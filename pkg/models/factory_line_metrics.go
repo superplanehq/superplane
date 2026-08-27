@@ -25,10 +25,10 @@ type ClosedWorkOrderMetricRow struct {
 // Work orders with no executions are excluded. Close time is the latest
 // order.status.updated event with toState=closed, not updated_at.
 //
-// A row is merged when the work order result is completed, or when a PR
-// artifact is stamped merged (merged_at, data.state=merged, or GitHub-native
-// data.merged=true). Merge time is the artifact merged_at, or the close
-// event when that stamp is missing.
+// A row is merged when the work order result is completed, or when a
+// factory pull request is stamped merged (merged_at or state=merged).
+// Merge time is the pull request merged_at, or the close event when that
+// stamp is missing.
 func ListClosedWorkOrderMetricRows(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time) ([]ClosedWorkOrderMetricRow, error) {
 	var rows []ClosedWorkOrderMetricRow
 	err := tx.Raw(listClosedWorkOrderMetricRowsSQL,
@@ -37,9 +37,8 @@ func ListClosedWorkOrderMetricRows(tx *gorm.DB, factoryID uuid.UUID, from, to ti
 		FactoryWorkOrderStateClosed,
 		factoryID,
 		factoryID,
-		PrArtifactStateMerged,
+		FactoryPullRequestStateMerged,
 		factoryID,
-		FactoryWorkOrderArtifactTypePR,
 		FactoryWorkOrderResultCompleted,
 		FactoryWorkOrderResultCompleted,
 		factoryID,
@@ -90,17 +89,15 @@ execution_stats AS (
 ),
 merged_pr AS (
 	SELECT
-		a.work_order_id,
+		p.work_order_id,
 		BOOL_OR(
-			a.merged_at IS NOT NULL
-			OR COALESCE(a.data->>'state', '') = ?
-			OR LOWER(COALESCE(a.data->>'merged', '')) = 'true'
+			p.merged_at IS NOT NULL
+			OR p.state = ?
 		) AS merged,
-		MIN(a.merged_at) AS merged_at
-	FROM factory_work_order_artifacts a
-	WHERE a.factory_id = ?
-		AND a.type = ?
-	GROUP BY a.work_order_id
+		MIN(p.merged_at) AS merged_at
+	FROM factory_pull_requests p
+	WHERE p.factory_id = ?
+	GROUP BY p.work_order_id
 )
 SELECT
 	le.line_id,

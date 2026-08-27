@@ -1,4 +1,4 @@
-import type { FactoriesFactoryIntakeRun, FactoryIntakeSettings } from "@/api-client";
+import type { FactoriesFactoryIntakeRun, FactoriesFactoryIntakeSettings } from "@/api-client";
 import { formatTimeAgo } from "@/lib/date";
 
 export type IntakeListenMode = "listen" | "schedule";
@@ -202,7 +202,7 @@ export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): Inta
   return { ...draft, name, confidencePct };
 }
 
-export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSettings | undefined): IntakeSourceSettings {
+export function intakeSettingsFromApi(name: string, settings: FactoriesFactoryIntakeSettings | undefined): IntakeSourceSettings {
   return {
     name,
     listenMode: "listen",
@@ -213,7 +213,7 @@ export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSetti
   };
 }
 
-export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryIntakeSettings {
+export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
   return {
     confidencePct: settings.confidencePct,
     labels: settings.labels,
@@ -227,7 +227,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryInta
   };
 }
 
-function assignmentFromApi(assignment: FactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
+function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
   if (assignment === "ASSIGNMENT_ASSIGNED") {
     return "assigned";
   }

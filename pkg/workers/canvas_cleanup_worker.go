@@ -284,6 +284,10 @@ func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) 
 		return nil, nil, fmt.Errorf("delete factory intakes: %w", err)
 	}
 
+	if err := models.DeleteFactoryPRFeedbackHandlersByCanvas(tx, canvas.ID); err != nil {
+		return nil, nil, fmt.Errorf("delete factory PR feedback handlers: %w", err)
+	}
+
 	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
 		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
 	}

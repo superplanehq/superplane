@@ -56,6 +56,23 @@ function artifactNames(artifacts: Array<{ data?: Record<string, unknown> }> | un
   });
 }
 
+function outputNames(
+  phase:
+    | {
+        artifacts?: Array<{ data?: Record<string, unknown> }>;
+        stream?: Array<{ pullRequest?: { number?: string | number } }>;
+      }
+    | undefined,
+): string[] {
+  const fromPullRequests = (phase?.stream ?? []).flatMap((line) => {
+    const number = String(line.pullRequest?.number ?? "")
+      .replace(/^#/, "")
+      .trim();
+    return number ? [`#${number}`] : [];
+  });
+  return [...artifactNames(phase?.artifacts), ...fromPullRequests];
+}
+
 describe("splitRunFixtureForWorkOrder", () => {
   it("uses the designed running fixture when the order is missing", () => {
     const fixture = splitRunFixtureForWorkOrder();
@@ -109,12 +126,12 @@ describe("splitRunFixtureForWorkOrder", () => {
     });
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
       name: "Confidence score",
       score: 4,
     });
-    expect(artifactNames(implement?.artifacts)).toEqual(["feature/rf-103", "#503"]);
+    expect(outputNames(implement)).toEqual(["feature/rf-103", "#503"]);
   });
 
   it("keeps a single Backlog ingest row on an ingest draft", () => {
@@ -137,7 +154,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     });
     expect(fixture.checks[0]?.analysis).toContain("The automation read this GitHub issue.");
     expect(fixture.checks[0]?.analysis).toContain("how suitable the work is for an agent");
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
   });
 
   it("narrates source, plan, and confidence reasons on a scored draft footer", () => {
@@ -166,9 +183,9 @@ describe("splitRunFixtureForWorkOrder", () => {
       }),
     );
     expect(fixture.footerTone).toBe("waiting");
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Listening for user review"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
-    expect(fixture.footer.note?.headline).toBe("Listening for user review");
+    expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
@@ -662,7 +679,7 @@ describe("splitRunFixtureForWorkOrder", () => {
 
   it("omits invented files and ledger pull requests for a live order", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false });
-    const names = fixture.phases.flatMap((phase) => artifactNames(phase.artifacts));
+    const names = fixture.phases.flatMap((phase) => outputNames(phase));
 
     expect(names).not.toContain("merge-screenshot.png");
     expect(names).not.toContain("closure.md");
@@ -677,31 +694,22 @@ describe("line board work-order examples", () => {
   it("keeps a plan, a branch, and a pull request on the running GitHub implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-103",
-      "#503",
-    ]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-103", "#503"]);
   });
 
   it("keeps ingest analysis, a branch, and a pull request on the approval implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(APPROVAL_WORK_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-109",
-      "#509",
-    ]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-109", "#509"]);
   });
 
   it("keeps ingest analysis, a branch, and a pull request on the failed implement card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual(["ingest", "analyze", "plan", "score", "implement-0"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-106",
-      "#506",
-    ]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-106", "#506"]);
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
   });
@@ -716,12 +724,9 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-102",
-      "#502",
-    ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-102", "#502"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
       "Risk score",
       "Code quality",
@@ -752,17 +757,158 @@ describe("line board work-order examples", () => {
       "implement-0",
       "verify-1",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual([
       "feature/rf-104",
       "#6812",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
       "Risk score",
       "Code quality",
     ]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
+  });
+
+  it("hides the waiting review note while a PR feedback run is active", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-9",
+            canvasId: "canvas-fb",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.note?.headline).not.toBe("Addressing PR feedback");
+    expect(fixture.waitingNotes.map((note) => note.headline)).not.toContain("Waiting for user review");
+  });
+
+  it("appends matching PR feedback runs after line steps, oldest first", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          handlerName: "Address PR feedback",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-new",
+            canvasId: "canvas-fb",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+            updatedAt: "2026-08-26T12:00:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-fb",
+          handlerName: "Address PR feedback",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-old",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
+    });
+    const feedback = fixture.phases.filter((phase) => phase.id.startsWith("pr-feedback-"));
+
+    expect(feedback.map((phase) => phase.id)).toEqual(["pr-feedback-run-old", "pr-feedback-run-new"]);
+    expect(feedback[0]).toMatchObject({
+      name: "Address feedback on PR #6812",
+      status: "passed",
+      appId: "canvas-fb",
+      runId: "run-old",
+      componentName: "Address PR feedback",
+    });
+    expect(feedback[1]).toMatchObject({
+      name: "Address feedback on PR #6812",
+      status: "running",
+      appId: "canvas-fb",
+      runId: "run-new",
+    });
+    expect(fixture.phases.at(-1)?.id).toBe("pr-feedback-run-new");
+    expect(fixture.currentPhaseId).toBe("pr-feedback-run-new");
+    expect(fixture.openPhaseId).toBe("pr-feedback-run-new");
+  });
+
+  it("uses the linked run description as the PR feedback phase name", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          handlerName: "Address PR feedback",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-comment",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+            description: "Please add tests for the retry path.",
+          },
+        },
+      ],
+    });
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-comment")).toMatchObject({
+      name: "Please add tests for the retry path.",
+    });
+  });
+
+  it("leaves line-step current phase when PR feedback runs already finished", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-done",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.some((phase) => phase.id === "pr-feedback-run-done")).toBe(true);
+    expect(fixture.currentPhaseId).not.toMatch(/^pr-feedback-/);
+    expect(fixture.openPhaseId).toBeUndefined();
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
+    expect(fixture.footer.attentionCard).toBe(true);
+  });
+
+  it("uses the canvas run span for PR feedback phase duration", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          pullRequestNumber: "6812",
+          run: {
+            id: "run-span",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-span")?.duration).toBe("5m");
   });
 
   it("keeps ingest analysis and the merged receipts pull request on the done card", () => {
@@ -776,17 +922,14 @@ describe("line board work-order examples", () => {
       "verify-1",
       "done-2",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-88",
-      "#510",
-    ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-88", "#510"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
     expect(fixture.phases.find((phase) => phase.id === "verify-1")?.checks?.map((check) => check.name)).toEqual([
       "Risk score",
       "Code quality",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#510"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#510"]);
   });
 
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
@@ -800,15 +943,12 @@ describe("line board work-order examples", () => {
       "verify-1",
       "done-2",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-112",
-      "#512",
-    ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "verify-1")?.artifacts)).toEqual([]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["#512"]);
-    expect(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts[0]?.data).toMatchObject({
-      state: "closed",
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-112", "#512"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "verify-1"))).toEqual([]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#512"]);
+    expect(fixture.phases.find((phase) => phase.id === "done-2")?.stream[0]?.pullRequest).toMatchObject({
+      state: "STATE_CLOSED",
     });
   });
 
@@ -823,12 +963,9 @@ describe("line board work-order examples", () => {
       "verify-1",
       "done-2",
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implement-0")?.artifacts)).toEqual([
-      "feature/rf-113",
-      "#513",
-    ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "done-2")?.artifacts)).toEqual(["notes.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-113", "#513"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["notes.md"]);
   });
 
   it("keeps a completed notify log on the extra implement card", () => {
@@ -863,11 +1000,9 @@ describe("line board work-order examples", () => {
         "1m 26s",
       ],
     ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "backlog")?.artifacts)).toEqual([
-      "description.md",
-    ]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "planning-0")?.artifacts)).toEqual(["PLAN.md"]);
-    expect(artifactNames(fixture.phases.find((phase) => phase.id === "implementation-1")?.artifacts)).toEqual([
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "backlog"))).toEqual(["description.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "planning-0"))).toEqual(["PLAN.md"]);
+    expect(outputNames(fixture.phases.find((phase) => phase.id === "implementation-1"))).toEqual([
       "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9",
     ]);
     const prStream = fixture.phases.find((phase) => phase.id === "pr-creation-2")?.stream ?? [];
@@ -877,12 +1012,12 @@ describe("line board work-order examples", () => {
       ["19:51:17", "Run Claude Code", "Generate PR title and description", "passed"],
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
-      ["19:52:39", "Add Work Order Artifact", "Attach PR to Work Order", "passed"],
+      ["19:52:39", "Add Pull Request", "Attach PR to Work Order", "passed"],
       ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
     ]);
-    expect(prStream.find((line) => line.componentName === "Attach PR to Work Order")?.artifact?.data).toMatchObject({
-      number: 6837,
-      state: "merged",
+    expect(prStream.find((line) => line.componentName === "Attach PR to Work Order")?.pullRequest).toMatchObject({
+      number: "6837",
+      state: "STATE_MERGED",
       url: "https://github.com/superplanehq/superplane/pull/6837",
     });
     const verifyStream = fixture.phases.find((phase) => phase.id === "ci-loop-3")?.stream ?? [];

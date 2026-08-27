@@ -1,14 +1,16 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { useWorkOrderEventsMock, useWorkOrderArtifactsMock } = vi.hoisted(() => ({
+const { useWorkOrderEventsMock, useWorkOrderArtifactsMock, useFactoryPullRequestsMock } = vi.hoisted(() => ({
   useWorkOrderEventsMock: vi.fn(),
   useWorkOrderArtifactsMock: vi.fn(),
+  useFactoryPullRequestsMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: useWorkOrderEventsMock,
   useWorkOrderArtifacts: useWorkOrderArtifactsMock,
+  useFactoryPullRequests: useFactoryPullRequestsMock,
 }));
 
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
@@ -29,7 +31,7 @@ describe("useSplitRunStreamArtifacts", () => {
                 timestamp: "2026-08-24T16:32:18.000Z",
                 event: {
                   automation: { nodeId: "add-pr" },
-                  artifact: { id: "art-pr-1", type: "pr", data: { state: "open" } },
+                  artifact: { id: "art-branch-1", type: "branch", data: { name: "feature/retry" } },
                 },
               },
             ],
@@ -38,21 +40,23 @@ describe("useSplitRunStreamArtifacts", () => {
       },
     });
     useWorkOrderArtifactsMock.mockReturnValue({
-      data: [{ id: "art-pr-1", type: "TYPE_PR", data: { state: "merged", number: 482 } }],
+      data: [{ id: "art-branch-1", type: "TYPE_BRANCH", data: { name: "feature/retry-v2" } }],
     });
+    useFactoryPullRequestsMock.mockReturnValue({ data: [] });
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", "order-1"));
 
     expect(result.current.byNodeId.get("add-pr")).toEqual({
-      id: "art-pr-1",
-      type: "TYPE_PR",
-      data: { state: "merged", number: 482 },
+      id: "art-branch-1",
+      type: "TYPE_BRANCH",
+      data: { name: "feature/retry-v2" },
     });
   });
 
   it("returns an empty index when the order id is missing", () => {
     useWorkOrderEventsMock.mockReturnValue({ data: { pages: [] } });
     useWorkOrderArtifactsMock.mockReturnValue({ data: [] });
+    useFactoryPullRequestsMock.mockReturnValue({ data: [] });
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", undefined));
 

@@ -583,6 +583,34 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
 }
 
+func (o *FactoryWorkOrder) RecordPullRequestAdded(
+	tx *gorm.DB,
+	pullRequest *factory.PullRequestRef,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+) error {
+	return o.recordEvent(tx, factory.EventTypeOrderPullRequestAdded, factory.WorkOrderPullRequestAdded{
+		Order:       o.Ref(),
+		PullRequest: pullRequest,
+		Automation:  automation,
+		Run:         run,
+	})
+}
+
+func (o *FactoryWorkOrder) RecordPullRequestUpdated(
+	tx *gorm.DB,
+	pullRequest *factory.PullRequestRef,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+) error {
+	return o.recordEvent(tx, factory.EventTypeOrderPullRequestUpdated, factory.WorkOrderPullRequestUpdated{
+		Order:       o.Ref(),
+		PullRequest: pullRequest,
+		Automation:  automation,
+		Run:         run,
+	})
+}
+
 func (o *FactoryWorkOrder) RecordAssigneesUpdated(
 	tx *gorm.DB,
 	updatedBy uuid.UUID,

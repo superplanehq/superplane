@@ -283,8 +283,8 @@ spec:
 
   it("rewrites Claude Code nodes to an OpenRouter integration", () => {
     const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-pr"),
-      canvasName: "Verify",
+      definition: getFactoryDefinition("line-implementation"),
+      canvasName: "Implement",
       canvasId: "canvas-or-byok",
       installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
       integrations: {

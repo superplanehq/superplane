@@ -390,3 +390,60 @@ describe("WorkOrderCard scores", () => {
     expect(tip).toHaveTextContent("4/5");
   });
 });
+
+describe("WorkOrderCard attention", () => {
+  const waitingOrder: FactoriesWorkOrder = {
+    id: "wo-waiting",
+    number: "12",
+    title: "Ship refund retries",
+    state: "STATE_OPEN",
+    createdAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2024-06-02T00:00:00Z",
+    statusNotes: [{ key: "pr-closure", headline: "Waiting for user review", body: "Tag the agent." }],
+    lineDispatches: [],
+    assignees: [],
+  };
+
+  const cardProps = {
+    organizationId,
+    factoryKey,
+    factoryLines: [{ id: "line-a", name: "hotfix" }] as FactoriesFactoryLine[],
+    canDispatch: true,
+    canAssign: true,
+    dispatchingOrderIds: new Set<string>(),
+    isAssigneesSaving: false,
+    onDispatch: vi.fn(),
+    onAssigneesSave: vi.fn(),
+    onOpen: vi.fn(),
+  };
+
+  it("shows Waiting for user review when the work order has a status note", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard entry={buildWorkOrderListEntry(waitingOrder, factory)} {...cardProps} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
+    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+  });
+
+  it("shows Addressing user feedback when a PR-feedback run is active", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+  });
+});

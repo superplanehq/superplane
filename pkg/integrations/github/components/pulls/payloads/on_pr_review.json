@@ -1,0 +1,43 @@
+{
+  "data": {
+    "action": "submitted",
+    "pull_request": {
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42",
+      "number": 42,
+      "title": "Rename the game title to Snake Toy",
+      "head": {
+        "ref": "feat/rename-title",
+        "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      }
+    },
+    "repository": {
+      "full_name": "acme-labs/snaketoy",
+      "name": "snaketoy"
+    },
+    "review": {
+      "body": "Please address the inline comments @superplaneagent",
+      "html_url": "https://github.com/acme-labs/snaketoy/pull/42#pullrequestreview-987654321",
+      "id": 987654321,
+      "state": "changes_requested",
+      "user": {
+        "login": "jules-ramirez",
+        "type": "User"
+      }
+    },
+    "review_comments": [
+      {
+        "body": "Small nit: could we also update the page heading to match the new title?",
+        "html_url": "https://github.com/acme-labs/snaketoy/pull/42#discussion_r3179045528",
+        "id": 3179045528,
+        "path": "index.html",
+        "line": 6,
+        "user": {
+          "login": "jules-ramirez",
+          "type": "User"
+        }
+      }
+    ]
+  },
+  "timestamp": "2026-02-25T18:22:21.000000000Z",
+  "type": "github.prReview"
+}

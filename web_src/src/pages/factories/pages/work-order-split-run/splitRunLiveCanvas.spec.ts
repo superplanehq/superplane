@@ -242,11 +242,11 @@ describe("resolveSplitRunVisual", () => {
       .map((line) => line.artifact)
       .filter((artifact) => artifact?.type === "TYPE_BRANCH")
       .map((artifact) => artifact?.data?.name);
-    const pullRequests = (visual.stream ?? []).filter((line) => line.artifact?.type === "TYPE_PR");
+    const pullRequests = (visual.stream ?? []).filter((line) => line.pullRequest);
 
     expect(branches).toEqual(["feature/rf-103"]);
     expect(pullRequests).toHaveLength(1);
-    expect(pullRequests[0]?.artifact?.data).toMatchObject({ number: 503 });
+    expect(pullRequests[0]?.pullRequest).toMatchObject({ number: "503" });
   });
 
   it("does not copy demo YAML artifacts onto a live stream", () => {

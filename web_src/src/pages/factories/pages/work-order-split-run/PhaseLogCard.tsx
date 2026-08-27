@@ -2,7 +2,7 @@ import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, Loader2, Maximize2, Pencil } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/components/Link/link";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
@@ -10,6 +10,7 @@ import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLog
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
+import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
 import { logStatusTimeLabel, runningSpinnerFrame, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
@@ -80,6 +81,7 @@ type StreamNodeGroup = {
   line: SplitRunStreamLine;
   notes: SplitRunStreamLine[];
   artifact?: FactoriesWorkOrderArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
 };
 
 export function toolCallSummary(tools: Array<{ type?: string; componentType?: string }>): string {
@@ -180,6 +182,7 @@ export function groupSplitRunStream(lines: SplitRunStreamLine[]): StreamNodeGrou
       line,
       notes: notesByNode.get(line.nodeId ?? "") ?? [],
       artifact: line.artifact,
+      pullRequest: line.pullRequest,
     }));
 }
 
@@ -207,6 +210,29 @@ function artifactsProducedBySteps(
     }
   }
   return produced.length > 0 ? produced : fallback;
+}
+
+function pullRequestsProducedBySteps(groups: StreamNodeGroup[]): FactoriesFactoryPullRequest[] {
+  const produced: FactoriesFactoryPullRequest[] = [];
+  const seen = new Set<string>();
+  const add = (pullRequest?: FactoriesFactoryPullRequest) => {
+    if (!pullRequest) {
+      return;
+    }
+    const key = pullRequest.id ?? pullRequest.url ?? String(pullRequest.number ?? "");
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    produced.push(pullRequest);
+  };
+  for (const group of groups) {
+    add(group.pullRequest);
+    for (const note of group.notes) {
+      add(note.pullRequest);
+    }
+  }
+  return produced;
 }
 
 /**
@@ -308,6 +334,7 @@ export function PhaseLogCard({
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
+  const producedPullRequests = pullRequestsProducedBySteps(groups);
   const rootRef = useRef<HTMLDivElement>(null);
   useLastRunningLine(rootRef, phase.status === "running");
 
@@ -340,6 +367,7 @@ export function PhaseLogCard({
           expanded={expanded}
           collapsible={collapsible}
           producedArtifacts={producedArtifacts}
+          producedPullRequests={producedPullRequests}
           onToggle={onToggle}
           onStop={onStop}
           onRerun={onRerun}
@@ -375,6 +403,7 @@ function AutomationHeader({
   expanded,
   collapsible,
   producedArtifacts,
+  producedPullRequests,
   onToggle,
   onStop,
   onRerun,
@@ -386,6 +415,7 @@ function AutomationHeader({
   expanded: boolean;
   collapsible: boolean;
   producedArtifacts: FactoriesWorkOrderArtifact[];
+  producedPullRequests: FactoriesFactoryPullRequest[];
   onToggle?: () => void;
   onStop?: () => void;
   onRerun?: () => void;
@@ -420,11 +450,14 @@ function AutomationHeader({
         </div>
       )}
       {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
-      {producedArtifacts.length > 0 ? (
+      {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
         <span
           data-testid={`split-run-phase-artifacts-${phase.id}`}
           className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
         >
+          {producedPullRequests.map((pullRequest) => (
+            <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
+          ))}
           {producedArtifacts.map((artifact) => (
             <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
           ))}
@@ -562,7 +595,7 @@ function StreamNode({
   organizationId?: string;
   canvasId?: string;
 }) {
-  const { line, notes, artifact } = group;
+  const { line, notes, artifact, pullRequest } = group;
   const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
   const steps = groupClaudeSteps(liveNotes ?? notes);
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
@@ -574,6 +607,7 @@ function StreamNode({
         hasChildren={hasChildren}
         highlighted={highlighted}
         artifact={artifact}
+        pullRequest={pullRequest}
         onSelect={onSelect}
       />
       {hasChildren ? (
@@ -592,12 +626,14 @@ function StreamNodeHeader({
   hasChildren,
   highlighted,
   artifact,
+  pullRequest,
   onSelect,
 }: {
   line: SplitRunStreamLine;
   hasChildren: boolean;
   highlighted: boolean;
   artifact?: FactoriesWorkOrderArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
   onSelect?: (nodeId: string) => void;
 }) {
   const name = (
@@ -648,6 +684,7 @@ function StreamNodeHeader({
         </div>
       )}
       <span className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+        {pullRequest ? <StreamPullRequest pullRequest={pullRequest} /> : null}
         {artifact ? <StreamArtifact artifact={artifact} /> : null}
         <StreamDuration line={line} />
       </span>
@@ -843,6 +880,10 @@ function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) 
       }}
     />
   );
+}
+
+function StreamPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRequest }) {
+  return <WorkOrderPullRequestInline className={cn(LOG_FACE, "font-bold tracking-normal")} pullRequest={pullRequest} />;
 }
 
 function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: string }) {

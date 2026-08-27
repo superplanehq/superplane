@@ -79,6 +79,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
+  useFactoryPullRequests: () => ({ data: [] }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -103,6 +104,10 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
   }),
+}));
+
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({

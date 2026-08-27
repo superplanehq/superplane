@@ -80,6 +80,26 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "canvas already implements an intake")
 	case errors.Is(err, models.ErrFactoryIntakeCanvasRequired):
 		return grpcerrors.InvalidArgument(err, "intake canvas is required")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerNotFound):
+		return grpcerrors.NotFound(err, "factory PR feedback handler not found")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerSubjectInvalid):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler subject is not supported")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerSourceInvalid):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler source is not supported")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasInUse):
+		return grpcerrors.AlreadyExists(err, "canvas already implements a PR feedback handler")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasRequired):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler canvas is required")
+	case errors.Is(err, models.ErrFactoryPullRequestNotFound):
+		return grpcerrors.NotFound(err, "factory pull request not found")
+	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
+		return grpcerrors.AlreadyExists(err, "factory pull request already exists")
+	case errors.Is(err, models.ErrFactoryPullRequestRunAlreadyLinked):
+		return grpcerrors.FailedPrecondition(err, "run is already linked to a different pull request")
+	case errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete):
+		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):

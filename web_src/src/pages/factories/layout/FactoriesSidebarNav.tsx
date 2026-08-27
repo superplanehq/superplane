@@ -1,14 +1,16 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromLine, Gauge, Kanban, Settings } from "lucide-react";
+import { ArrowRightFromLine, Gauge, Kanban, MessageSquare, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   factoryHomePath,
   factoryIntakePath,
+  factoryPRFeedbackPath,
   factorySettingsPath,
   factoryVelocityPath,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
 } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
@@ -52,7 +54,7 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: intake drawer on the line board,
+ * Icon rail under the workspace switcher: intake drawer, PR feedback,
  * the line board, velocity, then settings.
  */
 export function FactoriesSidebarNav({
@@ -65,11 +67,14 @@ export function FactoriesSidebarNav({
   const { pathname, search } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const intakeOpen = isIntakeSearchOpen(search);
+  const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const intakeHref = intakeOpen ? boardHref : factoryIntakePath(organizationId, factoryKey, lineId);
+  const prFeedbackHref = prFeedbackOpen ? boardHref : factoryPRFeedbackPath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
   const settingsHref = factorySettingsPath(organizationId, factoryKey);
   const intakeCurrent = intakeOpen;
-  const boardCurrent = isBoardPath(pathname) && !intakeOpen;
+  const prFeedbackCurrent = prFeedbackOpen;
+  const boardCurrent = isBoardPath(pathname) && !intakeOpen && !prFeedbackOpen;
   const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
 
@@ -81,6 +86,13 @@ export function FactoriesSidebarNav({
         Icon={ArrowRightFromLine}
         testId="factories-nav-intake"
         isCurrent={intakeCurrent}
+      />
+      <RailNavLink
+        to={prFeedbackHref}
+        label="PR feedback"
+        Icon={MessageSquare}
+        testId="factories-nav-pr-feedback"
+        isCurrent={prFeedbackCurrent}
       />
       <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
       <RailNavLink
