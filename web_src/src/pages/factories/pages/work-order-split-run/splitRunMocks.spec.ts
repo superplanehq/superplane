@@ -107,7 +107,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       appId: "app-refund-implementer",
       runId: RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id,
     });
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
     expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
     expect(artifactNames(fixture.phases.find((phase) => phase.id === "plan")?.artifacts)).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
@@ -149,7 +149,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -170,7 +170,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Listening for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -191,7 +191,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("A person must act");
     expect(fixture.footer.attentionCard).toBeUndefined();
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -569,7 +569,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -657,7 +657,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("Start this work order");
     expect(fixture.footer.note?.text).toContain("A person created this work order manually.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
