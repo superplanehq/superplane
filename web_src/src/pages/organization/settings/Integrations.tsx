@@ -31,6 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { analytics } from "@/lib/analytics";
 import { isCapabilityBasedIntegrationDefinition, usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { GitHubConnectControls } from "./GitHubConnectControls";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { cn } from "@/lib/utils";
 import { getNextIntegrationName } from "./components/IntegrationSetup/lib";
@@ -502,27 +503,40 @@ function IntegrationsLoaded(props: {
                       ) : null}
                     </div>
                   </div>
-                  <PermissionTooltip
-                    allowed={Boolean(item.integrationDef) && (canCreateIntegrations || permissionsLoading)}
-                    message={
-                      item.integrationDef
-                        ? "You don't have permission to connect integrations."
-                        : "This integration provider is no longer available for new connections."
-                    }
-                  >
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => {
+                  {usesHostedGitHubAppInstall(item.integrationDef) ? (
+                    <GitHubConnectControls
+                      organizationId={organizationId}
+                      definition={item.integrationDef}
+                      canCreateIntegrations={canCreateIntegrations}
+                      permissionsLoading={permissionsLoading}
+                      onConnect={() => {
                         if (!item.integrationDef) return;
                         onConnectClick(item.integrationDef);
                       }}
-                      className="self-start"
-                      disabled={!item.integrationDef || !canCreateIntegrations}
+                    />
+                  ) : (
+                    <PermissionTooltip
+                      allowed={Boolean(item.integrationDef) && (canCreateIntegrations || permissionsLoading)}
+                      message={
+                        item.integrationDef
+                          ? "You don't have permission to connect integrations."
+                          : "This integration provider is no longer available for new connections."
+                      }
                     >
-                      {item.integrationDef ? "Connect" : "Unavailable"}
-                    </Button>
-                  </PermissionTooltip>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          if (!item.integrationDef) return;
+                          onConnectClick(item.integrationDef);
+                        }}
+                        className="self-start"
+                        disabled={!item.integrationDef || !canCreateIntegrations}
+                      >
+                        {item.integrationDef ? "Connect" : "Unavailable"}
+                      </Button>
+                    </PermissionTooltip>
+                  )}
                 </div>
                 {item.instances.length > 0 ? (
                   <div className="pr-4 pb-4 pl-[60px]">
