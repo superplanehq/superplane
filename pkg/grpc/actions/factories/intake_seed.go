@@ -20,10 +20,6 @@ const (
 	// intakeSeedSize is how many items a new intake analyzes at once.
 	intakeSeedSize = 5
 
-	// intakeSeedPageSize reads more than the seed size because GitHub answers
-	// the issue endpoint with pull requests too, and those are dropped.
-	intakeSeedPageSize = 30
-
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
 	intakeGitHubIssuePayloadType = "github.issue"
@@ -86,34 +82,20 @@ func newestGitHubIssueEvents(
 	repository string,
 	limit int,
 ) ([]map[string]any, error) {
-	issues, _, err := client.ListIssues(ctx, repository, &github.IssueListByRepoOptions{
-		State:       "open",
-		Sort:        "created",
-		Direction:   "desc",
-		ListOptions: github.ListOptions{PerPage: intakeSeedPageSize},
-	})
-
+	issues, err := client.ListNewestOpenIssues(ctx, repository, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list the issues of %s: %w", repository, err)
 	}
 
-	return gitHubIssueEvents(issues, repository, limit)
+	return gitHubIssueEvents(issues, repository)
 }
 
-// gitHubIssueEvents keeps the first issues of a newest-first page and shapes
-// each one like the webhook body the trigger would have delivered, so the rest
-// of the graph cannot tell a seeded item from a received one.
-func gitHubIssueEvents(issues []*github.Issue, repository string, limit int) ([]map[string]any, error) {
-	events := make([]map[string]any, 0, limit)
+// gitHubIssueEvents shapes each issue of a newest-first page like the webhook
+// body the trigger would have delivered, so the rest of the graph cannot tell a
+// seeded item from a received one.
+func gitHubIssueEvents(issues []*github.Issue, repository string) ([]map[string]any, error) {
+	events := make([]map[string]any, 0, len(issues))
 	for _, issue := range issues {
-		if len(events) == limit {
-			break
-		}
-
-		if issue == nil || issue.IsPullRequest() {
-			continue
-		}
-
 		event, err := gitHubIssueEvent(issue, repository)
 		if err != nil {
 			return nil, err
