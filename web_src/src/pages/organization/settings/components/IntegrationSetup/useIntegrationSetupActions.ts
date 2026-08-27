@@ -6,6 +6,7 @@ import type {
   IntegrationSetupRoute,
   IntegrationSetupState,
 } from "./useIntegrationSetupController";
+import { privateGitHubAppCreateConfiguration } from "@/lib/privateGitHubApp";
 import { showErrorToast } from "@/lib/toast";
 import { getGroupToggleState } from "./lib";
 import type { IntegrationSetupStepDefinitionType } from "@/api-client";
@@ -60,9 +61,11 @@ function useCreateIntegrationHandler({ route, state, mutations }: CreateIntegrat
     }
 
     try {
+      const configuration = privateGitHubAppCreateConfiguration(route.integrationName);
       const response = await mutations.createMutation.mutateAsync({
         integrationName: route.integrationName,
         name: trimmedName,
+        ...(configuration ? { configuration } : {}),
       });
       state.setCreatedIntegration(response.data?.integration || null);
       state.setStepInputs({});
