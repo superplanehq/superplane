@@ -36,6 +36,8 @@ describe("FactoryAppSplitRunPage", () => {
     expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
     expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
     expect(within(page).getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpy-\d/);
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpt-\d/);
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
     expect(within(page).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
