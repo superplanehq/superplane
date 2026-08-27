@@ -1,5 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
@@ -205,39 +207,73 @@ describe("PhaseLogCard title line", () => {
     expect(card?.className).toMatch(/\bbg-card\b/);
     expect(card?.className).not.toMatch(/\bbg-muted\b/);
   });
+
+  it("keeps produced artifacts on the title line when the phase is expanded", () => {
+    render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          artifacts: [
+            {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          ],
+        }}
+        expanded
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-phase-plan");
+    expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(within(row).queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+  });
 });
 
-describe("PhaseLogCard edit control", () => {
+describe("PhaseLogCard phase actions", () => {
+  const RUN_HREF = "/org-1/workspaces/RF/apps/app-refund-planner/split-run?run=run-1";
+  const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-planner?configure=1";
+
+  function renderCard(ui: ReactElement) {
+    return render(<MemoryRouter>{ui}</MemoryRouter>);
+  }
+
   it("stays off collapsed phases", () => {
-    render(<PhaseLogCard phase={PHASE} expanded={false} onEdit={vi.fn()} />);
+    renderCard(<PhaseLogCard phase={PHASE} expanded={false} runHref={RUN_HREF} editHref={EDIT_HREF} />);
 
-    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
-  it("sits next to the name of an expanded phase", () => {
-    render(<PhaseLogCard phase={PHASE} expanded onEdit={vi.fn()} />);
+  it("puts View Automation Run and Edit Automation next to an expanded name", () => {
+    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} editHref={EDIT_HREF} />);
 
-    const edit = screen.getByTestId("split-run-phase-edit-plan");
-    expect(edit).toHaveAccessibleName("Edit Plan automation");
-    expect(edit.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+    const view = screen.getByRole("link", { name: "View Automation Run" });
+    const edit = screen.getByRole("link", { name: "Edit Automation" });
+    expect(view).toHaveAttribute("href", RUN_HREF);
+    expect(edit).toHaveAttribute("href", EDIT_HREF);
+    expect(view.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+    expect(edit.previousElementSibling).toBe(view);
   });
 
-  it("opens the automation editor without collapsing the phase", async () => {
-    const onEdit = vi.fn();
+  it("opens the run or canvas without collapsing the phase", async () => {
     const onToggle = vi.fn();
     const user = userEvent.setup();
-    render(<PhaseLogCard phase={PHASE} expanded onEdit={onEdit} onToggle={onToggle} />);
+    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} editHref={EDIT_HREF} onToggle={onToggle} />);
 
-    await user.click(screen.getByTestId("split-run-phase-edit-plan"));
+    await user.click(screen.getByRole("link", { name: "View Automation Run" }));
+    await user.click(screen.getByRole("link", { name: "Edit Automation" }));
 
-    expect(onEdit).toHaveBeenCalledTimes(1);
     expect(onToggle).not.toHaveBeenCalled();
   });
 
-  it("is absent when the log cannot edit automations", () => {
-    render(<PhaseLogCard phase={PHASE} expanded />);
+  it("is absent when the log has no run or canvas path", () => {
+    renderCard(<PhaseLogCard phase={PHASE} expanded />);
 
-    expect(screen.queryByTestId("split-run-phase-edit-plan")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 });
 

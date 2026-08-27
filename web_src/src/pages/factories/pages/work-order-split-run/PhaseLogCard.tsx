@@ -1,9 +1,10 @@
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight, Loader2, Pencil } from "lucide-react";
+import { ChevronRight, Loader2, Maximize2, Pencil } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -281,7 +282,8 @@ export function PhaseLogCard({
   onSelectNode,
   onStop,
   onRerun,
-  onEdit,
+  runHref,
+  editHref,
   actionBusy = false,
   collapsible = true,
   organizationId,
@@ -295,8 +297,11 @@ export function PhaseLogCard({
   onSelectNode?: (nodeId: string) => void;
   onStop?: () => void;
   onRerun?: () => void;
-  onEdit?: () => void;
   actionBusy?: boolean;
+  /** Full-screen run page with the log in the sidebar. */
+  runHref?: string;
+  /** Configure URL of the automation that owns the phase. */
+  editHref?: string;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -338,7 +343,8 @@ export function PhaseLogCard({
           onToggle={onToggle}
           onStop={onStop}
           onRerun={onRerun}
-          onEdit={onEdit}
+          runHref={runHref}
+          editHref={editHref}
           actionBusy={actionBusy}
         />
 
@@ -372,7 +378,8 @@ function AutomationHeader({
   onToggle,
   onStop,
   onRerun,
-  onEdit,
+  runHref,
+  editHref,
   actionBusy,
 }: {
   phase: SplitRunPhase;
@@ -382,7 +389,8 @@ function AutomationHeader({
   onToggle?: () => void;
   onStop?: () => void;
   onRerun?: () => void;
-  onEdit?: () => void;
+  runHref?: string;
+  editHref?: string;
   actionBusy: boolean;
 }) {
   return (
@@ -411,7 +419,7 @@ function AutomationHeader({
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </div>
       )}
-      {onEdit && expanded ? <PhaseEditButton phase={phase} onEdit={onEdit} /> : null}
+      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
       {producedArtifacts.length > 0 ? (
         <span
           data-testid={`split-run-phase-artifacts-${phase.id}`}
@@ -458,19 +466,28 @@ function automationAccent(status: SplitRunPhaseStatus): string {
   return "border-l-border";
 }
 
-/** Opens the automation editor for an expanded phase. */
-function PhaseEditButton({ phase, onEdit }: { phase: SplitRunPhase; onEdit: () => void }) {
+const PHASE_ACTION_PILL =
+  "inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+
+function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; runHref?: string; editHref?: string }) {
+  if (!runHref && !editHref) {
+    return null;
+  }
   return (
-    <button
-      type="button"
-      data-testid={`split-run-phase-edit-${phase.id}`}
-      aria-label={`Edit ${phase.name} automation`}
-      onClick={onEdit}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-    >
-      <Pencil className="size-2.5" aria-hidden />
-      Edit
-    </button>
+    <>
+      {runHref ? (
+        <Link href={runHref} data-testid={`split-run-phase-run-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Maximize2 className="size-2.5" aria-hidden />
+          View Automation Run
+        </Link>
+      ) : null}
+      {editHref ? (
+        <Link href={editHref} data-testid={`split-run-phase-edit-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Pencil className="size-2.5" aria-hidden />
+          Edit Automation
+        </Link>
+      ) : null}
+    </>
   );
 }
 
