@@ -101,6 +101,47 @@ func (s *OrganizationService) ListHostedLLMModels(
 	return organizations.ListHostedLLMModels(ctx, orgID, req)
 }
 
+func (s *OrganizationService) ListBYOKLLMModels(
+	ctx context.Context,
+	req *pb.ListBYOKLLMModelsRequest,
+) (*pb.ListBYOKLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListBYOKLLMModels(ctx, s.registry, orgID, req)
+}
+
+func (s *OrganizationService) UpdateBYOKLLMModels(
+	ctx context.Context,
+	req *pb.UpdateBYOKLLMModelsRequest,
+) (*pb.UpdateBYOKLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateBYOKLLMModels(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ListHostedCreditProducts(
+	ctx context.Context,
+	req *pb.ListHostedCreditProductsRequest,
+) (*pb.ListHostedCreditProductsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListHostedCreditProducts(ctx, orgID, req)
+}
+
+func (s *OrganizationService) CreateHostedCreditCheckout(
+	ctx context.Context,
+	req *pb.CreateHostedCreditCheckoutRequest,
+) (*pb.CreateHostedCreditCheckoutResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	accountID, _ := accountIDFromContext(ctx)
+	return organizations.CreateHostedCreditCheckout(ctx, orgID, req, accountID, s.baseURL)
+}
+
+func (s *OrganizationService) CreateBillingPortalSession(
+	ctx context.Context,
+	req *pb.CreateBillingPortalSessionRequest,
+) (*pb.CreateBillingPortalSessionResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.CreateBillingPortalSession(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
