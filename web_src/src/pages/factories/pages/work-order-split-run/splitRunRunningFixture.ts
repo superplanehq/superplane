@@ -149,6 +149,9 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       duration: "4m",
       componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
+      appId: "app-refund-implementer",
+      runId: LINE_RUN_IMPLEMENT_ID,
+      stepIndex: 0,
       stream: [
         {
           id: "impl-branch",
