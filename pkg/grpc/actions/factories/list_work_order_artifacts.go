@@ -97,8 +97,6 @@ func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.Use
 
 func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 	switch t {
-	case models.FactoryWorkOrderArtifactTypePR:
-		return pb.WorkOrderArtifact_TYPE_PR
 	case models.FactoryWorkOrderArtifactTypeMarkdown:
 		return pb.WorkOrderArtifact_TYPE_MARKDOWN
 	case models.FactoryWorkOrderArtifactTypeBranch:
@@ -112,8 +110,6 @@ func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {
 
 func artifactTypeFromProto(t pb.WorkOrderArtifact_Type) (string, bool) {
 	switch t {
-	case pb.WorkOrderArtifact_TYPE_PR:
-		return models.FactoryWorkOrderArtifactTypePR, true
 	case pb.WorkOrderArtifact_TYPE_MARKDOWN:
 		return models.FactoryWorkOrderArtifactTypeMarkdown, true
 	case pb.WorkOrderArtifact_TYPE_BRANCH:

@@ -22,9 +22,9 @@ func TestDescribeFactoryVelocity_WithoutRepository(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/1", models.PrArtifactStateMerged, now.Add(-1*time.Hour))
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/2", models.PrArtifactStateMerged, now.Add(-25*time.Hour))
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/3", models.PrArtifactStateClosed, now.Add(-2*time.Hour))
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/1", models.FactoryPullRequestStateMerged, now.Add(-1*time.Hour))
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/2", models.FactoryPullRequestStateMerged, now.Add(-25*time.Hour))
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/3", models.FactoryPullRequestStateClosed, now.Add(-2*time.Hour))
 
 	resp, err := DescribeFactoryVelocity(ctx, nil, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
 		FactoryId:  factoryModel.ID.String(),
@@ -103,8 +103,8 @@ func TestListKnownSuperPlanePRs_IncludesUntimestamped(t *testing.T) {
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/11", models.PrArtifactStateOpen, time.Time{})
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/12", models.PrArtifactStateMerged, time.Now())
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/11", models.FactoryPullRequestStateOpen, time.Time{})
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/12", models.FactoryPullRequestStateMerged, time.Now())
 
 	got, err := listKnownSuperPlanePRs(database.DB(t.Context()), factoryModel.ID)
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestDescribeFactoryVelocity_PeopleSearchFailedKeepsSuperPlaneCounts(t *test
 	require.NoError(t, err)
 
 	now := time.Now()
-	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/1", models.PrArtifactStateMerged, now.Add(-1*time.Hour))
+	seedPRArtifact(t, factoryModel, "https://github.com/example/repo/pull/1", models.FactoryPullRequestStateMerged, now.Add(-1*time.Hour))
 
 	resp, err := DescribeFactoryVelocity(ctx, nil, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
 		FactoryId:     factoryModel.ID.String(),
@@ -290,24 +290,23 @@ func TestAggregateTotals(t *testing.T) {
 	assert.Equal(t, int32(0), gotNoPeople.SuperplaneSharePct)
 }
 
-func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryWorkOrderArtifact {
+func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryPullRequest {
 	t.Helper()
 
 	order, err := factoryModel.CreateWorkOrder(database.DB(t.Context()), "PR order", "", nil, nil, nil)
 	require.NoError(t, err)
 
-	data := map[string]any{"url": url, "state": state}
-	if state == models.PrArtifactStateMerged {
-		data["mergedAt"] = at.UTC().Format(time.RFC3339)
+	params := models.FactoryPullRequestParams{
+		URL:   url,
+		State: state,
 	}
-	if state == models.PrArtifactStateClosed {
-		data["closedAt"] = at.UTC().Format(time.RFC3339)
+	if state == models.FactoryPullRequestStateMerged && !at.IsZero() {
+		params.MergedAt = &at
 	}
-	artifact, err := order.CreateArtifact(database.DB(t.Context()), models.FactoryWorkOrderArtifactParams{
-		Type: models.FactoryWorkOrderArtifactTypePR,
-		Data: data,
-		Key:  url,
-	})
+	if state == models.FactoryPullRequestStateClosed && !at.IsZero() {
+		params.ClosedAt = &at
+	}
+	pullRequest, err := order.CreatePullRequest(database.DB(t.Context()), params)
 	require.NoError(t, err)
-	return artifact
+	return pullRequest
 }

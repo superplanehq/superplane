@@ -1,5 +1,6 @@
 import type {
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
@@ -36,6 +37,9 @@ interface WorkOrderDetailLoadedViewProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  isPullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   /** Why the order is waiting, announced by automations. */
   statusNotes?: WorkOrderStatusNotePresentation[];
   /** Scores reported by automations (risk review, coverage, …). */
@@ -124,6 +128,7 @@ function WorkOrderDetailMainColumn({
   onLoadMoreEvents,
   onRetryEvents,
   artifacts,
+  pullRequests,
   statusNotes,
   checks,
   isChecksLoading,
@@ -202,6 +207,7 @@ function WorkOrderDetailMainColumn({
             onLoadMoreEvents={onLoadMoreEvents}
             onRetryEvents={onRetryEvents}
             artifacts={artifacts}
+            pullRequests={pullRequests}
             footer={
               <WorkOrderCommentComposer
                 organizationId={organizationId}
@@ -224,6 +230,9 @@ function WorkOrderDetailBodyAside({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  pullRequests,
+  isPullRequestsLoading,
+  pullRequestsError,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -247,6 +256,9 @@ function WorkOrderDetailBodyAside({
         artifacts={artifacts}
         isArtifactsLoading={isArtifactsLoading}
         artifactsError={artifactsError}
+        pullRequests={pullRequests}
+        isPullRequestsLoading={isPullRequestsLoading}
+        pullRequestsError={pullRequestsError}
         displayStatus={displayStatus}
         statusMeta={statusMeta}
         assigneeIds={assigneeIds}

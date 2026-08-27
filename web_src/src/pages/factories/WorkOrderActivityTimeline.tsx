@@ -1,13 +1,19 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
+} from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useMemo, type ReactNode } from "react";
-import { Clock, FileText, Gauge, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { Clock, FileText, Gauge, GitPullRequest, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
 import { buildLatestArtifactDataById } from "./lib/workOrderArtifact";
+import { indexPullRequestsById } from "./lib/workOrderPullRequest";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
@@ -22,6 +28,7 @@ import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
 import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
 import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
+import { PullRequestEventBody } from "./timeline/PullRequestEventBody";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
 import {
@@ -45,13 +52,12 @@ interface WorkOrderTimelineProps {
   onRetryEvents?: () => void;
   /**
    * Current artifacts list (from useWorkOrderArtifacts), used to overlay
-   * live data — e.g. a PR's current `state` — on top of each
-   * `artifactAdded` event's data snapshot, so the "attached" chip in the
-   * timeline doesn't go stale the moment the PR changes state. Falls
-   * back to the event's own snapshot when an artifact isn't found here
-   * (very old events beyond the artifacts list, or a deleted artifact).
+   * live data on `artifactAdded` event snapshots so chips do not go stale.
+   * Falls back to the event's own snapshot when an artifact isn't found here.
    */
   artifacts?: FactoriesWorkOrderArtifact[];
+  /** Live pull requests used to overlay state onto timeline chips. */
+  pullRequests?: FactoriesFactoryPullRequest[];
   /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
 }
@@ -68,12 +74,14 @@ export function WorkOrderActivityTimeline({
   onLoadMoreEvents,
   onRetryEvents,
   artifacts,
+  pullRequests,
   footer,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
+  const latestPullRequestById = useMemo(() => indexPullRequestsById(pullRequests), [pullRequests]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
@@ -100,6 +108,7 @@ export function WorkOrderActivityTimeline({
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
           latestArtifactDataById={latestArtifactDataById}
+          latestPullRequestById={latestPullRequestById}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -122,6 +131,7 @@ interface TimelineEventsListProps {
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -134,6 +144,7 @@ function TimelineEventsList({
   events,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -167,6 +178,7 @@ function TimelineEventsList({
               orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
               latestArtifactDataById={latestArtifactDataById}
+              latestPullRequestById={latestPullRequestById}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -232,6 +244,8 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "closed",
   "commented",
   "artifactAdded",
+  "pullRequestAdded",
+  "pullRequestUpdated",
 ];
 
 function TimelineItem({
@@ -241,6 +255,7 @@ function TimelineItem({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
@@ -249,6 +264,7 @@ function TimelineItem({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -259,6 +275,7 @@ function TimelineItem({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
+        latestPullRequestById={latestPullRequestById}
       />
     );
   }
@@ -281,6 +298,7 @@ function TimelineItem({
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
             latestArtifactDataById={latestArtifactDataById}
+            latestPullRequestById={latestPullRequestById}
           />
         </div>
       </div>
@@ -295,6 +313,7 @@ function TimelineItemBody({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -302,6 +321,7 @@ function TimelineItemBody({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -326,6 +346,17 @@ function TimelineItemBody({
         actorDisplay={actorDisplay}
         timeLabel={timeLabel}
         latestArtifactDataById={latestArtifactDataById}
+      />
+    );
+  }
+
+  if (event.kind === "pullRequestAdded" || event.kind === "pullRequestUpdated") {
+    return (
+      <PullRequestEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        latestPullRequestById={latestPullRequestById}
       />
     );
   }
@@ -451,6 +482,9 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
     case "artifactAdded":
       return FileText;
+    case "pullRequestAdded":
+    case "pullRequestUpdated":
+      return GitPullRequest;
     case "checkReported":
       return Gauge;
     case "queued":

@@ -12,7 +12,7 @@ import type {
   FactoriesFactoryIntakeRun,
   FactoriesFactoryIntakeSource,
   FactoriesWorkOrder,
-  FactoryIntakeSettings,
+  FactoriesFactoryIntakeSettings,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -108,7 +108,7 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { intakeId: string; name?: string; settings?: FactoryIntakeSettings }) => {
+    mutationFn: async (input: { intakeId: string; name?: string; settings?: FactoriesFactoryIntakeSettings }) => {
       const response = await factoriesUpdateFactoryIntake(
         withOrganizationHeader({
           organizationId,

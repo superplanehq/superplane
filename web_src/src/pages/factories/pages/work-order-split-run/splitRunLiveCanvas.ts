@@ -2,6 +2,7 @@ import type {
   CanvasesCanvas,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrderArtifact,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
@@ -363,9 +364,12 @@ export function resolveSplitRunVisual(
   const demoArtifacts = options?.demoArtifacts !== false;
   const lineCanvas = splitRunCanvasForPhase(phase);
   const lineStream = attachPhaseChecks(
-    attachPhaseArtifacts(
-      richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase), { demoArtifacts }),
-      demoArtifacts ? phase.artifacts : [],
+    attachPhasePullRequests(
+      attachPhaseArtifacts(
+        richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase), { demoArtifacts }),
+        demoArtifacts ? phase.artifacts : [],
+      ),
+      demoArtifacts ? pullRequestsFromPhase(phase) : [],
     ),
     phase.checks ?? [],
   );
@@ -433,6 +437,83 @@ function attachPhaseArtifacts(
     insertAt += 1;
   }
   return next;
+}
+
+function pullRequestsFromPhase(phase: SplitRunPhase): FactoriesFactoryPullRequest[] {
+  const seen = new Set<string>();
+  const pullRequests: FactoriesFactoryPullRequest[] = [];
+  for (const line of phase.stream) {
+    const pullRequest = line.pullRequest;
+    if (!pullRequest) {
+      continue;
+    }
+    const key = pullRequest.id ?? pullRequest.url ?? String(pullRequest.number ?? "");
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    pullRequests.push(pullRequest);
+  }
+  return pullRequests;
+}
+
+function attachPhasePullRequests(
+  stream: SplitRunStreamLine[],
+  pullRequests: FactoriesFactoryPullRequest[],
+): SplitRunStreamLine[] {
+  if (pullRequests.length === 0) {
+    return stream;
+  }
+  const queued = [...pullRequests];
+  const next = stream.map((line) => {
+    if (!line.pullRequest || queued.length === 0) {
+      return line;
+    }
+    return { ...line, pullRequest: queued.shift() };
+  });
+  if (queued.length === 0) {
+    return next;
+  }
+
+  const hostIndex = hostIndexForPullRequests(next);
+  if (hostIndex < 0) {
+    return next;
+  }
+
+  const host = next[hostIndex]!;
+  let insertAt = hostIndex + 1;
+  for (const [index, pullRequest] of queued.entries()) {
+    if (index === 0 && !host.pullRequest) {
+      next[hostIndex] = { ...host, pullRequest };
+      continue;
+    }
+    next.splice(insertAt, 0, {
+      id: `${host.id}-pull-request-${pullRequest.id ?? insertAt}`,
+      nodeId: host.nodeId,
+      at: host.at,
+      componentName: pullRequest.title ?? `#${pullRequest.number ?? ""}`,
+      status: host.status,
+      pullRequest,
+      note: true,
+    });
+    insertAt += 1;
+  }
+  return next;
+}
+
+function hostIndexForPullRequests(stream: SplitRunStreamLine[]): number {
+  const attachIndex = stream.findIndex((line) => line.nodeId === "attach-pr-artifact");
+  if (attachIndex >= 0) {
+    return attachIndex;
+  }
+  const branchIndex = stream.findIndex(
+    (line) =>
+      line.nodeId === "add-branch-artifact" || (line.artifact != null && artifactKind(line.artifact) === "branch"),
+  );
+  if (branchIndex >= 0) {
+    return branchIndex;
+  }
+  return stream.findIndex((line) => line.kind === "trigger");
 }
 
 function artifactKind(artifact: FactoriesWorkOrderArtifact): string {
