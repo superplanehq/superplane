@@ -153,6 +153,46 @@ describe("useCanvasState", () => {
     expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the open sidebar node selected through factory layout animation", () => {
+    const animationFrames = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 1;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      const frameId = nextFrameId++;
+      animationFrames.set(frameId, callback);
+      return frameId;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation((frameId) => {
+      animationFrames.delete(frameId);
+    });
+
+    const { result, rerender } = renderHook(({ props }: { props: CanvasPageProps }) => useCanvasState(props), {
+      initialProps: {
+        props: {
+          ...makeProps([makeNode("a", 0, 0)]),
+          layoutMode: "factory-auto" as const,
+          initialSidebar: { isOpen: true, nodeId: "a" },
+        } as unknown as CanvasPageProps,
+      },
+    });
+
+    expect(result.current.nodes.find((node) => node.id === "a")?.selected).toBe(true);
+
+    rerender({
+      props: {
+        ...makeProps([makeNode("a", 100, 100)]),
+        layoutMode: "factory-auto" as const,
+        initialSidebar: { isOpen: true, nodeId: "a" },
+      } as unknown as CanvasPageProps,
+    });
+
+    act(() => {
+      const frame = [...animationFrames.values()].at(-1);
+      frame?.(performance.now() + 1_000);
+    });
+
+    expect(result.current.nodes.find((node) => node.id === "a")?.selected).toBe(true);
+  });
+
   it("does not re-push sidebar params when onSidebarChange identity changes", () => {
     const onSidebarChange = vi.fn();
     const props = {

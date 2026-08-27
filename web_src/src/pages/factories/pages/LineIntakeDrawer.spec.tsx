@@ -461,7 +461,7 @@ describe("LineIntakeDrawer", () => {
       configuredSources: [GITHUB_INTAKE],
       organizationId: "org-1",
       factoryId: "factory-1",
-      editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+      editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines",
     });
 
     await user.click(screen.getByRole("button", { name: "Open GitHub issues settings" }));
@@ -473,7 +473,7 @@ describe("LineIntakeDrawer", () => {
     expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines",
     );
   });
 
