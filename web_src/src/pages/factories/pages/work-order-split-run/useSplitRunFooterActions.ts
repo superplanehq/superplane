@@ -1,5 +1,10 @@
 import { canvasesCancelRun } from "@/api-client";
-import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import {
+  factoryQueryKeys,
+  useCloseWorkOrder,
+  useDispatchWorkOrder,
+  useUpdateWorkOrderStatus,
+} from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -68,6 +73,15 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["canvases"] });
+      if (!organizationId || !factoryId) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      if (orderId) {
+        await queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+        });
+      }
     },
   });
 

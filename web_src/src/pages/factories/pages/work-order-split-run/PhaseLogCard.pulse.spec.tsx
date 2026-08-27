@@ -104,6 +104,32 @@ describe("PhaseLogCard running pulse", () => {
     expect(screen.getByRole("button", { name: "Ran 1 command" })).not.toHaveAttribute("data-last-running-line");
   });
 
+  it("does not pulse a later pending node", () => {
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running" }}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            componentType: "Run Claude Code",
+            status: "running",
+          }),
+          line({
+            id: "run-tests",
+            nodeId: "run-tests",
+            componentName: "Run tests",
+            status: "pending",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-stream-line-planner-agent")).toHaveAttribute("data-last-running-line");
+    expect(screen.getByTestId("split-run-stream-line-run-tests")).not.toHaveAttribute("data-last-running-line");
+  });
+
   it("does not pulse a line after the automation finishes", () => {
     render(
       <PhaseLogCard

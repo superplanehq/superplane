@@ -234,9 +234,8 @@ function useLastRunningLine(rootRef: { current: HTMLElement | null }, active: bo
     }
 
     const mark = () => {
-      const lines = root.querySelectorAll("[data-stream-line]");
-      const last = lines.item(lines.length - 1);
-      for (const el of lines) {
+      const last = lastActiveStreamLine(root);
+      for (const el of root.querySelectorAll("[data-stream-line]")) {
         if (el === last) {
           el.setAttribute("data-last-running-line", "");
         } else {
@@ -253,6 +252,24 @@ function useLastRunningLine(rootRef: { current: HTMLElement | null }, active: bo
       clear();
     };
   }, [active, rootRef]);
+}
+
+function lastActiveStreamLine(root: HTMLElement): Element | undefined {
+  const lines = root.querySelectorAll("[data-stream-line]");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines.item(index);
+    if (line.getAttribute("data-stream-status") !== "pending") {
+      return line;
+    }
+  }
+  return undefined;
+}
+
+function streamLineAttrs(status?: SplitRunPhaseStatus) {
+  if (!status) {
+    return { "data-stream-line": "" };
+  }
+  return { "data-stream-line": "", "data-stream-status": status };
 }
 
 export function PhaseLogCard({
@@ -361,7 +378,7 @@ function AutomationHeader({
   return (
     <div
       data-testid={`split-run-automation-header-${phase.id}`}
-      data-stream-line=""
+      {...streamLineAttrs(phase.status)}
       className={cn(
         "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
         LAST_RUNNING_LINE_PULSE,
@@ -547,7 +564,7 @@ function StreamNodeHeader({
   return (
     <div
       data-testid={`split-run-stream-line-${line.id}`}
-      data-stream-line=""
+      {...streamLineAttrs(line.status)}
       data-highlighted={highlighted ? "true" : undefined}
       aria-current={highlighted ? "true" : undefined}
       className={cn(
@@ -591,7 +608,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
     <li className="min-w-0">
       <div
         data-testid={`split-run-stream-line-${step.line.id}`}
-        data-stream-line=""
+        {...streamLineAttrs(step.line.status)}
         className={cn(STREAM_LINE_WRAP_ROW, STREAM_SECTION, hasBody && STICKY_STEP)}
       >
         {step.line.componentType ? (
@@ -608,7 +625,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
               <div
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
-                data-stream-line=""
+                {...streamLineAttrs(event.line.status)}
                 className={cn("flex w-full items-start px-2", LOG_ROW_HOVER, LAST_RUNNING_LINE_PULSE)}
               >
                 <span className="inline-flex w-4 shrink-0" aria-hidden />
@@ -635,7 +652,7 @@ function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStr
       <button
         type="button"
         data-testid={`split-run-tools-toggle-${stepId}`}
-        data-stream-line=""
+        {...streamLineAttrs(tools.some((tool) => tool.status === "running") ? "running" : tools.at(-1)?.status)}
         aria-expanded={expanded}
         aria-label={summary}
         onClick={() => setExpanded((open) => !open)}
@@ -682,7 +699,7 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
         <button
           type="button"
           data-testid={`split-run-stream-line-${tool.id}`}
-          data-stream-line=""
+          {...streamLineAttrs(tool.status)}
           aria-expanded={expanded}
           onClick={() => setExpanded((open) => !open)}
           className={cn(STREAM_LINE_WRAP_ROW, "cursor-pointer hover:text-foreground")}
@@ -690,7 +707,11 @@ function StreamTool({ tool }: { tool: SplitRunStreamLine }) {
           {row}
         </button>
       ) : (
-        <div data-testid={`split-run-stream-line-${tool.id}`} data-stream-line="" className={STREAM_LINE_WRAP_ROW}>
+        <div
+          data-testid={`split-run-stream-line-${tool.id}`}
+          {...streamLineAttrs(tool.status)}
+          className={STREAM_LINE_WRAP_ROW}
+        >
           {row}
         </div>
       )}

@@ -20,11 +20,15 @@ vi.mock("@/api-client", async (importOriginal) => {
   };
 });
 
-vi.mock("@/hooks/useFactoryData", () => ({
-  useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
-  useUpdateWorkOrderStatus: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
-  useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutateAsync, isPending: false }),
-}));
+vi.mock("@/hooks/useFactoryData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useFactoryData")>();
+  return {
+    ...actual,
+    useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
+    useUpdateWorkOrderStatus: () => ({ mutateAsync: updateMutateAsync, isPending: false }),
+    useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutateAsync, isPending: false }),
+  };
+});
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
@@ -125,6 +129,23 @@ describe("useSplitRunFooterActions", () => {
     );
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(showSuccessToast).toHaveBeenCalledWith("Automation stopped.");
+  });
+
+  it("refreshes the work order after stopping an automation", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), {
+      wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+    });
+
+    await result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "work-orders"],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "work-orders", "wo-1"],
+    });
   });
 
   it("cancels the canvas run before closing a running order", async () => {

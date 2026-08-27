@@ -136,14 +136,14 @@ export function WorkOrderSplitRunBody({
     return () => void actions.handleStopAutomation({ appId, runId });
   };
   const automationRerun = (entry: SplitRunPhase) => {
-    if (!canUpdate || !liveOrder || entry.status !== "failed") {
+    if (!canUpdate || !liveOrder || entry.status !== "failed" || entry.stepIndex == null) {
       return undefined;
     }
     return () =>
       void actions.handleStop("rerun-step", {
         kind: "failed",
         lineName: fixture.lineName,
-        stepIndex: entry.stepIndex ?? fixture.currentStepIndex,
+        stepIndex: entry.stepIndex,
       });
   };
 

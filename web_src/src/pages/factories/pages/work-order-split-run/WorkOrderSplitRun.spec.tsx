@@ -423,6 +423,33 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
+  it("hides automation Rerun when the failed phase has no step index", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-failed-implement",
+      fixture: splitRunFixtureForWorkOrder({
+        id: "wo-failed-implement",
+        title: "Later step",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [
+              { id: "e-plan", step: "Planning", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+              { id: "e-impl", step: "Implement", state: "STATE_FINISHED", result: "RESULT_FAILED" },
+              { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            ],
+          },
+        ],
+      }),
+    });
+
+    expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
+  });
+
   it("pins a default failed note and keeps Reopen in the header", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,

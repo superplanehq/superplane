@@ -118,6 +118,34 @@ export function AutomationLookPreview({ look }: { look: AutomationLook }) {
   );
 }
 
+function previewHeaderAction(status: SplitRunPhaseStatus, onStop: () => void, onRerun: () => void) {
+  if (status === "running") {
+    return (
+      <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
+        Stop
+      </Button>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
+        Rerun
+      </Button>
+    );
+  }
+  return null;
+}
+
+function previewGlyphKind(status: SplitRunPhaseStatus) {
+  if (status === "passed") {
+    return "passed" as const;
+  }
+  if (status === "running") {
+    return "running" as const;
+  }
+  return "failed" as const;
+}
+
 function AutomationRow({
   look,
   phase,
@@ -133,16 +161,7 @@ function AutomationRow({
   onStop: () => void;
   onRerun: () => void;
 }) {
-  const action =
-    phase.status === "running" ? (
-      <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
-        Stop
-      </Button>
-    ) : phase.status === "failed" ? (
-      <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
-        Rerun
-      </Button>
-    ) : null;
+  const action = previewHeaderAction(phase.status, onStop, onRerun);
 
   const header = (
     <div className="flex min-w-0 items-center gap-2">
@@ -152,10 +171,7 @@ function AutomationRow({
         onClick={onToggle}
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
       >
-        <PhaseGlyph
-          kind={phase.status === "passed" ? "passed" : phase.status === "running" ? "running" : "failed"}
-          className="size-3.5"
-        />
+        <PhaseGlyph kind={previewGlyphKind(phase.status)} className="size-3.5" />
         <span
           className={cn(
             "min-w-0 truncate",
