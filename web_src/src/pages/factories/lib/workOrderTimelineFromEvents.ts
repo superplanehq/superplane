@@ -1,14 +1,18 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
-import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
-import { isPullRequestArtifactType, pullRequestFromEventPayload, pullRequestLabel } from "./workOrderPullRequest";
-import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
+import { isPullRequestArtifactType, pullRequestFromEventPayload } from "./workOrderPullRequest";
+import {
+  describeArtifactAdded,
+  describeAssigneesUpdated,
+  describePullRequestEvent,
+  findAutomationStep,
+  resolveUserDisplayName,
+  toAutomationActor,
+} from "./workOrderTimelineFromEvents.helpers";
 import type {
   UserNameLookup,
-  WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
-  WorkOrderTimelineStep,
   WorkOrderTimelineStepComment,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
@@ -17,8 +21,6 @@ import {
   type DispatchBatchContext,
   type LineStepExecutionPayload,
 } from "./workOrderTimelineStepBuilder";
-
-const UNKNOWN_MEMBER_LABEL = UNKNOWN_ORG_USER_NAME;
 
 interface EventUserRef {
   id?: string;
@@ -172,10 +174,22 @@ function applyApiEventToTimeline(
       appendArtifactEvent(state, index, payload, at, resolveUserName);
       return;
     case "order.pull_request.added":
-      appendPullRequestEvent(state, index, payload, at, "pullRequestAdded", resolveUserName);
+      appendPullRequestEvent(state, {
+        index,
+        payload,
+        at,
+        kind: "pullRequestAdded",
+        resolveUserName,
+      });
       return;
     case "order.pull_request.updated":
-      appendPullRequestEvent(state, index, payload, at, "pullRequestUpdated", resolveUserName);
+      appendPullRequestEvent(state, {
+        index,
+        payload,
+        at,
+        kind: "pullRequestUpdated",
+        resolveUserName,
+      });
       return;
     case "order.check.reported":
       appendCheckReportedEvent(state, index, payload, at);
@@ -384,12 +398,15 @@ function appendArtifactEvent(
 
 function appendPullRequestEvent(
   state: TimelineBuildState,
-  index: number,
-  payload: EventPayload,
-  at: string,
-  kind: "pullRequestAdded" | "pullRequestUpdated",
-  resolveUserName?: UserNameLookup,
+  args: {
+    index: number;
+    payload: EventPayload;
+    at: string;
+    kind: "pullRequestAdded" | "pullRequestUpdated";
+    resolveUserName?: UserNameLookup;
+  },
 ): void {
+  const { index, payload, at, kind, resolveUserName } = args;
   if (!payload.pullRequest) {
     return;
   }
@@ -446,163 +463,8 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
   });
 }
 
-function findAutomationStep(
-  state: TimelineBuildState,
-  actor: WorkOrderTimelineAutomationActor | undefined,
-): WorkOrderTimelineStep | undefined {
-  if (!actor) {
-    return undefined;
-  }
-
-  const dispatch = [...state.events]
-    .reverse()
-    .find(
-      (event) =>
-        event.kind === "dispatched" &&
-        ((actor.lineId && event.lineId === actor.lineId) || (actor.lineName && event.lineName === actor.lineName)),
-    );
-  if (!dispatch?.steps?.length) {
-    return undefined;
-  }
-
-  if (actor.stepName) {
-    const matchingName = [...dispatch.steps].reverse().find((step) => step.stepName === actor.stepName);
-    if (matchingName) {
-      return matchingName;
-    }
-  }
-
-  if (actor.stepIndex !== undefined && actor.stepIndex >= 0 && actor.stepIndex < dispatch.steps.length) {
-    return dispatch.steps[actor.stepIndex];
-  }
-
-  // No confident match. Let the caller push a top-level event rather than
-  // attaching to an arbitrary step (last would misattribute step-0 refs when
-  // JSON `omitempty` dropped the index).
-  return undefined;
-}
-
-const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
-  markdown: "note",
-  branch: "branch",
-};
-
-function formatArtifactKindShort(type: string | undefined): string {
-  if (!type) {
-    return "artifact";
-  }
-  return ARTIFACT_KIND_SHORT_LABEL[type] ?? "artifact";
-}
-
-function describeArtifactAdded(artifact: EventArtifactPayload): string {
-  const label =
-    extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data) || extractArtifactName(artifact.data);
-  const type = formatArtifactKindShort(artifact.type);
-  return label ? `attached ${type}: ${label}` : `attached ${type}`;
-}
-
-function describePullRequestEvent(
-  kind: "pullRequestAdded" | "pullRequestUpdated",
-  pullRequest: ReturnType<typeof pullRequestFromEventPayload>,
-): string {
-  const label = pullRequestLabel(pullRequest);
-  return kind === "pullRequestUpdated" ? `updated pull request ${label}` : `added pull request ${label}`;
-}
-
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
   failed: "RESULT_FAILED",
 };
-
-function toAutomationActor(
-  payload: EventAutomationRefPayload | undefined,
-): WorkOrderTimelineAutomationActor | undefined {
-  if (!payload) {
-    return undefined;
-  }
-
-  const anySet =
-    payload.nodeId || payload.nodeName || payload.appId || payload.appName || payload.lineId || payload.lineName;
-  if (!anySet) {
-    return undefined;
-  }
-
-  return {
-    nodeId: payload.nodeId,
-    nodeName: payload.nodeName,
-    appId: payload.appId,
-    appName: payload.appName,
-    lineId: payload.lineId,
-    lineName: payload.lineName,
-    stepIndex: payload.stepIndex,
-    stepName: payload.stepName,
-  };
-}
-
-function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
-  if (!userId) {
-    return undefined;
-  }
-
-  return resolveUserName?.(userId) ?? UNKNOWN_MEMBER_LABEL;
-}
-
-function describeAssigneesUpdated(payload: EventPayload, resolveUserName?: UserNameLookup): string {
-  const actorId = payload.user?.id;
-  const assignedIds = (payload.assigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id));
-  const assignedOthers = actorId ? assignedIds.filter((userId) => userId !== actorId) : assignedIds;
-  const selfAssigned = Boolean(actorId && assignedIds.includes(actorId));
-  const unassignedNames = formatEventUserNames(payload.unassigned, resolveUserName);
-  const parts: string[] = [];
-
-  if (selfAssigned && assignedOthers.length === 0) {
-    parts.push("took ownership");
-  } else if (selfAssigned && assignedOthers.length > 0) {
-    const otherNames = formatEventUserNames(
-      assignedOthers.map((id) => ({ id })),
-      resolveUserName,
-    );
-    parts.push(otherNames ? `took ownership and assigned ${otherNames} as owner` : "took ownership");
-  } else {
-    const assignedNames = formatEventUserNames(payload.assigned, resolveUserName);
-    if (assignedNames) {
-      parts.push(`assigned ${assignedNames} as owner`);
-    }
-  }
-
-  if (unassignedNames) {
-    parts.push(`removed ${unassignedNames} as owner`);
-  }
-
-  if (parts.length === 0) {
-    return "updated owners";
-  }
-
-  return parts.join(" and ");
-}
-
-function formatEventUserNames(users: EventUserRef[] | undefined, resolveUserName?: UserNameLookup): string | null {
-  if (!users?.length) {
-    return null;
-  }
-
-  const names = users.map((user) => resolveUserDisplayName(user.id, resolveUserName) ?? UNKNOWN_MEMBER_LABEL);
-  return formatNameList(names);
-}
-
-function formatNameList(names: string[]): string {
-  if (names.length === 0) {
-    return "";
-  }
-
-  if (names.length === 1) {
-    return names[0];
-  }
-
-  if (names.length === 2) {
-    return `${names[0]} and ${names[1]}`;
-  }
-
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-}

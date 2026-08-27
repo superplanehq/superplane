@@ -202,7 +202,10 @@ export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): Inta
   return { ...draft, name, confidencePct };
 }
 
-export function intakeSettingsFromApi(name: string, settings: FactoriesFactoryIntakeSettings | undefined): IntakeSourceSettings {
+export function intakeSettingsFromApi(
+  name: string,
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): IntakeSourceSettings {
   return {
     name,
     listenMode: "listen",

@@ -93,143 +93,232 @@ export function PRFeedbackSettingsPopup({
           onRetry={onRetryAutomation}
         />
       ) : (
-        <>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-            <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-              <section>
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">Health</h3>
-                  <Badge variant="outline" data-testid="pr-feedback-health">
-                    {healthy ? PR_FEEDBACK_SETTINGS_COPY.healthReady : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepair}
-                  </Badge>
-                </div>
-                <p className="workspace-body-text mt-1 text-muted-foreground">
-                  {healthy
-                    ? PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
-                    : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper}
-                </p>
-              </section>
-
-              <section>
-                <Label htmlFor="pr-feedback-name">{PR_FEEDBACK_SETTINGS_COPY.nameLabel}</Label>
-                <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.nameHelper}</p>
-                <Input
-                  id="pr-feedback-name"
-                  className="mt-2"
-                  value={draft.name}
-                  onChange={(event) => update("name", event.target.value)}
-                  data-testid="pr-feedback-name"
-                />
-              </section>
-
-              <section>
-                <Label htmlFor="pr-feedback-repository">{PR_FEEDBACK_SETTINGS_COPY.repositoryLabel}</Label>
-                <p className="workspace-body-text mt-1 text-muted-foreground">
-                  {PR_FEEDBACK_SETTINGS_COPY.repositoryHelper}
-                </p>
-                <Input
-                  id="pr-feedback-repository"
-                  className="mt-2"
-                  value={draft.repository}
-                  onChange={(event) => update("repository", event.target.value)}
-                  data-testid="pr-feedback-repository"
-                />
-              </section>
-
-              <section>
-                <Label htmlFor="pr-feedback-mention">{PR_FEEDBACK_SETTINGS_COPY.mentionLabel}</Label>
-                <p className="workspace-body-text mt-1 text-muted-foreground">
-                  {PR_FEEDBACK_SETTINGS_COPY.mentionHelper}
-                </p>
-                <Input
-                  id="pr-feedback-mention"
-                  className="mt-2"
-                  value={draft.mention}
-                  onChange={(event) => update("mention", event.target.value)}
-                  data-testid="pr-feedback-mention"
-                />
-              </section>
-
-              <label className="flex items-start gap-3">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={draft.ignoreBots}
-                  onChange={(event) => update("ignoreBots", event.currentTarget.checked)}
-                  data-testid="pr-feedback-ignore-bots"
-                />
-                <span>
-                  <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
-                    {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
-                  </span>
-                  <span className="workspace-body-text mt-1 block text-muted-foreground">
-                    {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsHelper}
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
-            {confirmDelete ? (
-              <>
-                <p className="workspace-body-text text-destructive" role="alert">
-                  {PR_FEEDBACK_SETTINGS_COPY.confirmDelete}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
-                    {PR_FEEDBACK_SETTINGS_COPY.keep}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={deletePending}
-                    onClick={() => void onDelete?.()}
-                    data-testid="pr-feedback-settings-delete-confirm"
-                  >
-                    {deletePending ? PR_FEEDBACK_SETTINGS_COPY.deleting : PR_FEEDBACK_SETTINGS_COPY.delete}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                {saveError ? (
-                  <p className="workspace-body-text text-destructive" role="alert">
-                    {saveError}
-                  </p>
-                ) : onDelete ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmDelete(true)}
-                    data-testid="pr-feedback-settings-delete"
-                  >
-                    {PR_FEEDBACK_SETTINGS_COPY.delete}
-                  </Button>
-                ) : (
-                  <span />
-                )}
-                <Button
-                  type="button"
-                  disabled={savePending || !prFeedbackDraftIsValid(draft)}
-                  onClick={async () => {
-                    try {
-                      await onSave(normalizePRFeedbackDraft(draft));
-                      onClose();
-                    } catch {
-                      // The parent supplies the actionable error message.
-                    }
-                  }}
-                  data-testid="pr-feedback-settings-save"
-                >
-                  {savePending ? PR_FEEDBACK_SETTINGS_COPY.saving : PR_FEEDBACK_SETTINGS_COPY.save}
-                </Button>
-              </>
-            )}
-          </footer>
-        </>
+        <PRFeedbackGeneralTab
+          draft={draft}
+          healthy={healthy}
+          confirmDelete={confirmDelete}
+          savePending={savePending}
+          deletePending={deletePending}
+          saveError={saveError}
+          onUpdate={(key, value) => update(key, value)}
+          onSave={onSave}
+          onDelete={onDelete}
+          onConfirmDelete={(next) => setConfirmDelete(next)}
+          onClose={onClose}
+        />
       )}
     </PopupShell>
+  );
+}
+
+function PRFeedbackGeneralTab({
+  draft,
+  healthy,
+  confirmDelete,
+  savePending,
+  deletePending,
+  saveError,
+  onUpdate,
+  onSave,
+  onDelete,
+  onConfirmDelete,
+  onClose,
+}: {
+  draft: PRFeedbackDraftSettings;
+  healthy: boolean;
+  confirmDelete: boolean;
+  savePending?: boolean;
+  deletePending?: boolean;
+  saveError?: string;
+  onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
+  onSave: (next: PRFeedbackDraftSettings) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+  onConfirmDelete: (next: boolean) => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+          <section>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">Health</h3>
+              <Badge variant="outline" data-testid="pr-feedback-health">
+                {healthy ? PR_FEEDBACK_SETTINGS_COPY.healthReady : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepair}
+              </Badge>
+            </div>
+            <p className="workspace-body-text mt-1 text-muted-foreground">
+              {healthy
+                ? PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
+                : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper}
+            </p>
+          </section>
+
+          <PRFeedbackTextField
+            id="pr-feedback-name"
+            label={PR_FEEDBACK_SETTINGS_COPY.nameLabel}
+            helper={PR_FEEDBACK_SETTINGS_COPY.nameHelper}
+            value={draft.name}
+            onChange={(value) => onUpdate("name", value)}
+          />
+          <PRFeedbackTextField
+            id="pr-feedback-repository"
+            label={PR_FEEDBACK_SETTINGS_COPY.repositoryLabel}
+            helper={PR_FEEDBACK_SETTINGS_COPY.repositoryHelper}
+            value={draft.repository}
+            onChange={(value) => onUpdate("repository", value)}
+          />
+          <PRFeedbackTextField
+            id="pr-feedback-mention"
+            label={PR_FEEDBACK_SETTINGS_COPY.mentionLabel}
+            helper={PR_FEEDBACK_SETTINGS_COPY.mentionHelper}
+            value={draft.mention}
+            onChange={(value) => onUpdate("mention", value)}
+          />
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="pr-feedback-ignore-bots"
+              className="mt-0.5"
+              checked={draft.ignoreBots}
+              onChange={(event) => onUpdate("ignoreBots", event.currentTarget.checked)}
+              data-testid="pr-feedback-ignore-bots"
+            />
+            <Label htmlFor="pr-feedback-ignore-bots">
+              <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
+                {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
+              </span>
+              <span className="workspace-body-text mt-1 block text-muted-foreground">
+                {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsHelper}
+              </span>
+            </Label>
+          </div>
+        </div>
+      </div>
+      <PRFeedbackSettingsFooter
+        draft={draft}
+        confirmDelete={confirmDelete}
+        savePending={savePending}
+        deletePending={deletePending}
+        saveError={saveError}
+        onSave={onSave}
+        onDelete={onDelete}
+        onConfirmDelete={onConfirmDelete}
+        onClose={onClose}
+      />
+    </>
+  );
+}
+
+function PRFeedbackTextField({
+  id,
+  label,
+  helper,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  helper: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <section>
+      <Label htmlFor={id}>{label}</Label>
+      <p className="workspace-body-text mt-1 text-muted-foreground">{helper}</p>
+      <Input
+        id={id}
+        className="mt-2"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        data-testid={id}
+      />
+    </section>
+  );
+}
+
+function PRFeedbackSettingsFooter({
+  draft,
+  confirmDelete,
+  savePending,
+  deletePending,
+  saveError,
+  onSave,
+  onDelete,
+  onConfirmDelete,
+  onClose,
+}: {
+  draft: PRFeedbackDraftSettings;
+  confirmDelete: boolean;
+  savePending?: boolean;
+  deletePending?: boolean;
+  saveError?: string;
+  onSave: (next: PRFeedbackDraftSettings) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+  onConfirmDelete: (next: boolean) => void;
+  onClose: () => void;
+}) {
+  if (confirmDelete) {
+    return (
+      <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+        <p className="workspace-body-text text-destructive" role="alert">
+          {PR_FEEDBACK_SETTINGS_COPY.confirmDelete}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => onConfirmDelete(false)}>
+            {PR_FEEDBACK_SETTINGS_COPY.keep}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={deletePending}
+            onClick={() => void onDelete?.()}
+            data-testid="pr-feedback-settings-delete-confirm"
+          >
+            {deletePending ? PR_FEEDBACK_SETTINGS_COPY.deleting : PR_FEEDBACK_SETTINGS_COPY.delete}
+          </Button>
+        </div>
+      </footer>
+    );
+  }
+
+  return (
+    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-5 py-3">
+      {saveError ? (
+        <p className="workspace-body-text text-destructive" role="alert">
+          {saveError}
+        </p>
+      ) : onDelete ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => onConfirmDelete(true)}
+          data-testid="pr-feedback-settings-delete"
+        >
+          {PR_FEEDBACK_SETTINGS_COPY.delete}
+        </Button>
+      ) : (
+        <span />
+      )}
+      <Button
+        type="button"
+        disabled={savePending || !prFeedbackDraftIsValid(draft)}
+        onClick={async () => {
+          try {
+            await onSave(normalizePRFeedbackDraft(draft));
+            onClose();
+          } catch {
+            // The parent supplies the actionable error message.
+          }
+        }}
+        data-testid="pr-feedback-settings-save"
+      >
+        {savePending ? PR_FEEDBACK_SETTINGS_COPY.saving : PR_FEEDBACK_SETTINGS_COPY.save}
+      </Button>
+    </footer>
   );
 }
 

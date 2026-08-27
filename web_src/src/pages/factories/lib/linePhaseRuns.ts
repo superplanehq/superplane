@@ -7,12 +7,10 @@ import type {
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
 import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
-import {
-  dispatchStepRows,
-  isActiveWorkOrderExecution,
-  isQueuedStepRow,
-  type WorkOrderStepRow,
-} from "./workOrderExecutions";
+import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
+import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
+
+export { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
@@ -266,38 +264,6 @@ function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWork
     return rightTime - leftTime;
   }
   return (right.id ?? "").localeCompare(left.id ?? "");
-}
-
-export function resolvePhaseRunStatus(execution: WorkOrderStepRow): {
-  kind: "running" | "waiting" | "queued" | "failed" | "idle";
-  label: string;
-} {
-  if (isQueuedStepRow(execution)) {
-    const position = execution.queuePosition ?? 0;
-    return { kind: "queued", label: position > 0 ? `Queued #${position}` : "Queued" };
-  }
-  if (execution.state === "STATE_STARTED") {
-    return { kind: "running", label: "Executing" };
-  }
-  if (execution.state === "STATE_CANCELLING") {
-    // In-flight like Automations (running tick), but keep Cancelling label.
-    return { kind: "running", label: "Cancelling" };
-  }
-  if (execution.state === "STATE_PENDING") {
-    return { kind: "queued", label: "Queued" };
-  }
-  if (execution.state === "STATE_FINISHED") {
-    if (execution.result === "RESULT_PASSED") {
-      return { kind: "idle", label: "Passed" };
-    }
-    if (execution.result === "RESULT_FAILED") {
-      return { kind: "failed", label: "Failed" };
-    }
-    if (execution.result === "RESULT_CANCELLED") {
-      return { kind: "idle", label: "Cancelled" };
-    }
-  }
-  return { kind: "idle", label: "Unknown" };
 }
 
 /** Board-level status for a phase column header. */

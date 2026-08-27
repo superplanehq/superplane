@@ -382,75 +382,90 @@ export function richStreamForCanvas(
   let tick = 0;
 
   for (const node of canvas.nodes) {
-    if (!node.id) {
-      continue;
-    }
-    const nodeStatus = canvas.statuses[node.id] ?? "pending";
-    const presentation = componentPresentation(node.component);
-    const componentName = node.name ?? presentation.title;
-    const lineStatus = streamStatusForNode(nodeStatus);
-    const kind = classifyNode(node);
-    const streamKind = streamKindForNode(node);
-
-    const artifact =
-      kind === "check" || nodeStatus === "did_not_run"
-        ? undefined
-        : artifactForNode(node.id, canvas.key, description, options?.demoArtifacts !== false);
-    const pullRequest =
-      kind === "check" || nodeStatus === "did_not_run"
-        ? undefined
-        : pullRequestForNode(node.id, options?.demoArtifacts !== false);
-    const name = kind === "check" ? checkName(node.id, componentName) : componentName;
-    lines.push({
-      id: node.id,
-      nodeId: node.id,
-      at: clockAt(tick),
-      componentName: name,
-      status: lineStatus,
-      artifact,
-      pullRequest,
-      kind: streamKind,
-      componentType: componentTypeLabel(node.component),
-      action: actionForStreamLine(streamKind, nodeStatus, node.id),
-      iconSlug: presentation.iconSlug,
-      iconSrc: presentation.iconSrc,
-    });
-    tick += 1;
-
-    if (kind === "agent" && nodeStatus !== "did_not_run" && nodeStatus !== "pending") {
-      for (const step of claudeCodeChildren(node, canvas.key, options?.demoArtifacts !== false)) {
-        const stepId = `${node.id}-note-${tick}`;
-        lines.push({
-          id: stepId,
-          nodeId: node.id,
-          at: clockAt(tick),
-          componentName: step.name,
-          status: step.status,
-          detail: step.output,
-          note: true,
-          componentType: step.type,
-        });
-        tick += 1;
-        for (const command of step.commands) {
-          lines.push({
-            id: `${node.id}-cmd-${tick}`,
-            nodeId: node.id,
-            at: clockAt(tick),
-            componentName: command.name,
-            status: command.status,
-            detail: command.output,
-            note: true,
-            noteParentId: stepId,
-            noteDepth: 1,
-            componentType: command.type,
-          });
-          tick += 1;
-        }
-      }
-    }
+    tick = appendRichStreamNode({ lines, node, canvas, description, options, tick });
   }
 
   return lines;
+}
+
+function appendRichStreamNode({
+  lines,
+  node,
+  canvas,
+  description,
+  options,
+  tick,
+}: {
+  lines: SplitRunStreamLine[];
+  node: ComponentsNode;
+  canvas: SplitRunCanvasModel;
+  description: FactoriesWorkOrderArtifact | undefined;
+  options: { demoArtifacts?: boolean } | undefined;
+  tick: number;
+}): number {
+  if (!node.id) {
+    return tick;
+  }
+  const nodeStatus = canvas.statuses[node.id] ?? "pending";
+  const presentation = componentPresentation(node.component);
+  const componentName = node.name ?? presentation.title;
+  const lineStatus = streamStatusForNode(nodeStatus);
+  const kind = classifyNode(node);
+  const streamKind = streamKindForNode(node);
+  const skipOutputs = hidesProducedOutputs(kind, nodeStatus);
+  const showDemo = options?.demoArtifacts !== false;
+
+  lines.push({
+    id: node.id,
+    nodeId: node.id,
+    at: clockAt(tick),
+    componentName: kind === "check" ? checkName(node.id, componentName) : componentName,
+    status: lineStatus,
+    artifact: skipOutputs ? undefined : artifactForNode(node.id, canvas.key, description, showDemo),
+    pullRequest: skipOutputs ? undefined : pullRequestForNode(node.id, showDemo),
+    kind: streamKind,
+    componentType: componentTypeLabel(node.component),
+    action: actionForStreamLine(streamKind, nodeStatus, node.id),
+    iconSlug: presentation.iconSlug,
+    iconSrc: presentation.iconSrc,
+  });
+  tick += 1;
+
+  if (kind !== "agent" || nodeStatus === "did_not_run" || nodeStatus === "pending") {
+    return tick;
+  }
+
+  for (const step of claudeCodeChildren(node, canvas.key, showDemo)) {
+    const stepId = `${node.id}-note-${tick}`;
+    lines.push({
+      id: stepId,
+      nodeId: node.id,
+      at: clockAt(tick),
+      componentName: step.name,
+      status: step.status,
+      detail: step.output,
+      note: true,
+      componentType: step.type,
+    });
+    tick += 1;
+    for (const command of step.commands) {
+      lines.push({
+        id: `${node.id}-cmd-${tick}`,
+        nodeId: node.id,
+        at: clockAt(tick),
+        componentName: command.name,
+        status: command.status,
+        detail: command.output,
+        note: true,
+        noteParentId: stepId,
+        noteDepth: 1,
+        componentType: command.type,
+      });
+      tick += 1;
+    }
+  }
+
+  return tick;
 }
 
 export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
@@ -493,6 +508,10 @@ function actionForStreamLine(kind: SplitRunStreamKind, nodeStatus: FactoryNodeSt
     return "triggered";
   }
   return "passed";
+}
+
+function hidesProducedOutputs(kind: "agent" | "check" | "artifact" | "simple", nodeStatus: string): boolean {
+  return kind === "check" || nodeStatus === "did_not_run";
 }
 
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {

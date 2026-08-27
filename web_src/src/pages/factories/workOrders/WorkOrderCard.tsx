@@ -7,6 +7,7 @@ import {
   WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
   WORK_ORDER_ATTENTION_ICON,
   WORK_ORDER_ATTENTION_LABEL,
+  type WorkOrderAttentionReason,
 } from "../lib/workOrderAttention";
 import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
@@ -78,7 +79,6 @@ export function WorkOrderCard({
   const attentionReason = getWorkOrderAttentionReason(entry.order, {
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
   });
-  const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
 
   return (
     <article
@@ -140,19 +140,24 @@ export function WorkOrderCard({
               ) : null}
             </div>
           ) : null}
-          {attentionReason && AttentionIcon ? (
-            <span
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                WORK_ORDER_ATTENTION_CHIP_CLASSNAME[attentionReason],
-              )}
-            >
-              <AttentionIcon className={cn("size-3", attentionReason === "feedback" && "animate-spin")} aria-hidden />
-              {WORK_ORDER_ATTENTION_LABEL[attentionReason]}
-            </span>
-          ) : null}
+          {attentionReason ? <WorkOrderAttentionChip reason={attentionReason} /> : null}
         </div>
       </div>
     </article>
+  );
+}
+
+function WorkOrderAttentionChip({ reason }: { reason: WorkOrderAttentionReason }) {
+  const Icon = WORK_ORDER_ATTENTION_ICON[reason];
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+        WORK_ORDER_ATTENTION_CHIP_CLASSNAME[reason],
+      )}
+    >
+      <Icon className={cn("size-3", reason === "feedback" && "animate-spin")} aria-hidden />
+      {WORK_ORDER_ATTENTION_LABEL[reason]}
+    </span>
   );
 }

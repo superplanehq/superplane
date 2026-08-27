@@ -61,34 +61,29 @@ export function WorkOrderDetailPanel({
   // across re-renders/refetches that don't actually change `order`.
   const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
-  usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"], { enabled: chrome === "page" });
+  usePageTitle(workOrderDetailTitle(order, factory), { enabled: chrome === "page" });
 
   const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const unavailable = shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError });
+  const ready = isWorkOrderDetailReady(factory, order, derived);
 
-  if (shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError })) {
-    if (chrome === "dialog") {
-      return <p className="px-6 py-8 text-[13px] text-muted-foreground">This work order cannot be opened.</p>;
-    }
-    return <Navigate to={boardHref} replace />;
+  if (unavailable) {
+    return <WorkOrderDetailUnavailable chrome={chrome} boardHref={boardHref} />;
   }
 
   if (factoryLoading || orderLoading) {
-    return (
-      <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
-        <p className="text-[13px] text-muted-foreground">Loading work order…</p>
-      </div>
-    );
+    return <WorkOrderDetailLoading chrome={chrome} />;
   }
 
-  if (!factory || !order || !derived.statusMeta || !derived.displayStatus) {
+  if (!ready) {
     return null;
   }
 
   return (
     <LoadedWorkOrderDetail
-      order={order}
+      order={order!}
       derived={derived}
-      factoryLines={factory.lines ?? []}
+      factoryLines={factory!.lines ?? []}
       organizationId={organizationId}
       factoryKey={factoryKey}
       chrome={chrome}
@@ -104,6 +99,39 @@ export function WorkOrderDetailPanel({
       actions={actions}
     />
   );
+}
+
+function workOrderDetailTitle(
+  order: ReturnType<typeof useWorkOrder>["data"],
+  factory: ReturnType<typeof useFactory>["data"],
+) {
+  return [order?.title ?? "Work Order", factory?.name ?? "Workspace"];
+}
+
+function isWorkOrderDetailReady(
+  factory: ReturnType<typeof useFactory>["data"],
+  order: ReturnType<typeof useWorkOrder>["data"],
+  derived: ReturnType<typeof getWorkOrderDetailDerived>,
+): derived is ReturnType<typeof getWorkOrderDetailDerived> & {
+  statusMeta: NonNullable<ReturnType<typeof getWorkOrderDetailDerived>["statusMeta"]>;
+  displayStatus: NonNullable<ReturnType<typeof getWorkOrderDetailDerived>["displayStatus"]>;
+} {
+  return Boolean(factory && order && derived.statusMeta && derived.displayStatus);
+}
+
+function WorkOrderDetailLoading({ chrome }: { chrome: "page" | "dialog" }) {
+  return (
+    <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
+      <p className="text-[13px] text-muted-foreground">Loading work order…</p>
+    </div>
+  );
+}
+
+function WorkOrderDetailUnavailable({ chrome, boardHref }: { chrome: "page" | "dialog"; boardHref: string }) {
+  if (chrome === "dialog") {
+    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This work order cannot be opened.</p>;
+  }
+  return <Navigate to={boardHref} replace />;
 }
 
 function shouldRedirectAfterError(state: {

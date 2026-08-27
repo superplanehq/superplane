@@ -41,20 +41,30 @@ function useSplitRunPageSelection(
   return { isLoading, lineName, order, query };
 }
 
+function useSplitRunWorkOrderExtras(
+  organizationId: string,
+  factoryId: string,
+  order: ReturnType<typeof useSplitRunPageSelection>["order"],
+) {
+  const orderId = order?.id ?? "";
+  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const { data: pullRequests = [] } = useFactoryPullRequests(
+    organizationId,
+    factoryId,
+    orderId ? { workOrderIds: [orderId] } : undefined,
+  );
+  const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
+  return { orderChecks, prFeedbackRuns };
+}
+
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { appId = "" } = useParams<{ appId: string }>();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
-  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
-  const { data: pullRequests = [] } = useFactoryPullRequests(
-    organizationId,
-    factoryId,
-    order?.id ? { workOrderIds: [order.id] } : undefined,
-  );
-  const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
-  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
+  const { orderChecks, prFeedbackRuns } = useSplitRunWorkOrderExtras(organizationId, factoryId, order);
   const fixture = useMemo(
     () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
     [order, orderChecks, prFeedbackRuns, query.lineId],
