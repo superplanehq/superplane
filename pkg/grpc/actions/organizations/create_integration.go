@@ -82,11 +82,14 @@ func CreateIntegrationWithUsage(
 		AppName: integrationName,
 	})
 
+	configMap := configurationMap(appConfig)
+
 	//
 	// If the integration and organization support the new flow, use it.
 	// Public GitHub App install skips the wizard and uses Sync instead.
+	// CreateIntegration configuration privateApp=true opts out of hosted install.
 	//
-	if registry.UseNewSetupFlow(org, integrationName) && !github.UseHostedInstall(org.String(), integrationName) {
+	if registry.UseNewSetupFlow(org, integrationName) && !github.PreferHostedInstall(org.String(), integrationName, configMap) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
@@ -104,7 +107,7 @@ func CreateIntegrationWithUsage(
 	//
 	// Otherwise, use the old flow.
 	//
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, configMap, integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
 		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
@@ -530,4 +533,11 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
+}
+
+func configurationMap(appConfig *structpb.Struct) map[string]any {
+	if appConfig == nil {
+		return map[string]any{}
+	}
+	return appConfig.AsMap()
 }

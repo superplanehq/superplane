@@ -15,6 +15,7 @@ export const FIRST_RUN_COPY = {
     body: "SuperPlane reads your repositories. It does not start work yet.",
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
+    createPrivateApp: "Create your own GitHub App",
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",

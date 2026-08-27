@@ -71,6 +71,7 @@ type GitHub struct {
 
 type Configuration struct {
 	Organization string `mapstructure:"organization" json:"organization"`
+	PrivateApp   bool   `mapstructure:"privateApp" json:"privateApp"`
 }
 
 func (g *GitHub) Name() string {
@@ -178,7 +179,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
-	if UseHostedApp(ctx.OrganizationID) {
+	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
 		return g.syncHostedApp(ctx)
 	}
 
