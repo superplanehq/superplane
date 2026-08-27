@@ -139,8 +139,8 @@ func Test__ApplyOrderRefundedFullAndIdempotent(t *testing.T) {
 	require.NoError(t, err)
 
 	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
-	require.NoError(t, ApplyOrderRefunded(db, refund))
-	require.NoError(t, ApplyOrderRefunded(db, refund))
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 
 	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
@@ -154,12 +154,12 @@ func Test__ApplyOrderRefundedPartialDoesNotGoBelowZero(t *testing.T) {
 	orderID := uuid.NewString()
 	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
 
-	require.NoError(t, ApplyOrderRefunded(db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 1000)))
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 1000), nil))
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(1500), summary.GrantMicros)
 
-	require.NoError(t, ApplyOrderRefunded(db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 99999)))
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 99999), nil))
 	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), after.GrantMicros)
@@ -172,7 +172,7 @@ func Test__ApplyOrderRefundedIgnoresNonPacks(t *testing.T) {
 	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 
-	err = ApplyOrderRefunded(db, &OrderWebhookEvent{
+	err = ApplyOrderRefunded(context.Background(), db, &OrderWebhookEvent{
 		Type: orderRefundedType,
 		Data: OrderData{
 			ID:     uuid.NewString(),
@@ -186,8 +186,47 @@ func Test__ApplyOrderRefundedIgnoresNonPacks(t *testing.T) {
 			},
 			RefundedAmount: 2500,
 		},
-	})
+	}, nil)
 	require.NoError(t, err)
+
+	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.GrantMicros, after.GrantMicros)
+}
+
+func Test__ApplyOrderRefundedUsesExistingGrantWithoutPackMetadata(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
+	refund.Data.Product.Metadata = map[string]any{"superplane_credit_pack": false}
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
+
+	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
+}
+
+func Test__ApplyOrderRefundedRetriesUntilGrantExists(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	refund := refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500)
+
+	err := ApplyOrderRefunded(context.Background(), db, refund, nil)
+	require.Error(t, err)
+	assert.False(t, IsPermanentApplyError(err))
+
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), before.GrantMicros)
+
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
+	require.NoError(t, ApplyOrderRefunded(context.Background(), db, refund, nil))
 
 	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)

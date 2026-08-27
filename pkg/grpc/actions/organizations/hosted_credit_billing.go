@@ -221,7 +221,9 @@ func clientIPFromContext(ctx context.Context) string {
 	}
 	for _, key := range []string{
 		"cf-connecting-ip",
+		"grpcgateway-cf-connecting-ip",
 		"true-client-ip",
+		"grpcgateway-true-client-ip",
 		"x-real-ip",
 		"grpcgateway-x-real-ip",
 	} {

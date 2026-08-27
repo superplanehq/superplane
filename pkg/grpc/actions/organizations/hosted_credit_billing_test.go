@@ -383,6 +383,12 @@ func Test__ClientIPFromContext(t *testing.T) {
 	))
 	assert.Equal(t, "203.0.113.50", clientIPFromContext(ctx))
 
+	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs(
+		"grpcgateway-cf-connecting-ip", "203.0.113.50",
+		"x-forwarded-for", "198.51.100.1, 10.0.0.1",
+	))
+	assert.Equal(t, "203.0.113.50", clientIPFromContext(ctx))
+
 	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-forwarded-for", "203.0.113.10, 10.0.0.1"))
 	assert.Equal(t, "10.0.0.1", clientIPFromContext(ctx))
 }

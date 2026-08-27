@@ -171,6 +171,28 @@ func Test__HandlePolarWebhook(t *testing.T) {
 		_, err := models.FindLLMCreditRefundByPolarRefundID(database.Conn(), orderID+":full")
 		require.NoError(t, err)
 	})
+
+	t.Run("refund before grant is retried", func(t *testing.T) {
+		t.Setenv("POLAR_WEBHOOK_SECRET", secret)
+		orderID := uuid.NewString()
+		refund := []byte(fmt.Sprintf(`{
+			"type": "order.refunded",
+			"data": {
+				"id": %q,
+				"status": "refunded",
+				"refunded_amount": 2500,
+				"customer": {"id": "cust_1", "external_id": %q},
+				"product": {
+					"id": "prod_1",
+					"metadata": {"superplane_credit_pack": true},
+					"prices": [{"amount_type": "fixed", "price_amount": 2500}]
+				}
+			}
+		}`, orderID, r.Organization.ID.String()))
+		rec := signedPolarWebhook(t, secret, refund)
+		server.handlePolarWebhook(rec.recorder, rec.request)
+		assert.Equal(t, http.StatusInternalServerError, rec.recorder.Code)
+	})
 }
 
 type signedPolarWebhookCall struct {

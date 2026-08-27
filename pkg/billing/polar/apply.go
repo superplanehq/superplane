@@ -34,7 +34,7 @@ func ApplyOrderEvent(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent,
 	case orderPaidType:
 		return ApplyOrderPaid(ctx, tx, event, lookup)
 	case orderRefundedType:
-		return ApplyOrderRefunded(tx, event)
+		return ApplyOrderRefunded(ctx, tx, event, lookup)
 	default:
 		return nil
 	}
@@ -84,7 +84,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 	})
 }
 
-func ApplyOrderRefunded(tx *gorm.DB, event *OrderWebhookEvent) error {
+func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, lookup CreditPackLookup) error {
 	if event == nil {
 		return permanentApplyError("order event is required")
 	}
@@ -97,12 +97,9 @@ func ApplyOrderRefunded(tx *gorm.DB, event *OrderWebhookEvent) error {
 	grant, err := models.FindLLMCreditGrantByPolarOrderID(tx, event.Data.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
+			return refundBeforeGrantError(ctx, event.Data, lookup)
 		}
 		return err
-	}
-	if event.Data.Product.ID != "" && !event.Data.Product.IsCreditPack() {
-		return nil
 	}
 
 	reverseMicros := refundReverseMicros(grant.AmountMicros, event.Data)
@@ -147,6 +144,20 @@ func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLoo
 		return false, err
 	}
 	return pack != nil, nil
+}
+
+// refundBeforeGrantError keeps Polar retrying a pack refund until order.paid
+// records the grant. A 202 here would drop the refund. Non-pack refunds stay
+// ignored so Polar does not disable the endpoint.
+func refundBeforeGrantError(ctx context.Context, data OrderData, lookup CreditPackLookup) error {
+	isPack, err := orderIsCreditPack(ctx, data, lookup)
+	if err != nil {
+		return err
+	}
+	if !isPack {
+		return nil
+	}
+	return fmt.Errorf("polar credit grant for order %s is not recorded yet", data.ID)
 }
 
 func shouldGrantPurchase(data OrderData) bool {
