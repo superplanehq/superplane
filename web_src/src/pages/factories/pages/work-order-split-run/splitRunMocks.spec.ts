@@ -124,7 +124,7 @@ describe("splitRunFixtureForWorkOrder", () => {
       appId: "app-refund-implementer",
       runId: RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id,
     });
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toMatchObject([{ id: "wo-running-refunds-confidence", name: "Confidence score", score: 4 }]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(fixture.phases.find((phase) => phase.id === "score")?.checks?.[0]).toMatchObject({
@@ -187,7 +187,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -208,7 +208,28 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("A person must act");
     expect(fixture.footer.attentionCard).toBeUndefined();
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+  });
+
+  it("does not treat a missing execution step index as the first step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        title: "Later step",
+        lineDispatches: [
+          dispatch("STATE_ACTIVE", [
+            { id: "e-plan", step: "Planning", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", state: "STATE_FINISHED", result: "RESULT_FAILED" },
+            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+          ]),
+        ],
+      }),
+    );
+
+    const implement = fixture.phases.find((phase) => phase.name === "Implement");
+    expect(implement?.status).toBe("failed");
+    expect(implement?.stepIndex).toBeUndefined();
+    expect(fixture.currentStepIndex).toBe(2);
   });
 
   it("keeps a waiting state bar after a finished unnamed step while the order waits", () => {
@@ -565,7 +586,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Stop"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 

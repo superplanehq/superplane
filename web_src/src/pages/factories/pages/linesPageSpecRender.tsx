@@ -16,29 +16,7 @@ import { LinesPage } from "./LinesPage";
 
 export function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="lines-test-location">{location.pathname}</div>;
-}
-
-export function LinesListSpecHarness({ factory = REFUND_FACTORY }: { factory?: FactoriesFactory }) {
-  return (
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[`/${PRIMARY_FACTORY_KEY}/lines`]}>
-        <FactoriesLayoutContext.Provider
-          value={{
-            organizationId: "org-1",
-            factoryId: PRIMARY_FACTORY_ID,
-            factoryKey: PRIMARY_FACTORY_KEY,
-            factory,
-            factories: [factory],
-            openCreateWorkOrder: () => {},
-          }}
-        >
-          <LinesPage />
-          <LocationProbe />
-        </FactoriesLayoutContext.Provider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
+  return <div data-testid="lines-test-location">{`${location.pathname}${location.search}`}</div>;
 }
 
 export function LinesBoardSpecHarness({

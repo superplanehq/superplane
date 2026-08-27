@@ -72,7 +72,7 @@ describe("getWorkOrderAttentionReason", () => {
             {
               key: "pr-closure",
               headline: "Waiting for user review",
-              body: "Tag `@superplaneagent` to request changes.",
+              body: "The pull request is open.",
             },
           ],
         }),

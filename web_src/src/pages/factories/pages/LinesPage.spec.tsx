@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
-import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
+import type * as canvasData from "@/hooks/useCanvasData";
+import { editFactoryLinePath, factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -17,13 +18,9 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
-import { LINE_LIST_METRICS_BY_ID } from "./lineListMetricsMockData";
-import { LinesBoardSpecHarness, LinesListSpecHarness } from "./linesPageSpecRender";
+import { LinesBoardSpecHarness } from "./linesPageSpecRender";
+import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
-
-function renderLinesList(factory: FactoriesFactory = REFUND_FACTORY) {
-  return render(<LinesListSpecHarness factory={factory} />);
-}
 
 function renderLinesBoard(
   path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
@@ -131,59 +128,29 @@ const useWorkOrderChecks = vi.hoisted(() =>
   })),
 );
 
+const useCanvasMock = vi.hoisted(() => vi.fn());
+const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
+const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof canvasData>();
+  return {
+    ...actual,
+    useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
+      useCanvasMock(organizationId, canvasId, options),
+    useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
+    useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
+  };
+});
+
+vi.mock("@/lib/toast", () => ({
+  showErrorToast: vi.fn(),
+  showSuccessToast: vi.fn(),
+}));
+
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
 }));
-
-describe("LinesPage metrics", () => {
-  it("shows zero success rate and completions when a line has no nested metrics", () => {
-    renderLinesList();
-    const cards = screen.getAllByTestId("lines-card-metrics");
-    expect(cards[0]).toHaveTextContent("0%");
-    expect(cards[0]).toHaveTextContent("0 per day");
-    expect(cards[0]).toHaveTextContent("—");
-  });
-
-  it("shows live numbers for a line that has nested metrics", () => {
-    const factory: FactoriesFactory = {
-      ...REFUND_FACTORY,
-      lines: (REFUND_FACTORY.lines ?? []).map((line) =>
-        line.id === REFUND_LINE_PLAN_ID ? { ...line, metrics: LINE_LIST_METRICS_BY_ID[REFUND_LINE_PLAN_ID]! } : line,
-      ),
-    };
-    renderLinesList(factory);
-    expect(screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`)).toHaveTextContent("82%");
-    expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0%");
-    expect(screen.getByTestId("lines-card-line-hotfix")).toHaveTextContent("0 per day");
-  });
-});
-
-describe("LinesPage card menu", () => {
-  it("duplicates a line with its steps and a unique copy name, then opens the new line", async () => {
-    const sourceLine = REFUND_FACTORY.lines?.find((line) => line.id === REFUND_LINE_PLAN_ID);
-    const newLine = { id: "line-new", name: "plan-and-implement copy", steps: sourceLine?.steps ?? [] };
-    createFactoryLineMutateAsync.mockResolvedValueOnce(newLine);
-
-    const user = userEvent.setup();
-    renderLinesList();
-
-    const card = screen.getByTestId(`lines-card-${REFUND_LINE_PLAN_ID}`);
-    await user.click(within(card).getByTestId("lines-card-menu"));
-    await user.click(screen.getByTestId("lines-card-duplicate"));
-
-    await waitFor(() => {
-      expect(createFactoryLineMutateAsync).toHaveBeenCalledWith({
-        name: "plan-and-implement copy",
-        steps: sourceLine?.steps ?? [],
-      });
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-        factoryLineDetailPath("org-1", PRIMARY_FACTORY_KEY, "line-new"),
-      );
-    });
-  });
-});
 
 describe("LinesPage board", () => {
   beforeEach(async () => {
@@ -202,6 +169,17 @@ describe("LinesPage board", () => {
         data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
       }),
     );
+    useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
+      if (options?.enabled === false) {
+        return { data: undefined, isPending: false, isError: false };
+      }
+      if (canvasId === "app-refund-implementer") {
+        return canvasQuery(implementerCanvas);
+      }
+      return canvasQuery(canvasWithoutAgent);
+    });
+    updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
+    commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
   });
 
   it("does not show a back link to the lines list", () => {
@@ -260,10 +238,10 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
     expect(within(dialog).getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
-    expect(within(dialog).getByTestId("split-run-review")).toBeInTheDocument();
+    expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("tab", { name: "Log" }));
-    expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
+    expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
@@ -428,16 +406,81 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
-  it("labels phase Edit as Edit Automation", async () => {
+  it("offers full-screen automation editing and inline agent editing", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
-    await user.keyboard("{Escape}");
+    expect(screen.getByTestId("lines-phase-menu-0-edit-agent")).toHaveTextContent("Edit Agent");
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
+  });
+
+  it("opens the agent editor with the canvas agent name and steps", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue("Clone Repo");
+    expect(screen.getByTestId("planning-review-step-body-0")).toHaveValue("git clone $REPO repo");
+  });
+
+  it("hides Edit Agent when the column canvas has no agent", async () => {
+    useCanvasMock.mockReturnValue(canvasQuery(canvasWithoutAgent));
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
+    expect(screen.queryByTestId("lines-phase-menu-0-edit-agent")).not.toBeInTheDocument();
+  });
+
+  it("stages and commits the canvas agent on Save Agent", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    const stepName = screen.getByTestId("planning-review-step-name-0");
+    await user.clear(stepName);
+    await user.type(stepName, "Clone repository");
+    await user.click(screen.getByTestId("planning-review-save"));
+
+    await waitFor(() => {
+      expect(updateCanvasVersionMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          versionId: "version-live",
+          canvasYaml: expect.stringContaining("Clone repository"),
+        }),
+      );
+    });
+    expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update agent");
+    expect(screen.queryByTestId("lines-planning-review")).not.toBeInTheDocument();
+  });
+
+  it("keeps Backlog Edit as the only edit action", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.getByTestId("lines-backlog-menu-edit")).toHaveTextContent("Edit");
+    expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
   });
 

@@ -32,10 +32,12 @@ export function ConfigureAutomationPage() {
     organizationId && factoryId
       ? isStandalone
         ? `/${organizationId}/workspaces/${factoryId}/automations`
-        : `/${organizationId}/workspaces/${factoryId}/lines`
+        : lineId
+          ? `/${organizationId}/workspaces/${factoryId}/lines/${lineId}`
+          : `/${organizationId}/workspaces/${factoryId}`
       : isStandalone
         ? "/automations"
-        : "/lines";
+        : "/";
   const backLabel = isStandalone
     ? (state.automationName ?? automationId ?? "Automations")
     : (state.lineName ?? lineId ?? "Factory line");

@@ -1,5 +1,10 @@
 import { canvasesCancelRun } from "@/api-client";
-import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
+import {
+  factoryQueryKeys,
+  useCloseWorkOrder,
+  useDispatchWorkOrder,
+  useUpdateWorkOrderStatus,
+} from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -8,7 +13,7 @@ import { useCallback } from "react";
 
 import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
 import { isSplitRunRerunChoice, rerunStartStepIndex } from "./splitRunFooter";
-import { applySplitRunStop, type SplitRunStopRun } from "./splitRunStop";
+import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from "./splitRunStop";
 
 type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   lineName?: string;
@@ -19,6 +24,9 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
     return "Work order closed as completed.";
   }
+  if (choice === "canceled") {
+    return "Work order closed as rejected.";
+  }
   if (choice === "reopen") {
     return "Work order reopened.";
   }
@@ -28,11 +36,11 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "rerun-step") {
     return "Work order step started again.";
   }
-  return "Work order closed as canceled.";
+  return "Work order closed as failed.";
 }
 
 function rejectToast(): string {
-  return "Work order deleted.";
+  return closeToast("canceled");
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
@@ -65,11 +73,22 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["canvases"] });
+      if (!organizationId || !factoryId) {
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      if (orderId) {
+        await queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+        });
+      }
     },
   });
 
+  const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
+
   const handleReject = useCallback(async () => {
-    if (!live || !orderId) {
+    if (!live || !orderId || busy) {
       return false;
     }
     try {
@@ -80,11 +99,11 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
       return false;
     }
-  }, [closeWorkOrder, live, orderId]);
+  }, [busy, closeWorkOrder, live, orderId]);
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
-      if (!live || !orderId) {
+      if (!live || !orderId || busy) {
         return;
       }
       try {
@@ -119,12 +138,30 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         showErrorToast(getApiErrorMessage(error, stopErrorFallback(choice, footer)));
       }
     },
-    [cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
+    [busy, cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
+  );
+
+  const handleStopAutomation = useCallback(
+    async (run: SplitRunStopRun) => {
+      if (!live || busy) {
+        return;
+      }
+      try {
+        await stopSplitRunAutomation(run, (next) => cancelRun.mutateAsync(next));
+        showSuccessToast("Automation stopped.");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to stop the run"));
+      }
+    },
+    [busy, cancelRun, live],
   );
 
   return {
     handleStop,
+    handleStopAutomation,
     handleReject,
-    busy: cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending,
+    busy,
   };
 }
+
+export type SplitRunFooterActions = ReturnType<typeof useSplitRunFooterActions>;

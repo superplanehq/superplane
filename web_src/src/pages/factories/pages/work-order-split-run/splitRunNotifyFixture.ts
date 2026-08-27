@@ -2,9 +2,11 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrde
 
 import { implementationPlanMarkdown } from "../onboarding/first-run/reviewCandidateModel";
 import { doneFooterForStatus } from "./splitRunFooter";
+import type { SplitRunCanvasKey } from "./splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
 
 const NOTIFY_BRANCH = "fix/bug-not-getting-notified-for-status-change-when-re-1787246840-4193b6d9";
+const NOTIFY_REPOSITORY = "superplanehq/superplane";
 const NOTIFY_PR_URL = "https://github.com/superplanehq/superplane/pull/6837";
 
 function markdownArtifact(id: string, name: string, body: string): FactoriesWorkOrderArtifact {
@@ -32,7 +34,11 @@ function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
   return {
     id: `art-branch-${orderId}`,
     type: "TYPE_BRANCH",
-    data: { name: NOTIFY_BRANCH },
+    data: {
+      name: NOTIFY_BRANCH,
+      repository: NOTIFY_REPOSITORY,
+      url: `https://github.com/${NOTIFY_REPOSITORY}/tree/${NOTIFY_BRANCH}`,
+    },
   };
 }
 
@@ -66,6 +72,7 @@ function passedPhase(input: {
   stream?: SplitRunStreamLine[];
   appId?: string;
   runId?: string;
+  canvasKey?: SplitRunCanvasKey | null;
 }): SplitRunPhase {
   return {
     id: input.id,
@@ -76,7 +83,7 @@ function passedPhase(input: {
     artifacts: input.artifacts ?? [],
     stream: input.stream ?? [],
     canvasSteps: [],
-    canvasKey: null,
+    canvasKey: input.canvasKey ?? null,
     appId: input.appId,
     runId: input.runId,
   };
@@ -325,6 +332,8 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "Planning",
       duration: "2m 59s",
       artifacts: [plan],
+      appId: "app-refund-planner",
+      canvasKey: "planning",
     }),
     passedPhase({
       id: "implementation-1",
@@ -334,6 +343,7 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       artifacts: [branch],
       appId: run?.appId,
       runId: run?.runId,
+      canvasKey: "implementation",
     }),
     passedPhase({
       id: "pr-creation-2",
@@ -341,6 +351,8 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "PR Creation",
       duration: "1m 23s",
       stream: notifyPrCreationStream(pullRequest),
+      appId: "app-pr-closure",
+      canvasKey: "closure",
     }),
     passedPhase({
       id: "ci-loop-3",
@@ -348,12 +360,16 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "Risk Assessment",
       duration: "10m 12s",
       stream: notifyCiLoopStream(),
+      appId: "app-refund-verifier",
+      canvasKey: "risk",
     }),
     passedPhase({
       id: "risk-assessment-4",
       name: "Verify",
       componentName: "Risk Assessment",
       duration: "29s",
+      appId: "app-refund-verifier",
+      canvasKey: "risk",
     }),
     passedPhase({
       id: "ui-preview-storybook-coverage-5",
@@ -361,6 +377,8 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
       componentName: "UI Preview & Storybook Coverage",
       duration: "1m 26s",
       stream: notifyUiPreviewStream(),
+      appId: "app-refund-verifier",
+      canvasKey: "risk",
     }),
   ];
 }

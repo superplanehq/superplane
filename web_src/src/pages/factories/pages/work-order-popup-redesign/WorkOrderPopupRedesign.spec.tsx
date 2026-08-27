@@ -214,7 +214,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("button", { name: "plan.md" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: /feature\/rf-103/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Log" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
     expect(within(dialog).queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
@@ -274,7 +274,9 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -304,7 +306,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("tab", { name: "Plan" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("tab", { name: "Ticket" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-overview-checks")).toHaveTextContent("Confidence score");
-    await user.click(within(dialog).getByRole("tab", { name: "Log" }));
+    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
@@ -313,7 +315,7 @@ describe("Line board job popup", () => {
     await user.click(screen.getByRole("button", { name: "Open Send refund receipts after provider confirm" }));
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole("tab", { name: "Log" }));
+    await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
     expect(await within(dialog).findByTestId("split-run-phase-checks-verify-1")).toBeInTheDocument();
     expect(within(dialog).getByText("Risk score")).toBeInTheDocument();
     expect(within(dialog).getByText("Code quality")).toBeInTheDocument();

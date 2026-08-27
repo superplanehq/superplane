@@ -49,7 +49,7 @@ func Test__IntakeSeed(t *testing.T) {
 			"Add a flake retry to the checkout e2e suite",
 		}
 
-		events, err := gitHubIssueEvents(gitHubIssuePage(titles), "acme/backlog", intakeSeedSize)
+		events, err := gitHubIssueEvents(gitHubIssuePage(titles), "acme/backlog")
 		require.NoError(t, err)
 		require.NoError(t, emitIntakeEvents(
 			database.DB(t.Context()),
@@ -94,14 +94,8 @@ func Test__IntakeSeed(t *testing.T) {
 }
 
 func Test__GitHubIssueEvents(t *testing.T) {
-	t.Run("pull requests do not enter the intake", func(t *testing.T) {
-		issues := gitHubIssuePage([]string{"Newest issue", "Older issue"})
-		issues = append([]*github.Issue{{
-			Title:            github.Ptr("A pull request"),
-			PullRequestLinks: &github.PullRequestLinks{URL: github.Ptr("https://github.com/acme/backlog/pull/1")},
-		}}, issues...)
-
-		events, err := gitHubIssueEvents(issues, "acme/backlog", intakeSeedSize)
+	t.Run("the newest issue ends up on top of the intake", func(t *testing.T) {
+		events, err := gitHubIssueEvents(gitHubIssuePage([]string{"Newest issue", "Older issue"}), "acme/backlog")
 		require.NoError(t, err)
 		require.Len(t, events, 2)
 
@@ -111,16 +105,6 @@ func Test__GitHubIssueEvents(t *testing.T) {
 		assert.Equal(t, "Newest issue", issueEventTitle(t, events[1]))
 	})
 
-	t.Run("a page longer than the seed is cut to the newest items", func(t *testing.T) {
-		titles := []string{"1", "2", "3", "4", "5", "6", "7"}
-		events, err := gitHubIssueEvents(gitHubIssuePage(titles), "acme/backlog", intakeSeedSize)
-		require.NoError(t, err)
-
-		require.Len(t, events, intakeSeedSize)
-		assert.Equal(t, "5", issueEventTitle(t, events[0]))
-		assert.Equal(t, "1", issueEventTitle(t, events[len(events)-1]))
-	})
-
 	t.Run("an event carries what the graph reads", func(t *testing.T) {
 		issue := &github.Issue{
 			Number: github.Ptr(42),
@@ -128,7 +112,7 @@ func Test__GitHubIssueEvents(t *testing.T) {
 			Body:   github.Ptr("A retried refund charges the customer twice."),
 		}
 
-		events, err := gitHubIssueEvents([]*github.Issue{issue}, "acme/backlog", intakeSeedSize)
+		events, err := gitHubIssueEvents([]*github.Issue{issue}, "acme/backlog")
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 

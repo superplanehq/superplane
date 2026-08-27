@@ -30,14 +30,14 @@ export function firstFactoryLineName(
 }
 
 /**
- * Workspace home: the first line board when a line exists, otherwise the
- * lines list (empty state).
+ * Workspace home: the first line board when a line id is present.
+ * Without a line id, the workspace index — which redirects to that board.
  */
 export function factoryHomePath(organizationId: string, factoryKey: string, lineId?: string | null) {
   if (lineId) {
     return factoryLineDetailPath(organizationId, factoryKey, lineId);
   }
-  return linesPath(organizationId, factoryKey);
+  return factoryDetailPath(organizationId, factoryKey);
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */

@@ -1,10 +1,4 @@
-import {
-  automationDetailPath,
-  automationsPath,
-  factoryHomePath,
-  factoryLineDetailPath,
-  linesPath,
-} from "./factoryPagePaths";
+import { automationDetailPath, automationsPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
 
 export type FactoryAppBackNav = {
   label: string;
@@ -49,7 +43,7 @@ export function resolveFactoryAppBackNav(
         href: factoryLineDetailPath(organizationId, factoryKey, options.lineId),
       };
     }
-    return { label: "Back", href: linesPath(organizationId, factoryKey) };
+    return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };
   }
 
   if (from === "work-order") {

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -244,7 +245,7 @@ func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, pullRequestI
 	  }
 	}`
 
-	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID})
+	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID}, nil)
 }
 
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
@@ -330,14 +331,6 @@ func (c *Client) CreateIssue(ctx context.Context, repository string, issue *gith
 func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber int) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
-}
-
-// ListIssues wraps the repository issue list. GitHub answers this endpoint with
-// pull requests too, so a caller that wants issues only must skip the entries
-// that report IsPullRequest.
-func (c *Client) ListIssues(ctx context.Context, repository string, opts *github.IssueListByRepoOptions) ([]*github.Issue, *github.Response, error) {
-	owner, name := c.ownerAndName(repository)
-	return c.underlying.Issues.ListByRepo(ctx, owner, name, opts)
 }
 
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
@@ -437,7 +430,10 @@ type graphQLRequest struct {
 	Variables map[string]any `json:"variables,omitempty"`
 }
 
+// graphQLResponse reports a failure in its `errors` array on an HTTP 200, so
+// err() turns that array into a regular error.
 type graphQLResponse struct {
+	Data   json.RawMessage `json:"data"`
 	Errors []struct {
 		Message string `json:"message"`
 	} `json:"errors"`
@@ -445,9 +441,9 @@ type graphQLResponse struct {
 
 // doGraphQL sends a mutation or query to GitHub's GraphQL endpoint, reusing the
 // REST client so that authentication and the HTTP context transport apply.
-// GraphQL reports failures as an `errors` array on an HTTP 200, so those are
-// turned into a regular error here.
-func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any) error {
+// A query that reads data passes a target for the `data` object; a mutation
+// passes nil.
+func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any, data any) error {
 	request, err := c.underlying.NewRequest(http.MethodPost, "graphql", graphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -461,12 +457,28 @@ func (c *Client) doGraphQL(ctx context.Context, query string, variables map[stri
 		return err
 	}
 
-	if len(response.Errors) == 0 {
+	if err := response.err(); err != nil {
+		return err
+	}
+
+	if data == nil || len(response.Data) == 0 {
+		return nil
+	}
+
+	if err := json.Unmarshal(response.Data, data); err != nil {
+		return fmt.Errorf("failed to read GraphQL response: %w", err)
+	}
+
+	return nil
+}
+
+func (r graphQLResponse) err() error {
+	if len(r.Errors) == 0 {
 		return nil
 	}
 
 	messages := []string{}
-	for _, e := range response.Errors {
+	for _, e := range r.Errors {
 		if e.Message != "" {
 			messages = append(messages, e.Message)
 		}

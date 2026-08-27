@@ -46,7 +46,7 @@ describe("ColumnLaneMenu", () => {
     expect(onColorChange).toHaveBeenCalledWith(null);
   });
 
-  it("calls onEdit instead of following a canvas href", async () => {
+  it("calls the inline Edit action when it is supplied", async () => {
     const onEdit = vi.fn();
     const user = userEvent.setup();
 
@@ -66,6 +66,36 @@ describe("ColumnLaneMenu", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-edit"));
     expect(onEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers a separate Edit Agent action", async () => {
+    const onEditAgent = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Plan"
+          testId="lines-phase-menu-0"
+          editHref="/canvas-edit"
+          editLabel="Edit Automation"
+          onEditAgent={onEditAgent}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    const editAgent = screen.getByTestId("lines-phase-menu-0-edit-agent");
+    const editAutomation = screen.getByTestId("lines-phase-menu-0-edit");
+    expect(editAgent).toHaveTextContent("Edit Agent");
+    expect(editAutomation).toHaveTextContent("Edit Automation");
+    // Editing the agent is the common task, so it leads the menu.
+    expect(editAgent.compareDocumentPosition(editAutomation) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(editAgent);
+
+    expect(onEditAgent).toHaveBeenCalledTimes(1);
   });
 
   it("uses the supplied Edit label for canvas columns", async () => {
