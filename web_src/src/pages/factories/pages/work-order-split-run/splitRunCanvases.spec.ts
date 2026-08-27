@@ -80,12 +80,11 @@ describe("splitRunCanvasForPhase", () => {
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
-    expect(canvas.nodes.map((node) => node.name)).toContain("From GH issue?");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Agent - Implement from order description");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Draft Pull Request");
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Work Order");
     expect(canvas.statuses["create-branch"]).toBe("passed");
-    expect(canvas.statuses["implementation-agent"]).toBe("running");
-    expect(canvas.statuses["implementation-agent-no-issue"]).toBe("did_not_run");
+    expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
     expect(canvas.statuses["generate-pr-text"]).toBe("did_not_run");
     expect(canvas.statuses["create-draft-pr"]).toBe("did_not_run");
     expect(canvas.statuses["add-pr-label"]).toBe("did_not_run");
@@ -106,7 +105,7 @@ describe("splitRunCanvasForPhase", () => {
       canvasSteps: [],
     });
 
-    expect(canvas.statuses["implementation-agent"]).toBe("passed");
+    expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
     expect(canvas.statuses["generate-pr-text"]).toBe("passed");
     expect(canvas.statuses["create-draft-pr"]).toBe("passed");
     expect(canvas.statuses["add-pr-label"]).toBe("passed");
@@ -130,8 +129,8 @@ describe("splitRunCanvasForPhase", () => {
     const canvas = splitRunCanvasForPhase(plan!);
     expect(canvas.title).toBe("Plan");
     expect(canvas.statuses["onrun-create-plan"]).toBe("triggered");
-    expect(canvas.statuses["planner-agent"]).toBe("passed");
-    expect(canvas.statuses["planner-agent-no-issue"]).toBe("did_not_run");
+    expect(canvas.statuses["planner-agent-no-issue"]).toBe("passed");
+    expect(canvas.statuses["add-plan-artifact"]).toBe("passed");
   });
 
   it("writes one log line per canvas node and extra Claude Code notes", () => {
@@ -266,15 +265,15 @@ describe("splitRunCanvasForPhase", () => {
       canvasSteps: [],
     });
     const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "add-factory-label")).toMatchObject({
-      componentType: "github.addIssueLabel",
-      componentName: "Add Factory Label",
+    expect(stream.find((line) => line.id === "add-plan-artifact")).toMatchObject({
+      componentType: "Add Work Order Artifact",
+      componentName: "Add Plan Artifact",
     });
-    expect(stream.find((line) => line.id === "planner-agent")).toMatchObject({
+    expect(stream.find((line) => line.id === "planner-agent-no-issue")).toMatchObject({
       componentType: "Run Claude Code",
-      componentName: "Agent - Plan for GH Issue",
+      componentName: "Agent - No GH Issue Plan",
     });
-    const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent" && line.note);
+    const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent-no-issue" && line.note);
     expect(
       plannerNotes
         .filter((line) => !line.noteParentId)
@@ -305,11 +304,6 @@ describe("splitRunCanvasForPhase", () => {
       plannerNotes.some((line) => line.componentName.includes("LineListCard.tsx") && line.componentType === "read"),
     ).toBe(true);
     expect(plannerNotes.some((line) => line.componentName.includes("import type"))).toBe(false);
-    expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent") ?? {})).toEqual([
-      { name: "Clone Repo", type: "bash" },
-      { name: "Write Implementation Plan", type: "prompt" },
-      { name: "Use plan as output", type: "bash" },
-    ]);
     expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent-no-issue") ?? {})).toEqual([
       { name: "Clone Repo", type: "bash" },
       { name: "Write Implementation Plan", type: "prompt" },
@@ -329,7 +323,7 @@ describe("splitRunCanvasForPhase", () => {
       canvasSteps: [],
     });
     const stream = richStreamForCanvas(canvas);
-    const agentNotes = stream.filter((line) => line.nodeId === "implementation-agent" && line.note);
+    const agentNotes = stream.filter((line) => line.nodeId === "implementation-agent-no-issue" && line.note);
     expect(
       agentNotes
         .filter((line) => !line.noteParentId)

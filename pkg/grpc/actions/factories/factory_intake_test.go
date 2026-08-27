@@ -122,6 +122,28 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, "integration", credentials["source"])
 	})
 
+	t.Run("an intake analyzes a batch of items in parallel", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		// A node without a concurrency spec runs one execution at a time, so a
+		// seeded batch would take as long as the sum of its analyses. Both the
+		// canvas version and the node record have to carry the spec: the
+		// scheduler reads the record.
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
+			if node.ID == intakeTriggerNodeID {
+				continue
+			}
+
+			assert.Equalf(t, intakeConcurrencyMax, node.Concurrency.EffectiveMax(), "version node %s", node.ID)
+
+			stored, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, node.ID)
+			require.NoError(t, err)
+			assert.Equalf(t, intakeConcurrencyMax, stored.ConcurrencySpec().EffectiveMax(), "node record %s", node.ID)
+		}
+	})
+
 	t.Run("a source can have several intakes", func(t *testing.T) {
 		factory := newFactory(t)
 		first := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})

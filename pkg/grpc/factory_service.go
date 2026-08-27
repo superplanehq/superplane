@@ -137,6 +137,16 @@ func (s *FactoryService) ListFactoryPRFeedbackHandlerRuns(ctx context.Context, r
 	return actions.ListFactoryPRFeedbackHandlerRuns(ctx, organizationID, req)
 }
 
+func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListWorkOrders(ctx, organizationID, req)

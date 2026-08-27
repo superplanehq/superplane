@@ -14,28 +14,38 @@ export function WorkOrderSplitRunSource({ source }: { source: SplitRunSource }) 
 }
 
 function IntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "intake" }> }) {
-  const href = safeExternalUrl(source.ticket.href);
   return (
     <>
       <p className="flex min-w-0 items-center gap-1.5 text-foreground">
         <img src={source.iconSrc} alt={source.iconAlt} className="size-4 shrink-0" />
         <span className="truncate">{source.name}</span>
       </p>
-      {href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-w-0 items-center gap-1.5 font-medium text-foreground hover:underline"
-          data-testid="split-run-source-ticket"
-        >
-          <span className="truncate">{source.ticket.label}</span>
-          <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-        </a>
-      ) : (
-        <p className="truncate font-medium text-foreground">{source.ticket.label}</p>
-      )}
+      <IntakeTicket ticket={source.ticket} />
     </>
+  );
+}
+
+function IntakeTicket({ ticket }: { ticket?: { label: string; href: string } }) {
+  if (!ticket) {
+    return null;
+  }
+
+  const href = safeExternalUrl(ticket.href);
+  if (!href) {
+    return <p className="truncate font-medium text-foreground">{ticket.label}</p>;
+  }
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex min-w-0 items-center gap-1.5 font-medium text-foreground hover:underline"
+      data-testid="split-run-source-ticket"
+    >
+      <span className="truncate">{ticket.label}</span>
+      <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+    </a>
   );
 }
 

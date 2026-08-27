@@ -218,6 +218,26 @@ spec:
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
 
+  it("keeps the planning agent on Opus when Claude Code credentials become hosted", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Plan",
+      canvasId: "canvas-hosted-plan",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerClaudeCode",
+        model: "claude-sonnet-4-6",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/id: planner-agent-no-issue[\s\S]*model: opus/);
+    expect(canvasYaml).not.toContain("model: claude-sonnet-4-6");
+  });
+
   it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
     const canvasYaml = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-implementation"),

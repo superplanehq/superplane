@@ -120,7 +120,9 @@ function buildEventApp(args: {
 
 /**
  * Ordered factory-line apps provisioned during onboarding. Each entry maps to a
- * bundled app template and the line step that calls its onRun entrypoint.
+ * bundled app template and the line step that calls its onRun entrypoint. The
+ * bundled Verify app stays available for manual install, because the line hands
+ * the pull request to review from Implement.
  */
 export interface OnboardingLineApp {
   factoryId: string;

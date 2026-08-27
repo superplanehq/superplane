@@ -37,6 +37,8 @@ export function useHomeIntegrationConnectActions({
 
   /**
    * Two GitHub setup paths (see registry.UseNewSetupFlow):
+   * - hosted public app (definition.hostedAppInstall): skip the dialog and
+   *   follow the Sync browserAction to the SuperPlane GitHub App install page
    * - org experimental feature new_integration_setup_flow + SetupProvider:
    *   definition.legacySetupOnly === false → wizard at /settings/integrations/:name/setup
    * - feature off: legacySetupOnly === true →
