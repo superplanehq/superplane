@@ -10,10 +10,9 @@ interface TimelineAutomationActorProps {
 
 export function TimelineAutomationActor({ actor, fallbackLabel = "Automation" }: TimelineAutomationActorProps) {
   const lineName = actor.lineName?.trim();
-  const stepName = actor.stepName?.trim();
   const nodeName = actor.nodeName?.trim();
-  const appName = actor.appName?.trim();
-  const tooltip = formatStepNodeTooltip(stepName, nodeName);
+  const appName = actor.appName?.trim() || actor.stepName?.trim();
+  const tooltip = formatStepNodeTooltip(appName, nodeName);
 
   if (lineName && tooltip) {
     return (

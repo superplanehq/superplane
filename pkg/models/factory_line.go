@@ -1,15 +1,11 @@
 package models
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -17,6 +13,10 @@ import (
 
 const (
 	FactoryLineStepTypeRunApp = "runApp"
+
+	// DefaultFactoryLineStepMaxParallelism is the number of in-flight runs
+	// a step allows when maxParallelism is not set.
+	DefaultFactoryLineStepMaxParallelism = 10
 
 	factoryLineNameUniqueConstraint = "factory_lines_factory_id_name_key"
 )
@@ -26,13 +26,24 @@ var (
 	ErrFactoryLineNameAlreadyExists = errors.New("factory line name already exists")
 	ErrFactoryLineHasNoSteps        = errors.New("factory line has no steps")
 	ErrFactoryLineStepNotOnRun      = errors.New("factory line step entrypoint must use the onRun trigger")
+	ErrFactoryLineStepOutOfRange    = errors.New("factory line step index is out of range")
 )
 
 type FactoryLineStep struct {
-	Name       string    `json:"name"`
 	Type       string    `json:"type"`
 	AppID      uuid.UUID `json:"app_id"`
 	Entrypoint string    `json:"entrypoint"`
+	// MaxParallelism caps the step's in-flight runs across all work
+	// orders on the line. Unset means the default of 10; there is no
+	// unbounded setting.
+	MaxParallelism *int `json:"max_parallelism,omitempty"`
+}
+
+func (s *FactoryLineStep) EffectiveMaxParallelism() int {
+	if s.MaxParallelism == nil || *s.MaxParallelism < 1 {
+		return DefaultFactoryLineStepMaxParallelism
+	}
+	return *s.MaxParallelism
 }
 
 type FactoryLine struct {
@@ -81,122 +92,18 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 	return line, nil
 }
 
+// FactoryLineStepResult is the outcome of making a work order ready for a
+// step (see FactoryLine.Dispatch and
+// FactoryWorkOrderLineDispatch.EnqueueOrStartStep): either the run +
+// execution created by starting it, or — when the step is at its
+// maxParallelism — the queue item created instead (Run and Execution nil).
 type FactoryLineStepResult struct {
 	Run       *CanvasRun
 	Execution *FactoryWorkOrderExecution
+	QueueItem *FactoryWorkOrderQueueItem
 }
 
 const onRunTriggerName = "onRun"
-
-// StartStep launches the given step against the run's inputs and records a
-// `step.execution.created` event.
-func (l *FactoryLine) StartStep(tx *gorm.DB, order *FactoryWorkOrder, stepIndex int) (*FactoryLineStepResult, error) {
-	steps := []FactoryLineStep(l.Steps)
-	if stepIndex < 0 || stepIndex >= len(steps) {
-		return nil, fmt.Errorf("step index %d out of range", stepIndex)
-	}
-
-	step := steps[stepIndex]
-
-	node, err := FindCanvasNode(tx, step.AppID, step.Entrypoint)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("entrypoint %q not found", step.Entrypoint)
-		}
-		return nil, err
-	}
-
-	ref := node.Ref.Data()
-	if ref.Trigger == nil || ref.Trigger.Name != onRunTriggerName {
-		return nil, ErrFactoryLineStepNotOnRun
-	}
-
-	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, step.AppID)
-	if err != nil {
-		return nil, err
-	}
-
-	runInput, err := factoryWorkOrderRunInput(tx, order)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	run := &CanvasRun{
-		ID:         uuid.New(),
-		WorkflowID: step.AppID,
-		NodeID:     step.Entrypoint,
-		VersionID:  liveVersion.ID,
-		Callbacks: datatypes.JSONSlice[core.RunCallback]{
-			{
-				When: core.RunCallbackWhenPending,
-				On:   core.RunCallbackOnEntry,
-				Hook: "onMessage",
-			},
-		},
-		Input:     NewJSONValue(runInput),
-		State:     CanvasRunStatePending,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-	}
-
-	if err := tx.Create(run).Error; err != nil {
-		return nil, err
-	}
-
-	execution := &FactoryWorkOrderExecution{
-		ID:             uuid.New(),
-		OrganizationID: l.OrganizationID,
-		FactoryID:      l.FactoryID,
-		WorkOrderID:    order.ID,
-		LineID:         l.ID,
-		StepIndex:      stepIndex,
-		StepName:       step.Name,
-		RunID:          run.ID,
-		Status:         FactoryWorkOrderExecutionStatusPending,
-		Result:         "",
-		CreatedAt:      now,
-		UpdatedAt:      now,
-	}
-
-	if err := tx.Clauses(clause.Returning{}).Create(execution).Error; err != nil {
-		return nil, err
-	}
-
-	if err := l.RecordStepExecutionCreated(tx, order, execution, &step, run); err != nil {
-		return nil, err
-	}
-
-	return &FactoryLineStepResult{
-		Run:       run,
-		Execution: execution,
-	}, nil
-}
-
-func (l *FactoryLine) RecordStepExecutionCreated(tx *gorm.DB, order *FactoryWorkOrder, execution *FactoryWorkOrderExecution, step *FactoryLineStep, run *CanvasRun) error {
-	data := factory.LineStepExecutionCreated{
-		StepName: step.Name,
-		Order:    order.Ref(),
-		Line:     &factory.LineRef{ID: l.ID, Name: l.Name},
-		App:      &factory.AppRef{ID: run.WorkflowID},
-		Run:      &factory.RunRef{ID: run.ID, State: run.State},
-	}
-
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	event := &FactoryWorkOrderEvent{
-		ID:          uuid.New(),
-		WorkOrderID: order.ID,
-		Type:        factory.EventTypeLineStepExecutionCreated,
-		Data:        datatypes.JSON(jsonData),
-		CreatedAt:   time.Now(),
-	}
-
-	return tx.Create(event).Error
-}
 
 func (f *Factory) FindLine(tx *gorm.DB, lineID uuid.UUID) (*FactoryLine, error) {
 	var line FactoryLine

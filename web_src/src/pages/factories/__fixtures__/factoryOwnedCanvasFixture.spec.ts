@@ -13,6 +13,7 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   PRIMARY_FACTORY_ID,
@@ -20,7 +21,7 @@ import {
 import { SIMPLE_FACTORY_RUN_EDGES, SIMPLE_FACTORY_RUN_NODE_IDS } from "./simpleFactoryRunCanvas";
 
 describe("factoryOwnedCanvasFixture", () => {
-  it("marks the canvas as owned by the Refunds Factory", () => {
+  it("marks the canvas as owned by Semaphore", () => {
     const fixture = factoryOwnedCanvasFixture(REFUND_IMPLEMENTER_APP);
 
     expect(fixture.canvasId).toBe(REFUND_IMPLEMENTER_APP.id);
@@ -39,6 +40,7 @@ describe("factoryOwnedCanvasFixture", () => {
     expect(runIds).toEqual([
       LINE_RUN_IMPLEMENT_ID,
       LINE_RUN_IMPLEMENT_FAILED_ID,
+      LINE_RUN_IMPLEMENT_NOTIFY_ID,
       LINE_RUN_IMPLEMENT_PASSED_ID,
       LINE_RUN_VERIFY_PASSED_ID,
     ]);

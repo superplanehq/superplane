@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"gorm.io/gorm"
@@ -22,6 +23,12 @@ type FactoryContext struct {
 	// mutation with a `reason` string (currently the event type that was
 	// recorded). Wired by the node executor via WithWorkOrderUpdated.
 	onWorkOrderUpdated func(factoryID, orderID, reason string)
+
+	// Optional notification fan-out callback: invoked with a fully built
+	// notification payload for mutations that should email work order
+	// owners/creators. The node executor collects these and publishes
+	// them after the surrounding transaction commits.
+	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -48,6 +55,13 @@ func (c *FactoryContext) WithWorkOrderUpdated(callback func(factoryID, orderID, 
 	return c
 }
 
+func (c *FactoryContext) WithWorkOrderNotification(
+	callback func(messages.FactoryWorkOrderNotificationMessage),
+) *FactoryContext {
+	c.onWorkOrderNotification = callback
+	return c
+}
+
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
@@ -68,7 +82,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	sourceRunID := c.execution.RunID
-	order, err := f.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,12 +91,46 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	return workOrderToCore(order), nil
 }
 
+func (c *FactoryContext) createFactoryWorkOrder(
+	factoryModel *models.Factory,
+	params core.WorkOrderParams,
+	sourceRunID uuid.UUID,
+) (*models.FactoryWorkOrder, error) {
+	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
+		return factoryModel.CreateWorkOrderWithOrigin(
+			c.tx,
+			params.Title,
+			params.Description,
+			nil,
+			[]uuid.UUID{},
+			&sourceRunID,
+			*origin,
+		)
+	}
+
+	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+}
+
+func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
+	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
+		return nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, sourceRunID)
+	if err != nil {
+		return nil
+	}
+
+	return models.OriginFromIntakeRootEvent(event)
+}
+
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
 	order, err := c.resolveWorkOrder(params.OrderID)
 	if err != nil {
 		return nil, false, err
 	}
 
+	fromState := order.State
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:    params.State,
 		Result:     params.Result,
@@ -103,6 +151,16 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusUpdated)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderStatusUpdated,
+		ActorName:      c.automationName(),
+		FromState:      fromState,
+		ToState:        order.State,
+		Result:         order.Result,
+	})
 	return workOrderToCore(order), true, nil
 }
 
@@ -124,11 +182,23 @@ func (c *FactoryContext) AddWorkOrderComment(params core.AddWorkOrderCommentPara
 		Automation: c.automationRef(),
 	}
 
-	if err := order.RecordCommentAdded(c.tx, body, author, c.runRef()); err != nil {
+	if _, err := order.RecordCommentAdded(c.tx, models.FactoryWorkOrderCommentParams{
+		Body:   body,
+		Author: author,
+		Run:    c.runRef(),
+	}); err != nil {
 		return err
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCommentAdded)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderCommentAdded,
+		ActorName:      c.automationName(),
+		CommentBody:    body,
+	})
 	return nil
 }
 
@@ -150,6 +220,14 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 	}
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactAdded)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: order.OrganizationID.String(),
+		FactoryID:      order.FactoryID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factory.EventTypeOrderArtifactAdded,
+		ActorName:      c.automationName(),
+		ArtifactType:   artifact.Type,
+	})
 	return artifactToCore(artifact)
 }
 
@@ -166,6 +244,68 @@ func (c *FactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArti
 
 	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
 	return artifactToCore(artifact)
+}
+
+func (c *FactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	check, err := order.ReportCheck(c.tx, models.FactoryWorkOrderCheckParams{
+		Key:        params.CheckKey,
+		Name:       params.Name,
+		Score:      params.Score,
+		MaxScore:   params.MaxScore,
+		Format:     params.Format,
+		Level:      params.Level,
+		Summary:    params.Summary,
+		Analysis:   params.Analysis,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderCheckReported)
+	return checkToCore(check), nil
+}
+
+func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	note, err := order.SetStatusNote(c.tx, models.FactoryWorkOrderStatusNoteParams{
+		Key:                 params.NoteKey,
+		Kind:                params.Kind,
+		Headline:            params.Headline,
+		Body:                params.Body,
+		CtaLabel:            params.CtaLabel,
+		CtaURL:              params.CtaURL,
+		ShowOnlyWhenWaiting: params.ShowOnlyWhenWaiting,
+		Automation:          c.automationRef(),
+		Run:                 c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusNoteUpdated)
+	c.notifyWorkOrderNotification(messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID:     order.OrganizationID.String(),
+		FactoryID:          order.FactoryID.String(),
+		OrderID:            order.ID.String(),
+		EventType:          factory.EventTypeOrderStatusNoteUpdated,
+		ActorName:          c.automationName(),
+		StatusNoteHeadline: note.Headline,
+		StatusNoteBody:     note.Body,
+		StatusNoteCtaLabel: note.CtaLabel,
+		StatusNoteCtaURL:   note.CtaURL,
+	})
+	return statusNoteToCore(order, note), nil
 }
 
 // FindWorkOrder resolves a work order by id or by an artifact key,
@@ -248,6 +388,26 @@ func (c *FactoryContext) notifyWorkOrderUpdated(factoryID, orderID uuid.UUID, re
 	c.onWorkOrderUpdated(factoryID.String(), orderID.String(), reason)
 }
 
+func (c *FactoryContext) notifyWorkOrderNotification(message messages.FactoryWorkOrderNotificationMessage) {
+	if c.onWorkOrderNotification == nil {
+		return
+	}
+	c.onWorkOrderNotification(message)
+}
+
+// automationName picks a display name for the automation actor shown in
+// notification emails: the canvas node name when known, else the app name.
+func (c *FactoryContext) automationName() string {
+	ref := c.automationRef()
+	if ref == nil {
+		return ""
+	}
+	if ref.NodeName != "" {
+		return ref.NodeName
+	}
+	return ref.AppName
+}
+
 // runRef attributes emitted events back to the currently executing run.
 func (c *FactoryContext) runRef() *factory.RunRef {
 	if c.execution == nil {
@@ -267,7 +427,7 @@ func (c *FactoryContext) appRef() *factory.AppRef {
 		return nil
 	}
 
-	return &factory.AppRef{ID: c.canvas.ID}
+	return &factory.AppRef{ID: c.canvas.ID, Name: c.canvas.Name}
 }
 
 // automationRef captures node/app/line/step identity for timeline
@@ -318,19 +478,17 @@ func (c *FactoryContext) lineStep() (lineStepInfo, bool) {
 		return lineStepInfo{}, false
 	}
 
-	f, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
-	if err != nil {
-		return lineStepInfo{}, false
-	}
-
-	line, err := f.FindLine(c.tx, execution.LineID)
+	// Attribute back to the line dispatch's snapshot, not the live line —
+	// this is a historical fact about the traversal, so a line rename after
+	// dispatch shouldn't change what earlier events say.
+	dispatch, err := models.FindWorkOrderLineDispatch(c.tx, execution.LineDispatchID)
 	if err != nil {
 		return lineStepInfo{}, false
 	}
 
 	c.lineStepCache = lineStepInfo{
-		LineID:    line.ID,
-		LineName:  line.Name,
+		LineID:    dispatch.LineID,
+		LineName:  dispatch.LineName,
 		StepIndex: execution.StepIndex,
 		StepName:  execution.StepName,
 	}
@@ -362,4 +520,32 @@ func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderA
 		Type:        artifact.Type,
 		Data:        data,
 	}, nil
+}
+
+func statusNoteToCore(order *models.FactoryWorkOrder, note *models.FactoryWorkOrderStatusNote) *core.WorkOrderStatusNote {
+	return &core.WorkOrderStatusNote{
+		WorkOrderID:         order.ID.String(),
+		Key:                 note.Key,
+		Kind:                note.Kind,
+		Headline:            note.Headline,
+		Body:                note.Body,
+		CtaLabel:            note.CtaLabel,
+		CtaURL:              note.CtaURL,
+		ShowOnlyWhenWaiting: note.ShowOnlyWhenWaiting,
+	}
+}
+
+func checkToCore(check *models.FactoryWorkOrderCheck) *core.WorkOrderCheck {
+	return &core.WorkOrderCheck{
+		ID:            check.ID.String(),
+		WorkOrderID:   check.WorkOrderID.String(),
+		Key:           check.Key,
+		Name:          check.Name,
+		Score:         check.Score,
+		MaxScore:      check.MaxScore,
+		Format:        check.Format,
+		Level:         check.Level,
+		PreviousScore: check.PreviousScore,
+		RecentScores:  check.RecentScores,
+	}
 }

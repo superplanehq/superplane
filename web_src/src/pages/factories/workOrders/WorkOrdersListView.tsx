@@ -2,7 +2,7 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Link } from "react-router";
-import { workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryHomePath } from "../lib/factoryPagePaths";
 import { groupWorkOrderEntriesByLane, type WorkOrderListEntry } from "../lib/workOrderListModel";
 import { WORK_ORDER_BOARD_LANES, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
@@ -15,7 +15,8 @@ interface WorkOrdersListViewProps {
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
-  isDispatching: boolean;
+  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
@@ -37,7 +38,7 @@ export function WorkOrdersListView(props: WorkOrdersListViewProps) {
         return (
           <section key={lane.id} aria-label={lane.title} data-testid={`work-orders-list-lane-${lane.id}`}>
             <header className="mb-1.5 flex items-center gap-2 px-1">
-              <h2 className="text-[12px] font-semibold uppercase tracking-[0.06em] text-foreground/80">{lane.title}</h2>
+              <h2 className="workspace-section-title">{lane.title}</h2>
               <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {laneEntries.length}
               </span>
@@ -63,14 +64,13 @@ function ListRow({
   factoryLines,
   canDispatch,
   canAssign,
-  isDispatching,
+  dispatchingOrderIds,
   isAssigneesSaving,
   onDispatch,
   onAssigneesSave,
 }: WorkOrdersListViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href =
-    entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#";
+  const href = factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article
@@ -81,7 +81,7 @@ function ListRow({
 
       <span
         className={cn(
-          "relative z-10 pointer-events-none inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+          "relative z-10 pointer-events-none inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
           meta.className,
         )}
       >
@@ -100,7 +100,7 @@ function ListRow({
 
       {entry.usageLabel ? (
         <span
-          className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground sm:inline"
+          className="relative z-10 pointer-events-none shrink-0 text-[11px] tabular-nums text-muted-foreground"
           title={entry.usageTooltip ?? undefined}
         >
           {entry.usageLabel}
@@ -116,7 +116,7 @@ function ListRow({
           entry={entry}
           lines={factoryLines}
           canDispatch={canDispatch}
-          isDispatching={isDispatching}
+          isDispatching={dispatchingOrderIds.has(entry.id)}
           onDispatch={onDispatch}
           visible={entry.isDispatchable}
         />

@@ -295,6 +295,22 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	getRule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me/notification-settings"}]
+	require.True(t, ok)
+	assert.Equal(t, "notifications", getRule.Resource)
+	assert.Equal(t, "read", getRule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, getRule.RequiredExperimentalFeatures)
+
+	putRule, ok := rules[HTTPRoute{Method: http.MethodPut, Pattern: "/api/v1/me/notification-settings"}]
+	require.True(t, ok)
+	assert.Equal(t, "notifications", putRule.Resource)
+	assert.Equal(t, "update", putRule.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, putRule.RequiredExperimentalFeatures)
+}
+
 func httptestRequest(t *testing.T, headers map[string]string) *http.Request {
 	t.Helper()
 

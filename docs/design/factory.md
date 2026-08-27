@@ -50,6 +50,11 @@ Expressions on a dispatched run should prefer `order()` over
 `root().data.work_order`. `order()` resolves the live work order for the
 current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
 `source`) and returns `nil` when the run is not attached to a work order.
+`order().url` is the work order permalink
+(`{BASE_URL}/{orgId}/workspaces/{factoryKey}/work-order/{number}`), resolved
+lazily only when the expression references it, because the factory that owns
+the order has to be loaded for its key. Use it to link back from anything an
+automation creates, e.g. a pull request description.
 `order().artifacts` is a list field loaded lazily only when the expression
 references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
 `order().comments` is likewise a list field loaded lazily only when the
@@ -119,7 +124,7 @@ the Filter menu and `/` opens the search field.
 ## Comments and artifacts
 
 - **Comments** are timeline-only. They persist as `order.comment.added` events with `{ body, author { kind, userId?, automation? } }`. `kind` is `user` or `automation`. `user` comments carry the authenticated caller's id; `automation` comments carry an `automation` ref (`{ nodeId, nodeName, appId, appName }`) captured from the executing canvas node so the timeline can render "commented via `<node>` in `<app>`" without any free-form author label. The UI renders comments inline in the activity timeline; automation comments show a small badge.
-- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifacts add`). Each artifact has a required `type` (`pr`, `markdown`, or `branch`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, `state`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`. `pr`'s optional `data.state` (`open`/`draft`/`closed`/`merged`) drives the artifact chip's icon and color in the UI (GitHub-style: open green, draft gray, closed red, merged purple) and defaults to the `open` look when absent (older artifacts, or types other than `pr`). `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
+- **Artifacts** are first-class rows in `factory_work_order_artifacts`. They can be created by the `addWorkOrderArtifact` canvas component (automation authorship), by `POST …/artifacts` (interactive user authorship), or by the CLI (`superplane factory artifacts add`). Each artifact has a required `type` (`pr`, `markdown`, `branch`, or `link`) plus a JSONB `data` map that carries everything else — the on-wire shape is `{ id, type, data, createdBy, createdAt }`, and `url`, `title`, `number`, `body`, `name`, `state`, and any free-form extras all live inside `data`. `pr` requires `data.url`; `markdown` requires `data.body`; `branch` requires `data.name`; `link` requires `data.url` (with an optional `data.title` used as the chip's label, e.g. a preview-environment URL). `pr`'s optional `data.state` (`open`/`draft`/`closed`/`merged`) drives the artifact chip's icon and color in the UI (GitHub-style: open green, draft gray, closed red, merged purple) and defaults to the `open` look when absent (older artifacts, or types other than `pr`). `data.url` is optional on any other type, but whenever it is present — regardless of type — the model enforces that it is an absolute `http(s)` URL with a host and rejects `javascript:`, `data:`, `file:`, `mailto:`, and protocol-relative URLs, so no caller can smuggle a dangerous scheme into a link teammates will click. The client mirrors this check with `lib/safeExternalUrl` before rendering `href`s. Creation is transactional with an `order.artifact.added` event that includes the artifact `data` so the timeline can render markdown inline without a second fetch. The Work Order detail sidebar lists artifacts read-only (no attach composer in the UI yet).
 - Artifacts optionally carry a `key` (`VARCHAR(512)`, nullable, unique per factory via a partial index that excludes `NULL`) so a work order can be looked up from an external identifier — e.g. a pull request's URL — without already knowing the order id. `addWorkOrderArtifact`'s `artifactKey` field sets it; `findWorkOrder` (`by: artifactKey`) reads it, and `updateWorkOrderArtifact` (see below) also resolves the artifact to mutate by this same key. Setting it is currently only possible from the canvas component — the artifact-key field is not yet exposed on the REST API or CLI, so artifacts created that way can't be tagged with a key (known gap).
 - **Updating an artifact after attach**: `updateWorkOrderArtifact` resolves the artifact tagged with a given `artifactKey` under a work order and shallow-merges new fields (`state`, `title`) into its existing `data`, leaving everything else untouched. This is how a PR artifact's `state` stays live as GitHub reports it moving through open/draft/closed/merged (typically driven from a `github.onPullRequest` webhook flow — see below). It does not append a new timeline event (that would spam the timeline on every state flip); it re-saves the row in place and fires the same `work_order_updated` websocket notification (reason `order.artifact.updated`) the frontend already listens for, so the sidebar chip and the timeline's "attached" line both pick up the change without a page reload.
 
@@ -129,6 +134,7 @@ REST gateway on `protos/factories.proto`:
 
 - Factories: list, create, describe (includes lines).
 - Lines: create, update.
+- Line metrics: list trailing 30-day success, completions, duration, and cost per line.
 - Apps: list factory-owned canvases.
 - Work orders: list (filters: state, result, assignees, unassigned), create, describe, update assignees, dispatch, close, **update status**, **add comment**, **list artifacts**, **create artifact**, list events.
 
@@ -144,6 +150,21 @@ New RPCs (all under `/api/v1/factories/{factoryId}/orders/{orderId}/…`):
 Factory structure (create/update/delete factory + lines) uses the `factories` resource.
 Work-order lifecycle (create/list/describe orders, status, assignees, dispatch, close, comments, artifacts, events) uses the separate `work_orders` resource (`read`, `create`, `update`). That lets limited tokens (runners/agents) mutate work orders without `factories:update`. All endpoints stay behind the `factories` experimental feature flag.
 
+## Line metrics
+
+`DescribeFactory` and `UpdateFactory` return trailing 30-day summary numbers on each `FactoryLine` (`metrics`). Auth is `factories:read` or `factories:update`. The window is 30 local calendar days, including today. The prior window is the 30 days before that (deltas). When a line has no closed work orders in the current window, `metrics` is unset. The UI shows 0% success rate and 0 completions per day. Duration and cost stay as dashes. Create-line and update-line responses do not include metrics.
+
+Rules:
+
+- Population: work orders currently `closed`, with at least one execution, whose latest `order.status.updated` event with `toState=closed` falls in the window. Close time is that event, not `updated_at`.
+- Line attribution: `line_id` of the latest execution (`created_at`, then `id`).
+- Success: a closed work order counts as merged when its `result` is `completed`. It also counts as merged when a PR artifact has `merged_at`, `data.state=merged`, or GitHub-native `data.merged=true`. Success rate is merged / closed.
+- Completions: `mergedCount / 30`. `throughputTrend` is daily merged counts by close day, oldest first.
+- Duration: median minutes of summed execution run time among merged work orders. Run time is `finished_at - created_at` for every finished execution on that work order. Omitted when the sum is 0.
+- Cost per success: `SUM(execution.cost_cents) / mergedCount / 100` across all executions of those closed work orders. Omitted when the sum is 0 (usage is not written yet).
+- `successTrendPct` is the cumulative success rate from the start of the window through each day.
+- Deltas compare current vs prior window. A delta is omitted when the prior window has no comparable data.
+
 ## Canvas components
 
 Built-in factory components in `pkg/components/factory/`, registered on the standard palette (behind the `factories` flag on the FE via `FACTORY_BLOCK_NAMES`).
@@ -154,7 +175,7 @@ Built-in factory components in `pkg/components/factory/`, registered on the stan
 | `findWorkOrder` | `by` (`id`/`artifactKey`), conditional `orderId` or `artifactKey` | Resolves a work order by id or by an artifact's `key`, without needing a `factory_work_order_executions` row. Emits `workOrder.found` on the `found` channel on a match, or `workOrder.notFound` on the `notFound` channel otherwise — never fails the run just because nothing matched. |
 | `updateWorkOrderStatus` | required `orderId` (defaults to `{{ order().id }}`), `status` (`draft`/`open`/`closed`), conditional `result` (`completed`/`rejected`/`failed`, required for `closed`; only `rejected` is valid when closing from `draft`) | Runs the FSM and records an enriched `order.status.updated`. |
 | `addWorkOrderComment` | required `orderId` (defaults to `{{ order().id }}`), `body` | Appends an `order.comment.added` event. Authorship is derived from the executing canvas node (`kind = automation`, `automation = { nodeName, appName, lineName, stepName }`). |
-| `addWorkOrderArtifact` | required `orderId` (defaults to `{{ order().id }}`), `artifactType` (`pr`/`markdown`/`branch`); for `pr`: required `url`, optional `number` and `state` (`open`/`draft`/`closed`/`merged`, defaults to `open`); for `markdown`: required `body`; for `branch`: required `name`; optional `title` on `pr`/`markdown`; optional `artifactKey`; free-form `data` (`{name, value}` list, merged into the artifact's `data` map — typed fields win on name collisions) | Creates the artifact row + `order.artifact.added` event. |
+| `addWorkOrderArtifact` | required `orderId` (defaults to `{{ order().id }}`), `artifactType` (`pr`/`markdown`/`branch`/`link`); for `pr`: required `url`, optional `number` and `state` (`open`/`draft`/`closed`/`merged`, defaults to `open`); for `markdown`: required `body`; for `branch`: required `name`, optional `url`; for `link`: required `url`; optional `title` on `pr`/`markdown`/`link`; optional `artifactKey`; free-form `data` (`{name, value}` list, merged into the artifact's `data` map — typed fields win on name collisions) | Creates the artifact row + `order.artifact.added` event. |
 | `updateWorkOrderArtifact` | required `orderId` (defaults to `{{ order().id }}`) and `artifactKey`; optional `state` (`open`/`draft`/`closed`/`merged`) and `title` | Shallow-merges the given fields into the artifact tagged with `artifactKey`. No new timeline event; just the row + a `work_order_updated` websocket notify. |
 
 `updateWorkOrderStatus` / `addWorkOrderComment` / `addWorkOrderArtifact` / `updateWorkOrderArtifact` always target a work order explicitly via `orderId` — there is no implicit fallback. The field defaults to `{{ order().id }}`, which resolves the work order driving the current canvas run (via the `factory_work_order_executions` row created when the run was dispatched from a factory line) and only works in that context. Runs not dispatched from a line, e.g. a flow triggered by `github.onPullRequest`, must replace the default with an id resolved another way — typically `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. Canvas invocations attribute events to the caller line: the `automation` payload snapshots `{ nodeId, nodeName, appId, appName, lineId, lineName, stepIndex, stepName }` at write time (line/step are omitted when the run isn't attached to one), and status updates additionally carry the current `run` + `app` refs so the timeline can link straight back to the originating run. No acting user is attributed on canvas-driven events.
@@ -224,12 +245,12 @@ Minimal factory CLI for artifacts (flag-based; optional active factory):
 ```bash
 superplane factory active [factory]   # set/show active factory (name or UUID)
 superplane factory artifacts list --factory <name-or-id> --order-id <uuid>
-superplane factory artifacts add --order-id <uuid> --type <pr|markdown|branch> [flags]
+superplane factory artifacts add --order-id <uuid> --type <pr|markdown|branch|link> [flags]
 ```
 
 `--factory` accepts a factory name or UUID. When omitted, the active factory
 from `superplane factory active` is used. `--order-id` is the work-order UUID.
-`--type` is `pr`, `markdown`, or `branch`. Typed flags build the API `data` map:
+`--type` is `pr`, `markdown`, `branch`, or `link`. Typed flags build the API `data` map:
 
 ```bash
 superplane factory artifacts list \
@@ -260,6 +281,12 @@ superplane factory artifacts add \
   --order-id "$OID" \
   --type branch \
   --name feature/login
+
+superplane factory artifacts add \
+  --order-id "$OID" \
+  --type link \
+  --url https://preview.example.com/pr-42 \
+  --title Preview
 ```
 
 For markdown, provide `--body` or `-f` / `--file` (file contents become `data.body`).

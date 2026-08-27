@@ -46,6 +46,14 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
+interface EventCheckPayload {
+  name?: string;
+  score?: number;
+  maxScore?: number;
+  format?: "fraction" | "percent" | "boolean";
+  previousScore?: number;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   automation?: EventAutomationRefPayload;
@@ -62,6 +70,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  check?: EventCheckPayload;
 }
 
 interface TimelineBuildState {
@@ -72,9 +81,11 @@ interface TimelineBuildState {
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.status.updated": 15,
   "order.assignees.updated": 20,
+  "step.execution.queued": 25,
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
+  "order.check.reported": 46,
   "order.artifact.added": 47,
 };
 
@@ -131,6 +142,9 @@ function applyApiEventToTimeline(
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
+    case "step.execution.queued":
+      appendStepQueuedEvent(state.events, index, payload, at);
+      return;
     case "step.execution.created":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.created");
       return;
@@ -142,6 +156,9 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.check.reported":
+      appendCheckReportedEvent(state, index, payload, at);
   }
 }
 
@@ -150,6 +167,26 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
     timelineEvents: state.events,
     dispatchBatchByLine: state.dispatchBatchByLine,
   };
+}
+
+// The step is at its max parallelism: the work order waits in the step
+// queue until a run completes and frees a slot.
+function appendStepQueuedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+): void {
+  const stepName = payload.stepName?.trim() || "Unnamed step";
+  const lineName = payload.line?.name?.trim();
+  events.push({
+    id: `step-queued-${index}`,
+    kind: "queued",
+    at,
+    lineId: payload.line?.id,
+    lineName,
+    title: `Queued at ${stepName} — waiting for a free slot`,
+  });
 }
 
 function appendAssigneesUpdatedEvent(
@@ -322,6 +359,36 @@ function appendArtifactEvent(
     actorAutomation: automationActor,
     artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
+  });
+}
+
+// Check reports stay top-level: they come from dedicated automations
+// (risk review, coverage), not from a dispatched line step.
+function appendCheckReportedEvent(state: TimelineBuildState, index: number, payload: EventPayload, at: string): void {
+  const check = payload.check;
+  if (!check?.name || check.score === undefined || check.maxScore === undefined) {
+    return;
+  }
+
+  const automationActor = toAutomationActor(payload.automation);
+  // Same wording rule as CheckReportedEventBody: a re-report with an
+  // unchanged score still reads as "reported".
+  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
+  state.events.push({
+    id: `check-${index}`,
+    kind: "checkReported",
+    at,
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    check: {
+      name: check.name,
+      score: check.score,
+      maxScore: check.maxScore,
+      format: check.format,
+      previousScore: check.previousScore,
+    },
+    title: isRescore ? `re-scored ${check.name}` : `reported ${check.name}`,
   });
 }
 

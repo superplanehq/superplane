@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
@@ -83,6 +84,32 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Nil(t, opened.User)
 	})
 
+	t.Run("sets origin from an intake source event", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factory.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+		created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+
+		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(created.ID))
+		require.NoError(t, err)
+		require.NotNil(t, persisted.Origin())
+		assert.Equal(t, "https://github.com/acme/payments/issues/12", persisted.Origin().URL)
+		assert.Equal(t, "acme/payments#12", persisted.Origin().Label)
+	})
+
 	t.Run("rejects blank title", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 
@@ -107,6 +134,8 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		existingOrder, err := factory.CreateWorkOrder(database.Conn(), "Existing", "", &r.User, nil, nil)
 		require.NoError(t, err)
 
+		dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, existingOrder.ID, line.ID, line.Name, nil)
+
 		now := time.Now()
 		workOrderExecution := models.FactoryWorkOrderExecution{
 			ID:             uuid.New(),
@@ -114,9 +143,10 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 			FactoryID:      factory.ID,
 			WorkOrderID:    existingOrder.ID,
 			LineID:         line.ID,
+			LineDispatchID: dispatch.ID,
 			StepIndex:      0,
 			StepName:       "step-one",
-			RunID:          run.ID,
+			RunID:          &run.ID,
 			Status:         models.FactoryWorkOrderExecutionStatusRunning,
 			CreatedAt:      now,
 			UpdatedAt:      now,
@@ -394,6 +424,64 @@ func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *t
 	assert.Equal(t, order.ID.String(), artifact.WorkOrderID)
 }
 
+func TestFactoryContext_ReportWorkOrderCheck(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Check target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	notifications := 0
+	lastReason := ""
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			notifications++
+			lastReason = reason
+		})
+
+	check, err := ctx.ReportWorkOrderCheck(core.ReportWorkOrderCheckParams{
+		OrderID:  order.ID.String(),
+		CheckKey: "risk-review",
+		Name:     "Risk review",
+		Score:    7,
+		MaxScore: 10,
+		Level:    models.FactoryWorkOrderCheckLevelCaution,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, order.ID.String(), check.WorkOrderID)
+	assert.Nil(t, check.PreviousScore)
+	assert.Equal(t, 1, notifications)
+	assert.Equal(t, factoryevents.EventTypeOrderCheckReported, lastReason)
+
+	// A re-report of the same key updates in place and keeps the prior score.
+	updated, err := ctx.ReportWorkOrderCheck(core.ReportWorkOrderCheckParams{
+		OrderID:  order.ID.String(),
+		CheckKey: "risk-review",
+		Name:     "Risk review",
+		Score:    3,
+		MaxScore: 10,
+		Level:    models.FactoryWorkOrderCheckLevelPositive,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, check.ID, updated.ID)
+	require.NotNil(t, updated.PreviousScore)
+	assert.Equal(t, float64(7), *updated.PreviousScore)
+	assert.Equal(t, 2, notifications)
+
+	// The timeline event carries automation + run attribution.
+	event := findWorkOrderEvent(t, order, factoryevents.EventTypeOrderCheckReported)
+	var payload factoryevents.WorkOrderCheckReported
+	require.NoError(t, json.Unmarshal(event.Data, &payload))
+	require.NotNil(t, payload.Automation)
+	assert.Equal(t, canvas.ID, payload.Automation.AppID)
+	require.NotNil(t, payload.Run)
+	assert.Equal(t, nodeExecution.RunID, payload.Run.ID)
+}
+
 func TestFactoryContext_FindWorkOrder_ByID(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -509,6 +597,94 @@ func TestFactoryContext_AddWorkOrderComment(t *testing.T) {
 	assert.Equal(t, "component-under-test", payload.Author.Automation.StepName)
 }
 
+func TestFactoryContext_AddWorkOrderComment_EmitsNotification(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Comment target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	require.NoError(t, ctx.AddWorkOrderComment(core.AddWorkOrderCommentParams{
+		OrderID: order.ID.String(),
+		Body:    "Ready for review",
+	}))
+
+	require.Len(t, notifications, 1)
+	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
+	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
+	assert.Equal(t, factoryevents.EventTypeOrderCommentAdded, notifications[0].EventType)
+	assert.Equal(t, "Ready for review", notifications[0].CommentBody)
+	assert.NotEmpty(t, notifications[0].ActorName)
+}
+
+func TestFactoryContext_SetWorkOrderStatusNote_EmitsNotification(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Note target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+
+	var notifications []messages.FactoryWorkOrderNotificationMessage
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderNotification(func(notification messages.FactoryWorkOrderNotificationMessage) {
+			notifications = append(notifications, notification)
+		})
+
+	_, err = ctx.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
+		OrderID:  order.ID.String(),
+		NoteKey:  "pr-closure",
+		Headline: "Review the pull request",
+		Body:     "Merging the PR completes this work order automatically.",
+		CtaLabel: "Review PR #42",
+		CtaURL:   "https://github.com/example/repo/pull/42",
+	})
+	require.NoError(t, err)
+
+	require.Len(t, notifications, 1)
+	assert.Equal(t, factory.ID.String(), notifications[0].FactoryID)
+	assert.Equal(t, order.ID.String(), notifications[0].OrderID)
+	assert.Equal(t, factoryevents.EventTypeOrderStatusNoteUpdated, notifications[0].EventType)
+	assert.Equal(t, "Review the pull request", notifications[0].StatusNoteHeadline)
+	assert.Equal(t, "Merging the PR completes this work order automatically.", notifications[0].StatusNoteBody)
+	assert.Equal(t, "Review PR #42", notifications[0].StatusNoteCtaLabel)
+	assert.Equal(t, "https://github.com/example/repo/pull/42", notifications[0].StatusNoteCtaURL)
+	assert.NotEmpty(t, notifications[0].ActorName)
+
+	// Re-setting the same note key sends a fresh notification: a status
+	// note update is new information the reviewer should see, same as a
+	// second comment firing its own email.
+	_, err = ctx.SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams{
+		OrderID:  order.ID.String(),
+		NoteKey:  "pr-closure",
+		Headline: "Still waiting on review",
+	})
+	require.NoError(t, err)
+	require.Len(t, notifications, 2)
+	assert.Equal(t, "Still waiting on review", notifications[1].StatusNoteHeadline)
+}
+
 func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -615,6 +791,8 @@ func linkRunToWorkOrder(
 	line, err := factory.CreateLine(database.Conn(), support.RandomName("line"), nil)
 	require.NoError(t, err)
 
+	dispatch := support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, workOrderID, line.ID, line.Name, nil)
+
 	now := time.Now()
 	execution := models.FactoryWorkOrderExecution{
 		ID:             uuid.New(),
@@ -622,9 +800,10 @@ func linkRunToWorkOrder(
 		FactoryID:      factory.ID,
 		WorkOrderID:    workOrderID,
 		LineID:         line.ID,
+		LineDispatchID: dispatch.ID,
 		StepIndex:      0,
 		StepName:       "component-under-test",
-		RunID:          runID,
+		RunID:          &runID,
 		Status:         models.FactoryWorkOrderExecutionStatusRunning,
 		CreatedAt:      now,
 		UpdatedAt:      now,
@@ -637,6 +816,16 @@ func setupFactoryAppExecution(
 	t *testing.T,
 	r *support.ResourceRegistry,
 	factoryID uuid.UUID,
+) (*models.Canvas, *models.CanvasNodeExecution, *models.CanvasRun) {
+	t.Helper()
+	return setupFactoryAppExecutionWithPayload(t, r, factoryID, map[string]any{"key": "value"})
+}
+
+func setupFactoryAppExecutionWithPayload(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	payload map[string]any,
 ) (*models.Canvas, *models.CanvasNodeExecution, *models.CanvasRun) {
 	t.Helper()
 
@@ -654,7 +843,7 @@ func setupFactoryAppExecution(
 	require.NoError(t, database.Conn().Model(canvas).Update("factory_id", factoryID).Error)
 	canvas.FactoryID = &factoryID
 
-	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	triggerEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, payload)
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
 	require.NoError(t, err)
 

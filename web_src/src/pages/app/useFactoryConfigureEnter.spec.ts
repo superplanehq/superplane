@@ -161,4 +161,39 @@ describe("useFactoryConfigureEnter", () => {
     expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
     expect(setEditSessionActive).toHaveBeenCalledTimes(1);
   });
+
+  it("re-enters Configure after save when the next visit is allowed", async () => {
+    const activateCanvasVersionForEditing = vi.fn();
+    const setEditSessionActive = vi.fn();
+
+    const { rerender, result } = renderHook(
+      ({ editSessionActive }: { editSessionActive: boolean }) =>
+        useFactoryConfigureEnter(
+          baseOptions({
+            editSessionActive,
+            factoryConfigure: true,
+            activateCanvasVersionForEditing,
+            setEditSessionActive,
+          }),
+        ),
+      { initialProps: { editSessionActive: false } },
+    );
+
+    await waitFor(() => {
+      expect(setEditSessionActive).toHaveBeenCalledWith(true);
+    });
+    expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender({ editSessionActive: true });
+    });
+    await act(async () => {
+      result.current.allowNextConfigureEnter();
+      rerender({ editSessionActive: false });
+    });
+
+    await waitFor(() => {
+      expect(activateCanvasVersionForEditing).toHaveBeenCalledTimes(2);
+    });
+  });
 });

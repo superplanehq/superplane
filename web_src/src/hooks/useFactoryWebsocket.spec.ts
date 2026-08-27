@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
+import { canvasKeys } from "@/hooks/useCanvasData";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 
 const { useWebSocketMock } = vi.hoisted(() => ({
@@ -77,6 +78,9 @@ describe("useFactoryWebsocket", () => {
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderDetail("org-1", "factory-1", "order-1"),
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
@@ -84,6 +88,30 @@ describe("useFactoryWebsocket", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
+    });
+  });
+
+  it("invalidates described canvas runs for the updated work order", () => {
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
+      {
+        id: "order-1",
+        lineDispatches: [
+          {
+            stepExecutions: [{ run: { id: "run-1", appId: "app-1" } }],
+          },
+        ],
+      },
+    ]);
+    invalidateSpy.mockClear();
+
+    emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-1", reason: "run_started" },
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: canvasKeys.run("app-1", "run-1"),
     });
   });
 
@@ -113,6 +141,9 @@ describe("useFactoryWebsocket", () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrders("org-1", "factory-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: factoryQueryKeys.detail("org-1", "factory-1"),
     });
   });
 });

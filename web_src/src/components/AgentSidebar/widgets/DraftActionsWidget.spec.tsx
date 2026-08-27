@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DraftActionsWidget } from "./DraftActionsWidget";
+import { draftActionsConfirmCopy } from "./draftActionsConfirmCopy";
 
 describe("DraftActionsWidget", () => {
   afterEach(() => {
@@ -19,6 +20,26 @@ describe("DraftActionsWidget", () => {
     await user.click(screen.getByRole("button", { name: /see changes/i }));
 
     expect(onViewStaging).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses Save copy in factory context", () => {
+    expect(draftActionsConfirmCopy("save")).toEqual({ idle: "Save", busy: "Saving..." });
+    expect(draftActionsConfirmCopy("commit")).toEqual({ idle: "Commit", busy: "Committing..." });
+  });
+
+  it("shows Save instead of Commit when confirmKind is save", () => {
+    render(
+      <DraftActionsWidget
+        canvasId="canvas-1"
+        organizationId="org-1"
+        isEditing
+        confirmKind="save"
+        onCommitStaging={vi.fn().mockResolvedValue(true)}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^commit$/i })).not.toBeInTheDocument();
   });
 
   it("commits staging through the shared commit handler", async () => {

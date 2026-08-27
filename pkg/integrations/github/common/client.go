@@ -307,6 +307,14 @@ func (c *Client) GetIssue(ctx context.Context, repository string, issueNumber in
 	return c.underlying.Issues.Get(ctx, owner, name, issueNumber)
 }
 
+// ListIssues wraps the repository issue list. GitHub answers this endpoint with
+// pull requests too, so a caller that wants issues only must skip the entries
+// that report IsPullRequest.
+func (c *Client) ListIssues(ctx context.Context, repository string, opts *github.IssueListByRepoOptions) ([]*github.Issue, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Issues.ListByRepo(ctx, owner, name, opts)
+}
+
 func (c *Client) EditIssue(ctx context.Context, repository string, issueNumber int, issue *github.IssueRequest) (*github.Issue, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.Issues.Edit(ctx, owner, name, issueNumber, issue)
@@ -391,6 +399,14 @@ func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Resp
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
 }
 
+// SearchIssues wraps the /search/issues endpoint. The Velocity page uses it to
+// list a repository's merged pull requests within a window; keeping the SDK
+// pass-through thin means callers can build any query GitHub Search supports
+// (issues, PRs, drafts, authors) without a new helper per shape.
+func (c *Client) SearchIssues(ctx context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
+	return c.underlying.Search.Issues(ctx, query, opts)
+}
+
 type graphQLRequest struct {
 	Query     string         `json:"query"`
 	Variables map[string]any `json:"variables,omitempty"`
@@ -453,7 +469,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := FindSecret(ctx, GitHubAppPEM)
+	pem, err := LegacyAppPrivateKey(ctx, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}

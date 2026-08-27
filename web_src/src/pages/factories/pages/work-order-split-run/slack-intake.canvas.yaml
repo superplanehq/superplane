@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Slack
+  description: Create a work order when someone mentions the SuperPlane agent in Slack.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-slack-mention
+      targetId: mentioned-agent
+    - channel: default
+      sourceId: mentioned-agent
+      targetId: create-work-order
+  nodes:
+    - id: on-slack-mention
+      name: On Mention
+      type: TYPE_TRIGGER
+      component: slack.onAppMention
+      position:
+        x: 576
+        'y': 258
+      isCollapsed: false
+    - id: mentioned-agent
+      name: Mentioned the agent?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().text.contains("@superplane")
+      position:
+        x: 576
+        'y': 618
+      isCollapsed: false
+    - id: create-work-order
+      name: Create Work Order
+      type: TYPE_ACTION
+      component: createWorkOrder
+      configuration:
+        title: '{{ root().text }}'
+        description: '{{ root().text }}'
+      position:
+        x: 576
+        'y': 978
+      isCollapsed: false

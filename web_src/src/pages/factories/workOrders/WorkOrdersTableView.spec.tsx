@@ -22,15 +22,20 @@ const busyEntry = buildWorkOrderListEntry(
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [
+    lineDispatches: [
       {
-        id: "e1",
-        step: "verify",
-        state: "STATE_FINISHED",
-        result: "RESULT_PASSED",
+        id: "dispatch-1",
         line: { id: "line-a", name: "hotfix" },
-        totalTokens: "1200",
-        costCents: "45",
+        stepExecutions: [
+          {
+            id: "e1",
+            step: "verify",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            totalTokens: "1200",
+            costCents: "45",
+          },
+        ],
       },
     ],
     assignees: [{ id: "user-1", name: "Ada Lovelace" }],
@@ -48,7 +53,7 @@ const idleEntry = buildWorkOrderListEntry(
     state: "STATE_CLOSED",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-03T00:00:00Z",
-    executions: [],
+    lineDispatches: [],
     assignees: [],
   } satisfies FactoriesWorkOrder,
   factory,
@@ -67,7 +72,7 @@ function renderTable() {
           factoryLines={[]}
           canDispatch={true}
           canAssign={true}
-          isDispatching={false}
+          dispatchingOrderIds={new Set()}
           isAssigneesSaving={false}
           onDispatch={vi.fn().mockResolvedValue(undefined)}
           onAssigneesSave={vi.fn().mockResolvedValue(undefined)}
@@ -85,15 +90,13 @@ function gridTemplateTokens(className: string): string[] {
 }
 
 describe("WorkOrdersTableView", () => {
-  it("has a non-empty spend usage label to prove removal isn't just an empty-state coincidence", () => {
-    expect(busyEntry.usageLabel).toBe("$0.45");
-  });
-
-  it("never renders a Spend column, header or cell", () => {
+  it("shows USD and tokens in the Spend column", () => {
+    expect(busyEntry.usageLabel).toBe("$0.45 · 1k tokens");
     renderTable();
 
-    expect(screen.queryByText("Spend")).not.toBeInTheDocument();
-    expect(screen.queryByText(busyEntry.usageLabel as string)).not.toBeInTheDocument();
+    expect(screen.getByText("Spend")).toBeInTheDocument();
+    expect(screen.getByText("$0.45")).toBeInTheDocument();
+    expect(screen.getByText("1k tokens")).toBeInTheDocument();
   });
 
   it("keeps the header and every row on the exact same grid template, regardless of row content", () => {

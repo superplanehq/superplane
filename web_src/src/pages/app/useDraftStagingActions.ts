@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { executeResetStaging } from "./lib/reset-staging-flow";
+import { stagingCommitSuccessToast, stagingResetSuccessToast } from "./lib/staging-action-copy";
 
 type CommitMutation = {
   mutateAsync: (commitMessage: string) => Promise<{ version?: CanvasesCanvasVersion }>;
@@ -47,6 +48,7 @@ type UseDraftStagingActionsOptions = {
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
   onCommittedVersionId?: (versionId: string) => void;
   registerIgnoredCanvasUpdatedEcho?: () => () => void;
+  factoryContext?: boolean;
 };
 
 export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
@@ -69,6 +71,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     onCanvasDraftRestoredToCommitted,
     onCommittedVersionId,
     registerIgnoredCanvasUpdatedEcho,
+    factoryContext = false,
   } = options;
   const queryClient = useQueryClient();
   const [commitStagingPending, setCommitStagingPending] = useState(false);
@@ -110,7 +113,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
             onCommittedVersionId,
           });
           if (committed) {
-            showSuccessToast("Changes committed");
+            showSuccessToast(stagingCommitSuccessToast(factoryContext));
           }
         });
         return committed;
@@ -134,6 +137,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       setDraftCanvasSpec,
       setIsPreparingVersionAction,
       setStagingResetNonce,
+      factoryContext,
     ],
   );
 
@@ -158,7 +162,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
           cancelPendingCanvasSaves,
           onCanvasDraftRestoredToCommitted,
         });
-        showSuccessToast("Reverted to last commit");
+        showSuccessToast(stagingResetSuccessToast(factoryContext));
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
@@ -178,6 +182,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     setDraftCanvasSpec,
     setIsPreparingVersionAction,
     setStagingResetNonce,
+    factoryContext,
   ]);
 
   return { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending };

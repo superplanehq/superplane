@@ -185,6 +185,8 @@ const RUNNER_BLOCK_ORDER: Record<string, number> = {
   runnerJS: 2,
   runnerPython: 3,
   runnerClaudeCode: 4,
+  runnerCodex: 5,
+  runnerOpenRouter: 6,
 };
 
 function sortRunnerBlocks(a: BuildingBlock, b: BuildingBlock): number {
@@ -205,11 +207,13 @@ function isRunnerBlock(component: { name?: string }): boolean {
     name === "runnerJS" ||
     name === "runnerBash" ||
     name === "runnerPython" ||
-    name === "runnerClaudeCode"
+    name === "runnerClaudeCode" ||
+    name === "runnerCodex" ||
+    name === "runnerOpenRouter"
   );
 }
 
-const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp"]);
+const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp", "addRunError"]);
 const FACTORY_BLOCK_NAMES = new Set([
   "createWorkOrder",
   "findWorkOrder",
@@ -217,6 +221,7 @@ const FACTORY_BLOCK_NAMES = new Set([
   "addWorkOrderComment",
   "addWorkOrderArtifact",
   "updateWorkOrderArtifact",
+  "reportWorkOrderCheck",
 ]);
 
 function isSuperPlaneBlock(component: { name?: string }): boolean {

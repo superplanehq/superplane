@@ -100,6 +100,7 @@ const STATUS_TEXT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
   completed: "text-[color:var(--status-completed-fg)]",
   running: "text-[color:var(--status-running-fg)]",
   failed: "text-[color:var(--status-failed-fg)]",
+  rejected: "text-[color:var(--status-failed-fg)]",
   cancelled: "text-[color:var(--status-cancelled-fg)]",
   waiting: "text-[color:var(--status-waiting-fg)]",
   draft: "text-[color:var(--status-draft-fg)]",
@@ -109,6 +110,7 @@ const STATUS_DOT_CLASSNAME: Record<WorkOrderDisplayStatus, string> = {
   completed: "bg-[color:var(--status-completed-dot)]",
   running: "bg-[color:var(--status-running-dot)]",
   failed: "bg-[color:var(--status-failed-dot)]",
+  rejected: "bg-[color:var(--status-failed-dot)]",
   cancelled: "bg-[color:var(--status-cancelled-dot)]",
   waiting: "bg-[color:var(--status-waiting-dot)]",
   draft: "bg-[color:var(--status-draft-dot)]",
@@ -186,7 +188,7 @@ function AssigneeOverviewRow({
   const { resolveUser } = useOrgUserLookup(organizationId);
   return (
     <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Owner">
-      <PermissionTooltip allowed={canEdit} message="You don't have permission to update owners.">
+      <PermissionTooltip allowed={canEdit} message="You don't have permission to update the owner.">
         <WorkOrderAssigneesPopover
           organizationId={organizationId}
           selectedIds={assigneeIds}
@@ -224,17 +226,8 @@ function AssigneeButtonBody({
   if (assigneeIds.length === 0) {
     return <span className="min-w-0 truncate text-muted-foreground">Assign…</span>;
   }
-  if (assigneeIds.length === 1) {
-    const display = resolveUser(assigneeIds[0], assigneeNames[0]);
-    return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
-  }
-  const first = resolveUser(assigneeIds[0], assigneeNames[0]);
-  return (
-    <>
-      <OrgUserReference display={first} size="xs" nameClassName="truncate text-[13px]" />
-      <span className="shrink-0 text-muted-foreground">+{assigneeIds.length - 1}</span>
-    </>
-  );
+  const display = resolveUser(assigneeIds[0], assigneeNames[0]);
+  return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
 }
 
 function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactNode {
@@ -243,16 +236,16 @@ function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactN
   if (tokens && usd) {
     return (
       <>
-        {tokens} <span className="text-muted-foreground">·</span> {usd}
+        {usd} <span className="text-muted-foreground">·</span> {tokens}
       </>
     );
   }
-  return tokens ?? usd ?? "";
+  return usd ?? tokens ?? "";
 }
 
 function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
   const parts: string[] = [];
-  if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
   if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
+  if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
   return parts.join(" · ");
 }

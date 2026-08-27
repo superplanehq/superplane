@@ -54,6 +54,30 @@ service Me {
       tags: "Me";
     };
   }
+
+  // Self-scoped work order notification settings for the calling user.
+  rpc DescribeNotificationSettings(DescribeNotificationSettingsRequest) returns (DescribeNotificationSettingsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/notification-settings"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe notification settings";
+      description: "Returns the calling user's work order notification settings";
+      tags: "Me";
+    };
+  }
+
+  rpc UpdateNotificationSettings(UpdateNotificationSettingsRequest) returns (UpdateNotificationSettingsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/notification-settings"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update notification settings";
+      description: "Updates the calling user's work order notification settings";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -78,4 +102,56 @@ message User {
 
 message RegenerateTokenResponse {
   string token = 1;
+}
+
+// NotificationSettings is a user's organization-wide configuration for
+// work order notification emails. A missing row defaults to all
+// workspace events. Nested `workspaces` leaves room for other levels later.
+message NotificationSettings {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_WORK_ORDER_ASSIGNED = 1;
+    TYPE_WORK_ORDER_COMMENT_OWNED = 2;
+    TYPE_WORK_ORDER_COMMENT_CREATED = 3;
+    TYPE_WORK_ORDER_STATUS_OWNED = 4;
+    TYPE_WORK_ORDER_ARTIFACT_OWNED = 5;
+    TYPE_WORK_ORDER_MENTIONED = 6;
+    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 7;
+  }
+
+  enum WorkspaceScope {
+    WORKSPACE_SCOPE_UNSPECIFIED = 0;
+    WORKSPACE_SCOPE_ALL = 1;
+    WORKSPACE_SCOPE_FILTERED = 2;
+    WORKSPACE_SCOPE_NONE = 3;
+  }
+
+  message WorkspaceFilter {
+    string workspace_id = 1;
+    string workspace_key = 2;
+    repeated Type event_types = 3;
+  }
+
+  message Workspaces {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means every type.
+    repeated Type event_types = 3;
+  }
+
+  Workspaces workspaces = 1;
+}
+
+message DescribeNotificationSettingsRequest {}
+
+message DescribeNotificationSettingsResponse {
+  NotificationSettings settings = 1;
+}
+
+message UpdateNotificationSettingsRequest {
+  NotificationSettings settings = 1;
+}
+
+message UpdateNotificationSettingsResponse {
+  NotificationSettings settings = 1;
 }

@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Ingest
+  description: Create a work order when an issue gets the factory label or is assigned to the SuperPlane agent.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-issue-labeled
+      targetId: has-factory-label
+    - channel: default
+      sourceId: has-factory-label
+      targetId: create-work-order
+    - channel: default
+      sourceId: on-issue-assigned
+      targetId: assigned-to-agent
+    - channel: default
+      sourceId: assigned-to-agent
+      targetId: create-work-order
+  nodes:
+    - id: on-issue-labeled
+      name: On Issue Label
+      type: TYPE_TRIGGER
+      component: github.onIssue
+      configuration:
+        actions:
+          - labeled
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 576
+        'y': 258
+      isCollapsed: false
+    - id: has-factory-label
+      name: Factory Label?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().data.label.name == "factory"
+      position:
+        x: 576
+        'y': 618
+      isCollapsed: false
+    - id: on-issue-assigned
+      name: On Issue Assignment
+      type: TYPE_TRIGGER
+      component: github.onIssue
+      configuration:
+        actions:
+          - assigned
+        repository: '{{ install_params.backlogRepository }}'
+      position:
+        x: 1044
+        'y': 258
+      isCollapsed: false
+    - id: assigned-to-agent
+      name: Assigned to agent?
+      type: TYPE_ACTION
+      component: filter
+      configuration:
+        expression: root().data.assignee.login == "superplaneagent"
+      position:
+        x: 1044
+        'y': 618
+      isCollapsed: false
+    - id: create-work-order
+      name: Create Work Order
+      type: TYPE_ACTION
+      component: createWorkOrder
+      configuration:
+        title: '{{ root().data.issue.title }}'
+        description: '{{ root().data.issue.body }}'
+      position:
+        x: 810
+        'y': 978
+      isCollapsed: false

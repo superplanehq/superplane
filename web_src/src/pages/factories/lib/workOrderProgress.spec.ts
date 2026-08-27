@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import {
+  WORK_ORDER_BOARD_LANES,
   countActiveWorkOrders,
   filterWorkOrdersByStatus,
+  getWorkOrderDetailDerived,
   getWorkOrderDisplayKey,
   getWorkOrderDisplayStatus,
+  getWorkOrderDisplayStatusMeta,
   groupWorkOrdersByLane,
   type WorkOrderStatusFilter,
 } from "./workOrderProgress";
@@ -17,14 +20,43 @@ function order(overrides: Partial<FactoriesWorkOrder>): FactoriesWorkOrder {
     title: "test order",
     state: "STATE_OPEN",
     result: "RESULT_UNSPECIFIED",
-    executions: [],
+    lineDispatches: [],
     ...overrides,
   };
+}
+
+/** One line dispatch with a single step execution — enough to drive
+ * `hasActiveLineDispatch`/`getWorkOrderDisplayStatus` in these tests. */
+function activeDispatch(): FactoriesWorkOrder["lineDispatches"] {
+  return [
+    {
+      id: "d1",
+      state: "STATE_ACTIVE",
+      stepExecutions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+    },
+  ];
 }
 
 function idsFilteredBy(orders: FactoriesWorkOrder[], statusFilter: WorkOrderStatusFilter) {
   return filterWorkOrdersByStatus(orders, statusFilter).map((o) => o.id);
 }
+
+describe("getWorkOrderDisplayStatusMeta", () => {
+  it("labels the idle open state as Needs attention", () => {
+    const meta = getWorkOrderDisplayStatusMeta("waiting");
+    expect(meta.label).toBe("Needs attention");
+    expect(meta.filterLabel).toBe("Needs attention");
+    expect(meta.summary).toBe("A person must act before this work can continue.");
+  });
+});
+
+describe("WORK_ORDER_BOARD_LANES", () => {
+  it("names the waiting lane Needs attention", () => {
+    const review = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "review");
+    expect(review?.title).toBe("Needs attention");
+    expect(review?.description).toBe("Work orders that wait for a human decision.");
+  });
+});
 
 describe("getWorkOrderDisplayStatus", () => {
   it("draft orders are draft", () => {
@@ -36,7 +68,38 @@ describe("getWorkOrderDisplayStatus", () => {
       getWorkOrderDisplayStatus(
         order({
           state: "STATE_OPEN",
-          executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+          lineDispatches: activeDispatch(),
+        }),
+      ),
+    ).toBe("running");
+  });
+
+  it("open orders with an in-flight step stay running when the dispatch is not marked active", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+            },
+          ],
+        }),
+      ),
+    ).toBe("running");
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_PENDING", result: "RESULT_UNKNOWN" }],
+            },
+          ],
         }),
       ),
     ).toBe("running");
@@ -50,7 +113,14 @@ describe("getWorkOrderDisplayStatus", () => {
       getWorkOrderDisplayStatus(
         order({
           state: "STATE_OPEN",
-          executions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              stepExecutions: [{ id: "e1", step: "s", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+            },
+          ],
         }),
       ),
     ).toBe("waiting");
@@ -59,9 +129,21 @@ describe("getWorkOrderDisplayStatus", () => {
   it.each([
     ["RESULT_COMPLETED", "completed"] as const,
     ["RESULT_FAILED", "failed"] as const,
-    ["RESULT_REJECTED", "cancelled"] as const,
+    ["RESULT_REJECTED", "rejected"] as const,
   ])("closed orders with %s map to %s", (result, expected) => {
     expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
+  });
+
+  it("maps a canceled line dispatch to Canceled when the order is not completed", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_CLOSED",
+          result: "RESULT_UNSPECIFIED",
+          lineDispatches: [{ id: "d1", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
+        }),
+      ),
+    ).toBe("cancelled");
   });
 });
 
@@ -71,13 +153,19 @@ describe("filterWorkOrdersByStatus", () => {
   const running = order({
     state: "STATE_OPEN",
     id: "wo-running",
-    executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+    lineDispatches: activeDispatch(),
   });
   const closedCompleted = order({ state: "STATE_CLOSED", result: "RESULT_COMPLETED", id: "wo-completed" });
-  const closedCancelled = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-cancelled" });
+  const closedRejected = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-rejected" });
+  const closedCancelled = order({
+    state: "STATE_CLOSED",
+    result: "RESULT_UNSPECIFIED",
+    id: "wo-cancelled",
+    lineDispatches: [{ id: "d-cancel", state: "STATE_FINISHED", result: "RESULT_CANCELLED" }],
+  });
   const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-failed" });
 
-  const all = [draft, waiting, running, closedCompleted, closedCancelled, closedFailed];
+  const all = [draft, waiting, running, closedCompleted, closedRejected, closedCancelled, closedFailed];
 
   it("`active` returns every non-closed order", () => {
     expect(idsFilteredBy(all, "active")).toEqual([draft.id, waiting.id, running.id]);
@@ -93,6 +181,7 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "running")).toEqual([running.id]);
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
+    expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
     expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
   });
 
@@ -110,7 +199,7 @@ describe("groupWorkOrdersByLane", () => {
       order({
         id: "r",
         state: "STATE_OPEN",
-        executions: [{ id: "e1", step: "s", state: "STATE_STARTED", result: "RESULT_UNKNOWN" }],
+        lineDispatches: activeDispatch(),
       }),
       order({ id: "c", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
       order({ id: "f", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
@@ -126,6 +215,21 @@ describe("groupWorkOrdersByLane", () => {
       review: ["w"],
       done: ["c", "f", "x"],
     });
+  });
+});
+
+describe("getWorkOrderDetailDerived", () => {
+  it("exposes only the first assignee as the owner", () => {
+    const derived = getWorkOrderDetailDerived(
+      order({
+        assignees: [
+          { id: "owner-1", name: "Ada" },
+          { id: "owner-2", name: "Grace" },
+        ],
+      }),
+    );
+    expect(derived.assigneeIds).toEqual(["owner-1"]);
+    expect(derived.assigneeNames).toEqual(["Ada"]);
   });
 });
 

@@ -1,4 +1,10 @@
+import {
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_EMAIL,
+  STORYBOOK_ME_USER_NAME,
+} from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
+import { storybookHostedLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -6,11 +12,11 @@ export const homePageIds = {
   organizationId: defaultHomePageFixture.organizationId,
 };
 
-function buildMeUser(orgId: string) {
+export function buildStorybookMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: STORYBOOK_ME_USER_NAME,
+    email: STORYBOOK_ME_USER_EMAIL,
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
@@ -23,9 +29,11 @@ function buildMeUser(orgId: string) {
       "users",
       "roles",
       "organization",
+      "org",
       "agents",
       "factories",
       "work_orders",
+      "notifications",
     ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
@@ -41,7 +49,7 @@ interface Route {
 
 function buildRoutes(fixture: HomePageFixture): Route[] {
   const orgId = fixture.organizationId;
-  const meUser = buildMeUser(orgId);
+  const meUser = buildStorybookMeUser(orgId);
 
   return [
     { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
@@ -111,6 +119,14 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({ json: {} }),
     },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/llm-spend"),
+      resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
+    },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
+      resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+    },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -164,6 +180,15 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       }),
     },
     {
+      pattern: re("/organizations"),
+      resolve: () => ({
+        json: [
+          { id: orgId, name: fixture.organizationName },
+          { id: "org-storybook-acme", name: "Acme" },
+        ],
+      }),
+    },
+    {
       pattern: re("/account"),
       resolve: () => ({
         json: {
@@ -171,6 +196,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           email: meUser.email,
           name: meUser.name,
           organization_id: orgId,
+          avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
         },
       }),
     },
@@ -264,17 +290,7 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
     { legacySetupOnly: false },
   ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
-    {
-      name: "apiKey",
-      type: "string",
-      description: "Claude API key",
-      required: true,
-      label: "API Key",
-      visibilityConditions: [],
-      requiredConditions: [],
-      sensitive: true,
-      togglable: false,
-    },
+    storybookApiKeyField("Claude API key"),
     {
       name: "adminKey",
       type: "string",
@@ -287,6 +303,12 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
       togglable: false,
     },
   ]),
+  storybookIntegrationDefinition("openai", "OpenAI", "Generate text responses with OpenAI models", [
+    storybookApiKeyField("OpenAI API key"),
+  ]),
+  storybookIntegrationDefinition("openrouter", "OpenRouter", "Use OpenRouter models in workflows", [
+    storybookApiKeyField("OpenRouter API key"),
+  ]),
 ];
 
 const STORYBOOK_GITHUB_REPOSITORIES = [
@@ -297,6 +319,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
 ];
 
 /** Storybook definitions aligned with real integration Configuration() fields. */
+function storybookApiKeyField(description: string): StorybookConfigField {
+  return {
+    name: "apiKey",
+    type: "string",
+    description,
+    required: true,
+    label: "API Key",
+    visibilityConditions: [],
+    requiredConditions: [],
+    sensitive: true,
+    togglable: false,
+  };
+}
+
 function storybookIntegrationDefinition(
   name: string,
   label: string,

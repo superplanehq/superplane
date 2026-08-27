@@ -127,6 +127,34 @@ describe("BuildingBlocksSidebar", () => {
       expect(onEnterSubmit).not.toHaveBeenCalled();
     });
 
+    it("applies factory sidebar color and Inter font", () => {
+      render(<BuildingBlocksSidebar {...defaultProps} blocks={[coreCategory]} factoryChrome />);
+
+      const sidebar = screen.getByTestId("building-blocks-sidebar");
+      expect(sidebar).toHaveAttribute("data-factory-chrome", "true");
+      expect(sidebar).toHaveClass("factory-sidebar");
+      expect(sidebar).toHaveClass("font-inter");
+      expect(sidebar).toHaveClass("bg-background");
+      expect(sidebar).toHaveClass("dark:bg-background");
+      expect(sidebar).toHaveClass("text-foreground");
+      expect(screen.getByRole("heading", { name: "Select Component" })).toHaveClass("text-foreground");
+      expect(screen.getByText("Core").parentElement).toHaveClass("bg-background");
+
+      const filter = screen.getByPlaceholderText("Filter components...");
+      expect(filter).toHaveClass("dark:bg-background");
+      expect(filter.className).not.toMatch(/dark:bg-gray-800/);
+      expect(screen.getByLabelText("Sidebar settings")).toHaveClass("dark:bg-background");
+    });
+
+    it("keeps org-app colors when factory chrome is off", () => {
+      render(<BuildingBlocksSidebar {...defaultProps} blocks={[coreCategory]} />);
+
+      const sidebar = screen.getByTestId("building-blocks-sidebar");
+      expect(sidebar).not.toHaveAttribute("data-factory-chrome");
+      expect(sidebar).not.toHaveClass("factory-sidebar");
+      expect(sidebar.querySelector(".bg-white")).toBeInTheDocument();
+    });
+
     it("renders Debugging directly after Core", () => {
       const blocks: BuildingBlockCategory[] = [
         { name: "Memory", blocks: [{ name: "addmemory", label: "Add Memory", type: "component" }] },

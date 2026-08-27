@@ -14,6 +14,7 @@ function baseLogState(): LogState {
         index: 0,
         text: "completed",
         lines: [],
+        events: [],
         status: "passed",
         duration_ms: 100,
         started_at: 1_000,
@@ -23,6 +24,7 @@ function baseLogState(): LogState {
         index: 1,
         text: "Set up DevEnv",
         lines: ["docker compose up"],
+        events: [],
         status: "running",
         duration_ms: null,
         started_at: 2_000,
@@ -71,6 +73,51 @@ describe("runner live log state", () => {
       duration_ms: 3_000,
       collapsed: true,
     });
+  });
+
+  it("closes nested running tools when the execution ends", () => {
+    const finalized = finalizeRunningCommandSections(
+      {
+        ...baseLogState(),
+        sections: [
+          {
+            index: 5,
+            text: "Implementation",
+            kind: "prompt",
+            lines: [],
+            events: [
+              {
+                kind: "tools",
+                id: "5-tools-0",
+                tools: [
+                  {
+                    id: "5-tool-0",
+                    kind: "read",
+                    text: "pkg/foo.go",
+                    lines: [],
+                    status: "running",
+                    duration_ms: null,
+                  },
+                ],
+              },
+            ],
+            status: "running",
+            duration_ms: null,
+            started_at: 2_000,
+            collapsed: false,
+          },
+        ],
+      },
+      "failed",
+      5_000,
+    );
+
+    const tools = finalized.sections[0]?.events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools[0]).toMatchObject({ status: "failed", duration_ms: 0 });
   });
 
   it("maps terminal execution result to command status", () => {

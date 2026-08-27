@@ -90,6 +90,7 @@ services:
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       # Task broker /v1 (Runner component). Base URL has no trailing slash.
+      # FLEET_ID, when set, is the create-task fleet_id (overrides node machine type).
       TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
       # Bearer; must match broker AUTH_TOKEN when auth is enabled
@@ -98,6 +99,12 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
       ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:-}
+      SUPERPLANE_GITHUB_APP_ID: ${SUPERPLANE_GITHUB_APP_ID:-}
+      SUPERPLANE_GITHUB_APP_SLUG: ${SUPERPLANE_GITHUB_APP_SLUG:-}
+      SUPERPLANE_GITHUB_APP_PRIVATE_KEY: ${SUPERPLANE_GITHUB_APP_PRIVATE_KEY:-}
+      SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET: ${SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET:-}
+      SUPERPLANE_GITHUB_APP_CLIENT_ID: ${SUPERPLANE_GITHUB_APP_CLIENT_ID:-}
+      SUPERPLANE_GITHUB_APP_CLIENT_SECRET: ${SUPERPLANE_GITHUB_APP_CLIENT_SECRET:-}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}

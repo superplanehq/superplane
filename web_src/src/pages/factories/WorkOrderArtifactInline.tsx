@@ -39,17 +39,19 @@ const artifactInlineClassName =
 
 export function WorkOrderArtifactInline({ artifact, className }: WorkOrderArtifactInlineProps) {
   const kind = normalizeArtifactKind(artifact.type);
-  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
 
   if (kind === "markdown") {
     return <MarkdownArtifactInline artifact={artifact} className={className} />;
   }
 
-  const { icon: Icon, label, iconClassName } = artifactLinkPresentation(kind, artifact);
+  const safeUrl = safeExternalUrl(extractArtifactUrl(artifact.data));
+  const { icon: Icon, label, fullLabel, iconClassName } = artifactLinkPresentation(kind, artifact);
   const content = (
     <>
       <Icon className={cn("size-3.5 shrink-0", iconClassName ?? "text-muted-foreground")} aria-hidden />
-      <span className="truncate">{label}</span>
+      <span className="truncate" title={fullLabel === label ? undefined : fullLabel}>
+        {label}
+      </span>
       {safeUrl ? <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden /> : null}
     </>
   );
@@ -106,10 +108,17 @@ const PR_STATE_PRESENTATION: Record<PrArtifactState, { icon: typeof GitPullReque
   merged: { icon: GitMerge, className: "text-purple-600 dark:text-purple-400" },
 };
 
-function artifactLinkPresentation(
-  kind: string,
-  artifact: WorkOrderArtifactPresentation,
-): { icon: typeof FileText; label: string; iconClassName?: string } {
+/** Branch names run long enough to push everything else off the row. */
+const BRANCH_LABEL_MAX_CHARS = 25;
+
+type ArtifactLinkPresentation = {
+  icon: typeof FileText;
+  label: string;
+  fullLabel: string;
+  iconClassName?: string;
+};
+
+function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPresentation): ArtifactLinkPresentation {
   const title = extractArtifactTitle(artifact.data);
   const name = extractArtifactName(artifact.data);
   const url = extractArtifactUrl(artifact.data);
@@ -117,24 +126,34 @@ function artifactLinkPresentation(
   switch (kind) {
     case "pr": {
       const { icon, className } = PR_STATE_PRESENTATION[extractPrArtifactState(artifact.data) ?? "open"];
-      return {
+      return presentation(
         icon,
-        iconClassName: className,
-        label: firstLabel(formatPrArtifactLabel(artifact.data), title, name, compactUrlLabel(url), "Pull request"),
-      };
+        firstLabel(formatPrArtifactLabel(artifact.data), title, name, compactUrlLabel(url), "Pull request"),
+        className,
+      );
     }
-    case "branch":
-      return { icon: GitBranch, label: firstLabel(name, title, compactUrlLabel(url), "Branch") };
+    case "branch": {
+      const branch = firstLabel(name, title, compactUrlLabel(url), "Branch");
+      return { icon: GitBranch, label: capLabel(branch, BRANCH_LABEL_MAX_CHARS), fullLabel: branch };
+    }
     case "link":
     case "url":
     case "preview":
-      return { icon: LinkIcon, label: firstLabel(name, title, compactUrlLabel(url), "Link") };
+      return presentation(LinkIcon, firstLabel(name, title, compactUrlLabel(url), "Link"));
     default:
-      return {
-        icon: url ? LinkIcon : FileText,
-        label: firstLabel(title, name, compactUrlLabel(url), "Artifact"),
-      };
+      return presentation(url ? LinkIcon : FileText, firstLabel(title, name, compactUrlLabel(url), "Artifact"));
   }
+}
+
+function presentation(icon: typeof FileText, label: string, iconClassName?: string): ArtifactLinkPresentation {
+  return { icon, label, fullLabel: label, iconClassName };
+}
+
+function capLabel(label: string, maxChars: number): string {
+  if (label.length <= maxChars) {
+    return label;
+  }
+  return `${label.slice(0, maxChars)}…`;
 }
 
 function firstLabel(...labels: Array<string | undefined>): string {

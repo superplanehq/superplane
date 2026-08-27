@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -32,15 +33,17 @@ var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                  uuid.UUID
-	OrganizationID      uuid.UUID
-	Name                string
-	Description         string
-	Key                 string
-	NextWorkOrderNumber int64
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	DeletedAt           gorm.DeletedAt `gorm:"index"`
+	ID                    uuid.UUID
+	OrganizationID        uuid.UUID
+	Name                  string
+	Description           string
+	Key                   string
+	NextWorkOrderNumber   int64
+	OnboardingConfig      datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	DeletedAt             gorm.DeletedAt `gorm:"index"`
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -121,14 +124,16 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 
 	now := time.Now()
 	factory := &Factory{
-		ID:                  uuid.New(),
-		OrganizationID:      organizationID,
-		Name:                name,
-		Description:         description,
-		Key:                 normalizedKey,
-		NextWorkOrderNumber: 1,
-		CreatedAt:           now,
-		UpdatedAt:           now,
+		ID:                    uuid.New(),
+		OrganizationID:        organizationID,
+		Name:                  name,
+		Description:           description,
+		Key:                   normalizedKey,
+		NextWorkOrderNumber:   1,
+		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt: nil,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 
 	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
@@ -199,6 +204,27 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	var factory Factory
 	err := tx.
 		Where("organization_id = ? AND id = ?", organizationID, factoryID).
+		First(&factory).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
+	normalized := NormalizeFactoryKey(key)
+	if err := ValidateFactoryKey(normalized); err != nil {
+		return nil, err
+	}
+
+	var factory Factory
+	err := tx.
+		Where("organization_id = ? AND key = ?", organizationID, normalized).
 		First(&factory).
 		Error
 	if err != nil {
@@ -403,6 +429,23 @@ func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
 	return nil
 }
 
+// CountFactoriesByIDs counts the active factories in the organization
+// matching the given IDs. Callers use it to verify a caller-provided
+// workspace list before persisting references to it.
+func CountFactoriesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("id IN ?", ids).
+		Count(&count).
+		Error
+	return count, err
+}
+
 func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
 	var count int64
 	err := tx.Unscoped().
@@ -436,6 +479,28 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithOrigin(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+}
+
+func (f *Factory) createWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin *WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -466,6 +531,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
+	applyWorkOrderOrigin(order, origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
 		return nil, err

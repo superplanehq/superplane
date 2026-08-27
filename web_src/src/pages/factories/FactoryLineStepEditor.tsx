@@ -37,17 +37,6 @@ export function FactoryLineStepEditor({
     <LineStepEditorShell>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className={cn("space-y-2", stepFieldClassName)}>
-          <Label htmlFor={`factory-line-step-name-${index}`}>Step name</Label>
-          <Input
-            id={`factory-line-step-name-${index}`}
-            className={stepFieldClassName}
-            value={step.name}
-            onChange={(event) => onChange({ ...step, name: event.target.value })}
-            placeholder="start-implementation"
-          />
-        </div>
-
-        <div className={cn("space-y-2", stepFieldClassName)}>
           <Label htmlFor={`factory-line-step-app-${index}`}>Automation</Label>
           <Select
             value={step.appId || undefined}
@@ -89,6 +78,22 @@ export function FactoryLineStepEditor({
               {appById.get(step.appId)?.name ?? "This automation"} has no triggers yet.
             </p>
           ) : null}
+        </div>
+
+        <div className={cn("space-y-2", stepFieldClassName)}>
+          <Label htmlFor={`factory-line-step-max-parallelism-${index}`}>Max parallelism</Label>
+          <Input
+            id={`factory-line-step-max-parallelism-${index}`}
+            className={stepFieldClassName}
+            type="number"
+            min={1}
+            value={step.maxParallelism}
+            onChange={(event) => onChange({ ...step, maxParallelism: event.target.value })}
+            placeholder="10"
+          />
+          <p className="text-xs text-muted-foreground">
+            Maximum number of work orders to be processed in parallel at this step.
+          </p>
         </div>
       </div>
     </LineStepEditorShell>

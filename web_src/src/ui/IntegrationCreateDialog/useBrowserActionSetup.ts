@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { OrganizationsBrowserAction } from "@/api-client";
 import { integrationKeys } from "@/hooks/useIntegrations";
 import type { useUpdateIntegration } from "@/hooks/useIntegrations";
+import { followBrowserAction } from "@/lib/browserAction";
+import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
 
 interface UseBrowserActionSetupParams {
@@ -11,6 +13,8 @@ interface UseBrowserActionSetupParams {
   organizationId: string;
   integrationId: string | undefined;
   integrationName: string;
+  /** Where to send the browser after the external provider redirects back. */
+  returnTo?: string;
   onCreated?: (integrationId: string, instanceName: string) => void;
   handleClose: () => void;
 }
@@ -22,6 +26,7 @@ export function useBrowserActionSetup({
   organizationId,
   integrationId,
   integrationName,
+  returnTo,
   onCreated,
   handleClose,
 }: UseBrowserActionSetupParams) {
@@ -34,33 +39,18 @@ export function useBrowserActionSetup({
     setBrowserActionCompleted(false);
   }, []);
 
-  // Opens the action's URL (or submits its POST form), then advances the dialog - even when
-  // resuming a pending integration, since there is no follow-up round trip in that case.
+  // Opens the action's URL (or submits its POST form) in the same tab, so the provider
+  // redirects back into this same window. A single tab keeps one origin, so the return
+  // marker in localStorage survives the round trip and the caller regains control.
   const continueBrowserAction = useCallback(() => {
     if (!browserAction) return;
-    const { url, method, formFields } = browserAction;
-    if (method?.toUpperCase() === "POST" && formFields) {
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-    } else if (url) {
-      window.open(url, "_blank");
-    }
-
-    setBrowserActionCompleted(true);
-  }, [browserAction]);
+    // The provider redirects back to the integration page after setup. Record
+    // where to continue so callers such as workspace setup regain control. The
+    // legacy GitHub connect creates a new integration during the round trip, so
+    // the marker is stored per organization, not per integration id.
+    rememberIntegrationSetupReturn(organizationId, returnTo);
+    followBrowserAction(browserAction);
+  }, [browserAction, organizationId, returnTo]);
 
   // Used for a browser action with no URL (e.g. "fill in more config and save"): submits the
   // current configuration and advances to whatever browser action comes next, if any.

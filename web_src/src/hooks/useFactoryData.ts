@@ -15,6 +15,7 @@ import {
   factoriesListWorkOrders,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
+  factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
 } from "@/api-client";
@@ -46,7 +47,16 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
+  workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
+  velocity: (
+    organizationId: string,
+    factoryId: string,
+    periodDays: number,
+    integrationId: string,
+    repository: string,
+  ) => ["factories", organizationId, factoryId, "velocity", periodDays, integrationId, repository] as const,
 };
 
 function factoryListKey(organizationId: string) {
@@ -278,6 +288,41 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
+export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; title?: string; description?: string }) => {
+      const response = await factoriesUpdateWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            title: input.title,
+            description: input.description,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to update work order");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
 export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
@@ -313,13 +358,20 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; lineName: string }) => {
+    mutationFn: async (input: {
+      orderId: string;
+      lineName: string;
+      startStepIndex?: number;
+      replaceActive?: boolean;
+    }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             lineName: input.lineName,
+            startStepIndex: input.startStepIndex,
+            replaceActive: input.replaceActive,
           },
         }),
       );
@@ -380,13 +432,14 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; body: string }) => {
+    mutationFn: async (input: { orderId: string; body: string; mentionedUserIds?: string[] }) => {
       const response = await factoriesAddWorkOrderComment(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             body: input.body,
+            mentionedUserIds: input.mentionedUserIds,
           },
         }),
       );

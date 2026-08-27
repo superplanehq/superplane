@@ -85,6 +85,22 @@ func (s *OrganizationService) DescribeUsage(
 	return organizations.DescribeUsage(ctx, s.usageService, orgID)
 }
 
+func (s *OrganizationService) DescribeOrganizationLLMSpend(
+	ctx context.Context,
+	req *pb.DescribeOrganizationLLMSpendRequest,
+) (*pb.DescribeOrganizationLLMSpendResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationLLMSpend(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ListHostedLLMModels(
+	ctx context.Context,
+	req *pb.ListHostedLLMModelsRequest,
+) (*pb.ListHostedLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListHostedLLMModels(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {

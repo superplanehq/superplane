@@ -49,6 +49,8 @@ type ExecutionContext struct {
 	Apps           AppExecutionContext
 	Runs           RunExecutionContext
 	Factory        FactoryContext
+	Usage          UsageRecorder
+	HostedLLM      HostedLLMContext
 }
 
 type AppExecutionContext interface {

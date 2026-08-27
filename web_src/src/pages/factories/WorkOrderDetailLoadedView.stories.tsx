@@ -10,11 +10,11 @@ import {
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
-  OPEN_WORK_ORDER_ARTIFACTS,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
+import { OPEN_WORK_ORDER_ARTIFACTS } from "./__fixtures__/factoryPageFixtureVariants";
 import {
   CLOSED_FAILED_WORK_ORDER_EVENTS,
   CLOSED_WORK_ORDER_EVENTS,
@@ -24,6 +24,13 @@ import {
   RICH_OPEN_WORK_ORDER_EVENTS,
   RUNNING_WORK_ORDER_EVENTS,
 } from "./__fixtures__/factoryPageEventFixtures";
+import {
+  CRITICAL_WORK_ORDER_CHECKS,
+  OPEN_WORK_ORDER_CHECKS,
+  RUNNING_WORK_ORDER_CHECKS,
+} from "./__fixtures__/workOrderCheckFixtures";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { presentWorkOrderStatusNotes } from "./lib/workOrderStatusNote";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
 import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
@@ -59,6 +66,7 @@ type Story = StoryObj<typeof meta>;
 interface BuildLoadedViewOverrides {
   events?: FactoriesWorkOrderEvent[];
   artifacts?: FactoriesWorkOrderArtifact[];
+  checks?: WorkOrderCheckPresentation[];
 }
 
 function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedViewOverrides = {}) {
@@ -69,6 +77,8 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
+    statusNotes: presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined),
+    checks: overrides.checks,
     isArtifactsLoading: false,
     displayStatus: derived.displayStatus!,
     statusMeta: derived.statusMeta!,
@@ -140,6 +150,72 @@ export const WithCommentsAndArtifacts: Story = {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
   }),
+};
+
+/** Checks — automation-reported scorecards (risk, coverage, confidence) plus a passing boolean CI check above Activity. Click a card to open the full analysis. */
+export const WithChecks: Story = {
+  name: "With Checks",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS),
+  }),
+};
+
+/** Failing boolean check — CI reads Fail next to two scored checks while the line retries. Status notes stay visible; Update manually matches the header (Complete and Reject, no Back to draft). */
+export const WithFailingCICheck: Story = {
+  name: "With Failing CI Check",
+  args: {
+    ...buildLoadedViewArgs(RUNNING_WORK_ORDER, {
+      events: RUNNING_WORK_ORDER_EVENTS,
+      checks: presentWorkOrderChecks(RUNNING_WORK_ORDER_CHECKS),
+    }),
+    statusNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
+  },
+};
+
+/** Single critical check — the smallest checks state, with the critical accent. */
+export const WithCriticalCheck: Story = {
+  name: "With Critical Check",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: OPEN_WORK_ORDER_EVENTS,
+    checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
+  }),
+};
+
+/**
+ * Status notes — automations announce the next step and what resolves
+ * it. Set by setWorkOrderStatusNote, keyed so several notes can sit
+ * side by side; cleared on any state change. Shown whenever the order
+ * has notes, including while a line is still running.
+ */
+export const WithStatusNote: Story = {
+  name: "With Status Note",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+  }),
+};
+
+/** Two notes with distinct keys — PR review plus a second informational wait. */
+export const WithTwoStatusNotes: Story = {
+  name: "With Two Status Notes",
+  args: {
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, {
+      events: RICH_OPEN_WORK_ORDER_EVENTS,
+      artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    }),
+    statusNotes: presentWorkOrderStatusNotes([
+      ...(OPEN_WORK_ORDER.statusNotes ?? []),
+      {
+        key: "deploy-window",
+        kind: "info",
+        headline: "Waiting on the deploy window",
+        body: "The change is ready. SuperPlane will complete this work order after the next deploy window.",
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      },
+    ]),
+  },
 };
 
 /** Closed as failed — failed badge, reopen actions, markdown artifact + failed close. */

@@ -129,6 +129,54 @@ func TestRenderRunnerLogsTextPrintsAllOutputsAfterTruncatedOutput(t *testing.T) 
 	require.Contains(t, raw, "second execution")
 }
 
+func TestRenderRunnerLogRecordFormatsKindPreviewAndTools(t *testing.T) {
+	duration := int64(12)
+	tests := []struct {
+		name   string
+		record runneraction.LiveLogRecord
+		want   string
+	}{
+		{
+			name:   "cmd start with kind and preview",
+			record: runneraction.LiveLogRecord{Type: "cmd_start", Kind: "bash", Text: "Clone", Preview: "git clone"},
+			want:   "$ [BASH] git clone\n",
+		},
+		{
+			name:   "cmd start with kind uses text when preview is blank",
+			record: runneraction.LiveLogRecord{Type: "cmd_start", Kind: "prompt", Text: "Implement", Preview: "  \n"},
+			want:   "$ [PROMPT] Implement\n",
+		},
+		{
+			name:   "cmd start without kind uses preview",
+			record: runneraction.LiveLogRecord{Type: "cmd_start", Text: "Clone", Preview: "git clone"},
+			want:   "$ git clone\n",
+		},
+		{
+			name:   "cmd start without kind uses text",
+			record: runneraction.LiveLogRecord{Type: "cmd_start", Text: "npm run build"},
+			want:   "$ npm run build\n",
+		},
+		{
+			name:   "tool start",
+			record: runneraction.LiveLogRecord{Type: "tool_start", Kind: "read", Text: "pkg/foo.go"},
+			want:   "  -> [READ] pkg/foo.go\n",
+		},
+		{
+			name:   "tool end",
+			record: runneraction.LiveLogRecord{Type: "tool_end", Status: "passed", DurationMS: &duration},
+			want:   "  # tool passed (12ms)\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout := bytes.NewBuffer(nil)
+			require.NoError(t, renderRunnerLogRecord(stdout, tt.record))
+			require.Equal(t, tt.want, stdout.String())
+		})
+	}
+}
+
 func newExecutionLogBroker(t *testing.T) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,24 @@ const INSTALL_PARAM_PATTERN = /\{\{\s*install_params\.(\w+)\s*\}\}/g;
 
 export const FACTORY_CANVAS_ID_PLACEHOLDER = "__FACTORY_CANVAS_ID__";
 
+/**
+ * Legacy home install passed a single `repository`. Map it onto the split
+ * app/backlog params so older callers and tests keep working.
+ */
+export function normalizeFactoryInstallParams(params: Record<string, string>): Record<string, string> {
+  const next = { ...params };
+  const legacyRepository = next.repository?.trim();
+  if (!legacyRepository) return next;
+
+  if (!next.appRepository?.trim()) {
+    next.appRepository = legacyRepository;
+  }
+  if (!next.backlogRepository?.trim()) {
+    next.backlogRepository = legacyRepository;
+  }
+  return next;
+}
+
 export function substituteInstallParams(content: string, params: Record<string, string>): string {
   return content.replace(INSTALL_PARAM_PATTERN, (match, name: string) => {
     if (Object.prototype.hasOwnProperty.call(params, name)) {
@@ -88,22 +106,54 @@ export function wireFactoryIntegrations(
   return yaml.dump(doc, { lineWidth: -1, noRefs: true });
 }
 
+const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
+
+export type FactoryAgentRewrite = {
+  component: string;
+  model: string;
+  credentials: { source: "hosted" } | { source: "integration"; name: string };
+};
+
+function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
+  for (const node of doc.spec?.nodes ?? []) {
+    if (node.component !== CLAUDE_CODE_COMPONENT) continue;
+    node.component = rewrite.component;
+    const configuration = node.configuration;
+    if (!configuration || typeof configuration !== "object") continue;
+    if (rewrite.credentials.source === "hosted") {
+      configuration.credentials = { source: "hosted" };
+    } else {
+      configuration.credentials = {
+        source: "integration",
+        integration: { name: rewrite.credentials.name },
+      };
+    }
+    configuration.model = rewrite.model;
+  }
+}
+
 export function materializeFactoryCanvas(args: {
   definition: FactoryDefinition;
   canvasName: string;
   canvasId: string;
   installParams: Record<string, string>;
   integrations: IntegrationSelections;
+  agentRewrite?: FactoryAgentRewrite;
 }): string {
   const withPlaceholders = replacePlaceholders(args.definition.canvasYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: args.canvasId,
   });
 
-  const substituted = substituteInstallParams(withPlaceholders, args.installParams);
+  const installParams = normalizeFactoryInstallParams(args.installParams);
+  const substituted = substituteInstallParams(withPlaceholders, installParams);
   const wired = wireFactoryIntegrations(substituted, args.definition.componentIntegrations, args.integrations);
   const doc = yaml.load(wired) as YamlCanvas;
   if (!doc.metadata) doc.metadata = {};
   doc.metadata.name = args.canvasName;
+
+  if (args.agentRewrite) {
+    rewriteOnboardingAgentNodes(doc, args.agentRewrite);
+  }
 
   for (const node of doc.spec?.nodes ?? []) {
     if (node.component !== "runApp") continue;

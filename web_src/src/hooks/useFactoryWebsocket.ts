@@ -1,6 +1,8 @@
-import { useCallback, useRef } from "react";
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useRef } from "react";
+import { canvasKeys } from "./useCanvasData";
 import { factoryQueryKeys } from "./useFactoryData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/factories/`;
@@ -25,6 +27,47 @@ function parseFactoryEvent(event: MessageEvent<unknown>): FactoryWebsocketMessag
   }
 }
 
+export function canvasRunsForWorkOrders(orders: FactoriesWorkOrder[]): Array<{ appId: string; runId: string }> {
+  const seen = new Set<string>();
+  const runs: Array<{ appId: string; runId: string }> = [];
+  for (const order of orders) {
+    for (const dispatch of order.lineDispatches ?? []) {
+      for (const execution of dispatch.stepExecutions ?? []) {
+        const appId = execution.run?.appId;
+        const runId = execution.run?.id;
+        if (!appId || !runId) {
+          continue;
+        }
+        const key = `${appId}:${runId}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        runs.push({ appId, runId });
+      }
+    }
+  }
+  return runs;
+}
+
+function cachedWorkOrdersForInvalidation(
+  queryClient: ReturnType<typeof useQueryClient>,
+  organizationId: string,
+  factoryId: string,
+  orderId?: string,
+): FactoriesWorkOrder[] {
+  const list =
+    queryClient.getQueryData<FactoriesWorkOrder[]>(factoryQueryKeys.workOrders(organizationId, factoryId)) ?? [];
+  if (!orderId) {
+    return list;
+  }
+
+  const detail = queryClient.getQueryData<FactoriesWorkOrder>(
+    factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId),
+  );
+  return [...list.filter((order) => order.id === orderId), ...(detail && detail.id === orderId ? [detail] : [])];
+}
+
 export function invalidateFactoryWorkOrderQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   organizationId: string,
@@ -34,6 +77,17 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrders(organizationId, factoryId),
   });
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.detail(organizationId, factoryId),
+  });
+
+  for (const run of canvasRunsForWorkOrders(
+    cachedWorkOrdersForInvalidation(queryClient, organizationId, factoryId, orderId),
+  )) {
+    void queryClient.invalidateQueries({
+      queryKey: canvasKeys.run(run.appId, run.runId),
+    });
+  }
 
   if (!orderId) {
     return;
@@ -51,6 +105,11 @@ export function invalidateFactoryWorkOrderQueries(
   // timeline's live-data overlay silently go stale until a manual reload.
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
+  });
+  // Check reports (reportWorkOrderCheck) update the scorecards in place;
+  // refetch so a re-scored check shows its new value and trend delta.
+  void queryClient.invalidateQueries({
+    queryKey: factoryQueryKeys.workOrderChecks(organizationId, factoryId, orderId),
   });
 }
 

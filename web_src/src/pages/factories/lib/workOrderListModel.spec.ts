@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesLineRef,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
 
 import {
   EMPTY_WORK_ORDER_FILTERS,
@@ -12,11 +18,24 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
 const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
 
-function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
+/** Fixture-only shape: a step execution plus which line it ran on, before
+ * it's grouped into a dispatch by `order()` below. */
+type TestExecution = FactoriesWorkOrderExecution & { line?: FactoriesLineRef };
+
+interface OrderOverrides extends Omit<Partial<FactoriesWorkOrder>, "lineDispatches"> {
+  /** Convenience: a flat execution list, grouped into one dispatch per
+   * distinct line so most test cases don't need to hand-build dispatches. */
+  executions?: TestExecution[];
+}
+
+function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
+  const { executions, ...rest } = overrides;
   return {
     id: overrides.id ?? "wo-1",
     title: "Order title",
@@ -24,9 +43,28 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
     result: "RESULT_UNSPECIFIED",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [],
-    ...overrides,
+    lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
+    ...rest,
   };
+}
+
+function dispatchesFromExecutions(executions: TestExecution[]): FactoriesWorkOrderLineDispatch[] {
+  const byLineId = new Map<string, FactoriesWorkOrderLineDispatch>();
+  for (const { line, ...execution } of executions) {
+    const lineId = line?.id ?? "unknown";
+    const dispatch = byLineId.get(lineId);
+    if (dispatch) {
+      dispatch.stepExecutions = [...(dispatch.stepExecutions ?? []), execution];
+      continue;
+    }
+    byLineId.set(lineId, {
+      id: `dispatch-${lineId}`,
+      line,
+      state: isActiveWorkOrderExecution(execution) ? "STATE_ACTIVE" : "STATE_FINISHED",
+      stepExecutions: [execution],
+    });
+  }
+  return [...byLineId.values()];
 }
 
 describe("buildWorkOrderListEntry", () => {
@@ -51,6 +89,21 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.searchHaystack).toContain("reconcile refunds");
     expect(entry.searchHaystack).toContain("alex reviewer");
     expect(entry.isDispatchable).toBe(true);
+  });
+
+  it("keeps only the first assignee as the owner", () => {
+    const entry = buildWorkOrderListEntry(
+      order({
+        assignees: [
+          { id: "u1", name: "Alex Reviewer" },
+          { id: "u2", name: "Grace" },
+        ],
+      }),
+      factory,
+    );
+
+    expect(entry.assigneeIds).toEqual(["u1"]);
+    expect(entry.assigneeNames).toEqual(["Alex Reviewer"]);
   });
 
   it("picks the latest execution and counts distinct lines", () => {
@@ -175,7 +228,7 @@ describe("buildWorkOrderListEntry", () => {
 
     expect(entry.totalTokens).toBe(1700);
     expect(entry.totalCostCents).toBe(60);
-    expect(entry.usageLabel).toBe("$0.60");
+    expect(entry.usageLabel).toBe("$0.60 · 2k tokens");
   });
 
   it("keeps closed orders out of the dispatchable set", () => {
@@ -188,6 +241,25 @@ describe("scope + filter + search + ordering", () => {
   const meAssigned = order({ id: "mine-1", assignees: [{ id: "me", name: "You" }], updatedAt: "2024-06-05T00:00:00Z" });
   const unassigned = order({ id: "u-1", assignees: [], updatedAt: "2024-06-06T00:00:00Z" });
   const others = order({ id: "o-1", assignees: [{ id: "alex", name: "Alex" }], updatedAt: "2024-06-07T00:00:00Z" });
+  const running = order({
+    id: "r-1",
+    assignees: [{ id: "runner", name: "Runner" }],
+    executions: [{ id: "exec-run", state: "STATE_STARTED", step: "Implement" }],
+    updatedAt: "2024-06-08T00:00:00Z",
+  });
+  const draft = order({
+    id: "d-1",
+    state: "STATE_DRAFT",
+    assignees: [{ id: "author", name: "Author" }],
+    updatedAt: "2024-06-09T00:00:00Z",
+  });
+  const failed = order({
+    id: "f-1",
+    state: "STATE_CLOSED",
+    result: "RESULT_FAILED",
+    assignees: [{ id: "owner", name: "Owner" }],
+    updatedAt: "2024-05-15T00:00:00Z",
+  });
   const closed = order({
     id: "c-1",
     state: "STATE_CLOSED",
@@ -195,18 +267,27 @@ describe("scope + filter + search + ordering", () => {
     updatedAt: "2024-05-01T00:00:00Z",
   });
 
-  const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, closed], factory);
+  const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, running, draft, failed, closed], factory);
+
+  it("labels the attention scope and describes My as work you started", () => {
+    const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
+    expect(attention?.label).toBe("Needs attention");
+    expect(attention?.tooltip).toBe("Work orders that need your attention.");
+    expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
+      "Work orders you created or started. SuperPlane assigns those to you.",
+    );
+  });
 
   it("scope=my only keeps orders assigned to the current user", () => {
     expect(applyWorkOrderScope(entries, "my", "me").map((e) => e.id)).toEqual(["mine-1"]);
   });
 
-  it("scope=active drops completed, failed, and cancelled orders", () => {
-    expect(applyWorkOrderScope(entries, "active").map((e) => e.id)).toEqual(["mine-1", "u-1", "o-1"]);
+  it("scope=active keeps drafts, waiting, and failed orders and drops running work", () => {
+    expect(applyWorkOrderScope(entries, "active").map((e) => e.id)).toEqual(["mine-1", "u-1", "o-1", "d-1", "f-1"]);
   });
 
   it("scope=all keeps everything", () => {
-    expect(applyWorkOrderScope(entries, "all")).toHaveLength(4);
+    expect(applyWorkOrderScope(entries, "all")).toHaveLength(7);
   });
 
   it("status filter narrows down to the selected display statuses", () => {
@@ -255,7 +336,15 @@ describe("scope + filter + search + ordering", () => {
   });
 
   it("ordering=updated puts the newest updated first", () => {
-    expect(applyWorkOrderOrdering(entries, "updated").map((e) => e.id)).toEqual(["o-1", "u-1", "mine-1", "c-1"]);
+    expect(applyWorkOrderOrdering(entries, "updated").map((e) => e.id)).toEqual([
+      "d-1",
+      "r-1",
+      "o-1",
+      "u-1",
+      "mine-1",
+      "f-1",
+      "c-1",
+    ]);
   });
 
   it("ordering=status follows the display status order", () => {

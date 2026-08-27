@@ -8,6 +8,7 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   PRIMARY_FACTORY_ID,
@@ -15,6 +16,7 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
+import { factoryAgentChatMessages } from "./factoryAgentChatMessages";
 import {
   SIMPLE_FACTORY_RUN_EVENT_AT,
   mergeSimpleFactoryRunActions,
@@ -27,21 +29,31 @@ export {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
 };
 
-export const REFUND_PLANNER_APP = REFUND_FACTORY_APPS[0];
-export const REFUND_IMPLEMENTER_APP = REFUND_FACTORY_APPS[1];
-export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
+function refundFactoryApp(id: string): FactoryApp {
+  const app = REFUND_FACTORY_APPS.find((candidate) => candidate.id === id);
+  if (!app) {
+    throw new Error(`Unknown refund factory app: ${id}`);
+  }
+  return app;
+}
+
+export const REFUND_PLANNER_APP = refundFactoryApp("app-refund-planner");
+export const REFUND_IMPLEMENTER_APP = refundFactoryApp("app-refund-implementer");
+export const REFUND_VERIFIER_APP = refundFactoryApp("app-refund-verifier");
 
 /**
- * Clone of the captured Software Factory canvas, owned by the Refunds Factory
+ * Clone of the captured Software Factory canvas, owned by Semaphore
  * so FactoryAppCanvasPage does not redirect to Overview.
  */
 export function factoryOwnedCanvasFixture(
   app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_PLANNER_APP,
   extras: Partial<CanvasAppFixture> = {},
+  factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
   const baseCanvas = defaultCanvasAppFixture.canvas?.canvas as
     | { metadata?: Record<string, unknown>; spec?: unknown }
@@ -65,7 +77,7 @@ export function factoryOwnedCanvasFixture(
           id: canvasId,
           name: app.name,
           description: app.description,
-          factoryId: PRIMARY_FACTORY_ID,
+          factoryId,
         },
       },
     } as CanvasAppFixture["canvas"],
@@ -102,6 +114,15 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         },
       },
       {
+        id: LINE_RUN_IMPLEMENT_NOTIFY_ID,
+        canvasId: implementerId,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: HOUR_AGO,
+        updatedAt: HOUR_AGO,
+        rootEvent: { customName: "Notify on status change after a reopen" },
+      },
+      {
         id: LINE_RUN_IMPLEMENT_PASSED_ID,
         canvasId: implementerId,
         state: "STATE_FINISHED",
@@ -120,7 +141,7 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         rootEvent: { customName: "Backfill refund audit trail" },
       },
     ],
-    totalCount: 4,
+    totalCount: 5,
     hasNextPage: false,
   };
 }
@@ -128,18 +149,24 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
 /** Factory-owned compact CI canvas plus the runs that Line cards open. */
 export function refundLineCanvasFixture(
   app: Pick<FactoryApp, "id" | "name" | "description"> = REFUND_IMPLEMENTER_APP,
+  factoryId = PRIMARY_FACTORY_ID,
 ): CanvasAppFixture {
-  return factoryOwnedCanvasFixture(app, {
-    runs: refundFactoryLineRuns(),
-    triggers: { triggers: [simpleFactoryRunOnRunTrigger()] },
-    actions: mergeSimpleFactoryRunActions(defaultCanvasAppFixture.actions),
-    executionsByEventId: {
-      [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
-    },
-    canvas: {
+  return factoryOwnedCanvasFixture(
+    app,
+    {
+      runs: refundFactoryLineRuns(),
+      triggers: { triggers: [simpleFactoryRunOnRunTrigger()] },
+      actions: mergeSimpleFactoryRunActions(defaultCanvasAppFixture.actions),
+      executionsByEventId: {
+        [LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID]: { executions: simpleFactoryRunExecutions() },
+      },
+      agentMessages: factoryAgentChatMessages(),
       canvas: {
-        spec: simpleFactoryRunCanvasSpec(),
+        canvas: {
+          spec: simpleFactoryRunCanvasSpec(),
+        },
       },
     },
-  });
+    factoryId,
+  );
 }

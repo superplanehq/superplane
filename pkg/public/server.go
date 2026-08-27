@@ -664,6 +664,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	//
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
+	githubAppUserRoute := r.NewRoute().Subrouter()
+	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/oauth/callback", s.HandleGitHubAppOAuthCallback).Methods("GET")
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
@@ -685,10 +691,18 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/llm-settings", s.adminGetInstallationLLMSettings).Methods("GET")
+	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/llm-providers/{provider}/models", s.adminListHostedLLMProviderModels).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
@@ -762,6 +776,15 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if status := hostedGitHubAppBrowserCallbackStatus(r.Context(), r, integrationInstance); status != 0 {
+		writeHostedGitHubAppAuthError(w, status)
+		return
+	}
+
+	s.dispatchIntegrationRequest(w, r, integrationInstance)
+}
+
+func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Request, integrationInstance *models.Integration) {
 	integration, err := s.registry.GetIntegration(integrationInstance.AppName)
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
@@ -800,7 +823,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 	})
 
 	integrationInstance.Capabilities = capabilityCtx.States()
-	err = database.Conn().Save(&integrationInstance).Error
+	err = database.Conn().Save(integrationInstance).Error
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return
@@ -1368,8 +1391,10 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 			}
 
 			organizationID := ""
+			var organizationUUID uuid.UUID
 			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
 				organizationID = workflow.OrganizationID.String()
+				organizationUUID = workflow.OrganizationID
 			}
 
 			return &core.ExecutionContext{
@@ -1388,6 +1413,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				Logger:         logging.ForExecution(execution),
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
+				Usage:          contexts.NewUsageContext(organizationUUID, execution),
 			}, nil
 		},
 	})
@@ -1451,6 +1477,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	<-client.Done
 }
 
+func shouldProxyToVite(path string) bool {
+	if strings.HasPrefix(path, "/admin/api") {
+		return false
+	}
+
+	if strings.HasPrefix(path, "/api") {
+		return false
+	}
+
+	return true
+}
+
 // setupDevProxy configures a simple reverse proxy to the Vite development server
 func (s *Server) setupDevProxy(webBasePath string) {
 	viteHost := os.Getenv("VITE_DEV_HOST")
@@ -1501,7 +1539,8 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	}
 
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+		if !shouldProxyToVite(r.URL.Path) {
+			http.NotFound(w, r)
 			return
 		}
 

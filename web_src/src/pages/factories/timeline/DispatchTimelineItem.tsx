@@ -115,11 +115,12 @@ function DispatchStepRow({
   const runHref = getWorkOrderExecutionRunHref(organizationId, factoryKey, step.execution, { orderNumber });
   const duration = formatStepExecutionDuration(step);
   const status = executionStatus(step.execution);
+  const name = step.execution.run?.appName?.trim() || step.stepName;
 
   return (
     <li className="min-w-0 py-1.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <StepName name={step.stepName} runHref={runHref} />
+        <StepName name={name} runHref={runHref} />
         {status ? (
           <span className={cn("inline-flex items-center gap-1.5 text-[12px]", status.textClassName)}>
             <span className={cn("size-1.5 shrink-0 rounded-full", status.dotClassName)} aria-hidden />

@@ -48,7 +48,7 @@ vi.mock("@/lib/toast", () => ({
 beforeEach(() => {
   mockedExecutions = [runnerExecution];
   useLiveLogStreamMock.mockReturnValue({
-    sections: [{ index: 0, text: "npm run build", lines: ["> build", "vite build"], status: "passed" }],
+    sections: [{ index: 0, text: "npm run build", lines: ["> build", "vite build"], events: [], status: "passed" }],
     orphanLines: [],
     error: null,
     isStreaming: false,

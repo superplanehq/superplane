@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -22,7 +22,16 @@ endif
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
-COMPOSE=docker compose -f docker-compose.dev.yml
+# On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
+# host directories that the CI cache can restore and store between jobs.
+COMPOSE_FILES := -f docker-compose.dev.yml
+GO_CACHE_DIRS :=
+ifneq ($(strip $(CI)),)
+COMPOSE_FILES += -f docker-compose.ci.yml
+GO_CACHE_DIRS := tmp/go tmp/go-build
+endif
+
+COMPOSE=docker compose $(COMPOSE_FILES)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
 
@@ -50,7 +59,7 @@ test.e2e:
 	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -65,6 +74,9 @@ test.coverage:
 test.coverage.check:
 	$(MAKE) test.coverage
 	$(MAKE) check.coverage.go
+
+test.coverage.autoparallel:
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
 
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
@@ -99,7 +111,7 @@ dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
-	@mkdir -p tmp/screenshots
+	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
@@ -113,7 +125,7 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
@@ -207,7 +219,7 @@ check.test.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
 
 check.test.ui.shard:
-	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
+	$(COMPOSE) exec -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"

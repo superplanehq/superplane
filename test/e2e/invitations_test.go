@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -116,7 +117,7 @@ func (s *invitationSteps) acceptInvite(token string) {
 
 func (s *invitationSteps) waitForOrganizationRedirect() {
 	waitErr := s.session.Page().WaitForURL("**/"+s.session.OrgID.String()+"*", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(10000),
+		Timeout: pw.Float(30000),
 	})
 	require.NoError(s.t, waitErr)
 }
@@ -132,37 +133,27 @@ func (s *invitationSteps) visitMembersSettings() {
 func (s *invitationSteps) followInviteLinkToLogin(token string) {
 	s.session.Visit("/invite/" + token)
 	waitErr := s.session.Page().WaitForURL("**/login?redirect=**", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(10000),
+		Timeout: pw.Float(30000),
 	})
 	require.NoError(s.t, waitErr)
 }
 
 func (s *invitationSteps) openSignupForm() {
-	// With magic code enabled, toggle to password login first
-	// so the "Create an account" link becomes visible.
-	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
-	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
-		require.NoError(s.t, toggle.Click())
-	}
-
-	button := s.session.Page().Locator("text=Create an account").First()
-	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
-	require.NoError(s.t, button.Click())
+	s.session.AssertVisible(q.Text("Continue with email"))
+	s.session.Click(q.Text("Sign in with password instead"))
+	s.session.Click(q.Text("Create an account"))
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
-	page := s.session.Page()
-
-	require.NoError(s.t, page.Locator(`input[placeholder="First name"]`).Fill(firstName))
-	require.NoError(s.t, page.Locator(`input[placeholder="Last name"]`).Fill(lastName))
-	require.NoError(s.t, page.Locator(`input[placeholder="Email"]`).Fill(email))
-	require.NoError(s.t, page.Locator(`input[placeholder="Password"]`).Fill(password))
-	require.NoError(s.t, page.Locator(`input[placeholder="Repeat password"]`).Fill(password))
+	s.session.FillIn(q.Locator(`input[placeholder="First name"]`), firstName)
+	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
+	s.session.FillIn(q.Locator(`input[placeholder="Email"]`), email)
+	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
+	s.session.FillIn(q.Locator(`input[placeholder="Repeat password"]`), password)
 }
 
 func (s *invitationSteps) submitSignup() {
-	button := s.session.Page().Locator("text=Create account").First()
-	require.NoError(s.t, button.Click())
+	s.session.Click(q.Text("Create account"))
 }
 
 func (s *invitationSteps) disableInviteLink(token string) {

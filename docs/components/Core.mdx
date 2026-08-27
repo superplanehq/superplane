@@ -23,7 +23,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
-  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, or branch) to a work order" />
+  <LinkCard title="Add Run Error" href="#add-run-error" description="Record a business failure on the current run" />
+  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (PR, markdown note, branch, or link) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
@@ -40,12 +41,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a work order" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
   <LinkCard title="Run Claude Code" href="#run-claude-code" description="Runs Claude Code on a fleet runner" />
+  <LinkCard title="Run Codex" href="#run-codex" description="Runs the Codex CLI on a fleet runner" />
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
+  <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
+  <LinkCard title="Set Work Order Status Note" href="#set-work-order-status-note" description="Announce what a waiting work order is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
@@ -424,6 +429,39 @@ A single `memory.added` event is emitted with all written rows and the total `co
 }
 ```
 
+<a id="add-run-error"></a>
+
+## Add Run Error
+
+**Component key:** `addRunError`
+
+The Add Run Error component appends an error entry to the current run.
+
+### Use Cases
+
+- **Channel-based failures**: Mark the run as failed when a component emits on a failed output channel instead of failing the execution
+- **Handled failures**: Record that a business operation failed even though downstream nodes continue
+- **Parallel branches**: Each branch can report its own failure; all entries are collected on the run
+
+### Behavior
+
+- Appends an error message to the run
+- A run with one or more recorded errors is treated as failed when it finishes
+- Downstream nodes still receive an event on the default output channel
+- The execution itself passes unless storing the error exceeds platform limits
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "pipeline failed"
+  },
+  "timestamp": "2026-07-20T12:00:00Z",
+  "type": "addRunError.finished"
+}
+```
+
 <a id="add-work-order-artifact"></a>
 
 ## Add Work Order Artifact
@@ -434,11 +472,12 @@ The Add Work Order Artifact component stores a typed artifact against a work ord
 
 Supported types:
 
-- **Pull request** (`pr`): requires `url`; optional `number`, `title`, and `state` (`open`/`draft`/`closed`/`merged`, defaults to `open`) which drives the icon/color of the artifact chip in the work order UI.
+- **Pull request** (`pr`): requires `url`; optional `number`, `title`, `state`, `merged`, `draft`, `mergedAt`, and `closedAt`. The `state` field (`open`/`draft`/`closed`/`merged`, defaults to `open`) drives the icon/color of the artifact chip in the work order UI. `state`, `merged`, and `draft` all accept expressions, so a flow can wire them straight to a `github.onPullRequest` payload: a GitHub-shaped `state: "closed"` + `merged: true` folds into SuperPlane's `state: "merged"` before it hits the artifact. Set `mergedAt` / `closedAt` (RFC3339, usually from the GitHub event) when you attach an already-merged or closed PR so Velocity uses the real day instead of now.
 - **Markdown note** (`markdown`): requires `body`; optional `title`.
-- **Branch** (`branch`): requires `name` (the branch name); optional `url` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Branch** (`branch`): requires `name` and `repository` (`owner/repo` or a repository http(s) URL), or an explicit `url`. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time and does not wait for a pull request.
+- **Link** (`link`): requires `url` (must be http or https); optional `title` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR and markdown types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
+PR, markdown, and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
 Set `artifactKey` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a `github.onPullRequest` merged event. Keys are unique per factory.
 
@@ -1193,6 +1232,53 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
+<a id="report-work-order-check"></a>
+
+## Report Work Order Check
+
+**Component key:** `reportWorkOrderCheck`
+
+The Report Work Order Check component stores a scored check against a work order. Checks appear as scorecards on the work order page, next to the description.
+
+Each check is identified by its `checkKey` (for example `risk-review`). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
+
+A check is either scored or a pass/fail verdict, controlled by `format`:
+
+- `fraction` and `percent` are scored checks. Set `score` and `maxScore`.
+- `boolean` is a pass/fail verdict (e.g. CI status). Set `passed` to true or false instead of a score; a pass shows as healthy, a fail as critical.
+
+For scored checks, the level (healthy / neutral / needs attention / critical) is computed from the score and the thresholds you configure:
+
+- `direction` says which way is bad: `higherIsBetter` (e.g. coverage) or `lowerIsBetter` (e.g. risk).
+- `cautionAt` and `criticalAt` are score thresholds. When the score crosses a threshold in the bad direction, the check shows that level.
+- With no thresholds set, the check stays neutral.
+
+For example, a risk score from 0 to 10 where lower is better, with `cautionAt: 5` and `criticalAt: 8`: a score of 3 is healthy, 6 needs attention, 9 is critical.
+
+`score`, `maxScore`, and `passed` accept expressions, so a preceding automation run can feed them (e.g. `{{ previous().data.risk.score }}`). Use `analysis` for the full markdown report — it renders when a user opens the check.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "check": {
+      "format": "fraction",
+      "id": "chk-123",
+      "key": "risk-review",
+      "level": "positive",
+      "maxScore": 10,
+      "name": "Risk review",
+      "score": 3
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.checkReported"
+}
+```
+
 <a id="run-app"></a>
 
 ## Run App
@@ -1341,7 +1427,7 @@ Runs [Claude Code](https://code.claude.com/docs/en/headless) in non-interactive 
 
 ### Prerequisites
 - The `claude` CLI is installed on the runner machine and available on `PATH`.
-- An Anthropic API key stored as a SuperPlane secret.
+- An Anthropic API key stored as a SuperPlane secret, a Claude integration, or SuperPlane-hosted credentials.
 
 ### Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -1359,8 +1445,8 @@ Example:
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Anthropic API Key**: SuperPlane secret used as `ANTHROPIC_API_KEY`.
-- **Model**: Optional model id or alias (for example `sonnet`).
+- **Anthropic API Key**: SuperPlane secret, Claude integration, or SuperPlane-hosted credentials used as `ANTHROPIC_API_KEY`.
+- **Model**: Optional model id or alias (for example `sonnet`). SuperPlane-hosted credentials require a model from the installation allowlist.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -1388,6 +1474,55 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerClaudeCode.finished"
+}
+```
+
+<a id="run-codex"></a>
+
+## Run Codex
+
+**Component key:** `runnerCodex`
+
+Runs the OpenAI Codex CLI in non-interactive mode on a fleet runner.
+
+### Prerequisites
+- The `codex` CLI is installed on the runner machine and available on `PATH`.
+- An OpenAI API key stored as a SuperPlane secret, an OpenAI integration, or SuperPlane-hosted credentials.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — a Codex turn. Later prompts continue in the same working directory.
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Credentials**: SuperPlane secret, OpenAI integration, or SuperPlane-hosted credentials used as `OPENAI_API_KEY`.
+- **Model**: Optional Codex model id. SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerCodex.finished"
 }
 ```
 
@@ -1445,6 +1580,56 @@ function main() {
 }
 ```
 
+<a id="run-open-router-agent"></a>
+
+## Run OpenRouter Agent
+
+**Component key:** `runnerOpenRouter`
+
+Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can use bash, read, edit, and write tools.
+
+### Prerequisites
+- Node.js on the runner `PATH`.
+- An OpenRouter API key stored as a SuperPlane secret, or SuperPlane-hosted credentials.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — one OpenRouter agent loop in the same working directory (up to max turns).
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as `OPENROUTER_API_KEY`.
+- **Model**: Required OpenRouter model id (`provider/model`). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+- **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerOpenRouter.finished"
+}
+```
+
 <a id="run-python"></a>
 
 ## Run Python
@@ -1495,6 +1680,44 @@ def main(payload):
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerPython.finished"
+}
+```
+
+<a id="set-work-order-status-note"></a>
+
+## Set Work Order Status Note
+
+**Component key:** `setWorkOrderStatusNote`
+
+The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+
+Each note is identified by its `noteKey` (for example `pr-closure`). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
+
+- `headline` is the short instruction shown as the panel title (e.g. "Review the pull request").
+- `body` is an optional markdown paragraph with the details — what happens on each outcome.
+- `ctaLabel` and `ctaUrl` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
+- `showOnlyWhenWaiting` hides the note while a line is running. The default is off, so the note stays visible during a run.
+
+`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+
+Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "statusNote": {
+      "body": "When PR #42 merges, this work order completes automatically.",
+      "ctaLabel": "Review PR #42",
+      "ctaUrl": "https://github.com/acme/app/pull/42",
+      "headline": "Review the pull request",
+      "key": "pr-closure",
+      "kind": "info"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.statusNoteSet"
 }
 ```
 
@@ -1661,7 +1884,9 @@ The Update Work Order Artifact component keeps an already-attached artifact's da
 
 This does not add a new timeline entry: the work order's "attached" line and the sidebar artifact list both update in place so the chip's icon/color track the pull request's current state without spamming the timeline on every open → draft → merged flip.
 
-Typical wiring to stay in sync with GitHub: a `github.onPullRequest` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → `findWorkOrder` (`by: artifactKey`, `artifactKey: {{ event.data.pull_request.html_url }}`) → this component, with `state` derived from the webhook action: `opened`/`reopened` → `open`, `converted_to_draft` → `draft`, `ready_for_review` → `open`, `closed` with `pull_request.merged == true` → `merged`, `closed` with `merged == false` → `closed`.
+Typical wiring to stay in sync with GitHub: a `github.onPullRequest` trigger (actions: opened, ready_for_review, converted_to_draft, closed) → `findWorkOrder` (`by: artifactKey`, `artifactKey: {{ event.data.pull_request.html_url }}`) → this component.
+
+The `state`, `merged`, and `draft` fields all accept expressions, so you can pass the webhook payload through as-is instead of writing an if-node per branch. Set `state: "{{ event.data.pull_request.state }}"` and `merged: "{{ event.data.pull_request.merged }}"` (plus optional `draft: "{{ event.data.pull_request.draft }}"`); the component folds a GitHub-shaped payload (`state: "closed"` + `merged: true`) into SuperPlane's `state: "merged"` before it hits the artifact, so the chip flips to purple as soon as the merge event lands.
 
 `orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
