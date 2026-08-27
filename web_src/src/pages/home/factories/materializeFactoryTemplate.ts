@@ -106,7 +106,7 @@ export function wireFactoryIntegrations(
   return yaml.dump(doc, { lineWidth: -1, noRefs: true });
 }
 
-const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
+const ONBOARDING_AGENT_COMPONENTS = new Set(["runnerClaudeCode", "runnerCodex", "runnerOpenRouter"]);
 
 export type FactoryAgentRewrite = {
   component: string;
@@ -116,7 +116,7 @@ export type FactoryAgentRewrite = {
 
 function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
   for (const node of doc.spec?.nodes ?? []) {
-    if (node.component !== CLAUDE_CODE_COMPONENT) continue;
+    if (typeof node.component !== "string" || !ONBOARDING_AGENT_COMPONENTS.has(node.component)) continue;
     node.component = rewrite.component;
     const configuration = node.configuration;
     if (!configuration || typeof configuration !== "object") continue;

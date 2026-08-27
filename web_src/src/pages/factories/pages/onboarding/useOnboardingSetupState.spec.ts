@@ -1,10 +1,14 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
 describe("useOnboardingSetupState", () => {
+  beforeEach(() => {
+    sessionStorage.removeItem("superplane.onboarding.keyProvider");
+  });
+
   it("uses real connected state and completes discovery without fixture counts", () => {
     const connected = new Set<IntegrationId>(["github", "claude"]);
     const { result } = renderHook(() =>
@@ -27,7 +31,7 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issueCount).toBeUndefined();
   });
 
-  it("marks the agent step ready when remaining credit is greater than zero", () => {
+  it("marks the agent step ready when SuperPlane agent has remaining credit", () => {
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
         connected: new Set<IntegrationId>(),
@@ -36,10 +40,11 @@ describe("useOnboardingSetupState", () => {
       }),
     );
 
+    expect(result.current.keyProvider).toBeNull();
     expect(result.current.agentReady).toBe(true);
   });
 
-  it("marks the agent step ready when OpenAI is connected and credit is empty", () => {
+  it("does not mark the agent step ready from a connected key without BYOK selection", () => {
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
         connected: new Set<IntegrationId>(["openai"]),
@@ -48,10 +53,10 @@ describe("useOnboardingSetupState", () => {
       }),
     );
 
-    expect(result.current.agentReady).toBe(true);
+    expect(result.current.agentReady).toBe(false);
   });
 
-  it("lets setup finish when OpenRouter is connected", () => {
+  it("marks the agent step ready after the user selects a connected BYOK provider", () => {
     const connected = new Set<IntegrationId>(["github", "openrouter"]);
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
@@ -64,18 +69,19 @@ describe("useOnboardingSetupState", () => {
     act(() => {
       result.current.selectVcsHost("github");
       result.current.selectRepo("acme/payments");
+      result.current.setKeyProvider("openrouter");
     });
 
     expect(result.current.agentReady).toBe(true);
     expect(result.current.canFinish).toBe(true);
   });
 
-  it("lets setup finish when Anthropic is connected or remaining credit is greater than zero", () => {
-    const connected = new Set<IntegrationId>(["github", "claude"]);
+  it("lets setup finish on SuperPlane agent credit without a connected key", () => {
+    const connected = new Set<IntegrationId>(["github"]);
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
         connected,
-        remainingCreditCents: 0,
+        remainingCreditCents: 5000,
         simulateDiscovery: false,
       }),
     );

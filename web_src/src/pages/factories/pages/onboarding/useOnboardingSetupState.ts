@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { isAgentStepReady } from "./onboardingAgentReadiness";
+import { isAgentStepReady, type AgentProviderId, AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
 import {
   fixtureIssueCount,
   type AgentHarnessId,
@@ -9,6 +9,31 @@ import {
   type VcsHostId,
 } from "./onboardingFixtures";
 import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
+
+const KEY_PROVIDER_STORAGE = "superplane.onboarding.keyProvider";
+
+function keyProviderStorageKey(factoryId?: string): string {
+  return factoryId ? `${KEY_PROVIDER_STORAGE}.${factoryId}` : KEY_PROVIDER_STORAGE;
+}
+
+function readStoredKeyProvider(factoryId?: string): AgentProviderId | null {
+  if (typeof sessionStorage === "undefined") return null;
+  const stored = sessionStorage.getItem(keyProviderStorageKey(factoryId));
+  if (stored && AGENT_PROVIDER_IDS.includes(stored as AgentProviderId)) {
+    return stored as AgentProviderId;
+  }
+  return null;
+}
+
+function writeStoredKeyProvider(factoryId: string | undefined, keyProvider: AgentProviderId | null): void {
+  if (typeof sessionStorage === "undefined") return;
+  const key = keyProviderStorageKey(factoryId);
+  if (keyProvider) {
+    sessionStorage.setItem(key, keyProvider);
+    return;
+  }
+  sessionStorage.removeItem(key);
+}
 
 export type OnboardingSetupState = {
   workspaceName: string;
@@ -20,6 +45,7 @@ export type OnboardingSetupState = {
   issuesDiscovered: boolean;
   issuesChoice: IssuesChoiceId | null;
   agent: AgentHarnessId | null;
+  keyProvider: AgentProviderId | null;
   finished: boolean;
 };
 
@@ -43,12 +69,13 @@ function setupReadiness(input: {
   connected: Set<IntegrationId>;
   issuesChoice: IssuesChoiceId | null;
   remainingCreditCents: number;
+  keyProvider: AgentProviderId | null;
 }) {
   const nameReady = input.workspaceName.trim().length > 0;
   const vcsReady = input.vcsHost !== null && input.connected.has(input.vcsHost);
   const repoReady = vcsReady && input.selectedRepo !== null;
   const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
-  const agentReady = isAgentStepReady(input.connected, input.remainingCreditCents);
+  const agentReady = isAgentStepReady(input.connected, input.remainingCreditCents, input.keyProvider);
   return {
     nameReady,
     vcsReady,
@@ -65,6 +92,7 @@ export function useOnboardingSetupState(
     connected?: Set<IntegrationId>;
     remainingCreditCents?: number;
     simulateDiscovery?: boolean;
+    factoryId?: string;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -86,6 +114,16 @@ export function useOnboardingSetupState(
   /** True after Continue to coding agent — starts backlog analysis. */
   const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
+  const [keyProvider, setKeyProviderState] = useState<AgentProviderId | null>(() =>
+    readStoredKeyProvider(options?.factoryId),
+  );
+  const setKeyProvider = useCallback(
+    (next: AgentProviderId | null) => {
+      writeStoredKeyProvider(options?.factoryId, next);
+      setKeyProviderState(next);
+    },
+    [options?.factoryId],
+  );
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
   const connected = options?.connected ?? localConnected;
@@ -205,6 +243,7 @@ export function useOnboardingSetupState(
     connected,
     issuesChoice,
     remainingCreditCents: options?.remainingCreditCents ?? 0,
+    keyProvider,
   });
 
   const summary = useMemo(
@@ -243,6 +282,8 @@ export function useOnboardingSetupState(
     commitIssuesStep,
     agent,
     setAgent,
+    keyProvider,
+    setKeyProvider,
     finished,
     setFinished,
     issueCount,

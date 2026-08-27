@@ -513,7 +513,7 @@ function ticketAnalysisCanvas(complete: boolean): SplitRunCanvasModel {
       id: analyzeId,
       name: "Analyze ticket",
       type: "TYPE_ACTION",
-      component: "runnerClaudeCode",
+      component: "runnerOpenRouter",
       configuration: {
         prompt: "Read this ticket and the repository. Find the files and risks that matter.",
       },

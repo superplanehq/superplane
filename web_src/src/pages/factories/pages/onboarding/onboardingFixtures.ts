@@ -126,7 +126,7 @@ export const WIZARD_STEPS = [
   {
     id: "agent" as const,
     label: "Agent",
-    purpose: "Connect Anthropic, OpenAI, or OpenRouter. Hosted credit lets you continue without your own keys.",
+    purpose: "SuperPlane will run the agent on this workspace. Work starts only after you approve a ticket.",
   },
   {
     id: "name" as const,

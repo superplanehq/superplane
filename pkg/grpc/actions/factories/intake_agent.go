@@ -157,7 +157,7 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 		return nil
 	}
 
-	for _, spec := range intakeAgentSpecs {
+	for _, spec := range hostedIntakeAgentSpecs() {
 		index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
 			return provider.Provider == spec.hostedProvider && provider.OffersHostedModels()
 		})
@@ -178,6 +178,22 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 	}
 
 	return nil
+}
+
+// hostedIntakeAgentSpecs prefers SuperPlane-hosted OpenRouter, then the other
+// hosted providers. Installation lookup keeps intakeAgentSpecs order so a
+// workspace that already connected Claude does not flip to OpenRouter.
+func hostedIntakeAgentSpecs() []intakeAgentSpec {
+	preferred := make([]intakeAgentSpec, 0, 1)
+	rest := make([]intakeAgentSpec, 0, len(intakeAgentSpecs))
+	for _, spec := range intakeAgentSpecs {
+		if spec.hostedProvider == models.UsageProviderOpenRouter {
+			preferred = append(preferred, spec)
+			continue
+		}
+		rest = append(rest, spec)
+	}
+	return append(preferred, rest...)
 }
 
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {

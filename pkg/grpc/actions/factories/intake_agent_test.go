@@ -98,6 +98,32 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, "claude-sonnet-4-6", agent.Model)
 	})
 
+	t.Run("hosted fallback prefers OpenRouter when several providers are enabled", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		clearHostedLLMProviders(t, db)
+		_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+			Provider:      models.UsageProviderAnthropic,
+			Enabled:       true,
+			APIKey:        []byte("test-hosted-key"),
+			AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+		_, err = models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+			Provider:      models.UsageProviderOpenRouter,
+			Enabled:       true,
+			APIKey:        []byte("test-openrouter-key"),
+			AllowedModels: datatypes.JSONSlice[string]{"openai/gpt-4.1", "anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, "runnerOpenRouter", agent.Component)
+		assert.Equal(t, map[string]any{"source": runner.CredentialsSourceHosted}, agent.Credentials)
+		assert.Equal(t, "anthropic/claude-sonnet-4-6", agent.Model)
+	})
+
 	t.Run("a workspace with no agent at all leaves the node incomplete", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)

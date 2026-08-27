@@ -58,7 +58,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
       id: runnerId,
       name: "Classify intake",
       type: "TYPE_ACTION",
-      component: "runnerClaudeCode",
+      component: "runnerOpenRouter",
       configuration: {
         prompt: spec.classifyPrompt,
       },

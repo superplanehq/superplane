@@ -46,14 +46,12 @@ spec:
     - id: generate-pr-text
       name: Generate PR title and description
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       concurrency:
         max: 5
       configuration:
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
         environmentFrom:
           - source: integration
             integration:
@@ -73,6 +71,7 @@ spec:
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
+        model: anthropic/claude-sonnet-4-6
         steps:
           - name: Inject Plan
             type: bash

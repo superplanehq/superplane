@@ -70,10 +70,6 @@ function useRestoreSetup(
     const source = localIssuesSource(onboarding?.issuesSource);
     if (source && setup.issuesChoice !== source) setup.setIssuesChoice(source);
   }, [onboarding?.issuesSource, setup]);
-  useEffect(() => {
-    if (!selections.claude?.ready) return;
-    setup.setAgent("claude-code");
-  }, [onboarding?.agentHarness, selections.claude?.ready, setup]);
 }
 
 async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
@@ -150,10 +146,9 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
   );
 }
 
-function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
+function useRemainingCreditCents(organizationId: string) {
   const spend = useOrganizationLLMSpend(organizationId);
-  const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
+  return parseWorkOrderMetric(spend.data?.remainingCreditCents);
 }
 
 function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: string) {
@@ -184,12 +179,19 @@ export function useOnboardingPageModel(args: {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected);
+  const remainingCreditCents = useRemainingCreditCents(args.organizationId);
   const setup = useOnboardingSetupState(args.factory?.name ?? "", {
     connected: integrations.connected,
-    remainingCreditCents: agent.remainingCreditCents,
+    remainingCreditCents,
     simulateDiscovery: false,
+    factoryId: args.factoryId,
   });
+  const agent = useOnboardingAgentPlan(
+    args.organizationId,
+    integrations.connected,
+    remainingCreditCents,
+    setup.keyProvider,
+  );
   useRestoreSetup(setup, onboarding, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {

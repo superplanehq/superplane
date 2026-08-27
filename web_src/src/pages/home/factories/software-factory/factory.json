@@ -2,7 +2,7 @@
   "id": "software-factory",
   "title": "Software Factory",
   "description": "Automate coding work with agents, from issue to pull request.",
-  "integrations": ["github", "claude"],
+  "integrations": ["github"],
   "componentIntegrations": {
     "github.addIssueLabel": "github",
     "github.createIssue": "github",

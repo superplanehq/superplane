@@ -54,8 +54,10 @@ describe("setup factory line apps", () => {
   it("materializes repositories and integration wiring, leaving no template placeholders", () => {
     for (const app of ONBOARDING_LINE_APPS) {
       const canvasYaml = materializeOnboardingApp(app.factoryId);
-      expect(canvasYaml).toContain("name: acme-claude");
+      expect(canvasYaml).toContain("runnerOpenRouter");
+      expect(canvasYaml).toContain("source: hosted");
       expect(canvasYaml).toContain("name: acme-github");
+      expect(canvasYaml).not.toContain("name: acme-claude");
       expect(canvasYaml).not.toContain("{{ install_params.");
       expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
       // No org-specific bindings copied from the production canvases.

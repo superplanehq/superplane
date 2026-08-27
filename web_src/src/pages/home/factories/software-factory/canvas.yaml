@@ -145,7 +145,7 @@ spec:
     - id: apply-user-request-claude
       name: Apply user request
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       configuration:
         environmentFrom:
           - source: integration
@@ -222,9 +222,8 @@ spec:
             type: bash
             workingDirectory: repo
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
+        model: anthropic/claude-sonnet-4-6
       position:
         x: 672
         'y': 816
@@ -361,7 +360,7 @@ spec:
     - id: implementation-implementation-2-ilbopr
       name: Write Plan
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       configuration:
         environmentFrom:
           - source: integration
@@ -429,9 +428,8 @@ spec:
             name: Update PR description
             type: bash
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
+        model: anthropic/claude-sonnet-4-6
       position:
         x: 2304
         'y': 0
@@ -491,7 +489,7 @@ spec:
     - id: run-claude-code-implementation
       name: Implementation
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       configuration:
         environmentFrom:
           - source: integration
@@ -572,9 +570,8 @@ spec:
             type: bash
             workingDirectory: repo
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
+        model: anthropic/claude-sonnet-4-6
       position:
         x: 3000
         'y': 0
@@ -642,7 +639,7 @@ spec:
     - id: fix-ci-claude
       name: Review & Fix PR Checks
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       configuration:
         environmentFrom:
           - source: integration
@@ -723,9 +720,8 @@ spec:
             type: bash
             workingDirectory: repo
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
+        model: anthropic/claude-sonnet-4-6
       position:
         x: 1920
         'y': 2688
@@ -1227,7 +1223,7 @@ spec:
     - id: analyze-create-issue
       name: Draft Issue
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       configuration:
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
@@ -1296,9 +1292,8 @@ spec:
             value: '{{ install_params.appRepository }}'
             valueSource: literal
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
+        model: anthropic/claude-sonnet-4-6
       position:
         x: 672
         'y': 4200

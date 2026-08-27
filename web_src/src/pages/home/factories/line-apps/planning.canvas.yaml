@@ -74,14 +74,12 @@ spec:
     - id: planner-agent
       name: Agent - Plan for GH Issue
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       concurrency:
         max: 5
       configuration:
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
         environmentFrom:
           - source: integration
             integration:
@@ -92,7 +90,7 @@ spec:
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
-        model: sonnet
+        model: anthropic/claude-sonnet-4-6
         steps:
           - name: Clone Repo
             type: bash
@@ -134,14 +132,12 @@ spec:
     - id: planner-agent-no-issue
       name: Agent - No GH Issue Plan
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerOpenRouter
       concurrency:
         max: 5
       configuration:
         credentials:
-          source: integration
-          integration:
-            name: claude
+          source: hosted
         environmentFrom:
           - source: integration
             integration:
@@ -155,7 +151,7 @@ spec:
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
-        model: sonnet
+        model: anthropic/claude-sonnet-4-6
         steps:
           - name: Clone Repo
             type: bash

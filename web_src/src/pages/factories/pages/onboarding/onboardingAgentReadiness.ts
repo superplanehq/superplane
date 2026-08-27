@@ -50,41 +50,31 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
   },
 };
 
-export function isAgentProviderConnected(connected: Set<IntegrationId>): boolean {
-  return AGENT_PROVIDER_IDS.some((id) => connected.has(id));
-}
-
-export function isAgentStepReady(connected: Set<IntegrationId>, remainingCreditCents: number): boolean {
-  return remainingCreditCents > 0 || isAgentProviderConnected(connected);
+export function isAgentStepReady(
+  connected: Set<IntegrationId>,
+  remainingCreditCents: number,
+  keyProvider: AgentProviderId | null,
+): boolean {
+  if (keyProvider) {
+    return connected.has(keyProvider);
+  }
+  return remainingCreditCents > 0;
 }
 
 export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
   remainingCreditCents: number;
   hostedModels: HostedModelsByProvider;
+  keyProvider: AgentProviderId | null;
 }): OnboardingAgentPlan | undefined {
-  for (const providerId of AGENT_PROVIDER_IDS) {
-    if (!args.connected.has(providerId)) continue;
-    return planForConnectedProvider(providerId, args.hostedModels);
+  if (args.keyProvider) {
+    if (!args.connected.has(args.keyProvider)) return undefined;
+    return planForConnectedProvider(args.keyProvider, args.hostedModels);
   }
 
   if (args.remainingCreditCents <= 0) return undefined;
 
-  for (const providerId of AGENT_PROVIDER_IDS) {
-    const spec = AGENT_PROVIDER_SPECS[providerId];
-    const model = pickHostedModel(spec.hostedProvider, args.hostedModels[spec.hostedProvider]);
-    if (!model) continue;
-    return {
-      providerId,
-      component: spec.component,
-      credentialsSource: "hosted",
-      integrationName: providerId,
-      harness: spec.harness,
-      model,
-    };
-  }
-
-  return undefined;
+  return hostedSuperPlaneAgent(args.hostedModels);
 }
 
 export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{ isFetched: boolean }>): boolean {
@@ -101,7 +91,7 @@ export function firstWorkOrderAgentError(args: {
   }
   if (args.plan) return null;
   if (args.remainingCreditCents <= 0) {
-    return "Connect Anthropic, OpenAI, or OpenRouter, or use hosted credit.";
+    return "Use SuperPlane agent credit, or connect Anthropic, OpenAI, or OpenRouter.";
   }
   return "Ask an installation admin to enable SuperPlane-hosted models.";
 }
@@ -112,9 +102,23 @@ export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {
 
 export function hostedCreditGrantCopy(remainingCreditCents: number): string {
   if (remainingCreditCents > 0) {
-    return `This organization has ${formatUsdCents(remainingCreditCents)} of hosted credit. You can continue without connecting your own keys.`;
+    return `This organization has ${formatUsdCents(remainingCreditCents)} of SuperPlane agent credit. SuperPlane can run the agent without your own key.`;
   }
-  return "Hosted credit is empty. Connect a provider to continue.";
+  return "SuperPlane agent credit is empty. Connect a provider to continue.";
+}
+
+function hostedSuperPlaneAgent(hostedModels: HostedModelsByProvider): OnboardingAgentPlan | undefined {
+  const spec = AGENT_PROVIDER_SPECS.openrouter;
+  const model = pickHostedModel(spec.hostedProvider, hostedModels[spec.hostedProvider]);
+  if (!model) return undefined;
+  return {
+    providerId: "openrouter",
+    component: spec.component,
+    credentialsSource: "hosted",
+    integrationName: "openrouter",
+    harness: spec.harness,
+    model,
+  };
 }
 
 function planForConnectedProvider(

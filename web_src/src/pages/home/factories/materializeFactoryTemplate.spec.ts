@@ -120,7 +120,7 @@ spec:
     expect(canvasYaml).toContain("app: canvas-123");
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("{{ install_params.");
-    expect(definition.integrations).toEqual(["github", "claude"]);
+    expect(definition.integrations).toEqual(["github"]);
   });
 
   it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {
@@ -178,17 +178,19 @@ spec:
     expect(steps["Commit and push"]?.workingDirectory).toBe("repo");
   });
 
-  it("materializes runners with integration-sourced credentials", () => {
+  it("materializes runners with SuperPlane-hosted OpenRouter credentials", () => {
     const canvasYaml = materializeSoftwareFactory();
 
-    expect(canvasYaml).toContain("runnerClaudeCode");
+    expect(canvasYaml).toContain("runnerOpenRouter");
     expect(canvasYaml).toContain("@superplaneagent");
     expect(canvasYaml).toContain('name == "factory"');
     expect(canvasYaml).toContain("REPLACE ME WITH");
-    expect(canvasYaml).toContain("source: integration");
+    expect(canvasYaml).toContain("source: hosted");
     expect(canvasYaml).toContain("environmentFrom:");
-    expect(canvasYaml).toContain("name: acme-claude");
     expect(canvasYaml).toContain("name: acme-github");
+    expect(canvasYaml).toContain("model: anthropic/claude-sonnet-4-6");
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+    expect(canvasYaml).not.toContain("name: acme-claude");
     expect(canvasYaml).not.toContain("anthropicApiKey");
     expect(canvasYaml).not.toContain("install_params.anthropic_api_key");
     expect(canvasYaml).not.toContain("install_params.github_token");
@@ -218,7 +220,7 @@ spec:
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
 
-  it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
+  it("keeps hosted OpenRouter on the default SuperPlane agent rewrite", () => {
     const canvasYaml = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-implementation"),
       canvasName: "Implementation",
@@ -228,19 +230,19 @@ spec:
         github: { id: "int-1", name: "acme-github", ready: true },
       },
       agentRewrite: {
-        component: "runnerClaudeCode",
-        model: "claude-sonnet-4-6",
+        component: "runnerOpenRouter",
+        model: "anthropic/claude-sonnet-4-6",
         credentials: { source: "hosted" },
       },
     });
 
-    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*source: hosted/);
-    expect(canvasYaml).toContain("model: claude-sonnet-4-6");
+    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*source: hosted/);
+    expect(canvasYaml).toContain("model: anthropic/claude-sonnet-4-6");
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
     expect(canvasYaml).not.toMatch(/credentials:[\s\S]*source: integration[\s\S]*name: claude/);
-    expect(canvasYaml).not.toContain("model: sonnet");
   });
 
-  it("rewrites Claude Code nodes to hosted OpenRouter with an allowlisted model", () => {
+  it("rewrites SuperPlane agent nodes to hosted OpenRouter with an allowlisted model", () => {
     const canvasYaml = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-planning"),
       canvasName: "Planning",
@@ -261,7 +263,28 @@ spec:
     expect(canvasYaml).not.toContain("runnerClaudeCode");
   });
 
-  it("rewrites Claude Code nodes to an OpenRouter integration", () => {
+  it("rewrites SuperPlane agent nodes to a Claude Code installation", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Planning",
+      canvasId: "canvas-claude-byok",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+        claude: { id: "int-2", name: "acme-claude", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerClaudeCode",
+        model: "sonnet",
+        credentials: { source: "integration", name: "acme-claude" },
+      },
+    });
+
+    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*name: acme-claude/);
+    expect(canvasYaml).not.toContain("runnerOpenRouter");
+  });
+
+  it("rewrites SuperPlane agent nodes to an OpenRouter integration", () => {
     const canvasYaml = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-pr"),
       canvasName: "Verify",

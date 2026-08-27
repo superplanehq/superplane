@@ -93,13 +93,13 @@ export const Issues: Story = {
   ),
 };
 
-/** The organization has hosted credit, so the user can continue without keys. */
+/** SuperPlane agent is the default. Remaining credit lets setup finish. */
 export const AgentWithGrant: Story = {
-  name: "4a Agent (hosted credit)",
+  name: "4a Agent (SuperPlane agent)",
   render: () => <SetupStep step="agent" answers={SETUP_ANSWERS.issues} orgIntegrations={GITHUB_SETUP_INTEGRATIONS} />,
 };
 
-/** No grant: the user must connect Anthropic, OpenAI, or OpenRouter. */
+/** Empty credit: the user expands Use your own key and connects a provider. */
 export const AgentWithoutGrant: Story = {
   name: "4b Agent (connect a provider)",
   render: () => (

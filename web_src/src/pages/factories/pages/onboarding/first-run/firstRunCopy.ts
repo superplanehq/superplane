@@ -41,10 +41,10 @@ export const FIRST_RUN_COPY = {
     jiraHelper: "Find tickets in your Jira backlog.",
     linearHelper: "Find tickets in your Linear backlog.",
     analyze: "Analyze my tickets",
-    continue: "Connect agent",
+    continue: "Continue",
   },
   agent: {
-    headline: "Connect agent",
+    headline: "SuperPlane agent",
   },
   analysis: {
     headline: "Analyzing your backlog",

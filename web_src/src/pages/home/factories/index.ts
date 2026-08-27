@@ -89,7 +89,7 @@ function buildLineApp(args: {
 }): FactoryDefinition {
   return buildOnboardingApp({
     ...args,
-    integrations: ["github", "claude"],
+    integrations: ["github"],
     componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
     consoleYaml: lineAppConsoleYaml,
   });

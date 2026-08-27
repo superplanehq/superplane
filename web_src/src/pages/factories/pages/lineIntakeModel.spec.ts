@@ -89,7 +89,7 @@ describe("lineIntakeModel", () => {
     ]);
     expect(fixture.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "github.onIssue",
-      "runnerClaudeCode",
+      "runnerOpenRouter",
       "addWorkOrderArtifact",
       "reportWorkOrderCheck",
     ]);
@@ -280,7 +280,7 @@ describe("lineIntakeModel", () => {
     const canvas = fixture.phases[0]?.canvas;
     expect(canvas?.nodes.map((node) => node.component)).toEqual([
       "github.onIssue",
-      "runnerClaudeCode",
+      "runnerOpenRouter",
       "createWorkOrder",
     ]);
   });
@@ -289,14 +289,14 @@ describe("lineIntakeModel", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
-      "runnerClaudeCode",
+      "runnerOpenRouter",
       "createWorkOrder",
     ]);
 
     const pagerduty = intakeAutomationFixture(lineIntakeSourceById("pagerduty-incidents")!);
     expect(pagerduty.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "pagerduty.onIncident",
-      "runnerClaudeCode",
+      "runnerOpenRouter",
       "createWorkOrder",
     ]);
   });

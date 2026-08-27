@@ -21,29 +21,62 @@ const noHostedModels = {
 };
 
 describe("isAgentStepReady", () => {
-  it("is ready when remaining hosted credit is greater than zero", () => {
-    expect(isAgentStepReady(connected(), 4124)).toBe(true);
+  it("is ready when SuperPlane agent has remaining hosted credit", () => {
+    expect(isAgentStepReady(connected(), 4124, null)).toBe(true);
+    expect(isAgentStepReady(connected("claude"), 4124, null)).toBe(true);
   });
 
-  it("is ready when Anthropic, OpenAI, or OpenRouter is connected", () => {
-    expect(isAgentStepReady(connected("claude"), 0)).toBe(true);
-    expect(isAgentStepReady(connected("openai"), 0)).toBe(true);
-    expect(isAgentStepReady(connected("openrouter"), 0)).toBe(true);
+  it("is not ready when SuperPlane agent has empty credit", () => {
+    expect(isAgentStepReady(connected(), 0, null)).toBe(false);
+    expect(isAgentStepReady(connected("claude"), 0, null)).toBe(false);
   });
 
-  it("is not ready when credit is empty and no provider is connected", () => {
-    expect(isAgentStepReady(connected(), 0)).toBe(false);
-    expect(isAgentStepReady(connected("github"), 0)).toBe(false);
+  it("is ready for BYOK only when the selected provider is connected", () => {
+    expect(isAgentStepReady(connected("claude"), 0, "claude")).toBe(true);
+    expect(isAgentStepReady(connected("openai"), 0, "openai")).toBe(true);
+    expect(isAgentStepReady(connected("openrouter"), 0, "openrouter")).toBe(true);
+    expect(isAgentStepReady(connected("openai"), 0, "claude")).toBe(false);
+    expect(isAgentStepReady(connected(), 5000, "claude")).toBe(false);
   });
 });
 
 describe("resolveOnboardingAgent", () => {
-  it("uses a connected OpenRouter integration and an allowlisted model", () => {
+  it("uses hosted OpenRouter when SuperPlane agent is selected", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        remainingCreditCents: 5000,
+        hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"] },
+        keyProvider: null,
+      }),
+    ).toEqual({
+      providerId: "openrouter",
+      component: "runnerOpenRouter",
+      credentialsSource: "hosted",
+      integrationName: "openrouter",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("does not let a connected Claude key steal the SuperPlane agent default", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude", "openai"),
+        remainingCreditCents: 5000,
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        keyProvider: null,
+      })?.providerId,
+    ).toBe("openrouter");
+  });
+
+  it("uses a connected OpenRouter integration only after BYOK selection", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openrouter"),
         remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"] },
+        keyProvider: "openrouter",
       }),
     ).toEqual({
       providerId: "openrouter",
@@ -55,48 +88,44 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  it("uses hosted OpenRouter and the selected allowlist when only credit remains", () => {
+  it("uses the selected BYOK Claude runner and installation", () => {
     expect(
       resolveOnboardingAgent({
-        connected: connected(),
+        connected: connected("claude"),
         remainingCreditCents: 5000,
-        hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1"] },
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        keyProvider: "claude",
       }),
     ).toEqual({
-      providerId: "openrouter",
-      component: "runnerOpenRouter",
-      credentialsSource: "hosted",
-      integrationName: "openrouter",
+      providerId: "claude",
+      component: "runnerClaudeCode",
+      credentialsSource: "integration",
+      integrationName: "claude",
       harness: "AGENT_HARNESS_CLAUDE_CODE",
-      model: "openai/gpt-4.1",
+      model: "sonnet",
     });
   });
 
-  it("uses hosted OpenAI when that provider is the enabled hosted allowlist", () => {
-    expect(
-      resolveOnboardingAgent({
-        connected: connected(),
-        remainingCreditCents: 5000,
-        hostedModels: { ...noHostedModels, openai: ["gpt-5", "gpt-4.1"] },
-      }),
-    ).toEqual({
-      providerId: "openai",
-      component: "runnerCodex",
-      credentialsSource: "hosted",
-      integrationName: "openai",
-      harness: "AGENT_HARNESS_CODEX",
-      model: "gpt-5",
-    });
-  });
-
-  it("prefers a connected provider over hosted credit", () => {
+  it("uses the selected BYOK OpenAI runner", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openai"),
+        remainingCreditCents: 0,
+        hostedModels: noHostedModels,
+        keyProvider: "openai",
+      })?.component,
+    ).toBe("runnerCodex");
+  });
+
+  it("returns undefined when SuperPlane agent has credit but OpenRouter is not allowlisted", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
         remainingCreditCents: 5000,
-        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
-      })?.providerId,
-    ).toBe("openai");
+        hostedModels: { ...noHostedModels, openai: ["gpt-5"] },
+        keyProvider: null,
+      }),
+    ).toBeUndefined();
   });
 
   it("returns undefined when credit remains but no hosted models are enabled", () => {
@@ -105,6 +134,7 @@ describe("resolveOnboardingAgent", () => {
         connected: connected(),
         remainingCreditCents: 5000,
         hostedModels: noHostedModels,
+        keyProvider: null,
       }),
     ).toBeUndefined();
   });
@@ -122,14 +152,14 @@ describe("hostedModelsQueriesLoading", () => {
 });
 
 describe("firstWorkOrderAgentError", () => {
-  it("asks the user to connect a provider when credit is empty", () => {
+  it("asks the user to use SuperPlane agent credit or a key when credit is empty", () => {
     expect(
       firstWorkOrderAgentError({
         remainingCreditCents: 0,
         hostedModelsLoading: false,
         plan: undefined,
       }),
-    ).toBe("Connect Anthropic, OpenAI, or OpenRouter, or use hosted credit.");
+    ).toBe("Use SuperPlane agent credit, or connect Anthropic, OpenAI, or OpenRouter.");
   });
 
   it("asks the user to wait when hosted models are still loading", () => {
@@ -179,13 +209,13 @@ describe("hosted credit grant copy", () => {
     expect(shouldShowHostedCreditGrant(5000)).toBe(true);
   });
 
-  it("explains that remaining credit lets the user continue without keys", () => {
+  it("explains that remaining credit lets SuperPlane run the agent", () => {
     expect(hostedCreditGrantCopy(5000)).toBe(
-      "This organization has $50.00 of hosted credit. You can continue without connecting your own keys.",
+      "This organization has $50.00 of SuperPlane agent credit. SuperPlane can run the agent without your own key.",
     );
   });
 
   it("asks the user to connect a provider when remaining credit is empty", () => {
-    expect(hostedCreditGrantCopy(0)).toBe("Hosted credit is empty. Connect a provider to continue.");
+    expect(hostedCreditGrantCopy(0)).toBe("SuperPlane agent credit is empty. Connect a provider to continue.");
   });
 });

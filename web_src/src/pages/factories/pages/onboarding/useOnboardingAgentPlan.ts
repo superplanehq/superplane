@@ -6,6 +6,7 @@ import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSect
 import {
   hostedModelsQueriesLoading,
   resolveOnboardingAgent,
+  type AgentProviderId,
   type OnboardingAgentPlan,
 } from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
@@ -14,22 +15,22 @@ export function useOnboardingAgentPlan(
   organizationId: string,
   connected: Set<IntegrationId>,
   remainingCreditCents: number,
+  keyProvider: AgentProviderId | null,
 ) {
-  const needHosted = remainingCreditCents > 0;
-  const anthropic = useHostedLLMModels(organizationId, "anthropic", needHosted);
-  const openai = useHostedLLMModels(organizationId, "openai", needHosted);
+  const needHosted = remainingCreditCents > 0 && keyProvider === null;
   const openrouter = useHostedLLMModels(organizationId, "openrouter", needHosted);
   return {
     remainingCreditCents,
-    hostedModelsLoading: hostedModelsQueriesLoading(needHosted, [anthropic, openai, openrouter]),
+    hostedModelsLoading: hostedModelsQueriesLoading(needHosted, [openrouter]),
     plan: resolveOnboardingAgent({
       connected,
       remainingCreditCents,
       hostedModels: {
-        anthropic: hostedModelIds(anthropic.data?.models),
-        openai: hostedModelIds(openai.data?.models),
+        anthropic: [],
+        openai: [],
         openrouter: hostedModelIds(openrouter.data?.models),
       },
+      keyProvider,
     }),
   };
 }

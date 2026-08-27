@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FACTORIES_ORGANIZATION_ID } from "@/pages/factories/__fixtures__/factoryPageResponses";
 
@@ -28,7 +28,7 @@ function renderAgentStep(args?: {
   function Harness() {
     const setup = useOnboardingSetupState("Payments", {
       connected: new Set(args?.connected ?? []),
-      remainingCreditCents: 0,
+      remainingCreditCents: Number(spendState.remainingCreditCents),
       simulateDiscovery: false,
     });
     return <AgentStep organizationId={FACTORIES_ORGANIZATION_ID} setup={setup} onRequestConnect={onRequestConnect} />;
@@ -41,52 +41,58 @@ function renderAgentStep(args?: {
 }
 
 describe("AgentStep", () => {
-  it("shows hosted credit when the organization has a grant", () => {
-    renderAgentStep();
-
-    expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
-    expect(screen.getByText("SuperPlane-hosted credit")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "This organization has $41.24 of hosted credit. You can continue without connecting your own keys.",
-      ),
-    ).toBeInTheDocument();
+  beforeEach(() => {
+    sessionStorage.removeItem("superplane.onboarding.keyProvider");
   });
 
-  it("hides the grant block when the organization has no grant", () => {
-    renderAgentStep({
-      spend: { remainingCreditCents: "0", grantTotalCents: "0" },
-    });
+  it("selects SuperPlane agent by default and hides BYOK rows", () => {
+    renderAgentStep();
 
-    expect(screen.getByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /SuperPlane agent/ })).toBeInTheDocument();
+    expect(
+      screen.getByText("SuperPlane will run the agent on this workspace. Work starts only after you approve a ticket."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use your own key" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect Anthropic" })).not.toBeInTheDocument();
+    expect(screen.queryByText("OpenRouter")).not.toBeInTheDocument();
     expect(screen.queryByTestId("hosted-credit-grant")).not.toBeInTheDocument();
   });
 
-  it("shows Anthropic, OpenAI, and OpenRouter as connectable, and Cursor as coming soon", () => {
+  it("expands Claude, OpenAI, and OpenRouter after Use your own key, without Cursor", async () => {
+    const user = userEvent.setup();
     renderAgentStep({ spend: { remainingCreditCents: "0", grantTotalCents: "0" } });
+
+    await user.click(screen.getByRole("button", { name: "Use your own key" }));
 
     expect(screen.getByRole("button", { name: "Connect Anthropic" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenAI" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Connect OpenRouter" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Connect Cursor/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
-  it("asks to connect a provider when a grant exists but remaining credit is empty", () => {
+  it("shows empty SuperPlane agent credit copy on the BYOK path", async () => {
+    const user = userEvent.setup();
     renderAgentStep({
       spend: { remainingCreditCents: "0", grantTotalCents: "5000" },
     });
 
-    expect(screen.getByTestId("hosted-credit-grant")).toBeInTheDocument();
-    expect(screen.getByText("Hosted credit is empty. Connect a provider to continue.")).toBeInTheDocument();
+    expect(
+      screen.queryByText("SuperPlane agent credit is empty. Connect a provider to continue."),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Use your own key" }));
+
+    expect(screen.getByText("SuperPlane agent credit is empty. Connect a provider to continue.")).toBeInTheDocument();
   });
 
-  it("connects OpenAI without selecting a single harness", async () => {
+  it("connects OpenAI from the expanded BYOK list", async () => {
     const user = userEvent.setup();
     const { onRequestConnect } = renderAgentStep({
       spend: { remainingCreditCents: "0", grantTotalCents: "0" },
     });
 
+    await user.click(screen.getByRole("button", { name: "Use your own key" }));
     await user.click(screen.getByRole("button", { name: "Connect OpenAI" }));
 
     expect(onRequestConnect).toHaveBeenCalledWith("openai");
