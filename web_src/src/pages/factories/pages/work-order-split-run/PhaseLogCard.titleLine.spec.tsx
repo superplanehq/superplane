@@ -41,7 +41,7 @@ describe("PhaseLogCard title line", () => {
     expect(within(row).queryByText("Passed 01:00")).not.toBeInTheDocument();
     expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:00");
     expect(row.firstElementChild?.className).toMatch(/rounded-md/);
-    expect(row.firstElementChild?.className).not.toMatch(/\bbg-muted\b/);
+    expect(row.firstElementChild?.className).toMatch(/\bbg-muted\b/);
     expect(row.firstElementChild?.className).toMatch(/hover:bg-/);
     expect(row.firstElementChild?.className).not.toMatch(/\bborder\b/);
     expect(within(row).getByRole("button", { name: "Plan" }).querySelector(".lucide-chevron-right")).toBeNull();
@@ -268,7 +268,7 @@ describe("PhaseLogCard title line", () => {
 
     const card = () => screen.getByTestId("split-run-phase-plan").firstElementChild;
     expect(card()?.className).toMatch(/rounded-md/);
-    expect(card()?.className).not.toMatch(/\bbg-muted\b/);
+    expect(card()?.className).toMatch(/\bbg-muted\b/);
     expect(card()?.className).toMatch(/hover:bg-/);
     expect(card()?.className).not.toMatch(/\bbg-card\b/);
     expect(card()?.className).not.toMatch(/\bborder\b/);
@@ -277,15 +277,15 @@ describe("PhaseLogCard title line", () => {
     expect(card()?.className).toMatch(/\bpy-2\b/);
 
     rerender(<PhaseLogCard phase={PHASE} expanded stream={[]} />);
-    expect(card()?.className).not.toMatch(/\bbg-muted\b/);
+    expect(card()?.className).toMatch(/\bbg-muted\b/);
     expect(card()?.className).not.toMatch(/hover:bg-/);
     expect(card()?.className).toMatch(/\bpb-2\b/);
     expect(card()?.className).not.toMatch(/\bborder\b/);
 
     const header = screen.getByTestId("split-run-automation-header-plan");
     expect(header.className).toMatch(/\bh-8\b/);
-    expect(header.className).not.toMatch(/\bbg-muted\b/);
-    expect(header.className).toMatch(/\bbg-background\b/);
+    expect(header.className).toMatch(/\bbg-muted\b/);
+    expect(header.className).not.toMatch(/\bbg-background\b/);
     expect(card()?.className).not.toMatch(/\bpx-2\b/);
     expect(header.className).toMatch(/\bpx-2\b/);
     expect(header.className).not.toMatch(/-mx-2/);

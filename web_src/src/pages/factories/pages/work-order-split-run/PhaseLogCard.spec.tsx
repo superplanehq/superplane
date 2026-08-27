@@ -406,8 +406,8 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(phase.className).toMatch(/sticky/);
     expect(phase.className).toMatch(/top-0/);
     expect(phase.className).toMatch(/\bh-8\b/);
-    expect(phase.className).not.toMatch(/\bbg-muted\b/);
-    expect(phase.className).toMatch(/\bbg-background\b/);
+    expect(phase.className).toMatch(/\bbg-muted\b/);
+    expect(phase.className).not.toMatch(/\bbg-background\b/);
 
     const node = screen.getByTestId("split-run-stream-line-planner-agent");
     expect(node.className).toMatch(/sticky/);

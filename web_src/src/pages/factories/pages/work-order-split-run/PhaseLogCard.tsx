@@ -48,7 +48,7 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
 const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
 const LOG_ROW_H = "h-[1.375rem]";
 const STREAM_SECTION = "px-2";
-const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-background";
+const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
 const STICKY_NODE = cn("sticky top-8 z-20 bg-background", STREAM_SECTION);
 const STICKY_STEP = cn("sticky top-[3.375rem] z-10 bg-background", STREAM_SECTION);
 
@@ -336,7 +336,7 @@ export function PhaseLogCard({
     >
       <div
         className={cn(
-          "rounded-md",
+          "rounded-md bg-muted",
           !expanded && LOG_ROW_HOVER,
           expanded ? "pb-2" : "py-2",
           canToggleFromHeader && !expanded && "cursor-pointer",
@@ -417,7 +417,7 @@ function AutomationHeader({
       data-testid={`split-run-automation-header-${phase.id}`}
       {...streamLineAttrs(phase.status)}
       className={cn(
-        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
+        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight bg-muted",
         LAST_RUNNING_LINE_PULSE,
         expanded && STICKY_PHASE,
         collapsible && onToggle && "cursor-pointer",
