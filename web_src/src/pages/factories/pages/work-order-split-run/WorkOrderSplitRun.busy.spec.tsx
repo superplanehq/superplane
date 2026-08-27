@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,7 +48,7 @@ describe("WorkOrderSplitRunPopup action busy state", () => {
     cancelRunMock.mockReset().mockReturnValue(new Promise(() => {}));
   });
 
-  it("shares the busy state between automation Stop and header Reject", async () => {
+  it("keeps automation Stop busy while a cancel is in flight", async () => {
     const user = userEvent.setup();
     renderRunningPopup();
 
@@ -58,12 +58,8 @@ describe("WorkOrderSplitRunPopup action busy state", () => {
     });
 
     expect(screen.getByRole("button", { name: "Stop" })).toBeDisabled();
-    expect(
-      within(screen.getByTestId("split-run-header-actions")).getByRole("button", { name: "Reject" }),
-    ).toBeDisabled();
-    expect(
-      within(screen.getByTestId("split-run-header-actions")).getByRole("button", { name: "Approve" }),
-    ).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Stop" }));
     expect(cancelRunMock).toHaveBeenCalledTimes(1);

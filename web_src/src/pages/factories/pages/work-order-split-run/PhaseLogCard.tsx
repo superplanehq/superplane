@@ -1,9 +1,10 @@
+import { formatClockDurationLabel } from "@/lib/duration";
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight, Loader2, Maximize2, Pencil } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronRight, CircleX, Loader2, Maximize2, Pencil, RotateCw } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
-import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "@/components/Link/link";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
@@ -12,13 +13,14 @@ import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
-import { logStatusTimeLabel, runningSpinnerFrame, tickingRunningClock } from "./logStatusTime";
+import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
 const LOG_FACE = "font-mono text-[14px]";
+const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -30,23 +32,23 @@ function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
 
 function statusTimeTone(status: SplitRunPhaseStatus): string {
   if (status === "passed") {
-    return "bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]";
+    return "text-[color:var(--status-completed-fg)]";
   }
   if (status === "running") {
-    return "bg-[color:var(--status-running-bg)] text-[color:var(--status-running-fg)]";
+    return "text-[color:var(--status-running-fg)]";
   }
   if (status === "waiting") {
-    return "bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]";
+    return "text-[color:var(--status-waiting-fg)]";
   }
   if (status === "failed") {
-    return "bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]";
+    return "text-[color:var(--status-failed-fg)]";
   }
   return "text-muted-foreground";
 }
 
 const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
 const LOG_ROW_H = "h-[1.375rem]";
-const STREAM_SECTION = "bg-muted border-b border-border px-2";
+const STREAM_SECTION = "bg-muted px-2";
 const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
 const STICKY_NODE = cn("sticky top-8 z-20", STREAM_SECTION);
 const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
@@ -54,15 +56,15 @@ const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
 const LAST_RUNNING_LINE_PULSE = "data-[last-running-line]:animate-pulse";
 
 const STREAM_LINE_ROW = cn(
-  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap px-2 text-left",
+  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap text-left",
+  STREAM_SECTION,
   LOG_ROW_H,
-  LOG_ROW_HOVER,
   LAST_RUNNING_LINE_PULSE,
 );
 
 const STREAM_LINE_WRAP_ROW = cn(
-  "flex w-full min-w-0 max-w-full items-start justify-start px-2 text-left",
-  LOG_ROW_HOVER,
+  "flex w-full min-w-0 max-w-full items-start justify-start text-left",
+  STREAM_SECTION,
   LAST_RUNNING_LINE_PULSE,
 );
 
@@ -299,6 +301,10 @@ function streamLineAttrs(status?: SplitRunPhaseStatus) {
   return { "data-stream-line": "", "data-stream-status": status };
 }
 
+function isNestedHeaderControl(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest("a, button, [role='button']"));
+}
+
 export function PhaseLogCard({
   phase,
   expanded,
@@ -348,6 +354,8 @@ export function PhaseLogCard({
     }
   }, [selectedNodeId]);
 
+  const canToggleFromHeader = collapsible && Boolean(onToggle);
+
   return (
     <div
       ref={rootRef}
@@ -357,10 +365,22 @@ export function PhaseLogCard({
     >
       <div
         className={cn(
-          "rounded-md border border-border border-l-2 bg-card",
-          expanded ? "pb-1.5" : "py-1.5",
-          automationAccent(phase.status),
+          "rounded-md bg-muted",
+          !expanded && LOG_ROW_HOVER,
+          expanded ? "pb-2" : "py-2",
+          canToggleFromHeader && !expanded && "cursor-pointer",
         )}
+        data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
+        onClick={
+          canToggleFromHeader
+            ? (event) => {
+                if (isNestedHeaderControl(event.target)) {
+                  return;
+                }
+                onToggle?.();
+              }
+            : undefined
+        }
       >
         <AutomationHeader
           phase={phase}
@@ -380,6 +400,7 @@ export function PhaseLogCard({
           <ol
             className={cn("mt-1 min-w-0 list-none leading-tight", LOG_FACE)}
             data-testid={`split-run-stream-${phase.id}`}
+            onClick={(event) => event.stopPropagation()}
           >
             {groups.map((group) => (
               <StreamNode
@@ -428,79 +449,64 @@ function AutomationHeader({
       data-testid={`split-run-automation-header-${phase.id}`}
       {...streamLineAttrs(phase.status)}
       className={cn(
-        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
+        "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight bg-muted",
         LAST_RUNNING_LINE_PULSE,
         expanded && STICKY_PHASE,
+        collapsible && onToggle && "cursor-pointer",
       )}
     >
       {collapsible ? (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em]"
-        >
+        <button type="button" onClick={onToggle} aria-expanded={expanded} className={cn(PHASE_NAME_FACE, "text-left")}>
           <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </button>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em]">
+        <div className={PHASE_NAME_FACE}>
           <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </div>
       )}
       {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
-      {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
-        <span
-          data-testid={`split-run-phase-artifacts-${phase.id}`}
-          className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-        >
-          {producedPullRequests.map((pullRequest) => (
-            <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
-          ))}
-          {producedArtifacts.map((artifact) => (
-            <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-          ))}
-        </span>
-      ) : null}
-      {phase.checks && phase.checks.length > 0 ? (
-        <span className="shrink-0">
-          <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-        </span>
-      ) : null}
       {phase.status === "running" && onStop ? (
-        <Button
-          type="button"
-          size="xs"
-          variant="outline"
-          className="text-destructive"
-          disabled={actionBusy}
-          onClick={onStop}
-        >
-          {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-          Stop
-        </Button>
+        <PhaseStopButton phaseId={phase.id} busy={actionBusy} onStop={onStop} />
       ) : null}
       {phase.status === "failed" && onRerun ? (
-        <Button type="button" size="xs" variant="ghost" disabled={actionBusy} onClick={onRerun}>
-          {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-          Rerun
-        </Button>
+        <PhaseRerunButton phaseId={phase.id} busy={actionBusy} onRerun={onRerun} />
       ) : null}
+      <span className="ml-auto flex min-w-0 items-center justify-end gap-2 overflow-hidden">
+        {phase.checks && phase.checks.length > 0 ? (
+          <span className="shrink-0">
+            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+          </span>
+        ) : null}
+        {producedArtifacts.length > 0 || producedPullRequests.length > 0 ? (
+          <span
+            data-testid={`split-run-phase-artifacts-${phase.id}`}
+            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+          >
+            {producedPullRequests.map((pullRequest) => (
+              <StreamPullRequest key={pullRequest.id ?? pullRequest.url} pullRequest={pullRequest} />
+            ))}
+            {producedArtifacts.map((artifact) => (
+              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+            ))}
+          </span>
+        ) : null}
+        <PhaseDuration phase={phase} />
+      </span>
     </div>
   );
 }
 
-function automationAccent(status: SplitRunPhaseStatus): string {
-  if (status === "passed") return "border-l-[#10b981]";
-  if (status === "running") return "border-l-[#3b82f6]";
-  if (status === "failed") return "border-l-[#ef4444]";
-  if (status === "waiting") return "border-l-[#f59e0b]";
-  return "border-l-border";
-}
-
-const PHASE_ACTION_PILL =
-  "inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+const PHASE_ACTION_LINK = cn(
+  LOG_FACE,
+  "inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
+);
+const VIEW_RUN_LABEL = "View automation run";
+const EDIT_AUTOMATION_LABEL = "Edit automation";
+const RERUN_LABEL = "Rerun";
+const STOP_LABEL = "Stop";
+const PHASE_STOP_ACTION = cn(PHASE_ACTION_LINK, "hover:bg-destructive/10 hover:text-destructive");
 
 function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; runHref?: string; editHref?: string }) {
   if (!runHref && !editHref) {
@@ -509,18 +515,95 @@ function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; 
   return (
     <>
       {runHref ? (
-        <Link href={runHref} data-testid={`split-run-phase-run-${phase.id}`} className={PHASE_ACTION_PILL}>
-          <Maximize2 className="size-2.5" aria-hidden />
-          View Automation Run
-        </Link>
+        <PhaseActionLink href={runHref} testId={`split-run-phase-run-${phase.id}`} label={VIEW_RUN_LABEL}>
+          <Maximize2 className="size-3.5" aria-hidden />
+        </PhaseActionLink>
       ) : null}
       {editHref ? (
-        <Link href={editHref} data-testid={`split-run-phase-edit-${phase.id}`} className={PHASE_ACTION_PILL}>
-          <Pencil className="size-2.5" aria-hidden />
-          Edit Automation
-        </Link>
+        <PhaseActionLink href={editHref} testId={`split-run-phase-edit-${phase.id}`} label={EDIT_AUTOMATION_LABEL}>
+          <Pencil className="size-3.5" aria-hidden />
+        </PhaseActionLink>
       ) : null}
     </>
+  );
+}
+
+function PhaseActionLink({
+  href,
+  testId,
+  label,
+  children,
+}: {
+  href: string;
+  testId: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link href={href} data-testid={testId} aria-label={label} className={PHASE_ACTION_LINK}>
+          {children}
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PhaseIconButton({
+  testId,
+  label,
+  className = PHASE_ACTION_LINK,
+  disabled,
+  onClick,
+  children,
+}: {
+  testId: string;
+  label: string;
+  className?: string;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          data-testid={testId}
+          aria-label={label}
+          className={className}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PhaseRerunButton({ phaseId, busy, onRerun }: { phaseId: string; busy: boolean; onRerun: () => void }) {
+  return (
+    <PhaseIconButton testId={`split-run-phase-rerun-${phaseId}`} label={RERUN_LABEL} disabled={busy} onClick={onRerun}>
+      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <RotateCw className="size-3.5" aria-hidden />}
+    </PhaseIconButton>
+  );
+}
+
+function PhaseStopButton({ phaseId, busy, onStop }: { phaseId: string; busy: boolean; onStop: () => void }) {
+  return (
+    <PhaseIconButton
+      testId={`split-run-phase-stop-${phaseId}`}
+      label={STOP_LABEL}
+      className={PHASE_STOP_ACTION}
+      disabled={busy}
+      onClick={onStop}
+    >
+      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <CircleX className="size-3.5" aria-hidden />}
+    </PhaseIconButton>
   );
 }
 
@@ -541,27 +624,68 @@ function LogStatusTime({
 }) {
   const running = status === "running";
   const { now, sampledAt } = useRunningLogClock(running, duration);
-  const label = running
-    ? `Running ${tickingRunningClock(duration, sampledAt, now)}`
-    : logStatusTimeLabel(status, duration);
-  if (!label) {
+  const clock = running ? tickingRunningClock(duration, sampledAt, now) : logStatusTimeLabel(duration);
+  const mark = statusTimeMark(status);
+  if (!mark && !clock) {
     return null;
   }
   return (
     <span
       data-testid={testId}
-      aria-label={running ? "Running" : undefined}
+      aria-label={statusTimeName(status)}
       className={cn(
-        "shrink-0 rounded-sm px-1.5 text-right text-[12px] leading-[1.125rem] tabular-nums [font-feature-settings:'zero']",
+        "inline-flex shrink-0 items-center gap-1 text-right tabular-nums [font-feature-settings:'zero']",
+        LOG_FACE,
         statusTimeTone(status),
       )}
     >
-      {running ? (
-        <span data-testid="split-run-running-spinner" className="mr-1 inline-block w-[1ch]" aria-hidden>
-          {runningSpinnerFrame(now - sampledAt)}
-        </span>
-      ) : null}
-      {label}
+      {mark}
+      {clock ? <span>{clock}</span> : null}
+    </span>
+  );
+}
+
+function statusTimeName(status: SplitRunPhaseStatus): string | undefined {
+  if (status === "passed") {
+    return "Passed";
+  }
+  if (status === "running") {
+    return "Running";
+  }
+  if (status === "failed") {
+    return "Failed";
+  }
+  if (status === "waiting") {
+    return "Waiting";
+  }
+  return undefined;
+}
+
+function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
+  if (status === "passed") {
+    return <span aria-hidden>✓</span>;
+  }
+  if (status === "failed") {
+    return <span aria-hidden>✗</span>;
+  }
+  return null;
+}
+
+function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
+  const running = phase.status === "running";
+  const { now, sampledAt } = useRunningLogClock(running, phase.duration);
+  const clock = running
+    ? tickingRunningClock(phase.duration, sampledAt, now)
+    : formatClockDurationLabel(phase.duration);
+  if (!clock || clock === "—") {
+    return null;
+  }
+  return (
+    <span
+      data-testid={`split-run-phase-duration-${phase.id}`}
+      className={cn(LOG_FACE, "min-w-[5ch] text-right tabular-nums text-muted-foreground")}
+    >
+      {clock}
     </span>
   );
 }
@@ -659,7 +783,6 @@ function StreamNodeHeader({
       className={cn(
         "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap",
         LOG_ROW_H,
-        LOG_ROW_HOVER,
         STREAM_SECTION,
         LAST_RUNNING_LINE_PULSE,
         hasChildren && STICKY_NODE,
@@ -701,7 +824,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
       <div
         data-testid={`split-run-stream-line-${step.line.id}`}
         {...streamLineAttrs(step.line.status)}
-        className={cn(STREAM_LINE_WRAP_ROW, STREAM_SECTION, hasBody && STICKY_STEP)}
+        className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
       >
         {step.line.componentType ? (
           <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
@@ -718,7 +841,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
                 {...streamLineAttrs(event.line.status)}
-                className={cn("flex w-full items-start px-2", LOG_ROW_HOVER, LAST_RUNNING_LINE_PULSE)}
+                className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
               >
                 <span className="inline-flex w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
@@ -819,7 +942,7 @@ function StreamOutput({ text }: { text: string }) {
         <div
           key={index}
           data-stream-line=""
-          className={cn("flex min-w-0 w-full items-start px-2", LOG_FACE, LOG_ROW_HOVER, LAST_RUNNING_LINE_PULSE)}
+          className={cn("flex min-w-0 w-full items-start", STREAM_SECTION, LOG_FACE, LAST_RUNNING_LINE_PULSE)}
         >
           <span className="inline-flex w-4 shrink-0" aria-hidden />
           <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 leading-5 text-muted-foreground">

@@ -241,7 +241,8 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByTestId("split-run-review")).not.toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("tab", { name: "Automations" }));
-    expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-backlog")).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();

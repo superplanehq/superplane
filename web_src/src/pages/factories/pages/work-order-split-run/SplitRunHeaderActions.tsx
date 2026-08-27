@@ -1,39 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/ui/alertDialog";
-
-import {
-  splitRunCloseNeedsConfirm,
-  type SplitRunFooter,
-  type SplitRunFooterAction,
-  type SplitRunFooterActionKind,
-  type SplitRunStopChoice,
-} from "./splitRunFooter";
-
-type CloseKind = Extract<SplitRunFooterActionKind, "reject" | "approve">;
+import { type SplitRunFooter, type SplitRunFooterAction, type SplitRunStopChoice } from "./splitRunFooter";
 
 function visibleHeaderActions(
   actions: SplitRunFooter["actions"],
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>,
-  onReject?: () => void | Promise<void>,
 ) {
   return actions.filter((action) => {
-    if (action.kind === "reopen" || action.kind === "approve") {
-      return Boolean(onStop);
+    if (action.kind === "reject" || action.kind === "approve") {
+      return false;
     }
-    if (action.kind === "reject") {
-      return Boolean(onReject) || Boolean(onStop);
+    if (action.kind === "reopen") {
+      return Boolean(onStop);
     }
     return true;
   });
@@ -41,12 +20,12 @@ function visibleHeaderActions(
 
 /**
  * Work-order actions in the popup header, left of Close.
+ * Start stays on drafts. Reopen stays on closed orders.
  */
 export function SplitRunHeaderActions({
   footer,
   onStart,
   onStop,
-  onReject,
   startBusy = false,
   stopBusy = false,
   startDisabled = false,
@@ -54,28 +33,14 @@ export function SplitRunHeaderActions({
   footer: SplitRunFooter;
   onStart?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
-  onReject?: () => void | Promise<void>;
   startBusy?: boolean;
   stopBusy?: boolean;
   startDisabled?: boolean;
 }) {
-  const [pendingKind, setPendingKind] = useState<CloseKind | null>(null);
-  const actions = visibleHeaderActions(footer.actions, onStop, onReject);
+  const actions = visibleHeaderActions(footer.actions, onStop);
   if (actions.length === 0) {
     return null;
   }
-
-  const runClose = (kind: CloseKind) => {
-    if (kind === "approve") {
-      void onStop?.("completed");
-      return;
-    }
-    if (footer.kind === "draft") {
-      void onReject?.();
-      return;
-    }
-    void onStop?.("canceled");
-  };
 
   const onActionClick = (action: SplitRunFooterAction) => {
     if (action.kind === "start") {
@@ -84,14 +49,6 @@ export function SplitRunHeaderActions({
     }
     if (action.kind === "reopen") {
       void onStop?.("reopen");
-      return;
-    }
-    if (action.kind === "reject" || action.kind === "approve") {
-      if (splitRunCloseNeedsConfirm(footer.kind)) {
-        setPendingKind(action.kind);
-        return;
-      }
-      runClose(action.kind);
     }
   };
 
@@ -107,28 +64,6 @@ export function SplitRunHeaderActions({
           onClick={() => onActionClick(action)}
         />
       ))}
-      <AlertDialog open={pendingKind !== null} onOpenChange={(open) => !open && setPendingKind(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Stop running automations?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action stops all running automations on this work order. Then it closes the work order.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingKind) {
-                  runClose(pendingKind);
-                }
-              }}
-            >
-              {pendingKind === "approve" ? "Approve" : "Reject"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
