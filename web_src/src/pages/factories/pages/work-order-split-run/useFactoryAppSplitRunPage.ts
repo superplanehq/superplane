@@ -1,4 +1,5 @@
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useMemo, useState } from "react";
@@ -8,6 +9,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
+import { useWorkOrderPRFeedbackLog } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
@@ -39,21 +41,38 @@ function useSplitRunPageSelection(
   return { isLoading, lineName, order, query };
 }
 
+function useSplitRunWorkOrderExtras(
+  organizationId: string,
+  factoryId: string,
+  order: ReturnType<typeof useSplitRunPageSelection>["order"],
+) {
+  const orderId = order?.id ?? "";
+  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const { data: pullRequests = [] } = useFactoryPullRequests(
+    organizationId,
+    factoryId,
+    orderId ? { workOrderIds: [orderId] } : undefined,
+  );
+  const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
+  return { orderChecks, prFeedbackRuns };
+}
+
 export function useFactoryAppSplitRunPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const { appId = "" } = useParams<{ appId: string }>();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
-  const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
+  const { orderChecks, prFeedbackRuns } = useSplitRunWorkOrderExtras(organizationId, factoryId, order);
   const fixture = useMemo(
-    () => fixtureForSplitRunPage(order, orderChecks, query.lineId),
-    [order, orderChecks, query.lineId],
+    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
+    [order, orderChecks, prFeedbackRuns, query.lineId],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
-    () => splitRunPhaseOnRoute(phaseForSplitRunCanvas(fixture, canvasKey), appId),
-    [appId, canvasKey, fixture],
+    () => splitRunPhaseOnRoute(phaseForSplitRunCanvas(fixture, canvasKey, query.runId), appId),
+    [appId, canvasKey, fixture, query.runId],
   );
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);

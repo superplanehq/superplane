@@ -319,15 +319,15 @@ describe("FactoriesHarness Acme onboarding", () => {
     await waitFor(() => {
       expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
     });
-    expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Verify");
+    expect(screen.getByTestId("lines-column-title-verify")).toHaveTextContent("Verify");
     expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
-    expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-column-title-phase-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No work orders in the backlog.");
     expect(screen.getByTestId("lines-phase-column-0")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No work orders in Verify.");
     expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
-    expect(screen.queryByTestId("lines-phase-column-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-phase-column-1")).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
   }, 15000);
 

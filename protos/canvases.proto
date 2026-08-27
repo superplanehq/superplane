@@ -913,6 +913,10 @@ message CanvasRunRef {
   CanvasRun.State state = 3;
   CanvasRun.Result result = 4;
   repeated string errors = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  google.protobuf.Timestamp finished_at = 8;
+  string description = 9;
 }
 
 message ListEventExecutionsRequest {

@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
+import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } from "./splitRunCanvases";
 import {
   SPLIT_RUN_RUNNING,
@@ -41,17 +42,33 @@ export function fixtureForSplitRunPage(
   order: FactoriesWorkOrder | null,
   orderChecks: FactoriesWorkOrderCheck[],
   lineId: string | null,
+  prFeedbackRuns?: PRFeedbackLogRun[],
 ): SplitRunFixture | null {
   if (!order) {
     return null;
   }
-  return splitRunFixtureForWorkOrder(order, { checks: orderChecks, lineId, demoArtifacts: false });
+  return splitRunFixtureForWorkOrder(order, {
+    checks: orderChecks,
+    lineId,
+    demoArtifacts: false,
+    prFeedbackRuns,
+  });
 }
 
-export function phaseForSplitRunCanvas(fixture: SplitRunFixture | null, canvasKey?: SplitRunCanvasKey): SplitRunPhase {
+export function phaseForSplitRunCanvas(
+  fixture: SplitRunFixture | null,
+  canvasKey?: SplitRunCanvasKey,
+  runId?: string | null,
+): SplitRunPhase {
   const fallback = implementFallbackPhase();
   if (!fixture) {
     return fallback;
+  }
+  if (runId) {
+    const byRun = fixture.phases.find((entry) => entry.runId === runId);
+    if (byRun) {
+      return byRun;
+    }
   }
   if (canvasKey) {
     return fixture.phases.find((entry) => canvasKeyForPhase(entry) === canvasKey) ?? fixture.phases[0] ?? fallback;

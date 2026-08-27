@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
+} from "@/api-client";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
@@ -14,7 +19,7 @@ import {
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
-import { OPEN_WORK_ORDER_ARTIFACTS } from "./__fixtures__/factoryPageFixtureVariants";
+import { OPEN_WORK_ORDER_ARTIFACTS, OPEN_WORK_ORDER_PULL_REQUESTS } from "./__fixtures__/factoryPageFixtureVariants";
 import {
   CLOSED_FAILED_WORK_ORDER_EVENTS,
   CLOSED_WORK_ORDER_EVENTS,
@@ -66,6 +71,7 @@ type Story = StoryObj<typeof meta>;
 interface BuildLoadedViewOverrides {
   events?: FactoriesWorkOrderEvent[];
   artifacts?: FactoriesWorkOrderArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   checks?: WorkOrderCheckPresentation[];
 }
 
@@ -77,6 +83,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     order,
     events: overrides.events ?? [],
     artifacts: overrides.artifacts ?? [],
+    pullRequests: overrides.pullRequests ?? [],
     statusNotes: presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined),
     checks: overrides.checks,
     isArtifactsLoading: false,
@@ -149,6 +156,7 @@ export const WithCommentsAndArtifacts: Story = {
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
   }),
 };
 
@@ -158,6 +166,7 @@ export const WithChecks: Story = {
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
     checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS),
   }),
 };
@@ -194,6 +203,7 @@ export const WithStatusNote: Story = {
   args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
     events: RICH_OPEN_WORK_ORDER_EVENTS,
     artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
   }),
 };
 
@@ -204,6 +214,7 @@ export const WithTwoStatusNotes: Story = {
     ...buildLoadedViewArgs(OPEN_WORK_ORDER, {
       events: RICH_OPEN_WORK_ORDER_EVENTS,
       artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+      pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
     }),
     statusNotes: presentWorkOrderStatusNotes([
       ...(OPEN_WORK_ORDER.statusNotes ?? []),

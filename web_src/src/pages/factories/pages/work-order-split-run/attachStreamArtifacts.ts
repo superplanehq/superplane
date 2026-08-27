@@ -1,6 +1,11 @@
-import type { FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
 
 import { buildLatestArtifactDataById, overlayLiveArtifactData } from "../../lib/workOrderArtifact";
+import {
+  indexPullRequestsById,
+  overlayLivePullRequest,
+  pullRequestFromEventPayload,
+} from "../../lib/workOrderPullRequest";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
 interface ArtifactAddedPayload {
@@ -15,44 +20,67 @@ interface ArtifactAddedPayload {
   };
 }
 
+interface PullRequestEventPayload {
+  automation?: {
+    nodeId?: string;
+    nodeName?: string;
+  };
+  pullRequest?: {
+    id?: string;
+    provider?: string;
+    repository?: string;
+    number?: number | string;
+    url?: string;
+    title?: string;
+    state?: string;
+  };
+}
+
 export interface StreamArtifactIndex {
   byNodeId: Map<string, FactoriesWorkOrderArtifact>;
   byNodeName: Map<string, FactoriesWorkOrderArtifact>;
+  pullRequestsByNodeId: Map<string, FactoriesFactoryPullRequest>;
+  pullRequestsByNodeName: Map<string, FactoriesFactoryPullRequest>;
 }
 
 export function streamArtifactIndexFromEvents(
   events: FactoriesWorkOrderEvent[],
   liveArtifacts: FactoriesWorkOrderArtifact[] | undefined,
+  livePullRequests?: FactoriesFactoryPullRequest[],
 ): StreamArtifactIndex {
   const byNodeId = new Map<string, FactoriesWorkOrderArtifact>();
   const byNodeName = new Map<string, FactoriesWorkOrderArtifact>();
+  const pullRequestsByNodeId = new Map<string, FactoriesFactoryPullRequest>();
+  const pullRequestsByNodeName = new Map<string, FactoriesFactoryPullRequest>();
   const liveById = liveArtifactsById(liveArtifacts);
-  const latestDataById = buildLatestArtifactDataById(liveArtifacts);
+  const latestDataById = buildLatestArtifactDataById(liveArtifacts ?? []);
+  const livePullRequestsById = indexPullRequestsById(livePullRequests);
 
   for (const event of sortEventsChronologically(events)) {
-    if (event.type !== "order.artifact.added") {
-      continue;
+    const automation = eventAutomation(event);
+    const nodeId = automation?.nodeId?.trim();
+    const nodeName = automation?.nodeName?.trim();
+
+    const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
+    if (artifact) {
+      if (nodeId) {
+        byNodeId.set(nodeId, artifact);
+      } else if (nodeName) {
+        byNodeName.set(nodeName, artifact);
+      }
     }
 
-    const payload = (event.event ?? {}) as ArtifactAddedPayload;
-    const artifact = resolveAddedArtifact(payload.artifact, liveById, latestDataById);
-    if (!artifact) {
-      continue;
-    }
-
-    const nodeId = payload.automation?.nodeId?.trim();
-    if (nodeId) {
-      byNodeId.set(nodeId, artifact);
-      continue;
-    }
-
-    const nodeName = payload.automation?.nodeName?.trim();
-    if (nodeName) {
-      byNodeName.set(nodeName, artifact);
+    const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
+    if (pullRequest) {
+      if (nodeId) {
+        pullRequestsByNodeId.set(nodeId, pullRequest);
+      } else if (nodeName) {
+        pullRequestsByNodeName.set(nodeName, pullRequest);
+      }
     }
   }
 
-  return { byNodeId, byNodeName };
+  return { byNodeId, byNodeName, pullRequestsByNodeId, pullRequestsByNodeName };
 }
 
 export function attachArtifactsToStream(
@@ -70,22 +98,57 @@ export function attachStreamArtifacts(
   stream: SplitRunStreamLine[] | undefined,
   events: FactoriesWorkOrderEvent[],
   liveArtifacts?: FactoriesWorkOrderArtifact[],
+  livePullRequests?: FactoriesFactoryPullRequest[],
 ): SplitRunStreamLine[] | undefined {
-  return attachArtifactsToStream(stream, streamArtifactIndexFromEvents(events, liveArtifacts));
+  return attachArtifactsToStream(stream, streamArtifactIndexFromEvents(events, liveArtifacts, livePullRequests));
+}
+
+function artifactFromStreamEvent(
+  event: FactoriesWorkOrderEvent,
+  liveById: Map<string, FactoriesWorkOrderArtifact>,
+  latestDataById: Map<string, Record<string, unknown>>,
+): FactoriesWorkOrderArtifact | undefined {
+  if (event.type !== "order.artifact.added") {
+    return undefined;
+  }
+  const payload = (event.event ?? {}) as ArtifactAddedPayload;
+  return resolveAddedArtifact(payload.artifact, liveById, latestDataById);
+}
+
+function pullRequestFromStreamEvent(
+  event: FactoriesWorkOrderEvent,
+  liveById: Map<string, FactoriesFactoryPullRequest>,
+): FactoriesFactoryPullRequest | undefined {
+  if (event.type !== "order.pull_request.added" && event.type !== "order.pull_request.updated") {
+    return undefined;
+  }
+  const payload = (event.event ?? {}) as PullRequestEventPayload;
+  if (!payload.pullRequest) {
+    return undefined;
+  }
+  return overlayLivePullRequest(pullRequestFromEventPayload(payload.pullRequest), liveById);
+}
+
+function eventAutomation(event: FactoriesWorkOrderEvent): { nodeId?: string; nodeName?: string } | undefined {
+  const payload = (event.event ?? {}) as ArtifactAddedPayload & PullRequestEventPayload;
+  return payload.automation;
 }
 
 function attachLineArtifact(line: SplitRunStreamLine, index: StreamArtifactIndex): SplitRunStreamLine {
-  const byId = line.nodeId ? index.byNodeId.get(line.nodeId) : undefined;
-  if (byId) {
-    return { ...line, artifact: byId };
+  const next = { ...line };
+  const artifactById = line.nodeId ? index.byNodeId.get(line.nodeId) : undefined;
+  const artifactByName = index.byNodeName.get(line.componentName);
+  if (artifactById || artifactByName) {
+    next.artifact = artifactById ?? artifactByName;
   }
 
-  const byName = index.byNodeName.get(line.componentName);
-  if (byName) {
-    return { ...line, artifact: byName };
+  const pullRequestById = line.nodeId ? index.pullRequestsByNodeId.get(line.nodeId) : undefined;
+  const pullRequestByName = index.pullRequestsByNodeName.get(line.componentName);
+  if (pullRequestById || pullRequestByName) {
+    next.pullRequest = pullRequestById ?? pullRequestByName;
   }
 
-  return line;
+  return next;
 }
 
 function resolveAddedArtifact(

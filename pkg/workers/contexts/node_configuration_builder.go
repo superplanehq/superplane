@@ -1108,6 +1108,27 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["comments"] = commentPayloads
 	}
 
+	usesPullRequests, err := expressionvalidation.ExpressionUsesOrderPullRequests(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesPullRequests {
+		factoryModel, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
+		}
+		pullRequests, err := factoryModel.ListPullRequests(b.tx, models.FactoryPullRequestFilter{WorkOrderID: &order.ID})
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
+		}
+
+		payloads := make([]any, 0, len(pullRequests))
+		for i := range pullRequests {
+			payloads = append(payloads, pullRequestExpressionPayload(&pullRequests[i]))
+		}
+		payload["pullRequests"] = payloads
+	}
+
 	return payload, nil
 }
 
@@ -1146,6 +1167,23 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 		"type": artifact.Type,
 		"data": normalizeExpressionValue(data),
 	}, nil
+}
+
+func pullRequestExpressionPayload(pullRequest *models.FactoryPullRequest) map[string]any {
+	payload := map[string]any{
+		"id":          pullRequest.ID.String(),
+		"workOrderId": pullRequest.WorkOrderID.String(),
+		"provider":    pullRequest.Provider,
+		"repository":  pullRequest.Repository,
+		"number":      pullRequest.Number,
+		"url":         pullRequest.URL,
+		"title":       pullRequest.Title,
+		"state":       pullRequest.State,
+	}
+	if pullRequest.ExternalID != nil {
+		payload["externalId"] = *pullRequest.ExternalID
+	}
+	return payload
 }
 
 func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
