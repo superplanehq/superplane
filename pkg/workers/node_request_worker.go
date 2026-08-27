@@ -393,21 +393,14 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	}
 
 	logger.Infof("Component execution hook completed")
-	finished, err := execution.IsFinished(tx)
-	if err != nil {
-		return err
-	}
 
-	if finished {
-		logger.Infof("Execution %s already finished after hook - completing request", execution.ID)
-		return request.Complete(tx)
-	}
-
-	err = tx.Save(&execution).Error
-	if err != nil {
-		return fmt.Errorf("error saving execution after action handler: %v", err)
-	}
-
+	//
+	// Hook contexts persist their own execution columns in this transaction:
+	// Metadata.Set updates metadata, Pass and Fail write state and result.
+	// A full-row save here would undo a cancellation committed while the hook
+	// ran, because this worker locks the request row, not the execution row.
+	// The executor saves under its execution row lock (FOR NO KEY UPDATE SKIP LOCKED).
+	//
 	logger.Infof("Request completed")
 	return request.Complete(tx)
 }
