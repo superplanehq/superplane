@@ -192,6 +192,28 @@ describe("BacklogCreatePopover", () => {
     expect(status.querySelector("svg.animate-spin")).not.toBeNull();
   });
 
+  it("keeps search results when a later page fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={githubItems}
+        query=""
+        focusedIntakeId="intake-github"
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onImportItem={vi.fn()}
+        errorMessage={BACKLOG_CREATE_COPY.unconnected}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    expect(screen.getByTestId("lines-backlog-create-item-gh-1")).toHaveTextContent("Handle duplicate refunds");
+    expect(screen.queryByText(BACKLOG_CREATE_COPY.unconnected)).not.toBeInTheDocument();
+  });
+
   it("shows the search error when the intake is not connected", async () => {
     const user = userEvent.setup();
     render(

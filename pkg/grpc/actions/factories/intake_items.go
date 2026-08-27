@@ -101,21 +101,7 @@ func (unsupportedIntakeItemSource) Get(context.Context, string) (*IntakeItem, er
 }
 
 func (s *gitHubIntakeItemSource) Search(ctx context.Context, query string, limit int) ([]IntakeItem, error) {
-	trimmed := strings.TrimSpace(query)
-	if trimmed == "" {
-		issues, _, err := s.github.ListIssues(ctx, s.repository, &github.IssueListByRepoOptions{
-			State:       "open",
-			Sort:        "created",
-			Direction:   "desc",
-			ListOptions: github.ListOptions{PerPage: gitHubIntakePageSize(limit)},
-		})
-		if err != nil {
-			return nil, err
-		}
-		return gitHubIssueItems(issues, limit), nil
-	}
-
-	result, _, err := s.github.SearchIssues(ctx, gitHubIssueSearchQuery(s.repository, trimmed), &github.SearchOptions{
+	result, _, err := s.github.SearchIssues(ctx, gitHubIssueSearchQuery(s.repository, query), &github.SearchOptions{
 		ListOptions: github.ListOptions{PerPage: gitHubIntakePageSize(limit)},
 	})
 	if err != nil {
@@ -206,7 +192,12 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 }
 
 func gitHubIssueSearchQuery(repository, query string) string {
-	return fmt.Sprintf("repo:%s is:issue is:open %q", repository, query)
+	base := fmt.Sprintf("repo:%s is:issue is:open", repository)
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
+		return base
+	}
+	return fmt.Sprintf("%s %q", base, trimmed)
 }
 
 func gitHubIntakePageSize(limit int) int {

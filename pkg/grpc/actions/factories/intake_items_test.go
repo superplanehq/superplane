@@ -36,6 +36,7 @@ func TestIntakeItemLimit(t *testing.T) {
 }
 
 func TestGitHubIssueSearchQuery_QuotesTheOperatorTerm(t *testing.T) {
+	assert.Equal(t, "repo:acme/pay is:issue is:open", gitHubIssueSearchQuery("acme/pay", ""))
 	assert.Equal(t, `repo:acme/pay is:issue is:open "refund"`, gitHubIssueSearchQuery("acme/pay", "refund"))
 	assert.Equal(
 		t,

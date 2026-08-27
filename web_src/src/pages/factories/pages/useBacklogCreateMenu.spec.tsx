@@ -207,4 +207,39 @@ describe("useBacklogCreateMenu", () => {
     expect(result.current.hasMore).toBe(true);
     expect(result.current.items).toHaveLength(5);
   });
+
+  it("keeps loaded items when a later search page fails", async () => {
+    const liveItems = Array.from({ length: 5 }, (_, index) => ({
+      id: `${index}`,
+      key: `#${index}`,
+      title: `Issue ${index}`,
+      body: "",
+    }));
+    useSearchFactoryIntakeItems.mockImplementation((input: { limit?: number }) => ({
+      data: liveItems,
+      isLoading: false,
+      isFetching: false,
+      isError: (input.limit ?? 0) > 5,
+      error: new Error("rate limited"),
+    }));
+
+    const { result } = renderHook(() => useBacklogCreateMenu("org-1", "factory-1"), {
+      wrapper: wrapper(),
+    });
+
+    act(() => {
+      result.current.setFocusedIntake(intake.id);
+    });
+    expect(result.current.items).toHaveLength(5);
+    expect(result.current.errorMessage).toBeUndefined();
+
+    act(() => {
+      result.current.loadMore();
+    });
+
+    await waitFor(() => {
+      expect(result.current.items).toHaveLength(5);
+    });
+    expect(result.current.errorMessage).toBeUndefined();
+  });
 });

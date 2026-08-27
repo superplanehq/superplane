@@ -124,9 +124,10 @@ export function useBacklogCreateMenu(
     isLoadingMore,
     hasMore,
     loadMore,
-    errorMessage: searchQuery.isError
-      ? getApiErrorMessage(searchQuery.error, BACKLOG_CREATE_COPY.unconnected)
-      : undefined,
+    errorMessage:
+      searchQuery.isError && items.length === 0
+        ? getApiErrorMessage(searchQuery.error, BACKLOG_CREATE_COPY.unconnected)
+        : undefined,
     importItem,
   };
 }

@@ -204,7 +204,7 @@ function IntakeSearchResults({
   let body: ReactNode;
   if (isLoading && items.length === 0) {
     body = <SearchLoadingStatus label={BACKLOG_CREATE_COPY.loading} testId="lines-backlog-create-loading" />;
-  } else if (errorMessage) {
+  } else if (errorMessage && items.length === 0) {
     body = <div className="px-2 py-2 text-[13px] text-muted-foreground">{errorMessage}</div>;
   } else if (items.length === 0) {
     body = <div className="px-2 py-2 text-[13px] text-muted-foreground">{BACKLOG_CREATE_COPY.empty}</div>;
