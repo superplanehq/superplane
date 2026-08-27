@@ -2,6 +2,9 @@ import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 
 export const PRIVATE_GITHUB_APP_CONFIG = { privateApp: true } as const;
 
+/** Label for the customer GitHub App path beside hosted Connect GitHub. */
+export const CREATE_PRIVATE_GITHUB_APP_LABEL = "Create your own GitHub App";
+
 export function privateGitHubAppCreateConfiguration(integrationName: string): { privateApp: true } | undefined {
   if (integrationName !== "github") {
     return undefined;

@@ -349,6 +349,31 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
 	})
 
+	t.Run("github uses setup provider when privateApp is set even if setup flow feature is off", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_CLIENT_SECRET", "")
+
+		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
+		assert.Equal(t, "selectOwner", response.Integration.Status.SetupState.CurrentStep.Name)
+		assert.Nil(t, response.Integration.Status.BrowserAction)
+	})
+
 	t.Run("github uses setup provider when privateApp is set even if hosted install is on", func(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
