@@ -108,6 +108,7 @@ export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
   createdAt: TWO_HOURS_AGO,
   updatedAt: TWO_HOURS_AGO,
   createdBy: SENTRY_CREATED_BY,
+  origin: SENTRY_ORIGIN,
   assignees: [{ id: ARNOLD_USER.id, name: ARNOLD_USER.name }],
   lineDispatches: [],
 };
@@ -125,6 +126,7 @@ export const QUESTION_WORK_ORDER: FactoriesWorkOrder = {
   createdAt: TWO_HOURS_AGO,
   updatedAt: HOUR_AGO,
   createdBy: SLACK_CREATED_BY,
+  origin: SLACK_ORIGIN,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [],
   statusNotes: [

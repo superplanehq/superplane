@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -12,6 +12,7 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { extractArtifactUrl, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { reviewCandidateForWorkOrderId } from "../onboarding/first-run/reviewCandidates";
+import { canvasKeyForAutomation } from "./splitRunCanvases";
 
 export const CREATED_MANUALLY = "Created manually";
 
@@ -30,6 +31,8 @@ export type SplitRunSource =
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
     };
+
+const GITHUB_REPO = "acme/payments-service";
 
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
@@ -81,6 +84,12 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSourc
     return intakeSourceFromHref(candidate.issue.url);
   }
 
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    const intakeKind = intakeKindForAutomation(automation);
+    return intakeSourceFromHref(ticketHrefForIntake(intakeKind, order), intakeKind);
+  }
+
   return {
     kind: "manual",
     person: sourcePerson(order),
@@ -108,6 +117,38 @@ function intakeSourceFromHref(
     ...INTAKE_PRESENTATION[intakeKind],
     ticket: { label, href },
   };
+}
+
+function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIntakeKind {
+  const key = canvasKeyForAutomation({ id: automation.appId, name: automation.appName });
+  if (key === "sentry") {
+    return "sentry-exceptions";
+  }
+  if (key === "slack") {
+    return "slack";
+  }
+  if (/pagerduty/i.test(`${automation.appId ?? ""} ${automation.appName ?? ""}`)) {
+    return "pagerduty-incidents";
+  }
+  return "github-issues";
+}
+
+function ticketHrefForIntake(kind: SplitRunIntakeKind, order: FactoriesWorkOrder): string {
+  const number = ticketNumber(order);
+  if (kind === "sentry-exceptions") {
+    return `https://superplane.sentry.io/issues/${number}/`;
+  }
+  if (kind === "pagerduty-incidents") {
+    return `https://acme.pagerduty.com/incidents/P${number}`;
+  }
+  if (kind === "slack") {
+    return `https://acme.slack.com/archives/C0REFUNDS/p${number}`;
+  }
+  return `https://github.com/${GITHUB_REPO}/issues/${number}`;
+}
+
+function ticketNumber(order: FactoriesWorkOrder): string {
+  return `${order.key ?? order.number ?? "1"}`.replace(/\D/g, "") || "1";
 }
 
 function intakeKindFromHref(href: string): SplitRunIntakeKind {

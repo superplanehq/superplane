@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
+  QUESTION_WORK_ORDER,
   RUNNING_WORK_ORDER,
   SENTRY_DRAFT_WORK_ORDER,
   SLACK_DRAFT_WORK_ORDER,
@@ -71,6 +73,23 @@ describe("splitRunSourceForOrder", () => {
         kind: "intake",
         name: "GitHub issues",
         ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+      }),
+    );
+  });
+
+  it("maps automation-created orders without origin to the intake source", () => {
+    expect(splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined })).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Sentry exceptions",
+        ticket: { label: expect.stringMatching(/^superplane#/), href: expect.stringContaining("sentry.io") },
+      }),
+    );
+    expect(splitRunSourceForOrder({ ...QUESTION_WORK_ORDER, origin: undefined })).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Slack",
+        ticket: { label: expect.stringMatching(/^acme#/), href: expect.stringContaining("slack.com") },
       }),
     );
   });

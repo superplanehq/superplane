@@ -21,8 +21,8 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { BacklogCreatePopover } from "./BacklogCreatePopover";
-import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
+import { BacklogColumn } from "./BacklogColumn";
+import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -45,7 +45,6 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
-  buildWorkOrderListEntry,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
@@ -62,9 +61,7 @@ import {
   workOrderKanbanLaneSizeClassName,
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
-import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
+import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
@@ -88,13 +85,11 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
-import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
-  isFirstRunOnboardingFactory,
   isLineIntakeSourceId,
   type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
@@ -791,124 +786,6 @@ function PhaseBoard({
   );
 }
 
-function BacklogColumn({
-  organizationId,
-  factoryId,
-  factoryKey,
-  orders,
-  title,
-  size,
-  settingsOpen,
-  onOpenSettings,
-  onCloseSettings,
-  onSaveSettings,
-  colorId,
-  onColorChange,
-  canCreateWorkOrder,
-  canRename,
-  onRename,
-  onCreateWorkOrder,
-  workOrderCardContext,
-  onOpenWorkOrder,
-}: {
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  orders: FactoriesWorkOrder[];
-  title: string;
-  size: number | null;
-  settingsOpen: boolean;
-  onOpenSettings: () => void;
-  onCloseSettings: () => void;
-  onSaveSettings: (settings: { name: string; size: number | null }) => void;
-  colorId: LineBoardColumnColorId | null;
-  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
-  canCreateWorkOrder: boolean;
-  canRename: boolean;
-  onRename: (title: string) => void;
-  onCreateWorkOrder: () => void;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
-}) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
-  const atCapacity = size != null && orders.length >= size;
-  const canAdd = canCreateWorkOrder && !atCapacity;
-  const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
-  const createPopover = {
-    canAdd,
-    atCapacity,
-    sources: createMenu.sources,
-    items: createMenu.items,
-    query: createMenu.query,
-    focusedIntakeId: createMenu.focusedIntakeId,
-    onQueryChange: createMenu.setQuery,
-    onFocusedIntakeChange: createMenu.setFocusedIntake,
-    onCreateManually: onCreateWorkOrder,
-    onImportItem: createMenu.importItem,
-    isLoading: createMenu.isLoading,
-    isLoadingMore: createMenu.isLoadingMore,
-    hasMore: createMenu.hasMore,
-    onLoadMore: createMenu.loadMore,
-    errorMessage: createMenu.errorMessage,
-  };
-
-  return (
-    <>
-      <WorkOrderBoardLane
-        title={title}
-        label={title}
-        canRename={canRename}
-        onRename={onRename}
-        titleTestId="lines-column-title-backlog"
-        count={orders.length}
-        tone="neutral"
-        surfaceClassName={surfaceClassName}
-        emptyDescription="No work orders in the backlog."
-        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
-        keepChildrenWhenEmpty
-        className={surfaceClassName ? undefined : "bg-muted"}
-        actions={
-          <div className="flex shrink-0 items-center gap-0.5">
-            <BacklogCreatePopover {...createPopover} />
-            <ColumnLaneMenu
-              title={title}
-              testId="lines-backlog-menu"
-              onEdit={onOpenSettings}
-              colorId={colorId}
-              onColorChange={onColorChange}
-            />
-          </div>
-        }
-        testId="lines-backlog-column"
-      >
-        <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-          {orders.map((order) => (
-            <li key={order.id}>
-              <LineBoardOrderCard
-                order={order}
-                workOrderCardContext={workOrderCardContext}
-                onOpenWorkOrder={onOpenWorkOrder}
-              />
-            </li>
-          ))}
-          {atCapacity ? null : (
-            <li data-testid="lines-backlog-create-ghost-item">
-              <BacklogCreatePopover variant="ghost" {...createPopover} />
-            </li>
-          )}
-        </ul>
-      </WorkOrderBoardLane>
-      <BacklogSettingsDialog
-        open={settingsOpen}
-        name={title}
-        size={size}
-        onSave={onSaveSettings}
-        onClose={onCloseSettings}
-      />
-    </>
-  );
-}
-
 function DoneColumn({
   orders,
   title,
@@ -1136,57 +1013,6 @@ function PhaseRunCard({
         </p>
       ) : null}
     </div>
-  );
-}
-
-function LineBoardOrderCard({
-  order,
-  workOrderCardContext,
-  onOpenWorkOrder,
-}: {
-  order: FactoriesWorkOrder;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
-}) {
-  return (
-    <LineBoardWorkOrderCard
-      order={order}
-      workOrderCardContext={workOrderCardContext}
-      onOpen={() => {
-        if (order.id) {
-          onOpenWorkOrder(order.id);
-        }
-      }}
-    />
-  );
-}
-
-function LineBoardWorkOrderCard({
-  order,
-  workOrderCardContext,
-  onOpen,
-}: {
-  order: FactoriesWorkOrder;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpen: () => void;
-}) {
-  const { factory } = useFactoriesLayout();
-  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
-  const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const { data: checks = [] } = useWorkOrderChecks(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryId ?? "",
-    order.id ?? "",
-    { enabled: showConfidence },
-  );
-
-  return (
-    <WorkOrderCard
-      {...workOrderCardContext}
-      entry={entry}
-      confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
-      onOpen={onOpen}
-    />
   );
 }
 

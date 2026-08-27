@@ -60,7 +60,7 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
   useWorkOrderCardActions: () => ({
-    isDispatching: false,
+    dispatchingOrderIds: new Set<string>(),
     isAssigneesSaving: false,
     onDispatch: vi.fn(),
     onAssigneesSave: vi.fn(),
