@@ -143,7 +143,6 @@ export function WorkOrderSplitRunBody({
       <SplitRunLogHeader
         following={follow.following}
         onFollowingChange={follow.setFollowing}
-        expandHref={expandHref}
         className="mb-2 px-3 pt-3"
       />
 
