@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
+import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "./splitRunMocks";
@@ -64,6 +65,41 @@ export function splitRunAutomationRunHref(args: {
   );
   const run = preferred ?? current ?? latest ?? fixture.footer.run;
   return getWorkOrderRunHref(organizationId, factoryKey, run?.appId, run?.runId, { orderNumber });
+}
+
+/** Configure URL of the automation that owns a log phase. */
+export function splitRunPhaseAutomationHref(args: {
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  phase: SplitRunPhase;
+}): string | undefined {
+  const { organizationId, factoryKey, orderNumber, phase } = args;
+  if (!organizationId || !factoryKey || !phase.appId) {
+    return undefined;
+  }
+  return factoryAppConfigurePath(organizationId, factoryKey, phase.appId, { orderNumber });
+}
+
+/** Full-screen run page with the log in the sidebar. */
+export function splitRunPhaseRunHref(args: {
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  lineId?: string;
+  phase: SplitRunPhase;
+}): string | undefined {
+  const { organizationId, factoryKey, orderNumber, lineId, phase } = args;
+  if (!organizationId || !factoryKey || !phase.appId) {
+    return undefined;
+  }
+  return factoryAppSplitRunPath(organizationId, factoryKey, phase.appId, {
+    from: "work-order",
+    orderNumber,
+    lineId,
+    runId: phase.runId,
+    canvas: phase.canvasKey ?? undefined,
+  });
 }
 
 export function resolveSplitRunPopupArtifacts(args: {

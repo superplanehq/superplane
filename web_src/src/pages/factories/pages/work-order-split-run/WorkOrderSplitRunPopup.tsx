@@ -1,10 +1,8 @@
 import { useWorkOrderArtifacts } from "@/hooks/useFactoryData";
-import { Maximize2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
 
-import { Link } from "@/components/Link/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell, SectionTitle } from "../work-order-popup-redesign/popupShared";
@@ -18,9 +16,10 @@ import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
-  splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
+  splitRunPhaseAutomationHref,
+  splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { useSplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -60,6 +59,7 @@ type WorkOrderSplitRunBodyProps = {
   factoryKey?: string;
   orderId?: string;
   orderNumber?: string;
+  lineId?: string;
   fixture: SplitRunFixture;
   onDispatch?: () => Promise<void>;
   isDispatching?: boolean;
@@ -75,6 +75,7 @@ export function WorkOrderSplitRunBody({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   fixture,
   onDispatch,
   isDispatching = false,
@@ -104,13 +105,6 @@ export function WorkOrderSplitRunBody({
         : { canvas: emptySplitRunCanvas(), stream: undefined },
     [demoArtifacts, live, selectedPhase],
   );
-  const expandHref = splitRunAutomationRunHref({
-    organizationId,
-    factoryKey,
-    orderNumber,
-    fixture,
-    preferredPhaseId: openPhaseId ?? phaseId,
-  });
   const streams = useMemo(() => {
     const yamlOnly = { enabled: false, stream: [] };
     return new Map(
@@ -128,18 +122,8 @@ export function WorkOrderSplitRunBody({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
-      <div className="mb-2 flex items-center justify-between gap-2 px-3 pt-3">
+      <div className="mb-2 px-3 pt-3">
         <SectionTitle>Log</SectionTitle>
-        {expandHref ? (
-          <Link
-            href={expandHref}
-            aria-label="Open automation run"
-            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            data-testid="split-run-log-expand"
-          >
-            <Maximize2 className="size-3.5" aria-hidden />
-          </Link>
-        ) : null}
       </div>
 
       <ol className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-3">
@@ -153,6 +137,8 @@ export function WorkOrderSplitRunBody({
               onSelectNode={setNodeId}
               organizationId={organizationId}
               canvasId={entry.appId}
+              runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
+              editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
               onToggle={() => {
                 setPhaseId(entry.id);
                 setNodeId(null);
@@ -188,6 +174,7 @@ export function WorkOrderSplitRunPopup({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   fixture,
   onClose,
   fixed = false,
@@ -257,6 +244,7 @@ export function WorkOrderSplitRunPopup({
         factoryKey={factoryKey}
         orderId={orderId}
         orderNumber={orderNumber}
+        lineId={lineId}
         initialTab={initialTab}
         mutations={mutations}
         onDispatch={onDispatch}
@@ -280,6 +268,7 @@ function SplitRunPopupTabs({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   initialTab,
   mutations,
   onDispatch,
@@ -298,6 +287,7 @@ function SplitRunPopupTabs({
   factoryKey?: string;
   orderId?: string;
   orderNumber?: string;
+  lineId?: string;
   initialTab: string;
   mutations: ReturnType<typeof footerMutationHandlers>;
   onDispatch?: () => Promise<void>;
@@ -357,6 +347,7 @@ function SplitRunPopupTabs({
           factoryKey={factoryKey}
           orderId={orderId}
           orderNumber={orderNumber}
+          lineId={lineId}
           fixture={fixture}
           onDispatch={onDispatch}
           isDispatching={isDispatching}

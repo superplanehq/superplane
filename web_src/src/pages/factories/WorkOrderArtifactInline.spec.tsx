@@ -40,9 +40,27 @@ describe("WorkOrderArtifactInline", () => {
     const link = screen.getByRole("link");
     expect(link).toHaveAttribute("href", "https://github.com/example/repo/tree/feature/refund-retry");
     expect(link).toHaveTextContent("feature/refund-retry");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("renders a branch artifact without a url as plain text", () => {
+  it("links a branch stored with a repository but no url", () => {
+    render(
+      <WorkOrderArtifactInline
+        artifact={{
+          id: "branch-from-repository",
+          type: "TYPE_BRANCH",
+          data: { name: "feature/refund-retry", repository: "example/repo" },
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "https://github.com/example/repo/tree/feature/refund-retry");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  it("renders a branch artifact with neither url nor repository as plain text", () => {
     render(
       <WorkOrderArtifactInline
         artifact={{

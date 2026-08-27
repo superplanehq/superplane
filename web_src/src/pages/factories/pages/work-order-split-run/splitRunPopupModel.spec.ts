@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import {
   DRAFT_WORK_ORDER,
@@ -20,6 +21,8 @@ import {
   splitRunDescriptionMarkdown,
   splitRunLinkedArtifacts,
   splitRunLogTabDotClass,
+  splitRunPhaseAutomationHref,
+  splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
@@ -70,6 +73,40 @@ describe("splitRunPopupModel", () => {
         fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER),
       }),
     ).toBeNull();
+  });
+
+  it("opens the split-run page for a phase automation", () => {
+    const fixture = splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER);
+    const prCreation = fixture.phases.find((phase) => phase.id === "pr-creation-2");
+    expect(prCreation?.appId).toBe("app-pr-closure");
+
+    expect(
+      splitRunPhaseRunHref({
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        phase: prCreation!,
+      }),
+    ).toBe(
+      factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
+        from: "work-order",
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        canvas: "closure",
+      }),
+    );
+    expect(
+      splitRunPhaseAutomationHref({
+        organizationId: FACTORIES_ORGANIZATION_ID,
+        factoryKey: PRIMARY_FACTORY_KEY,
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        phase: prCreation!,
+      }),
+    ).toBe(
+      factoryAppConfigurePath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+      }),
+    );
+    expect(splitRunPhaseRunHref({ phase: prCreation! })).toBeUndefined();
   });
 
   it("opens the description tab for drafts and done cards, and the log for later states", () => {

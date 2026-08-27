@@ -423,16 +423,44 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Inbox");
   });
 
-  it("labels phase Edit as Edit Automation", async () => {
+  it("offers full-screen automation editing and inline agent editing", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
-    await user.keyboard("{Escape}");
+    expect(screen.getByTestId("lines-phase-menu-0-edit-agent")).toHaveTextContent("Edit Agent");
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
+  });
+
+  it("opens the agent editor with the agent name as the title", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+
+    expect(screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" })).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  it("keeps Backlog Edit as the only edit action", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.getByTestId("lines-backlog-menu-edit")).toHaveTextContent("Edit");
+    expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
   });
 

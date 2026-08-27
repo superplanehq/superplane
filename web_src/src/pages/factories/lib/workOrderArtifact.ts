@@ -45,6 +45,27 @@ export function extractArtifactUrl(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "url") ?? extractArtifactField(data, "html_url");
 }
 
+/**
+ * Browse URL for a branch artifact that carries no `url`. The Add Work Order
+ * Artifact component writes a tree URL at attach time, so this only covers
+ * branches attached before that: they hold `repository` (`owner/repo` or a
+ * repository http(s) URL) plus the branch `name`.
+ */
+export function branchTreeUrl(data: ArtifactData): string | undefined {
+  const repository = extractArtifactField(data, "repository") ?? extractArtifactField(data, "repo");
+  const branch = extractArtifactName(data)?.trim();
+  if (!repository || !branch) {
+    return undefined;
+  }
+
+  const path = branch.split("/").map(encodeURIComponent).join("/");
+  const repo = repository.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(repo)) {
+    return treeUrlFromRepositoryUrl(repo, path);
+  }
+  return /^[^/\s]+\/[^/\s]+$/.test(repo) ? `https://github.com/${repo}/tree/${path}` : undefined;
+}
+
 export function extractArtifactTitle(data: ArtifactData): string | undefined {
   return extractArtifactField(data, "title");
 }
@@ -115,6 +136,23 @@ export function overlayLiveArtifactData<T extends { id?: string; data?: Record<s
 ): T {
   const liveData = artifact.id ? latestById.get(artifact.id) : undefined;
   return liveData ? { ...artifact, data: liveData } : artifact;
+}
+
+// A repository URL can carry credentials, a query, or a fragment
+// (`https://oauth2:token@host/acme/repo?tab=readme`). Drop those before the
+// branch path lands in an href, the same way the backend does.
+function treeUrlFromRepositoryUrl(repository: string, branchPath: string): string | undefined {
+  try {
+    const parsed = new URL(repository);
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+    parsed.pathname = `${parsed.pathname.replace(/\/+$/, "")}/tree/${branchPath}`;
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
 }
 
 function readPrArtifactStateField(data: ArtifactData): PrArtifactState | undefined {
