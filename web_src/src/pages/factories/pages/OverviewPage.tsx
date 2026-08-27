@@ -8,13 +8,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import {
-  factoryHomePath,
-  factoryLineDetailPath,
-  firstFactoryLineId,
-  linesPath,
-  workOrdersPath,
-} from "../lib/factoryPagePaths";
+import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import {
   factoryCardClassName,
@@ -169,7 +163,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={linesPath(organizationId, factoryKey)}
+          to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId({ lines }))}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >

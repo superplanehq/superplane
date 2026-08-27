@@ -1,9 +1,10 @@
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, Maximize2, Pencil } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { Link } from "@/components/Link/link";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -281,6 +282,8 @@ export function PhaseLogCard({
   onSelectNode,
   onStop,
   onRerun,
+  runHref,
+  editHref,
   actionBusy = false,
   collapsible = true,
   organizationId,
@@ -295,6 +298,10 @@ export function PhaseLogCard({
   onStop?: () => void;
   onRerun?: () => void;
   actionBusy?: boolean;
+  /** Full-screen run page with the log in the sidebar. */
+  runHref?: string;
+  /** Configure URL of the automation that owns the phase. */
+  editHref?: string;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -336,6 +343,8 @@ export function PhaseLogCard({
           onToggle={onToggle}
           onStop={onStop}
           onRerun={onRerun}
+          runHref={runHref}
+          editHref={editHref}
           actionBusy={actionBusy}
         />
 
@@ -369,6 +378,8 @@ function AutomationHeader({
   onToggle,
   onStop,
   onRerun,
+  runHref,
+  editHref,
   actionBusy,
 }: {
   phase: SplitRunPhase;
@@ -378,6 +389,8 @@ function AutomationHeader({
   onToggle?: () => void;
   onStop?: () => void;
   onRerun?: () => void;
+  runHref?: string;
+  editHref?: string;
   actionBusy: boolean;
 }) {
   return (
@@ -406,6 +419,7 @@ function AutomationHeader({
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </div>
       )}
+      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
       {producedArtifacts.length > 0 ? (
         <span
           data-testid={`split-run-phase-artifacts-${phase.id}`}
@@ -452,6 +466,31 @@ function automationAccent(status: SplitRunPhaseStatus): string {
   return "border-l-border";
 }
 
+const PHASE_ACTION_PILL =
+  "inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-card px-1.5 py-0.5 font-sans text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
+
+function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; runHref?: string; editHref?: string }) {
+  if (!runHref && !editHref) {
+    return null;
+  }
+  return (
+    <>
+      {runHref ? (
+        <Link href={runHref} data-testid={`split-run-phase-run-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Maximize2 className="size-2.5" aria-hidden />
+          View Automation Run
+        </Link>
+      ) : null}
+      {editHref ? (
+        <Link href={editHref} data-testid={`split-run-phase-edit-${phase.id}`} className={PHASE_ACTION_PILL}>
+          <Pencil className="size-2.5" aria-hidden />
+          Edit Automation
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
 function StreamDuration({ line }: { line: SplitRunStreamLine }) {
   return (
     <LogStatusTime status={line.status} duration={line.duration} testId={`split-run-stream-duration-${line.id}`} />
@@ -480,7 +519,7 @@ function LogStatusTime({
       data-testid={testId}
       aria-label={running ? "Running" : undefined}
       className={cn(
-        "ml-auto shrink-0 rounded-sm px-1.5 text-right text-[12px] leading-[1.125rem] tabular-nums [font-feature-settings:'zero']",
+        "shrink-0 rounded-sm px-1.5 text-right text-[12px] leading-[1.125rem] tabular-nums [font-feature-settings:'zero']",
         statusTimeTone(status),
       )}
     >
@@ -608,8 +647,10 @@ function StreamNodeHeader({
           {name}
         </div>
       )}
-      {artifact ? <StreamArtifact artifact={artifact} /> : null}
-      <StreamDuration line={line} />
+      <span className="ml-auto flex min-w-0 shrink-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap">
+        {artifact ? <StreamArtifact artifact={artifact} /> : null}
+        <StreamDuration line={line} />
+      </span>
     </div>
   );
 }

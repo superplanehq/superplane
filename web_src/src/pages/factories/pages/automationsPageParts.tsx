@@ -107,7 +107,7 @@ export function AutomationCard({
   );
 }
 
-/** Shared with the lines list-card menu so both overflow menus stay pixel-for-pixel in sync. */
+/** Overflow menu chrome for automation cards. */
 export const overflowMenuContentClassName = "min-w-[12rem] rounded-xl border-border p-1 shadow-lg";
 export const overflowMenuItemClassName = "cursor-pointer rounded-md px-2 py-1.5 text-[13px] [&_svg]:size-3.5";
 const overflowMenuDestructiveItemClassName =
