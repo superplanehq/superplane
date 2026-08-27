@@ -47,6 +47,24 @@ describe("autoExpandedPhaseId", () => {
     expect(autoExpandedPhaseId(fixture)).toBe("pr-creation-2");
   });
 
+  it("expands the oldest active PR feedback run", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          run: {
+            id: "run-fb",
+            title: "Address feedback on PR #12",
+            status: "STATUS_QUEUED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(autoExpandedPhaseId(fixture)).toBe("pr-feedback-run-fb");
+  });
+
   it("does not expand a passed current step while the order waits", () => {
     const fixture = splitRunFixtureForWorkOrder({
       ...OPEN_WORK_ORDER,

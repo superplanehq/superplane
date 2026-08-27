@@ -69,6 +69,21 @@ describe("fixtureForSplitRunPage", () => {
     expect(names).not.toContain("#503");
     expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
   });
+
+  it("appends PR feedback runs from the live overlay", () => {
+    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
+      {
+        canvasId: "canvas-fb",
+        run: { id: "run-fb", title: "Address feedback on PR #12", status: "STATUS_PASSED" },
+      },
+    ]);
+
+    expect(fixture?.phases.some((phase) => phase.id === "pr-feedback-run-fb")).toBe(true);
+    expect(fixture?.phases.find((phase) => phase.id === "pr-feedback-run-fb")).toMatchObject({
+      appId: "canvas-fb",
+      runId: "run-fb",
+    });
+  });
 });
 
 describe("phaseForSplitRunCanvas", () => {
@@ -78,6 +93,16 @@ describe("phaseForSplitRunCanvas", () => {
 
   it("uses the current phase when the canvas key is missing", () => {
     expect(phaseForSplitRunCanvas({ ...SPLIT_RUN_RUNNING, currentPhaseId: "plan" }).id).toBe("plan");
+  });
+
+  it("picks the phase whose run id matches the URL", () => {
+    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
+      {
+        canvasId: "canvas-fb",
+        run: { id: "run-fb", title: "Address feedback on PR #12", status: "STATUS_PASSED" },
+      },
+    ]);
+    expect(phaseForSplitRunCanvas(fixture, "implementation", "run-fb").id).toBe("pr-feedback-run-fb");
   });
 
   it("falls back to implement when the fixture is missing", () => {

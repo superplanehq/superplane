@@ -31,7 +31,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { addressingPRFeedbackNote } from "../prFeedbackSettingsModel";
+import { prFeedbackRunTitle, statusForPRFeedbackRun, type PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
   doneFooterForStatus,
@@ -276,8 +276,8 @@ export type SplitRunFixtureOptions = {
   lineId?: string | null;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
-  /** Overlay the Verify card while a PR feedback run is queued or running. */
-  prFeedbackRunHref?: string;
+  /** PR-feedback canvas runs for this work order, shown as extra Log phases. */
+  prFeedbackRuns?: PRFeedbackLogRun[];
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -295,7 +295,11 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
-  const phases = phasesForOrder(order, executions, options?.checks, demoArtifacts);
+  const phases = [
+    ...phasesForOrder(order, executions, options?.checks, demoArtifacts),
+    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
+  ];
+  const activeFeedbackPhaseId = activePRFeedbackPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Work order",
     descriptionText: order.description ?? "",
@@ -308,7 +312,9 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
-    currentPhaseId: current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? ""),
+    currentPhaseId:
+      activeFeedbackPhaseId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
+    openPhaseId: activeFeedbackPhaseId,
     phases,
     source: splitRunSourceForOrder(order),
     ...reviewSurfaces(order, displayStatus, {
@@ -316,7 +322,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
-      prFeedbackRunHref: options?.prFeedbackRunHref,
+      addressingFeedback: Boolean(activeFeedbackPhaseId),
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -333,7 +339,7 @@ function reviewSurfaces(
     phases: SplitRunPhase[];
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
-    prFeedbackRunHref?: string;
+    addressingFeedback?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -356,7 +362,7 @@ function reviewSurfaces(
     return failedReviewSurface(current, displayStatus, checks);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.prFeedbackRunHref);
+    return waitingReviewSurface(order, displayStatus, checks, input.addressingFeedback);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -396,11 +402,9 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
-  prFeedbackRunHref?: string,
+  addressingFeedback?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  const notes = prFeedbackRunHref
-    ? [addressingPRFeedbackNote(prFeedbackRunHref)]
-    : presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  const notes = addressingFeedback ? [] : presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
@@ -477,6 +481,55 @@ function phasesForOrder(
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
   ];
+}
+
+function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[]): SplitRunPhase[] {
+  return [...runs]
+    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""))
+    .map(prFeedbackRunToPhase);
+}
+
+function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | undefined {
+  return phases.find(
+    (phase) => phase.id.startsWith("pr-feedback-") && (phase.status === "running" || phase.status === "pending"),
+  )?.id;
+}
+
+function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
+  const status = statusForPRFeedbackRun(entry.run.status);
+  const name = prFeedbackRunTitle(entry.run);
+  const componentName = entry.handlerName?.trim() || "Address PR feedback";
+  const duration = durationForExecution(
+    {
+      createdAt: entry.run.createdAt ?? entry.run.startedAt,
+      updatedAt: entry.run.finishedAt ?? entry.run.createdAt ?? entry.run.startedAt,
+    },
+    status,
+  );
+  const line: SplitRunStreamLine = {
+    id: entry.run.id ?? name,
+    at: clockLabel(entry.run.startedAt ?? entry.run.createdAt),
+    componentName,
+    status,
+    duration,
+    kind: "action",
+    componentType: componentName,
+    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    iconSlug: "box",
+  };
+  return {
+    id: `pr-feedback-${entry.run.id}`,
+    name,
+    status,
+    duration,
+    componentName,
+    artifacts: [],
+    stream: [line],
+    canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+    appId: entry.canvasId,
+    runId: entry.run.id,
+  };
 }
 
 function sourcePhasesForOrder(

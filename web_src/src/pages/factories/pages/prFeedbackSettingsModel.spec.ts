@@ -4,17 +4,78 @@ import type { FactoriesFactoryPrFeedbackHandlerRun } from "@/api-client";
 
 import {
   activePRFeedbackWorkOrderIds,
-  addressingPRFeedbackNote,
   isActivePRFeedbackRunStatus,
+  matchPRFeedbackRunsForWorkOrder,
   oldestActivePRFeedbackRun,
   prFeedbackDraftFromHandler,
   prFeedbackDraftIsValid,
+  statusForPRFeedbackRun,
 } from "./prFeedbackSettingsModel";
 import { matchOldestActivePRFeedbackRun } from "./useWorkOrderPRFeedbackRunHref";
 
 function run(overrides: FactoriesFactoryPrFeedbackHandlerRun): FactoriesFactoryPrFeedbackHandlerRun {
   return overrides;
 }
+
+describe("matchPRFeedbackRunsForWorkOrder", () => {
+  it("returns matching runs oldest first and skips other work orders", () => {
+    const matches = matchPRFeedbackRunsForWorkOrder(
+      [
+        { id: "h-1", canvasId: "c-1" },
+        { id: "h-2", canvasId: "c-2" },
+      ],
+      [
+        [
+          run({
+            id: "later",
+            workOrderId: "wo-1",
+            status: "STATUS_RUNNING",
+            createdAt: "2026-08-26T12:00:00Z",
+          }),
+          run({
+            id: "other",
+            workOrderId: "wo-2",
+            status: "STATUS_PASSED",
+            createdAt: "2026-08-26T08:00:00Z",
+          }),
+        ],
+        [
+          run({
+            id: "older",
+            workOrderId: "wo-1",
+            status: "STATUS_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          }),
+        ],
+      ],
+      "wo-1",
+    );
+
+    expect(matches.map((match) => match.run.id)).toEqual(["older", "later"]);
+    expect(matches[0]?.handler.id).toBe("h-2");
+  });
+
+  it("skips runs without an id", () => {
+    expect(
+      matchPRFeedbackRunsForWorkOrder(
+        [{ id: "h-1", canvasId: "c-1" }],
+        [[run({ workOrderId: "wo-1", status: "STATUS_PASSED", createdAt: "2026-08-26T11:00:00Z" })]],
+        "wo-1",
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("statusForPRFeedbackRun", () => {
+  it("maps handler run status onto log phase status", () => {
+    expect(statusForPRFeedbackRun("STATUS_QUEUED")).toBe("pending");
+    expect(statusForPRFeedbackRun("STATUS_RUNNING")).toBe("running");
+    expect(statusForPRFeedbackRun("STATUS_PASSED")).toBe("passed");
+    expect(statusForPRFeedbackRun("STATUS_FAILED")).toBe("failed");
+    expect(statusForPRFeedbackRun("STATUS_CANCELLED")).toBe("failed");
+    expect(statusForPRFeedbackRun("STATUS_UNSPECIFIED")).toBe("pending");
+  });
+});
 
 describe("oldestActivePRFeedbackRun", () => {
   it("returns the oldest queued or running run for the work order", () => {
@@ -81,17 +142,6 @@ describe("activePRFeedbackWorkOrderIds", () => {
         [run({ id: "c", workOrderId: "wo-3", status: "STATUS_QUEUED" })],
       ]),
     ).toEqual(new Set(["wo-1", "wo-3"]));
-  });
-});
-
-describe("addressingPRFeedbackNote", () => {
-  it("links the overlay to the oldest active run", () => {
-    expect(addressingPRFeedbackNote("/org-1/workspaces/SP/apps/app-1?run=run-9")).toEqual({
-      key: "pr-feedback-active",
-      headline: "Addressing PR feedback",
-      text: "SuperPlane is applying the current pull request feedback.",
-      cta: { label: "Open the run", href: "/org-1/workspaces/SP/apps/app-1?run=run-9" },
-    });
   });
 });
 

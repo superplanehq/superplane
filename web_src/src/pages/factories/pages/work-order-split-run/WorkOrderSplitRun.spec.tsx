@@ -82,6 +82,29 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: "Open automation run" })).not.toBeInTheDocument();
   });
 
+  it("lists PR feedback runs on the Log tab after line steps", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-fb",
+            handlerName: "Address PR feedback",
+            run: {
+              id: "run-fb",
+              title: "Address feedback on PR #12",
+              status: "STATUS_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    await openLogTab(user);
+    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Address feedback on PR #12");
+  });
+
   it("does not put an Open work order link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),

@@ -744,16 +744,118 @@ describe("line board work-order examples", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
   });
 
-  it("overlays Addressing PR feedback while a matching run is active", () => {
+  it("hides the waiting review note while a PR feedback run is active", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
-      prFeedbackRunHref: "/org-1/workspaces/SP/apps/fb-1?run=run-9",
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          run: {
+            id: "run-9",
+            title: "Address feedback on PR #6812",
+            status: "STATUS_RUNNING",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
     });
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Addressing PR feedback"]);
-    expect(fixture.waitingNotes[0]?.cta).toEqual({
-      label: "Open the run",
-      href: "/org-1/workspaces/SP/apps/fb-1?run=run-9",
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.note?.headline).not.toBe("Addressing PR feedback");
+    expect(fixture.waitingNotes.map((note) => note.headline)).not.toContain("Waiting for user review");
+  });
+
+  it("appends matching PR feedback runs after line steps, oldest first", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          handlerName: "Address PR feedback",
+          run: {
+            id: "run-new",
+            title: "Address feedback on PR #6812",
+            workOrderId: LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id,
+            status: "STATUS_RUNNING",
+            createdAt: "2026-08-26T12:00:00Z",
+            startedAt: "2026-08-26T12:00:00Z",
+          },
+        },
+        {
+          canvasId: "canvas-fb",
+          handlerName: "Address PR feedback",
+          run: {
+            id: "run-old",
+            pullRequestNumber: "6812",
+            workOrderId: LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id,
+            status: "STATUS_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            startedAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
     });
-    expect(fixture.footer.note?.headline).toBe("Addressing PR feedback");
+    const feedback = fixture.phases.filter((phase) => phase.id.startsWith("pr-feedback-"));
+
+    expect(feedback.map((phase) => phase.id)).toEqual(["pr-feedback-run-old", "pr-feedback-run-new"]);
+    expect(feedback[0]).toMatchObject({
+      name: "Address feedback on PR #6812",
+      status: "passed",
+      appId: "canvas-fb",
+      runId: "run-old",
+      componentName: "Address PR feedback",
+    });
+    expect(feedback[1]).toMatchObject({
+      name: "Address feedback on PR #6812",
+      status: "running",
+      appId: "canvas-fb",
+      runId: "run-new",
+    });
+    expect(fixture.phases.at(-1)?.id).toBe("pr-feedback-run-new");
+    expect(fixture.currentPhaseId).toBe("pr-feedback-run-new");
+    expect(fixture.openPhaseId).toBe("pr-feedback-run-new");
+  });
+
+  it("leaves line-step current phase when PR feedback runs already finished", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          run: {
+            id: "run-done",
+            title: "Address feedback on PR #6812",
+            workOrderId: LINE_BOARD_VERIFY_PR_REVIEW_ORDER.id,
+            status: "STATUS_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.some((phase) => phase.id === "pr-feedback-run-done")).toBe(true);
+    expect(fixture.currentPhaseId).not.toMatch(/^pr-feedback-/);
+    expect(fixture.openPhaseId).toBeUndefined();
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
+    expect(fixture.footer.attentionCard).toBe(true);
+  });
+
+  it("uses the canvas run span for PR feedback phase duration", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          run: {
+            id: "run-span",
+            title: "Address feedback on PR #6812",
+            status: "STATUS_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            startedAt: "2026-08-26T11:04:50Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-span")?.duration).toBe("5m");
   });
 
   it("keeps ingest analysis and the merged receipts pull request on the done card", () => {

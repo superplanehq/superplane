@@ -1,8 +1,6 @@
 import type { FactoriesFactoryPrFeedbackHandler, FactoriesFactoryPrFeedbackHandlerRun } from "@/api-client";
 import { formatTimeAgo } from "@/lib/date";
 
-import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
-
 export type PRFeedbackSettingsTab = "general" | "runs" | "automation";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
@@ -121,6 +119,31 @@ export function activePRFeedbackWorkOrderIds(
   return ids;
 }
 
+export type PRFeedbackRunMatch = {
+  handler: FactoriesFactoryPrFeedbackHandler;
+  run: FactoriesFactoryPrFeedbackHandlerRun;
+};
+
+export type PRFeedbackLogRun = {
+  canvasId: string;
+  handlerName?: string;
+  run: FactoriesFactoryPrFeedbackHandlerRun;
+};
+
+export function matchPRFeedbackRunsForWorkOrder(
+  handlers: FactoriesFactoryPrFeedbackHandler[],
+  runsByHandler: FactoriesFactoryPrFeedbackHandlerRun[][],
+  workOrderId: string,
+): PRFeedbackRunMatch[] {
+  return handlers
+    .flatMap((handler, index) =>
+      (runsByHandler[index] ?? [])
+        .filter((run) => Boolean(run.id) && run.workOrderId === workOrderId)
+        .map((run) => ({ handler, run })),
+    )
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+}
+
 export function oldestActivePRFeedbackRun(
   runs: FactoriesFactoryPrFeedbackHandlerRun[],
   workOrderId: string,
@@ -134,13 +157,19 @@ export function oldestActivePRFeedbackRun(
   return [...active].sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))[0];
 }
 
-export function addressingPRFeedbackNote(runHref: string): WorkOrderStatusNotePresentation {
-  return {
-    key: "pr-feedback-active",
-    headline: "Addressing PR feedback",
-    text: "SuperPlane is applying the current pull request feedback.",
-    cta: { label: "Open the run", href: runHref },
-  };
+export function statusForPRFeedbackRun(
+  status: FactoriesFactoryPrFeedbackHandlerRun["status"],
+): "passed" | "running" | "pending" | "failed" {
+  if (status === "STATUS_RUNNING") {
+    return "running";
+  }
+  if (status === "STATUS_PASSED") {
+    return "passed";
+  }
+  if (status === "STATUS_FAILED" || status === "STATUS_CANCELLED") {
+    return "failed";
+  }
+  return "pending";
 }
 
 export function prFeedbackRunStatusLabel(status: FactoriesFactoryPrFeedbackHandlerRun["status"]): string {

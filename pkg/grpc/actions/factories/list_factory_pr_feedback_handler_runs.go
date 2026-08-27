@@ -128,12 +128,8 @@ func serializePRFeedbackRuns(
 		if run.CreatedAt != nil {
 			serializedRun.CreatedAt = timestamppb.New(*run.CreatedAt)
 		}
-		if runner, ok := context.runners[run.ID]; ok {
-			if runner.State == models.CanvasNodeExecutionStateStarted || runner.State == models.CanvasNodeExecutionStateFinished {
-				if runner.UpdatedAt != nil {
-					serializedRun.StartedAt = timestamppb.New(*runner.UpdatedAt)
-				}
-			}
+		if startedAt := prFeedbackRunStartedAt(run, context.runners[run.ID]); startedAt != nil {
+			serializedRun.StartedAt = startedAt
 		}
 		if run.FinishedAt != nil {
 			serializedRun.FinishedAt = timestamppb.New(*run.FinishedAt)
@@ -285,6 +281,16 @@ func prFeedbackPullRequestNumber(payload map[string]any) int64 {
 		return number
 	}
 	return 0
+}
+
+func prFeedbackRunStartedAt(run models.CanvasRun, runner models.CanvasNodeExecution) *timestamppb.Timestamp {
+	if runner.CreatedAt != nil {
+		return timestamppb.New(*runner.CreatedAt)
+	}
+	if run.CreatedAt != nil {
+		return timestamppb.New(*run.CreatedAt)
+	}
+	return nil
 }
 
 func prFeedbackRunStatus(run models.CanvasRun, runner models.CanvasNodeExecution) pb.FactoryPRFeedbackHandlerRun_Status {

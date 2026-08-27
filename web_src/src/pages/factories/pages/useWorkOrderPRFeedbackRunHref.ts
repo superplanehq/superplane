@@ -6,69 +6,62 @@ import {
 } from "@/hooks/useFactoryPRFeedbackData";
 import { useQueries } from "@tanstack/react-query";
 
-import { factoryAppRunPath } from "../lib/factoryPagePaths";
-import { activePRFeedbackWorkOrderIds, oldestActivePRFeedbackRun } from "./prFeedbackSettingsModel";
+import {
+  activePRFeedbackWorkOrderIds,
+  isActivePRFeedbackRunStatus,
+  matchPRFeedbackRunsForWorkOrder,
+  type PRFeedbackLogRun,
+  type PRFeedbackRunMatch,
+} from "./prFeedbackSettingsModel";
 
-export function useActivePRFeedbackWorkOrderIds(organizationId: string, factoryId: string): ReadonlySet<string> {
+function useFactoryPRFeedbackRunLists(organizationId: string, factoryId: string, enabled = true) {
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const handlers = handlersQuery.data ?? [];
   const runQueries = useQueries({
     queries: handlers.map((handler) => ({
       queryKey: factoryPRFeedbackHandlerRunsKey(organizationId, factoryId, handler.id ?? ""),
       queryFn: () => fetchFactoryPRFeedbackHandlerRuns(organizationId, factoryId, handler.id ?? ""),
-      enabled: Boolean(organizationId && factoryId && handler.id),
+      enabled: Boolean(organizationId && factoryId && handler.id) && enabled,
       refetchInterval: 10_000,
     })),
   });
-  return activePRFeedbackWorkOrderIds(runQueries.map((query) => query.data ?? []));
+  return { handlers, runsByHandler: runQueries.map((query) => query.data ?? []) };
 }
 
-export function useWorkOrderPRFeedbackRunHref(
+export function useActivePRFeedbackWorkOrderIds(organizationId: string, factoryId: string): ReadonlySet<string> {
+  const { runsByHandler } = useFactoryPRFeedbackRunLists(organizationId, factoryId);
+  return activePRFeedbackWorkOrderIds(runsByHandler);
+}
+
+export function useWorkOrderPRFeedbackLog(
   organizationId: string,
   factoryId: string,
-  factoryKey: string,
   workOrderId: string | undefined,
-): string | undefined {
-  const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
-  const handlers = handlersQuery.data ?? [];
-  const runQueries = useQueries({
-    queries: handlers.map((handler) => ({
-      queryKey: factoryPRFeedbackHandlerRunsKey(organizationId, factoryId, handler.id ?? ""),
-      queryFn: () => fetchFactoryPRFeedbackHandlerRuns(organizationId, factoryId, handler.id ?? ""),
-      enabled: Boolean(organizationId && factoryId && handler.id && workOrderId),
-      refetchInterval: 10_000,
-    })),
-  });
-
-  if (!workOrderId) {
-    return undefined;
-  }
-
-  const match = matchOldestActivePRFeedbackRun(
-    handlers,
-    runQueries.map((query) => query.data ?? []),
-    workOrderId,
+): PRFeedbackLogRun[] {
+  const { handlers, runsByHandler } = useFactoryPRFeedbackRunLists(
+    organizationId,
+    factoryId,
+    Boolean(organizationId && factoryId && workOrderId),
   );
-  if (!match?.run.id || !match.handler.canvasId) {
-    return undefined;
+  if (!workOrderId) {
+    return [];
   }
-
-  return factoryAppRunPath(organizationId, factoryKey, match.handler.canvasId, match.run.id, { from: "work-order" });
+  return matchPRFeedbackRunsForWorkOrder(handlers, runsByHandler, workOrderId).flatMap(splitRunPRFeedbackRunFromMatch);
 }
 
 export function matchOldestActivePRFeedbackRun(
   handlers: FactoriesFactoryPrFeedbackHandler[],
   runsByHandler: FactoriesFactoryPrFeedbackHandlerRun[][],
   workOrderId: string,
-): { handler: FactoriesFactoryPrFeedbackHandler; run: FactoriesFactoryPrFeedbackHandlerRun } | undefined {
-  const candidates = handlers.flatMap((handler, index) => {
-    const run = oldestActivePRFeedbackRun(runsByHandler[index] ?? [], workOrderId);
-    return run ? [{ handler, run }] : [];
-  });
-  if (candidates.length === 0) {
-    return undefined;
+): PRFeedbackRunMatch | undefined {
+  return matchPRFeedbackRunsForWorkOrder(handlers, runsByHandler, workOrderId).find((match) =>
+    isActivePRFeedbackRunStatus(match.run.status),
+  );
+}
+
+function splitRunPRFeedbackRunFromMatch(match: PRFeedbackRunMatch): PRFeedbackLogRun[] {
+  if (!match.handler.canvasId || !match.run.id) {
+    return [];
   }
-  return [...candidates].sort(
-    (left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""),
-  )[0];
+  return [{ canvasId: match.handler.canvasId, handlerName: match.handler.name, run: match.run }];
 }

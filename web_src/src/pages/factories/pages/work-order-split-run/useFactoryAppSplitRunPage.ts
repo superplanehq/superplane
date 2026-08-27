@@ -8,7 +8,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { resolveFactoryAppCanvasSubtitle, resolveFactoryLineName } from "../../lib/factoryAppCanvasCopy";
 import { resolveFactoryAppBackNav } from "../../lib/factoryAppNav";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../../lib/factoryPagePaths";
-import { useWorkOrderPRFeedbackRunHref } from "../useWorkOrderPRFeedbackRunHref";
+import { useWorkOrderPRFeedbackLog } from "../useWorkOrderPRFeedbackRunHref";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { canvasKeyForAutomation } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
@@ -47,15 +47,15 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
-  const prFeedbackRunHref = useWorkOrderPRFeedbackRunHref(organizationId, factoryId, factoryKey, order?.id);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(organizationId, factoryId, order?.id);
   const fixture = useMemo(
-    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRunHref),
-    [order, orderChecks, prFeedbackRunHref, query.lineId],
+    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
+    [order, orderChecks, prFeedbackRuns, query.lineId],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
-    () => splitRunPhaseOnRoute(phaseForSplitRunCanvas(fixture, canvasKey), appId),
-    [appId, canvasKey, fixture],
+    () => splitRunPhaseOnRoute(phaseForSplitRunCanvas(fixture, canvasKey, query.runId), appId),
+    [appId, canvasKey, fixture, query.runId],
   );
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);

@@ -104,7 +104,7 @@ import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import { isPRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
-import { useActivePRFeedbackWorkOrderIds, useWorkOrderPRFeedbackRunHref } from "./useWorkOrderPRFeedbackRunHref";
+import { useActivePRFeedbackWorkOrderIds, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
@@ -541,7 +541,7 @@ function LineBoardSplitRunPopup({
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
-  const prFeedbackRunHref = useWorkOrderPRFeedbackRunHref(organizationId, factoryId, factoryKey, peekOrderId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(organizationId, factoryId, peekOrderId);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -555,7 +555,7 @@ function LineBoardSplitRunPopup({
         checks: peekChecks,
         lineId,
         demoArtifacts: false,
-        prFeedbackRunHref,
+        prFeedbackRuns,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
