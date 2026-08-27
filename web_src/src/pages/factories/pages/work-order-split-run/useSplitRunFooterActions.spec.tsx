@@ -49,14 +49,14 @@ describe("useSplitRunFooterActions", () => {
     vi.mocked(showErrorToast).mockReset();
   });
 
-  it("closes as rejected for Stop and Close", async () => {
+  it("closes as rejected for Reject", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     await result.current.handleStop("canceled", { kind: "waiting" });
 
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
     expect(cancelRunMock).not.toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as canceled.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
   });
 
   it("closes as completed for Stop and Complete", async () => {
@@ -113,6 +113,20 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Work order reopened.");
   });
 
+  it("stops a running automation without closing the work order", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
+
+    expect(cancelRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "app-implement", runId: "run-9" },
+      }),
+    );
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Automation stopped.");
+  });
+
   it("cancels the canvas run before closing a running order", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
@@ -130,14 +144,14 @@ describe("useSplitRunFooterActions", () => {
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
   });
 
-  it("deletes a draft from Reject", async () => {
+  it("closes a draft from Reject", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     const deleted = await result.current.handleReject();
 
     expect(deleted).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order deleted.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
   });
 
   it("does not mutate when the popup has no live order", async () => {

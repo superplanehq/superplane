@@ -43,6 +43,7 @@ export function PopupHeader({
   title,
   children,
   onClose,
+  actions,
   canEditTitle = false,
   titleBusy = false,
   onTitleSave,
@@ -50,39 +51,47 @@ export function PopupHeader({
   title: string;
   children?: ReactNode;
   onClose?: () => void;
+  actions?: ReactNode;
   canEditTitle?: boolean;
   titleBusy?: boolean;
   onTitleSave?: (next: string) => void;
 }) {
   return (
-    <header className="relative shrink-0 border-b border-border px-5 py-3 pr-12">
-      <div className="flex min-w-0 items-center gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
-          {canEditTitle && onTitleSave ? (
-            <ClickToRename
-              value={title}
-              onSave={onTitleSave}
-              canEdit={canEditTitle}
-              busy={titleBusy}
-              testId="popup-work-order-title"
-              ariaLabel="Work order title"
-              className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
-              inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
-            />
-          ) : (
-            title
-          )}
-        </h2>
+    <header className="relative shrink-0 border-b border-border px-5 py-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-3">
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+              {canEditTitle && onTitleSave ? (
+                <ClickToRename
+                  value={title}
+                  onSave={onTitleSave}
+                  canEdit={canEditTitle}
+                  busy={titleBusy}
+                  testId="popup-work-order-title"
+                  ariaLabel="Work order title"
+                  className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
+                  inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
+                />
+              ) : (
+                title
+              )}
+            </h2>
+          </div>
+          {children}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
+            aria-label="Close"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      {children}
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-        aria-label="Close"
-      >
-        <XIcon className="h-4 w-4" />
-      </button>
     </header>
   );
 }
