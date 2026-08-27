@@ -16,7 +16,7 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
-import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
+import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
   apiIssuesSource,
@@ -120,13 +120,15 @@ function useSectionSaves(args: {
       }),
     );
   };
-  const saveIssues = () => {
+  // The caller passes the source, because a selection made in the same render
+  // is not readable from the setup state yet.
+  const saveIssues = (source: IssuesChoiceId) => {
     const backlogRepository = args.setup.issuesRepo ?? args.setup.selectedRepo;
-    if (!backlogRepository || !args.setup.issuesChoice) return Promise.resolve(false);
+    if (!backlogRepository) return Promise.resolve(false);
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         backlogRepository,
-        issuesSource: apiIssuesSource(args.setup.issuesChoice),
+        issuesSource: apiIssuesSource(source),
       }),
     );
   };
