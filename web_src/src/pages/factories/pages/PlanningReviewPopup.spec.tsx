@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -74,6 +74,16 @@ describe("PlanningReviewPopup", () => {
 
     const note = screen.getByTestId("planning-review-automation-note");
     expect(within(note).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("places Environment and Model on one row under Steps", () => {
+    renderPopup();
+
+    const steps = screen.getByRole("heading", { name: "Steps" });
+    const row = screen.getByTestId("planning-review-environment-model-row");
+    expect(within(row).getByText("Environment")).toBeInTheDocument();
+    expect(within(row).getByText("Model")).toBeInTheDocument();
+    expect(steps.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows the runner component expanded", () => {
@@ -167,16 +177,39 @@ describe("PlanningReviewPopup", () => {
     expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
     await user.click(screen.getByTestId("planning-review-save"));
 
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        components: [
-          expect.objectContaining({
-            id: "implementation-agent",
-            concurrency: expect.objectContaining({ max: "8" }),
-          }),
-        ],
-      }),
-    );
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          components: [
+            expect.objectContaining({
+              id: "implementation-agent",
+              concurrency: expect.objectContaining({ max: "8" }),
+            }),
+          ],
+        }),
+      );
+    });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("keeps the popup open when save fails", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn().mockRejectedValue(new Error("stage failed"));
+    const user = userEvent.setup();
+    renderPopup({ onClose, onSave });
+
+    await user.click(screen.getByTestId("planning-review-save"));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("planning-review-save")).toBeInTheDocument();
+  });
+
+  it("shows a loading state instead of the mock agent", () => {
+    renderPopup({ isLoading: true, initialDraft: { title: "Editing Agent", components: [] } });
+
+    expect(screen.getByTestId("planning-review-loading")).toHaveTextContent("Loading agent…");
+    expect(screen.queryByText("Steps")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toBeDisabled();
   });
 });

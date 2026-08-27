@@ -10,7 +10,7 @@ import { useState } from "react";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import {
   PLANNING_REVIEW_ADVANCED_FIELD_NAMES,
-  PLANNING_REVIEW_FIELDS_ABOVE_STEPS,
+  PLANNING_REVIEW_ENVIRONMENT_MODEL_FIELDS,
   PLANNING_REVIEW_RUNNER_FIELDS,
 } from "./planningReviewRunnerFields";
 import { PlanningReviewStepList } from "./PlanningReviewStepList";
@@ -123,19 +123,21 @@ function RunnerConfiguration({
 
   return (
     <>
-      {fieldsNamed(PLANNING_REVIEW_FIELDS_ABOVE_STEPS).map((field) => (
-        <RunnerField
-          key={field.name}
-          field={field}
-          component={component}
-          organizationId={organizationId}
-          onChange={setConfigurationField}
-        />
-      ))}
       <PlanningReviewStepList
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
       />
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3" data-testid="planning-review-environment-model-row">
+        {fieldsNamed(PLANNING_REVIEW_ENVIRONMENT_MODEL_FIELDS).map((field) => (
+          <RunnerField
+            key={field.name}
+            field={field}
+            component={component}
+            organizationId={organizationId}
+            onChange={setConfigurationField}
+          />
+        ))}
+      </div>
       <div className="border-t border-border pt-4">
         <button
           type="button"

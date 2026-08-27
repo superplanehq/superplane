@@ -68,6 +68,16 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [] }),
 }));
 
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useCanvasData")>();
+  return {
+    ...actual,
+    useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
+    useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useCommitCanvasStaging: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  };
+});
+
 function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>

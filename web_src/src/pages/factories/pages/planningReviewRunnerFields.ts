@@ -69,7 +69,7 @@ const environmentVariableSchema: ConfigurationField[] = [
   },
 ];
 
-export const PLANNING_REVIEW_FIELDS_ABOVE_STEPS = ["machineType", "model"];
+export const PLANNING_REVIEW_ENVIRONMENT_MODEL_FIELDS = ["machineType", "model"];
 
 export const PLANNING_REVIEW_ADVANCED_FIELD_NAMES = [
   "workingDirectory",

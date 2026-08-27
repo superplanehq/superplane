@@ -46,38 +46,64 @@ export function PlanningReviewPopup({
   onSave,
   organizationId,
   automationHref,
+  isLoading = false,
 }: {
   onClose: () => void;
   initialDraft?: PlanningReviewDraft;
-  onSave?: (draft: PlanningReviewDraft) => void;
+  onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   organizationId?: string;
   automationHref?: string;
+  isLoading?: boolean;
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
+  const [isSaving, setIsSaving] = useState(false);
+
+  const title = isLoading ? "Editing Agent" : planningReviewPopupTitle(draft);
+  const saveDisabled = isLoading || isSaving || draft.components.length === 0;
+
+  const handleSave = async () => {
+    if (!onSave) {
+      onClose();
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onSave(draft);
+      onClose();
+    } catch {
+      // Caller reports the error and keeps this popup open.
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <PopupShell testId="lines-planning-review" fixed onDismiss={onClose}>
-      <PopupHeader title={planningReviewPopupTitle(draft)} onClose={onClose} />
+      <PopupHeader title={title} onClose={onClose} />
       <PopupBody className="bg-muted">
         <div className="flex flex-col gap-3">
           <AutomationNote href={automationHref} />
-          <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+          {isLoading ? (
+            <p className="px-1 py-6 text-[13px] text-muted-foreground" data-testid="planning-review-loading">
+              Loading agent…
+            </p>
+          ) : (
+            <PlanningReviewForm draft={draft} onChange={setDraft} organizationId={organizationId} />
+          )}
         </div>
       </PopupBody>
       <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
-        <Button type="button" size="sm" variant="outline" onClick={onClose}>
+        <Button type="button" size="sm" variant="outline" onClick={onClose} disabled={isSaving}>
           Cancel
         </Button>
         <Button
           type="button"
           size="sm"
-          onClick={() => {
-            onSave?.(draft);
-            onClose();
-          }}
+          onClick={() => void handleSave()}
+          disabled={saveDisabled}
           data-testid="planning-review-save"
         >
-          Save Agent
+          {isSaving ? "Saving…" : "Save Agent"}
         </Button>
       </footer>
     </PopupShell>
