@@ -212,9 +212,6 @@ check.db.migrations:
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
-check.build.storybook:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
-
 check.test.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
 
@@ -264,14 +261,11 @@ profile.goroutines:
 	$(COMPOSE) exec app curl -s "http://localhost:$${PPROF_PORT:-6060}/debug/pprof/goroutine?debug=2"
 
 
-storybook:
-	$(COMPOSE) exec app /bin/bash -c "cd web_src && npm install && npm run storybook"
-
 ui.setup:
 	npm install
 
 ui.start:
-	npm run storybook
+	npm run dev
 
 #
 # Database target helpers (require a running app container: `make dev.up`)

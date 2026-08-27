@@ -23,6 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 .tool-versions
-
-*storybook.log
-storybook-static
