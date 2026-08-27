@@ -133,11 +133,13 @@ describe("setup factory line apps", () => {
       "implementation-agent-no-issue",
       "create-draft-pr",
       "attach-pr-artifact",
+      "set-pr-closure-note",
     ]);
     expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
     expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-draft-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
     expect(implementation).toMatch(
       /id: attach-pr-artifact[\s\S]*artifactType: pr[\s\S]*state: open[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
     );
@@ -148,6 +150,7 @@ describe("setup factory line apps", () => {
       "implementation-agent-no-issue": 5,
       "create-draft-pr": 100,
       "attach-pr-artifact": 100,
+      "set-pr-closure-note": undefined,
     });
 
     const pr = materializeOnboardingApp("line-pr");
@@ -170,6 +173,17 @@ describe("setup factory line apps", () => {
     expect(pr).toContain("headline: Listening for user review");
     expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(pr).toContain("showOnlyWhenWaiting: true");
+  });
+
+  it("announces the PR-merge wait after the implement app attaches the pull request", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).toContain("component: setWorkOrderStatusNote");
+    expect(implementation).toContain("noteKey: pr-closure");
+    expect(implementation).toContain("headline: Listening for user review");
+    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data._links.html.href }}'");
+    expect(implementation).toContain("showOnlyWhenWaiting: true");
   });
 
   it("fails planning when the agent does not write the plan file", () => {
