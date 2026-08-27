@@ -28,10 +28,11 @@ import (
 )
 
 const (
-	DefaultAPIURL           = "http://localhost:8000"
-	ConfigKeyOutput         = "output"
-	ConfigKeyContexts       = "contexts"
-	ConfigKeyCurrentContext = "currentContext"
+	DefaultAPIURL            = "http://localhost:8000"
+	ConfigKeyOutput          = "output"
+	ConfigKeyContexts        = "contexts"
+	ConfigKeyCurrentContext  = "currentContext"
+	ConfigKeyLastUpdateCheck = "lastUpdateCheck"
 )
 
 var cfgFile string
