@@ -207,10 +207,10 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 }
 
-func serializeFactories(factories []models.Factory) []*pb.Factory {
+func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) []*pb.Factory {
 	result := make([]*pb.Factory, len(factories))
 	for i := range factories {
-		result[i] = serializeFactory(&factories[i])
+		result[i] = serializeFactoryWithLines(&factories[i], linesByFactory[factories[i].ID], nil)
 	}
 	return result
 }

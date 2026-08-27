@@ -152,6 +152,25 @@ func (f *Factory) ListLines(tx *gorm.DB) ([]FactoryLine, error) {
 	return lines, nil
 }
 
+func ListFactoryLinesByFactoryIDs(tx *gorm.DB, organizationID uuid.UUID, factoryIDs []uuid.UUID) ([]FactoryLine, error) {
+	if len(factoryIDs) == 0 {
+		return nil, nil
+	}
+
+	var lines []FactoryLine
+	err := tx.
+		Where("organization_id = ? AND factory_id IN ?", organizationID, factoryIDs).
+		Order("name ASC").
+		Order("id ASC").
+		Find(&lines).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return lines, nil
+}
+
 func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep) error {
 	updates := map[string]any{
 		"updated_at": time.Now(),
