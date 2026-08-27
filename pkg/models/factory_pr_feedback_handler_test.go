@@ -16,19 +16,40 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
+	createHandler := func(t *testing.T, factory *models.Factory, canvasID uuid.UUID) *models.FactoryPRFeedbackHandler {
+		t.Helper()
+		handler, err := factory.CreatePRFeedbackHandler(
+			db,
+			canvasID,
+			models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+			models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+		)
+		require.NoError(t, err)
+		return handler
+	}
+
 	t.Run("created handler takes its name from the canvas", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback")
 
-		handler, err := factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
+		handler := createHandler(t, factory, canvas.ID)
 		assert.Equal(t, canvas.ID, handler.CanvasID)
-		assert.Equal(t, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests, handler.Source)
+		assert.Equal(t, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, handler.Subject)
+		assert.Equal(t, models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, handler.Source)
 
 		found, err := factory.FindPRFeedbackHandler(db, handler.ID)
 		require.NoError(t, err)
 		assert.Equal(t, canvas.Name, found.Name())
+	})
+
+	t.Run("subject must be one we know how to change", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Unknown subject")
+
+		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, "gitlab-merge-request", models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion)
+		assert.ErrorIs(t, err, models.ErrFactoryPRFeedbackHandlerSubjectInvalid)
 	})
 
 	t.Run("source must be one we know how to run", func(t *testing.T) {
@@ -36,7 +57,7 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Unknown source")
 
-		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, "gitlab-merge-requests")
+		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, "status-checks")
 		assert.ErrorIs(t, err, models.ErrFactoryPRFeedbackHandlerSourceInvalid)
 	})
 
@@ -45,10 +66,13 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback")
 
-		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
-
-		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
+		_ = createHandler(t, factory, canvas.ID)
+		_, err = factory.CreatePRFeedbackHandler(
+			db,
+			canvas.ID,
+			models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+			models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+		)
 		assert.ErrorIs(t, err, models.ErrFactoryPRFeedbackHandlerCanvasInUse)
 	})
 
@@ -58,10 +82,8 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		first := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback")
 		second := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback (2)")
 
-		_, err = factory.CreatePRFeedbackHandler(db, first.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
-		_, err = factory.CreatePRFeedbackHandler(db, second.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
+		_ = createHandler(t, factory, first.ID)
+		_ = createHandler(t, factory, second.ID)
 
 		handlers, err := factory.ListPRFeedbackHandlers(db)
 		require.NoError(t, err)
@@ -76,8 +98,7 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		canvas := support.CreateFactoryCanvas(t, r, other.ID, "Address PR feedback")
-		_, err = other.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
+		_ = createHandler(t, other, canvas.ID)
 
 		handlers, err := factory.ListPRFeedbackHandlers(db)
 		require.NoError(t, err)
@@ -89,8 +110,7 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback")
 
-		handler, err := factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
+		handler := createHandler(t, factory, canvas.ID)
 		require.NoError(t, canvas.SoftDeleteInTransaction(db))
 
 		handlers, err := factory.ListPRFeedbackHandlers(db)
@@ -106,9 +126,7 @@ func Test__FactoryPRFeedbackHandler(t *testing.T) {
 		require.NoError(t, err)
 		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Address PR feedback")
 
-		_, err = factory.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
-		require.NoError(t, err)
-
+		_ = createHandler(t, factory, canvas.ID)
 		require.NoError(t, models.DeleteFactoryPRFeedbackHandlersByCanvas(db, canvas.ID))
 
 		var count int64

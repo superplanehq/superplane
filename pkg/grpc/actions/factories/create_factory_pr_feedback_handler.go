@@ -37,12 +37,21 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	repository := strings.TrimSpace(req.GetRepository())
+	repository := strings.TrimSpace(req.GetSettings().GetSubject().GetRepository())
 	if repository == "" {
 		repository = strings.TrimSpace(factory.OnboardingConfigValue().AppRepository)
 	}
 	if repository == "" {
 		return nil, factoryErrorToStatus(invalidArgument("repository is required"), "failed to create factory PR feedback handler")
+	}
+
+	subject, err := parseFactoryPRFeedbackHandlerSubject(req.GetSubject())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+	source, err := parseFactoryPRFeedbackHandlerSource(req.GetSource())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
 	name := strings.TrimSpace(req.GetName())
@@ -59,7 +68,7 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, err
 	}
 
-	handler, err := factory.CreatePRFeedbackHandler(db, canvasID, models.FactoryPRFeedbackHandlerSourceGitHubPullRequests)
+	handler, err := factory.CreatePRFeedbackHandler(db, canvasID, subject, source)
 	if err != nil {
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")

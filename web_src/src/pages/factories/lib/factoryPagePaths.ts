@@ -79,7 +79,7 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
 }
 
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
-/** Opens PR feedback settings on a tab: general, runs, or automation. */
+/** Opens PR feedback settings on a tab: general or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
 
 export function factoryPRFeedbackPath(

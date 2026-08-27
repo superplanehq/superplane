@@ -161,7 +161,9 @@ describe("provisionPRFeedbackHandler", () => {
   });
 
   it("leaves a handler for the same repository alone so a retry adds no second copy", async () => {
-    const listHandlers = vi.fn().mockResolvedValue([{ id: "handler-1", settings: { repository: "acme/app" } }]);
+    const listHandlers = vi
+      .fn()
+      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/app" } } }]);
     const createHandler = vi.fn();
 
     const handler = await provisionPRFeedbackHandler({
@@ -175,7 +177,9 @@ describe("provisionPRFeedbackHandler", () => {
   });
 
   it("creates a handler next to one that watches a different repository", async () => {
-    const listHandlers = vi.fn().mockResolvedValue([{ id: "handler-1", settings: { repository: "acme/other" } }]);
+    const listHandlers = vi
+      .fn()
+      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/other" } } }]);
     const createHandler = vi.fn().mockResolvedValue({ id: "handler-2" } as FactoriesFactoryPrFeedbackHandler);
 
     const handler = await provisionPRFeedbackHandler({

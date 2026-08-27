@@ -84,8 +84,8 @@ describe("factoryPRFeedbackPath", () => {
   });
 
   it("opens the line board on a settings tab", () => {
-    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", "runs")).toBe(
-      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackSettings=runs",
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackSettings=automation",
     );
   });
 

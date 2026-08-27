@@ -132,11 +132,6 @@ func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req
 	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
 }
 
-func (s *FactoryService) ListFactoryPRFeedbackHandlerRuns(ctx context.Context, req *pb.ListFactoryPRFeedbackHandlerRunsRequest) (*pb.ListFactoryPRFeedbackHandlerRunsResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.ListFactoryPRFeedbackHandlerRuns(ctx, organizationID, req)
-}
-
 func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)

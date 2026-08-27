@@ -152,7 +152,7 @@ export async function provisionPRFeedbackHandler(args: {
   repository: string;
 }): Promise<FactoriesFactoryPrFeedbackHandler> {
   const handlers = await args.listHandlers();
-  const existing = handlers.find((handler) => handler.settings?.repository === args.repository);
+  const existing = handlers.find((handler) => handler.settings?.subject?.repository === args.repository);
   if (existing) {
     return existing;
   }

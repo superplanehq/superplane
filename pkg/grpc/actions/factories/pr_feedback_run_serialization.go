@@ -1,13 +1,10 @@
 package factories
 
 import (
-	"context"
 	"encoding/json"
 	"strconv"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,78 +12,10 @@ import (
 )
 
 const (
-	defaultPRFeedbackRunsLimit = 50
-	maxPRFeedbackRunsLimit     = 200
-
 	prFeedbackEventComment = "github.prComment"
 	prFeedbackEventReview  = "github.prReview"
 	prFeedbackEventReply   = "github.prReviewComment"
 )
-
-func ListFactoryPRFeedbackHandlerRuns(
-	ctx context.Context,
-	organizationID string,
-	req *pb.ListFactoryPRFeedbackHandlerRunsRequest,
-) (*pb.ListFactoryPRFeedbackHandlerRunsResponse, error) {
-	orgID, err := parseOrganizationID(organizationID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	handlerID, err := parsePRFeedbackHandlerID(req.GetHandlerId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	handler, err := factory.FindPRFeedbackHandler(db, handlerID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	limit := int(req.GetLimit())
-	if limit <= 0 {
-		limit = defaultPRFeedbackRunsLimit
-	}
-	if limit > maxPRFeedbackRunsLimit {
-		limit = maxPRFeedbackRunsLimit
-	}
-
-	var before *time.Time
-	if req.Before != nil {
-		beforeTime := req.GetBefore().AsTime()
-		before = &beforeTime
-	}
-
-	runs, err := models.ListCanvasRunsInTransaction(db, handler.CanvasID, limit, before, models.CanvasRunFilters{})
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	serialized, err := serializePRFeedbackRuns(db, factory, handler, runs)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to list factory PR feedback handler runs")
-	}
-
-	response := &pb.ListFactoryPRFeedbackHandlerRunsResponse{Runs: serialized}
-	if len(runs) > 0 {
-		if last := runs[len(runs)-1].CreatedAt; last != nil {
-			response.LastTimestamp = timestamppb.New(*last)
-		}
-	}
-
-	return response, nil
-}
 
 type prFeedbackRunContext struct {
 	graph      prFeedbackGraph

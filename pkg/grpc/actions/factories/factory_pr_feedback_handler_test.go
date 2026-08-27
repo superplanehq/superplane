@@ -54,12 +54,13 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
 
-		assert.Equal(t, pb.FactoryPRFeedbackHandler_SOURCE_GITHUB_PULL_REQUESTS, handler.GetSource())
+		assert.Equal(t, pb.FactoryPRFeedbackHandler_SUBJECT_GITHUB_PULL_REQUEST, handler.GetSubject())
+		assert.Equal(t, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION, handler.GetSource())
 		assert.Equal(t, prFeedbackDefaultName, handler.GetName())
 		assert.True(t, handler.GetHealthy())
-		assert.Equal(t, "acme/app", handler.GetSettings().GetRepository())
-		assert.Equal(t, prFeedbackDefaultMention, handler.GetSettings().GetMention())
-		assert.True(t, handler.GetSettings().GetIgnoreBots())
+		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
+		assert.Equal(t, prFeedbackDefaultMention, handler.GetSettings().GetDiscussion().GetMention())
+		assert.True(t, handler.GetSettings().GetDiscussion().GetIgnoreBots())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		require.NoError(t, err)
@@ -131,14 +132,18 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			HandlerId: handler.GetId(),
 			Name:      &name,
 			Settings: &pb.FactoryPRFeedbackHandler_Settings{
-				Repository: "acme/other",
-				Mention:    "@superplaneagent",
-				IgnoreBots: true,
+				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+					Repository: "acme/other",
+				},
+				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+					Mention:    "@superplaneagent",
+					IgnoreBots: true,
+				},
 			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "Address review comments", response.GetHandler().GetName())
-		assert.Equal(t, "acme/other", response.GetHandler().GetSettings().GetRepository())
+		assert.Equal(t, "acme/other", response.GetHandler().GetSettings().GetSubject().GetRepository())
 		assert.True(t, response.GetHandler().GetHealthy())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
@@ -174,21 +179,5 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		_, err = models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		assert.Error(t, err)
-	})
-
-	t.Run("a new handler has no runs yet", func(t *testing.T) {
-		factory := newFactory(t)
-		appRepo := "acme/app"
-		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
-			AppRepository: &appRepo,
-		}))
-		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{})
-
-		response, err := ListFactoryPRFeedbackHandlerRuns(ctx, orgID, &pb.ListFactoryPRFeedbackHandlerRunsRequest{
-			FactoryId: factory.ID.String(),
-			HandlerId: handler.GetId(),
-		})
-		require.NoError(t, err)
-		assert.Empty(t, response.GetRuns())
 	})
 }

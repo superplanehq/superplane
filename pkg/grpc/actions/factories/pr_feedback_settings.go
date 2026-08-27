@@ -51,9 +51,13 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedbackHandler_Settings {
 	settings = settings.normalized()
 	return &pb.FactoryPRFeedbackHandler_Settings{
-		Repository: settings.Repository,
-		Mention:    settings.Mention,
-		IgnoreBots: settings.IgnoreBots,
+		Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+			Repository: settings.Repository,
+		},
+		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+			Mention:    settings.Mention,
+			IgnoreBots: settings.IgnoreBots,
+		},
 	}
 }
 
@@ -63,8 +67,12 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 	}
 
 	updated := current
-	updated.Repository = strings.TrimSpace(requested.GetRepository())
-	updated.Mention = strings.TrimSpace(requested.GetMention())
-	updated.IgnoreBots = requested.GetIgnoreBots()
+	if requested.GetSubject() != nil {
+		updated.Repository = strings.TrimSpace(requested.GetSubject().GetRepository())
+	}
+	if requested.GetDiscussion() != nil {
+		updated.Mention = strings.TrimSpace(requested.GetDiscussion().GetMention())
+		updated.IgnoreBots = requested.GetDiscussion().GetIgnoreBots()
+	}
 	return updated.normalized()
 }

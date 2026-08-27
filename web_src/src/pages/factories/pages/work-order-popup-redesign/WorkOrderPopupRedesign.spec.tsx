@@ -170,7 +170,9 @@ describe("Line board job popup", () => {
     expect(
       within(screen.getByTestId("work-order-card-wo-failed-refunds")).getByText("Waiting for user review"),
     ).toBeInTheDocument();
-    expect(within(screen.getByTestId("lines-verify-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(1);
+    expect(within(screen.getByTestId("lines-verify-column")).getAllByRole("button", { name: /^Open / })).toHaveLength(
+      1,
+    );
     expect(
       within(screen.getByLabelText("Verify phase")).getByRole("button", {
         name: "Open Add refund reason enum to schema",

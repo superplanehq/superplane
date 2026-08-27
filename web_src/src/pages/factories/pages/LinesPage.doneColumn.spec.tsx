@@ -70,8 +70,6 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useFactoryPRFeedbackHandlers: () => ({ data: [] }),
-  factoryPRFeedbackHandlerRunsKey: (...args: string[]) => ["pr-feedback-runs", ...args],
-  fetchFactoryPRFeedbackHandlerRuns: async () => [],
 }));
 
 function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {

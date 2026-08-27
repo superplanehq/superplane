@@ -47,7 +47,7 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
-  const prFeedbackRuns = useWorkOrderPRFeedbackLog(organizationId, factoryId, order?.id);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order);
   const fixture = useMemo(
     () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
     [order, orderChecks, prFeedbackRuns, query.lineId],

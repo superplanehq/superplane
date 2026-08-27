@@ -198,6 +198,7 @@ func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler,
 		FactoryId: handler.FactoryID.String(),
 		CanvasId:  handler.CanvasID.String(),
 		Name:      handler.Name(),
+		Subject:   serializeFactoryPRFeedbackHandlerSubject(handler.Subject),
 		Source:    serializeFactoryPRFeedbackHandlerSource(handler.Source),
 		Settings:  serializePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec)),
 		Healthy:   graph.Healthy(spec),
@@ -212,12 +213,39 @@ func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler,
 	return serialized
 }
 
+func serializeFactoryPRFeedbackHandlerSubject(subject string) pb.FactoryPRFeedbackHandler_Subject {
+	switch subject {
+	case models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest:
+		return pb.FactoryPRFeedbackHandler_SUBJECT_GITHUB_PULL_REQUEST
+	default:
+		return pb.FactoryPRFeedbackHandler_SUBJECT_UNSPECIFIED
+	}
+}
+
 func serializeFactoryPRFeedbackHandlerSource(source string) pb.FactoryPRFeedbackHandler_Source {
 	switch source {
-	case models.FactoryPRFeedbackHandlerSourceGitHubPullRequests:
-		return pb.FactoryPRFeedbackHandler_SOURCE_GITHUB_PULL_REQUESTS
+	case models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion:
+		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION
 	default:
 		return pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED
+	}
+}
+
+func parseFactoryPRFeedbackHandlerSubject(subject pb.FactoryPRFeedbackHandler_Subject) (string, error) {
+	switch subject {
+	case pb.FactoryPRFeedbackHandler_SUBJECT_UNSPECIFIED, pb.FactoryPRFeedbackHandler_SUBJECT_GITHUB_PULL_REQUEST:
+		return models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, nil
+	default:
+		return "", invalidArgument("PR feedback handler subject is not supported")
+	}
+}
+
+func parseFactoryPRFeedbackHandlerSource(source pb.FactoryPRFeedbackHandler_Source) (string, error) {
+	switch source {
+	case pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION:
+		return models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, nil
+	default:
+		return "", invalidArgument("PR feedback handler source is not supported")
 	}
 }
 

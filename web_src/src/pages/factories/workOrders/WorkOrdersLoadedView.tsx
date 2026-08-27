@@ -49,7 +49,7 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { workOrders, factory, state, currentUserId } = props;
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(props.organizationId, factory.id ?? "");
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(workOrders);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),

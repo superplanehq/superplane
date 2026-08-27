@@ -266,6 +266,39 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 	return &artifact, nil
 }
 
+func (o *FactoryWorkOrder) ListPRArtifactKeys(tx *gorm.DB) ([]string, error) {
+	keysByOrder, err := ListPRArtifactKeysByWorkOrderIDs(tx, o.FactoryID, []uuid.UUID{o.ID})
+	if err != nil {
+		return nil, err
+	}
+	return keysByOrder[o.ID], nil
+}
+
+func ListPRArtifactKeysByWorkOrderIDs(tx *gorm.DB, factoryID uuid.UUID, orderIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	keysByOrder := map[uuid.UUID][]string{}
+	if len(orderIDs) == 0 {
+		return keysByOrder, nil
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := tx.
+		Where("factory_id = ? AND work_order_id IN ? AND type = ? AND key IS NOT NULL", factoryID, orderIDs, FactoryWorkOrderArtifactTypePR).
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, artifact := range artifacts {
+		if artifact.Key == nil || strings.TrimSpace(*artifact.Key) == "" {
+			continue
+		}
+		keysByOrder[artifact.WorkOrderID] = append(keysByOrder[artifact.WorkOrderID], *artifact.Key)
+	}
+
+	return keysByOrder, nil
+}
+
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {
 	var artifacts []FactoryWorkOrderArtifact
 	err := tx.

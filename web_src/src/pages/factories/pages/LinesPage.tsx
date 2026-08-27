@@ -153,7 +153,7 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(organizationId, factoryId);
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(workOrders);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
@@ -251,7 +251,6 @@ export function LinesPage() {
             factoryId={factoryId}
             factoryKey={factoryKey}
             lineId={selectedLine.id}
-            workOrders={workOrders}
             canUpdate={canUpdate}
             initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
             onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
@@ -546,7 +545,7 @@ function LineBoardSplitRunPopup({
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
-  const prFeedbackRuns = useWorkOrderPRFeedbackLog(organizationId, factoryId, peekOrderId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekOrder);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup

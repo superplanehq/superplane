@@ -1,10 +1,13 @@
-import type { FactoriesFactoryPrFeedbackHandler, FactoriesFactoryPrFeedbackHandlerRun } from "@/api-client";
-import { formatTimeAgo } from "@/lib/date";
+import type {
+  FactoriesFactoryPrFeedbackHandler,
+  FactoriesFactoryPrFeedbackHandlerRun,
+  FactoriesWorkOrder,
+} from "@/api-client";
 
-export type PRFeedbackSettingsTab = "general" | "runs" | "automation";
+export type PRFeedbackSettingsTab = "general" | "automation";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
-  return value === "general" || value === "runs" || value === "automation";
+  return value === "general" || value === "automation";
 }
 
 export interface PRFeedbackDraftSettings {
@@ -17,7 +20,6 @@ export interface PRFeedbackDraftSettings {
 export const PR_FEEDBACK_SETTINGS_COPY = {
   tabsLabel: "PR feedback settings",
   generalTab: "General",
-  runsTab: "Runs",
   automationTab: "Automation",
   nameLabel: "Name",
   nameHelper: "This name appears in the workspace app list.",
@@ -46,44 +48,19 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   loading: "Loading PR feedback.",
   loadError: "Could not load PR feedback.",
   retry: "Retry",
-  runsEmpty: "No runs yet. Mention the agent in a pull request comment or review to start a run.",
-  runsLoading: "Loading runs.",
-  runsError: "Could not load runs.",
-  retryRuns: "Retry",
   automationEmpty: "This automation has no canvas yet.",
   automationLoading: "Loading the canvas.",
   automationError: "Could not load the canvas.",
   retryAutomation: "Retry",
   editAutomation: "Edit automation",
-  viewRun: "Open the run",
-  viewWorkOrder: "Open the work order",
-  viewPullRequest: "Open the pull request",
-  viewComment: "Open the comment",
-  runWhen: "Started",
-  runStatus: "Status",
-  runTrigger: "Trigger",
 } as const;
-
-const RUN_STATUS_LABEL: Record<string, string> = {
-  STATUS_QUEUED: "Queued",
-  STATUS_RUNNING: "Running",
-  STATUS_PASSED: "Passed",
-  STATUS_FAILED: "Failed",
-  STATUS_CANCELLED: "Cancelled",
-};
-
-const RUN_TRIGGER_LABEL: Record<string, string> = {
-  TRIGGER_PR_COMMENT: "Comment",
-  TRIGGER_PR_REVIEW: "Review",
-  TRIGGER_PR_REVIEW_REPLY: "Reply",
-};
 
 export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHandler): PRFeedbackDraftSettings {
   return {
     name: handler.name?.trim() || "Address PR feedback",
-    repository: handler.settings?.repository?.trim() ?? "",
-    mention: handler.settings?.mention?.trim() || "@superplaneagent",
-    ignoreBots: handler.settings?.ignoreBots !== false,
+    repository: handler.settings?.subject?.repository?.trim() ?? "",
+    mention: handler.settings?.discussion?.mention?.trim() || "@superplaneagent",
+    ignoreBots: handler.settings?.discussion?.ignoreBots !== false,
   };
 }
 
@@ -105,24 +82,19 @@ export function isActivePRFeedbackRunStatus(status: FactoriesFactoryPrFeedbackHa
   return status === "STATUS_QUEUED" || status === "STATUS_RUNNING";
 }
 
-export function activePRFeedbackWorkOrderIds(
-  runsByHandler: FactoriesFactoryPrFeedbackHandlerRun[][],
-): ReadonlySet<string> {
+export function activePRFeedbackWorkOrderIds(workOrders: FactoriesWorkOrder[]): ReadonlySet<string> {
   const ids = new Set<string>();
-  for (const runs of runsByHandler) {
-    for (const run of runs) {
-      if (run.workOrderId && isActivePRFeedbackRunStatus(run.status)) {
-        ids.add(run.workOrderId);
-      }
+  for (const order of workOrders) {
+    if (!order.id) {
+      continue;
+    }
+    const hasActive = (order.prFeedbackRuns ?? []).some((item) => isActivePRFeedbackRunStatus(item.run?.status));
+    if (hasActive) {
+      ids.add(order.id);
     }
   }
   return ids;
 }
-
-export type PRFeedbackRunMatch = {
-  handler: FactoriesFactoryPrFeedbackHandler;
-  run: FactoriesFactoryPrFeedbackHandlerRun;
-};
 
 export type PRFeedbackLogRun = {
   canvasId: string;
@@ -130,27 +102,10 @@ export type PRFeedbackLogRun = {
   run: FactoriesFactoryPrFeedbackHandlerRun;
 };
 
-export function matchPRFeedbackRunsForWorkOrder(
-  handlers: FactoriesFactoryPrFeedbackHandler[],
-  runsByHandler: FactoriesFactoryPrFeedbackHandlerRun[][],
-  workOrderId: string,
-): PRFeedbackRunMatch[] {
-  return handlers
-    .flatMap((handler, index) =>
-      (runsByHandler[index] ?? [])
-        .filter((run) => Boolean(run.id) && run.workOrderId === workOrderId)
-        .map((run) => ({ handler, run })),
-    )
-    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
-}
-
 export function oldestActivePRFeedbackRun(
   runs: FactoriesFactoryPrFeedbackHandlerRun[],
-  workOrderId: string,
 ): FactoriesFactoryPrFeedbackHandlerRun | undefined {
-  const active = runs.filter(
-    (run) => Boolean(run.id) && run.workOrderId === workOrderId && isActivePRFeedbackRunStatus(run.status),
-  );
+  const active = runs.filter((run) => Boolean(run.id) && isActivePRFeedbackRunStatus(run.status));
   if (active.length === 0) {
     return undefined;
   }
@@ -170,22 +125,6 @@ export function statusForPRFeedbackRun(
     return "failed";
   }
   return "pending";
-}
-
-export function prFeedbackRunStatusLabel(status: FactoriesFactoryPrFeedbackHandlerRun["status"]): string {
-  return (status && RUN_STATUS_LABEL[status]) || "Unknown";
-}
-
-export function prFeedbackRunTriggerLabel(trigger: FactoriesFactoryPrFeedbackHandlerRun["trigger"]): string {
-  return (trigger && RUN_TRIGGER_LABEL[trigger]) || "Mention";
-}
-
-export function prFeedbackRunTimeLabel(run: FactoriesFactoryPrFeedbackHandlerRun): string {
-  const value = run.startedAt ?? run.createdAt;
-  if (!value) {
-    return "—";
-  }
-  return formatTimeAgo(new Date(value));
 }
 
 export function prFeedbackRunTitle(run: FactoriesFactoryPrFeedbackHandlerRun): string {

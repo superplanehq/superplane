@@ -249,19 +249,6 @@ service Factories {
     };
   }
 
-  rpc ListFactoryPRFeedbackHandlerRuns(
-    ListFactoryPRFeedbackHandlerRunsRequest
-  ) returns (ListFactoryPRFeedbackHandlerRunsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}/runs"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List factory PR feedback handler runs";
-      description: "Returns the runs that addressed pull request feedback";
-      tags: "Factory";
-    };
-  }
-
   rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
@@ -764,17 +751,32 @@ message ListFactoryIntakeRunsResponse {
 // Factory PR feedback handlers
 
 message FactoryPRFeedbackHandler {
+  // Object this handler can change.
+  enum Subject {
+    SUBJECT_UNSPECIFIED = 0;
+    SUBJECT_GITHUB_PULL_REQUEST = 1;
+  }
+
+  // Signal that starts a run.
   enum Source {
     SOURCE_UNSPECIFIED = 0;
-    SOURCE_GITHUB_PULL_REQUESTS = 1;
+    SOURCE_PULL_REQUEST_DISCUSSION = 1;
+  }
+
+  message SubjectSettings {
+    string repository = 1;
+  }
+
+  message DiscussionSettings {
+    string mention = 1;
+    bool ignore_bots = 2;
   }
 
   // Settings stored in the canvas graph. This block is a read/write facade
   // over that graph.
   message Settings {
-    string repository = 1;
-    string mention = 2;
-    bool ignore_bots = 3;
+    SubjectSettings subject = 1;
+    DiscussionSettings discussion = 2;
   }
 
   string id = 1;
@@ -782,13 +784,16 @@ message FactoryPRFeedbackHandler {
   string canvas_id = 3;
   string name = 4;
   string description = 5;
-  Source source = 6;
-  Settings settings = 7;
+  // Unspecified defaults to a GitHub pull request.
+  Subject subject = 6;
+  // Unspecified defaults to pull request discussion.
+  Source source = 7;
+  Settings settings = 8;
   // False when the canvas can no longer receive a mention and address it.
   // The handler stays listed so the user can repair it.
-  bool healthy = 8;
-  google.protobuf.Timestamp created_at = 9;
-  google.protobuf.Timestamp updated_at = 10;
+  bool healthy = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
 }
 
 message FactoryPRFeedbackHandlerRun {
@@ -834,7 +839,9 @@ message ListFactoryPRFeedbackHandlersResponse {
 message CreateFactoryPRFeedbackHandlerRequest {
   string factory_id = 1;
   string name = 2;
-  string repository = 3;
+  FactoryPRFeedbackHandler.Subject subject = 3;
+  FactoryPRFeedbackHandler.Source source = 4;
+  FactoryPRFeedbackHandler.Settings settings = 5;
 }
 
 message CreateFactoryPRFeedbackHandlerResponse {
@@ -858,18 +865,6 @@ message DeleteFactoryPRFeedbackHandlerRequest {
 }
 
 message DeleteFactoryPRFeedbackHandlerResponse {}
-
-message ListFactoryPRFeedbackHandlerRunsRequest {
-  string factory_id = 1;
-  string handler_id = 2;
-  int32 limit = 3;
-  google.protobuf.Timestamp before = 4;
-}
-
-message ListFactoryPRFeedbackHandlerRunsResponse {
-  repeated FactoryPRFeedbackHandlerRun runs = 1;
-  google.protobuf.Timestamp last_timestamp = 2;
-}
 
 message FactoryIntakeItem {
   string id = 1;
@@ -982,6 +977,15 @@ message WorkOrder {
   repeated WorkOrderStatusNote status_notes = 15;
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
+  // PR feedback handler runs that addressed this work order, oldest first.
+  repeated WorkOrderPRFeedbackRun pr_feedback_runs = 17;
+}
+
+message WorkOrderPRFeedbackRun {
+  string handler_id = 1;
+  string handler_name = 2;
+  string canvas_id = 3;
+  FactoryPRFeedbackHandlerRun run = 4;
 }
 
 message WorkOrderOrigin {

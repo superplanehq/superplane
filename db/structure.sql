@@ -398,6 +398,7 @@ CREATE TABLE public.factory_pr_feedback_handlers (
     organization_id uuid NOT NULL,
     factory_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
+    subject character varying(64) NOT NULL,
     source character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL

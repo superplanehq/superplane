@@ -106,10 +106,10 @@ func applyPRFeedbackSettings(
 
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
 		graph := resolvePRFeedbackGraph(spec)
-		if strings.TrimSpace(settings.GetRepository()) == "" {
+		if strings.TrimSpace(settings.GetSubject().GetRepository()) == "" {
 			return invalidArgument("repository cannot be empty")
 		}
-		if strings.TrimSpace(settings.GetMention()) == "" {
+		if strings.TrimSpace(settings.GetDiscussion().GetMention()) == "" {
 			return invalidArgument("mention cannot be empty")
 		}
 		updated := parsePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec), settings)

@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	FactoryPRFeedbackHandlerSourceGitHubPullRequests = "github-pull-requests"
+	FactoryPRFeedbackHandlerSubjectGitHubPullRequest    = "github-pull-request"
+	FactoryPRFeedbackHandlerSourcePullRequestDiscussion = "pull-request-discussion"
 
 	factoryPRFeedbackHandlerCanvasUniqueConstraint = "idx_factory_pr_feedback_handlers_canvas_id"
 )
@@ -20,12 +21,17 @@ const (
 var (
 	ErrFactoryPRFeedbackHandlerNotFound       = errors.New("factory PR feedback handler not found")
 	ErrFactoryPRFeedbackHandlerCanvasInUse    = errors.New("canvas already implements a factory PR feedback handler")
+	ErrFactoryPRFeedbackHandlerSubjectInvalid = errors.New("factory PR feedback handler subject is not valid")
 	ErrFactoryPRFeedbackHandlerSourceInvalid  = errors.New("factory PR feedback handler source is not valid")
 	ErrFactoryPRFeedbackHandlerCanvasRequired = errors.New("factory PR feedback handler canvas is required")
 )
 
+var factoryPRFeedbackHandlerSubjects = []string{
+	FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+}
+
 var factoryPRFeedbackHandlerSources = []string{
-	FactoryPRFeedbackHandlerSourceGitHubPullRequests,
+	FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
 }
 
 // FactoryPRFeedbackHandler declares that a factory canvas addresses pull
@@ -35,11 +41,16 @@ type FactoryPRFeedbackHandler struct {
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
 	CanvasID       uuid.UUID
+	Subject        string
 	Source         string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 
 	Canvas *Canvas `gorm:"foreignKey:CanvasID"`
+}
+
+func ValidFactoryPRFeedbackHandlerSubject(subject string) bool {
+	return slices.Contains(factoryPRFeedbackHandlerSubjects, subject)
 }
 
 func ValidFactoryPRFeedbackHandlerSource(source string) bool {
@@ -71,9 +82,12 @@ func MapFactoryPRFeedbackHandlerCanvasUniqueConstraintError(err error) error {
 	return err
 }
 
-func (f *Factory) CreatePRFeedbackHandler(tx *gorm.DB, canvasID uuid.UUID, source string) (*FactoryPRFeedbackHandler, error) {
+func (f *Factory) CreatePRFeedbackHandler(tx *gorm.DB, canvasID uuid.UUID, subject, source string) (*FactoryPRFeedbackHandler, error) {
 	if canvasID == uuid.Nil {
 		return nil, ErrFactoryPRFeedbackHandlerCanvasRequired
+	}
+	if !ValidFactoryPRFeedbackHandlerSubject(subject) {
+		return nil, ErrFactoryPRFeedbackHandlerSubjectInvalid
 	}
 	if !ValidFactoryPRFeedbackHandlerSource(source) {
 		return nil, ErrFactoryPRFeedbackHandlerSourceInvalid
@@ -85,6 +99,7 @@ func (f *Factory) CreatePRFeedbackHandler(tx *gorm.DB, canvasID uuid.UUID, sourc
 		OrganizationID: f.OrganizationID,
 		FactoryID:      f.ID,
 		CanvasID:       canvasID,
+		Subject:        subject,
 		Source:         source,
 		CreatedAt:      now,
 		UpdatedAt:      now,

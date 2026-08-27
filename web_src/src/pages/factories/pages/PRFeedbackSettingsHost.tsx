@@ -1,18 +1,15 @@
-import type { FactoriesFactoryPrFeedbackHandlerRun, FactoriesWorkOrder } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import {
   useCreateFactoryPRFeedbackHandler,
   useDeleteFactoryPRFeedbackHandler,
-  useFactoryPRFeedbackHandlerRuns,
   useFactoryPRFeedbackHandlers,
   useUpdateFactoryPRFeedbackHandler,
 } from "@/hooks/useFactoryPRFeedbackData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useState } from "react";
 
-import { factoryAppConfigurePath, factoryAppRunPath, workOrderDetailPath } from "../lib/factoryPagePaths";
+import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -28,7 +25,6 @@ interface PRFeedbackSettingsHostProps {
   factoryId: string;
   factoryKey: string;
   lineId?: string;
-  workOrders?: FactoriesWorkOrder[];
   canUpdate: boolean;
   initialTab?: PRFeedbackSettingsTab;
   onClose: () => void;
@@ -39,7 +35,6 @@ export function PRFeedbackSettingsHost({
   factoryId,
   factoryKey,
   lineId,
-  workOrders = [],
   canUpdate,
   initialTab = "general",
   onClose,
@@ -102,7 +97,6 @@ export function PRFeedbackSettingsHost({
       factoryId={factoryId}
       factoryKey={factoryKey}
       lineId={lineId}
-      workOrders={workOrders}
       canUpdate={canUpdate}
       initialTab={initialTab}
       handlerId={handler.id}
@@ -119,7 +113,6 @@ function PRFeedbackSettingsLoaded({
   factoryId,
   factoryKey,
   lineId,
-  workOrders,
   canUpdate,
   initialTab,
   handlerId,
@@ -132,7 +125,6 @@ function PRFeedbackSettingsLoaded({
   factoryId: string;
   factoryKey: string;
   lineId?: string;
-  workOrders: FactoriesWorkOrder[];
   canUpdate: boolean;
   initialTab?: PRFeedbackSettingsTab;
   handlerId: string;
@@ -141,26 +133,13 @@ function PRFeedbackSettingsLoaded({
   healthy: boolean;
   onClose: () => void;
 }) {
-  const navigate = useNavigate();
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
-  const runsQuery = useFactoryPRFeedbackHandlerRuns(organizationId, factoryId, handlerId);
   const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
   const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
-  const workOrderHrefFor = useMemo(
-    () => workOrderHrefLookup(organizationId, factoryKey, workOrders),
-    [factoryKey, organizationId, workOrders],
-  );
   const editAutomationHref = canvasId
     ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
     : undefined;
-
-  function openRun(run: FactoriesFactoryPrFeedbackHandlerRun) {
-    if (!canvasId || !run.id) {
-      return;
-    }
-    navigate(factoryAppRunPath(organizationId, factoryKey, canvasId, run.id, { from: "lines", lineId }));
-  }
 
   return (
     <PRFeedbackSettingsPopup
@@ -170,10 +149,6 @@ function PRFeedbackSettingsLoaded({
       automationLoading={automation.isLoading}
       automationError={automation.isError}
       onRetryAutomation={() => void automation.refetch()}
-      runs={runsQuery.data ?? []}
-      runsLoading={runsQuery.isPending}
-      runsError={runsQuery.isError}
-      onRetryRuns={() => void runsQuery.refetch()}
       savePending={updateHandler.isPending}
       deletePending={deleteHandler.isPending}
       saveError={saveError}
@@ -184,9 +159,8 @@ function PRFeedbackSettingsLoaded({
             handlerId,
             name: next.name,
             settings: {
-              repository: next.repository,
-              mention: next.mention,
-              ignoreBots: next.ignoreBots,
+              subject: { repository: next.repository },
+              discussion: { mention: next.mention, ignoreBots: next.ignoreBots },
             },
           });
         } catch (error) {
@@ -207,25 +181,9 @@ function PRFeedbackSettingsLoaded({
             }
           : undefined
       }
-      onOpenRun={openRun}
-      workOrderHrefFor={workOrderHrefFor}
       editAutomationHref={editAutomationHref}
       onClose={onClose}
       initialTab={initialTab}
     />
   );
-}
-
-function workOrderHrefLookup(
-  organizationId: string,
-  factoryKey: string,
-  workOrders: FactoriesWorkOrder[],
-): (workOrderId: string) => string | undefined {
-  const numberById = new Map(
-    workOrders.flatMap((order) => (order.id && order.number != null ? [[order.id, order.number]] : [])),
-  );
-  return (workOrderId: string) => {
-    const number = numberById.get(workOrderId);
-    return number == null ? undefined : workOrderDetailPath(organizationId, factoryKey, number);
-  };
 }

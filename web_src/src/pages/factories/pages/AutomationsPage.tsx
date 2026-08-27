@@ -15,7 +15,7 @@ import { useActivePRFeedbackWorkOrderIds } from "./useWorkOrderPRFeedbackRunHref
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(model.organizationId, model.factoryId);
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(model.workOrders);
 
   // Above the list/detail branching below (hooks can't be conditional): this
   // single call covers both the Automations list and the in-page detail view
