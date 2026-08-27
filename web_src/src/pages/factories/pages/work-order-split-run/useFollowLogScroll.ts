@@ -72,7 +72,7 @@ export function useFollowLogScroll(runningPhaseId: string | null, contentTick: u
         scrollToBottom();
       }
     });
-    observer.observe(el, { childList: true, subtree: true, characterData: true });
+    observer.observe(el, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [following, scrollToBottom]);
 

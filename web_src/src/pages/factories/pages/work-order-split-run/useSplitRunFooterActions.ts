@@ -19,6 +19,9 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
     return "Work order closed as completed.";
   }
+  if (choice === "canceled") {
+    return "Work order closed as rejected.";
+  }
   if (choice === "reopen") {
     return "Work order reopened.";
   }
@@ -32,7 +35,7 @@ function closeToast(choice: SplitRunStopChoice): string {
 }
 
 function rejectToast(): string {
-  return "Work order closed as failed.";
+  return closeToast("canceled");
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {

@@ -707,7 +707,7 @@ function executionToPhase(
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: execution.run?.appId,
     runId: execution.run?.id,
-    stepIndex: execution.stepIndex ?? 0,
+    stepIndex: execution.stepIndex,
   };
 }
 

@@ -194,6 +194,27 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
   });
 
+  it("does not treat a missing execution step index as the first step", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        state: "STATE_OPEN",
+        title: "Later step",
+        lineDispatches: [
+          dispatch("STATE_STARTED", [
+            { id: "e-plan", step: "Planning", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", state: "STATE_FINISHED", result: "RESULT_FAILED" },
+            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+          ]),
+        ],
+      }),
+    );
+
+    const implement = fixture.phases.find((phase) => phase.name === "Implement");
+    expect(implement?.status).toBe("failed");
+    expect(implement?.stepIndex).toBeUndefined();
+    expect(fixture.currentStepIndex).toBe(2);
+  });
+
   it("keeps a waiting state bar after a finished unnamed step while the order waits", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({

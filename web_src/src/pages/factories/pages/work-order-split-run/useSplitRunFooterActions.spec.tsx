@@ -56,7 +56,7 @@ describe("useSplitRunFooterActions", () => {
 
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
     expect(cancelRunMock).not.toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as failed.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
   });
 
   it("closes as completed for Stop and Complete", async () => {
@@ -151,7 +151,7 @@ describe("useSplitRunFooterActions", () => {
 
     expect(deleted).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as failed.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
   });
 
   it("does not mutate when the popup has no live order", async () => {

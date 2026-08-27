@@ -13,7 +13,13 @@ import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
+import {
+  autoExpandedPhaseId,
+  splitRunStatusLabel,
+  type SplitRunFixture,
+  type SplitRunPhase,
+  type SplitRunPhaseId,
+} from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
@@ -63,6 +69,7 @@ type WorkOrderSplitRunBodyProps = {
   orderId?: string;
   orderNumber?: string;
   fixture: SplitRunFixture;
+  canUpdate?: boolean;
 };
 
 /** Phase log for a work-order popup. The popup wraps this. */
@@ -73,6 +80,7 @@ export function WorkOrderSplitRunBody({
   orderId,
   orderNumber,
   fixture,
+  canUpdate = true,
 }: WorkOrderSplitRunBodyProps) {
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
@@ -120,13 +128,13 @@ export function WorkOrderSplitRunBody({
   const actions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const liveOrder = Boolean(organizationId && factoryId && orderId);
   const automationStop = (entry: SplitRunPhase) => {
-    if (!liveOrder || entry.status !== "running" || !entry.appId || !entry.runId) {
+    if (!canUpdate || !liveOrder || entry.status !== "running" || !entry.appId || !entry.runId) {
       return undefined;
     }
     return () => void actions.handleStopAutomation({ appId: entry.appId, runId: entry.runId });
   };
   const automationRerun = (entry: SplitRunPhase) => {
-    if (!liveOrder || entry.status !== "failed") {
+    if (!canUpdate || !liveOrder || entry.status !== "failed") {
       return undefined;
     }
     return () =>
@@ -278,6 +286,7 @@ export function WorkOrderSplitRunPopup({
         orderId={orderId}
         orderNumber={orderNumber}
         initialTab={initialTab}
+        canUpdate={canUpdate}
       />
     </PopupShell>
   );
@@ -294,6 +303,7 @@ function SplitRunPopupTabs({
   orderId,
   orderNumber,
   initialTab,
+  canUpdate,
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
@@ -305,6 +315,7 @@ function SplitRunPopupTabs({
   orderId?: string;
   orderNumber?: string;
   initialTab: string;
+  canUpdate: boolean;
 }) {
   return (
     <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -349,6 +360,7 @@ function SplitRunPopupTabs({
           orderId={orderId}
           orderNumber={orderNumber}
           fixture={fixture}
+          canUpdate={canUpdate}
         />
       </TabsContent>
     </Tabs>

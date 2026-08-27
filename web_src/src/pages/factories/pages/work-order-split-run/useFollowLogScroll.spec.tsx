@@ -60,4 +60,24 @@ describe("useFollowLogScroll", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(scroller.scrollTop).toBe(40);
   });
+
+  it("does not pin the scroller when only text inside a line changes", async () => {
+    const box = { height: 200, view: 100 };
+    render(<FollowLog tick={1} />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    scroller.scrollTop = 100;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    const settledTop = scroller.scrollTop;
+
+    box.height = 400;
+    const line = scroller.querySelector("li");
+    expect(line?.firstChild?.nodeType).toBe(Node.TEXT_NODE);
+    line!.firstChild!.nodeValue = "Running 00:01";
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(scroller.scrollTop).toBe(settledTop);
+  });
 });

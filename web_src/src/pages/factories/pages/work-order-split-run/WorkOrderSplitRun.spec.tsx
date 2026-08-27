@@ -399,6 +399,30 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
+  it("offers automation Stop on a live running work order", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-running",
+      fixture: SPLIT_RUN_RUNNING,
+    });
+
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+
+  it("hides automation Stop when the user cannot update the work order", () => {
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-running",
+      fixture: SPLIT_RUN_RUNNING,
+      canUpdate: false,
+    });
+
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+  });
+
   it("pins a default failed note and keeps Reopen in the header", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
