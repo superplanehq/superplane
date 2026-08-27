@@ -7,7 +7,12 @@ import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
 import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 
-const useCanvasMock = vi.hoisted(() => vi.fn(() => ({ data: undefined, isPending: false })));
+const useCanvasMock = vi.hoisted(() =>
+  vi.fn((): { data: { metadata?: { factoryId?: string } } | undefined; isPending: boolean } => ({
+    data: undefined,
+    isPending: false,
+  })),
+);
 
 vi.mock("@/hooks/useHostedLLMModels", () => ({
   useHostedLLMModels: vi.fn(),
@@ -18,7 +23,7 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  useCanvas: (...args: unknown[]) => useCanvasMock(...args),
+  useCanvas: useCanvasMock,
 }));
 
 function createField(): ConfigurationField {

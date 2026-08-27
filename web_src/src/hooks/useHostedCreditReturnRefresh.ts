@@ -7,7 +7,12 @@ import {
   type HostedCreditRefreshStatus,
 } from "@/lib/hostedCredit";
 
-export function useHostedCreditReturnRefresh(args: {
+export function useHostedCreditReturnRefresh({
+  organizationId,
+  creditAdded,
+  grantTotalCents,
+  refetch,
+}: {
   organizationId: string;
   creditAdded: boolean;
   grantTotalCents: number;
@@ -17,38 +22,38 @@ export function useHostedCreditReturnRefresh(args: {
   const [snapshotCents, setSnapshotCents] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!args.creditAdded) {
+    if (!creditAdded) {
       setTimedOut(false);
       setSnapshotCents(null);
       return;
     }
     setTimedOut(false);
-    setSnapshotCents(readHostedCreditGrantSnapshot(args.organizationId));
-  }, [args.creditAdded, args.organizationId]);
+    setSnapshotCents(readHostedCreditGrantSnapshot(organizationId));
+  }, [creditAdded, organizationId]);
 
   const status = hostedCreditRefreshStatus({
-    creditAddedQuery: args.creditAdded,
+    creditAddedQuery: creditAdded,
     snapshotCents,
-    grantTotalCents: args.grantTotalCents,
+    grantTotalCents,
     timedOut,
   });
 
   useEffect(() => {
-    if (!args.creditAdded || status !== "refreshing") {
+    if (!creditAdded || status !== "refreshing") {
       return;
     }
 
     const startedAt = Date.now();
-    void args.refetch();
+    void refetch();
     const intervalId = window.setInterval(() => {
-      void args.refetch();
+      void refetch();
       if (Date.now() - startedAt >= HOSTED_CREDIT_REFRESH_TIMEOUT_MS) {
         setTimedOut(true);
       }
     }, HOSTED_CREDIT_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [args.creditAdded, args.refetch, status]);
+  }, [creditAdded, refetch, status]);
 
   return status;
 }
