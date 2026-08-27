@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
-import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
 import {
   dispatchStepRows,
   isActiveWorkOrderExecution,
@@ -62,7 +62,10 @@ export function linePhaseRunHref(
   if (appId) {
     return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });
   }
-  return linesPath(organizationId, factoryKey);
+  if (lineId) {
+    return factoryLineDetailPath(organizationId, factoryKey, lineId);
+  }
+  return factoryHomePath(organizationId, factoryKey);
 }
 
 /**

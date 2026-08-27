@@ -1,5 +1,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
@@ -205,6 +207,74 @@ describe("PhaseLogCard title line", () => {
     expect(card?.className).toMatch(/\bbg-card\b/);
     expect(card?.className).not.toMatch(/\bbg-muted\b/);
   });
+
+  it("keeps produced artifacts on the title line when the phase is expanded", () => {
+    render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          artifacts: [
+            {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          ],
+        }}
+        expanded
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-phase-plan");
+    expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(within(row).queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+  });
+});
+
+describe("PhaseLogCard phase actions", () => {
+  const RUN_HREF = "/org-1/workspaces/RF/apps/app-refund-planner/split-run?run=run-1";
+  const EDIT_HREF = "/org-1/workspaces/RF/apps/app-refund-planner?configure=1";
+
+  function renderCard(ui: ReactElement) {
+    return render(<MemoryRouter>{ui}</MemoryRouter>);
+  }
+
+  it("stays off collapsed phases", () => {
+    renderCard(<PhaseLogCard phase={PHASE} expanded={false} runHref={RUN_HREF} editHref={EDIT_HREF} />);
+
+    expect(screen.queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit Automation" })).not.toBeInTheDocument();
+  });
+
+  it("puts View Automation Run and Edit Automation next to an expanded name", () => {
+    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} editHref={EDIT_HREF} />);
+
+    const view = screen.getByRole("link", { name: "View Automation Run" });
+    const edit = screen.getByRole("link", { name: "Edit Automation" });
+    expect(view).toHaveAttribute("href", RUN_HREF);
+    expect(edit).toHaveAttribute("href", EDIT_HREF);
+    expect(view.previousElementSibling).toBe(screen.getByRole("button", { name: "Plan" }));
+    expect(edit.previousElementSibling).toBe(view);
+  });
+
+  it("opens the run or canvas without collapsing the phase", async () => {
+    const onToggle = vi.fn();
+    const user = userEvent.setup();
+    renderCard(<PhaseLogCard phase={PHASE} expanded runHref={RUN_HREF} editHref={EDIT_HREF} onToggle={onToggle} />);
+
+    await user.click(screen.getByRole("link", { name: "View Automation Run" }));
+    await user.click(screen.getByRole("link", { name: "Edit Automation" }));
+
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it("is absent when the log has no run or canvas path", () => {
+    renderCard(<PhaseLogCard phase={PHASE} expanded />);
+
+    expect(screen.queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit Automation" })).not.toBeInTheDocument();
+  });
 });
 
 describe("PhaseLogCard node line", () => {
@@ -230,9 +300,38 @@ describe("PhaseLogCard node line", () => {
 
     const statusTime = within(row).getByTestId("split-run-stream-duration-planner-agent");
     expect(statusTime).toHaveTextContent("Passed 01:20");
-    expect(statusTime.className).toMatch(/ml-auto/);
+    expect(statusTime.parentElement?.className).toMatch(/ml-auto/);
     expect(statusTime.className).toMatch(/text-right/);
     expect(screen.getByTestId("split-run-stream-plan").className).toMatch(/font-mono/);
+  });
+
+  it("floats the produced artifact next to the duration", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            duration: "1m 20s",
+            artifact: {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-stream-line-planner-agent");
+    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
+    const duration = within(row).getByTestId("split-run-stream-duration-planner-agent");
+
+    expect(artifact.parentElement).toBe(duration.parentElement);
+    expect(artifact.parentElement?.className).toMatch(/ml-auto/);
+    expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("styles the node line as a table header without a caret", () => {

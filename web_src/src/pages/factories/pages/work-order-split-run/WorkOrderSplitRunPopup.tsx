@@ -24,9 +24,10 @@ import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
-  splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
+  splitRunPhaseAutomationHref,
+  splitRunPhaseRunHref,
   splitRunSourceDescription,
 } from "./splitRunPopupModel";
 import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
@@ -68,6 +69,7 @@ type WorkOrderSplitRunBodyProps = {
   factoryKey?: string;
   orderId?: string;
   orderNumber?: string;
+  lineId?: string;
   fixture: SplitRunFixture;
   canUpdate?: boolean;
   footerActions: SplitRunFooterActions;
@@ -80,6 +82,7 @@ export function WorkOrderSplitRunBody({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   fixture,
   canUpdate = true,
   footerActions,
@@ -104,13 +107,6 @@ export function WorkOrderSplitRunBody({
         : { canvas: emptySplitRunCanvas(), stream: undefined },
     [demoArtifacts, live, selectedPhase],
   );
-  const expandHref = splitRunAutomationRunHref({
-    organizationId,
-    factoryKey,
-    orderNumber,
-    fixture,
-    preferredPhaseId: openPhaseId ?? phaseId,
-  });
   const streams = useMemo(() => {
     const yamlOnly = { enabled: false, stream: [] };
     return new Map(
@@ -153,7 +149,6 @@ export function WorkOrderSplitRunBody({
       <SplitRunLogHeader
         following={follow.following}
         onFollowingChange={follow.setFollowing}
-        expandHref={expandHref}
         className="mb-2 px-3 pt-3"
       />
 
@@ -174,6 +169,8 @@ export function WorkOrderSplitRunBody({
               canvasId={entry.appId}
               onStop={automationStop(entry)}
               onRerun={automationRerun(entry)}
+              runHref={splitRunPhaseRunHref({ organizationId, factoryKey, orderNumber, lineId, phase: entry })}
+              editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
               actionBusy={footerActions.busy}
               onToggle={() => {
                 setPhaseId(entry.id);
@@ -204,6 +201,7 @@ export function WorkOrderSplitRunPopup({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   fixture,
   onClose,
   fixed = false,
@@ -289,6 +287,7 @@ export function WorkOrderSplitRunPopup({
         factoryKey={factoryKey}
         orderId={orderId}
         orderNumber={orderNumber}
+        lineId={lineId}
         initialTab={initialTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
@@ -325,6 +324,7 @@ function SplitRunPopupTabs({
   factoryKey,
   orderId,
   orderNumber,
+  lineId,
   initialTab,
   canUpdate,
   footerActions,
@@ -338,6 +338,7 @@ function SplitRunPopupTabs({
   factoryKey?: string;
   orderId?: string;
   orderNumber?: string;
+  lineId?: string;
   initialTab: string;
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
@@ -384,6 +385,7 @@ function SplitRunPopupTabs({
           factoryKey={factoryKey}
           orderId={orderId}
           orderNumber={orderNumber}
+          lineId={lineId}
           fixture={fixture}
           canUpdate={canUpdate}
           footerActions={footerActions}
