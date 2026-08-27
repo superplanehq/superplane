@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { implementationPlanMarkdown } from "../onboarding/first-run/reviewCandidateModel";
 import { doneFooterForStatus } from "./splitRunFooter";
@@ -36,16 +36,14 @@ function notifyBranchArtifact(orderId: string): FactoriesWorkOrderArtifact {
   };
 }
 
-function notifyPullRequestArtifact(orderId: string): FactoriesWorkOrderArtifact {
+function notifyPullRequest(orderId: string): FactoriesFactoryPullRequest {
   return {
-    id: `art-pr-${orderId}`,
-    type: "TYPE_PR",
-    data: {
-      url: NOTIFY_PR_URL,
-      title: "Notify on status change after a reopen",
-      number: 6837,
-      state: "merged",
-    },
+    id: `pr-${orderId}`,
+    workOrderId: orderId,
+    number: "6837",
+    url: NOTIFY_PR_URL,
+    title: "Notify on status change after a reopen",
+    state: "STATE_MERGED",
   };
 }
 
@@ -94,6 +92,7 @@ function streamLine(input: {
   /** Triggers fire at a point in time, so they carry no duration. */
   duration?: string;
   artifact?: FactoriesWorkOrderArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
 }): SplitRunStreamLine {
   return {
     id: input.id,
@@ -107,6 +106,7 @@ function streamLine(input: {
     iconSlug: input.iconSlug,
     duration: input.duration,
     artifact: input.artifact,
+    pullRequest: input.pullRequest,
   };
 }
 
@@ -235,7 +235,7 @@ function notifyUiPreviewStream(): SplitRunStreamLine[] {
   ];
 }
 
-function notifyPrCreationStream(pr: FactoriesWorkOrderArtifact): SplitRunStreamLine[] {
+function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStreamLine[] {
   return [
     streamLine({
       id: "onrun-onrun-otn0e9",
@@ -284,12 +284,12 @@ function notifyPrCreationStream(pr: FactoriesWorkOrderArtifact): SplitRunStreamL
     streamLine({
       id: "component-node-f069ua",
       at: "19:52:39",
-      componentType: "Add Work Order Artifact",
+      componentType: "Add Pull Request",
       componentName: "Attach PR to Work Order",
       action: "passed",
       iconSlug: "factory",
       duration: "1s",
-      artifact: pr,
+      pullRequest: pr,
     }),
     streamLine({
       id: "set-pr-closure-note",
@@ -308,7 +308,7 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
   const description = markdownArtifact(`art-description-${orderId}`, "description.md", order.description ?? "");
   const plan = markdownArtifact(`art-plan-${orderId}`, "PLAN.md", notifyPlanMarkdown(order));
   const branch = notifyBranchArtifact(orderId);
-  const pullRequest = notifyPullRequestArtifact(orderId);
+  const pullRequest = notifyPullRequest(orderId);
   const run = orderRun(order);
 
   return [

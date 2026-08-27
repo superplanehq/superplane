@@ -1,8 +1,10 @@
 import type {
+  CanvasesCanvasRunRef,
   FactoriesFactoryPrFeedbackHandler,
-  FactoriesFactoryPrFeedbackHandlerRun,
-  FactoriesWorkOrder,
+  FactoriesFactoryPullRequest,
 } from "@/api-client";
+
+import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 
 export type PRFeedbackSettingsTab = "general" | "automation";
 
@@ -78,19 +80,19 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
   return next.name.length > 0 && next.repository.length > 0 && next.mention.startsWith("@");
 }
 
-export function isActivePRFeedbackRunStatus(status: FactoriesFactoryPrFeedbackHandlerRun["status"]): boolean {
-  return status === "STATUS_QUEUED" || status === "STATUS_RUNNING";
+export function isActivePRFeedbackRun(run: CanvasesCanvasRunRef | undefined): boolean {
+  return isActiveCanvasRun(run);
 }
 
-export function activePRFeedbackWorkOrderIds(workOrders: FactoriesWorkOrder[]): ReadonlySet<string> {
+export function activePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
   const ids = new Set<string>();
-  for (const order of workOrders) {
-    if (!order.id) {
+  for (const pullRequest of pullRequests) {
+    const workOrderId = pullRequest.workOrderId?.trim();
+    if (!workOrderId) {
       continue;
     }
-    const hasActive = (order.prFeedbackRuns ?? []).some((item) => isActivePRFeedbackRunStatus(item.run?.status));
-    if (hasActive) {
-      ids.add(order.id);
+    if ((pullRequest.runs ?? []).some(isActiveCanvasRun)) {
+      ids.add(workOrderId);
     }
   }
   return ids;
@@ -99,40 +101,14 @@ export function activePRFeedbackWorkOrderIds(workOrders: FactoriesWorkOrder[]): 
 export type PRFeedbackLogRun = {
   canvasId: string;
   handlerName?: string;
-  run: FactoriesFactoryPrFeedbackHandlerRun;
+  pullRequestNumber?: string;
+  run: CanvasesCanvasRunRef;
 };
 
-export function oldestActivePRFeedbackRun(
-  runs: FactoriesFactoryPrFeedbackHandlerRun[],
-): FactoriesFactoryPrFeedbackHandlerRun | undefined {
-  const active = runs.filter((run) => Boolean(run.id) && isActivePRFeedbackRunStatus(run.status));
+export function oldestActivePRFeedbackRun(runs: CanvasesCanvasRunRef[]): CanvasesCanvasRunRef | undefined {
+  const active = runs.filter((run) => isActiveCanvasRun(run));
   if (active.length === 0) {
     return undefined;
   }
   return [...active].sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))[0];
-}
-
-export function statusForPRFeedbackRun(
-  status: FactoriesFactoryPrFeedbackHandlerRun["status"],
-): "passed" | "running" | "pending" | "failed" {
-  if (status === "STATUS_RUNNING") {
-    return "running";
-  }
-  if (status === "STATUS_PASSED") {
-    return "passed";
-  }
-  if (status === "STATUS_FAILED" || status === "STATUS_CANCELLED") {
-    return "failed";
-  }
-  return "pending";
-}
-
-export function prFeedbackRunTitle(run: FactoriesFactoryPrFeedbackHandlerRun): string {
-  if (run.title?.trim()) {
-    return run.title.trim();
-  }
-  if (run.pullRequestNumber) {
-    return `Address feedback on PR #${run.pullRequestNumber}`;
-  }
-  return "Address PR feedback";
 }

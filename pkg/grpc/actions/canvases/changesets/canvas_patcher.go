@@ -186,6 +186,10 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 	// node will be in an error state.
 	//
 
+	if node.Configuration != nil {
+		newNode.Configuration = node.Configuration.AsMap()
+	}
+
 	integrationID, err := p.validateIntegration(node)
 	if err != nil {
 		errorMessage := err.Error()
@@ -203,10 +207,7 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 		return nil
 	}
 
-	var nodeConfiguration map[string]any
-	if node.Configuration != nil {
-		nodeConfiguration = node.Configuration.AsMap()
-	}
+	nodeConfiguration := newNode.Configuration
 
 	err = p.validateNodeConfiguration(nodeType, *nodeRef, schema, nodeConfiguration)
 	if err != nil {

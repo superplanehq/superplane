@@ -169,53 +169,6 @@ func ListRootEventsForRuns(tx *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) 
 	return eventsByRunID, nil
 }
 
-// ListRootEventsForPullRequestURLs returns root events on the given canvases
-// whose payload pull-request URL is one of urls.
-func ListRootEventsForPullRequestURLs(tx *gorm.DB, canvasIDs []uuid.UUID, urls []string) ([]CanvasEvent, error) {
-	if len(canvasIDs) == 0 || len(urls) == 0 {
-		return []CanvasEvent{}, nil
-	}
-
-	uniqueURLs := uniqueNonEmptyStrings(urls)
-	if len(uniqueURLs) == 0 {
-		return []CanvasEvent{}, nil
-	}
-
-	var events []CanvasEvent
-	err := tx.
-		Where("workflow_id IN ?", canvasIDs).
-		Where("execution_id IS NULL").
-		Where(
-			"(data #>> '{data,pull_request,html_url}' IN ? OR data #>> '{data,issue,pull_request,html_url}' IN ?)",
-			uniqueURLs,
-			uniqueURLs,
-		).
-		Order("created_at DESC").
-		Find(&events).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-func uniqueNonEmptyStrings(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	unique := make([]string, 0, len(values))
-	for _, value := range values {
-		if value == "" {
-			continue
-		}
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		unique = append(unique, value)
-	}
-	return unique
-}
-
 func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	query := db.

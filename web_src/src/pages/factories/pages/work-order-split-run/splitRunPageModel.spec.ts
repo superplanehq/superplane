@@ -74,7 +74,14 @@ describe("fixtureForSplitRunPage", () => {
     const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
       {
         canvasId: "canvas-fb",
-        run: { id: "run-fb", title: "Address feedback on PR #12", status: "STATUS_PASSED" },
+        pullRequestNumber: "12",
+        run: {
+          id: "run-fb",
+          canvasId: "canvas-fb",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-26T11:00:00Z",
+        },
       },
     ]);
 
@@ -99,7 +106,14 @@ describe("phaseForSplitRunCanvas", () => {
     const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
       {
         canvasId: "canvas-fb",
-        run: { id: "run-fb", title: "Address feedback on PR #12", status: "STATUS_PASSED" },
+        pullRequestNumber: "12",
+        run: {
+          id: "run-fb",
+          canvasId: "canvas-fb",
+          state: "STATE_FINISHED",
+          result: "RESULT_PASSED",
+          createdAt: "2026-08-26T11:00:00Z",
+        },
       },
     ]);
     expect(phaseForSplitRunCanvas(fixture, "implementation", "run-fb").id).toBe("pr-feedback-run-fb");

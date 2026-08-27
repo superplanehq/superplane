@@ -9,12 +9,17 @@ import {
   toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
-import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import {
+  DEFAULT_ARTIFACTS_BY_ORDER_ID,
+  DEFAULT_EVENTS_BY_ORDER_ID,
+  DEFAULT_PULL_REQUESTS_BY_ORDER_ID,
+} from "./factoryPageEventFixtures";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesFactoryOnboarding,
+  FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -217,6 +222,37 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
       return { json: { factory: factoryWithLineMetrics(factory) } };
     },
   };
+}
+
+function factoryPullRequestRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/prs"),
+      resolve: (match, method, _body, url) => {
+        if (method !== "GET") return { json: {} };
+        const factoryId = match[1];
+        const orderNumber = (url.searchParams.get("order") ?? "").trim();
+        const workOrderIds = [
+          ...url.searchParams.getAll("workOrderIds"),
+          ...url.searchParams.getAll("work_order_ids"),
+        ].filter(Boolean);
+        const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
+        let pullRequests = orders.flatMap((order) => (order.id ? orderPullRequests(fixture, order.id) : []));
+        if (orderNumber) {
+          const order = orders.find((entry) => entry.number === orderNumber || entry.id === orderNumber);
+          pullRequests = order?.id ? orderPullRequests(fixture, order.id) : [];
+        } else if (workOrderIds.length > 0) {
+          const allowed = new Set(workOrderIds);
+          pullRequests = pullRequests.filter((pr) => pr.workOrderId && allowed.has(pr.workOrderId));
+        }
+        return { json: { pullRequests } };
+      },
+    },
+  ];
+}
+
+function orderPullRequests(fixture: FactoriesFixture, orderId: string): FactoriesFactoryPullRequest[] {
+  return fixture.pullRequestsByOrderId?.[orderId] ?? DEFAULT_PULL_REQUESTS_BY_ORDER_ID[orderId] ?? [];
 }
 
 function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
@@ -540,6 +576,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     ...factoryLinesRoutes(fixture),
+    ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
     hostedLlmModelsRoute(),

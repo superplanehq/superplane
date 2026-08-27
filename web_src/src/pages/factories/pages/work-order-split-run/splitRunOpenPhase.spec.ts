@@ -52,10 +52,11 @@ describe("autoExpandedPhaseId", () => {
       prFeedbackRuns: [
         {
           canvasId: "canvas-fb",
+          pullRequestNumber: "12",
           run: {
             id: "run-fb",
-            title: "Address feedback on PR #12",
-            status: "STATUS_QUEUED",
+            canvasId: "canvas-fb",
+            state: "STATE_PENDING",
             createdAt: "2026-08-26T11:00:00Z",
           },
         },

@@ -10,12 +10,14 @@ import { AutomationDetail } from "./AutomationDetail";
 import { AutomationsPageBody } from "./automationsPageBody";
 import { AutomationsLegacyRedirect } from "./automationsPageRedirect";
 import { useAutomationsPageModel } from "./useAutomationsPageModel";
+import { useFactoryPullRequests } from "@/hooks/useFactoryData";
 import { useActivePRFeedbackWorkOrderIds } from "./useWorkOrderPRFeedbackRunHref";
 
 export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(model.workOrders);
+  const { data: pullRequests = [] } = useFactoryPullRequests(model.organizationId, model.factoryId);
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
 
   // Above the list/detail branching below (hooks can't be conditional): this
   // single call covers both the Automations list and the in-page detail view

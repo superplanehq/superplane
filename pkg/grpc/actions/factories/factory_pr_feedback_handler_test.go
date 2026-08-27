@@ -69,8 +69,8 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 5)
-		assert.Len(t, liveVersion.Edges, 4)
+		assert.Len(t, liveVersion.Nodes, 6)
+		assert.Len(t, liveVersion.Edges, 5)
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, "noop", node.ComponentName())
 		}
@@ -151,6 +151,9 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
+			if node.ID == prFeedbackActivityNodeID {
+				assert.Equal(t, prFeedbackActivityDescriptionExpression(), node.Configuration["description"])
+			}
 			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
 				continue
 			}

@@ -1,4 +1,5 @@
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useMemo, useState } from "react";
@@ -47,7 +48,13 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { data: orderChecks = [] } = useWorkOrderChecks(organizationId, factoryId, order?.id ?? "");
-  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order);
+  const { data: pullRequests = [] } = useFactoryPullRequests(
+    organizationId,
+    factoryId,
+    order?.id ? { workOrderIds: [order.id] } : undefined,
+  );
+  const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
   const fixture = useMemo(
     () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
     [order, orderChecks, prFeedbackRuns, query.lineId],

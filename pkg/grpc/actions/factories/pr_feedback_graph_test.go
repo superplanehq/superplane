@@ -18,6 +18,7 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		assert.Equal(t, prFeedbackReviewTriggerNodeID, graph.ReviewTriggerNodeID)
 		assert.Equal(t, prFeedbackReplyTriggerNodeID, graph.ReplyTriggerNodeID)
 		assert.Equal(t, prFeedbackFindNodeID, graph.FindNodeID)
+		assert.Equal(t, prFeedbackActivityNodeID, graph.ActivityNodeID)
 		assert.Equal(t, prFeedbackRunnerNodeID, graph.RunnerNodeID)
 		assert.True(t, graph.Healthy(spec))
 	})
@@ -29,11 +30,13 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 				triggerNode(prFeedbackReviewTriggerNodeID, "github.onPRReview"),
 				triggerNode(prFeedbackReplyTriggerNodeID, "github.onPRReviewComment"),
 				componentNode(prFeedbackFindNodeID, prFeedbackFindComponent),
+				componentNode(prFeedbackActivityNodeID, prFeedbackActivityComponent),
 			},
 			Edges: []models.Edge{
 				{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{SourceID: prFeedbackReviewTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{SourceID: prFeedbackReplyTriggerNodeID, TargetID: prFeedbackFindNodeID},
+				{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID},
 			},
 		}
 
@@ -70,7 +73,8 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			"default:" + prFeedbackCommentTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"default:" + prFeedbackReviewTriggerNodeID + "->" + prFeedbackFindNodeID,
 			"default:" + prFeedbackReplyTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"found:" + prFeedbackFindNodeID + "->" + prFeedbackRunnerNodeID,
+			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
+			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackRunnerNodeID,
 		}, yamlEdgeChannels(canvas))
 
 		for _, node := range canvas.Spec.Nodes {
@@ -83,6 +87,10 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Equal(t, prFeedbackCommentScopeReplies, reply.Configuration["commentScope"])
 		assert.Equal(t, true, reply.Configuration["ignoreBots"])
 		assert.Equal(t, prFeedbackDefaultMention, reply.Configuration["contentFilter"])
+
+		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
+		assert.Equal(t, `{{ $["Find Pull Request"].data.pullRequest.id }}`, activity.Configuration["pullRequestId"])
+		assert.Equal(t, prFeedbackActivityDescriptionExpression(), activity.Configuration["description"])
 	})
 
 	t.Run("the runner checks out the pull request head branch", func(t *testing.T) {
@@ -92,7 +100,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 			IgnoreBots: true,
 		})
 		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
-		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request.head.ref")
+		assert.Contains(t, runnerEnv(t, runner, "PR_HEAD"), "pull_request?.head?.ref")
 
 		checkout := runnerStepCommand(t, runner, "Checkout Pull Request")
 		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)

@@ -126,16 +126,25 @@ func applyPRFeedbackSettings(
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
-			if !triggerIDs[nodes[i].ID] {
+			if triggerIDs[nodes[i].ID] {
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["repository"] = updated.Repository
+				configuration["contentFilter"] = updated.Mention
+				configuration["ignoreBots"] = updated.IgnoreBots
+				nodes[i].Configuration = configuration
+				continue
+			}
+			if nodes[i].ID != graph.ActivityNodeID && nodes[i].ComponentName() != prFeedbackActivityComponent {
 				continue
 			}
 			configuration := maps.Clone(nodes[i].Configuration)
 			if configuration == nil {
 				configuration = map[string]any{}
 			}
-			configuration["repository"] = updated.Repository
-			configuration["contentFilter"] = updated.Mention
-			configuration["ignoreBots"] = updated.IgnoreBots
+			configuration["description"] = prFeedbackActivityDescriptionExpression()
 			nodes[i].Configuration = configuration
 		}
 

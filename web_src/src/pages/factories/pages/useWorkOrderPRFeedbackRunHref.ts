@@ -1,25 +1,41 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderPrFeedbackRun } from "@/api-client";
+import type { FactoriesFactoryPrFeedbackHandler, FactoriesFactoryPullRequest } from "@/api-client";
 import { useMemo } from "react";
 
 import { activePRFeedbackWorkOrderIds, type PRFeedbackLogRun } from "./prFeedbackSettingsModel";
+import { prFeedbackRunTitle } from "../lib/workOrderPullRequest";
 
-export function useActivePRFeedbackWorkOrderIds(workOrders: FactoriesWorkOrder[]): ReadonlySet<string> {
-  return useMemo(() => activePRFeedbackWorkOrderIds(workOrders), [workOrders]);
+export function useActivePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
+  return useMemo(() => activePRFeedbackWorkOrderIds(pullRequests), [pullRequests]);
 }
 
-export function useWorkOrderPRFeedbackLog(order: FactoriesWorkOrder | undefined): PRFeedbackLogRun[] {
-  return useMemo(() => prFeedbackLogRunsFromItems(order?.prFeedbackRuns ?? []), [order?.prFeedbackRuns]);
+export function useWorkOrderPRFeedbackLog(
+  pullRequests: FactoriesFactoryPullRequest[],
+  handlers: FactoriesFactoryPrFeedbackHandler[] = [],
+): PRFeedbackLogRun[] {
+  return useMemo(() => prFeedbackLogRunsFromPullRequests(pullRequests, handlers), [handlers, pullRequests]);
 }
 
-export function prFeedbackLogRunsFromItems(items: FactoriesWorkOrderPrFeedbackRun[]): PRFeedbackLogRun[] {
-  return [...items]
-    .sort((left, right) => Date.parse(left.run?.createdAt ?? "") - Date.parse(right.run?.createdAt ?? ""))
-    .flatMap(prFeedbackLogRunFromItem);
+export function prFeedbackLogRunsFromPullRequests(
+  pullRequests: FactoriesFactoryPullRequest[],
+  handlers: FactoriesFactoryPrFeedbackHandler[] = [],
+): PRFeedbackLogRun[] {
+  const handlerNameByCanvasId = new Map(
+    handlers.flatMap((handler) =>
+      handler.canvasId ? [[handler.canvasId, handler.name?.trim() || undefined] as const] : [],
+    ),
+  );
+
+  return pullRequests.flatMap((pullRequest) =>
+    [...(pullRequest.runs ?? [])]
+      .filter((run) => Boolean(run.id && run.canvasId))
+      .sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))
+      .map((run) => ({
+        canvasId: run.canvasId ?? "",
+        handlerName: handlerNameByCanvasId.get(run.canvasId ?? ""),
+        pullRequestNumber: pullRequest.number,
+        run,
+      })),
+  );
 }
 
-function prFeedbackLogRunFromItem(item: FactoriesWorkOrderPrFeedbackRun): PRFeedbackLogRun[] {
-  if (!item.canvasId || !item.run?.id) {
-    return [];
-  }
-  return [{ canvasId: item.canvasId, handlerName: item.handlerName, run: item.run }];
-}
+export { prFeedbackRunTitle };

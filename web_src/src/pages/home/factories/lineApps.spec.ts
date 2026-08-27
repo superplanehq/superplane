@@ -108,8 +108,8 @@ describe("setup factory line apps", () => {
       });
       const agentNodes = canvasNodes(canvasYaml).filter((node) => node.component === "runnerOpenRouter");
 
-      expect(agentNodes).toHaveLength(1);
-      expect(agentNodes[0]?.configuration?.model).toBe("openai/gpt-4.1");
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      expect(agentNodes.every((node) => node.configuration?.model === "openai/gpt-4.1")).toBe(true);
     }
   });
 
@@ -144,9 +144,11 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
     expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: add-pr-label/);
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*component: addPullRequest/);
     expect(implementation).toMatch(
-      /id: attach-pr-artifact[\s\S]*artifactType: pr[\s\S]*state: open[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
+      /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
     );
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*state: open/);
     expect(Object.fromEntries(canvasNodes(implementation).map((node) => [node.id, node.concurrency?.max]))).toEqual({
       "onrun-implement": undefined,
       "create-branch": 5,
@@ -236,9 +238,9 @@ describe("setup factory event apps", () => {
 
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*actions:[\s\S]*- closed/);
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
-    expect(canvasYaml).toContain("component: findWorkOrder");
-    expect(canvasYaml).toContain("by: artifactKey");
-    expect(canvasYaml).toContain("component: updateWorkOrderArtifact");
+    expect(canvasYaml).toContain("component: findPullRequest");
+    expect(canvasYaml).toContain("component: addPullRequestActivity");
+    expect(canvasYaml).toContain("component: updatePullRequest");
     expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
     expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");
     expect(canvasYaml).toContain("result: completed");

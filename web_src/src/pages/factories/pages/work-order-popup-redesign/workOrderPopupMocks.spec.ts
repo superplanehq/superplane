@@ -137,7 +137,6 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.log.at(-1)).toMatchObject({
       actor: "Done",
       title: "Complete work order from merged pull request",
-      artifactId: "art-pr-closure",
     });
   });
 

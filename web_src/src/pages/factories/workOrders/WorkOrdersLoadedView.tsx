@@ -1,4 +1,9 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+} from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import {
@@ -27,6 +32,7 @@ interface WorkOrdersLoadedViewProps {
   factory: FactoriesFactory;
   factoryLines: FactoriesFactoryLine[];
   workOrders: FactoriesWorkOrder[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
@@ -48,8 +54,8 @@ interface WorkOrdersLoadedViewProps {
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId } = props;
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(workOrders);
+  const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),

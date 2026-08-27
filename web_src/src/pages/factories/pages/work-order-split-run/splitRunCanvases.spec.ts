@@ -119,7 +119,7 @@ describe("splitRunCanvasForPhase", () => {
       componentName: "Create Draft Pull Request",
       action: "passed",
     });
-    expect(stream.find((line) => line.id === "attach-pr-artifact")?.artifact?.type).toBe("TYPE_PR");
+    expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
   });
 
   it("opens the planning canvas for a completed plan step", () => {
@@ -146,12 +146,13 @@ describe("splitRunCanvasForPhase", () => {
     });
     const stream = richStreamForCanvas(canvas);
 
+    expect(canvas.nodes.map((node) => node.id)).toContain("find-pull-request");
     expect(canvas.nodes.length).toBeGreaterThanOrEqual(5);
     expect(stream.filter((line) => !line.note).length).toBe(canvas.nodes.length);
-    expect(stream.filter((line) => line.nodeId === "find-work-order").map((line) => line.id)).toEqual([
-      "find-work-order",
+    expect(stream.filter((line) => line.nodeId === "find-pull-request").map((line) => line.id)).toEqual([
+      "find-pull-request",
     ]);
-    expect(stream.some((line) => line.artifact?.type === "TYPE_PR")).toBe(true);
+    expect(stream.some((line) => line.pullRequest)).toBe(true);
     expect(
       stream.some(
         (line) =>

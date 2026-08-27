@@ -11,10 +11,12 @@ const (
 	prFeedbackCommentTriggerNodeID = "on-pr-comment"
 	prFeedbackReviewTriggerNodeID  = "on-pr-review"
 	prFeedbackReplyTriggerNodeID   = "on-pr-review-reply"
-	prFeedbackFindNodeID           = "find-work-order"
+	prFeedbackFindNodeID           = "find-pull-request"
+	prFeedbackActivityNodeID       = "add-pr-activity"
 	prFeedbackRunnerNodeID         = "address-pr-feedback"
 
-	prFeedbackFindComponent = "findWorkOrder"
+	prFeedbackFindComponent     = "findPullRequest"
+	prFeedbackActivityComponent = "addPullRequestActivity"
 
 	prFeedbackDefaultName         = "Address PR feedback"
 	prFeedbackDefaultDescription  = "Address pull request comments and reviews after a mention."
@@ -64,7 +66,8 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				{Channel: "default", SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{Channel: "default", SourceID: prFeedbackReviewTriggerNodeID, TargetID: prFeedbackFindNodeID},
 				{Channel: "default", SourceID: prFeedbackReplyTriggerNodeID, TargetID: prFeedbackFindNodeID},
-				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackRunnerNodeID},
+				{Channel: "found", SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID},
+				{Channel: "default", SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackRunnerNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -96,14 +99,27 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				},
 				{
 					ID:        prFeedbackFindNodeID,
-					Name:      "Find Work Order",
+					Name:      "Find Pull Request",
 					Type:      yaml.NodeTypeAction,
 					Component: prFeedbackFindComponent,
 					Configuration: map[string]any{
-						"by":          "artifactKey",
-						"artifactKey": prFeedbackPRURLExpression(),
+						"provider":   "github",
+						"repository": "{{ root().data.repository.full_name }}",
+						"number":     prFeedbackPRNumberExpression(),
+						"url":        prFeedbackPRURLExpression(),
 					},
 					Position: yaml.Position{X: 360, Y: 260},
+				},
+				{
+					ID:        prFeedbackActivityNodeID,
+					Name:      "Add Pull Request Activity",
+					Type:      yaml.NodeTypeAction,
+					Component: prFeedbackActivityComponent,
+					Configuration: map[string]any{
+						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
+						"description":   prFeedbackActivityDescriptionExpression(),
+					},
+					Position: yaml.Position{X: 500, Y: 260},
 				},
 				{
 					ID:            prFeedbackRunnerNodeID,
@@ -137,22 +153,26 @@ func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool)
 	return configuration
 }
 
+func prFeedbackActivityDescriptionExpression() string {
+	return "{{ root().data.comment?.body ?? root().data.review?.body ?? join(map(root().data.review_comments ?? [], .body), \"\\n\\n\") ?? \"\" }}"
+}
+
 func prFeedbackPRURLExpression() string {
-	return "{{ root().data.pull_request.html_url ?? root().data.issue.pull_request.html_url }}"
+	return "{{ root().data.pull_request?.html_url ?? root().data.issue?.pull_request?.html_url }}"
 }
 
 func prFeedbackPRNumberExpression() string {
-	return "{{ root().data.pull_request.number ?? root().data.issue.number }}"
+	return "{{ root().data.pull_request?.number ?? root().data.issue?.number }}"
 }
 
 func prFeedbackPRHeadExpression() string {
-	return "{{ root().data.pull_request.head.ref ?? \"\" }}"
+	return "{{ root().data.pull_request?.head?.ref ?? \"\" }}"
 }
 
 func prFeedbackRunnerConcurrency() *yaml.ConcurrencySpec {
 	max := 1
 	return &yaml.ConcurrencySpec{
-		Key: "github-{{ root().data.repository.id }}-pr-{{ root().data.pull_request.number ?? root().data.issue.number }}",
+		Key: "github-{{ root().data.repository.id }}-pr-{{ root().data.pull_request?.number ?? root().data.issue?.number }}",
 		Max: &max,
 	}
 }
@@ -278,7 +298,7 @@ func prFeedbackPrompt() string {
 		"Stay on this branch. Push commits to this branch. Do not create a new branch.",
 		"",
 		"Repository: {{ root().data.repository.full_name }}",
-		"Pull request: #{{ root().data.pull_request.number ?? root().data.issue.number }}",
+		"Pull request: #{{ root().data.pull_request?.number ?? root().data.issue?.number }}",
 		"",
 		"Use the GitHub token in GITHUB_TOKEN.",
 		"Read unresolved review threads.",

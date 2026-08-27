@@ -1,8 +1,14 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import type {
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesFactoryPullRequest,
+} from "@/api-client";
 
 import { WorkOrderSidebarFactoryLines } from "./sidebar/WorkOrderSidebarFactoryLines";
 import { WorkOrderSidebarOverview } from "./sidebar/WorkOrderSidebarOverview";
 import { WorkOrderArtifactsList } from "./WorkOrderArtifactsList";
+import { WorkOrderPullRequestsList } from "./WorkOrderPullRequestsList";
 import type { WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 
 interface WorkOrderDetailSidebarProps {
@@ -12,6 +18,9 @@ interface WorkOrderDetailSidebarProps {
   artifacts: FactoriesWorkOrderArtifact[];
   isArtifactsLoading: boolean;
   artifactsError?: Error | null;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  isPullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
   assigneeIds: string[];
@@ -35,6 +44,9 @@ export function WorkOrderDetailSidebar({
   artifacts,
   isArtifactsLoading,
   artifactsError,
+  pullRequests = [],
+  isPullRequestsLoading = false,
+  pullRequestsError = null,
   displayStatus,
   statusMeta,
   assigneeIds,
@@ -73,6 +85,12 @@ export function WorkOrderDetailSidebar({
         isDispatchable={isDispatchable}
         isDispatching={isDispatching}
         onDispatch={onDispatch}
+      />
+
+      <WorkOrderPullRequestsList
+        pullRequests={pullRequests}
+        isLoading={isPullRequestsLoading}
+        error={pullRequestsError}
       />
 
       <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />

@@ -121,9 +121,9 @@ describe("splitRunPopupModel", () => {
     const fixtureArtifacts = collectSplitRunArtifacts(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
     const liveArtifacts = [
       {
-        id: "art-live-pr",
-        type: "TYPE_PR" as const,
-        data: { number: 88, url: "https://github.com/acme/app/pull/88" },
+        id: "art-live-link",
+        type: "TYPE_LINK" as const,
+        data: { title: "Preview", url: "https://preview.example.com/88" },
       },
     ];
 
@@ -137,9 +137,9 @@ describe("splitRunPopupModel", () => {
     const artifacts = splitRunLinkedArtifacts([
       {
         id: "newer",
-        type: "TYPE_PR",
+        type: "TYPE_LINK",
         createdAt: "2026-08-25T12:00:00.000Z",
-        data: { number: 2 },
+        data: { title: "Preview", url: "https://preview.example.com/2" },
       },
       {
         id: "older",

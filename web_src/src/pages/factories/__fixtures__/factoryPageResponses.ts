@@ -3,6 +3,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
   MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
@@ -291,6 +292,8 @@ export interface FactoriesFixture {
   eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
   /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
   artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
+  /** Per-order pull requests; same fallback pattern as `eventsByOrderId`. */
+  pullRequestsByOrderId?: Record<string, FactoriesFactoryPullRequest[]>;
   /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
   /** Storybook-only intake items for the Backlog create search. */

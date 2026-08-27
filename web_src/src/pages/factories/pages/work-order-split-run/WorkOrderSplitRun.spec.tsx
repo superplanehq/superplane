@@ -90,10 +90,12 @@ describe("WorkOrderSplitRunPopup", () => {
           {
             canvasId: "canvas-fb",
             handlerName: "Address PR feedback",
+            pullRequestNumber: "12",
             run: {
               id: "run-fb",
-              title: "Address feedback on PR #12",
-              status: "STATUS_PASSED",
+              canvasId: "canvas-fb",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
               createdAt: "2026-08-26T11:00:00Z",
             },
           },
@@ -858,10 +860,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(stream).getByRole("link", { name: /merge-screenshot/ })).toBeInTheDocument();
     expect(within(stream).getByRole("link", { name: /#510/ })).toBeInTheDocument();
 
-    await user.click(within(screen.getByTestId("split-run-stream-line-find-work-order")).getByRole("button"));
+    await user.click(within(screen.getByTestId("split-run-stream-line-find-pull-request")).getByRole("button"));
 
-    expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.queryByTestId("split-run-canvas-node-find-work-order")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-find-pull-request")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.queryByTestId("split-run-canvas-node-find-pull-request")).not.toBeInTheDocument();
   });
 
   it("lets you rename the title and edit the description on a draft", async () => {

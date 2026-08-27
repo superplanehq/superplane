@@ -1,135 +1,117 @@
 import { describe, expect, it } from "vitest";
 
-import type { FactoriesFactoryPrFeedbackHandlerRun, FactoriesWorkOrderPrFeedbackRun } from "@/api-client";
+import type { CanvasesCanvasRunRef, FactoriesFactoryPullRequest } from "@/api-client";
 
 import {
   activePRFeedbackWorkOrderIds,
-  isActivePRFeedbackRunStatus,
   oldestActivePRFeedbackRun,
-  prFeedbackDraftFromHandler,
   prFeedbackDraftIsValid,
-  statusForPRFeedbackRun,
 } from "./prFeedbackSettingsModel";
-import { prFeedbackLogRunsFromItems } from "./useWorkOrderPRFeedbackRunHref";
+import { prFeedbackLogRunsFromPullRequests } from "./useWorkOrderPRFeedbackRunHref";
+import { isActiveCanvasRun, statusForCanvasRun } from "../lib/workOrderPullRequest";
 
-function run(overrides: FactoriesFactoryPrFeedbackHandlerRun): FactoriesFactoryPrFeedbackHandlerRun {
+function run(overrides: CanvasesCanvasRunRef): CanvasesCanvasRunRef {
   return overrides;
 }
 
-describe("prFeedbackLogRunsFromItems", () => {
+describe("prFeedbackLogRunsFromPullRequests", () => {
   it("returns matching runs oldest first and skips items without a canvas or run id", () => {
-    const items: FactoriesWorkOrderPrFeedbackRun[] = [
+    const pullRequests: FactoriesFactoryPullRequest[] = [
       {
-        handlerId: "h-1",
-        canvasId: "c-1",
-        handlerName: "Address PR feedback",
-        run: run({
-          id: "later",
-          status: "STATUS_RUNNING",
-          createdAt: "2026-08-26T12:00:00Z",
-        }),
-      },
-      {
-        handlerId: "h-2",
-        canvasId: "c-2",
-        run: run({
-          status: "STATUS_PASSED",
-          createdAt: "2026-08-26T08:00:00Z",
-        }),
-      },
-      {
-        handlerId: "h-2",
-        canvasId: "c-2",
-        handlerName: "Second handler",
-        run: run({
-          id: "older",
-          status: "STATUS_PASSED",
-          createdAt: "2026-08-26T11:00:00Z",
-        }),
+        workOrderId: "wo-1",
+        number: "42",
+        runs: [
+          run({
+            id: "later",
+            canvasId: "c-1",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          }),
+          run({
+            canvasId: "c-2",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T08:00:00Z",
+          }),
+          run({
+            id: "older",
+            canvasId: "c-2",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          }),
+        ],
       },
     ];
 
-    const matches = prFeedbackLogRunsFromItems(items);
+    const matches = prFeedbackLogRunsFromPullRequests(pullRequests, [{ canvasId: "c-2", name: "Second handler" }]);
     expect(matches.map((match) => match.run.id)).toEqual(["older", "later"]);
     expect(matches[0]?.handlerName).toBe("Second handler");
+    expect(matches[0]?.pullRequestNumber).toBe("42");
   });
 });
 
-describe("statusForPRFeedbackRun", () => {
-  it("maps handler run status onto log phase status", () => {
-    expect(statusForPRFeedbackRun("STATUS_QUEUED")).toBe("pending");
-    expect(statusForPRFeedbackRun("STATUS_RUNNING")).toBe("running");
-    expect(statusForPRFeedbackRun("STATUS_PASSED")).toBe("passed");
-    expect(statusForPRFeedbackRun("STATUS_FAILED")).toBe("failed");
-    expect(statusForPRFeedbackRun("STATUS_CANCELLED")).toBe("failed");
-    expect(statusForPRFeedbackRun("STATUS_UNSPECIFIED")).toBe("pending");
+describe("statusForCanvasRun", () => {
+  it("maps generic run state onto log phase status", () => {
+    expect(statusForCanvasRun(run({ state: "STATE_PENDING" }))).toBe("pending");
+    expect(statusForCanvasRun(run({ state: "STATE_STARTED" }))).toBe("running");
+    expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe("passed");
+    expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe("failed");
+    expect(statusForCanvasRun(run({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }))).toBe("failed");
   });
 });
 
 describe("oldestActivePRFeedbackRun", () => {
-  it("returns the oldest queued or running run", () => {
+  it("returns the oldest pending or started run", () => {
     const selected = oldestActivePRFeedbackRun([
       run({
         id: "later",
-        status: "STATUS_RUNNING",
+        state: "STATE_STARTED",
         createdAt: "2026-08-26T12:00:00Z",
       }),
       run({
         id: "older",
-        status: "STATUS_QUEUED",
+        state: "STATE_PENDING",
         createdAt: "2026-08-26T11:00:00Z",
       }),
-      run({
-        id: "done",
-        status: "STATUS_PASSED",
-        createdAt: "2026-08-26T09:00:00Z",
-      }),
     ]);
-
     expect(selected?.id).toBe("older");
-  });
-
-  it("returns nothing when no run is active", () => {
-    expect(
-      oldestActivePRFeedbackRun([run({ id: "done", status: "STATUS_PASSED", createdAt: "2026-08-26T09:00:00Z" })]),
-    ).toBeUndefined();
   });
 });
 
-describe("isActivePRFeedbackRunStatus", () => {
-  it("treats queued and running as active", () => {
-    expect(isActivePRFeedbackRunStatus("STATUS_QUEUED")).toBe(true);
-    expect(isActivePRFeedbackRunStatus("STATUS_RUNNING")).toBe(true);
-    expect(isActivePRFeedbackRunStatus("STATUS_PASSED")).toBe(false);
-    expect(isActivePRFeedbackRunStatus("STATUS_FAILED")).toBe(false);
+describe("isActiveCanvasRun", () => {
+  it("treats pending, started, and cancelling as active", () => {
+    expect(isActiveCanvasRun(run({ id: "1", state: "STATE_PENDING" }))).toBe(true);
+    expect(isActiveCanvasRun(run({ id: "2", state: "STATE_STARTED" }))).toBe(true);
+    expect(isActiveCanvasRun(run({ id: "3", state: "STATE_CANCELLING" }))).toBe(true);
+    expect(isActiveCanvasRun(run({ id: "4", state: "STATE_FINISHED", result: "RESULT_PASSED" }))).toBe(false);
+    expect(isActiveCanvasRun(run({ id: "5", state: "STATE_FINISHED", result: "RESULT_FAILED" }))).toBe(false);
   });
 });
 
 describe("activePRFeedbackWorkOrderIds", () => {
-  it("collects work orders that have a queued or running PR feedback run", () => {
+  it("returns work orders that have an active pull request run", () => {
     expect(
       activePRFeedbackWorkOrderIds([
-        { id: "wo-1", prFeedbackRuns: [{ run: { status: "STATUS_QUEUED" } }] },
-        { id: "wo-2", prFeedbackRuns: [{ run: { status: "STATUS_PASSED" } }] },
-        { id: "wo-3", prFeedbackRuns: [{ run: { status: "STATUS_RUNNING" } }] },
-        { prFeedbackRuns: [{ run: { status: "STATUS_QUEUED" } }] },
-        { id: "wo-4" },
+        { workOrderId: "wo-1", runs: [{ id: "r1", state: "STATE_PENDING" }] },
+        { workOrderId: "wo-2", runs: [{ id: "r2", state: "STATE_FINISHED", result: "RESULT_PASSED" }] },
+        { workOrderId: "wo-3", runs: [{ id: "r3", state: "STATE_STARTED" }] },
+        { runs: [{ id: "r4", state: "STATE_PENDING" }] },
       ]),
     ).toEqual(new Set(["wo-1", "wo-3"]));
   });
 });
 
 describe("prFeedbackDraftIsValid", () => {
-  it("requires a name, repository, and mention that starts with @", () => {
-    const draft = prFeedbackDraftFromHandler({
-      name: "Address PR feedback",
-      settings: {
-        subject: { repository: "acme/app" },
-        discussion: { mention: "@superplaneagent", ignoreBots: true },
-      },
-    });
-    expect(prFeedbackDraftIsValid(draft)).toBe(true);
-    expect(prFeedbackDraftIsValid({ ...draft, mention: "superplaneagent" })).toBe(false);
-    expect(prFeedbackDraftIsValid({ ...draft, repository: "  " })).toBe(false);
+  it("requires a name, repository, and mention", () => {
+    expect(
+      prFeedbackDraftIsValid({
+        name: "Address PR feedback",
+        repository: "acme/app",
+        mention: "@bot",
+        ignoreBots: true,
+      }),
+    ).toBe(true);
+    expect(prFeedbackDraftIsValid({ name: "", repository: "acme/app", mention: "@bot", ignoreBots: true })).toBe(false);
   });
 });

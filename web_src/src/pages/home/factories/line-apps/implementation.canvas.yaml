@@ -354,15 +354,18 @@ spec:
     - id: attach-pr-artifact
       name: Attach PR to Work Order
       type: TYPE_ACTION
-      component: addWorkOrderArtifact
+      component: addPullRequest
       concurrency:
         max: 100
       configuration:
-        artifactType: pr
-        number: '{{ $["Create Draft Pull Request"].data.number }}'
         orderId: '{{ order().id }}'
-        state: open
+        provider: github
+        repository: '{{ install_params.appRepository }}'
+        number: '{{ $["Create Draft Pull Request"].data.number }}'
         url: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
+        title: '{{ $["Create Draft Pull Request"].data.title }}'
+        state: open
+        externalId: '{{ $["Create Draft Pull Request"].data.id }}'
       position:
         x: 1442
         'y': 1488

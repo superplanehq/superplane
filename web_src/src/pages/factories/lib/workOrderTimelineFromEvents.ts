@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
 import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
+import { isPullRequestArtifactType, pullRequestFromEventPayload, pullRequestLabel } from "./workOrderPullRequest";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import type {
   UserNameLookup,
@@ -46,6 +47,16 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
+interface EventPullRequestPayload {
+  id?: string;
+  provider?: string;
+  repository?: string;
+  number?: number | string;
+  url?: string;
+  title?: string;
+  state?: string;
+}
+
 interface EventCheckPayload {
   name?: string;
   score?: number;
@@ -70,6 +81,7 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  pullRequest?: EventPullRequestPayload;
   check?: EventCheckPayload;
 }
 
@@ -87,6 +99,8 @@ const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.comment.added": 45,
   "order.check.reported": 46,
   "order.artifact.added": 47,
+  "order.pull_request.added": 48,
+  "order.pull_request.updated": 49,
 };
 
 function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
@@ -156,6 +170,12 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.pull_request.added":
+      appendPullRequestEvent(state, index, payload, at, "pullRequestAdded", resolveUserName);
+      return;
+    case "order.pull_request.updated":
+      appendPullRequestEvent(state, index, payload, at, "pullRequestUpdated", resolveUserName);
       return;
     case "order.check.reported":
       appendCheckReportedEvent(state, index, payload, at);
@@ -334,7 +354,7 @@ function appendArtifactEvent(
   resolveUserName?: UserNameLookup,
 ): void {
   const artifact = payload.artifact;
-  if (!artifact?.type) {
+  if (!artifact?.type || isPullRequestArtifactType(artifact.type)) {
     return;
   }
 
@@ -359,6 +379,40 @@ function appendArtifactEvent(
     actorAutomation: automationActor,
     artifact: timelineArtifact,
     title: describeArtifactAdded(artifact),
+  });
+}
+
+function appendPullRequestEvent(
+  state: TimelineBuildState,
+  index: number,
+  payload: EventPayload,
+  at: string,
+  kind: "pullRequestAdded" | "pullRequestUpdated",
+  resolveUserName?: UserNameLookup,
+): void {
+  if (!payload.pullRequest) {
+    return;
+  }
+
+  const pullRequest = pullRequestFromEventPayload(payload.pullRequest);
+  const automationActor = toAutomationActor(payload.automation);
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.pullRequests = [...(step.pullRequests ?? []), pullRequest];
+    return;
+  }
+
+  state.events.push({
+    id: `pull-request-${kind}-${index}`,
+    kind,
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    pullRequest,
+    title: describePullRequestEvent(kind, pullRequest),
   });
 }
 
@@ -429,7 +483,6 @@ function findAutomationStep(
 }
 
 const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
-  pr: "PR",
   markdown: "note",
   branch: "branch",
 };
@@ -446,6 +499,14 @@ function describeArtifactAdded(artifact: EventArtifactPayload): string {
     extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data) || extractArtifactName(artifact.data);
   const type = formatArtifactKindShort(artifact.type);
   return label ? `attached ${type}: ${label}` : `attached ${type}`;
+}
+
+function describePullRequestEvent(
+  kind: "pullRequestAdded" | "pullRequestUpdated",
+  pullRequest: ReturnType<typeof pullRequestFromEventPayload>,
+): string {
+  const label = pullRequestLabel(pullRequest);
+  return kind === "pullRequestUpdated" ? `updated pull request ${label}` : `added pull request ${label}`;
 }
 
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {

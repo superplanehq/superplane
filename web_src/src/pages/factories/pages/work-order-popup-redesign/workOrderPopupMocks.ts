@@ -214,17 +214,6 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
 const PHASE_NAMES = ["Implement", "Verify", "Done"] as const;
 const PR_CLOSURE_APP_NAME = "PR Closure";
 
-export const PR_CLOSURE_PR_ARTIFACT: FactoriesWorkOrderArtifact = {
-  id: "art-pr-closure",
-  type: "TYPE_PR",
-  data: {
-    url: "https://github.com/example/ledger/pull/510",
-    title: "Send refund receipts after provider confirm",
-    number: 510,
-    state: "merged",
-  },
-};
-
 function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
   return {
     ...DESCRIPTION_ARTIFACT,
@@ -267,7 +256,7 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
       ? presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence")
       : [],
     description: descriptionArtifactForOrder(order),
-    outputs: executions.some(isPrClosureRun) ? [PR_CLOSURE_PR_ARTIFACT] : [],
+    outputs: [],
     log: [backlogLogEntry(order), ...executions.map((execution) => executionToLogEntry(order, execution))],
     elapsed: displayStatus === "draft" ? "Not started" : base.elapsed,
     owner: workOrderOwnerDisplay(order, base.owner),
@@ -326,7 +315,7 @@ function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWork
     title: isDone ? doneLogTitle(order, execution) : (execution.step ?? actor),
     duration: state === "running" ? "4m so far" : "1m 12s",
     state,
-    artifactId: isDone && isPrClosureRun(execution) ? PR_CLOSURE_PR_ARTIFACT.id : undefined,
+    artifactId: undefined,
   };
 }
 

@@ -12,6 +12,7 @@ type prFeedbackGraph struct {
 	ReviewTriggerNodeID  string
 	ReplyTriggerNodeID   string
 	FindNodeID           string
+	ActivityNodeID       string
 	RunnerNodeID         string
 }
 
@@ -23,7 +24,7 @@ func (g prFeedbackGraph) Healthy(spec models.LiveCanvasSpec) bool {
 	if g.CommentTriggerNodeID == "" || g.ReviewTriggerNodeID == "" || g.ReplyTriggerNodeID == "" {
 		return false
 	}
-	if g.FindNodeID == "" || g.RunnerNodeID == "" {
+	if g.FindNodeID == "" || g.ActivityNodeID == "" || g.RunnerNodeID == "" {
 		return false
 	}
 
@@ -32,7 +33,10 @@ func (g prFeedbackGraph) Healthy(spec models.LiveCanvasSpec) bool {
 			return false
 		}
 	}
-	if !hasCanvasPath(spec.Edges, g.FindNodeID, g.RunnerNodeID) {
+	if !hasCanvasPath(spec.Edges, g.FindNodeID, g.ActivityNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.ActivityNodeID, g.RunnerNodeID) {
 		return false
 	}
 
@@ -64,6 +68,9 @@ func resolvePRFeedbackGraph(spec models.LiveCanvasSpec) prFeedbackGraph {
 		}),
 		FindNodeID: resolveIntakeNode(nodes, prFeedbackFindNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackFindComponent
+		}),
+		ActivityNodeID: resolveIntakeNode(nodes, prFeedbackActivityNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == prFeedbackActivityComponent
 		}),
 		RunnerNodeID: resolveIntakeNode(nodes, prFeedbackRunnerNodeID, func(node *models.Node) bool {
 			return slices.Contains(intakeAnalysisComponents, node.ComponentName())

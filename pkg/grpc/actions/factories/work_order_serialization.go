@@ -21,22 +21,12 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
-	runsByOrder, err := loadPRFeedbackRunsByWorkOrderID(db, factory, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
-
-	serialized, err := serializeWorkOrder(
+	return serializeWorkOrder(
 		factory,
 		order,
 		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
 	)
-	if err != nil {
-		return nil, err
-	}
-	serialized.PrFeedbackRuns = runsByOrder[order.ID]
-	return serialized, nil
 }
 
 func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, orders []models.FactoryWorkOrder) ([]*pb.WorkOrder, error) {
@@ -60,11 +50,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return nil, err
 	}
 
-	runsByOrder, err := loadPRFeedbackRunsByWorkOrderID(db, factory, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
 		serialized, err := serializeWorkOrder(
@@ -76,7 +61,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		if err != nil {
 			return nil, err
 		}
-		serialized.PrFeedbackRuns = runsByOrder[orders[i].ID]
 		result[i] = serialized
 	}
 
