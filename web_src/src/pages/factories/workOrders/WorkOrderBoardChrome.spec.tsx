@@ -28,6 +28,23 @@ describe("WorkOrderKanbanBoard", () => {
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
+  it("keeps children in an empty lane when keepChildrenWhenEmpty is set", () => {
+    render(
+      <WorkOrderBoardLane
+        title="Backlog"
+        count={0}
+        emptyDescription="No work orders in the backlog."
+        keepChildrenWhenEmpty
+        testId="lane-ghost"
+      >
+        <p data-testid="lane-children">Create work order</p>
+      </WorkOrderBoardLane>,
+    );
+
+    expect(screen.getByTestId("lane-children")).toHaveTextContent("Create work order");
+    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+  });
+
   it("renders custom empty content instead of the dashed copy", () => {
     render(
       <WorkOrderBoardLane

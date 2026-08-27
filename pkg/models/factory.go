@@ -479,6 +479,28 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithOrigin(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+}
+
+func (f *Factory) createWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin *WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
@@ -509,6 +531,7 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
+	applyWorkOrderOrigin(order, origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
 		return nil, err
