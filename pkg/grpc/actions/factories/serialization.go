@@ -257,7 +257,20 @@ func serializeWorkOrder(
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
 		StatusNotes:    statusNotes,
+		Origin:         serializeWorkOrderOrigin(order),
 	}, nil
+}
+
+func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {
+	origin := order.Origin()
+	if origin == nil {
+		return nil
+	}
+
+	return &pb.WorkOrderOrigin{
+		Url:   origin.URL,
+		Label: origin.Label,
+	}
 }
 
 func serializeWorkOrderStatusNotes(order *models.FactoryWorkOrder) ([]*pb.WorkOrderStatusNote, error) {
