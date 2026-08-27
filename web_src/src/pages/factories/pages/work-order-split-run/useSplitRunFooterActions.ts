@@ -28,11 +28,11 @@ function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "rerun-step") {
     return "Work order step started again.";
   }
-  return "Work order closed as canceled.";
+  return "Work order closed as failed.";
 }
 
 function rejectToast(): string {
-  return "Work order deleted.";
+  return "Work order closed as failed.";
 }
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {

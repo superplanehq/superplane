@@ -6,7 +6,7 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "d
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "stop" | "reopen";
+export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "reopen";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -70,6 +70,10 @@ export function rerunStartStepIndex(choice: SplitRunStopChoice, currentStepIndex
   return Math.max(0, currentStepIndex);
 }
 
+export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
+  return kind === "running";
+}
+
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
   return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
 }
@@ -130,7 +134,7 @@ export interface SplitRunFooter {
   sentence: string;
   actions: SplitRunFooterAction[];
   note?: SplitRunFooterNote;
-  /** When true, the waiting or failed note renders as a sticky strip above Stop. */
+  /** When true, the waiting or failed note renders as a sticky strip. */
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
@@ -138,8 +142,9 @@ export interface SplitRunFooter {
 
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
-const STOP: SplitRunFooterAction = { id: "stop", kind: "stop", label: "Stop", emphasis: "quiet" };
+const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+const REJECT_APPROVE: SplitRunFooterAction[] = [REJECT, APPROVE];
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
   return {
@@ -153,9 +158,9 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 }
 
 /**
- * The footer is the action bar under Description and Log. Draft keeps
- * Reject and Start. Implement and Verify keep Stop. Closed orders keep
- * Reopen. A visible waiting note sits above Stop as an attention card.
+ * Header actions for the work-order popup. Draft keeps Reject and Start.
+ * Open orders keep Reject and Approve. Closed orders keep Reopen.
+ * A visible waiting note sits under the log as an attention card.
  */
 export function buildSplitRunFooter(input: {
   kind: SplitRunFooterKind;
@@ -196,7 +201,7 @@ export function buildSplitRunFooter(input: {
       sentence: "This work order is running.",
       note,
       run: input.run,
-      actions: [STOP],
+      actions: REJECT_APPROVE,
     });
   }
   if (input.kind === "waiting" || input.kind === "failed") {
@@ -206,7 +211,7 @@ export function buildSplitRunFooter(input: {
       note,
       attentionCard,
       run: input.run,
-      actions: [STOP],
+      actions: REJECT_APPROVE,
     });
   }
   return withStatus({
