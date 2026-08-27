@@ -14,7 +14,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 
 type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
-interface ScheduleConfiguration {
+export interface ScheduleConfiguration {
   type: ScheduleConfigurationType;
   minutesInterval?: number;
   hoursInterval?: number;
@@ -81,7 +81,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
   }
 }
 
-function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
+export function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
   // Always use backend-calculated nextTrigger first if available
   if (referenceNextTrigger) {
     try {
@@ -244,10 +244,19 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Match Go backend: add interval months in timezone, set day/hour/minute
+      // Match Go backend: advance the month index arithmetically, then clamp
+      // dayOfMonth to the target month's length. Setting month/date separately
+      // (setMonth then setDate) would route the day through the same overflow
+      // normalization the backend fix avoids, so the year/month/day are set
+      // together in a single setFullYear call instead.
+      const monthIndex = nowInTZ.getMonth() + interval;
+      const targetYear = nowInTZ.getFullYear() + Math.floor(monthIndex / 12);
+      const targetMonth = ((monthIndex % 12) + 12) % 12;
+      const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const clampedDay = Math.min(dayOfMonth, daysInTargetMonth);
+
       const nextTriggerInTZ = new Date(nowInTZ);
-      nextTriggerInTZ.setMonth(nextTriggerInTZ.getMonth() + interval);
-      nextTriggerInTZ.setDate(dayOfMonth);
+      nextTriggerInTZ.setFullYear(targetYear, targetMonth, clampedDay);
       nextTriggerInTZ.setHours(hour);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);

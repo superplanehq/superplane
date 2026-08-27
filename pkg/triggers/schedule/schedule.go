@@ -762,12 +762,31 @@ func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now t
 	}
 
 	nowInTZ := now
-	nextTriggerMonths := interval
-	nextTrigger := nowInTZ.AddDate(0, nextTriggerMonths, 0)
-	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), dayOfMonth, hour, minute, 0, 0, nextTrigger.Location())
+
+	// Advance the month index arithmetically, without routing the current
+	// day-of-month through AddDate's overflow normalization (e.g. Jan 31 + 1
+	// month must land in February, not overflow to March).
+	monthIndex := int(nowInTZ.Month()) - 1 + interval
+	year := nowInTZ.Year() + monthIndex/12
+	month := time.Month(monthIndex%12 + 1)
+
+	// Clamp dayOfMonth to the target month's length, so e.g. dayOfMonth=31
+	// means "last day of the month" instead of overflowing into next month.
+	day := dayOfMonth
+	if maxDay := daysInMonth(year, month); day > maxDay {
+		day = maxDay
+	}
+
+	nextTrigger := time.Date(year, month, day, hour, minute, 0, 0, nowInTZ.Location())
 
 	utcResult := nextTrigger.UTC()
 	return &utcResult, nil
+}
+
+// daysInMonth returns the number of days in the given month of the given
+// year. Day 0 of the following month is the last day of the given month.
+func daysInMonth(year int, month time.Month) int {
+	return time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 }
 
 func nextCronTrigger(cronExpression string, now time.Time) (*time.Time, error) {
