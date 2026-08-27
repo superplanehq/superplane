@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
@@ -26,13 +26,13 @@ import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoar
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
-function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fixture"]) {
+function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fixture"], onClose?: () => void) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
-            <WorkOrderSplitRunPopup fixture={fixture} />
+            <WorkOrderSplitRunPopup fixture={fixture} onClose={onClose} />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
@@ -84,12 +84,17 @@ describe("WorkOrderSplitRunPopup stop actions", () => {
     expect(handleStopMock).toHaveBeenCalledWith("rerun-start", expect.objectContaining({ kind: "running" }));
   });
 
-  it("closes a draft as canceled from Reject", async () => {
+  it("closes the popup after Reject deletes a draft", async () => {
+    handleRejectMock.mockResolvedValue(true);
     const user = userEvent.setup();
-    renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER));
+    const onClose = vi.fn();
+    renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER), onClose);
 
     await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("reopens a closed work order from Reopen", async () => {

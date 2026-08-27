@@ -21,6 +21,8 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { BacklogColumn } from "./BacklogColumn";
+import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -43,7 +45,6 @@ import {
   applyWorkOrderScope,
   applyWorkOrderSearch,
   buildWorkOrderListEntries,
-  buildWorkOrderListEntry,
   WORK_ORDER_SCOPES,
 } from "../lib/workOrderListModel";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
@@ -60,9 +61,7 @@ import {
   workOrderKanbanLaneSizeClassName,
   type BoardLaneTone,
 } from "../workOrders/WorkOrderBoardChrome";
-import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
-import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { boardCardLoadsConfidenceChecks, confidenceScoreFromChecks } from "../lib/confidenceScore";
+import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
@@ -86,13 +85,11 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
-import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
-  isFirstRunOnboardingFactory,
   isLineIntakeSourceId,
   type ConfiguredLineIntakeSource,
 } from "./lineIntakeModel";
@@ -447,7 +444,15 @@ function LineDetail({
     [workOrders, line, fullBoard],
   );
   const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
-  const peekOrder = workOrders.find((order) => order.id === peekOrderId);
+  const [peekOrderHint, setPeekOrderHint] = useState<FactoriesWorkOrder | undefined>();
+  const peekOrder =
+    workOrders.find((order) => order.id === peekOrderId) ??
+    (peekOrderHint?.id === peekOrderId ? peekOrderHint : undefined);
+
+  const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
+    setPeekOrderHint(order);
+    setPeekOrderId(orderId);
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -466,10 +471,10 @@ function LineDetail({
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
-          onOpenWorkOrder={setPeekOrderId}
+          onOpenWorkOrder={openWorkOrder}
         />
       )}
-      {peekOrderId ? (
+      {peekOrderId && peekOrder ? (
         <LineBoardSplitRunPopup
           organizationId={organizationId}
           factoryId={factoryId}
@@ -482,7 +487,10 @@ function LineDetail({
           canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
-          onClose={() => setPeekOrderId(null)}
+          onClose={() => {
+            setPeekOrderHint(undefined);
+            setPeekOrderId(null);
+          }}
         />
       ) : null}
     </div>
@@ -509,7 +517,7 @@ function LineBoardSplitRunPopup({
   lineId: string | undefined;
   lineName: string | undefined;
   peekOrderId: string;
-  peekOrder: FactoriesWorkOrder | undefined;
+  peekOrder: FactoriesWorkOrder;
   canDispatch: boolean;
   canUpdate: boolean;
   isDispatching: boolean;
@@ -525,7 +533,7 @@ function LineBoardSplitRunPopup({
       factoryId={factoryId}
       factoryKey={factoryKey}
       orderId={peekOrderId}
-      orderNumber={peekOrder?.number}
+      orderNumber={peekOrder.number}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
@@ -665,7 +673,7 @@ function PhaseBoard({
   canRename: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
@@ -710,6 +718,8 @@ function PhaseBoard({
     <WorkOrderKanbanBoard testId="lines-phase-board">
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
         <BacklogColumn
+          organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
           orders={backlogOrders}
           title={columnTitles.backlog ?? "Backlog"}
@@ -776,112 +786,6 @@ function PhaseBoard({
   );
 }
 
-function BacklogColumn({
-  factoryKey,
-  orders,
-  title,
-  size,
-  settingsOpen,
-  onOpenSettings,
-  onCloseSettings,
-  onSaveSettings,
-  colorId,
-  onColorChange,
-  canCreateWorkOrder,
-  canRename,
-  onRename,
-  onCreateWorkOrder,
-  workOrderCardContext,
-  onOpenWorkOrder,
-}: {
-  factoryKey: string;
-  orders: FactoriesWorkOrder[];
-  title: string;
-  size: number | null;
-  settingsOpen: boolean;
-  onOpenSettings: () => void;
-  onCloseSettings: () => void;
-  onSaveSettings: (settings: { name: string; size: number | null }) => void;
-  colorId: LineBoardColumnColorId | null;
-  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
-  canCreateWorkOrder: boolean;
-  canRename: boolean;
-  onRename: (title: string) => void;
-  onCreateWorkOrder: () => void;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
-}) {
-  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
-  const atCapacity = size != null && orders.length >= size;
-  const canAdd = canCreateWorkOrder && !atCapacity;
-
-  return (
-    <>
-      <WorkOrderBoardLane
-        title={title}
-        label={title}
-        canRename={canRename}
-        onRename={onRename}
-        titleTestId="lines-column-title-backlog"
-        count={orders.length}
-        tone="neutral"
-        surfaceClassName={surfaceClassName}
-        emptyDescription="No work orders in the backlog."
-        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
-        className={surfaceClassName ? undefined : "bg-muted"}
-        actions={
-          <div className="flex shrink-0 items-center gap-0.5">
-            <PermissionTooltip allowed={canCreateWorkOrder} message="You don't have permission to create work orders.">
-              <button
-                type="button"
-                onClick={() => {
-                  if (canAdd) {
-                    onCreateWorkOrder();
-                  }
-                }}
-                disabled={!canAdd}
-                aria-label="Create work order"
-                title={atCapacity ? "The backlog is full." : "Create work order"}
-                data-testid="lines-backlog-create"
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
-              >
-                <Plus className="size-3.5" aria-hidden />
-              </button>
-            </PermissionTooltip>
-            <ColumnLaneMenu
-              title={title}
-              testId="lines-backlog-menu"
-              onEdit={onOpenSettings}
-              colorId={colorId}
-              onColorChange={onColorChange}
-            />
-          </div>
-        }
-        testId="lines-backlog-column"
-      >
-        <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-          {orders.map((order) => (
-            <li key={order.id}>
-              <LineBoardOrderCard
-                order={order}
-                workOrderCardContext={workOrderCardContext}
-                onOpenWorkOrder={onOpenWorkOrder}
-              />
-            </li>
-          ))}
-        </ul>
-      </WorkOrderBoardLane>
-      <BacklogSettingsDialog
-        open={settingsOpen}
-        name={title}
-        size={size}
-        onSave={onSaveSettings}
-        onClose={onCloseSettings}
-      />
-    </>
-  );
-}
-
 function DoneColumn({
   orders,
   title,
@@ -899,7 +803,7 @@ function DoneColumn({
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -997,7 +901,7 @@ function PhaseColumn({
   canRename: boolean;
   onRename: (title: string) => void;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -1087,7 +991,7 @@ function PhaseRunCard({
 }: {
   run: LinePhaseRunCard;
   workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
   const queuedLabel = isQueuedStepRow(run.execution) ? resolvePhaseRunStatus(run.execution).label : null;
 
@@ -1109,57 +1013,6 @@ function PhaseRunCard({
         </p>
       ) : null}
     </div>
-  );
-}
-
-function LineBoardOrderCard({
-  order,
-  workOrderCardContext,
-  onOpenWorkOrder,
-}: {
-  order: FactoriesWorkOrder;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpenWorkOrder: (orderId: string) => void;
-}) {
-  return (
-    <LineBoardWorkOrderCard
-      order={order}
-      workOrderCardContext={workOrderCardContext}
-      onOpen={() => {
-        if (order.id) {
-          onOpenWorkOrder(order.id);
-        }
-      }}
-    />
-  );
-}
-
-function LineBoardWorkOrderCard({
-  order,
-  workOrderCardContext,
-  onOpen,
-}: {
-  order: FactoriesWorkOrder;
-  workOrderCardContext: WorkOrderCardContext;
-  onOpen: () => void;
-}) {
-  const { factory } = useFactoriesLayout();
-  const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
-  const showConfidence = boardCardLoadsConfidenceChecks(entry.displayStatus);
-  const { data: checks = [] } = useWorkOrderChecks(
-    workOrderCardContext.organizationId,
-    workOrderCardContext.factoryId ?? "",
-    order.id ?? "",
-    { enabled: showConfidence },
-  );
-
-  return (
-    <WorkOrderCard
-      {...workOrderCardContext}
-      entry={entry}
-      confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
-      onOpen={onOpen}
-    />
   );
 }
 
