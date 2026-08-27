@@ -193,6 +193,29 @@ service Factories {
     };
   }
 
+  rpc SearchFactoryIntakeItems(SearchFactoryIntakeItemsRequest) returns (SearchFactoryIntakeItemsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/intakes/{intake_id}/items"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Search factory intake items";
+      description: "Returns recent or matching items from the intake source";
+      tags: "Factory";
+    };
+  }
+
+  rpc ImportFactoryIntakeItem(ImportFactoryIntakeItemRequest) returns (ImportFactoryIntakeItemResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/intakes/{intake_id}/imports"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Import factory intake item";
+      description: "Creates a backlog work order from an intake item";
+      tags: "Factory";
+    };
+  }
+
   // Work orders APIs
 
   rpc ListWorkOrders(ListWorkOrdersRequest) returns (ListWorkOrdersResponse) {
@@ -669,6 +692,35 @@ message ListFactoryIntakeRunsResponse {
   google.protobuf.Timestamp last_timestamp = 2;
 }
 
+message FactoryIntakeItem {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  string body = 4;
+  string url = 5;
+}
+
+message SearchFactoryIntakeItemsRequest {
+  string factory_id = 1;
+  string intake_id = 2;
+  string query = 3;
+  int32 limit = 4;
+}
+
+message SearchFactoryIntakeItemsResponse {
+  repeated FactoryIntakeItem items = 1;
+}
+
+message ImportFactoryIntakeItemRequest {
+  string factory_id = 1;
+  string intake_id = 2;
+  string item_id = 3;
+}
+
+message ImportFactoryIntakeItemResponse {
+  WorkOrder order = 1;
+}
+
 // Work orders
 
 message ListWorkOrdersRequest {
@@ -749,6 +801,13 @@ message WorkOrder {
   // is blocked on and what resolves it. One entry per note key; any
   // state transition clears the whole set.
   repeated WorkOrderStatusNote status_notes = 15;
+  // External ticket this work order was created from, when known.
+  WorkOrderOrigin origin = 16;
+}
+
+message WorkOrderOrigin {
+  string url = 1;
+  string label = 2;
 }
 
 // WorkOrderStatusNote announces what a waiting work order is blocked on
