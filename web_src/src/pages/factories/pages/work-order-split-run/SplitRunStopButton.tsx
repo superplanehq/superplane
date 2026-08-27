@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { Check, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import {
@@ -40,6 +40,10 @@ export function SplitRunStopButton({
   const [choice, setChoice] = useState<SplitRunStopChoice>(
     () => defaultSplitRunStopChoice(status, kind) ?? DEFAULT_SPLIT_RUN_STOP_CHOICE,
   );
+  useEffect(() => {
+    setChoice(defaultSplitRunStopChoice(status, kind) ?? DEFAULT_SPLIT_RUN_STOP_CHOICE);
+  }, [kind, status]);
+
   const selectedId = choices.some((item) => item.id === choice) ? choice : choices[0]?.id;
   const selected = choices.find((item) => item.id === selectedId);
 
