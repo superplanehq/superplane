@@ -18,7 +18,6 @@ import (
 )
 
 type githubManifest struct {
-	DefaultEvents      []string          `json:"default_events"`
 	DefaultPermissions map[string]string `json:"default_permissions"`
 }
 
@@ -36,7 +35,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
+		assertManifestContainsChecksPermission(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -61,7 +60,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/organizations/testhq/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
+		assertManifestContainsChecksPermission(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -273,13 +272,12 @@ func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	require.Equal(t, "https://github.com/test/repo2", repos[1].URL)
 }
 
-func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
+func assertManifestContainsChecksPermission(t *testing.T, manifestJSON string) {
 	t.Helper()
 
 	require.NotEmpty(t, manifestJSON)
 
 	var manifest githubManifest
 	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
-	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
 	require.Equal(t, "read", manifest.DefaultPermissions["checks"])
 }
