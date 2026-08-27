@@ -10,6 +10,14 @@ export const LIVE_CANVAS_FIT_VIEW_OPTIONS = {
   padding: 0.08,
 } as const;
 
+/** Fit at 100% zoom when Factory Configure opens. Do not shrink the graph. */
+export const FACTORY_CONFIGURE_FIT_VIEW_OPTIONS = {
+  ...CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
+  minZoom: 1.0,
+  maxZoom: 1.0,
+  padding: 0.08,
+} as const;
+
 /** Fit options when framing run participant nodes during run inspection. */
 export const RUN_CANVAS_FIT_VIEW_OPTIONS = {
   ...CANVAS_FIT_VIEW_INCLUDE_HIDDEN,

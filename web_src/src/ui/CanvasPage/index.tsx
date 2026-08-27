@@ -112,6 +112,7 @@ import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } 
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
+import { nodesWithSelectedId } from "./nodesWithSelectedId";
 import { resolveRunInspectorOpen } from "./resolveRunInspectorOpen";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -1306,6 +1307,13 @@ function CanvasPage(props: CanvasPageProps) {
     setPendingRuntimeEditNodeId(null);
   }, [pendingRuntimeEditNodeId, props.isEditing, props.isRunInspectionMode, state.componentSidebar]);
 
+  useEffect(() => {
+    if (!props.isEditing || props.isRunInspectionMode || !state.componentSidebar.isOpen) {
+      return;
+    }
+    setCurrentTab("settings");
+  }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
@@ -2357,8 +2365,8 @@ function CanvasContent({
   const isVerticalFlow = flowDirection === "vertical";
   const factoryEditGrid = Boolean(factoryEditWorkspace && (isEditing || factoryConfigure));
   const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid) : null;
-  const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
-  const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
+  const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#e2e8f0");
+  const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#b8c4d0");
   const flowDotGap = factoryBackground?.gap ?? 8;
   const flowDotSize = factoryBackground?.size ?? 2;
   // The content-key driven re-fit only applies when viewing the live/version
@@ -2696,29 +2704,23 @@ function CanvasContent({
       return;
     }
 
-    stateRef.current.setNodes((nodes) => {
-      if (!runSelectedNodeId) {
-        if (nodes.every((node) => !node.selected)) {
-          return nodes;
-        }
-        return nodes.map((node) => ({ ...node, selected: false }));
-      }
-
-      if (!nodes.some((node) => node.id === runSelectedNodeId)) {
-        return nodes;
-      }
-
-      const alreadyCorrect = nodes.every((node) => node.selected === (node.id === runSelectedNodeId));
-      if (alreadyCorrect) {
-        return nodes;
-      }
-
-      return nodes.map((node) => ({
-        ...node,
-        selected: node.id === runSelectedNodeId,
-      }));
-    });
+    stateRef.current.setNodes((nodes) => nodesWithSelectedId(nodes, runSelectedNodeId ?? null));
   }, [isRunInspectionMode, runSelectedNodeId, runCanvasNodeIdsKey]);
+
+  useEffect(() => {
+    if (isRunInspectionMode || !isEditing) {
+      return;
+    }
+
+    const selectedNodeId = state.componentSidebar.isOpen ? state.componentSidebar.selectedNodeId : null;
+    stateRef.current.setNodes((nodes) => nodesWithSelectedId(nodes, selectedNodeId));
+  }, [
+    isEditing,
+    isRunInspectionMode,
+    runCanvasNodeIdsKey,
+    state.componentSidebar.isOpen,
+    state.componentSidebar.selectedNodeId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -2872,12 +2874,20 @@ function CanvasContent({
   ]);
 
   const getFactoryConfigureNodeCount = useCallback(() => stateRef.current.nodes?.length ?? 0, []);
+  const getFactoryConfigureFocusNode = useCallback(() => {
+    const nodeId = stateRef.current.componentSidebar.selectedNodeId ?? initialFocusNodeId ?? null;
+    if (!nodeId) {
+      return undefined;
+    }
+    return getNodes().find((node) => node.id === nodeId) ?? stateRef.current.nodes.find((node) => node.id === nodeId);
+  }, [getNodes, initialFocusNodeId]);
   useFactoryConfigureFitView({
     factoryConfigure,
     isEditing,
     hasReactFlowInitialized,
     nodeCount: state.nodes?.length ?? 0,
     getNodeCount: getFactoryConfigureNodeCount,
+    getFocusNode: getFactoryConfigureFocusNode,
     fitView,
     getViewport,
     viewportRef,

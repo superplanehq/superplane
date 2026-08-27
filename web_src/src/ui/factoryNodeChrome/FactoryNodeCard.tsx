@@ -2,7 +2,9 @@ import React from "react";
 import type { DraftDiffStatus } from "@/lib/draftDiff";
 import type { EventStateMap } from "../componentBase/eventState";
 import type { MetadataItem } from "../metadataList";
+import { cn } from "@/lib/utils";
 import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
+import { FACTORY_NODE_SELECTED_RING_CLASSNAME } from "./factoryNodeSelectedRing";
 import { NodeHoverActions } from "./NodeHoverActions";
 import { WarningBadge } from "./WarningBadge";
 import { resolveFactoryNodeCardTitles } from "./resolveFactoryNodeCardTitles";
@@ -166,7 +168,15 @@ export function FactoryNodeCard({
   });
 
   return (
-    <div className="group relative" data-view-mode={isCompactView ? "compact" : "expanded"}>
+    <div
+      className={cn(
+        "group relative overflow-visible rounded-2xl",
+        selected && "z-10",
+        selected && FACTORY_NODE_SELECTED_RING_CLASSNAME,
+      )}
+      data-view-mode={isCompactView ? "compact" : "expanded"}
+      data-selected={selected ? "true" : undefined}
+    >
       <NodeHoverActions
         showHeader={showHeader}
         onDuplicate={onDuplicate}

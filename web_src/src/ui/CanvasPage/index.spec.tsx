@@ -599,6 +599,50 @@ describe("CanvasPage connection drop", () => {
     expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
   });
 
+  it("selects the deep-linked node when the edit sidebar opens from the URL", async () => {
+    const getSidebarData = vi.fn(() => ({
+      latestEvents: [],
+      nextInQueueEvents: [],
+      title: "Node",
+      totalInQueueCount: 0,
+      totalInHistoryCount: 0,
+    }));
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          canvasStateMode="editing"
+          nodes={[
+            {
+              id: "node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Node",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          initialSidebar={{ isOpen: true, nodeId: "node-1" }}
+          getSidebarData={getSidebarData}
+          workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const nodes = reactFlowPropsRef.current?.nodes as Array<{ id: string; selected?: boolean }>;
+      expect(nodes.find((node) => node.id === "node-1")?.selected).toBe(true);
+    });
+    expect(screen.getByTestId("component-sidebar")).toBeInTheDocument();
+  });
+
   it("closes hidden live sidebar state from canvas pane click", async () => {
     const onSidebarChange = vi.fn();
     const getSidebarData = vi.fn(() => ({

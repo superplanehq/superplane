@@ -102,4 +102,22 @@ describe("compactLineCanvasGraph", () => {
     expect(mergeEdge?.data).toMatchObject({ channelLabel: "passed" });
     expect(trueEdge?.type).toBe("custom");
   });
+
+  it("marks the selected node so the compact canvas can highlight it", () => {
+    const { nodes } = compactLineCanvasGraph(messyIfCanvas(), "comment", undefined, false);
+    expect(nodes.find((node) => node.id === "comment")?.data.isSelected).toBe(true);
+    expect(nodes.find((node) => node.id === "on-run")?.data.isSelected).toBe(false);
+  });
+
+  it("attaches an edit href only to the selected node", () => {
+    const { nodes } = compactLineCanvasGraph(
+      messyIfCanvas(),
+      "comment",
+      undefined,
+      false,
+      (nodeId) => `/edit?node=${nodeId}`,
+    );
+    expect(nodes.find((node) => node.id === "comment")?.data.editHref).toBe("/edit?node=comment");
+    expect(nodes.find((node) => node.id === "on-run")?.data.editHref).toBeUndefined();
+  });
 });
