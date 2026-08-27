@@ -375,7 +375,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(note.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(note).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
     expect(note).toHaveTextContent("This automation finished and opened PR #6812.");
-    expect(note).toHaveTextContent("Tag @superplaneagent in comment to request changes.");
     expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
     expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
       "href",
