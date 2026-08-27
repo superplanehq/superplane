@@ -55,6 +55,7 @@ export function RunInspectorHeader({
   organizationId,
   actionPending,
   actionDisabled,
+  actionDisabledReason,
   onAction,
   /** Nested inside a node accordion (factory): drop sticky page chrome styles. */
   embedded = false,
@@ -65,6 +66,8 @@ export function RunInspectorHeader({
   organizationId?: string;
   actionPending: boolean;
   actionDisabled: boolean;
+  /** Overrides the status-based tooltip, e.g. to explain a permission-based disabled state. */
+  actionDisabledReason?: string;
   onAction: () => void;
   embedded?: boolean;
 }) {
@@ -75,7 +78,7 @@ export function RunInspectorHeader({
   const duration = calculateRunDuration(run);
   const durationText = duration !== null ? formatMinutesSecondsDuration(duration) : "";
   const actionLabel = getActionLabel(status);
-  const actionTooltip = getActionTooltip(status);
+  const actionTooltip = actionDisabledReason ?? getActionTooltip(status);
   const isStopAction = status === "running";
 
   return (

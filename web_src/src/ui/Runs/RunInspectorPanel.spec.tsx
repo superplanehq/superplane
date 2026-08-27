@@ -84,6 +84,10 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+}));
+
 beforeEach(() => {
   mockedExecutions = executions;
   mockedExecutionsLoading = false;

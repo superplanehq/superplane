@@ -9,6 +9,7 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -113,6 +114,15 @@ function isStopOrCancelStatus(status: string) {
   return status === "running" || status === "cancelling";
 }
 
+/**
+ * Treat "still loading permissions" as allowed to avoid a disabled-button flash
+ * before `/me` resolves (matches the convention used elsewhere in the app, e.g.
+ * `Members.tsx`'s `canManageInviteLink || permissionsLoading`).
+ */
+function resolveCanRerun(canAct: (resource: string, action: string) => boolean, permissionsLoading: boolean) {
+  return canAct("canvases", "update") || permissionsLoading;
+}
+
 function RunInspectorPanelBody({
   factoryContext,
   organizationId,
@@ -159,7 +169,10 @@ function RunInspectorPanelBody({
         stepCount={model.sections.length || run.executions?.length || 0}
         onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
         actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
-        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
+        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id || !model.actions.canRerun}
+        actionDisabledReason={
+          !stopping && !model.actions.canRerun ? "You do not have permission to restart this run." : undefined
+        }
       />
       <RunInspectorContent
         runErrors={model.runErrors}
@@ -299,6 +312,8 @@ function useRunInspectorPanelModel({
   workflowNodes,
 }: RunInspectorPanelProps) {
   const { account } = useAccount();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const canRerun = resolveCanRerun(canAct, permissionsLoading);
   const { data: me } = useMe(true, organizationId ?? null);
   const executionsQuery = useEventExecutions(canvasId, run.rootEvent?.id || null);
   const runVersionQuery = useCanvasVersion(organizationId ?? "", canvasId, run.versionId ?? "", Boolean(run.versionId));
@@ -336,6 +351,7 @@ function useRunInspectorPanelModel({
     sections,
     executionsLoading: executionsQuery.isLoading,
     onRerunCreated,
+    canRerun,
   });
   const accordionValue = useMemo(
     () => resolveSelectedSectionValue(sections, selectedNodeId, selectedSectionValue),

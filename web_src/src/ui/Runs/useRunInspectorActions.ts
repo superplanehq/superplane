@@ -8,6 +8,7 @@ import {
   canvasesReemitTriggerEvent,
   type CanvasesCanvasRun,
 } from "@/api-client";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { RunInspectorNodeSection } from "./types";
@@ -18,12 +19,14 @@ export function useRunInspectorActions({
   sections,
   executionsLoading,
   onRerunCreated,
+  canRerun = true,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   sections: RunInspectorNodeSection[];
   executionsLoading: boolean;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  canRerun?: boolean;
 }) {
   const queryClient = useQueryClient();
   const runningExecutionIds = useMemo(() => {
@@ -59,7 +62,7 @@ export function useRunInspectorActions({
     await queryClient.invalidateQueries({ queryKey: ["canvases"] });
   }, [queryClient]);
 
-  const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries, onRerunCreated });
+  const rerunMutation = useRerunMutation({ canvasId, run, refreshRunQueries, onRerunCreated, canRerun });
   const stopMutation = useStopMutation({
     canvasId,
     runId: run.id ?? null,
@@ -72,6 +75,7 @@ export function useRunInspectorActions({
   return {
     rerun: () => rerunMutation.mutate(),
     rerunPending: rerunMutation.isPending,
+    canRerun,
     stop: () => stopMutation.mutate(),
     stopPending: stopMutation.isPending,
     stopDisabled:
@@ -107,14 +111,20 @@ function useRerunMutation({
   run,
   refreshRunQueries,
   onRerunCreated,
+  canRerun,
 }: {
   canvasId: string;
   run: CanvasesCanvasRun;
   refreshRunQueries: () => Promise<void>;
   onRerunCreated?: (eventId: string) => void | Promise<void>;
+  canRerun: boolean;
 }) {
   return useMutation({
     mutationFn: async () => {
+      if (!canRerun) {
+        throw new Error("You do not have permission to restart this run.");
+      }
+
       if (!run.rootEvent?.nodeId || !run.rootEvent?.id) {
         throw new Error("Run root event is missing");
       }
@@ -139,7 +149,8 @@ function useRerunMutation({
       showSuccessToast("Run restarted");
     },
     onError: (error) => {
-      console.error("Failed to restart run", error);
+      const message = getApiErrorMessage(error, "Failed to restart run");
+      console.error(`Failed to restart run: ${message}`);
       showErrorToast("Failed to restart run");
     },
   });
@@ -173,7 +184,8 @@ function useStopMutation({
       await refreshRunQueries();
     },
     onError: (error) => {
-      console.error("Failed to stop run", error);
+      const message = getApiErrorMessage(error, "Failed to stop run");
+      console.error(`Failed to stop run: ${message}`);
       showErrorToast("Failed to stop run");
     },
   });
@@ -193,7 +205,8 @@ function useCancelQueuedItemMutation({
       showSuccessToast("Queued step cancelled");
     },
     onError: (error) => {
-      console.error("Failed to cancel queued step", error);
+      const message = getApiErrorMessage(error, "Failed to cancel queued step");
+      console.error(`Failed to cancel queued step: ${message}`);
       showErrorToast("Failed to cancel queued step");
     },
   });
@@ -213,7 +226,8 @@ function useStopNodeMutation({
       showSuccessToast("Step stopped");
     },
     onError: (error) => {
-      console.error("Failed to stop step", error);
+      const message = getApiErrorMessage(error, "Failed to stop step");
+      console.error(`Failed to stop step: ${message}`);
       showErrorToast("Failed to stop step");
     },
   });
@@ -233,7 +247,8 @@ function useExecutionHookMutation({
       showSuccessToast(successMessageForHook(variables.hookName));
     },
     onError: (error, variables) => {
-      console.error(`Failed to invoke ${variables.hookName} hook`, error);
+      const message = getApiErrorMessage(error, `Failed to invoke ${variables.hookName} hook`);
+      console.error(`Failed to invoke ${variables.hookName} hook: ${message}`);
       showErrorToast(errorMessageForHook(variables.hookName));
     },
   });
