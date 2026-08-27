@@ -1,24 +1,30 @@
 import {
   factoriesCreateFactoryIntake,
+  factoriesImportFactoryIntakeItem,
   factoriesListFactoryIntakeRuns,
   factoriesListFactoryIntakes,
+  factoriesSearchFactoryIntakeItems,
   factoriesUpdateFactoryIntake,
 } from "@/api-client";
 import type {
   FactoriesFactoryIntake,
+  FactoriesFactoryIntakeItem,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryIntakeSource,
+  FactoriesWorkOrder,
   FactoryIntakeSettings,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { factoryAppsKey } from "./useFactoryData";
+import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
 
 const factoryIntakeQueryKeys = {
   list: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "intakes"] as const,
   runs: (organizationId: string, factoryId: string, intakeId: string) =>
     ["factories", organizationId, factoryId, "intakes", intakeId, "runs"] as const,
+  items: (organizationId: string, factoryId: string, intakeId: string, query: string, limit: number) =>
+    ["factories", organizationId, factoryId, "intakes", intakeId, "items", query, limit] as const,
 };
 
 export function factoryIntakesKey(organizationId: string, factoryId: string) {
@@ -126,4 +132,94 @@ export function useUpdateFactoryIntake(organizationId: string, factoryId: string
       });
     },
   });
+}
+
+export function useSearchFactoryIntakeItems({
+  organizationId,
+  factoryId,
+  intakeId,
+  query,
+  enabled = true,
+  limit = 5,
+}: {
+  organizationId: string;
+  factoryId: string;
+  intakeId: string | null;
+  query: string;
+  enabled?: boolean;
+  limit?: number;
+}) {
+  const scopedIntakeId = intakeId ?? "";
+  return useQuery({
+    queryKey: factoryIntakeQueryKeys.items(organizationId, factoryId, scopedIntakeId, query, limit),
+    queryFn: async (): Promise<FactoriesFactoryIntakeItem[]> => {
+      const response = await factoriesSearchFactoryIntakeItems(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, intakeId: scopedIntakeId },
+          query: { query, limit },
+        }),
+      );
+      return response.data?.items ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && intakeId) && enabled,
+    placeholderData: (previousData, previousQuery) => {
+      if (previousQuery?.queryKey[4] !== scopedIntakeId) {
+        return undefined;
+      }
+      if (previousQuery?.queryKey[6] !== query) {
+        return undefined;
+      }
+      return previousData;
+    },
+  });
+}
+
+export function useImportFactoryIntakeItem(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { intakeId: string; itemId: string }): Promise<FactoriesWorkOrder> => {
+      const response = await factoriesImportFactoryIntakeItem(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, intakeId: input.intakeId },
+          body: { itemId: input.itemId },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("SuperPlane could not import the item.");
+      }
+      return response.data.order;
+    },
+    onSuccess: (order) => {
+      queryClient.setQueryData<FactoriesWorkOrder[]>(
+        factoryQueryKeys.workOrders(organizationId, factoryId),
+        (current) => upsertImportedWorkOrder(current, order),
+      );
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
+      if (order.id) {
+        queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, order.id), order);
+        void queryClient.invalidateQueries({
+          queryKey: factoryQueryKeys.workOrderDetail(organizationId, factoryId, order.id),
+        });
+      }
+    },
+  });
+}
+
+function upsertImportedWorkOrder(
+  current: FactoriesWorkOrder[] | undefined,
+  order: FactoriesWorkOrder,
+): FactoriesWorkOrder[] {
+  if (!order.id) {
+    return current ?? [];
+  }
+  if (!current) {
+    return [order];
+  }
+  if (current.some((existing) => existing.id === order.id)) {
+    return current.map((existing) => (existing.id === order.id ? order : existing));
+  }
+  return [order, ...current];
 }
