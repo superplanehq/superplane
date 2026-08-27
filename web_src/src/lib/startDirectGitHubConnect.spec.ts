@@ -165,6 +165,39 @@ describe("startDirectGitHubConnect", () => {
     expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1");
   });
 
+  it("opens the picker under a factory integrations path", async () => {
+    const create = vi.fn();
+    const goTo = vi.fn();
+
+    await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/org-1/organization/integrations",
+      integrationsBasePath: "/org-1/organization/integrations",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            browserAction: { method: "GET", url: "https://github.com/login/oauth/authorize" },
+            metadata: {
+              startedByUserID: "user-1",
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ],
+      currentUserId: "user-1",
+      create,
+      goTo,
+    });
+
+    expect(goTo).toHaveBeenCalledWith("/org-1/organization/integrations/int-1");
+  });
+
   it("reuses a pending browser action", async () => {
     const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
     const create = vi.fn();
