@@ -24,15 +24,13 @@ export type SplitRunSource =
       name: string;
       iconSrc: string;
       iconAlt: string;
-      ticket: { label: string; href: string };
+      ticket?: { label: string; href: string };
     }
   | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
     };
-
-const GITHUB_REPO = "acme/payments-service";
 
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
@@ -86,8 +84,7 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSourc
 
   const automation = order.createdBy?.automation;
   if (automation) {
-    const intakeKind = intakeKindForAutomation(automation);
-    return intakeSourceFromHref(ticketHrefForIntake(intakeKind, order), intakeKind);
+    return intakeSourceFromKind(intakeKindForAutomation(automation));
   }
 
   return {
@@ -101,7 +98,7 @@ export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, sou
   if (artifact.id?.endsWith("-issue-link")) {
     return true;
   }
-  if (source?.kind !== "intake") {
+  if (source?.kind !== "intake" || !source.ticket) {
     return false;
   }
   return extractArtifactUrl(toArtifactDataRecord(artifact.data)) === source.ticket.href;
@@ -133,22 +130,11 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   return "github-issues";
 }
 
-function ticketHrefForIntake(kind: SplitRunIntakeKind, order: FactoriesWorkOrder): string {
-  const number = ticketNumber(order);
-  if (kind === "sentry-exceptions") {
-    return `https://superplane.sentry.io/issues/${number}/`;
-  }
-  if (kind === "pagerduty-incidents") {
-    return `https://acme.pagerduty.com/incidents/P${number}`;
-  }
-  if (kind === "slack") {
-    return `https://acme.slack.com/archives/C0REFUNDS/p${number}`;
-  }
-  return `https://github.com/${GITHUB_REPO}/issues/${number}`;
-}
-
-function ticketNumber(order: FactoriesWorkOrder): string {
-  return `${order.key ?? order.number ?? "1"}`.replace(/\D/g, "") || "1";
+function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunSource {
+  return {
+    kind: "intake",
+    ...INTAKE_PRESENTATION[intakeKind],
+  };
 }
 
 function intakeKindFromHref(href: string): SplitRunIntakeKind {

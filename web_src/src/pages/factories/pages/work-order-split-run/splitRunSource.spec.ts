@@ -78,20 +78,13 @@ describe("splitRunSourceForOrder", () => {
   });
 
   it("maps automation-created orders without origin to the intake source", () => {
-    expect(splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined })).toEqual(
-      expect.objectContaining({
-        kind: "intake",
-        name: "Sentry exceptions",
-        ticket: { label: expect.stringMatching(/^superplane#/), href: expect.stringContaining("sentry.io") },
-      }),
-    );
-    expect(splitRunSourceForOrder({ ...QUESTION_WORK_ORDER, origin: undefined })).toEqual(
-      expect.objectContaining({
-        kind: "intake",
-        name: "Slack",
-        ticket: { label: expect.stringMatching(/^acme#/), href: expect.stringContaining("slack.com") },
-      }),
-    );
+    const sentry = splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined });
+    expect(sentry).toEqual(expect.objectContaining({ kind: "intake", name: "Sentry exceptions" }));
+    expect(sentry).not.toHaveProperty("ticket");
+
+    const slack = splitRunSourceForOrder({ ...QUESTION_WORK_ORDER, origin: undefined });
+    expect(slack).toEqual(expect.objectContaining({ kind: "intake", name: "Slack" }));
+    expect(slack).not.toHaveProperty("ticket");
   });
 
   it("maps ingest, Sentry, and Slack automations to the drawer intake names", () => {
@@ -135,8 +128,10 @@ describe("splitRunSourceForOrder", () => {
       const source = splitRunSourceForOrder(order);
       if (source.kind === "intake") {
         expect(source.name, order.id).toBeTruthy();
-        expect(source.ticket.href, order.id).toMatch(/^https?:/);
-        expect(source.ticket.label, order.id).toBeTruthy();
+        if (source.ticket) {
+          expect(source.ticket.href, order.id).toMatch(/^https?:/);
+          expect(source.ticket.label, order.id).toBeTruthy();
+        }
       } else {
         expect(source.person.name, order.id).toBeTruthy();
         expect(source.detail, order.id).toBe("Created manually");

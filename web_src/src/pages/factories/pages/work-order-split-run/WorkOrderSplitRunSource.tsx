@@ -14,14 +14,14 @@ export function WorkOrderSplitRunSource({ source }: { source: SplitRunSource }) 
 }
 
 function IntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "intake" }> }) {
-  const href = safeExternalUrl(source.ticket.href);
+  const href = source.ticket ? safeExternalUrl(source.ticket.href) : undefined;
   return (
     <>
       <p className="flex min-w-0 items-center gap-1.5 text-foreground">
         <img src={source.iconSrc} alt={source.iconAlt} className="size-4 shrink-0" />
         <span className="truncate">{source.name}</span>
       </p>
-      {href ? (
+      {source.ticket && href ? (
         <a
           href={href}
           target="_blank"
@@ -32,9 +32,9 @@ function IntakeSource({ source }: { source: Extract<SplitRunSource, { kind: "int
           <span className="truncate">{source.ticket.label}</span>
           <ExternalLink className="size-3 shrink-0 text-muted-foreground" aria-hidden />
         </a>
-      ) : (
+      ) : source.ticket ? (
         <p className="truncate font-medium text-foreground">{source.ticket.label}</p>
-      )}
+      ) : null}
     </>
   );
 }
