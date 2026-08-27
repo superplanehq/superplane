@@ -1,5 +1,5 @@
-import { render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PhaseLogCard } from "./PhaseLogCard";
 import { idleLiveLogStream, line, PHASE } from "./PhaseLogCard.testHelpers";
@@ -15,25 +15,100 @@ beforeEach(() => {
   useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("PhaseLogCard title line", () => {
-  it("shows the phase name without the component or status word", () => {
+  it("shows the phase name without a status time chip", () => {
     render(<PhaseLogCard phase={PHASE} expanded={false} />);
 
     const row = screen.getByTestId("split-run-phase-plan");
     expect(within(row).getByRole("button", { name: "Plan" })).toBeInTheDocument();
     expect(within(row).queryByText("Planning")).not.toBeInTheDocument();
     expect(within(row).queryByText("Completed")).not.toBeInTheDocument();
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("01:00");
-    expect(row.firstElementChild?.className).toMatch(/font-mono/);
-    expect(row.firstElementChild?.className).toMatch(/text-\[14px\]/);
-    expect(row.firstElementChild?.className).not.toMatch(/font-semibold/);
+    expect(within(row).queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+    expect(within(row).queryByText("Passed 01:00")).not.toBeInTheDocument();
+    expect(row.firstElementChild?.className).toMatch(/rounded-md/);
+    expect(row.firstElementChild?.className).toMatch(/border/);
+    expect(within(row).getByRole("button", { name: "Plan" }).querySelector(".lucide-chevron-right")).toBeNull();
+    expect(within(row).getByRole("button", { name: "Plan" }).className).not.toMatch(/font-mono/);
   });
 
-  it("puts bold artifacts before the duration on the far right", () => {
+  it("ticks the running clock on a node, not the automation", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", duration: "4m so far" }}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            status: "running",
+            duration: "4m so far",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+    const badge = screen.getByTestId("split-run-stream-duration-planner-agent");
+    expect(badge).toHaveAccessibleName("Running");
+    expect(badge).toHaveTextContent("|");
+    expect(badge).toHaveTextContent("Running 04:00");
+
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(badge).toHaveTextContent("/");
+
+    await act(async () => {
+      vi.advanceTimersByTime(750);
+    });
+    expect(badge).toHaveTextContent("Running 04:01");
+
+    vi.useRealTimers();
+  });
+
+  it("keeps bold artifacts on the automation header when the card is expanded", () => {
+    const phase = {
+      ...PHASE,
+      artifacts: [
+        {
+          id: "art-plan",
+          type: "TYPE_MARKDOWN",
+          data: { name: "PLAN.md", title: "PLAN.md" },
+        },
+      ],
+    };
+    const { rerender } = render(<PhaseLogCard phase={phase} expanded={false} />);
+
+    const row = screen.getByTestId("split-run-phase-plan");
+    const name = within(row).getByRole("button", { name: "Plan" });
+    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
+
+    expect(name.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(artifact.className).toMatch(/font-bold/);
+    expect(name.className).toMatch(/flex-1/);
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
+    expect(within(row).queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+
+    rerender(<PhaseLogCard phase={phase} expanded stream={[]} />);
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-automation-header-plan")).getByRole("button", { name: "PLAN.md" }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts Stop to the right of artifacts on a running automation", () => {
     render(
       <PhaseLogCard
         phase={{
           ...PHASE,
+          status: "running",
           artifacts: [
             {
               id: "art-plan",
@@ -43,20 +118,61 @@ describe("PhaseLogCard title line", () => {
           ],
         }}
         expanded={false}
+        onStop={vi.fn()}
       />,
     );
 
-    const row = screen.getByTestId("split-run-phase-plan");
-    const name = within(row).getByRole("button", { name: "Plan" });
-    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
-    const duration = within(row).getByTestId("split-run-phase-duration-plan");
+    const header = screen.getByTestId("split-run-automation-header-plan");
+    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
+    const stop = within(header).getByRole("button", { name: "Stop" });
+    expect(artifact.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
 
-    expect(name.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(duration.className).toMatch(/ml-auto/);
-    expect(artifact.className).toMatch(/font-bold/);
-    expect(name.className).toMatch(/flex-1/);
-    expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
+  it("offers Stop on a running automation and Rerun on a failed one", () => {
+    const onStop = vi.fn();
+    const onRerun = vi.fn();
+    const { rerender } = render(
+      <PhaseLogCard phase={{ ...PHASE, status: "running" }} expanded={false} onStop={onStop} onRerun={onRerun} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop" }).className).toMatch(/text-destructive/);
+    expect(screen.getByRole("button", { name: "Stop" }).className).not.toMatch(/bg-destructive/);
+    expect(screen.getByRole("button", { name: "Stop" }).className).not.toMatch(/text-muted-foreground/);
+    expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
+
+    rerender(
+      <PhaseLogCard phase={{ ...PHASE, status: "failed" }} expanded={false} onStop={onStop} onRerun={onRerun} />,
+    );
+    expect(screen.getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+
+    rerender(<PhaseLogCard phase={PHASE} expanded={false} onStop={onStop} onRerun={onRerun} />);
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
+  });
+
+  it("puts a muted fill on the expanded header, not the nested log", () => {
+    render(<PhaseLogCard phase={PHASE} expanded stream={[]} />);
+
+    const card = screen.getByTestId("split-run-phase-plan").firstElementChild;
+    expect(card?.className).toMatch(/\bbg-card\b/);
+    expect(card?.className).not.toMatch(/\bbg-muted\b/);
+
+    const header = screen.getByTestId("split-run-automation-header-plan");
+    expect(header.className).toMatch(/\bh-8\b/);
+    expect(header.className).toMatch(/\bbg-muted\b/);
+    expect(card?.className).not.toMatch(/\bpx-2\b/);
+    expect(header.className).toMatch(/\bpx-2\b/);
+    expect(header.className).not.toMatch(/-mx-2/);
+  });
+
+  it("keeps a collapsed automation on the card background", () => {
+    render(<PhaseLogCard phase={PHASE} expanded={false} />);
+
+    const card = screen.getByTestId("split-run-phase-plan").firstElementChild;
+    expect(card?.className).toMatch(/\bbg-card\b/);
+    expect(card?.className).not.toMatch(/\bbg-muted\b/);
   });
 });
 
@@ -71,26 +187,34 @@ describe("PhaseLogCard node line", () => {
     }),
   ];
 
-  it("shows the node name and the clock duration on the far right", () => {
+  it("shows the node name and puts status plus time on the far right", () => {
     render(<PhaseLogCard phase={PHASE} expanded stream={NODE_STREAM} />);
 
     const row = screen.getByTestId("split-run-stream-line-planner-agent");
     expect(within(row).getByText("Agent - Plan for GH Issue")).toBeInTheDocument();
-    expect(within(row).getByText("passed")).toBeInTheDocument();
+    expect(within(row).queryByText("passed")).not.toBeInTheDocument();
+    expect(within(row).queryByText(">")).not.toBeInTheDocument();
     expect(within(row).queryByText("12:24:02")).not.toBeInTheDocument();
     expect(within(row).queryByText("Run Claude Code")).not.toBeInTheDocument();
 
-    const duration = within(row).getByTestId("split-run-stream-duration-planner-agent");
-    expect(duration).toHaveTextContent("01:20");
-    expect(duration.className).toMatch(/text-right/);
+    const statusTime = within(row).getByTestId("split-run-stream-duration-planner-agent");
+    expect(statusTime).toHaveTextContent("Passed 01:20");
+    expect(statusTime.className).toMatch(/ml-auto/);
+    expect(statusTime.className).toMatch(/text-right/);
+    expect(screen.getByTestId("split-run-stream-plan").className).toMatch(/font-mono/);
   });
 
-  it("aligns the node icon with the phase glyph column", () => {
+  it("styles the node line as a table header without a caret", () => {
     render(<PhaseLogCard phase={PHASE} expanded stream={NODE_STREAM} />);
 
+    const row = screen.getByTestId("split-run-stream-line-planner-agent");
+    expect(row.querySelector(".lucide-chevron-right")).toBeNull();
+    expect(row.className).toMatch(/\bbg-muted\b/);
+    expect(row.className).toMatch(/border-b/);
+    expect(row.className).not.toMatch(/-mx-2/);
     const toggle = screen.getByTestId("split-run-node-toggle-planner-agent");
     expect(toggle.className).toMatch(/gap-1\.5/);
-    expect(toggle.firstElementChild?.className).toMatch(/w-3/);
+    expect(toggle.firstElementChild?.className).toMatch(/size-3/);
     expect(screen.queryByTestId("split-run-node-indent")).not.toBeInTheDocument();
   });
 });

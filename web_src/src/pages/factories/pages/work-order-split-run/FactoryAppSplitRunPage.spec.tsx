@@ -38,6 +38,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
+    expect(within(page).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
