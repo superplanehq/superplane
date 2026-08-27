@@ -5,9 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { FactoryHomeRedirect } from "./FactoryHomeRedirect";
 
-function renderHome(factory: { lines?: Array<{ id?: string }> } | null) {
+function renderHome(factory: { lines?: Array<{ id?: string }> } | null, path = "/org-1/workspaces/PAY") {
   return render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY"]}>
+    <MemoryRouter initialEntries={[path]}>
       <FactoriesLayoutContext.Provider
         value={{
           organizationId: "org-1",
@@ -20,7 +20,8 @@ function renderHome(factory: { lines?: Array<{ id?: string }> } | null) {
       >
         <Routes>
           <Route path="/org-1/workspaces/PAY" element={<FactoryHomeRedirect />} />
-          <Route path="/org-1/workspaces/PAY/lines" element={<span>lines-list</span>} />
+          <Route path="/org-1/workspaces/PAY/lines" element={<FactoryHomeRedirect />} />
+          <Route path="/org-1/workspaces/PAY/overview" element={<span>overview</span>} />
           <Route path="/org-1/workspaces/PAY/lines/:lineId" element={<span>line-board</span>} />
         </Routes>
       </FactoriesLayoutContext.Provider>
@@ -34,8 +35,13 @@ describe("FactoryHomeRedirect", () => {
     expect(screen.getByText("line-board")).toBeInTheDocument();
   });
 
-  it("opens the lines list when the workspace has no line", () => {
+  it("sends /lines to the first line board", () => {
+    renderHome({ lines: [{ id: "line-plan" }] }, "/org-1/workspaces/PAY/lines");
+    expect(screen.getByText("line-board")).toBeInTheDocument();
+  });
+
+  it("opens overview when the workspace has no line", () => {
     renderHome({ lines: [] });
-    expect(screen.getByText("lines-list")).toBeInTheDocument();
+    expect(screen.getByText("overview")).toBeInTheDocument();
   });
 });

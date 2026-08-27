@@ -6,7 +6,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { factoryAppPath, factoryAppRunPath, factoryLineDetailPath } from "./factoryPagePaths";
 import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import { REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageIds";
 import {
@@ -383,7 +383,7 @@ describe("linePhaseRunHref", () => {
     expect(href).toBe(factoryAppPath("org-1", "RF", "app-refund-implementer", { from: "lines", lineId: "line-1" }));
   });
 
-  it("falls back to the lines list when the phase has no canvas", () => {
+  it("falls back to the line board when the phase has no canvas", () => {
     const href = linePhaseRunHref("org-1", "RF", "line-1", {
       executionId: "e1",
       workOrderId: "wo-1",
@@ -391,7 +391,7 @@ describe("linePhaseRunHref", () => {
       execution: { id: "e1" },
     });
 
-    expect(href).toBe(linesPath("org-1", "RF"));
+    expect(href).toBe(factoryLineDetailPath("org-1", "RF", "line-1"));
   });
 });
 
