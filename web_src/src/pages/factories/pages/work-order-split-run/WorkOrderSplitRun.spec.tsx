@@ -8,14 +8,13 @@ import { describe, expect, it } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
+import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import {
   DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
   LINE_RUN_IMPLEMENT_FAILED_ID,
-  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
@@ -54,7 +53,7 @@ async function openLogTab(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("WorkOrderSplitRunPopup", () => {
-  it("puts an Open automation run link on the Automations heading", () => {
+  it("does not put an expand control on the Log heading", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryKey: PRIMARY_FACTORY_KEY,
@@ -62,23 +61,7 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
 
-    const expand = screen.getByRole("link", { name: "Open automation run" });
-    expect(expand).toHaveAttribute("data-testid", "split-run-log-expand");
-    expect(expand).toHaveAttribute(
-      "href",
-      getWorkOrderRunHref(
-        FACTORIES_ORGANIZATION_ID,
-        PRIMARY_FACTORY_KEY,
-        "app-refund-implementer",
-        LINE_RUN_IMPLEMENT_NOTIFY_ID,
-        { orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number },
-      ),
-    );
-  });
-
-  it("hides the Open automation run link when the popup has no factory", () => {
-    renderSplitRun();
-
+    expect(screen.queryByTestId("split-run-log-expand")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open automation run" })).not.toBeInTheDocument();
   });
 
@@ -167,7 +150,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderSplitRun();
 
     const plan = screen.getByTestId("split-run-phase-plan");
-    const planToggle = within(plan).getByRole("button", { name: /Create plan/ });
+    const planToggle = within(plan).getByRole("button", { name: /^Create plan/ });
     const planArtifacts = within(plan).getByTestId("split-run-phase-artifacts-plan");
     expect(planToggle.parentElement).toBe(planArtifacts.parentElement);
     expect(within(planArtifacts).getByRole("button", { name: "plan.md" })).toBeInTheDocument();
@@ -184,7 +167,7 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeInTheDocument();
 
     const implement = screen.getByTestId("split-run-phase-implement");
-    const implementToggle = within(implement).getByRole("button", { name: /Implement/ });
+    const implementToggle = within(implement).getByRole("button", { name: /^Implement/ });
     const implementArtifacts = within(implement).getByTestId("split-run-phase-artifacts-implement");
     expect(implementToggle.parentElement).toBe(implementArtifacts.parentElement);
     expect(within(implementArtifacts).getByRole("link", { name: /feature\/refund-retry/ })).toBeInTheDocument();
@@ -768,7 +751,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /Create plan/ }));
+    await user.click(within(screen.getByTestId("split-run-phase-plan")).getByRole("button", { name: /^Create plan/ }));
 
     expect(screen.getByTestId("split-run-stream-plan")).toBeInTheDocument();
     expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Started")).not.toBeInTheDocument();
@@ -789,6 +772,40 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(planStream).queryByRole("button", { name: "Read 7 files, ran 35 commands" })).not.toBeInTheDocument();
     expect(within(planStream).queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
     expect(screen.queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
+  });
+
+  it("puts View Automation Run and Edit Automation on an expanded log row", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryKey: PRIMARY_FACTORY_KEY,
+      orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+      fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
+    });
+
+    const prCreation = screen.getByTestId("split-run-phase-pr-creation-2");
+    const view = within(prCreation).getByRole("link", { name: "View Automation Run" });
+    const edit = within(prCreation).getByRole("link", { name: "Edit Automation" });
+    expect(view).toHaveAttribute(
+      "href",
+      factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
+        from: "work-order",
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+        canvas: "closure",
+      }),
+    );
+    expect(edit).toHaveAttribute(
+      "href",
+      factoryAppConfigurePath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
+        orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
+      }),
+    );
+
+    const backlog = screen.getByTestId("split-run-phase-backlog");
+    expect(within(backlog).queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    await user.click(within(backlog).getByRole("button", { name: /^Backlog/ }));
+    expect(within(backlog).queryByRole("link", { name: "View Automation Run" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("link", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
   it("opens a mapped implement-running work order on the implement log", () => {
@@ -848,7 +865,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await openLogTab(user);
     expect(screen.queryByTestId("split-run-stream-done")).not.toBeInTheDocument();
-    await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /Done/ }));
+    await user.click(within(screen.getByTestId("split-run-phase-done")).getByRole("button", { name: /^Done/ }));
 
     const stream = screen.getByTestId("split-run-stream-done");
     expect(within(stream).queryByText("Started")).not.toBeInTheDocument();

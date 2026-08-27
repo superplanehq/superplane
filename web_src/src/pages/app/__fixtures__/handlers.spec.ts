@@ -169,6 +169,19 @@ describe("createFixtureFetch agent routes", () => {
   });
 });
 
+describe("createFixtureFetch canvas detail", () => {
+  it("exposes a live version so edit sessions can start", async () => {
+    const { canvasAppIds, createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
+    const fallback = vi.fn() as unknown as typeof fetch;
+    const fixtureFetch = createDefaultFixtureFetch(fallback);
+
+    const response = await fixtureFetch(`http://localhost/api/v1/canvases/${canvasAppIds.canvasId}`);
+    const body = await response.json();
+
+    expect(body.canvas.metadata.liveVersionId).toBe(canvasAppIds.versionId);
+  });
+});
+
 describe("createFixtureFetch agent gates", () => {
   it("exposes agents permissions and managed-agents feature", async () => {
     const { createFixtureFetch: createDefaultFixtureFetch } = await import("./handlers");
