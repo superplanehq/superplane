@@ -83,6 +83,16 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [] }),
 }));
 
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useCanvasData")>();
+  return {
+    ...actual,
+    useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
+    useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useCommitCanvasStaging: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  };
+});
+
 describe("LinesPage backlog create", () => {
   beforeEach(() => {
     window.localStorage.clear();

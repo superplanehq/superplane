@@ -58,7 +58,7 @@ describe("OnboardingGate", () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/lines")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
   });
 
   // Setup finishes with its own redirect to the intake drawer. This redirect

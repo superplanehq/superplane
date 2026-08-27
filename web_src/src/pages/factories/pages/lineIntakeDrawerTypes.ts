@@ -18,6 +18,7 @@ export interface LineIntakeDrawerProps {
   onSelectIntakeTemplate?: (template: AddIntakeTemplate) => void;
   organizationId?: string;
   factoryId?: string;
+  factoryKey?: string;
   editAutomationHref?: string;
   editAutomationHrefFor?: (intake: ConfiguredLineIntakeSource) => string | undefined;
   /** Preview an unconfigured source, used by the picker in Storybook. */

@@ -2,7 +2,12 @@ import type { FactoriesFactory } from "@/api-client";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryHomePath, factoryIntakePath, factorySetupPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
+import {
+  factoryIntakePath,
+  factoryOverviewPath,
+  factorySetupPath,
+  firstFactoryLineId,
+} from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -19,7 +24,7 @@ function isWorkspaceSetupRoute(pathname: string) {
 function pathAfterSetup(organizationId: string, factoryKey: string, factory: FactoriesFactory | null) {
   const lineId = firstFactoryLineId(factory);
   if (!lineId) {
-    return factoryHomePath(organizationId, factoryKey);
+    return factoryOverviewPath(organizationId, factoryKey);
   }
   return factoryIntakePath(organizationId, factoryKey, lineId);
 }

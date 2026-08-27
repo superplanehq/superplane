@@ -145,6 +145,7 @@ export function LineIntakeDrawer({
   onSelectIntakeTemplate,
   organizationId,
   factoryId,
+  factoryKey,
   editAutomationHref,
   editAutomationHrefFor,
   previewSource,
@@ -202,11 +203,13 @@ export function LineIntakeDrawer({
         initialSettingsTab={initialSettingsTab}
         organizationId={organizationId}
         factoryId={factoryId}
+        factoryKey={factoryKey}
         settingsIntake={drawer.settingsIntake}
         editAutomationHref={
           (drawer.settingsIntake ? editAutomationHrefFor?.(drawer.settingsIntake) : undefined) ?? editAutomationHref
         }
         previewSource={drawer.previewIntake?.source ?? previewSource}
+        previewAppId={drawer.previewIntake?.appId}
         openTicket={drawer.openTicket}
         onClosePicker={drawer.closePicker}
         onSelectTemplate={drawer.selectIntakeTemplate}
@@ -334,9 +337,11 @@ function LineIntakeDrawerPopups({
   initialSettingsTab,
   organizationId,
   factoryId,
+  factoryKey,
   settingsIntake,
   editAutomationHref,
   previewSource,
+  previewAppId,
   openTicket,
   onClosePicker,
   onSelectTemplate,
@@ -350,9 +355,11 @@ function LineIntakeDrawerPopups({
   initialSettingsTab: IntakeSettingsTab;
   organizationId?: string;
   factoryId?: string;
+  factoryKey?: string;
   settingsIntake?: ConfiguredLineIntakeSource;
   editAutomationHref?: string;
   previewSource?: LineIntakeSource;
+  previewAppId?: string;
   openTicket: LineIntakeAnalyzingTicket | null;
   onClosePicker: () => void;
   onSelectTemplate: (template: AddIntakeTemplate) => void;
@@ -415,7 +422,9 @@ function LineIntakeDrawerPopups({
       {previewSource ? (
         <WorkOrderSplitRunPopup
           key={previewSource.id}
-          fixture={intakeAutomationFixture(previewSource)}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          fixture={intakeAutomationFixture(previewSource, previewAppId)}
           onClose={onClosePreview}
           fixed
         />
@@ -423,6 +432,8 @@ function LineIntakeDrawerPopups({
       {openTicket ? (
         <WorkOrderSplitRunPopup
           key={openTicket.id}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
           fixture={intakeTicketAnalysisFixture(openTicket)}
           onClose={onCloseOpenTicket}
           fixed

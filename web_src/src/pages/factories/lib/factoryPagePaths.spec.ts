@@ -33,8 +33,8 @@ describe("factoryHomePath", () => {
     expect(factoryHomePath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan");
   });
 
-  it("opens the lines list when no line id is present", () => {
-    expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP/lines");
+  it("opens the workspace index when no line id is present", () => {
+    expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP");
   });
 });
 

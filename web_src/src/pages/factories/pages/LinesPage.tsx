@@ -1,7 +1,4 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
-import { Link } from "@/components/Link/link";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
@@ -15,7 +12,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, Layers, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Clock, MoreHorizontal, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { ClickToRename } from "../layout/ClickToRename";
@@ -66,27 +63,26 @@ import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRun
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
 import {
-  createFactoryLinePath,
   editFactoryLinePath,
   factoryAppConfigurePath,
   factoryAppRunPath,
   factoryHomePath,
-  factoryLineDetailPath,
+  firstFactoryLineId,
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
-  linesPath,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
   factoryKanbanPageClassName,
-  factorySectionBodyClassName,
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
+import { PlanningReviewPopup } from "./PlanningReviewPopup";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
@@ -96,12 +92,7 @@ import {
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
-import { LineListCard } from "./LineListCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
-import { descriptionForLine, toLineListMetrics } from "./lineListMetricsMockData";
-import { useLineCardMutations } from "./useLineCardMutations";
-
-const LIST_SUBTITLE = "Last 30 days. Success rate, completions per day, duration, and cost per merged work order.";
 
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
@@ -155,179 +146,114 @@ export function LinesPage() {
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
   );
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const { actionsForLine } = useLineCardMutations({
-    organizationId,
-    factoryId,
-    factoryKey,
-    lines,
-    canUpdate,
-  });
   const selectedLine = useMemo(
     () => (routeLineId ? (lines.find((line) => line.id === routeLineId) ?? null) : null),
     [lines, routeLineId],
   );
 
-  // Above the list/detail branching below (hooks can't be conditional): this
-  // single call covers both the Lines list and the in-page detail view for a
-  // selected line, re-firing when the selection changes without an
-  // unmount/mount.
-  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Lines", factory?.name ?? "Workspace"]);
+  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
 
-  if (routeLineId && factory && !selectedLine) {
-    return <Navigate to={linesPath(organizationId, factoryKey)} replace />;
+  if (!selectedLine) {
+    return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
   }
 
-  // The phase board is a Kanban surface: it claims the full viewport height so
-  // the lanes read as columns rather than as boxes around their cards.
-  if (selectedLine) {
-    const editAutomationHrefFor = (intake: ConfiguredLineIntakeSource) => {
-      if (!intake.appId) {
-        return undefined;
-      }
-      return factoryAppConfigurePath(organizationId, factoryKey, intake.appId, {
-        from: "lines",
-        lineId: selectedLine.id,
-      });
-    };
-    return (
-      <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
-        {intakeOpen ? (
-          <LineIntakeDrawer
-            configuredSources={configuredIntakes}
-            onOpenTicket={(ticket) => {
-              if (!ticket.appId || !ticket.runId) {
-                return;
-              }
-              navigate(
-                factoryAppRunPath(organizationId, factoryKey, ticket.appId, ticket.runId, {
-                  from: "lines",
-                  lineId: selectedLine.id,
-                }),
-              );
-            }}
-            initialIntakeId={intakeId ?? undefined}
-            initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
-            initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            editAutomationHrefFor={editAutomationHrefFor}
-            showAddIntakeControl={showAddIntakeControl}
-            onSelectIntakeTemplate={(template) => {
-              if (!isLineIntakeSourceId(template.id)) {
-                showErrorToast("This intake template is not available yet.");
-                return;
-              }
-              createIntake
-                .mutateAsync({ source: apiIntakeSource(template.id) })
-                .then((intake) => {
-                  if (!intake.canvasId) {
-                    return;
-                  }
-                  navigate(
-                    factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
-                      from: "lines",
-                      lineId: selectedLine.id,
-                    }),
-                  );
-                })
-                .catch((error) => {
-                  showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
-                });
-            }}
-            onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
-          />
-        ) : null}
-        <div className={factoryKanbanPageClassName}>
-          <div className="shrink-0">
-            <LineDetailHeader
-              organizationId={organizationId}
-              factoryId={factoryId}
-              factoryKey={factoryKey}
-              line={selectedLine}
-              workOrders={workOrders}
-              factory={factory}
-              state={listState}
-              canUpdate={canUpdate}
-            />
-          </div>
-          <div className={factoryWorkOrdersBodyClassName}>
-            <LineDetail
-              organizationId={organizationId}
-              factoryId={factoryId}
-              factoryKey={factoryKey}
-              line={selectedLine}
-              apps={factoryApps}
-              workOrders={visibleWorkOrders}
-              canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
-              canUpdate={canUpdate}
-              onCreateWorkOrder={openCreateWorkOrder}
-              workOrderCardContext={{
-                organizationId,
-                factoryId,
-                factoryKey,
-                factoryLines: lines,
-                canDispatch: canUpdateWorkOrders,
-                preferredLineName: selectedLine.name,
-                canAssign: canUpdateWorkOrders,
-                ...cardActions,
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const editAutomationHrefFor = (intake: ConfiguredLineIntakeSource) => {
+    if (!intake.appId) {
+      return undefined;
+    }
+    return factoryAppConfigurePath(organizationId, factoryKey, intake.appId, {
+      from: "lines",
+      lineId: selectedLine.id,
+    });
+  };
 
   return (
-    <>
-      <WorkspacePageHeader
-        className={factorySectionHeaderClassName}
-        title="Lines"
-        subtitle={LIST_SUBTITLE}
-        actions={
-          <PermissionTooltip
-            allowed={canUpdate || permissionsLoading}
-            message="You don't have permission to create lines."
-          >
-            <Button type="button" size="sm" asChild disabled={!canUpdate} data-testid="lines-create-button">
-              <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
-                <Plus className="size-3.5" aria-hidden />
-                New line
-              </Link>
-            </Button>
-          </PermissionTooltip>
-        }
-      />
-
-      <div className={factorySectionBodyClassName}>
-        {lines.length === 0 ? (
-          <EmptyLinesState
+    <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+      {intakeOpen ? (
+        <LineIntakeDrawer
+          configuredSources={configuredIntakes}
+          onOpenTicket={(ticket) => {
+            if (!ticket.appId || !ticket.runId) {
+              return;
+            }
+            navigate(
+              factoryAppRunPath(organizationId, factoryKey, ticket.appId, ticket.runId, {
+                from: "lines",
+                lineId: selectedLine.id,
+              }),
+            );
+          }}
+          initialIntakeId={intakeId ?? undefined}
+          initialSettingsOpen={isIntakeSettingsTab(intakeSettingsTab)}
+          initialSettingsTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          editAutomationHrefFor={editAutomationHrefFor}
+          showAddIntakeControl={showAddIntakeControl}
+          onSelectIntakeTemplate={(template) => {
+            if (!isLineIntakeSourceId(template.id)) {
+              showErrorToast("This intake template is not available yet.");
+              return;
+            }
+            createIntake
+              .mutateAsync({ source: apiIntakeSource(template.id) })
+              .then((intake) => {
+                if (!intake.canvasId) {
+                  return;
+                }
+                navigate(
+                  factoryAppConfigurePath(organizationId, factoryKey, intake.canvasId, {
+                    from: "lines",
+                    lineId: selectedLine.id,
+                  }),
+                );
+              })
+              .catch((error) => {
+                showErrorToast(getUsageLimitToastMessage(error, "Failed to create intake automation"));
+              });
+          }}
+          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+        />
+      ) : null}
+      <div className={factoryKanbanPageClassName}>
+        <div className="shrink-0">
+          <LineDetailHeader
             organizationId={organizationId}
+            factoryId={factoryId}
             factoryKey={factoryKey}
-            canUpdate={canUpdate || permissionsLoading}
+            line={selectedLine}
+            workOrders={workOrders}
+            factory={factory}
+            state={listState}
+            canUpdate={canUpdate}
           />
-        ) : (
-          <ul className="flex flex-col gap-4" data-testid="lines-list">
-            {lines.map((line) => {
-              if (!line.id) {
-                return null;
-              }
-              return (
-                <li key={line.id}>
-                  <LineListCard
-                    line={line}
-                    href={factoryLineDetailPath(organizationId, factoryKey, line.id)}
-                    metrics={toLineListMetrics(line.metrics)}
-                    description={descriptionForLine(line.id)}
-                    actions={actionsForLine(line)}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        </div>
+        <div className={factoryWorkOrdersBodyClassName}>
+          <LineDetail
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={factoryKey}
+            line={selectedLine}
+            apps={factoryApps}
+            workOrders={visibleWorkOrders}
+            canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+            canUpdate={canUpdate}
+            onCreateWorkOrder={openCreateWorkOrder}
+            workOrderCardContext={{
+              organizationId,
+              factoryId,
+              factoryKey,
+              factoryLines: lines,
+              canDispatch: canUpdateWorkOrders,
+              preferredLineName: selectedLine.name,
+              canAssign: canUpdateWorkOrders,
+              ...cardActions,
+            }}
+          />
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -534,6 +460,7 @@ function LineBoardSplitRunPopup({
       factoryKey={factoryKey}
       orderId={peekOrderId}
       orderNumber={peekOrder.number}
+      lineId={lineId}
       fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
@@ -906,6 +833,7 @@ function PhaseColumn({
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
+  const agentEditor = useColumnCanvasAgentEditor(organizationId, column.appId);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
 
@@ -951,6 +879,7 @@ function PhaseColumn({
             testId={`lines-phase-menu-${column.stepIndex}`}
             editHref={configureHref}
             editLabel={configureHref ? "Edit Automation" : undefined}
+            onEditAgent={agentEditor.openEditor}
             onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
             parallelism={parallelism}
             colorId={colorId}
@@ -980,6 +909,17 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
+      {agentEditor.editorOpen ? (
+        <PlanningReviewPopup
+          key={agentEditor.agentNode?.id ?? "agent"}
+          onClose={agentEditor.closeEditor}
+          organizationId={organizationId}
+          automationHref={configureHref ?? undefined}
+          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
+          isLoading={agentEditor.isLoading || !agentEditor.draft}
+          onSave={agentEditor.save}
+        />
+      ) : null}
     </>
   );
 }
@@ -1012,35 +952,6 @@ function PhaseRunCard({
           {queuedLabel} — waiting for a free slot
         </p>
       ) : null}
-    </div>
-  );
-}
-
-function EmptyLinesState({
-  organizationId,
-  factoryKey,
-  canUpdate,
-}: {
-  organizationId: string;
-  factoryKey: string;
-  canUpdate: boolean;
-}) {
-  return (
-    <div
-      className="flex flex-col items-center rounded-lg border border-dashed border-border bg-card px-6 py-12 text-center"
-      data-testid="lines-empty-state"
-    >
-      <Layers className="h-8 w-8 text-muted-foreground" aria-hidden />
-      <p className="mt-3 text-[15px] font-medium text-foreground">No lines yet</p>
-      <p className="mt-1 max-w-md text-[13px] text-muted-foreground">
-        Lines define how work orders flow through your apps.
-      </p>
-      <Button type="button" size="sm" asChild className="mt-6" disabled={!canUpdate}>
-        <Link href={canUpdate ? createFactoryLinePath(organizationId, factoryKey) : "#"}>
-          <Plus className="size-3.5" aria-hidden />
-          New line
-        </Link>
-      </Button>
     </div>
   );
 }

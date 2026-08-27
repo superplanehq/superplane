@@ -30,10 +30,10 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("falls back to the line board when from is missing", () => {
+  it("falls back to the workspace index when from is missing", () => {
     expect(resolveFactoryAppBackNav("org", "fac", {})).toEqual({
       label: "Back",
-      href: "/org/workspaces/fac/lines",
+      href: "/org/workspaces/fac",
     });
   });
 
@@ -46,10 +46,10 @@ describe("resolveFactoryAppBackNav", () => {
     );
   });
 
-  it("falls back to the lines list when from=work-order has no line", () => {
+  it("falls back to the workspace index when from=work-order has no line", () => {
     expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order" })).toEqual({
       label: "Back",
-      href: "/org/workspaces/fac/lines",
+      href: "/org/workspaces/fac",
     });
   });
 });
