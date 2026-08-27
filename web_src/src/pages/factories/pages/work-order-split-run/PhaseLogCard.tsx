@@ -1,5 +1,5 @@
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
@@ -281,6 +281,7 @@ export function PhaseLogCard({
   onSelectNode,
   onStop,
   onRerun,
+  actionBusy = false,
   collapsible = true,
   organizationId,
   canvasId,
@@ -293,6 +294,7 @@ export function PhaseLogCard({
   onSelectNode?: (nodeId: string) => void;
   onStop?: () => void;
   onRerun?: () => void;
+  actionBusy?: boolean;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -334,6 +336,7 @@ export function PhaseLogCard({
           onToggle={onToggle}
           onStop={onStop}
           onRerun={onRerun}
+          actionBusy={actionBusy}
         />
 
         {expanded ? (
@@ -366,6 +369,7 @@ function AutomationHeader({
   onToggle,
   onStop,
   onRerun,
+  actionBusy,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -374,6 +378,7 @@ function AutomationHeader({
   onToggle?: () => void;
   onStop?: () => void;
   onRerun?: () => void;
+  actionBusy: boolean;
 }) {
   return (
     <div
@@ -417,12 +422,21 @@ function AutomationHeader({
         </span>
       ) : null}
       {phase.status === "running" && onStop ? (
-        <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          className="text-destructive"
+          disabled={actionBusy}
+          onClick={onStop}
+        >
+          {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           Stop
         </Button>
       ) : null}
       {phase.status === "failed" && onRerun ? (
-        <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
+        <Button type="button" size="xs" variant="ghost" disabled={actionBusy} onClick={onRerun}>
+          {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
           Rerun
         </Button>
       ) : null}

@@ -85,8 +85,10 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     },
   });
 
+  const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
+
   const handleReject = useCallback(async () => {
-    if (!live || !orderId) {
+    if (!live || !orderId || busy) {
       return false;
     }
     try {
@@ -97,11 +99,11 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
       return false;
     }
-  }, [closeWorkOrder, live, orderId]);
+  }, [busy, closeWorkOrder, live, orderId]);
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {
-      if (!live || !orderId) {
+      if (!live || !orderId || busy) {
         return;
       }
       try {
@@ -136,12 +138,12 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         showErrorToast(getApiErrorMessage(error, stopErrorFallback(choice, footer)));
       }
     },
-    [cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
+    [busy, cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
   );
 
   const handleStopAutomation = useCallback(
     async (run: SplitRunStopRun) => {
-      if (!live) {
+      if (!live || busy) {
         return;
       }
       try {
@@ -151,13 +153,15 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
         showErrorToast(getApiErrorMessage(error, "Failed to stop the run"));
       }
     },
-    [cancelRun, live],
+    [busy, cancelRun, live],
   );
 
   return {
     handleStop,
     handleStopAutomation,
     handleReject,
-    busy: cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending,
+    busy,
   };
 }
+
+export type SplitRunFooterActions = ReturnType<typeof useSplitRunFooterActions>;

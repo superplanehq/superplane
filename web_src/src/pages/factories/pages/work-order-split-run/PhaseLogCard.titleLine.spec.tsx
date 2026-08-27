@@ -1,4 +1,5 @@
 import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
@@ -146,6 +147,40 @@ describe("PhaseLogCard title line", () => {
     rerender(<PhaseLogCard phase={PHASE} expanded={false} onStop={onStop} onRerun={onRerun} />);
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
+  });
+
+  it("disables Stop and Rerun while an action is busy", async () => {
+    const user = userEvent.setup();
+    const onStop = vi.fn();
+    const onRerun = vi.fn();
+    const { rerender } = render(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running" }}
+        expanded={false}
+        onStop={onStop}
+        onRerun={onRerun}
+        actionBusy
+      />,
+    );
+
+    const stop = screen.getByRole("button", { name: "Stop" });
+    expect(stop).toBeDisabled();
+    await user.click(stop);
+    expect(onStop).not.toHaveBeenCalled();
+
+    rerender(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "failed" }}
+        expanded={false}
+        onStop={onStop}
+        onRerun={onRerun}
+        actionBusy
+      />,
+    );
+    const rerun = screen.getByRole("button", { name: "Rerun" });
+    expect(rerun).toBeDisabled();
+    await user.click(rerun);
+    expect(onRerun).not.toHaveBeenCalled();
   });
 
   it("puts a muted fill on the expanded header, not the nested log", () => {

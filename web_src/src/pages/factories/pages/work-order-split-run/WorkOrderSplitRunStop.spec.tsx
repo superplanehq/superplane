@@ -14,6 +14,7 @@ vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
+    handleStopAutomation: vi.fn(),
     busy: false,
   }),
 }));

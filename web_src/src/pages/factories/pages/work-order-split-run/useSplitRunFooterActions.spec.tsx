@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as ApiClient from "@/api-client";
+import type * as FactoryData from "@/hooks/useFactoryData";
 
 const { closeMutateAsync, updateMutateAsync, dispatchMutateAsync, cancelRunMock } = vi.hoisted(() => ({
   closeMutateAsync: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock("@/api-client", async (importOriginal) => {
 });
 
 vi.mock("@/hooks/useFactoryData", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/useFactoryData")>();
+  const actual = await importOriginal<typeof FactoryData>();
   return {
     ...actual,
     useCloseWorkOrder: () => ({ mutateAsync: closeMutateAsync, isPending: false }),
@@ -129,6 +130,19 @@ describe("useSplitRunFooterActions", () => {
     );
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(showSuccessToast).toHaveBeenCalledWith("Automation stopped.");
+  });
+
+  it("ignores a second automation stop while cancel is in flight", async () => {
+    cancelRunMock.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    void result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
+    await waitFor(() => {
+      expect(result.current.busy).toBe(true);
+    });
+    await result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
+
+    expect(cancelRunMock).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes the work order after stopping an automation", async () => {
