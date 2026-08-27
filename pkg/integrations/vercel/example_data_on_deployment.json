@@ -1,0 +1,25 @@
+{
+  "data": {
+    "type": "deployment.succeeded",
+    "eventType": "deployment.succeeded",
+    "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+    "name": "my-app",
+    "url": "my-app-9jaegn4en.vercel.app",
+    "readyState": "READY",
+    "target": "production",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "payload": {
+      "target": "production",
+      "deployment": {
+        "id": "dpl_8f2vQkP3xWmTnYbZ",
+        "name": "my-app",
+        "url": "my-app-9jaegn4en.vercel.app",
+        "readyState": "READY",
+        "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+        "createdAt": 1755850000000
+      }
+    }
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployment.succeeded"
+}

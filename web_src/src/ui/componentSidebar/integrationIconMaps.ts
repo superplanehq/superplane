@@ -46,6 +46,7 @@ import gcpStorageIcon from "@/assets/icons/integrations/gcp.storage.svg";
 import gcpMonitoringIcon from "@/assets/icons/integrations/gcp.monitoring.svg";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import perplexityIcon from "@/assets/icons/integrations/perplexity.svg";
+import vercelIcon from "@/assets/icons/integrations/vercel.svg";
 import pagerDutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
@@ -110,6 +111,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  vercel: vercelIcon,
   dockerhub: dockerIcon,
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
@@ -163,6 +165,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  vercel: vercelIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
   newrelic: newrelicIcon,

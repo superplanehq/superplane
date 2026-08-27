@@ -1,0 +1,9 @@
+{
+  "data": {
+    "projectId": "prj_newProjectAbCdEfGh",
+    "name": "tenant-1234",
+    "createdAt": 1755850100000
+  },
+  "timestamp": "2026-08-22T08:15:00.000000Z",
+  "type": "vercel.project"
+}
