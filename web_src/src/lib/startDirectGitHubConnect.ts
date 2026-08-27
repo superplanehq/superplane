@@ -6,7 +6,7 @@ import type {
 
 import { followBrowserAction } from "@/lib/browserAction";
 import { pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
-import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { INTEGRATION_SETUP_STAY_PARAM, rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -68,7 +68,7 @@ export async function startDirectGitHubConnect(args: {
     const picker = pendingGitHubInstallPicker(args.connected, args.currentUserId);
     if (picker) {
       rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-      const path = `/${args.organizationId}/settings/integrations/${picker.id}`;
+      const path = `/${args.organizationId}/settings/integrations/${picker.id}?${INTEGRATION_SETUP_STAY_PARAM}=1`;
       if (args.goTo) {
         args.goTo(path);
         return true;

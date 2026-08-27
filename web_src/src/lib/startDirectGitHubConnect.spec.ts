@@ -11,6 +11,7 @@ const follow = vi.hoisted(() => vi.fn(() => true));
 
 vi.mock("@/lib/integrationSetupReturn", () => ({
   rememberIntegrationSetupReturn: remember,
+  INTEGRATION_SETUP_STAY_PARAM: "setupStay",
 }));
 
 vi.mock("@/lib/browserAction", () => ({
@@ -162,7 +163,7 @@ describe("startDirectGitHubConnect", () => {
     expect(create).not.toHaveBeenCalled();
     expect(follow).not.toHaveBeenCalled();
     expect(remember).toHaveBeenCalledWith("org-1", "/org-1/settings/integrations");
-    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1");
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/int-1?setupStay=1");
   });
 
   it("reuses a pending browser action", async () => {
