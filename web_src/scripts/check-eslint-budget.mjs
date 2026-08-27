@@ -15,7 +15,6 @@ const ignoredPrefixes = [
   "src/pages/factories/pages/WorkOrderCanvas.tsx",
   "src/pages/factories/pages/ConfigureAutomationPage.tsx",
   "src/pages/factories/pages/SelectComponentSidebar.tsx",
-  "storybook-static/",
   "dist/",
   "dist-ssr/",
   "node_modules/",
@@ -46,9 +45,8 @@ function extractIssues(results) {
   for (const result of results) {
     const filePath = toRelativeFilePath(result.filePath);
     const isIgnoredPath = ignoredPrefixes.some((prefix) => filePath.startsWith(prefix));
-    const isStorybookStoryFile = filePath.endsWith(".stories.tsx");
     const isStorybookSupportFile = filePath.includes("/storybooks/");
-    if (isIgnoredPath || isStorybookStoryFile || isStorybookSupportFile) {
+    if (isIgnoredPath || isStorybookSupportFile) {
       continue;
     }
 
@@ -73,9 +71,8 @@ function extractDisallowedDirectiveIssues(results) {
   for (const result of results) {
     const filePath = toRelativeFilePath(result.filePath);
     const isIgnoredPath = ignoredPrefixes.some((prefix) => filePath.startsWith(prefix));
-    const isStorybookStoryFile = filePath.endsWith(".stories.tsx");
     const isStorybookSupportFile = filePath.includes("/storybooks/");
-    if (isIgnoredPath || isStorybookStoryFile || isStorybookSupportFile) {
+    if (isIgnoredPath || isStorybookSupportFile) {
       continue;
     }
 

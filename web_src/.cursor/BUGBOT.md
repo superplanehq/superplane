@@ -87,7 +87,7 @@ where `web_src/src/components/ui/` typically provides a shadcn equivalent, then:
 
 ## Exports and patterns
 
-If the diff adds a **new** `export default` for a component or page module under `web_src/src` (not Storybook meta defaults, not Vite entry), then:
+If the diff adds a **new** `export default` for a component or page module under `web_src/src` (not Vite entry), then:
 
 - Add a **non-blocking** Bug titled `Prefer named exports`
 - Body: Named exports improve Vite compile behavior and IDE stability. See `web_src/AGENTS.md` (TypeScript).
@@ -100,13 +100,13 @@ If the diff adds **new** user-visible lists, tables, grids, or collections of da
 **empty**, **loading**, or **error** outcomes in the same change (or an obvious follow-up in the same feature area), then:
 
 - Add a **non-blocking** Bug titled `Empty, loading, and error states`
-- Body: Design for empty states, async feedback, and recoverable errors. Stories should cover key states when components are story-driven.
+- Body: Design for empty states, async feedback, and recoverable errors. Tests should cover key states.
 
 If the diff adds **mock or fixture data** inside a production component file
-(not `*.stories.*` or test helpers), then:
+(not test helpers), then:
 
 - Add a **non-blocking** Bug titled `Keep mock data out of component modules`
-- Body: Mock data belongs in Storybook stories or tests, not in shipped component files.
+- Body: Mock data belongs in tests or test fixtures, not in shipped component files.
 
 ---
 

@@ -26,7 +26,7 @@ encode good taste into these files, the patterns, principles, and preferences th
 ## Component State Coverage
 
 When developing a new component, ensure every statemap includes an explicit error state and a clear state resolution
-path. This applies to both implementation and Storybook coverage.
+path.
 
 ## Managed Agent Tools
 

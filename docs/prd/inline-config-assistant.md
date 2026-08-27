@@ -148,7 +148,7 @@ Proto and generated code may live under `protos/config_assistant.proto` and
   `getSuggestFieldValue(field, getCurrentValue)` for `SettingsTab` →
   `ConfigurationFieldRenderer`.
 - **Mock path:** When canvas/node/org context is missing, client uses a short delayed mock so
-  Storybook / partial contexts can still exercise UI.
+  partial contexts can still exercise UI.
 
 ## Example flow
 

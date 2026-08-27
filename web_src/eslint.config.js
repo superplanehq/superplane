@@ -1,6 +1,3 @@
-// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
-import storybook from "eslint-plugin-storybook";
-
 import js from '@eslint/js'
 import importPlugin from 'eslint-plugin-import'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
@@ -11,7 +8,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 
-export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static', 'node_modules', 'public/mockServiceWorker.js'] }, {
+export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'node_modules', 'public/mockServiceWorker.js'] }, {
   extends: [js.configs.recommended, ...tseslint.configs.recommended],
   files: ['**/*.{ts,tsx}'],
   languageOptions: {
@@ -65,10 +62,6 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
       "warn",
       {
         "paths": [
-          {
-            "name": "@storybook/react",
-            "message": "Use @storybook/react-vite instead."
-          },
           {
             "name": "react-router-dom",
             "message": "react-router-dom is frozen at v7. Import from \"react-router\" instead."
@@ -126,4 +119,4 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
     // coverage, not as production-function statement budget.
     'max-statements': 'off',
   },
-}, storybook.configs["flat/recommended"]);
+});
