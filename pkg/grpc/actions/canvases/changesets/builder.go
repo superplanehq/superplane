@@ -204,6 +204,7 @@ func changeNodeRefForAdd(proposedNode models.Node) (*ChangeNode, error) {
 		Name:        proposedNode.Name,
 		Block:       blockNameFromNode(proposedNode),
 		IsCollapsed: proto.Bool(proposedNode.IsCollapsed),
+		Concurrency: proposedNode.Concurrency,
 		Position: &componentpb.Position{
 			X: int32(proposedNode.Position.X),
 			Y: int32(proposedNode.Position.Y),
