@@ -19,15 +19,6 @@ beforeEach(() => {
 const LONG_NOTE =
   "Now let me check factories.proto Delete rpc absence explicitly and PermissionTooltip component quickly, plus check showSuccessToast import paths.";
 
-function outputIndentOf(text: string | RegExp) {
-  const node = screen.getByText(text);
-  const output = node.closest("[data-testid='split-run-stream-output']");
-  if (!output) {
-    throw new Error("expected stream output");
-  }
-  return within(output as HTMLElement).getByTestId("split-run-stream-output-indent");
-}
-
 const PLANNING_STREAM: SplitRunStreamLine[] = [
   line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
   line({
@@ -164,27 +155,27 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
   });
 
-  it("ellipsizes long bash and prompt titles instead of clipping them", async () => {
+  it("wraps long bash and prompt titles", async () => {
     const user = userEvent.setup();
     render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
     await user.click(screen.getByText("Agent - Plan for GH Issue"));
 
     const bash = screen.getByTestId("split-run-stream-line-step-clone");
-    expect(bash).toHaveClass("overflow-hidden", "min-w-0");
     const bashTitle = within(bash).getByText("Clone Repo");
-    expect(bashTitle).toHaveClass("truncate");
-    expect(bashTitle.parentElement).toHaveClass("flex-1", "min-w-0", "overflow-hidden", "w-0");
+    expect(bash).not.toHaveClass("whitespace-nowrap");
+    expect(bashTitle).not.toHaveClass("truncate");
+    expect(bashTitle).toHaveClass("whitespace-normal", "break-words");
 
     const prompt = screen.getByTestId("split-run-stream-line-step-write");
-    expect(prompt).toHaveClass("overflow-hidden", "min-w-0");
     const promptTitle = within(prompt).getByText("Write Implementation Plan");
-    expect(promptTitle).toHaveClass("truncate");
-    expect(promptTitle.parentElement).toHaveClass("flex-1", "min-w-0", "overflow-hidden", "w-0");
+    expect(prompt).not.toHaveClass("whitespace-nowrap");
+    expect(promptTitle).not.toHaveClass("truncate");
+    expect(promptTitle).toHaveClass("whitespace-normal", "break-words");
 
-    const nodeName = within(screen.getByTestId("split-run-stream-line-planner-agent")).getByText(
-      "Agent - Plan for GH Issue",
-    );
-    expect(nodeName).not.toHaveClass("flex-1");
+    await user.click(screen.getByText("Clone Repo"));
+    const output = screen.getByTestId("split-run-stream-output").querySelector("pre");
+    expect(output).toHaveClass("whitespace-pre-wrap", "break-words");
+    expect(output).not.toHaveClass("truncate");
   });
 
   it("expands the selected node in the log", () => {
@@ -382,9 +373,64 @@ describe("PhaseLogCard collapsed stream", () => {
     await user.click(screen.getByText("Clone Repo"));
 
     expect(screen.getByText("Cloning into 'superplane'...")).toBeInTheDocument();
-    expect(outputIndentOf("Cloning into 'superplane'...").getAttribute("style")).toContain("12ch");
+    expect(screen.queryByTestId("split-run-stream-output-indent")).not.toBeInTheDocument();
     await user.click(screen.getByText("Run Tests"));
     expect(screen.getByText("FAIL pkg/foo")).toBeInTheDocument();
+  });
+
+  it("does not show line numbers", async () => {
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    await user.click(screen.getByText("Agent - Plan for GH Issue"));
+    await user.click(screen.getByText("Clone Repo"));
+
+    expect(screen.queryAllByTestId("split-run-log-line-no")).toHaveLength(0);
+  });
+
+  it("gives each log line a hover background", async () => {
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    const phaseRow = screen.getByTestId("split-run-phase-plan").firstElementChild;
+    expect(phaseRow?.className).toMatch(/hover:bg-/);
+
+    await user.click(screen.getByText("Agent - Plan for GH Issue"));
+    const node = screen.getByTestId("split-run-stream-line-planner-agent");
+    expect(node.className).toMatch(/hover:bg-/);
+    const step = screen.getByTestId("split-run-stream-line-step-clone");
+    expect(step.className).toMatch(/hover:bg-/);
+
+    await user.click(screen.getByText("Clone Repo"));
+    const outputLine = screen.getByTestId("split-run-stream-output").firstElementChild;
+    expect(outputLine?.className).toMatch(/hover:bg-/);
+
+    await user.click(screen.getByText("Write Implementation Plan"));
+    expect(screen.getByText(LONG_NOTE).closest("[data-testid^='split-run-stream-line-']")?.className).toMatch(
+      /hover:bg-/,
+    );
+    expect(screen.getByRole("button", { name: "Ran 1 command" }).className).toMatch(/hover:bg-/);
+  });
+
+  it("pins the open phase, node, and step while their output scrolls", async () => {
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    expect(screen.getByTestId("split-run-stream-plan").className).not.toMatch(/overflow-hidden/);
+
+    const phase = screen.getByTestId("split-run-phase-plan").firstElementChild;
+    expect(phase?.className).toMatch(/sticky/);
+    expect(phase?.className).toMatch(/top-0/);
+
+    await user.click(screen.getByText("Agent - Plan for GH Issue"));
+    const node = screen.getByTestId("split-run-stream-line-planner-agent");
+    expect(node.className).toMatch(/sticky/);
+    expect(node.className).toMatch(/top-\[1\.375rem\]/);
+
+    await user.click(screen.getByText("Clone Repo"));
+    const step = screen.getByTestId("split-run-stream-line-step-clone");
+    expect(step.className).toMatch(/sticky/);
+    expect(step.className).toMatch(/top-\[2\.75rem\]/);
   });
 
   it("shows agent text and a collapsed tool summary when the prompt expands", async () => {
@@ -399,9 +445,7 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(note).not.toHaveClass("truncate");
     expect(note).toHaveClass("whitespace-normal");
     expect(screen.getByRole("button", { name: "Ran 1 command" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Ran 1 command" }).querySelector("span")?.getAttribute("style"),
-    ).toContain("12ch");
+    expect(screen.getByRole("button", { name: "Ran 1 command" }).querySelector('[style*="ch"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
     expect(screen.queryByText("LineListCard.tsx")).not.toBeInTheDocument();
@@ -411,14 +455,14 @@ describe("PhaseLogCard collapsed stream", () => {
 
     const stream = screen.getByTestId("split-run-stream-plan");
     expect(within(stream).getByText("cat /tmp/ORDER.md")).toBeInTheDocument();
-    expect(within(stream).getByText("cat /tmp/ORDER.md").closest("ol")).toHaveClass("pl-2");
+    expect(within(stream).getByText("cat /tmp/ORDER.md").closest("ol")).not.toHaveClass("pl-2");
     expect(within(stream).queryByText(/## Goal/)).not.toBeInTheDocument();
     expect(within(stream).queryByText("LineListCard.tsx")).not.toBeInTheDocument();
 
     await user.click(within(stream).getByText("cat /tmp/ORDER.md"));
     expect(within(stream).getByText(/## Goal/)).toBeInTheDocument();
     expect(within(stream).getByText(/Add a menu/)).toBeInTheDocument();
-    expect(outputIndentOf(/## Goal/).getAttribute("style")).toContain("16ch");
+    expect(screen.queryByTestId("split-run-stream-output-indent")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Read 1 file" }));
     expect(within(stream).getByText("LineListCard.tsx")).toBeInTheDocument();

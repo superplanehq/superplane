@@ -126,6 +126,11 @@ function parseSpokenDurationMs(label: string): number | null {
   return ((hours * 60 + minutes) * 60 + seconds) * 1000;
 }
 
+/** Parse a stored label such as `4m so far` into milliseconds. Unknown labels are 0. */
+export function durationLabelMs(label: string): number {
+  return parseSpokenDurationMs(label) ?? 0;
+}
+
 /** Turn a stored label such as `2m 59s` into a clock column value. */
 export function formatClockDurationLabel(label: string): string {
   const trimmed = label.replace(/\s+so far$/i, "").trim();

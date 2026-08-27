@@ -272,7 +272,9 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Stop and Close" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
