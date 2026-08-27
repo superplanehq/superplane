@@ -38,7 +38,7 @@ describe("WorkOrderSplitRunPopup Follow", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
-    await user.click(screen.getByRole("tab", { name: "Log" }));
+    await user.click(screen.getByRole("tab", { name: "Automations" }));
 
     expect(screen.getByRole("switch", { name: "Follow" })).not.toBeChecked();
   });

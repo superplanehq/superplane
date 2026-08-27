@@ -23,7 +23,7 @@ export function SplitRunLogHeader({
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
       <div className="flex min-w-0 items-center gap-3">
-        <SectionTitle>Log</SectionTitle>
+        <SectionTitle>Automations</SectionTitle>
         <div className="flex items-center gap-1.5">
           <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
             Follow

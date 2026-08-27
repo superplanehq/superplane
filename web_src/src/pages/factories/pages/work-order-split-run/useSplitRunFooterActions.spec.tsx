@@ -113,6 +113,20 @@ describe("useSplitRunFooterActions", () => {
     expect(showSuccessToast).toHaveBeenCalledWith("Work order reopened.");
   });
 
+  it("stops a running automation without closing the work order", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    await result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
+
+    expect(cancelRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { canvasId: "app-implement", runId: "run-9" },
+      }),
+    );
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Automation stopped.");
+  });
+
   it("cancels the canvas run before closing a running order", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 

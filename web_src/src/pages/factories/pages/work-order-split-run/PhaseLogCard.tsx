@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -43,17 +44,21 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
 
 const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
 const LOG_ROW_H = "h-[1.375rem]";
-const STICKY_PHASE = "sticky top-0 z-30 bg-background";
-const STICKY_NODE = "sticky top-[1.375rem] z-20 bg-background";
-const STICKY_STEP = "sticky top-[2.75rem] z-10 bg-background";
+const STREAM_SECTION = "bg-muted border-b border-border px-2";
+const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
+const STICKY_NODE = cn("sticky top-8 z-20", STREAM_SECTION);
+const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
 
 const STREAM_LINE_ROW = cn(
-  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap text-left",
+  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap px-2 text-left",
   LOG_ROW_H,
   LOG_ROW_HOVER,
 );
 
-const STREAM_LINE_WRAP_ROW = cn("flex w-full min-w-0 max-w-full items-start justify-start text-left", LOG_ROW_HOVER);
+const STREAM_LINE_WRAP_ROW = cn(
+  "flex w-full min-w-0 max-w-full items-start justify-start px-2 text-left",
+  LOG_ROW_HOVER,
+);
 
 function StreamLineTitle({ children, wrap = false }: { children: string; wrap?: boolean }) {
   if (wrap) {
@@ -212,6 +217,8 @@ export function PhaseLogCard({
   selectedNodeId,
   onToggle,
   onSelectNode,
+  onStop,
+  onRerun,
   collapsible = true,
   organizationId,
   canvasId,
@@ -222,6 +229,8 @@ export function PhaseLogCard({
   selectedNodeId?: string | null;
   onToggle?: () => void;
   onSelectNode?: (nodeId: string) => void;
+  onStop?: () => void;
+  onRerun?: () => void;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -243,74 +252,89 @@ export function PhaseLogCard({
     <div className="min-w-0" data-testid={`split-run-phase-${phase.id}`} aria-current={expanded ? "step" : undefined}>
       <div
         className={cn(
-          "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap leading-tight",
-          LOG_ROW_H,
-          LOG_FACE,
-          LOG_ROW_HOVER,
-          expanded && STICKY_PHASE,
+          "rounded-md border border-border border-l-2 bg-card",
+          expanded ? "pb-1.5" : "py-1.5",
+          automationAccent(phase.status),
         )}
       >
-        {collapsible ? (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-          >
-            <ChevronRight
-              className={cn("size-3 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")}
-              aria-hidden
-            />
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
-            <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-          </button>
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            <span className="inline-flex w-4 shrink-0" aria-hidden />
-            <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3" />
-            <span className="min-w-0 truncate text-foreground">{phase.name}</span>
-          </div>
-        )}
-        {phase.checks && phase.checks.length > 0 ? (
-          <span className="shrink-0">
-            <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-          </span>
-        ) : null}
-        {!expanded && producedArtifacts.length > 0 ? (
-          <span
-            data-testid={`split-run-phase-artifacts-${phase.id}`}
-            className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-          >
-            {producedArtifacts.map((artifact) => (
-              <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-            ))}
-          </span>
-        ) : null}
-        <PhaseDuration phase={phase} />
-      </div>
+        <div
+          data-testid={`split-run-automation-header-${phase.id}`}
+          className={cn(
+            "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap px-2 leading-tight",
+            expanded && STICKY_PHASE,
+          )}
+        >
+          {collapsible ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[13px] font-medium tracking-[-0.01em]"
+            >
+              <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+              <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+            </button>
+          ) : (
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em]">
+              <PhaseGlyph kind={statusGlyph(phase.status)} className="size-3.5" />
+              <span className="min-w-0 truncate text-foreground">{phase.name}</span>
+            </div>
+          )}
+          {phase.status === "running" && onStop ? (
+            <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
+              Stop
+            </Button>
+          ) : null}
+          {phase.status === "failed" && onRerun ? (
+            <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
+              Rerun
+            </Button>
+          ) : null}
+          {phase.checks && phase.checks.length > 0 ? (
+            <span className="shrink-0">
+              <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+            </span>
+          ) : null}
+          {!expanded && producedArtifacts.length > 0 ? (
+            <span
+              data-testid={`split-run-phase-artifacts-${phase.id}`}
+              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+            >
+              {producedArtifacts.map((artifact) => (
+                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+              ))}
+            </span>
+          ) : null}
+        </div>
 
-      {expanded ? (
-        <ol className={cn("min-w-0 list-none leading-tight", LOG_FACE)} data-testid={`split-run-stream-${phase.id}`}>
-          {groups.map((group) => (
-            <StreamNode
-              key={group.line.id}
-              group={group}
-              highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
-              onSelect={onSelectNode}
-              organizationId={organizationId}
-              canvasId={canvasId ?? phase.appId}
-            />
-          ))}
-        </ol>
-      ) : null}
+        {expanded ? (
+          <ol
+            className={cn("mt-1 min-w-0 list-none leading-tight", LOG_FACE)}
+            data-testid={`split-run-stream-${phase.id}`}
+          >
+            {groups.map((group) => (
+              <StreamNode
+                key={group.line.id}
+                group={group}
+                highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
+                onSelect={onSelectNode}
+                organizationId={organizationId}
+                canvasId={canvasId ?? phase.appId}
+              />
+            ))}
+          </ol>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
-  return (
-    <LogStatusTime status={phase.status} duration={phase.duration} testId={`split-run-phase-duration-${phase.id}`} />
-  );
+function automationAccent(status: SplitRunPhaseStatus): string {
+  if (status === "passed") return "border-l-[#10b981]";
+  if (status === "running") return "border-l-[#3b82f6]";
+  if (status === "failed") return "border-l-[#ef4444]";
+  if (status === "waiting") return "border-l-[#f59e0b]";
+  return "border-l-border";
 }
 
 function StreamDuration({ line }: { line: SplitRunStreamLine }) {
@@ -385,28 +409,20 @@ function StreamNode({
   canvasId?: string;
 }) {
   const { line, notes, artifact } = group;
-  const [expanded, setExpanded] = useState(line.status === "running" || highlighted);
-  const liveNotes = useRunnerNodeLiveNotes(line, expanded, organizationId, canvasId);
+  const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
   const steps = groupClaudeSteps(liveNotes ?? notes);
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
-
-  useEffect(() => {
-    if (highlighted && hasChildren) {
-      setExpanded(true);
-    }
-  }, [highlighted, hasChildren]);
 
   return (
     <li className="min-w-0">
       <StreamNodeHeader
         line={line}
-        expanded={expanded}
         hasChildren={hasChildren}
         highlighted={highlighted}
         artifact={artifact}
-        onClick={() => toggleStreamNode(hasChildren, line.nodeId, setExpanded, onSelect)}
+        onSelect={onSelect}
       />
-      {expanded ? (
+      {hasChildren ? (
         <ol className="min-w-0">
           {steps.map((step) => (
             <StreamStep key={step.line.id} step={step} />
@@ -419,19 +435,31 @@ function StreamNode({
 
 function StreamNodeHeader({
   line,
-  expanded,
   hasChildren,
   highlighted,
   artifact,
-  onClick,
+  onSelect,
 }: {
   line: SplitRunStreamLine;
-  expanded: boolean;
   hasChildren: boolean;
   highlighted: boolean;
   artifact?: FactoriesWorkOrderArtifact;
-  onClick: () => void;
+  onSelect?: (nodeId: string) => void;
 }) {
+  const name = (
+    <>
+      <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
+      <span
+        className={cn(
+          "min-w-0 overflow-hidden truncate",
+          line.status === "pending" ? "text-muted-foreground" : "text-foreground",
+        )}
+      >
+        {line.componentName}
+      </span>
+    </>
+  );
+
   return (
     <div
       data-testid={`split-run-stream-line-${line.id}`}
@@ -441,35 +469,28 @@ function StreamNodeHeader({
         "flex w-full min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap",
         LOG_ROW_H,
         LOG_ROW_HOVER,
-        expanded && hasChildren && STICKY_NODE,
-        highlighted && "bg-accent ring-1 ring-foreground/15",
+        STREAM_SECTION,
+        hasChildren && STICKY_NODE,
+        highlighted && "ring-1 ring-foreground/15",
       )}
     >
-      <button
-        type="button"
-        data-testid={`split-run-node-toggle-${line.id}`}
-        aria-expanded={hasChildren ? expanded : undefined}
-        onClick={onClick}
-        className={cn(
-          "flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left",
-          (hasChildren || line.nodeId) && "cursor-pointer hover:text-foreground",
-        )}
-      >
-        <span className="inline-flex w-4 shrink-0 items-center justify-center text-muted-foreground">
-          {hasChildren ? (
-            <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} aria-hidden />
-          ) : null}
-        </span>
-        <StreamLineIcon iconSlug={line.iconSlug} iconSrc={line.iconSrc} />
-        <span
-          className={cn(
-            "min-w-0 overflow-hidden truncate",
-            line.status === "pending" ? "text-muted-foreground" : "text-foreground",
-          )}
+      {line.nodeId ? (
+        <button
+          type="button"
+          data-testid={`split-run-node-toggle-${line.id}`}
+          onClick={() => onSelect?.(line.nodeId ?? line.id)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden text-left cursor-pointer hover:text-foreground"
         >
-          {line.componentName}
-        </span>
-      </button>
+          {name}
+        </button>
+      ) : (
+        <div
+          data-testid={`split-run-node-toggle-${line.id}`}
+          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden"
+        >
+          {name}
+        </div>
+      )}
       {artifact ? <StreamArtifact artifact={artifact} /> : null}
       <StreamDuration line={line} />
     </div>
@@ -477,49 +498,22 @@ function StreamNodeHeader({
 }
 
 function StreamStep({ step }: { step: ClaudeStepGroup }) {
-  const [expanded, setExpanded] = useState(step.line.status === "running");
-  useEffect(() => {
-    if (step.line.status === "running") {
-      setExpanded(true);
-    }
-  }, [step.line.status]);
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
 
-  const header = (
-    <>
-      <ExpandChevron expanded={expanded} visible={hasBody} />
-      {step.line.componentType ? (
-        <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
-      ) : null}
-      <StreamLineTitle wrap>{step.line.componentName}</StreamLineTitle>
-      <StepStatusMark status={step.line.status} />
-    </>
-  );
-  const rowClass = cn(
-    STREAM_LINE_WRAP_ROW,
-    hasBody && "cursor-pointer hover:text-foreground",
-    expanded && hasBody && STICKY_STEP,
-  );
-
   return (
     <li className="min-w-0">
+      <div
+        data-testid={`split-run-stream-line-${step.line.id}`}
+        className={cn(STREAM_LINE_WRAP_ROW, STREAM_SECTION, hasBody && STICKY_STEP)}
+      >
+        {step.line.componentType ? (
+          <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
+        ) : null}
+        <StreamLineTitle wrap>{step.line.componentName}</StreamLineTitle>
+        <StepStatusMark status={step.line.status} />
+      </div>
       {hasBody ? (
-        <button
-          type="button"
-          data-testid={`split-run-stream-line-${step.line.id}`}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((open) => !open)}
-          className={rowClass}
-        >
-          {header}
-        </button>
-      ) : (
-        <div data-testid={`split-run-stream-line-${step.line.id}`} className={rowClass}>
-          {header}
-        </div>
-      )}
-      {expanded ? (
         <>
           {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
           {step.events.map((event) =>
@@ -527,7 +521,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
               <div
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
-                className={cn("flex w-full items-start", LOG_ROW_HOVER)}
+                className={cn("flex w-full items-start px-2", LOG_ROW_HOVER)}
               >
                 <span className="inline-flex w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
@@ -625,7 +619,7 @@ function StreamOutput({ text }: { text: string }) {
   return (
     <div data-testid="split-run-stream-output" className="min-w-0">
       {text.split("\n").map((line, index) => (
-        <div key={index} className={cn("flex min-w-0 w-full items-start", LOG_FACE, LOG_ROW_HOVER)}>
+        <div key={index} className={cn("flex min-w-0 w-full items-start px-2", LOG_FACE, LOG_ROW_HOVER)}>
           <span className="inline-flex w-4 shrink-0" aria-hidden />
           <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 leading-5 text-muted-foreground">
             {line.length > 0 ? line : " "}
@@ -698,13 +692,10 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
 
 function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
-  expanded: boolean,
   organizationId?: string,
   canvasId?: string,
 ): SplitRunStreamLine[] | undefined {
-  const canStream = Boolean(
-    expanded && organizationId && canvasId && line.executionId && isRunnerComponent(line.component),
-  );
+  const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
   const { sections, error, isStreaming } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
@@ -722,18 +713,4 @@ function useRunnerNodeLiveNotes(
     isStreaming,
     nodeStatus: line.status,
   });
-}
-
-function toggleStreamNode(
-  hasChildren: boolean,
-  nodeId: string | undefined,
-  setExpanded: (update: (open: boolean) => boolean) => void,
-  onSelect?: (nodeId: string) => void,
-) {
-  if (hasChildren) {
-    setExpanded((open) => !open);
-  }
-  if (nodeId) {
-    onSelect?.(nodeId);
-  }
 }

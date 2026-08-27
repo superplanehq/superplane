@@ -41,7 +41,7 @@ function reviewRunHref(
 }
 
 /**
- * Attention note under Description and Log. Actions live in the header.
+ * Attention note under Description and Automations. Actions live in the header.
  */
 export function SplitRunReview({
   footer,

@@ -84,7 +84,7 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
         <aside
           className="flex min-h-0 min-w-[12rem] flex-col overflow-hidden border-r border-border bg-muted/25"
           style={{ width: `${model.split.percent}%` }}
-          aria-label="Log"
+          aria-label="Automations"
         >
           <SplitRunLogHeader
             following={follow.following}

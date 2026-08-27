@@ -8,7 +8,7 @@ import { useCallback } from "react";
 
 import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
 import { isSplitRunRerunChoice, rerunStartStepIndex } from "./splitRunFooter";
-import { applySplitRunStop, type SplitRunStopRun } from "./splitRunStop";
+import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from "./splitRunStop";
 
 type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
   lineName?: string;
@@ -122,8 +122,24 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     [cancelRun, closeWorkOrder, dispatchWorkOrder, live, orderId, updateStatus],
   );
 
+  const handleStopAutomation = useCallback(
+    async (run: SplitRunStopRun) => {
+      if (!live) {
+        return;
+      }
+      try {
+        await stopSplitRunAutomation(run, (next) => cancelRun.mutateAsync(next));
+        showSuccessToast("Automation stopped.");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to stop the run"));
+      }
+    },
+    [cancelRun, live],
+  );
+
   return {
     handleStop,
+    handleStopAutomation,
     handleReject,
     busy: cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending,
   };

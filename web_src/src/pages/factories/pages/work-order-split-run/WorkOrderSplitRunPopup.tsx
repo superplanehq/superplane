@@ -13,7 +13,7 @@ import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
-import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhaseId } from "./splitRunMocks";
+import { autoExpandedPhaseId, splitRunStatusLabel, type SplitRunFixture, type SplitRunPhase, type SplitRunPhaseId } from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
@@ -117,6 +117,25 @@ export function WorkOrderSplitRunBody({
   }, [artifactIndex, demoArtifacts, fixture.phases, selectedPhase?.id, visual.stream]);
   const streamTick = useMemo(() => [...streams.values()].map((stream) => stream?.length ?? 0).join(":"), [streams]);
   const follow = useFollowLogScroll(runningSplitRunPhaseId(fixture.phases), streamTick);
+  const actions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const liveOrder = Boolean(organizationId && factoryId && orderId);
+  const automationStop = (entry: SplitRunPhase) => {
+    if (!liveOrder || entry.status !== "running" || !entry.appId || !entry.runId) {
+      return undefined;
+    }
+    return () => void actions.handleStopAutomation({ appId: entry.appId, runId: entry.runId });
+  };
+  const automationRerun = (entry: SplitRunPhase) => {
+    if (!liveOrder || entry.status !== "failed") {
+      return undefined;
+    }
+    return () =>
+      void actions.handleStop("rerun-step", {
+        kind: "failed",
+        lineName: fixture.lineName,
+        stepIndex: entry.stepIndex ?? fixture.currentStepIndex,
+      });
+  };
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
@@ -130,10 +149,10 @@ export function WorkOrderSplitRunBody({
       <ol
         ref={follow.scrollRef}
         onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none overflow-x-hidden overflow-y-auto px-3 pb-3"
+        className="min-h-0 min-w-0 flex-1 list-none space-y-1.5 overflow-x-hidden overflow-y-auto px-3 pb-3"
       >
         {fixture.phases.map((entry) => (
-          <li key={entry.id} className="min-w-0 border-b border-border/70 py-1 last:border-b-0">
+          <li key={entry.id} className="min-w-0">
             <PhaseLogCard
               phase={entry}
               expanded={entry.id === openPhaseId}
@@ -142,6 +161,8 @@ export function WorkOrderSplitRunBody({
               onSelectNode={setNodeId}
               organizationId={organizationId}
               canvasId={entry.appId}
+              onStop={automationStop(entry)}
+              onRerun={automationRerun(entry)}
               onToggle={() => {
                 setPhaseId(entry.id);
                 setNodeId(null);
@@ -299,7 +320,7 @@ function SplitRunPopupTabs({
               data-testid="split-run-log-tab-dot"
               aria-hidden
             />
-            Log
+            Automations
           </TabsTrigger>
         </TabsList>
       </div>
