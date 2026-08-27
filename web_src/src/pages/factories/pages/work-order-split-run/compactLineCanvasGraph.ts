@@ -2,7 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
-import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
+import { factoryEdgePalette, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -19,6 +19,7 @@ export type LineNodeData = {
   nodeId: string;
   isSelected: boolean;
   onSelect?: (id: string) => void;
+  editHref?: string;
   isSideSource: boolean;
   isSpineSource: boolean;
   isSideTarget: boolean;
@@ -47,6 +48,7 @@ export function compactLineCanvasGraph(
   selectedId: string | null,
   onSelect: ((id: string) => void) | undefined,
   resolvedThemeIsDark: boolean,
+  nodeEditHref?: (nodeId: string) => string,
 ): { nodes: Node<LineNodeData>[]; edges: Edge[] } {
   const zero = origin(canvas.nodes);
   const rawNodes: Node<LineNodeData>[] = canvas.nodes
@@ -72,6 +74,7 @@ export function compactLineCanvasGraph(
           nodeId: node.id,
           isSelected: node.id === selectedId,
           onSelect,
+          editHref: node.id === selectedId ? nodeEditHref?.(node.id) : undefined,
           isSideSource: false,
           isSpineSource: false,
           isSideTarget: false,
@@ -112,7 +115,7 @@ export function compactLineCanvasGraph(
       nodes,
       isVerticalFlow: true,
       resolvedThemeIsDark,
-      edgeDefaults: { type: "custom", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
+      edgeDefaults: { type: "custom", style: factoryEdgePalette(resolvedThemeIsDark).default },
       hoveredEdgeId: null,
       isEditMode: false,
       isReadOnly: true,
