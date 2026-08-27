@@ -31,6 +31,12 @@ describe("WorkOrderSplitRunPopup Follow", () => {
     renderPopup({ fixture: SPLIT_RUN_RUNNING });
 
     expect(screen.getByRole("switch", { name: "Follow" })).toBeChecked();
+    const follow = screen.getByTestId("split-run-follow");
+    expect(follow.className).toMatch(/ml-auto/);
+    expect(
+      screen.getByRole("heading", { name: "Automations" }).compareDocumentPosition(follow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("starts Follow off when the run is finished", async () => {

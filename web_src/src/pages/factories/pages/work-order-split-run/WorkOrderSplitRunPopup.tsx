@@ -39,14 +39,9 @@ import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
-function footerMutationHandlers(
-  canUpdate: boolean,
-  footerActions: SplitRunFooterActions,
-  fixture: SplitRunFixture,
-  onClose?: () => void,
-) {
+function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
   if (!canUpdate) {
-    return { onStop: undefined, onReject: undefined };
+    return { onStop: undefined };
   }
   return {
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
@@ -55,11 +50,6 @@ function footerMutationHandlers(
         lineName: fixture.lineName,
         stepIndex: fixture.currentStepIndex,
       }),
-    onReject: async () => {
-      if (await footerActions.handleReject()) {
-        onClose?.();
-      }
-    },
   };
 }
 
@@ -155,7 +145,7 @@ export function WorkOrderSplitRunBody({
       <ol
         ref={follow.scrollRef}
         onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none space-y-1.5 overflow-x-hidden overflow-y-auto px-3 pb-3"
+        className="min-h-0 min-w-0 flex-1 list-none space-y-2 overflow-x-hidden overflow-y-auto px-3 pb-3"
       >
         {fixture.phases.map((entry) => (
           <li key={entry.id} className="min-w-0">
@@ -218,7 +208,7 @@ export function WorkOrderSplitRunPopup({
   canUpdate?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = hasLiveWorkOrder(organizationId, factoryId, orderId);
@@ -247,21 +237,23 @@ export function WorkOrderSplitRunPopup({
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const ownerOrganizationId = popupOwnerOrganizationId(organizationId, edits.canEdit);
+  const [fullPage, setFullPage] = useState(false);
 
   return (
-    <PopupShell testId="work-order-split-run" fixed={fixed} onDismiss={onClose}>
+    <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
       <PopupHeader
         title={edits.title}
         onClose={onClose}
         canEditTitle={edits.canEdit}
         titleBusy={edits.titleBusy}
         onTitleSave={(next) => void edits.saveTitle(next)}
+        expanded={fullPage}
+        onToggleExpanded={() => setFullPage((current) => !current)}
         actions={
           <SplitRunHeaderActions
             footer={fixture.footer}
             onStart={draftStart}
             onStop={mutations.onStop}
-            onReject={mutations.onReject}
             startBusy={isDispatching}
             stopBusy={footerActions.busy}
             startDisabled={!canDispatch}

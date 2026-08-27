@@ -22,25 +22,23 @@ export function SplitRunLogHeader({
 
   return (
     <div className={cn("flex items-center justify-between gap-2", className)}>
-      <div className="flex min-w-0 items-center gap-3">
-        <SectionTitle>Automations</SectionTitle>
-        <div className="flex items-center gap-1.5">
-          <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
-            Follow
-          </Label>
-          <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
-        </div>
+      <SectionTitle>Automations</SectionTitle>
+      <div className="ml-auto flex items-center gap-1.5" data-testid="split-run-follow">
+        {expandHref ? (
+          <Link
+            href={expandHref}
+            aria-label="Open automation run"
+            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            data-testid="split-run-log-expand"
+          >
+            <Maximize2 className="size-3.5" aria-hidden />
+          </Link>
+        ) : null}
+        <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
+          Follow
+        </Label>
+        <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
       </div>
-      {expandHref ? (
-        <Link
-          href={expandHref}
-          aria-label="Open automation run"
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          data-testid="split-run-log-expand"
-        >
-          <Maximize2 className="size-3.5" aria-hidden />
-        </Link>
-      ) : null}
     </div>
   );
 }

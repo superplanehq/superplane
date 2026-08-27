@@ -41,12 +41,39 @@ export function RunOverlayBoardBackdrop() {
   );
 }
 
+function overlayLayerClassName(fixed: boolean, fullPage: boolean) {
+  if (fullPage) {
+    // Pin to the viewport beside the sidebar. Absolute fill is clipped by the
+    // kanban overflow ancestors, so it cannot cover the main pane.
+    if (fixed) {
+      return "fixed inset-y-0 right-0 left-[var(--workspace-navigation-width)] z-50 flex bg-background p-0";
+    }
+    return "absolute inset-0 z-50 flex bg-background p-0";
+  }
+  return cn("inset-0 z-50 flex items-center justify-center bg-black/50 p-5 sm:p-10", fixed ? "fixed" : "absolute");
+}
+
+function overlayDialogClassName(wide: boolean, canvas: boolean, fullPage: boolean) {
+  if (fullPage) {
+    return "flex h-full w-full flex-col overflow-hidden bg-background dark:bg-gray-900";
+  }
+  return cn(
+    "flex max-h-[min(56rem,calc(100vh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
+    canvas
+      ? "h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))]"
+      : wide
+        ? "h-[min(48rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]"
+        : "h-[min(50rem,calc(100vh-5rem))] w-[min(70rem,calc(100vw-5rem))]",
+  );
+}
+
 export function RunOverlayFrame({
   children,
   testId,
   wide = false,
   canvas = false,
   fixed = false,
+  fullPage = false,
   onDismiss,
 }: {
   children: ReactNode;
@@ -55,25 +82,14 @@ export function RunOverlayFrame({
   canvas?: boolean;
   /** Cover the viewport. Use on the live line board so overflow does not clip the dialog. */
   fixed?: boolean;
+  /** Fill the main pane. The factory sidebar stays visible. */
+  fullPage?: boolean;
   onDismiss?: () => void;
 }) {
   return (
-    <div
-      className={cn(
-        "inset-0 z-50 flex items-center justify-center bg-black/50 p-5 sm:p-10",
-        fixed ? "fixed" : "absolute",
-      )}
-      onClick={onDismiss}
-    >
+    <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
       <div
-        className={cn(
-          "flex max-h-[min(52rem,calc(100vh-5rem))] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg dark:bg-gray-900",
-          canvas
-            ? "h-[min(52rem,calc(100vh-5rem))] w-[min(84rem,calc(100vw-5rem))]"
-            : wide
-              ? "h-[min(48rem,calc(100vh-5rem))] w-[min(72rem,calc(100vw-5rem))]"
-              : "h-[min(46rem,calc(100vh-5rem))] w-[min(56rem,calc(100vw-5rem))]",
-        )}
+        className={overlayDialogClassName(wide, canvas, fullPage)}
         data-testid={testId}
         role="dialog"
         aria-modal="true"
