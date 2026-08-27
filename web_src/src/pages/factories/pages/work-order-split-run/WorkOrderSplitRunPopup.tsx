@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunHeaderActions } from "./SplitRunHeaderActions";
-import { SplitRunLogHeader } from "./SplitRunLogHeader";
+import { SplitRunFollowSwitch } from "./SplitRunLogHeader";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
@@ -39,14 +39,9 @@ import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
-function footerMutationHandlers(
-  canUpdate: boolean,
-  footerActions: SplitRunFooterActions,
-  fixture: SplitRunFixture,
-  onClose?: () => void,
-) {
+function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
   if (!canUpdate) {
-    return { onStop: undefined, onReject: undefined };
+    return { onStop: undefined };
   }
   return {
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
@@ -55,11 +50,6 @@ function footerMutationHandlers(
         lineName: fixture.lineName,
         stepIndex: fixture.currentStepIndex,
       }),
-    onReject: async () => {
-      if (await footerActions.handleReject()) {
-        onClose?.();
-      }
-    },
   };
 }
 
@@ -75,6 +65,8 @@ type WorkOrderSplitRunBodyProps = {
   footerActions: SplitRunFooterActions;
 };
 
+type SplitRunFollow = ReturnType<typeof useFollowLogScroll>;
+
 /** Phase log for a work-order popup. The popup wraps this. */
 export function WorkOrderSplitRunBody({
   organizationId,
@@ -86,7 +78,12 @@ export function WorkOrderSplitRunBody({
   fixture,
   canUpdate = true,
   footerActions,
-}: WorkOrderSplitRunBodyProps) {
+  follow,
+  onStreamTick,
+}: WorkOrderSplitRunBodyProps & {
+  follow: SplitRunFollow;
+  onStreamTick: (tick: string) => void;
+}) {
   const [phaseId, setPhaseId] = useState<SplitRunPhaseId>(fixture.currentPhaseId);
   const [openPhaseId, setOpenPhaseId] = useState<SplitRunPhaseId | null>(() => autoExpandedPhaseId(fixture));
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -122,7 +119,9 @@ export function WorkOrderSplitRunBody({
     );
   }, [artifactIndex, demoArtifacts, fixture.phases, selectedPhase?.id, visual.stream]);
   const streamTick = useMemo(() => [...streams.values()].map((stream) => stream?.length ?? 0).join(":"), [streams]);
-  const follow = useFollowLogScroll(runningSplitRunPhaseId(fixture.phases), streamTick);
+  useEffect(() => {
+    onStreamTick(streamTick);
+  }, [onStreamTick, streamTick]);
   const liveOrder = Boolean(organizationId && factoryId && orderId);
   const automationStop = (entry: SplitRunPhase) => {
     const appId = entry.appId;
@@ -146,19 +145,14 @@ export function WorkOrderSplitRunBody({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
-      <SplitRunLogHeader
-        following={follow.following}
-        onFollowingChange={follow.setFollowing}
-        className="mb-2 px-3 pt-3"
-      />
-
       <ol
         ref={follow.scrollRef}
         onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none space-y-1.5 overflow-x-hidden overflow-y-auto px-3 pb-3"
+        className="min-h-0 min-w-0 flex-1 list-none space-y-2 overflow-x-hidden overflow-y-auto px-3 pb-3"
+        data-testid="split-run-log-scroll"
       >
         {fixture.phases.map((entry) => (
-          <li key={entry.id} className="min-w-0">
+          <li key={entry.id} className="min-w-0 first:mt-3">
             <PhaseLogCard
               phase={entry}
               expanded={entry.id === openPhaseId}
@@ -218,7 +212,7 @@ export function WorkOrderSplitRunPopup({
   canUpdate?: boolean;
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
-  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onClose);
+  const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
   const useLiveArtifacts = hasLiveWorkOrder(organizationId, factoryId, orderId);
@@ -247,21 +241,23 @@ export function WorkOrderSplitRunPopup({
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const ownerOrganizationId = popupOwnerOrganizationId(organizationId, edits.canEdit);
+  const [fullPage, setFullPage] = useState(false);
 
   return (
-    <PopupShell testId="work-order-split-run" fixed={fixed} onDismiss={onClose}>
+    <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
       <PopupHeader
         title={edits.title}
         onClose={onClose}
         canEditTitle={edits.canEdit}
         titleBusy={edits.titleBusy}
         onTitleSave={(next) => void edits.saveTitle(next)}
+        expanded={fullPage}
+        onToggleExpanded={() => setFullPage((current) => !current)}
         actions={
           <SplitRunHeaderActions
             footer={fixture.footer}
             onStart={draftStart}
             onStop={mutations.onStop}
-            onReject={mutations.onReject}
             startBusy={isDispatching}
             stopBusy={footerActions.busy}
             startDisabled={!canDispatch}
@@ -343,9 +339,13 @@ function SplitRunPopupTabs({
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
 }) {
+  const [tab, setTab] = useState(initialTab);
+  const [streamTick, setStreamTick] = useState("");
+  const follow = useFollowLogScroll(runningSplitRunPhaseId(fixture.phases), streamTick);
+
   return (
-    <Tabs defaultValue={initialTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="shrink-0 border-b border-border px-5 py-2">
+    <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-2">
         <TabsList aria-label="Work order views">
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="log">
@@ -360,6 +360,9 @@ function SplitRunPopupTabs({
             Automations
           </TabsTrigger>
         </TabsList>
+        {tab === "log" ? (
+          <SplitRunFollowSwitch following={follow.following} onFollowingChange={follow.setFollowing} />
+        ) : null}
       </div>
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkOrderSplitRunOverview
@@ -389,6 +392,8 @@ function SplitRunPopupTabs({
           fixture={fixture}
           canUpdate={canUpdate}
           footerActions={footerActions}
+          follow={follow}
+          onStreamTick={setStreamTick}
         />
       </TabsContent>
     </Tabs>
