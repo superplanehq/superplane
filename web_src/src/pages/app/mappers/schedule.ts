@@ -244,10 +244,16 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Match Go backend: add interval months in timezone, set day/hour/minute
+      // Match Go backend: advance the month arithmetically (setMonth on a day
+      // 29-31 normalizes overflow into the following month, skipping a month),
+      // then clamp the day to the target month's length so dayOfMonth 29-31
+      // means "last day" in shorter months.
       const nextTriggerInTZ = new Date(nowInTZ);
-      nextTriggerInTZ.setMonth(nextTriggerInTZ.getMonth() + interval);
-      nextTriggerInTZ.setDate(dayOfMonth);
+      const monthIndex = nextTriggerInTZ.getMonth() + interval;
+      const targetYear = nextTriggerInTZ.getFullYear() + Math.floor(monthIndex / 12);
+      const targetMonth = monthIndex % 12;
+      const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      nextTriggerInTZ.setFullYear(targetYear, targetMonth, Math.min(dayOfMonth, lastDay));
       nextTriggerInTZ.setHours(hour);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);
