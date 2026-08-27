@@ -39,9 +39,7 @@ describe("buildSplitRunFooter", () => {
       kind: "draft",
       sentence: "This work order is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
-      actions: [
-        { id: "start", kind: "start", label: "Start", emphasis: "primary" },
-      ],
+      actions: [{ id: "start", kind: "start", label: "Start", emphasis: "primary" }],
     });
   });
 

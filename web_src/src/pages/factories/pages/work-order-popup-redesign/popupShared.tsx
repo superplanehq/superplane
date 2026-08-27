@@ -120,12 +120,7 @@ export function PopupHeader({
         <div className="flex shrink-0 items-center gap-2">
           {actions}
           {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className={POPUP_HEADER_ICON_BUTTON}
-            aria-label="Close"
-          >
+          <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
             <XIcon className="h-4 w-4" />
           </button>
         </div>
