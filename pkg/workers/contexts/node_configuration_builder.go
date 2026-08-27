@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -843,9 +844,16 @@ func formatTemplateValue(value any) string {
 		return strconv.FormatFloat(float64(v), 'f', -1, 32)
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
-	default:
-		return fmt.Sprintf("%v", v)
 	}
+
+	switch reflect.ValueOf(value).Kind() {
+	case reflect.Map, reflect.Slice, reflect.Array:
+		if encoded, err := json.Marshal(value); err == nil {
+			return string(encoded)
+		}
+	}
+
+	return fmt.Sprintf("%v", value)
 }
 
 type resolvedNodeRefs struct {
