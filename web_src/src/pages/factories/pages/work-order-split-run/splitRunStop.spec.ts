@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { applySplitRunStop, applySplitRunStopChoice } from "./splitRunStop";
+import { applySplitRunStop, applySplitRunStopChoice, stopSplitRunAutomation } from "./splitRunStop";
 
 describe("applySplitRunStopChoice", () => {
   it("closes as rejected for Stop and Close", async () => {
@@ -146,20 +146,13 @@ describe("applySplitRunStop", () => {
     expect(onClose).toHaveBeenCalledWith("RESULT_REJECTED");
   });
 
-  it("does not change status when cancel fails", async () => {
-    const cancelRun = vi.fn().mockRejectedValue(new Error("run still busy"));
+  it("cancels a running automation without closing the work order", async () => {
+    const cancelRun = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
 
-    await expect(
-      applySplitRunStop("canceled", {
-        kind: "running",
-        run,
-        cancelRun,
-        onClose,
-        onStatusChange: vi.fn(),
-      }),
-    ).rejects.toThrow("run still busy");
+    await stopSplitRunAutomation(run, cancelRun);
 
+    expect(cancelRun).toHaveBeenCalledWith(run);
     expect(onClose).not.toHaveBeenCalled();
   });
 });

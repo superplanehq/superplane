@@ -105,6 +105,8 @@ export interface SplitRunPhase {
   triggerName?: string;
   /** When set, the popup shows this canvas instead of the phase-name map. */
   canvas?: SplitRunCanvasModel;
+  /** Line step index used to rerun this automation. */
+  stepIndex?: number;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -705,6 +707,7 @@ function executionToPhase(
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: execution.run?.appId,
     runId: execution.run?.id,
+    stepIndex: execution.stepIndex,
   };
 }
 
