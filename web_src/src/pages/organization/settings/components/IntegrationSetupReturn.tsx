@@ -1,9 +1,9 @@
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
-import { consumeIntegrationSetupReturn, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { hasIntegrationSetupStay, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 
 interface IntegrationSetupReturnProps {
   organizationId: string;
@@ -22,17 +22,18 @@ interface IntegrationSetupReturnProps {
  */
 export function IntegrationSetupReturn({ organizationId, children }: IntegrationSetupReturnProps) {
   const navigate = useNavigate();
-  // Read once on mount. After the marker is consumed the value must stay set,
-  // so the children never flash before the navigation happens.
+  const [searchParams] = useSearchParams();
+  const stayOnPage = hasIntegrationSetupStay(searchParams.toString());
+  // Peek only. The destination page deletes the marker, so a Strict Mode remount
+  // still finds the path and can navigate again.
   const [returnTo] = useState(() => peekIntegrationSetupReturn(organizationId));
 
   useEffect(() => {
-    if (!returnTo) return;
-    consumeIntegrationSetupReturn(organizationId);
+    if (!returnTo || stayOnPage) return;
     navigate(returnTo, { replace: true });
-  }, [navigate, organizationId, returnTo]);
+  }, [navigate, returnTo, stayOnPage]);
 
-  if (returnTo) {
+  if (returnTo && !stayOnPage) {
     return (
       <div className="flex min-h-screen items-center justify-center" data-testid="integration-setup-return">
         <Loader2 className="size-8 animate-spin text-gray-500 dark:text-gray-400" />

@@ -6,6 +6,7 @@ import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
+import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -249,6 +250,7 @@ function PageObservabilityScope() {
 function OrganizationScope() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  useConsumeIntegrationSetupReturnOnArrival(organizationId);
 
   useEffect(() => {
     if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {

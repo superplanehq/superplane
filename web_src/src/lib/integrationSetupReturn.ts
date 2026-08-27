@@ -1,6 +1,9 @@
 const STORAGE_PREFIX = "integration-setup-return";
 const MAX_AGE_MS = 15 * 60 * 1000;
 
+/** Keeps the hosted GitHub account picker on Integrations instead of bouncing back. */
+export const INTEGRATION_SETUP_STAY_PARAM = "setupStay";
+
 interface StoredReturn {
   path: string;
   createdAt: number;
@@ -51,4 +54,21 @@ export function peekIntegrationSetupReturn(organizationId: string): string | nul
 
 export function consumeIntegrationSetupReturn(organizationId: string): void {
   window.localStorage.removeItem(storageKey(organizationId));
+}
+
+function pathnameOf(path: string): string {
+  return path.split("?")[0] ?? path;
+}
+
+/** Deletes the marker after the browser lands on the stored return page. */
+export function consumeIntegrationSetupReturnIfArrived(organizationId: string, currentPathname: string): void {
+  const stored = peekIntegrationSetupReturn(organizationId);
+  if (!stored) return;
+  if (pathnameOf(stored) !== pathnameOf(currentPathname)) return;
+  consumeIntegrationSetupReturn(organizationId);
+}
+
+export function hasIntegrationSetupStay(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(INTEGRATION_SETUP_STAY_PARAM) === "1";
 }
