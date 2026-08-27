@@ -31,6 +31,10 @@ function closeToast(choice: SplitRunStopChoice): string {
   return "Work order closed as canceled.";
 }
 
+function rejectToast(): string {
+  return "Work order deleted.";
+}
+
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
   if (choice === "reopen") {
     return "Failed to reopen work order";
@@ -66,13 +70,15 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
 
   const handleReject = useCallback(async () => {
     if (!live || !orderId) {
-      return;
+      return false;
     }
     try {
       await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
-      showSuccessToast("Work order closed as canceled.");
+      showSuccessToast(rejectToast());
+      return true;
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
+      return false;
     }
   }, [closeWorkOrder, live, orderId]);
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,6 +70,8 @@ type FactoryWorkOrder struct {
 	Result         string
 	CreatedByID    *uuid.UUID
 	SourceRunID    *uuid.UUID
+	OriginURL      *string
+	OriginLabel    *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -102,6 +105,27 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 // the first dispatch from `draft` also promotes it to `open`.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+}
+
+func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
+	if o == nil || o.OriginURL == nil {
+		return nil
+	}
+
+	url := strings.TrimSpace(*o.OriginURL)
+	if url == "" {
+		return nil
+	}
+
+	label := ""
+	if o.OriginLabel != nil {
+		label = strings.TrimSpace(*o.OriginLabel)
+	}
+	if label == "" {
+		label = OriginLabelFromURL(url)
+	}
+
+	return &WorkOrderOrigin{URL: url, Label: label}
 }
 
 type FactoryWorkOrderAssignee struct {
