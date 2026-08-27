@@ -123,7 +123,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
 
@@ -383,7 +384,8 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Automations" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Follow" })).toBeInTheDocument();
   });
 
   it("pins a review note and keeps Update manually off the note", () => {

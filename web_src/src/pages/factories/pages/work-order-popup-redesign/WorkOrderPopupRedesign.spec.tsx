@@ -212,7 +212,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("button", { name: "plan.md" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: /feature\/rf-103/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("heading", { name: "Automations" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
     expect(within(dialog).queryByText("Listening for user review")).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Users see duplicate refund/)).not.toBeInTheDocument();
