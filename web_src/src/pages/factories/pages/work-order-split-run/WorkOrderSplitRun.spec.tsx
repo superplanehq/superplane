@@ -749,7 +749,7 @@ describe("WorkOrderSplitRunPopup", () => {
     );
     expect(within(screen.getByTestId("split-run-stream-plan")).queryByText("Clone Repo")).not.toBeInTheDocument();
 
-    await user.click(within(screen.getByTestId("split-run-stream-plan")).getByText("Agent - Plan for GH Issue"));
+    await user.click(within(screen.getByTestId("split-run-stream-plan")).getByText("Agent - No GH Issue Plan"));
     const planStream = screen.getByTestId("split-run-stream-plan");
     expect(within(planStream).getByText("Clone Repo")).toBeInTheDocument();
     expect(within(planStream).getAllByText("✓").length).toBeGreaterThan(0);
