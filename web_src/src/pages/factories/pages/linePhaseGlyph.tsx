@@ -11,11 +11,7 @@ export function PhaseGlyph({ kind, className }: { kind: PhaseGlyphKind; classNam
   const shared = cn("size-3.5 shrink-0", className);
 
   if (kind === "running") {
-    return (
-      <StatusDisk className={shared} tone="bg-[color:var(--status-running-dot)]">
-        <LoaderCircle className={cn(MARK, "animate-spin")} />
-      </StatusDisk>
-    );
+    return <LoaderCircle className={cn(shared, "animate-spin text-[color:var(--status-running-dot)]")} aria-hidden />;
   }
   if (kind === "waiting") {
     return (

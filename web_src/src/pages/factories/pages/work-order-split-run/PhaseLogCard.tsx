@@ -12,7 +12,7 @@ import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
-import { logStatusTimeLabel, runningSpinnerFrame, tickingRunningClock } from "./logStatusTime";
+import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
@@ -31,16 +31,16 @@ function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
 
 function statusTimeTone(status: SplitRunPhaseStatus): string {
   if (status === "passed") {
-    return "bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]";
+    return "text-[color:var(--status-completed-fg)]";
   }
   if (status === "running") {
-    return "bg-[color:var(--status-running-bg)] text-[color:var(--status-running-fg)]";
+    return "text-[color:var(--status-running-fg)]";
   }
   if (status === "waiting") {
-    return "bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]";
+    return "text-[color:var(--status-waiting-fg)]";
   }
   if (status === "failed") {
-    return "bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]";
+    return "text-[color:var(--status-failed-fg)]";
   }
   return "text-muted-foreground";
 }
@@ -589,30 +589,51 @@ function LogStatusTime({
 }) {
   const running = status === "running";
   const { now, sampledAt } = useRunningLogClock(running, duration);
-  const label = running
-    ? `Running ${tickingRunningClock(duration, sampledAt, now)}`
-    : logStatusTimeLabel(status, duration);
-  if (!label) {
+  const clock = running ? tickingRunningClock(duration, sampledAt, now) : logStatusTimeLabel(duration);
+  const mark = statusTimeMark(status);
+  if (!mark && !clock) {
     return null;
   }
   return (
     <span
       data-testid={testId}
-      aria-label={running ? "Running" : undefined}
+      aria-label={statusTimeName(status)}
       className={cn(
-        "shrink-0 rounded-sm px-1.5 text-right tabular-nums [font-feature-settings:'zero']",
+        "inline-flex shrink-0 items-center gap-1 text-right tabular-nums [font-feature-settings:'zero']",
         LOG_FACE,
         statusTimeTone(status),
       )}
     >
-      {running ? (
-        <span data-testid="split-run-running-spinner" className="mr-1 inline-block w-[1ch]" aria-hidden>
-          {runningSpinnerFrame(now - sampledAt)}
-        </span>
-      ) : null}
-      {label}
+      {mark}
+      {clock ? <span>{clock}</span> : null}
     </span>
   );
+}
+
+function statusTimeName(status: SplitRunPhaseStatus): string | undefined {
+  if (status === "passed") {
+    return "Passed";
+  }
+  if (status === "running") {
+    return "Running";
+  }
+  if (status === "failed") {
+    return "Failed";
+  }
+  if (status === "waiting") {
+    return "Waiting";
+  }
+  return undefined;
+}
+
+function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
+  if (status === "passed" || status === "running") {
+    return <span aria-hidden>✓</span>;
+  }
+  if (status === "failed") {
+    return <span aria-hidden>✗</span>;
+  }
+  return null;
 }
 
 function PhaseDuration({ phase }: { phase: SplitRunPhase }) {

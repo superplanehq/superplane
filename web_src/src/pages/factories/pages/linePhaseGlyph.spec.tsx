@@ -14,12 +14,15 @@ describe("PhaseGlyph", () => {
     expect(container.querySelector(".lucide-x")).not.toBeNull();
   });
 
-  it("fills running and waiting disks", () => {
-    const { rerender, container } = render(<PhaseGlyph kind="running" />);
-    expect(container.firstElementChild?.className).toMatch(/status-running-dot/);
+  it("uses a spinner without a fill disk", () => {
+    const { container } = render(<PhaseGlyph kind="running" />);
     expect(container.querySelector(".lucide-loader-circle")).not.toBeNull();
+    expect(container.firstElementChild?.getAttribute("class")).toMatch(/status-running-dot/);
+    expect(container.firstElementChild?.getAttribute("class")).not.toMatch(/rounded-full/);
+  });
 
-    rerender(<PhaseGlyph kind="waiting" />);
+  it("fills the waiting disk", () => {
+    const { container } = render(<PhaseGlyph kind="waiting" />);
     expect(container.firstElementChild?.className).toMatch(/status-waiting-dot/);
     expect(container.querySelector(".lucide-clock")).not.toBeNull();
   });

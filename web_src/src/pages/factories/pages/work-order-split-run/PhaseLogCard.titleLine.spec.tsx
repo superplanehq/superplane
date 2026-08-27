@@ -88,18 +88,16 @@ describe("PhaseLogCard title line", () => {
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("04:00");
     const badge = screen.getByTestId("split-run-stream-duration-planner-agent");
     expect(badge).toHaveAccessibleName("Running");
-    expect(badge).toHaveTextContent("|");
-    expect(badge).toHaveTextContent("Running 04:00");
+    expect(badge).toHaveTextContent("✓");
+    expect(badge).toHaveTextContent("04:00");
+    expect(badge).not.toHaveTextContent("Running");
+    expect(badge.querySelector(".lucide-loader-circle")).toBeNull();
+    expect(badge.className).not.toMatch(/bg-/);
 
     await act(async () => {
-      vi.advanceTimersByTime(250);
+      vi.advanceTimersByTime(1000);
     });
-    expect(badge).toHaveTextContent("/");
-
-    await act(async () => {
-      vi.advanceTimersByTime(750);
-    });
-    expect(badge).toHaveTextContent("Running 04:01");
+    expect(badge).toHaveTextContent("04:01");
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("04:01");
 
     vi.useRealTimers();
@@ -476,7 +474,11 @@ describe("PhaseLogCard node line", () => {
     expect(within(row).queryByText("Run Claude Code")).not.toBeInTheDocument();
 
     const statusTime = within(row).getByTestId("split-run-stream-duration-planner-agent");
-    expect(statusTime).toHaveTextContent("Passed 01:20");
+    expect(statusTime).toHaveAccessibleName("Passed");
+    expect(statusTime).toHaveTextContent("✓");
+    expect(statusTime).toHaveTextContent("01:20");
+    expect(statusTime).not.toHaveTextContent("Passed");
+    expect(statusTime.className).not.toMatch(/bg-/);
     expect(statusTime.parentElement?.className).toMatch(/ml-auto/);
     expect(statusTime.className).toMatch(/text-right/);
     expect(statusTime.className).toMatch(/font-mono/);
