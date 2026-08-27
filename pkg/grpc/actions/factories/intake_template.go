@@ -41,6 +41,8 @@ const (
 	intakeConfidenceCautionAt  = 3
 	intakeConfidenceCriticalAt = 2
 
+	intakeAnalysisOutputFile = "/tmp/intake-analysis.json"
+
 	// intakeConcurrencyMax is how many items an intake node works on at once.
 	// A node runs one execution at a time by default, which makes a batch of
 	// items wait for each other: a seeded batch, or a source that reports many
@@ -266,6 +268,11 @@ func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string
 				"type":   "prompt",
 				"prompt": intakeAnalysisPrompt(spec.analysisSubject),
 			},
+			map[string]any{
+				"name":    "Use analysis as output",
+				"type":    runner.AgentStepBash,
+				"command": intakeAnalysisOutputCommand(),
+			},
 		},
 	}
 
@@ -283,7 +290,8 @@ func intakeAnalysisPrompt(subject string) string {
 	return strings.Join([]string{
 		fmt.Sprintf("Analyze this %s and decide whether it is suitable for an engineering work order.", subject),
 		"Consider impact, clarity, feasibility, and whether an agent on this factory line can take a concrete action.",
-		"Return only one JSON object. Do not wrap it in markdown.",
+		fmt.Sprintf("Write one JSON object to %s. Do not write the result to another file.", intakeAnalysisOutputFile),
+		fmt.Sprintf("The file must parse with jq. Run `jq empty %s` and keep editing until it succeeds.", intakeAnalysisOutputFile),
 		"Keys:",
 		`- "score": integer from 0 through 100. A higher value means greater confidence.`,
 		`- "summary": one sentence on how suitable the work is for an agent on this factory line.`,
@@ -295,23 +303,25 @@ func intakeAnalysisPrompt(subject string) string {
 	}, "\n")
 }
 
-// intakeAnalysisResultRaw is the runner's text output. A node reference
-// resolves to one event, whose data holds that text, so the path walks
-// straight into it rather than indexing a list.
-func intakeAnalysisResultRaw() string {
-	return fmt.Sprintf(`$[%q].data.result.result`, intakeAnalysisNodeName)
-}
-
-// intakeAnalysisJSONExpr parses the JSON object the analysis runner returns.
-// Agents often wrap JSON in prose, so the slice is from the first "{" to the
-// last "}".
-func intakeAnalysisJSONExpr() string {
-	raw := intakeAnalysisResultRaw()
-	return fmt.Sprintf(`fromJSON(%s[indexOf(%s, "{"):lastIndexOf(%s, "}") + 1])`, raw, raw, raw)
+// intakeAnalysisOutputCommand promotes the file the agent wrote to the node's
+// result, so the rest of the graph reads fields instead of parsing text. The
+// prompt asks for an exact shape, but this step accepts what an agent really
+// produces: a quoted number, a missing summary, or a different number of
+// reasons. Only the score is required, because the threshold cannot run without
+// it.
+func intakeAnalysisOutputCommand() string {
+	return fmt.Sprintf(`if ! jq -ce '{
+  score: (.score | tonumber | floor),
+  summary: ((.summary // "") | tostring),
+  reasons: [(if (.reasons | type) == "array" then .reasons[] else empty end) | tostring]
+}' %s > "$SUPERPLANE_RESULT_FILE"; then
+  echo "The analysis at %s has no readable score" >&2
+  exit 1
+fi`, intakeAnalysisOutputFile, intakeAnalysisOutputFile)
 }
 
 func intakeAnalysisScorePath() string {
-	return intakeAnalysisJSONExpr() + ".score"
+	return fmt.Sprintf(`$[%q].data.result.score`, intakeAnalysisNodeName)
 }
 
 func intakeThresholdExpression(confidencePct int) string {
@@ -323,7 +333,7 @@ func intakeWorkOrderIDExpression() string {
 }
 
 func intakeConfidenceSummaryExpression() string {
-	return fmt.Sprintf(`{{ %s.summary }}`, intakeAnalysisJSONExpr())
+	return fmt.Sprintf(`{{ $[%q].data.result.summary }}`, intakeAnalysisNodeName)
 }
 
 func intakeConfidenceWriteupExpression(subject string) string {
@@ -332,9 +342,9 @@ func intakeConfidenceWriteupExpression(subject string) string {
 		subject,
 	)
 	return fmt.Sprintf(
-		`{{ %q + "\n\n### Why this score\n- " + join(%s.reasons, "\n- ") }}`,
+		`{{ %q + "\n\n### Why this score\n- " + join($[%q].data.result.reasons, "\n- ") }}`,
 		intro,
-		intakeAnalysisJSONExpr(),
+		intakeAnalysisNodeName,
 	)
 }
 

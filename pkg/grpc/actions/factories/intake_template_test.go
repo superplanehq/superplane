@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -83,17 +84,22 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Contains(t, prompt, `"reasons"`)
 		assert.Contains(t, prompt, `"summary"`)
 		assert.Contains(t, prompt, "exactly three short sentences")
+		assert.Contains(t, prompt, "/tmp/intake-analysis.json")
+		assert.Contains(t, prompt, "jq empty /tmp/intake-analysis.json")
+
+		output := steps[1].(map[string]any)
+		assert.Equal(t, "Use analysis as output", output["name"])
+		assert.Equal(t, runner.AgentStepBash, output["type"])
+		assert.Contains(t, output["command"], "/tmp/intake-analysis.json")
+		assert.Contains(t, output["command"], `"$SUPERPLANE_RESULT_FILE"`)
+		// A quoted or fractional score still resolves, and a summary or a
+		// reason list the agent left out does not fail the item.
+		assert.Contains(t, output["command"], "tonumber")
+		assert.Contains(t, output["command"], `(.summary // "")`)
+		assert.Contains(t, output["command"], `(.reasons | type) == "array"`)
 
 		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
-		result := `{
-			"score": 72,
-			"summary": "This issue is a mixed fit for an agent on this factory line.",
-			"reasons": [
-				"The GitHub issue names the empty-state title and the create-invoice action.",
-				"The billing page already has an empty branch and a shared empty-state component.",
-				"The change is copy and layout. An agent can do the work, but the copy is a judgment call."
-			]
-		}`
+		result := intakeAnalysisResult(72)
 
 		assert.Equal(
 			t,
@@ -341,21 +347,21 @@ func evaluateIntakeTemplate(t *testing.T, template string, result string) any {
 func evaluateIntakeExpression(t *testing.T, expression string, pct int) any {
 	t.Helper()
 
-	return evaluateIntakeExpressionResult(t, expression, fmt.Sprintf(`{"score":%d,"reasons":["a","b","c"]}`, pct))
+	return evaluateIntakeExpressionResult(t, expression, intakeAnalysisResult(pct))
 }
 
 func evaluateIntakeExpressionResult(t *testing.T, expression string, result string) any {
 	t.Helper()
+
+	var structuredResult map[string]any
+	require.NoError(t, json.Unmarshal([]byte(result), &structuredResult))
 
 	analysis := map[string]any{
 		"type": intakeAgentSpecs[0].component + ".finished",
 		"data": map[string]any{
 			"status":    "succeeded",
 			"exit_code": 0,
-			"result": map[string]any{
-				"type":   "result",
-				"result": "Here is the score:\n" + result,
-			},
+			"result":    structuredResult,
 		},
 	}
 
@@ -365,6 +371,18 @@ func evaluateIntakeExpressionResult(t *testing.T, expression string, result stri
 	require.NoError(t, err)
 
 	return output
+}
+
+func intakeAnalysisResult(score int) string {
+	return fmt.Sprintf(`{
+		"score": %d,
+		"summary": "This issue is a mixed fit for an agent on this factory line.",
+		"reasons": [
+			"The GitHub issue names the empty-state title and the create-invoice action.",
+			"The billing page already has an empty branch and a shared empty-state component.",
+			"The change is copy and layout. An agent can do the work, but the copy is a judgment call."
+		]
+	}`, score)
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {
