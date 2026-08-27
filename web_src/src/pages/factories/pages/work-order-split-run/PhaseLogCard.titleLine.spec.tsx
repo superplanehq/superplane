@@ -73,22 +73,18 @@ describe("PhaseLogCard title line", () => {
     vi.useRealTimers();
   });
 
-  it("puts bold artifacts on the far right of a collapsed automation", () => {
-    render(
-      <PhaseLogCard
-        phase={{
-          ...PHASE,
-          artifacts: [
-            {
-              id: "art-plan",
-              type: "TYPE_MARKDOWN",
-              data: { name: "PLAN.md", title: "PLAN.md" },
-            },
-          ],
-        }}
-        expanded={false}
-      />,
-    );
+  it("keeps bold artifacts on the automation header when the card is expanded", () => {
+    const phase = {
+      ...PHASE,
+      artifacts: [
+        {
+          id: "art-plan",
+          type: "TYPE_MARKDOWN",
+          data: { name: "PLAN.md", title: "PLAN.md" },
+        },
+      ],
+    };
+    const { rerender } = render(<PhaseLogCard phase={phase} expanded={false} />);
 
     const row = screen.getByTestId("split-run-phase-plan");
     const name = within(row).getByRole("button", { name: "Plan" });
@@ -99,6 +95,37 @@ describe("PhaseLogCard title line", () => {
     expect(name.className).toMatch(/flex-1/);
     expect(within(row).getByTestId("split-run-phase-artifacts-plan").className).toMatch(/justify-end/);
     expect(within(row).queryByTestId("split-run-phase-duration-plan")).not.toBeInTheDocument();
+
+    rerender(<PhaseLogCard phase={phase} expanded stream={[]} />);
+    expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-automation-header-plan")).getByRole("button", { name: "PLAN.md" }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts Stop to the right of artifacts on a running automation", () => {
+    render(
+      <PhaseLogCard
+        phase={{
+          ...PHASE,
+          status: "running",
+          artifacts: [
+            {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          ],
+        }}
+        expanded={false}
+        onStop={vi.fn()}
+      />,
+    );
+
+    const header = screen.getByTestId("split-run-automation-header-plan");
+    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
+    const stop = within(header).getByRole("button", { name: "Stop" });
+    expect(artifact.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("offers Stop on a running automation and Rerun on a failed one", () => {

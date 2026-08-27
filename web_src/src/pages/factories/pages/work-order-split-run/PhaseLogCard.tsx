@@ -206,8 +206,8 @@ function artifactsProducedBySteps(
 
 /**
  * Terminal log. The automation is the root. Each node hangs under it.
- * Collapsed automations show produced artifacts on the title line.
- * Expanded automations show those artifacts on the producing steps.
+ * Automations keep produced artifacts on the title line when collapsed or expanded.
+ * Expanded automations also show those artifacts on the producing steps.
  * Node icons keep the phase glyph column. Agent steps stay flush under them.
  */
 export function PhaseLogCard({
@@ -280,6 +280,21 @@ export function PhaseLogCard({
               <span className="min-w-0 truncate text-foreground">{phase.name}</span>
             </div>
           )}
+          {producedArtifacts.length > 0 ? (
+            <span
+              data-testid={`split-run-phase-artifacts-${phase.id}`}
+              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
+            >
+              {producedArtifacts.map((artifact) => (
+                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
+              ))}
+            </span>
+          ) : null}
+          {phase.checks && phase.checks.length > 0 ? (
+            <span className="shrink-0">
+              <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
+            </span>
+          ) : null}
           {phase.status === "running" && onStop ? (
             <Button type="button" size="xs" variant="outline" className="text-destructive" onClick={onStop}>
               Stop
@@ -289,21 +304,6 @@ export function PhaseLogCard({
             <Button type="button" size="xs" variant="ghost" onClick={onRerun}>
               Rerun
             </Button>
-          ) : null}
-          {phase.checks && phase.checks.length > 0 ? (
-            <span className="shrink-0">
-              <SplitRunCheckPills checks={phase.checks} testId={`split-run-phase-checks-${phase.id}`} />
-            </span>
-          ) : null}
-          {!expanded && producedArtifacts.length > 0 ? (
-            <span
-              data-testid={`split-run-phase-artifacts-${phase.id}`}
-              className="flex min-w-0 items-center justify-end gap-2 overflow-hidden whitespace-nowrap"
-            >
-              {producedArtifacts.map((artifact) => (
-                <StreamArtifact key={artifact.id ?? `${artifact.type}`} artifact={artifact} />
-              ))}
-            </span>
           ) : null}
         </div>
 
@@ -539,13 +539,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
 }
 
 function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStreamLine[] }) {
-  const streaming = tools.some((tool) => tool.status === "running");
-  const [expanded, setExpanded] = useState(streaming);
-  useEffect(() => {
-    if (streaming) {
-      setExpanded(true);
-    }
-  }, [streaming]);
+  const [expanded, setExpanded] = useState(false);
   const summary = toolCallSummary(tools);
 
   return (

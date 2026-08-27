@@ -162,7 +162,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByText("Factory Lines")).not.toBeInTheDocument();
   });
 
-  it("shows produced artifacts on the collapsed automation line", async () => {
+  it("shows produced artifacts on the automation line", async () => {
     const user = userEvent.setup();
     renderSplitRun();
 
@@ -175,7 +175,10 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(planToggle);
 
-    expect(within(plan).queryByTestId("split-run-phase-artifacts-plan")).not.toBeInTheDocument();
+    expect(within(plan).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-automation-header-plan")).getByRole("button", { name: "plan.md" }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-stream-plan")).getByRole("button", { name: "plan.md" }),
     ).toBeInTheDocument();
@@ -189,7 +192,12 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(implementToggle);
 
-    expect(within(implement).queryByTestId("split-run-phase-artifacts-implement")).not.toBeInTheDocument();
+    expect(within(implement).getByTestId("split-run-phase-artifacts-implement")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-automation-header-implement")).getByRole("link", {
+        name: /feature\/refund-retry/,
+      }),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-stream-implement")).getByRole("link", { name: /feature\/refund-retry/ }),
     ).toBeInTheDocument();

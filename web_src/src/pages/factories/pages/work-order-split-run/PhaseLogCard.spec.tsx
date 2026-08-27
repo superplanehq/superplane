@@ -448,6 +448,47 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(within(stream).getByText("LineListCard.tsx")).toBeInTheDocument();
   });
 
+  it("keeps running tool groups collapsed until the user opens them", async () => {
+    const user = userEvent.setup();
+    const runningStream: SplitRunStreamLine[] = [
+      line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+      line({
+        id: "step-write",
+        note: true,
+        componentName: "Write Implementation Plan",
+        componentType: "prompt",
+      }),
+      line({
+        id: "cmd-cat",
+        note: true,
+        noteParentId: "step-write",
+        noteDepth: 1,
+        componentName: "cat /tmp/ORDER.md",
+        componentType: "bash",
+        status: "running",
+        detail: "## Goal\nAdd a menu.",
+      }),
+    ];
+
+    const { rerender, unmount } = render(<PhaseLogCard phase={PHASE} expanded stream={runningStream} />);
+
+    const group = screen.getByRole("button", { name: "Ran 1 command" });
+    expect(group).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+
+    rerender(<PhaseLogCard phase={PHASE} expanded stream={runningStream} />);
+    expect(screen.getByRole("button", { name: "Ran 1 command" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Ran 1 command" }));
+    expect(screen.getByText("cat /tmp/ORDER.md")).toBeInTheDocument();
+
+    unmount();
+    render(<PhaseLogCard phase={PHASE} expanded stream={runningStream} />);
+    expect(screen.getByRole("button", { name: "Ran 1 command" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+  });
+
   it("shows a check pill on the phase title", () => {
     render(
       <PhaseLogCard
