@@ -14,7 +14,7 @@ after layout.
 
 - **Self-contained components**: Components should manage their own state when possible, using callbacks to notify parents of changes
 - **Generic callbacks**: Prefer generic update callbacks (e.g., `onTaskUpdate`, `onMilestoneUpdate`) over specific ones (e.g., `onAssigneeChange`, `onDueDateChange`)
-- **No mock data in components**: Mock data belongs in Storybook stories, not in component files
+- **No mock data in components**: Mock data belongs in Vitest specs and test fixtures, not in component files
 - **Backward compatibility**: Maintain compatibility where possible when refactoring
 
 ### Forms and shadcn
@@ -39,9 +39,9 @@ after layout.
 
 ### Setup
 
-1. **Storybook development**: Components are developed and tested in Storybook
+1. **App-driven development**: Develop and review components against the running app (`npm run dev`) and Vitest specs
 2. **TypeScript checking**: Run `npm run build && npm run test` regularly
-3. **Component stories**: Create comprehensive stories showing all component states
+3. **Component tests**: Create comprehensive Vitest specs covering all component states
 4. **Formatting**: Run `npm run format` before committing file edits to keep Prettier formatting consistent
 
 ### Tips
@@ -60,11 +60,10 @@ after layout.
 src/
 ├── ComponentName/
 │   ├── index.tsx              # Main component
-│   ├── index.stories.tsx      # Storybook stories
+│   ├── index.spec.tsx         # Vitest spec
 │   └── types.ts              # Component-specific types (if needed)
 ├── TaskBoard/
 │   ├── components/           # TaskBoard-specific components
-│   ├── stories/             # TaskBoard stories
 │   ├── tests/               # Mock data and test helpers
 │   └── types.ts             # Shared TaskBoard types
 ├── hooks/                   # Shared React hooks
@@ -75,13 +74,12 @@ src/
 - Put shared non-React helpers in `src/lib/`.
 - Put reusable React hook logic in `src/hooks/`.
 
-### Story Development
+### Test Development
 
-- **State management**: Use React state in story decorators for interactivity
-- **Comprehensive examples**: Show empty states, error states, loading states
+- **Comprehensive examples**: Cover empty states, error states, loading states in Vitest specs
 - **State maps and resolution**: Every statemap must include an explicit error state and a clear resolution path when developing new components
-- **Interactive callbacks**: Implement all callbacks with console logging
-- **Mock data**: Create realistic test data that demonstrates all features
+- **Interactive callbacks**: Assert all callbacks fire with the expected arguments
+- **Mock data**: Create realistic test fixtures that demonstrate all features
 
 ## Testing & Quality
 

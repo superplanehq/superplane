@@ -32,7 +32,6 @@ These are the ports you can override per repo:
 | Public API | `PUBLIC_API_PORT` | `8000` | `8001` |
 | Vite dev server | `VITE_DEV_PORT` | `5173` | `5174` |
 | Vite preview | `VITE_PREVIEW_PORT` | `4173` | `4174` |
-| Storybook | `STORYBOOK_PORT` | `6006` | `6007` |
 | OTEL gRPC | `OTEL_GRPC_PORT` | `4317` | `4319` |
 | OTEL HTTP | `OTEL_HTTP_PORT` | `4318` | `4320` |
 | PgWeb | `PGWEB_PORT` | `8081` | `8082` |
