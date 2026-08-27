@@ -148,10 +148,11 @@ export function WorkOrderSplitRunBody({
       <ol
         ref={follow.scrollRef}
         onScroll={follow.onScroll}
-        className="min-h-0 min-w-0 flex-1 list-none space-y-2 overflow-x-hidden overflow-y-auto px-3 py-3"
+        className="min-h-0 min-w-0 flex-1 list-none space-y-2 overflow-x-hidden overflow-y-auto px-3 pb-3"
+        data-testid="split-run-log-scroll"
       >
         {fixture.phases.map((entry) => (
-          <li key={entry.id} className="min-w-0">
+          <li key={entry.id} className="min-w-0 first:mt-3">
             <PhaseLogCard
               phase={entry}
               expanded={entry.id === openPhaseId}

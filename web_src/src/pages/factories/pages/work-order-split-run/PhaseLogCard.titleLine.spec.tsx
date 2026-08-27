@@ -88,7 +88,7 @@ describe("PhaseLogCard title line", () => {
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("04:00");
     const badge = screen.getByTestId("split-run-stream-duration-planner-agent");
     expect(badge).toHaveAccessibleName("Running");
-    expect(badge).toHaveTextContent("✓");
+    expect(badge).not.toHaveTextContent("✓");
     expect(badge).toHaveTextContent("04:00");
     expect(badge).not.toHaveTextContent("Running");
     expect(badge.querySelector(".lucide-loader-circle")).toBeNull();
@@ -520,7 +520,8 @@ describe("PhaseLogCard node line", () => {
 
     const row = screen.getByTestId("split-run-stream-line-planner-agent");
     expect(row.querySelector(".lucide-chevron-right")).toBeNull();
-    expect(row.className).not.toMatch(/\bbg-muted\b/);
+    expect(row.className).toMatch(/\bbg-muted\b/);
+    expect(row.className).not.toMatch(/\bbg-background\b/);
     expect(row.className).not.toMatch(/hover:bg-/);
     expect(row.className).not.toMatch(/border-b/);
     expect(row.className).not.toMatch(/-mx-2/);

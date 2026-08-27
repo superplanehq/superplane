@@ -100,9 +100,9 @@ export function AutomationLookPreview({ look }: { look: AutomationLook }) {
         <SectionTitle>Automations</SectionTitle>
         <span className="text-xs font-medium text-muted-foreground">Follow</span>
       </div>
-      <ol className="min-h-0 flex-1 list-none space-y-1 overflow-y-auto px-3 py-3">
+      <ol className="min-h-0 flex-1 list-none space-y-1 overflow-y-auto px-3 pb-3">
         {phases.map((phase) => (
-          <li key={phase.id}>
+          <li key={phase.id} className="first:mt-3">
             <AutomationRow
               look={look}
               phase={phase}

@@ -65,6 +65,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: "Open automation run" })).not.toBeInTheDocument();
   });
 
+  it("keeps the log scroller flush so sticky phase headers cover scrolled lines", () => {
+    renderSplitRun();
+    const scroll = screen.getByTestId("split-run-log-scroll");
+    expect(scroll.className).not.toMatch(/\bpy-\d/);
+    expect(scroll.className).not.toMatch(/\bpt-\d/);
+    expect(scroll.className).toMatch(/\bpb-3\b/);
+  });
+
   it("does not put an Open work order link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),

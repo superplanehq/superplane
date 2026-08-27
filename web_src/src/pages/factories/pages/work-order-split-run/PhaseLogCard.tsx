@@ -47,21 +47,23 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
 
 const LOG_ROW_HOVER = "hover:bg-[color:var(--status-running-bg)]";
 const LOG_ROW_H = "h-[1.375rem]";
-const STREAM_SECTION = "px-2";
+const STREAM_SECTION = "bg-muted px-2";
 const STICKY_PHASE = "sticky top-0 z-30 h-8 bg-muted";
-const STICKY_NODE = cn("sticky top-8 z-20 bg-background", STREAM_SECTION);
-const STICKY_STEP = cn("sticky top-[3.375rem] z-10 bg-background", STREAM_SECTION);
+const STICKY_NODE = cn("sticky top-8 z-20", STREAM_SECTION);
+const STICKY_STEP = cn("sticky top-[3.375rem] z-10", STREAM_SECTION);
 
 const LAST_RUNNING_LINE_PULSE = "data-[last-running-line]:animate-pulse";
 
 const STREAM_LINE_ROW = cn(
-  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap px-2 text-left",
+  "flex w-full min-w-0 max-w-full items-center justify-start overflow-hidden whitespace-nowrap text-left",
+  STREAM_SECTION,
   LOG_ROW_H,
   LAST_RUNNING_LINE_PULSE,
 );
 
 const STREAM_LINE_WRAP_ROW = cn(
-  "flex w-full min-w-0 max-w-full items-start justify-start px-2 text-left",
+  "flex w-full min-w-0 max-w-full items-start justify-start text-left",
+  STREAM_SECTION,
   LAST_RUNNING_LINE_PULSE,
 );
 
@@ -627,7 +629,7 @@ function statusTimeName(status: SplitRunPhaseStatus): string | undefined {
 }
 
 function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
-  if (status === "passed" || status === "running") {
+  if (status === "passed") {
     return <span aria-hidden>✓</span>;
   }
   if (status === "failed") {
@@ -785,7 +787,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
       <div
         data-testid={`split-run-stream-line-${step.line.id}`}
         {...streamLineAttrs(step.line.status)}
-        className={cn(STREAM_LINE_WRAP_ROW, STREAM_SECTION, hasBody && STICKY_STEP)}
+        className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
       >
         {step.line.componentType ? (
           <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
@@ -802,7 +804,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
                 key={event.line.id}
                 data-testid={`split-run-stream-line-${event.line.id}`}
                 {...streamLineAttrs(event.line.status)}
-                className={cn("flex w-full items-start px-2", LAST_RUNNING_LINE_PULSE)}
+                className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
               >
                 <span className="inline-flex w-4 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
@@ -903,7 +905,7 @@ function StreamOutput({ text }: { text: string }) {
         <div
           key={index}
           data-stream-line=""
-          className={cn("flex min-w-0 w-full items-start px-2", LOG_FACE, LAST_RUNNING_LINE_PULSE)}
+          className={cn("flex min-w-0 w-full items-start", STREAM_SECTION, LOG_FACE, LAST_RUNNING_LINE_PULSE)}
         >
           <span className="inline-flex w-4 shrink-0" aria-hidden />
           <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words py-0.5 leading-5 text-muted-foreground">
