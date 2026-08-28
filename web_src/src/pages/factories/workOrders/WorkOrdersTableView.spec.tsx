@@ -91,12 +91,12 @@ function gridTemplateTokens(className: string): string[] {
 
 describe("WorkOrdersTableView", () => {
   it("shows USD and tokens in the Spend column", () => {
-    expect(busyEntry.usageLabel).toBe("$0.45 · 1k tokens");
+    expect(busyEntry.usageLabel).toBe("$0.45 · 1.2k tokens");
     renderTable();
 
     expect(screen.getByText("Spend")).toBeInTheDocument();
     expect(screen.getByText("$0.45")).toBeInTheDocument();
-    expect(screen.getByText("1k tokens")).toBeInTheDocument();
+    expect(screen.getByText("1.2k tokens")).toBeInTheDocument();
   });
 
   it("keeps the header and every row on the exact same grid template, regardless of row content", () => {
