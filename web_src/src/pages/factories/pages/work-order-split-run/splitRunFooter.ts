@@ -241,7 +241,10 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
 }
 
 function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  const closedNote = note ?? closedDecisionNote(input.status);
+  const closedNote =
+    input.status === "failed" || input.kind === "failed"
+      ? closedDecisionNote(input.status ?? "failed")
+      : (note ?? closedDecisionNote(input.status));
   if (input.kind === "failed") {
     return withFooterMeta(input, {
       kind: "failed",

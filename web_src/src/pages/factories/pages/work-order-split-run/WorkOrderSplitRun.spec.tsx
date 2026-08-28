@@ -14,7 +14,6 @@ import {
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   INGEST_DRAFT_WORK_ORDER,
-  LINE_RUN_IMPLEMENT_FAILED_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
@@ -528,16 +527,9 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
-    expect(within(note).getByText(/This automation failed/)).toBeInTheDocument();
-    expect(within(note).getByRole("link", { name: "Review the run" })).toHaveAttribute(
-      "href",
-      expect.stringContaining(LINE_RUN_IMPLEMENT_FAILED_ID),
-    );
-    expect(within(note).getByRole("link", { name: "Review the run" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("orderNumber=106"),
-    );
+    expect(within(note).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
+    expect(within(note).getByText("Reopen this task to start the line again.")).toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "Review the run" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();

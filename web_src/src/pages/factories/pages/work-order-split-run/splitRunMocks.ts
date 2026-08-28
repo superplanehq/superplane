@@ -188,7 +188,8 @@ function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: s
 
 const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "waiting-person",
-  ...SPLIT_RUN_WAITING_NOTE,
+  headline: SPLIT_RUN_WAITING_NOTE.headline,
+  text: SPLIT_RUN_WAITING_NOTE.text ?? "",
 };
 
 /**
@@ -214,7 +215,8 @@ function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresenta
   }
   return {
     key: "draft-start",
-    ...SPLIT_RUN_DRAFT_NOTE,
+    headline: SPLIT_RUN_DRAFT_NOTE.headline,
+    text: SPLIT_RUN_DRAFT_NOTE.text ?? "",
   };
 }
 
