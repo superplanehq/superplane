@@ -107,7 +107,7 @@ import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
-import { isPRFeedbackSettingsTab, prFeedbackListenTitle, prFeedbackMention } from "./prFeedbackSettingsModel";
+import { isPRFeedbackSettingsTab, prFeedbackListenTitle } from "./prFeedbackSettingsModel";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { useActivePRFeedbackWorkOrderIds, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
@@ -195,7 +195,7 @@ export function LinesPage() {
   const prFeedbackHandler = prFeedbackHandlers[0];
   const verifyListener: LaneListener = {
     id: "pr-feedback",
-    title: prFeedbackListenTitle(prFeedbackMention(prFeedbackHandler)),
+    title: prFeedbackListenTitle(),
     iconSrc: githubIcon,
     iconAlt: "GitHub",
     healthy: prFeedbackHandler ? prFeedbackHandler.healthy !== false : true,

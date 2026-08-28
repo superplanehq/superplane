@@ -273,7 +273,7 @@ describe("LinesPage board", () => {
 
     const verify = screen.getByTestId("lines-verify-column");
     expect(within(verify).getByTestId("lines-verify-listener-pr-feedback")).toHaveTextContent(
-      "Listening to @superplaneagent comments",
+      "Listening to PR comments",
     );
 
     await user.click(screen.getByRole("button", { name: "Open PR feedback settings" }));

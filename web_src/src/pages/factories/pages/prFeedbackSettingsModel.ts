@@ -66,16 +66,9 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
   };
 }
 
-export const DEFAULT_PR_FEEDBACK_MENTION = "@superplaneagent";
-
-/** The mention the handler watches, or the default before one is declared. */
-export function prFeedbackMention(handler: FactoriesFactoryPrFeedbackHandler | undefined): string {
-  return handler ? prFeedbackDraftFromHandler(handler).mention : DEFAULT_PR_FEEDBACK_MENTION;
-}
-
 /** Row title on the Verify lane. It says what the handler listens to. */
-export function prFeedbackListenTitle(mention: string): string {
-  return `Listening to ${mention} comments`;
+export function prFeedbackListenTitle(): string {
+  return "Listening to PR comments";
 }
 
 export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeedbackDraftSettings {
