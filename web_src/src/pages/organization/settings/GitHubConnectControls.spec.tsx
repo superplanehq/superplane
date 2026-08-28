@@ -12,7 +12,15 @@ function LocationProbe() {
   return <span data-testid="location-path">{location.pathname}</span>;
 }
 
-function renderControls(onConnect = vi.fn()) {
+function renderControls(
+  onConnect = vi.fn(),
+  definition: { name?: string; label?: string; hostedAppInstall?: boolean; legacySetupOnly?: boolean } = {
+    name: "github",
+    label: "GitHub",
+    hostedAppInstall: true,
+    legacySetupOnly: false,
+  },
+) {
   return render(
     <MemoryRouter initialEntries={["/org-1/settings/integrations"]}>
       <TooltipProvider>
@@ -23,7 +31,7 @@ function renderControls(onConnect = vi.fn()) {
               <>
                 <GitHubConnectControls
                   organizationId="org-1"
-                  definition={{ name: "github", label: "GitHub", hostedAppInstall: true }}
+                  definition={definition}
                   canCreateIntegrations
                   permissionsLoading={false}
                   onConnect={onConnect}
@@ -57,5 +65,27 @@ describe("GitHubConnectControls", () => {
     expect(link).toHaveTextContent(CREATE_PRIVATE_GITHUB_APP_LABEL);
     await user.click(link);
     expect(screen.getByTestId("location-path")).toHaveTextContent(githubPrivateAppSetupPath("org-1"));
+  });
+
+  it("keeps the private-app link when the setup flow feature is off", async () => {
+    const user = userEvent.setup();
+    const onCreatePrivateApp = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/org-1/settings/integrations"]}>
+        <TooltipProvider>
+          <GitHubConnectControls
+            organizationId="org-1"
+            definition={{ name: "github", label: "GitHub", hostedAppInstall: true, legacySetupOnly: true }}
+            canCreateIntegrations
+            permissionsLoading={false}
+            onConnect={vi.fn()}
+            onCreatePrivateApp={onCreatePrivateApp}
+          />
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("integrations-create-private-github-app"));
+    expect(onCreatePrivateApp).toHaveBeenCalledTimes(1);
   });
 });

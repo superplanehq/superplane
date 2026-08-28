@@ -173,6 +173,7 @@ function CatalogProviderCard({
             canCreateIntegrations={catalog.canCreateIntegrations}
             permissionsLoading={catalog.permissionsLoading}
             onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
+            onCreatePrivateApp={() => catalog.handlePrivateAppClick(item.integrationDef ?? undefined)}
           />
         ) : (
           <PermissionTooltip

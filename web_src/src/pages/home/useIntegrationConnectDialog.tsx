@@ -1,11 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import type { OrganizationsIntegration } from "@/api-client";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
-import { usesHostedGitHubAppInstall } from "@/lib/integrations";
-import { startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
+import {
+  offersPrivateGitHubAppSetup,
+  usesHostedGitHubAppInstall,
+  usesPrivateGitHubAppWizard,
+} from "@/lib/integrations";
+import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
@@ -105,7 +109,7 @@ export function useIntegrationConnectDialog({
       }),
     [organizationId, dialogIntegrationName, dialogMode, dialogPendingInstance?.metadata?.id, selections],
   );
-  const useHostedGitHubApp = usesHostedGitHubAppInstall(availableIntegrations.find((item) => item.name === "github"));
+  const githubConnect = githubConnectFlags(availableIntegrations);
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
@@ -141,7 +145,7 @@ export function useIntegrationConnectDialog({
   );
 
   const requestConnect = (integrationName: string) => {
-    if (integrationName === "github" && useHostedGitHubApp) {
+    if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog();
       return;
     }
@@ -149,15 +153,34 @@ export function useIntegrationConnectDialog({
   };
 
   const requestPrivateGitHubConnect = useCallback(() => {
-    startPrivateGitHubAppSetup({
+    void connectPrivateGitHubApp({
+      useWizard: githubConnect.useWizard,
       organizationId,
       returnTo,
+      existingNames: existingIntegrationNames,
+      connected,
+      currentUserId: me?.id,
       goTo: navigate,
+      create: async (payload) => {
+        const response = await createIntegrationMutation.mutateAsync(payload);
+        return response.data;
+      },
+    }).catch((error) => {
+      showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
     });
-  }, [navigate, organizationId, returnTo]);
+  }, [
+    connected,
+    createIntegrationMutation,
+    existingIntegrationNames,
+    githubConnect.useWizard,
+    me?.id,
+    navigate,
+    organizationId,
+    returnTo,
+  ]);
 
   const createNew = (integrationName: string) => {
-    if (integrationName === "github" && useHostedGitHubApp) {
+    if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog(true);
       return;
     }
@@ -215,10 +238,20 @@ export function useIntegrationConnectDialog({
     integrationData,
     requestConnect,
     requestPrivateGitHubConnect,
-    hostedGitHubAppInstall: useHostedGitHubApp,
+    hostedGitHubAppInstall: githubConnect.hosted,
+    offersPrivateGitHubAppSetup: githubConnect.privateApp,
     createNew,
     selectInstance,
     configure: openConfigureDialog,
     dialogs,
+  };
+}
+
+function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefinition[]) {
+  const githubDefinition = availableIntegrations.find((item) => item.name === "github");
+  return {
+    hosted: usesHostedGitHubAppInstall(githubDefinition),
+    privateApp: offersPrivateGitHubAppSetup(githubDefinition),
+    useWizard: usesPrivateGitHubAppWizard(githubDefinition),
   };
 }
