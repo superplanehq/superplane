@@ -13,6 +13,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Icon } from "@/components/Icon";
 import { cn } from "@/lib/utils";
 import { settingsModalClassName } from "./settingsPageStyles";
+import { GitHubConnectControls } from "./GitHubConnectControls";
+import { usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { useIntegrationCatalog } from "@/hooks/useIntegrationCatalog";
 import { integrationStatusLabel, type IntegrationCatalogItem } from "@/lib/integrationCatalog";
 import {
@@ -164,24 +166,34 @@ function CatalogProviderCard({
             ) : null}
           </div>
         </div>
-        <PermissionTooltip
-          allowed={Boolean(item.integrationDef) && (catalog.canCreateIntegrations || catalog.permissionsLoading)}
-          message={
-            item.integrationDef
-              ? "You don't have permission to connect integrations."
-              : "This integration provider is no longer available for new connections."
-          }
-        >
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
-            className="self-start"
-            disabled={!item.integrationDef || !catalog.canCreateIntegrations}
+        {usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
+          <GitHubConnectControls
+            organizationId={catalog.organizationId}
+            definition={item.integrationDef ?? undefined}
+            canCreateIntegrations={catalog.canCreateIntegrations}
+            permissionsLoading={catalog.permissionsLoading}
+            onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
+          />
+        ) : (
+          <PermissionTooltip
+            allowed={Boolean(item.integrationDef) && (catalog.canCreateIntegrations || catalog.permissionsLoading)}
+            message={
+              item.integrationDef
+                ? "You don't have permission to connect integrations."
+                : "This integration provider is no longer available for new connections."
+            }
           >
-            {item.integrationDef ? "Connect" : "Unavailable"}
-          </Button>
-        </PermissionTooltip>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
+              className="self-start"
+              disabled={!item.integrationDef || !catalog.canCreateIntegrations}
+            >
+              {item.integrationDef ? "Connect" : "Unavailable"}
+            </Button>
+          </PermissionTooltip>
+        )}
       </div>
       {item.instances.length > 0 ? (
         <div className={styles.instancesWrap}>
