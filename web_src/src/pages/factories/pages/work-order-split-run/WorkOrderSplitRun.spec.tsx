@@ -17,6 +17,7 @@ import {
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  RUNNING_WORK_ORDER,
 } from "../../__fixtures__/factoryPageResponses";
 import {
   BOARD_DONE_REJECTED_ORDER,
@@ -110,6 +111,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
     expect(row).toHaveTextContent("$0.73");
     expect(row).toHaveTextContent("2.7k tokens");
+  });
+
+  it("shows tokens and cost on a line-step phase", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
+
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
   });
 
   it("does not put an Open work order link next to close", () => {

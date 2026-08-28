@@ -918,6 +918,13 @@ message DeleteFactoryPRFeedbackHandlerRequest {
 
 message DeleteFactoryPRFeedbackHandlerResponse {}
 
+message FactoryPullRequestRun {
+  string description = 1;
+  int64 total_tokens = 2;
+  int64 cost_cents = 3;
+  Superplane.Canvases.CanvasRunRef run = 4;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -948,7 +955,7 @@ message FactoryPullRequest {
   google.protobuf.Timestamp closed_at = 13;
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
-  repeated Superplane.Canvases.CanvasRunRef runs = 16;
+  repeated FactoryPullRequestRun runs = 16;
 }
 
 message ListFactoryPullRequestsRequest {
