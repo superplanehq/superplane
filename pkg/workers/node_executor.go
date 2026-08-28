@@ -395,6 +395,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		CanvasName:     workflow.Name,
@@ -424,6 +425,10 @@ func (w *NodeExecutor) executeActionNode(
 			WithWorkOrderNotification(onFactoryWorkOrderNotification),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+	}
+	if workOrderExecution, err := models.FindWorkOrderExecutionForRun(tx, execution.RunID); err == nil {
+		ctx.FactoryID = workOrderExecution.FactoryID
+		ctx.WorkOrderID = workOrderExecution.WorkOrderID
 	}
 
 	if node.AppInstallationID != nil {

@@ -39,6 +39,12 @@ const (
 	// same way status changes and comments do. Clearing rides on
 	// `order.status.updated`.
 	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
+	// EventTypeOrderSurveyUpdated is websocket-only: the pending survey
+	// is current-wait state. The UI refetches the work order.
+	EventTypeOrderSurveyUpdated = "order.survey.updated"
+	// EventTypeOrderSurveyAnswered is the timeline record of a submitted
+	// survey (questions + answers). Timeout and cancel do not write one.
+	EventTypeOrderSurveyAnswered = "order.survey.answered"
 
 	// Factory line events
 	EventTypeLineStepExecutionQueued   = "step.execution.queued"
@@ -259,4 +265,24 @@ type CheckRef struct {
 	Format        string    `json:"format"`
 	Level         string    `json:"level"`
 	PreviousScore *float64  `json:"previousScore,omitempty"`
+}
+
+type SurveyQuestion struct {
+	ID            string   `json:"id"`
+	Prompt        string   `json:"prompt"`
+	Options       []string `json:"options,omitempty"`
+	AllowFreeText bool     `json:"allowFreeText,omitempty"`
+}
+
+type SurveyAnswer struct {
+	ID    string `json:"id"`
+	Value string `json:"value"`
+}
+
+type WorkOrderSurveyAnswered struct {
+	Order     *WorkOrderRef    `json:"order,omitempty"`
+	SurveyID  uuid.UUID        `json:"surveyId"`
+	User      *UserRef         `json:"user,omitempty"`
+	Questions []SurveyQuestion `json:"questions,omitempty"`
+	Answers   []SurveyAnswer   `json:"answers,omitempty"`
 }

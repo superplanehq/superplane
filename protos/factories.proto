@@ -573,6 +573,18 @@ service Factories {
     };
   }
 
+  rpc AnswerWorkOrderSurvey(AnswerWorkOrderSurveyRequest) returns (AnswerWorkOrderSurveyResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/survey/answer"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Answer work order survey";
+      description: "Submits answers to the pending agent survey on a work order";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -1234,6 +1246,8 @@ message WorkOrder {
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
   int64 total_duration_seconds = 17;
+  // Pending agent survey, if the current run is waiting for a human answer.
+  WorkOrderSurvey pending_survey = 18;
 }
 
 message WorkOrderOrigin {
@@ -1826,4 +1840,37 @@ message UsageByMachineType {
   string machine_type = 1;
   int64 duration_seconds = 2;
   int64 cost_cents = 3;
+}
+
+message WorkOrderSurveyQuestion {
+  string id = 1;
+  string prompt = 2;
+  repeated string options = 3;
+  bool allow_free_text = 4;
+}
+
+message WorkOrderSurveyAnswer {
+  string id = 1;
+  string value = 2;
+}
+
+message WorkOrderSurvey {
+  string id = 1;
+  string status = 2;
+  string canvas_run_id = 3;
+  repeated WorkOrderSurveyQuestion questions = 4;
+  repeated WorkOrderSurveyAnswer answers = 5;
+  int32 timeout_seconds = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message AnswerWorkOrderSurveyRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  repeated WorkOrderSurveyAnswer answers = 3;
+}
+
+message AnswerWorkOrderSurveyResponse {
+  WorkOrder order = 1;
 }

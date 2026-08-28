@@ -1,6 +1,7 @@
 import { canvasesCancelRun } from "@/api-client";
 import {
   factoryQueryKeys,
+  useAnswerWorkOrderSurvey,
   useCloseWorkOrder,
   useDispatchWorkOrder,
   useUpdateWorkOrderStatus,
@@ -11,6 +12,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
+import type { WorkOrderSurveyAnswerInput } from "../../lib/workOrderSurvey";
 import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
 import { isSplitRunRerunChoice, rerunStartStepIndex } from "./splitRunFooter";
 import { applySplitRunStop, stopSplitRunAutomation, type SplitRunStopRun } from "./splitRunStop";
@@ -56,13 +58,9 @@ function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): stri
   return "Failed to close task";
 }
 
-export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+function useSplitRunCancelRun(organizationId?: string, factoryId?: string, orderId?: string) {
   const queryClient = useQueryClient();
-  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
-  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
-  const live = Boolean(organizationId && factoryId && orderId);
-  const cancelRun = useMutation({
+  return useMutation({
     mutationFn: async (run: SplitRunStopRun) => {
       await canvasesCancelRun(
         withOrganizationHeader({
@@ -84,8 +82,22 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       }
     },
   });
+}
 
-  const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
+export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
+  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
+  const answerSurvey = useAnswerWorkOrderSurvey(organizationId ?? "", factoryId ?? "");
+  const live = Boolean(organizationId && factoryId && orderId);
+  const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
+
+  const busy =
+    cancelRun.isPending ||
+    closeWorkOrder.isPending ||
+    updateStatus.isPending ||
+    dispatchWorkOrder.isPending ||
+    answerSurvey.isPending;
 
   const handleBackToDraft = useCallback(async () => {
     if (!live || !orderId || busy) {
@@ -170,11 +182,27 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     [busy, cancelRun, live],
   );
 
+  const handleAnswerSurvey = useCallback(
+    async (answers: WorkOrderSurveyAnswerInput[]) => {
+      if (!live || !orderId || busy) {
+        return;
+      }
+      try {
+        await answerSurvey.mutateAsync({ orderId, answers });
+        showSuccessToast("Answers sent to the agent.");
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to submit the survey"));
+      }
+    },
+    [answerSurvey, busy, live, orderId],
+  );
+
   return {
     handleStop,
     handleStopAutomation,
     handleReject,
     handleBackToDraft,
+    handleAnswerSurvey,
     busy,
   };
 }

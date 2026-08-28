@@ -320,7 +320,7 @@ func workOrderNotificationCandidates(
 		for _, assignee := range order.Assignees {
 			add(assignee.UserID, models.NotificationTypeWorkOrderArtifactOwned)
 		}
-	case factory.EventTypeOrderStatusNoteUpdated:
+	case factory.EventTypeOrderStatusNoteUpdated, factory.EventTypeOrderSurveyUpdated:
 		for _, assignee := range order.Assignees {
 			add(assignee.UserID, models.NotificationTypeWorkOrderStatusNoteOwned)
 		}
@@ -398,6 +398,14 @@ func buildWorkOrderNotificationContent(
 		content.Data.Detail = truncateNotificationDetail(message.StatusNoteBody)
 		content.Data.DetailCtaLabel = message.StatusNoteCtaLabel
 		content.Data.DetailCtaURL = message.StatusNoteCtaURL
+	case factory.EventTypeOrderSurveyUpdated:
+		headline := message.StatusNoteHeadline
+		if headline == "" {
+			headline = "The agent needs an answer"
+		}
+		content.Subject = fmt.Sprintf("[%s] %s", orderKey, headline)
+		content.Data.Summary = fmt.Sprintf("%s asked a question on %s.", actorName, orderKey)
+		content.Data.Detail = truncateNotificationDetail(message.StatusNoteBody)
 	default:
 		content.Subject = fmt.Sprintf("[%s] Work order update", orderKey)
 		content.Data.Summary = fmt.Sprintf("%s updated %s.", actorName, orderKey)

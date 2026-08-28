@@ -377,6 +377,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			if err := o.dropQueuedLineWork(tx); err != nil {
 				return err
 			}
+			if err := o.CancelPendingSurvey(tx); err != nil {
+				return err
+			}
 		}
 
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {

@@ -272,3 +272,8 @@ func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.Upd
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)
 }
+
+func (s *FactoryService) AnswerWorkOrderSurvey(ctx context.Context, req *pb.AnswerWorkOrderSurveyRequest) (*pb.AnswerWorkOrderSurveyResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AnswerWorkOrderSurvey(ctx, organizationID, req)
+}

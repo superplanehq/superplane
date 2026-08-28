@@ -664,6 +664,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/survey/answer"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		// A sync refreshes what the velocity report reads, so it takes the same
 		// permission as reading the report.
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/velocity/sync"}: {

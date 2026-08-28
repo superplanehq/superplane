@@ -289,6 +289,35 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
 
+	t.Run("survey notifies owners and creator", func(t *testing.T) {
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consume(t, newConsumer(emailService), messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:     r.Organization.ID.String(),
+			FactoryID:          factoryModel.ID.String(),
+			OrderID:            order.ID.String(),
+			EventType:          factoryevents.EventTypeOrderSurveyUpdated,
+			ActorName:          "Plan",
+			StatusNoteHeadline: "The agent needs an answer",
+			StatusNoteBody:     "The run waits until you submit.",
+		})
+
+		sent := emailService.SentWorkOrderNotificationEmails()
+		recipients := make([]string, 0, len(sent))
+		for _, email := range sent {
+			recipients = append(recipients, email.ToEmail)
+			assert.Contains(t, email.Subject, "The agent needs an answer")
+			assert.Contains(t, email.Data.Summary, "asked a question")
+		}
+		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
+	})
+
 	t.Run("status note setting can be turned off without affecting comments", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,

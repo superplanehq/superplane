@@ -1,6 +1,8 @@
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
+import { WORK_ORDER_ATTENTION_LABEL } from "../../lib/workOrderAttention";
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import type { WorkOrderSurveyView } from "../../lib/workOrderSurvey";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
@@ -142,6 +144,7 @@ export interface SplitRunFooter {
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
+  survey?: WorkOrderSurveyView;
 }
 
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
@@ -273,6 +276,7 @@ type FooterInput = {
   status?: WorkOrderDisplayStatus;
   actor?: OrgUserDisplay;
   automationName?: string;
+  survey?: WorkOrderSurveyView;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
@@ -367,7 +371,30 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
   });
 }
 
+export const SPLIT_RUN_SURVEY_NOTE: SplitRunFooterNote = {
+  headline: WORK_ORDER_ATTENTION_LABEL.question,
+  text: "The run waits until you submit. If you do not answer in time, the agent continues without an answer.",
+};
+
+function surveyDecisionFooter(input: FooterInput): SplitRunFooter {
+  return withFooterMeta(input, {
+    kind: input.kind,
+    sentence: WORK_ORDER_ATTENTION_LABEL.question,
+    note: { ...SPLIT_RUN_SURVEY_NOTE },
+    survey: input.survey,
+    attentionCard: true,
+    actions: [],
+  });
+}
+
 export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {
+  if (input.survey) {
+    return surveyDecisionFooter(input);
+  }
+  return buildSplitRunDecisionFooter(input);
+}
+
+function buildSplitRunDecisionFooter(input: FooterInput): SplitRunFooter {
   const note = input.note ? toFooterNote(input.note) : undefined;
   if (input.kind === "running" || input.decision === false) {
     return hiddenDecisionFooter(input, note);

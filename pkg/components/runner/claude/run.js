@@ -20,6 +20,9 @@ const SYSTEM_PROMPT =
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
   "Prefer plain paths, shell commands, and simple indentation.";
 
+const SURVEY_SYSTEM_PROMPT =
+  " If you need a human decision, call mcp__superplane__ask_work_order (also named ask_work_order). Do not print a survey in markdown.";
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -62,10 +65,31 @@ async function runPrompt(promptFile, model) {
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
+  const surveyEnabled = Boolean(process.env.SUPERPLANE_RUN_TOKEN && process.env.SUPERPLANE_BASE_URL);
+  if (surveyEnabled) {
+    println("Work order survey tool enabled");
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + SURVEY_SYSTEM_PROMPT;
+    const mcpConfigPath = path.join(sp, "mcp.runtime.json");
+    fs.writeFileSync(
+      mcpConfigPath,
+      `${JSON.stringify({
+        mcpServers: {
+          superplane: {
+            command: "node",
+            args: [path.join(sp, "ask_work_order_mcp.js")],
+          },
+        },
+      })}\n`,
+    );
+    claudeArgs.push("--mcp-config", mcpConfigPath);
+    claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write,mcp__superplane__ask_work_order");
+  } else {
+    println("Work order survey tool not attached");
+    claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write");
+  }
   if (model) {
     claudeArgs.push("--model", model);
   }
-  claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write");
   if (promptCount > 0) {
     claudeArgs.push("--continue");
   }
@@ -317,6 +341,12 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
+  const tools = Array.isArray(event.tools) ? event.tools.map((tool) => String(tool)) : [];
+  const surveyTools = tools.filter((tool) => tool.includes("ask_work_order") || tool.includes("mcp__superplane"));
+  println(surveyTools.length > 0 ? `survey tools: ${surveyTools.join(", ")}` : "survey tools: none");
+  if (event.mcp_server_errors) {
+    println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
+  }
   println();
 }
 

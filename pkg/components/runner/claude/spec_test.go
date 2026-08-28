@@ -187,6 +187,8 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
+	assert.Contains(t, runScript, "--mcp-config")
+	assert.Contains(t, runScript, "ask_work_order")
 	assert.NotContains(t, runScript, "workdir")
 }
 

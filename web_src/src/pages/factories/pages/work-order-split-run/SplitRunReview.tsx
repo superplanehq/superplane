@@ -11,6 +11,8 @@ import {
 } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
+import { WorkOrderSurveyCard } from "../../WorkOrderSurveyCard";
+import type { WorkOrderSurveyAnswerInput } from "../../lib/workOrderSurvey";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
 import {
   splitRunDecisionTone,
@@ -59,6 +61,7 @@ export function SplitRunReview({
   onReject,
   onBackToDraft,
   onStop,
+  onAnswerSurvey,
   startBusy = false,
   actionBusy = false,
   startDisabled = false,
@@ -73,12 +76,20 @@ export function SplitRunReview({
   onReject?: () => void | Promise<void>;
   onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  onAnswerSurvey?: (answers: WorkOrderSurveyAnswerInput[]) => void | Promise<void>;
   startBusy?: boolean;
   actionBusy?: boolean;
   startDisabled?: boolean;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
+  }
+  if (footer.survey) {
+    return (
+      <div className={cn("shrink-0", className)} data-testid="split-run-review">
+        <WorkOrderSurveyCard survey={footer.survey} canSubmit={canAct} busy={actionBusy} onSubmit={onAnswerSurvey} />
+      </div>
+    );
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
   const actions = canAct ? footer.actions : [];

@@ -146,6 +146,13 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	}
 }
 
+func claudeSurveyMCPFiles() []runner.BrokerTaskFile {
+	return []runner.BrokerTaskFile{
+		{Path: "ask_work_order_mcp.js", Content: askWorkOrderMCPScript, Mode: "0644"},
+		{Path: "mcp.json", Content: askWorkOrderMCPConfig, Mode: "0644"},
+	}
+}
+
 func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, step.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
