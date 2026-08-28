@@ -82,13 +82,46 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	sourceRunID := c.execution.RunID
-	order, err := f.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	order, err := c.createFactoryWorkOrder(f, params, sourceRunID)
 	if err != nil {
 		return nil, err
 	}
 
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
+}
+
+func (c *FactoryContext) createFactoryWorkOrder(
+	factoryModel *models.Factory,
+	params core.WorkOrderParams,
+	sourceRunID uuid.UUID,
+) (*models.FactoryWorkOrder, error) {
+	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
+		return factoryModel.CreateWorkOrderWithOrigin(
+			c.tx,
+			params.Title,
+			params.Description,
+			nil,
+			[]uuid.UUID{},
+			&sourceRunID,
+			*origin,
+		)
+	}
+
+	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+}
+
+func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {
+	if _, err := models.FindFactoryIntakeByCanvasID(c.tx, c.canvas.ID); err != nil {
+		return nil
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, sourceRunID)
+	if err != nil {
+		return nil
+	}
+
+	return models.OriginFromIntakeRootEvent(event)
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
@@ -195,21 +228,6 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		ActorName:      c.automationName(),
 		ArtifactType:   artifact.Type,
 	})
-	return artifactToCore(artifact)
-}
-
-func (c *FactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	order, err := c.resolveWorkOrder(params.OrderID)
-	if err != nil {
-		return nil, err
-	}
-
-	artifact, err := order.UpdateArtifactData(c.tx, params.Key, params.Data)
-	if err != nil {
-		return nil, err
-	}
-
-	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderArtifactUpdated)
 	return artifactToCore(artifact)
 }
 
@@ -470,7 +488,175 @@ func workOrderToCore(order *models.FactoryWorkOrder) *core.WorkOrder {
 		Description: order.Description,
 		State:       order.State,
 		Result:      order.Result,
+		Number:      order.Number,
 	}
+}
+
+func pullRequestToCore(pullRequest *models.FactoryPullRequest) *core.PullRequest {
+	item := &core.PullRequest{
+		ID:          pullRequest.ID.String(),
+		WorkOrderID: pullRequest.WorkOrderID.String(),
+		Provider:    pullRequest.Provider,
+		Repository:  pullRequest.Repository,
+		Number:      pullRequest.Number,
+		URL:         pullRequest.URL,
+		Title:       pullRequest.Title,
+		State:       pullRequest.State,
+	}
+	if pullRequest.ExternalID != nil {
+		item.ExternalID = *pullRequest.ExternalID
+	}
+	return item
+}
+
+func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest) (*core.PullRequestMatch, error) {
+	factoryModel, err := models.FindFactory(c.tx, pullRequest.OrganizationID, pullRequest.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	order, err := factoryModel.FindWorkOrder(c.tx, pullRequest.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+	workOrder := workOrderToCore(order)
+	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
+	return &core.PullRequestMatch{
+		PullRequest: pullRequestToCore(pullRequest),
+		WorkOrder:   workOrder,
+	}, nil
+}
+
+func (c *FactoryContext) currentFactory() (*models.Factory, error) {
+	if c.canvas.FactoryID == nil {
+		return nil, errors.New("app is not owned by a factory")
+	}
+	return models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+}
+
+func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	pullRequest, err := order.CreatePullRequest(c.tx, models.FactoryPullRequestParams{
+		Provider:   params.Provider,
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		Number:     params.Number,
+		URL:        params.URL,
+		Title:      params.Title,
+		State:      params.State,
+		MergedAt:   params.MergedAt,
+		ClosedAt:   params.ClosedAt,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderPullRequestAdded)
+	return pullRequestToCore(pullRequest), nil
+}
+
+func (c *FactoryContext) UpdatePullRequest(params core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := uuid.Parse(params.PullRequestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.PullRequestID, err)
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, models.FactoryPullRequestLookup{ID: id})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	if err := pullRequest.Update(c.tx, models.FactoryPullRequestPatch{
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		URL:        params.URL,
+		Title:      params.Title,
+		State:      params.State,
+		MergedAt:   params.MergedAt,
+		ClosedAt:   params.ClosedAt,
+		Automation: c.automationRef(),
+		Run:        c.runRef(),
+	}); err != nil {
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, factory.EventTypeOrderPullRequestUpdated)
+	return pullRequestToCore(pullRequest), nil
+}
+
+func (c *FactoryContext) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	lookup := models.FactoryPullRequestLookup{
+		Provider:   params.Provider,
+		ExternalID: params.ExternalID,
+		Repository: params.Repository,
+		Number:     params.Number,
+		URL:        params.URL,
+	}
+	if params.ID != "" {
+		id, parseErr := uuid.Parse(params.ID)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.ID, parseErr)
+		}
+		lookup.ID = id
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, lookup)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) || errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	return c.pullRequestMatch(pullRequest)
+}
+
+func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestMatch, error) {
+	if c.execution == nil {
+		return nil, errors.New("run is required to add pull request activity")
+	}
+
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := uuid.Parse(params.PullRequestID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pullRequestId %q: %w", params.PullRequestID, err)
+	}
+
+	pullRequest, err := factoryModel.FindPullRequest(c.tx, models.FactoryPullRequestLookup{ID: id})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) {
+			return nil, core.ErrPullRequestNotFound
+		}
+		return nil, err
+	}
+
+	if err := pullRequest.LinkRun(c.tx, c.execution.RunID, params.Description); err != nil {
+		return nil, err
+	}
+
+	return c.pullRequestMatch(pullRequest)
 }
 
 func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderArtifact, error) {

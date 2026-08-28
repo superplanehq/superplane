@@ -63,7 +63,7 @@ export const ConfigureEditMode: Story = {
   name: "Configure edit mode",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?configure=1&from=automations`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${plannerAppId}?configure=1&agent=1&from=automations`}
       factoriesFixture={defaultFactoriesFixture}
       appFixture={plannerCanvasFixture}
     />

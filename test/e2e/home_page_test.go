@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -108,7 +109,7 @@ func (steps *TestHomePageSteps) AssertNewAppDisabled() {
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
-	canvas, err := models.FindCanvasByName(canvasName, steps.session.OrgID)
+	canvas, err := models.FindCanvasByName(database.Conn(), steps.session.OrgID, nil, canvasName)
 
 	assert.NoError(steps.t, err)
 	assert.Equal(steps.t, canvasName, canvas.Name)

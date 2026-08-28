@@ -37,7 +37,6 @@ to pick from a list. Non-interactive with no args prints the active factory id.`
 		body     string
 		file     string
 		url      string
-		number   int64
 		name     string
 	)
 
@@ -48,7 +47,7 @@ to pick from a list. Non-interactive with no args prints the active factory id.`
 
 --factory is a factory name or UUID. When omitted, the active factory
 from "superplane factory active" is used. --order-id is the work order UUID.
---type is one of: pr, markdown, branch, link.
+--type is one of: markdown, branch, link.
 
 Examples:
   superplane factory artifacts list --factory shipping --order-id "$OID"
@@ -69,12 +68,6 @@ Examples:
 
   superplane factory artifacts add \
     --order-id "$OID" \
-    --type pr \
-    --url https://github.com/org/repo/pull/7 \
-    --number 7
-
-  superplane factory artifacts add \
-    --order-id "$OID" \
     --type branch \
     --name feature/login
 
@@ -87,12 +80,11 @@ Examples:
 	}
 	addCmd.Flags().StringVar(&factory, "factory", "", "factory name or UUID (default: active factory)")
 	addCmd.Flags().StringVar(&orderID, "order-id", "", "work order UUID")
-	addCmd.Flags().StringVar(&typeName, "type", "", "artifact type: pr, markdown, branch, or link")
+	addCmd.Flags().StringVar(&typeName, "type", "", "artifact type: markdown, branch, or link")
 	addCmd.Flags().StringVar(&title, "title", "", "artifact title")
 	addCmd.Flags().StringVar(&body, "body", "", "markdown body (inline)")
 	addCmd.Flags().StringVarP(&file, "file", "f", "", "read markdown body from file (or - for stdin)")
-	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for pr and link)")
-	addCmd.Flags().Int64Var(&number, "number", 0, "pull request number")
+	addCmd.Flags().StringVar(&url, "url", "", "artifact URL (required for link)")
 	addCmd.Flags().StringVar(&name, "name", "", "branch name (required for branch)")
 	_ = addCmd.MarkFlagRequired("order-id")
 	_ = addCmd.MarkFlagRequired("type")
@@ -104,7 +96,6 @@ Examples:
 		body:    &body,
 		file:    &file,
 		url:     &url,
-		number:  &number,
 		name:    &name,
 	}, options)
 

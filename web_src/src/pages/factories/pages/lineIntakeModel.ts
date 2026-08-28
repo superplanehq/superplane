@@ -1,6 +1,7 @@
 import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
+  FactoriesWorkOrderArtifact,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -15,11 +16,21 @@ import {
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
 } from "../__fixtures__/factoryPageResponses";
+import {
+  CONFIDENCE_CHECK_NAME,
+  CONFIDENCE_SCORE_MAX,
+  confidenceBandForScore,
+  confidenceCheckLevel,
+  confidenceScoreFromPercent,
+  confidenceSuitabilitySummary,
+} from "../lib/confidenceScore";
+import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
 import { intakeSettingsFromApi, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
+import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
 export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
@@ -118,6 +129,14 @@ export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
   return LINE_INTAKE_SOURCES.find((source) => source.id === id);
 }
 
+export function lineIntakeSourceForApiSource(apiSource: string | undefined): LineIntakeSource | undefined {
+  if (!apiSource) {
+    return undefined;
+  }
+  const sourceId = LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[apiSource];
+  return sourceId ? lineIntakeSourceById(sourceId) : undefined;
+}
+
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
   return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
 }
@@ -159,8 +178,7 @@ export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryI
 export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
   return intakes.flatMap((intake) => {
     const intakeId = intake.id?.trim();
-    const sourceId = intake.source ? LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[intake.source] : undefined;
-    const source = sourceId ? lineIntakeSourceById(sourceId) : undefined;
+    const source = lineIntakeSourceForApiSource(intake.source);
     if (!intakeId || !source) {
       return [];
     }
@@ -178,11 +196,49 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
   });
 }
 
+/**
+ * A ticket the intake still analyzes, or one that finished with a score under
+ * the minimum confidence. Tickets over the minimum leave the list for Backlog.
+ */
+export type LineIntakeTicketOutcome = "analyzing" | "below-threshold";
+
 export interface LineIntakeAnalyzingTicket {
   id: string;
   title: string;
   appId?: string;
   runId?: string;
+  outcome?: LineIntakeTicketOutcome;
+  detailsMarkdown?: string;
+  issueKey?: string;
+  issueUrl?: string;
+  planMarkdown?: string;
+  /** Score the intake reports, on the same scale as the minimum confidence. */
+  confidencePct?: number;
+  confidenceScore?: number;
+  confidenceSummary?: string;
+  confidenceAnalysis?: string;
+}
+
+export function isBelowThresholdTicket(ticket: LineIntakeAnalyzingTicket): boolean {
+  return ticket.outcome === "below-threshold";
+}
+
+/** Analyzing tickets stay on top. Tickets that did not make it stay below. */
+export function sortIntakeTicketsByOutcome(tickets: LineIntakeAnalyzingTicket[]): LineIntakeAnalyzingTicket[] {
+  return [
+    ...tickets.filter((ticket) => !isBelowThresholdTicket(ticket)),
+    ...tickets.filter((ticket) => isBelowThresholdTicket(ticket)),
+  ];
+}
+
+export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): number | undefined {
+  if (ticket.confidenceScore != null) {
+    return ticket.confidenceScore;
+  }
+  if (ticket.confidencePct != null) {
+    return confidenceScoreFromPercent(ticket.confidencePct);
+  }
+  return undefined;
 }
 
 export const LINE_INTAKE_COPY = {
@@ -190,6 +246,8 @@ export const LINE_INTAKE_COPY = {
   analyzingHelper: "Tickets from this intake.",
   analyzingStatus: "Analyzing",
   analyzingEmpty: "No tickets in analysis.",
+  belowThresholdStatus: "Not accepted",
+  belowThresholdHelper: "Not accepted. The score is below the minimum confidence.",
   needsRepair: "Needs repair",
   needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
@@ -205,6 +263,12 @@ export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
   { id: "gh-issue-3", title: "Show a clearer empty state on the billing page" },
   { id: "gh-issue-4", title: "Upgrade the Node 20 base image" },
   { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
+  { id: "gh-issue-6", title: "Document the refund webhook contract", outcome: "below-threshold", confidencePct: 58 },
+  { id: "gh-issue-7", title: "Make the billing dashboard faster", outcome: "below-threshold", confidencePct: 52 },
+  { id: "gh-issue-8", title: "Redesign the invoice settings page", outcome: "below-threshold", confidencePct: 44 },
+  { id: "gh-issue-9", title: "Investigate flaky payouts in staging", outcome: "below-threshold", confidencePct: 38 },
+  { id: "gh-issue-10", title: "Move the ledger to a new database", outcome: "below-threshold", confidencePct: 27 },
+  { id: "gh-issue-11", title: "Payments break for some customers", outcome: "below-threshold", confidencePct: 12 },
 ];
 
 const OWNER = {
@@ -218,6 +282,14 @@ const OWNER = {
  * Ticket click from GitHub issues: same split-run popup, with a canvas
  * for ingest, analyze, create plan, and score.
  */
+const ANALYSIS_PHASE_DURATION = {
+  ingest: "2s",
+  analyze: "3m 45s",
+  analyzeRunning: "3m 12s so far",
+  plan: "18s",
+  score: "7s",
+} as const;
+
 function ticketAnalysisPresentation(complete: boolean) {
   return {
     elapsed: complete ? "4m 12s" : "Running",
@@ -227,7 +299,6 @@ function ticketAnalysisPresentation(complete: boolean) {
     noteKey: complete ? "complete" : "analyzing",
     headline: complete ? LINE_INTAKE_COPY.analysisCompleteHeadline : LINE_INTAKE_COPY.analysisHeadline,
     text: complete ? LINE_INTAKE_COPY.analysisCompleteHelper : LINE_INTAKE_COPY.analysisHelper,
-    footerTone: complete ? undefined : ("waiting" as const),
     analyzeStatus: complete ? "passed" : "running",
     laterStatus: complete ? "passed" : "pending",
     analyzeDetail: complete ? "Read the ticket and the repository." : "Reading the ticket and the repository.",
@@ -240,8 +311,10 @@ export function intakeTicketAnalysisFixture(
   ticket: LineIntakeAnalyzingTicket,
   options?: { complete?: boolean },
 ): SplitRunFixture {
-  const canvas = ticketAnalysisCanvas();
-  const view = ticketAnalysisPresentation(Boolean(options?.complete));
+  const complete = options?.complete ?? isBelowThresholdTicket(ticket);
+  const canvas = ticketAnalysisCanvas(complete);
+  const checks = complete ? confidenceChecks(ticket) : [];
+  const view = ticketAnalysisPresentation(complete);
   return {
     title: ticket.title,
     owner: OWNER,
@@ -252,6 +325,7 @@ export function intakeTicketAnalysisFixture(
     lineName: "Intake",
     lineStatus: view.lineStatus,
     currentPhaseId: view.currentPhaseId,
+    currentStepIndex: 0,
     waitingNotes: [
       {
         key: `${ticket.id}-${view.noteKey}`,
@@ -259,69 +333,163 @@ export function intakeTicketAnalysisFixture(
         text: view.text,
       },
     ],
-    checks: [],
-    footerTone: view.footerTone,
+    checks,
+    // Analysis is not a line run — the footer narrates without line actions.
+    footer: {
+      kind: complete ? "done" : "running",
+      sentence: "",
+      actions: [],
+      note: { headline: view.headline, text: view.text },
+    },
+    footerTone: complete ? "done" : "running",
+    source: splitRunIntakeSource(ticket.issueUrl ?? githubIssueUrlForTicket(ticket.issueKey ?? ticket.id)),
     phases: [
       ticketAnalysisPhase({
         id: "ingest",
         name: "Ingest",
         status: "passed",
+        duration: ANALYSIS_PHASE_DURATION.ingest,
         componentName: "Ingest",
         detail: "Ticket received from GitHub issues.",
         canvas,
+        artifacts: ingestArtifacts(ticket),
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "analyze",
         name: "Analyze",
         status: view.analyzeStatus,
+        duration: complete ? ANALYSIS_PHASE_DURATION.analyze : ANALYSIS_PHASE_DURATION.analyzeRunning,
         componentName: "Analyze ticket",
         detail: view.analyzeDetail,
         canvas,
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "plan",
         name: "Create plan",
         status: view.laterStatus,
+        duration: complete ? ANALYSIS_PHASE_DURATION.plan : "—",
         componentName: "Create plan",
         detail: view.planDetail,
         canvas,
+        artifacts: complete ? planArtifact(ticket) : [],
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "score",
         name: "Score",
         status: view.laterStatus,
+        duration: complete ? ANALYSIS_PHASE_DURATION.score : "—",
         componentName: "Score",
         detail: view.scoreDetail,
         canvas,
+        checks,
+        appId: ticket.appId,
       }),
     ],
   };
+}
+
+function ingestArtifacts(ticket: LineIntakeAnalyzingTicket): FactoriesWorkOrderArtifact[] {
+  const issueKey = ticket.issueKey ?? ticket.id;
+  return [
+    {
+      id: `${ticket.id}-details`,
+      type: "TYPE_MARKDOWN",
+      data: {
+        name: "details.md",
+        title: "details.md",
+        body: ticket.detailsMarkdown ?? ticket.title,
+      },
+    },
+    {
+      id: `${ticket.id}-issue-link`,
+      type: "TYPE_LINK",
+      data: {
+        title: issueKey,
+        url: ticket.issueUrl ?? githubIssueUrlForTicket(issueKey),
+      },
+    },
+  ];
+}
+
+function planArtifact(ticket: LineIntakeAnalyzingTicket): FactoriesWorkOrderArtifact[] {
+  if (!ticket.planMarkdown) {
+    return [];
+  }
+  return [
+    {
+      id: `${ticket.id}-plan`,
+      type: "TYPE_MARKDOWN",
+      data: {
+        name: "plan.md",
+        title: "plan.md",
+        body: ticket.planMarkdown,
+      },
+    },
+  ];
+}
+
+function confidenceChecks(ticket: LineIntakeAnalyzingTicket): WorkOrderCheckPresentation[] {
+  const score = intakeTicketConfidenceScore(ticket);
+  if (score == null) {
+    return [];
+  }
+  return [
+    {
+      id: `${ticket.id}-confidence`,
+      name: CONFIDENCE_CHECK_NAME,
+      score,
+      maxScore: CONFIDENCE_SCORE_MAX,
+      format: "fraction",
+      level: confidenceCheckLevel(score),
+      summary: ticket.confidenceSummary ?? confidenceSuitabilitySummary(confidenceBandForScore(score)),
+      analysis: ticket.confidenceAnalysis,
+      sourceName: "Score",
+    },
+  ];
+}
+
+function githubIssueUrlForTicket(issueKey: string): string {
+  const number = issueKey.replace(/\D/g, "") || "1";
+  return `https://github.com/acme/payments-service/issues/${number}`;
 }
 
 function ticketAnalysisPhase({
   id,
   name,
   status,
+  duration,
   componentName,
   detail,
   canvas,
+  artifacts = [],
+  checks = [],
+  appId,
 }: {
   id: SplitRunPhase["id"];
   name: string;
   status: SplitRunPhase["status"];
+  duration: string;
   componentName: string;
   detail: string;
   canvas: SplitRunCanvasModel;
+  artifacts?: FactoriesWorkOrderArtifact[];
+  checks?: WorkOrderCheckPresentation[];
+  appId?: string;
 }): SplitRunPhase {
   return {
     id,
     name,
     status,
-    duration: "—",
+    duration,
     componentName,
-    artifacts: [],
+    artifacts,
+    checks,
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `ticket-${id}`,
@@ -334,7 +502,7 @@ function ticketAnalysisPhase({
   };
 }
 
-function ticketAnalysisCanvas(): SplitRunCanvasModel {
+function ticketAnalysisCanvas(complete: boolean): SplitRunCanvasModel {
   const ingestId = "ticket-ingest";
   const analyzeId = "ticket-analyze";
   const planId = "ticket-plan";
@@ -391,11 +559,16 @@ function ticketAnalysisCanvas(): SplitRunCanvasModel {
     ],
     statuses: {
       [ingestId]: "triggered",
-      [analyzeId]: "running",
-      [planId]: "pending",
-      [scoreId]: "pending",
+      [analyzeId]: complete ? "passed" : "running",
+      [planId]: complete ? "passed" : "pending",
+      [scoreId]: complete ? "passed" : "pending",
     } satisfies Record<string, FactoryNodeStatus>,
-    metrics: {},
+    metrics: {
+      [ingestId]: ANALYSIS_PHASE_DURATION.ingest,
+      [analyzeId]: complete ? ANALYSIS_PHASE_DURATION.analyze : ANALYSIS_PHASE_DURATION.analyzeRunning,
+      [planId]: complete ? ANALYSIS_PHASE_DURATION.plan : "—",
+      [scoreId]: complete ? ANALYSIS_PHASE_DURATION.score : "—",
+    },
   };
 }
 
@@ -407,7 +580,7 @@ export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvas
   return intakeCanvasForSource(source);
 }
 
-export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixture {
+export function intakeAutomationFixture(source: LineIntakeSource, appId?: string): SplitRunFixture {
   const canvas = intakeAutomationCanvas(source);
   const waitingNotes: WorkOrderStatusNotePresentation[] = [
     {
@@ -427,14 +600,26 @@ export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixtu
     lineName: "Intake",
     lineStatus: "running",
     currentPhaseId: "evaluate",
+    currentStepIndex: 0,
     waitingNotes,
     checks: [],
-    footerTone: "waiting",
-    phases: [listenPhase(source, canvas), evaluatePhase(source, canvas), backlogPhase(source, canvas)],
+    // An always-on automation, not a line run — no line actions in the footer.
+    footer: {
+      kind: "running",
+      sentence: "",
+      actions: [],
+      note: { headline: waitingNotes[0].headline, text: waitingNotes[0].text },
+    },
+    footerTone: "running",
+    phases: [
+      listenPhase(source, canvas, appId),
+      evaluatePhase(source, canvas, appId),
+      backlogPhase(source, canvas, appId),
+    ],
   };
 }
 
-function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   return {
     id: "listen",
     name: "Listen",
@@ -444,6 +629,7 @@ function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Spl
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `${source.id}-listen`,
@@ -456,7 +642,7 @@ function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Spl
   };
 }
 
-function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   return {
     id: "evaluate",
     name: "Evaluate",
@@ -466,6 +652,7 @@ function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): S
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `${source.id}-evaluate`,
@@ -478,7 +665,7 @@ function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): S
   };
 }
 
-function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   const stream: SplitRunStreamLine[] = [
     {
       id: `${source.id}-backlog`,
@@ -497,6 +684,7 @@ function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Sp
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream,
   };
 }

@@ -10,7 +10,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { factoryDetailPath, newFactoryPath } from "./lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, newFactoryPath } from "./lib/factoryPagePaths";
 import { pickInitialFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
 
@@ -59,7 +59,9 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const targetFactory = pickInitialFactory(factories, lastVisited);
 
   if (targetFactory?.key) {
-    return <Navigate to={factoryDetailPath(organizationId, targetFactory.key)} replace />;
+    return (
+      <Navigate to={factoryHomePath(organizationId, targetFactory.key, firstFactoryLineId(targetFactory))} replace />
+    );
   }
 
   const canCreate = canAct("factories", "create");

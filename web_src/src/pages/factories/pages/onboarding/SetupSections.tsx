@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { AgentStep } from "./AgentStep";
 import { WIZARD_STEPS, type IntegrationId, type WizardStepId } from "./onboardingFixtures";
 import { IssuesStep } from "./onboardingIssuesStep";
-import { NameStep, RepositoryStep, StartStep, VcsStep } from "./onboardingSteps";
+import { NameStep, RepositoryStep, VcsStep } from "./onboardingSteps";
 import { WizardStepFooter } from "./WizardStepFooter";
 import { type OnboardingSetupApi } from "./useOnboardingSetupState";
 
@@ -18,7 +18,6 @@ const WIZARD_STEP_INDEX: Record<WizardStepId, number> = {
   issues: 2,
   agent: 3,
   name: 4,
-  start: 5,
 };
 
 function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
@@ -33,8 +32,6 @@ function stepComplete(setup: OnboardingSetupApi, step: WizardStepId): boolean {
       return setup.agentReady;
     case "name":
       return setup.nameReady;
-    case "start":
-      return setup.startReady;
   }
 }
 
@@ -49,8 +46,6 @@ function canAdvance(setup: OnboardingSetupApi, step: WizardStepId): boolean {
     case "agent":
       return setup.agentReady;
     case "name":
-      return setup.nameReady;
-    case "start":
       return setup.canFinish;
   }
 }
@@ -168,8 +163,6 @@ function WizardStepBody({
       return <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={requestConnect} />;
     case "name":
       return <NameStep setup={setup} />;
-    case "start":
-      return <StartStep setup={setup} />;
   }
 }
 
@@ -180,6 +173,11 @@ async function continueToStep(
 ) {
   if (save && !(await save())) return;
   setStep(step);
+}
+
+async function continueAndFinish(save: (() => Promise<boolean>) | undefined, finish: () => void | Promise<void>) {
+  if (save && !(await save())) return;
+  await finish();
 }
 
 // Going back must keep the later steps reachable from the rail.
@@ -297,14 +295,10 @@ export function SetupSections({
 
   const goNext = () => {
     if (!nextStep) {
-      void onFinish();
+      void continueAndFinish(openSection === "name" ? onContinueName : undefined, onFinish);
       return;
     }
 
-    if (openSection === "name") {
-      void continueToStep(onContinueName, nextStep.id, setOpenSection);
-      return;
-    }
     if (openSection === "repo") {
       if (setup.selectedRepo) repositoryNavigation.continueFromRepository(setup.selectedRepo);
       return;

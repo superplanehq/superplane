@@ -65,8 +65,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 4)
-		assert.Len(t, liveVersion.Edges, 3)
+		assert.Len(t, liveVersion.Nodes, 5)
+		assert.Len(t, liveVersion.Edges, 4)
 	})
 
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
@@ -95,6 +95,55 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 
+	t.Run("an intake of a set up workspace has no incomplete node", func(t *testing.T) {
+		factory := newFactory(t)
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+		}))
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		// A node the canvas reports an error on cannot run, so the intake
+		// would look ready and never produce a work order. The trigger stays
+		// out: it validates against the GitHub API, which the installation of
+		// the test cannot answer. Its binding has a test of its own.
+		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
+			if node.ID == intakeTriggerNodeID {
+				continue
+			}
+			assert.Nilf(t, node.ErrorMessage, "node %s is incomplete: %s", node.ID, nodeErrorMessage(node))
+		}
+
+		analysis := liveIntakeNode(t, r.Organization.ID, intake, intakeAnalysisNodeID)
+		assert.Equal(t, "runnerClaudeCode", analysis.ComponentName())
+		credentials, ok := analysis.Configuration["credentials"].(map[string]any)
+		require.True(t, ok, "analysis node has no credentials")
+		assert.Equal(t, "integration", credentials["source"])
+	})
+
+	t.Run("an intake analyzes a batch of items in parallel", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		// A node without a concurrency spec runs one execution at a time, so a
+		// seeded batch would take as long as the sum of its analyses. Both the
+		// canvas version and the node record have to carry the spec: the
+		// scheduler reads the record.
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
+			if node.ID == intakeTriggerNodeID {
+				continue
+			}
+
+			assert.Equalf(t, intakeConcurrencyMax, node.Concurrency.EffectiveMax(), "version node %s", node.ID)
+
+			stored, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, node.ID)
+			require.NoError(t, err)
+			assert.Equalf(t, intakeConcurrencyMax, stored.ConcurrencySpec().EffectiveMax(), "node record %s", node.ID)
+		}
+	})
+
 	t.Run("a source can have several intakes", func(t *testing.T) {
 		factory := newFactory(t)
 		first := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -102,7 +151,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		assert.NotEqual(t, first.GetId(), second.GetId())
 		assert.NotEqual(t, first.GetCanvasId(), second.GetCanvasId())
-		// Canvas names are unique per organization, so the second one steps
+		// Canvas names are unique inside a workspace, so the second one steps
 		// aside instead of failing.
 		assert.NotEqual(t, first.GetName(), second.GetName())
 
@@ -304,18 +353,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 func liveIntakeTrigger(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) models.Node {
 	t.Helper()
 
+	return liveIntakeNode(t, organizationID, intake, intakeTriggerNodeID)
+}
+
+func liveIntakeNode(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake, nodeID string) models.Node {
+	t.Helper()
+
+	for _, node := range liveIntakeNodes(t, organizationID, intake) {
+		if node.ID == nodeID {
+			return node
+		}
+	}
+
+	require.Failf(t, "node not found", "intake canvas %s has no node %q", intake.GetCanvasId(), nodeID)
+	return models.Node{}
+}
+
+func nodeErrorMessage(node models.Node) string {
+	if node.ErrorMessage == nil {
+		return ""
+	}
+	return *node.ErrorMessage
+}
+
+func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) []models.Node {
+	t.Helper()
+
 	canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), organizationID, uuid.MustParse(intake.GetCanvasId()))
 	require.NoError(t, err)
 
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 	require.NoError(t, err)
 
-	for _, node := range liveVersion.Nodes {
-		if node.ID == intakeTriggerNodeID {
-			return node
-		}
-	}
-
-	require.Failf(t, "trigger not found", "intake canvas %s has no node %q", intake.GetCanvasId(), intakeTriggerNodeID)
-	return models.Node{}
+	return liveVersion.Nodes
 }

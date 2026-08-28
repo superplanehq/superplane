@@ -108,7 +108,7 @@ describe("IntakeSourceSettingsPopup", () => {
 
   it("shows the intake automation on the Automation tab", async () => {
     const user = userEvent.setup();
-    renderPopup({ editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1" });
+    renderPopup({ editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1" });
 
     await user.click(screen.getByRole("tab", { name: "Automation" }));
 
@@ -120,7 +120,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getAllByText("Create Work Order").length).toBeGreaterThan(0);
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1",
     );
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(implement).toHaveTextContent("Writing the retry handler.");
     expect(implement).not.toHaveTextContent("Moved to Backlog");
 
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Plan");
+    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Verify");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-3")).toHaveTextContent("In Backlog");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-4")).toHaveTextContent("Rejected");
     expect(within(runs).getByTestId("intake-source-run-gh-issue-5")).toHaveTextContent("Waiting for review.");

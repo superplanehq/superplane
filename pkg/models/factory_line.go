@@ -26,6 +26,7 @@ var (
 	ErrFactoryLineNameAlreadyExists = errors.New("factory line name already exists")
 	ErrFactoryLineHasNoSteps        = errors.New("factory line has no steps")
 	ErrFactoryLineStepNotOnRun      = errors.New("factory line step entrypoint must use the onRun trigger")
+	ErrFactoryLineStepOutOfRange    = errors.New("factory line step index is out of range")
 )
 
 type FactoryLineStep struct {
@@ -140,6 +141,25 @@ func (f *Factory) ListLines(tx *gorm.DB) ([]FactoryLine, error) {
 	var lines []FactoryLine
 	err := tx.
 		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
+		Order("name ASC").
+		Order("id ASC").
+		Find(&lines).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return lines, nil
+}
+
+func ListFactoryLinesByFactoryIDs(tx *gorm.DB, organizationID uuid.UUID, factoryIDs []uuid.UUID) ([]FactoryLine, error) {
+	if len(factoryIDs) == 0 {
+		return nil, nil
+	}
+
+	var lines []FactoryLine
+	err := tx.
+		Where("organization_id = ? AND factory_id IN ?", organizationID, factoryIDs).
 		Order("name ASC").
 		Order("id ASC").
 		Find(&lines).

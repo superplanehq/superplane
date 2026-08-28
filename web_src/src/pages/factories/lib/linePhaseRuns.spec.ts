@@ -6,7 +6,9 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
-import { factoryAppPath, factoryAppRunPath, linesPath } from "./factoryPagePaths";
+import { factoryAppPath, factoryAppRunPath, factoryLineDetailPath } from "./factoryPagePaths";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageIds";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -134,6 +136,28 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
   });
 
+  it("keeps closed work orders off the stage columns", () => {
+    const closed = {
+      ...order("wo-closed", "Closed", [
+        {
+          id: "e-closed",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_FAILED",
+          createdAt: "2026-08-11T12:00:00.000Z",
+          updatedAt: "2026-08-11T12:00:00.000Z",
+        },
+      ]),
+      state: "STATE_CLOSED" as const,
+    };
+
+    const board = buildLinePhaseBoard(LINE, [closed], APPS);
+
+    expect(workOrderIds(board)).toEqual([]);
+  });
+
   it("places a multi-step work order only in its furthest active step", () => {
     const orders = [
       order("wo-progress", "Progressing", [
@@ -225,6 +249,25 @@ describe("buildLinePhaseBoard", () => {
 
     const board = buildLinePhaseBoard(line, [], [{ id: "app-planner", name: "plan" }]);
     expect(board[0]).toMatchObject({ stepName: "plan", appId: "app-planner" });
+  });
+
+  it("places the notify card on Implement", () => {
+    const line: FactoriesFactoryLine = {
+      id: REFUND_LINE_PLAN_ID,
+      name: "plan-and-implement",
+      steps: [{ app: { app: "app-refund-implementer" } }, { app: { app: "app-refund-verifier" } }],
+    };
+    const board = buildLinePhaseBoard(
+      line,
+      [BOARD_IMPLEMENT_NOTIFY_ORDER],
+      [
+        { id: "app-refund-implementer", name: "Implement" },
+        { id: "app-refund-verifier", name: "Verify" },
+      ],
+    );
+
+    expect(board[0].runs.map((run) => run.order.title)).toEqual(["Notify on status change after a reopen"]);
+    expect(board[1].runs).toEqual([]);
   });
 
   it("keeps two columns when the same automation appears twice", () => {
@@ -340,7 +383,7 @@ describe("linePhaseRunHref", () => {
     expect(href).toBe(factoryAppPath("org-1", "RF", "app-refund-implementer", { from: "lines", lineId: "line-1" }));
   });
 
-  it("falls back to the lines list when the phase has no canvas", () => {
+  it("falls back to the line board when the phase has no canvas", () => {
     const href = linePhaseRunHref("org-1", "RF", "line-1", {
       executionId: "e1",
       workOrderId: "wo-1",
@@ -348,7 +391,7 @@ describe("linePhaseRunHref", () => {
       execution: { id: "e1" },
     });
 
-    expect(href).toBe(linesPath("org-1", "RF"));
+    expect(href).toBe(factoryLineDetailPath("org-1", "RF", "line-1"));
   });
 });
 
@@ -412,6 +455,13 @@ describe("findBacklogAutomationApp", () => {
       ]),
     ).toEqual({ id: "app-refund-backlog", name: "Backlog" });
   });
+
+  it("matches the Ingest app name", () => {
+    expect(findBacklogAutomationApp([{ id: "app-refund-backlog", name: "Ingest" }])).toEqual({
+      id: "app-refund-backlog",
+      name: "Ingest",
+    });
+  });
 });
 
 describe("findClosureAutomationApp", () => {
@@ -437,21 +487,5 @@ describe("isDoneLineColumn", () => {
     expect(isDoneLineColumn({ stepName: "Done", appId: "app-plan" })).toBe(true);
     expect(isDoneLineColumn({ stepName: "Phase 4", appId: "app-refund-done" })).toBe(true);
     expect(isDoneLineColumn({ stepName: "Plan", appId: "app-plan" })).toBe(false);
-  });
-});
-
-describe("resolvePhaseRunStatus", () => {
-  it("maps execution states to board labels", () => {
-    expect(resolvePhaseRunStatus({ state: "STATE_STARTED" })).toEqual({ kind: "running", label: "Executing" });
-    expect(resolvePhaseRunStatus({ state: "STATE_CANCELLING" })).toEqual({ kind: "running", label: "Cancelling" });
-    expect(resolvePhaseRunStatus({ state: "STATE_PENDING" })).toEqual({ kind: "queued", label: "Queued" });
-    expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_PASSED" })).toEqual({
-      kind: "idle",
-      label: "Passed",
-    });
-    expect(resolvePhaseRunStatus({ state: "STATE_FINISHED", result: "RESULT_FAILED" })).toEqual({
-      kind: "failed",
-      label: "Failed",
-    });
   });
 });

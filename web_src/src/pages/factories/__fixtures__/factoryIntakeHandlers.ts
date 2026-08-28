@@ -1,4 +1,4 @@
-import type { FactoriesFactoryIntake, FactoryIntakeSettings } from "@/api-client";
+import type { FactoriesFactoryIntake, FactoriesFactoryIntakeSettings } from "@/api-client";
 import type { FixtureResult } from "@/pages/home/__fixtures__/handlers";
 
 import type { FactoriesFixture } from "./factoryPageResponses";
@@ -36,6 +36,14 @@ function factoryIntakes(fixture: FactoriesFixture, factoryId: string): Factories
 export function factoryIntakeRoutes(fixture: FactoriesFixture): FactoryIntakeRoute[] {
   return [
     {
+      pattern: route("/api/v1/factories/([^/]+)/intakes/([^/]+)/items"),
+      resolve: (match, _method, _body, url) => searchFactoryIntakeItems(fixture, match[2], url),
+    },
+    {
+      pattern: route("/api/v1/factories/([^/]+)/intakes/([^/]+)/imports"),
+      resolve: (match, method, body) => importFactoryIntakeItem(fixture, match[1], match[2], method, body),
+    },
+    {
       pattern: route("/api/v1/factories/([^/]+)/intakes/([^/]+)/runs"),
       resolve: (match) => ({ json: { runs: fixture.intakeRunsByIntakeId?.[match[2]] ?? [] } }),
     },
@@ -69,7 +77,7 @@ function updateOrDeleteFactoryIntake(
     return null;
   }
 
-  const request = (body ?? {}) as { name?: unknown; settings?: FactoryIntakeSettings };
+  const request = (body ?? {}) as { name?: unknown; settings?: FactoriesFactoryIntakeSettings };
   const updated: FactoriesFactoryIntake = {
     ...intakes[index],
     ...(stringValue(request.name) ? { name: stringValue(request.name) } : {}),
@@ -77,6 +85,72 @@ function updateOrDeleteFactoryIntake(
   };
   intakes[index] = updated;
   return { json: { intake: updated } };
+}
+
+function searchFactoryIntakeItems(fixture: FactoriesFixture, intakeId: string, url: URL): FixtureResult {
+  const query = url.searchParams.get("query")?.trim().toLowerCase() ?? "";
+  const requested = Number(url.searchParams.get("limit"));
+  const limit = requested > 0 ? requested : query ? 10 : 5;
+  const items = (fixture.intakeItemCatalog?.items ?? [])
+    .filter((item) => item.intakeId === intakeId)
+    .filter((item) => {
+      if (!query) {
+        return true;
+      }
+      return `${item.key} ${item.title} ${item.body}`.toLowerCase().includes(query);
+    })
+    .slice(0, limit)
+    .map((item) => ({
+      id: item.id,
+      key: item.key,
+      title: item.title,
+      body: item.body,
+      url: "",
+    }));
+  return { json: { items } };
+}
+
+function importFactoryIntakeItem(
+  fixture: FactoriesFixture,
+  factoryId: string,
+  intakeId: string,
+  method: string,
+  body: Record<string, unknown> | null,
+): FixtureResult {
+  if (method !== "POST") {
+    return null;
+  }
+
+  const itemId = stringValue(body?.itemId);
+  const catalogItem = fixture.intakeItemCatalog?.items.find((item) => item.id === itemId && item.intakeId === intakeId);
+  if (!catalogItem) {
+    return { json: {} };
+  }
+
+  const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
+  const existing = orders.find((order) => order.origin?.url && order.title === catalogItem.title);
+  if (existing) {
+    return { json: { order: existing } };
+  }
+
+  const nowIso = new Date().toISOString();
+  const created = {
+    id: `storybook-imported-${orders.length + 1}`,
+    number: String(200 + orders.length + 1),
+    title: catalogItem.title,
+    description: catalogItem.body,
+    state: "STATE_DRAFT" as const,
+    result: "RESULT_UNSPECIFIED" as const,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    origin: {
+      url: `https://example.com/intake-items/${catalogItem.id}`,
+      label: catalogItem.key,
+    },
+    lineDispatches: [],
+  };
+  fixture.workOrdersByFactoryId[factoryId] = [...orders, created];
+  return { json: { order: created } };
 }
 
 function listOrCreateFactoryIntakes(

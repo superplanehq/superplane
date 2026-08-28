@@ -1,12 +1,8 @@
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import {
-  useCreateFactoryLine,
-  useCreateWorkOrder,
-  useDispatchWorkOrder,
-  useUpdateFactory,
-} from "@/hooks/useFactoryData";
+import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
+import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -21,7 +17,7 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
-import type { IntegrationId, WizardStepId } from "./onboardingFixtures";
+import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
   apiIssuesSource,
@@ -125,13 +121,15 @@ function useSectionSaves(args: {
       }),
     );
   };
-  const saveIssues = () => {
+  // The caller passes the source, because a selection made in the same render
+  // is not readable from the setup state yet.
+  const saveIssues = (source: IssuesChoiceId) => {
     const backlogRepository = args.setup.issuesRepo ?? args.setup.selectedRepo;
-    if (!backlogRepository || !args.setup.issuesChoice) return Promise.resolve(false);
+    if (!backlogRepository) return Promise.resolve(false);
     return runSave(args.setSaving, () =>
       args.updateOnboarding({
         backlogRepository,
-        issuesSource: apiIssuesSource(args.setup.issuesChoice),
+        issuesSource: apiIssuesSource(source),
       }),
     );
   };
@@ -217,8 +215,7 @@ export function useOnboardingPageModel(args: {
   const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
-  const createWorkOrder = useCreateWorkOrder(args.organizationId, args.factoryId);
-  const dispatchWorkOrder = useDispatchWorkOrder(args.organizationId, args.factoryId);
+  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(args.organizationId, args.factoryId);
   const installer = useInstallFactory();
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnections({
@@ -260,8 +257,8 @@ export function useOnboardingPageModel(args: {
     createLine: createLine.mutateAsync,
     listIntakes: () => fetchFactoryIntakes(args.organizationId, args.factoryId),
     createIntake: createIntake.mutateAsync,
-    createWorkOrder: createWorkOrder.mutateAsync,
-    dispatchWorkOrder: dispatchWorkOrder.mutateAsync,
+    listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
+    createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
@@ -293,7 +290,7 @@ export function useOnboardingPageModel(args: {
     repositoriesLoading: github.repositoriesLoading,
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
-    saving: saving || installer.isInstalling || createIntake.isPending || createWorkOrder.isPending,
+    saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
     ...saves,
     finish: finishSetup,
   };

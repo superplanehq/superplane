@@ -18,6 +18,7 @@ import {
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
+  WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 
@@ -240,6 +241,25 @@ describe("scope + filter + search + ordering", () => {
   const meAssigned = order({ id: "mine-1", assignees: [{ id: "me", name: "You" }], updatedAt: "2024-06-05T00:00:00Z" });
   const unassigned = order({ id: "u-1", assignees: [], updatedAt: "2024-06-06T00:00:00Z" });
   const others = order({ id: "o-1", assignees: [{ id: "alex", name: "Alex" }], updatedAt: "2024-06-07T00:00:00Z" });
+  const running = order({
+    id: "r-1",
+    assignees: [{ id: "runner", name: "Runner" }],
+    executions: [{ id: "exec-run", state: "STATE_STARTED", step: "Implement" }],
+    updatedAt: "2024-06-08T00:00:00Z",
+  });
+  const draft = order({
+    id: "d-1",
+    state: "STATE_DRAFT",
+    assignees: [{ id: "author", name: "Author" }],
+    updatedAt: "2024-06-09T00:00:00Z",
+  });
+  const failed = order({
+    id: "f-1",
+    state: "STATE_CLOSED",
+    result: "RESULT_FAILED",
+    assignees: [{ id: "owner", name: "Owner" }],
+    updatedAt: "2024-05-15T00:00:00Z",
+  });
   const closed = order({
     id: "c-1",
     state: "STATE_CLOSED",
@@ -247,18 +267,27 @@ describe("scope + filter + search + ordering", () => {
     updatedAt: "2024-05-01T00:00:00Z",
   });
 
-  const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, closed], factory);
+  const entries = buildWorkOrderListEntries([meAssigned, unassigned, others, running, draft, failed, closed], factory);
+
+  it("labels the attention scope and describes My as work you started", () => {
+    const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
+    expect(attention?.label).toBe("Needs attention");
+    expect(attention?.tooltip).toBe("Work orders that need your attention.");
+    expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
+      "Work orders you created or started. SuperPlane assigns those to you.",
+    );
+  });
 
   it("scope=my only keeps orders assigned to the current user", () => {
     expect(applyWorkOrderScope(entries, "my", "me").map((e) => e.id)).toEqual(["mine-1"]);
   });
 
-  it("scope=active drops completed, failed, and cancelled orders", () => {
-    expect(applyWorkOrderScope(entries, "active").map((e) => e.id)).toEqual(["mine-1", "u-1", "o-1"]);
+  it("scope=active keeps drafts, waiting, and failed orders and drops running work", () => {
+    expect(applyWorkOrderScope(entries, "active").map((e) => e.id)).toEqual(["mine-1", "u-1", "o-1", "d-1", "f-1"]);
   });
 
   it("scope=all keeps everything", () => {
-    expect(applyWorkOrderScope(entries, "all")).toHaveLength(4);
+    expect(applyWorkOrderScope(entries, "all")).toHaveLength(7);
   });
 
   it("status filter narrows down to the selected display statuses", () => {
@@ -307,7 +336,15 @@ describe("scope + filter + search + ordering", () => {
   });
 
   it("ordering=updated puts the newest updated first", () => {
-    expect(applyWorkOrderOrdering(entries, "updated").map((e) => e.id)).toEqual(["o-1", "u-1", "mine-1", "c-1"]);
+    expect(applyWorkOrderOrdering(entries, "updated").map((e) => e.id)).toEqual([
+      "d-1",
+      "r-1",
+      "o-1",
+      "u-1",
+      "mine-1",
+      "f-1",
+      "c-1",
+    ]);
   });
 
   it("ordering=status follows the display status order", () => {

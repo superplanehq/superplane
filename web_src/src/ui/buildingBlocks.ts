@@ -220,7 +220,10 @@ const FACTORY_BLOCK_NAMES = new Set([
   "updateWorkOrderStatus",
   "addWorkOrderComment",
   "addWorkOrderArtifact",
-  "updateWorkOrderArtifact",
+  "addPullRequest",
+  "updatePullRequest",
+  "findPullRequest",
+  "addPullRequestActivity",
   "reportWorkOrderCheck",
 ]);
 

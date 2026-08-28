@@ -3,6 +3,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
@@ -10,7 +11,7 @@ import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSect
 import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
-export const DEFAULT_LINE_NAME = "Software delivery";
+export const DEFAULT_LINE_NAME = "plan-and-implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
@@ -137,6 +138,28 @@ export async function provisionGithubIntake(args: {
   return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
 }
 
+export type ListFactoryPRFeedbackHandlers = () => Promise<FactoriesFactoryPrFeedbackHandler[]>;
+
+export type CreateFactoryPRFeedbackHandler = (input: {
+  repository?: string;
+}) => Promise<FactoriesFactoryPrFeedbackHandler>;
+
+// The PR feedback handler addresses review comments after a work-order PR
+// opens. Match by repository so a retried finish does not add a second copy.
+export async function provisionPRFeedbackHandler(args: {
+  listHandlers: ListFactoryPRFeedbackHandlers;
+  createHandler: CreateFactoryPRFeedbackHandler;
+  repository: string;
+}): Promise<FactoriesFactoryPrFeedbackHandler> {
+  const handlers = await args.listHandlers();
+  const existing = handlers.find((handler) => handler.settings?.subject?.repository === args.repository);
+  if (existing) {
+    return existing;
+  }
+
+  return args.createHandler({ repository: args.repository });
+}
+
 export async function provisionLine(args: {
   factory: FactoriesFactory | null;
   savedLineId?: string;
@@ -163,10 +186,10 @@ export async function provisionLine(args: {
     installFactory: args.installFactory,
   });
   const primaryAppId = steps[0]?.app?.app;
-  if (!primaryAppId) throw new Error("Software delivery apps were not created");
+  if (!primaryAppId) throw new Error("Line apps were not created");
 
   const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
-  if (!line.id) throw new Error("Software delivery line was not created");
+  if (!line.id) throw new Error("Line was not created");
   await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
   return { lineId: line.id, primaryAppId };
 }

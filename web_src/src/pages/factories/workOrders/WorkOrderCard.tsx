@@ -7,22 +7,31 @@ import {
   WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
   WORK_ORDER_ATTENTION_ICON,
   WORK_ORDER_ATTENTION_LABEL,
+  type WorkOrderAttentionReason,
 } from "../lib/workOrderAttention";
 import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
+import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
+
+const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
+  factoryId?: string;
   factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
   /** When set, Start on a draft sends the work order to this line. */
   preferredLineName?: string;
   canDispatch: boolean;
   canAssign: boolean;
-  isDispatching: boolean;
+  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
+  /** Work orders with a queued or running PR-feedback run. */
+  addressingFeedbackOrderIds?: ReadonlySet<string>;
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
@@ -34,8 +43,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   href?: string;
   /** When set, the card overlay opens this handler instead of navigating. */
   onOpen?: () => void;
-  /** First-run analysis score. Hides Start on draft cards. */
-  confidencePct?: number;
+  /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
+  confidenceScore?: number;
 }
 
 /**
@@ -43,9 +52,10 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  *
  * Every board uses this complete component. Status is a colored dot next
  * to the title. The footer shows the owner (except on drafts), the age of
- * the work order, and a Start button on drafts or a score on reviewed
- * drafts. Waiting cards show an attention label. The owner is
- * display-only on the card.
+ * the work order, and a Start button on drafts. Reviewed drafts also
+ * show a score to the left of Start. Waiting cards show an attention
+ * label such as Waiting for user review. The owner is display-only on
+ * the card.
  */
 export function WorkOrderCard({
   entry,
@@ -54,19 +64,21 @@ export function WorkOrderCard({
   factoryLines,
   preferredLineName,
   canDispatch,
-  isDispatching,
+  dispatchingOrderIds,
+  addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
   onDispatch,
   href,
   onOpen,
-  confidencePct,
+  confidenceScore,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
-  const showStart = entry.displayStatus === "draft" && confidencePct == null;
-  const attentionReason = getWorkOrderAttentionReason(entry.order);
-  const AttentionIcon = attentionReason ? WORK_ORDER_ATTENTION_ICON[attentionReason] : null;
+  const showStart = entry.displayStatus === "draft";
+  const attentionReason = getWorkOrderAttentionReason(entry.order, {
+    addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
+  });
 
   return (
     <article
@@ -86,15 +98,12 @@ export function WorkOrderCard({
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="relative size-2 shrink-0" title={meta.label} aria-label={meta.label}>
-            {entry.displayStatus === "running" ? (
-              <span
-                className={cn("absolute inset-0 rounded-full opacity-60 animate-ping", meta.dotClassName)}
-                aria-hidden
-              />
-            ) : null}
-            <span className={cn("relative block size-2 rounded-full", meta.dotClassName)} />
-          </span>
+          <WorkOrderStatusDot
+            colorClassName={meta.dotClassName}
+            pulsing={entry.displayStatus === "running"}
+            title={meta.label}
+            aria-label={meta.label}
+          />
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-snug text-foreground">
             {entry.title}
           </h3>
@@ -110,37 +119,45 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidencePct != null ? (
-            <span
-              className="shrink-0 text-[12px] font-medium tabular-nums text-foreground"
-              data-testid={`work-order-card-score-${entry.id}`}
-            >
-              {confidencePct}%
-            </span>
+          {confidenceScore != null || showStart ? (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {confidenceScore != null ? (
+                <ConfidenceMeter
+                  score={confidenceScore}
+                  className="shrink-0"
+                  testId={`work-order-card-score-${entry.id}`}
+                />
+              ) : null}
+              {showStart ? (
+                <StartDraftButton
+                  entry={entry}
+                  lines={factoryLines}
+                  preferredLineName={preferredLineName}
+                  canDispatch={canDispatch}
+                  isDispatching={dispatchingOrderIds.has(entry.id)}
+                  onDispatch={onDispatch}
+                />
+              ) : null}
+            </div>
           ) : null}
-          {showStart ? (
-            <StartDraftButton
-              entry={entry}
-              lines={factoryLines}
-              preferredLineName={preferredLineName}
-              canDispatch={canDispatch}
-              isDispatching={isDispatching}
-              onDispatch={onDispatch}
-            />
-          ) : null}
-          {attentionReason && AttentionIcon ? (
-            <span
-              className={cn(
-                "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
-                WORK_ORDER_ATTENTION_CHIP_CLASSNAME[attentionReason],
-              )}
-            >
-              <AttentionIcon className="size-3" aria-hidden />
-              {WORK_ORDER_ATTENTION_LABEL[attentionReason]}
-            </span>
-          ) : null}
+          {attentionReason ? <WorkOrderAttentionChip reason={attentionReason} /> : null}
         </div>
       </div>
     </article>
+  );
+}
+
+function WorkOrderAttentionChip({ reason }: { reason: WorkOrderAttentionReason }) {
+  const Icon = WORK_ORDER_ATTENTION_ICON[reason];
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+        WORK_ORDER_ATTENTION_CHIP_CLASSNAME[reason],
+      )}
+    >
+      <Icon className={cn("size-3", reason === "feedback" && "animate-spin")} aria-hidden />
+      {WORK_ORDER_ATTENTION_LABEL[reason]}
+    </span>
   );
 }

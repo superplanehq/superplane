@@ -1,6 +1,6 @@
 {
-  "maxAllowedInTransactionDefinitions": 159,
-  "maxAllowedDatabaseConnCalls": 178,
+  "maxAllowedInTransactionDefinitions": 158,
+  "maxAllowedDatabaseConnCalls": 177,
   "inTransactionDefinitionKeys": [
     "pkg/models/account.go:MarkPasswordChangedInTransaction",
     "pkg/models/account.go:CreateAccountInTransaction",
@@ -30,7 +30,6 @@
     "pkg/models/canvas.go:FindCanvasNodesInTransaction",
     "pkg/models/canvas.go:FindCanvasNodesUnscopedInTransaction",
     "pkg/models/canvas.go:SoftDeleteInTransaction",
-    "pkg/models/canvas.go:FindCanvasByNameInTransaction",
     "pkg/models/canvas.go:FindCanvasInTransaction",
     "pkg/models/canvas.go:FindCanvasWithoutOrgScopeInTransaction",
     "pkg/models/canvas.go:FindUnscopedCanvasInTransaction",
@@ -200,7 +199,6 @@
     "pkg/models/canvas.go:FindCanvasNodesUnscoped:database.Conn()#1",
     "pkg/models/canvas.go:SoftDelete:database.Conn()#1",
     "pkg/models/canvas.go:FindCanvas:database.Conn()#1",
-    "pkg/models/canvas.go:FindCanvasByName:database.Conn()#1",
     "pkg/models/canvas.go:FindCanvasWithoutOrgScope:database.Conn()#1",
     "pkg/models/canvas.go:FindUnscopedCanvas:database.Conn()#1",
     "pkg/models/canvas.go:ListCanvasesPaginated:database.Conn()#1",
@@ -342,5 +340,5 @@
     "pkg/models/webhook.go:ListDeletedWebhooks:database.Conn()#1",
     "pkg/models/webhook.go:ResetStuckProvisioningWebhooks:database.Conn()#1"
   ],
-  "updatedAt": "2026-08-17T23:48:46Z"
+  "updatedAt": "2026-08-28T09:52:20Z"
 }

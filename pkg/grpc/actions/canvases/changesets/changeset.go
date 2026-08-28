@@ -1,6 +1,7 @@
 package changesets
 
 import (
+	"github.com/superplanehq/superplane/pkg/models"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -51,6 +52,10 @@ type ChangeNode struct {
 	IntegrationID string
 	Position      *componentpb.Position
 	IsCollapsed   *bool
+
+	// Concurrency is the node's inline concurrency spec. Nil leaves the node
+	// with the default of one execution at a time.
+	Concurrency *models.ConcurrencySpec
 }
 
 type ChangeEdge struct {

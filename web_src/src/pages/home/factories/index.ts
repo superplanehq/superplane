@@ -9,7 +9,6 @@ import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
 import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
 import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
 import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
-import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
 import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
@@ -44,7 +43,6 @@ function buildSoftwareFactory(): FactoryDefinition {
 // phase — mirroring the production setup. Each app exposes a single onRun
 // entrypoint that the line calls in order, passing the work order through.
 const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.addIssueLabel": "github",
   "github.createIssueComment": "github",
   "github.createPullRequest": "github",
 };
@@ -122,6 +120,7 @@ function buildEventApp(args: {
 /**
  * Ordered factory-line apps provisioned during onboarding. Each entry maps to a
  * bundled app template and the line step that calls its onRun entrypoint.
+ * Implement opens the pull request and hands review to the wait note.
  */
 export interface OnboardingLineApp {
   factoryId: string;
@@ -131,7 +130,6 @@ export interface OnboardingLineApp {
 export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
   { factoryId: "line-planning", entrypointNodeId: "onrun-create-plan" },
   { factoryId: "line-implementation", entrypointNodeId: "onrun-implement" },
-  { factoryId: "line-pr", entrypointNodeId: "onrun-open-pr" },
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for
@@ -143,24 +141,17 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
   "line-planning": buildLineApp({
     id: "line-planning",
-    title: "Planning",
+    title: "Plan",
     description: "Read the work order and write an implementation plan.",
     canvasYaml: planningCanvasYaml,
     entrypointNodeId: "onrun-create-plan",
   }),
   "line-implementation": buildLineApp({
     id: "line-implementation",
-    title: "Implementation",
-    description: "Create a branch and implement the plan with an agent.",
+    title: "Implement",
+    description: "Create a branch, implement the plan, and open a draft pull request.",
     canvasYaml: implementationCanvasYaml,
     entrypointNodeId: "onrun-implement",
-  }),
-  "line-pr": buildLineApp({
-    id: "line-pr",
-    title: "PR Creation",
-    description: "Generate a pull request title and body, then open a draft PR.",
-    canvasYaml: prCanvasYaml,
-    entrypointNodeId: "onrun-open-pr",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",

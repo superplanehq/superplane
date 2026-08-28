@@ -30,14 +30,14 @@ export function firstFactoryLineName(
 }
 
 /**
- * Workspace home: the first line board when a line exists, otherwise the
- * lines list (empty state).
+ * Workspace home: the first line board when a line id is present.
+ * Without a line id, the workspace index — which redirects to that board.
  */
 export function factoryHomePath(organizationId: string, factoryKey: string, lineId?: string | null) {
   if (lineId) {
     return factoryLineDetailPath(organizationId, factoryKey, lineId);
   }
-  return linesPath(organizationId, factoryKey);
+  return factoryDetailPath(organizationId, factoryKey);
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */
@@ -76,6 +76,31 @@ export function intakeIdFromSearch(search: string): string | null {
 export function intakeSettingsTabFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
+}
+
+export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
+/** Opens PR feedback settings on a tab: general or automation. */
+export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+
+export function factoryPRFeedbackPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+) {
+  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${PR_FEEDBACK_SEARCH_PARAM}=1`;
+  const settingsQuery = settingsTab ? `&${PR_FEEDBACK_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
+  return `${path}${settingsQuery}`;
+}
+
+export function isPRFeedbackSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SEARCH_PARAM) === "1";
+}
+
+export function prFeedbackSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {
@@ -153,8 +178,12 @@ export type FactoryAppNavOptions = {
    * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
    */
   configure?: boolean;
+  /** Open the agent sidebar in factory edit mode (`agent=1`). */
+  agent?: boolean;
   /** Open the components panel in factory edit mode (`blocks=1`). */
   blocks?: boolean;
+  /** Open the component sidebar on this node (`sidebar=1&node=`). */
+  nodeId?: string;
 };
 
 function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
@@ -168,8 +197,15 @@ function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
   if (options.configure) {
     params.set("configure", "1");
   }
+  if (options.agent) {
+    params.set("agent", "1");
+  }
   if (options.blocks) {
     params.set("blocks", "1");
+  }
+  if (options.nodeId) {
+    params.set("sidebar", "1");
+    params.set("node", options.nodeId);
   }
   if (options.from) {
     params.set("from", options.from);
@@ -193,19 +229,20 @@ export function factoryAppConfigurePath(
   return factoryAppPath(organizationId, factoryKey, appId, {
     ...options,
     configure: true,
+    agent: options?.agent ?? true,
+    // Component edit is not run inspection. A leftover `run` param would hide
+    // the editor sidebar and strip `node` while Configure starts.
+    runId: options?.nodeId ? undefined : options?.runId,
   });
 }
 
-/** Factory canvas view URL. Run views use the split-run page. */
+/** Factory canvas view URL. `runId` opens the dedicated run inspector. */
 export function factoryAppViewPath(
   organizationId: string,
   factoryKey: string,
   appId: string,
   options?: Pick<FactoryAppNavOptions, "from" | "lineId" | "orderNumber" | "runId">,
 ) {
-  if (options?.runId) {
-    return factoryAppSplitRunPath(organizationId, factoryKey, appId, options);
-  }
   return factoryAppPath(organizationId, factoryKey, appId, options);
 }
 
@@ -225,7 +262,7 @@ export function factoryAppRunPath(
   runId: string,
   options?: Omit<FactoryAppNavOptions, "runId">,
 ) {
-  return factoryAppSplitRunPath(organizationId, factoryKey, appId, { ...options, runId });
+  return factoryAppPath(organizationId, factoryKey, appId, { ...options, runId });
 }
 
 export function factoryAppSplitRunPath(
@@ -262,12 +299,23 @@ export function factorySettingsSectionPath(organizationId: string, factoryKey: s
   return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
 }
 
-export function organizationSettingsPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/organization`;
+export type OrganizationSettingsLocationState = {
+  fromFactoryKey?: string;
+};
+
+export function organizationSettingsPath(organizationId: string) {
+  return `/${organizationId}/organization`;
 }
 
-export function organizationSettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${organizationSettingsPath(organizationId, factoryKey)}/${section}`;
+export function organizationSettingsSectionPath(organizationId: string, section: string) {
+  return `${organizationSettingsPath(organizationId)}/${section}`;
+}
+
+export function organizationSettingsBackPath(organizationId: string, fromFactoryKey?: string) {
+  if (fromFactoryKey) {
+    return factoryDetailPath(organizationId, fromFactoryKey);
+  }
+  return factoryListPath(organizationId);
 }
 
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */

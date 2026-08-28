@@ -163,6 +163,12 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&execution).Error)
 
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/app/pull/41",
+	})
+	require.NoError(t, err)
+	require.NoError(t, pullRequest.LinkRun(db, run.ID, "Address review from alice"))
+
 	// Checks reference the order and factory with RESTRICT FKs, so the
 	// cleaner must remove them before the order and factory rows.
 	_, err = order.ReportCheck(db, models.FactoryWorkOrderCheckParams{
@@ -198,6 +204,48 @@ func Test__FactoryResourceCleaner__HardDeletesFactoryDomain(t *testing.T) {
 	var checkCount int64
 	require.NoError(t, db.Model(&models.FactoryWorkOrderCheck{}).Where("factory_id = ?", factory.ID).Count(&checkCount).Error)
 	assert.Equal(t, int64(0), checkCount)
+
+	var pullRequestCount int64
+	require.NoError(t, db.Model(&models.FactoryPullRequest{}).Where("factory_id = ?", factory.ID).Count(&pullRequestCount).Error)
+	assert.Equal(t, int64(0), pullRequestCount)
+}
+
+func Test__FactoryResourceCleaner__DeletesPullRequestRunLinksBeforePullRequests(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		nil,
+	)
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createRunForRootEvent(t, rootEvent)
+
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/app/pull/77",
+	})
+	require.NoError(t, err)
+	require.NoError(t, pullRequest.LinkRun(db, run.ID, "Please add tests."))
+	require.NoError(t, factory.SoftDelete(db))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, complete, cleanErr := models.NewFactoryResourceCleaner(tx, factory).WithLimit(500).Run()
+		require.NoError(t, cleanErr)
+		assert.True(t, complete)
+		return nil
+	}))
+
+	var linkCount int64
+	require.NoError(t, db.Model(&models.FactoryPullRequestRun{}).Where("run_id = ?", run.ID).Count(&linkCount).Error)
+	assert.Equal(t, int64(0), linkCount)
 }
 
 func Test__FactoryResourceCleaner__RespectsLimit(t *testing.T) {

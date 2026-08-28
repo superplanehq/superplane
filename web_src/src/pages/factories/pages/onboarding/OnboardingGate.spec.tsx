@@ -18,7 +18,8 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
 }));
 
 function CurrentPath() {
-  return <span>{useLocation().pathname}</span>;
+  const { pathname, search } = useLocation();
+  return <span>{`${pathname}${search}`}</span>;
 }
 
 function Layout() {
@@ -57,6 +58,19 @@ describe("OnboardingGate", () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/lines")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
+  });
+
+  // Setup finishes with its own redirect to the intake drawer. This redirect
+  // can land after it, so both must open the same board with the drawer.
+  it("opens the intake drawer when a completed workspace leaves setup", async () => {
+    factory = {
+      id: "factory-1",
+      lines: [{ id: "line-plan" }],
+      onboarding: { completedAt: "2026-08-17T12:00:00Z" },
+    };
+    renderRoute("/org-1/workspaces/PAY/setup");
+
+    expect(await screen.findByText("/org-1/workspaces/PAY/lines/line-plan?intake=1")).toBeInTheDocument();
   });
 });

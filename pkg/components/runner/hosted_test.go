@@ -1,10 +1,14 @@
 package runner
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
@@ -67,4 +71,47 @@ func TestValidateHostedAgentSpecRejectsReservedBaseURL(t *testing.T) {
 		[]EnvironmentVariable{{Name: "ANTHROPIC_BASE_URL"}},
 		"ANTHROPIC_BASE_URL",
 	))
+}
+
+func TestPrepareHostedRunChecksFactoryAllowlist(t *testing.T) {
+	t.Parallel()
+
+	stub := &hostedAllowlistLLM{
+		access: core.HostedLLMAccess{
+			APIKey:        "sk-hosted",
+			AllowedModels: []string{"claude-sonnet-4-6", "claude-opus-4-6"},
+		},
+		selectable: map[string]bool{"claude-sonnet-4-6": true},
+	}
+
+	_, err := PrepareHostedRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "claude-opus-4-6")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "selected-model list")
+	assert.True(t, stub.asserted)
+
+	access, err := PrepareHostedRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "claude-sonnet-4-6")
+	require.NoError(t, err)
+	assert.Equal(t, "sk-hosted", access.APIKey)
+}
+
+type hostedAllowlistLLM struct {
+	access     core.HostedLLMAccess
+	selectable map[string]bool
+	asserted   bool
+}
+
+func (c *hostedAllowlistLLM) Resolve(string) (core.HostedLLMAccess, error) {
+	return c.access, nil
+}
+
+func (c *hostedAllowlistLLM) AssertCreditAvailable() error {
+	return nil
+}
+
+func (c *hostedAllowlistLLM) AssertModelSelectable(_, _, model string) error {
+	c.asserted = true
+	if c.selectable[strings.TrimSpace(model)] {
+		return nil
+	}
+	return fmt.Errorf("model %s is not on the selected-model list", model)
 }

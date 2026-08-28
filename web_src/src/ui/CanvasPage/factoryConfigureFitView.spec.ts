@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { FACTORY_LAYOUT_ANIMATION_DURATION_MS } from "./nodePositionAnimation";
-import { FACTORY_CONFIGURE_FIT_SETTLE_MS, shouldFitFactoryConfigureEnter } from "./factoryConfigureFitView";
+import {
+  FACTORY_CONFIGURE_FIT_SETTLE_MS,
+  factoryConfigureEnterFitViewOptions,
+  shouldFitFactoryConfigureEnter,
+} from "./factoryConfigureFitView";
 
 describe("shouldFitFactoryConfigureEnter", () => {
   const ready = {
@@ -39,5 +43,29 @@ describe("shouldFitFactoryConfigureEnter", () => {
 describe("FACTORY_CONFIGURE_FIT_SETTLE_MS", () => {
   it("waits for the factory layout animation plus a short measure buffer", () => {
     expect(FACTORY_CONFIGURE_FIT_SETTLE_MS).toBe(FACTORY_LAYOUT_ANIMATION_DURATION_MS + 50);
+  });
+});
+
+describe("factoryConfigureEnterFitViewOptions", () => {
+  it("frames the whole graph at 100% zoom", () => {
+    expect(factoryConfigureEnterFitViewOptions()).toEqual({
+      includeHiddenNodes: true,
+      minZoom: 1,
+      maxZoom: 1,
+      padding: 0.08,
+      duration: 500,
+    });
+  });
+
+  it("centers a deep-linked node at 100% zoom", () => {
+    const focusNode = { id: "implementation-agent-no-issue" };
+    expect(factoryConfigureEnterFitViewOptions(focusNode)).toEqual({
+      includeHiddenNodes: true,
+      minZoom: 1,
+      maxZoom: 1,
+      padding: 0.08,
+      duration: 500,
+      nodes: [focusNode],
+    });
   });
 });

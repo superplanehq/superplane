@@ -28,6 +28,37 @@ type IntakeDependencies struct {
 	GitProvider    git.Provider
 	WebhookBaseURL string
 	UsageService   usage.Service
+	NewItemSource  IntakeItemSourceFactory
+}
+
+type IntakeItem struct {
+	ID    string
+	Key   string
+	Title string
+	Body  string
+	URL   string
+}
+
+type intakeItemSource interface {
+	Search(ctx context.Context, query string, limit int) ([]IntakeItem, error)
+	Get(ctx context.Context, id string) (*IntakeItem, error)
+}
+
+type IntakeItemSourceFactory func(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error)
+
+func (d IntakeDependencies) itemSource(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error) {
+	if d.NewItemSource != nil {
+		return d.NewItemSource(ctx, tx, intake)
+	}
+	return newLiveIntakeItemSource(ctx, d, tx, intake)
 }
 
 func CreateFactoryIntake(
@@ -61,7 +92,7 @@ func CreateFactoryIntake(
 	if name == "" {
 		name = intakeDefaultName(source)
 	}
-	name, err = models.AvailableCanvasName(db, orgID, name)
+	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
@@ -71,13 +102,15 @@ func CreateFactoryIntake(
 		confidencePct = int(req.GetConfidencePct())
 	}
 
+	binding := resolveIntakeBinding(db, factory, source)
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,
 		FactoryID:      factoryID,
 		Source:         source,
 		Name:           name,
 		ConfidencePct:  confidencePct,
-		Binding:        resolveIntakeBinding(db, factory, source),
+		Binding:        binding,
+		Agent:          resolveIntakeAgent(db, factory),
 	})
 	if err != nil {
 		return nil, err
@@ -89,6 +122,12 @@ func CreateFactoryIntake(
 		// linger as an unexplained factory app. Retire it.
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	// An intake works without a first batch, so a source that cannot be read
+	// now costs the head start and nothing more.
+	if err := seedIntake(ctx, deps, db, canvasID, source, binding); err != nil {
+		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, err)
 	}
 
 	intake, err = factory.FindIntake(db, intake.ID)
@@ -114,6 +153,7 @@ type intakeCanvasRequest struct {
 	Name           string
 	ConfidencePct  int
 	Binding        *intakeBinding
+	Agent          *intakeAgent
 }
 
 // createIntakeCanvas builds the intake graph and commits it as the canvas's
@@ -125,7 +165,7 @@ func createIntakeCanvas(
 	request intakeCanvasRequest,
 ) (uuid.UUID, error) {
 	orgID := request.OrganizationID
-	canvasDoc, err := buildIntakeCanvas(request.Source, request.Name, request.ConfidencePct, request.Binding)
+	canvasDoc, err := buildIntakeCanvas(request)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}

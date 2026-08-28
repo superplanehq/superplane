@@ -37,7 +37,7 @@ describe("buildStyledCanvasEdges factory run routing", () => {
       nodes,
       isVerticalFlow: true,
       resolvedThemeIsDark: false,
-      edgeDefaults: { type: "custom", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
+      edgeDefaults: { type: "custom", style: { stroke: "#94a3b8", strokeWidth: 2 } },
       hoveredEdgeId: null,
       isEditMode: false,
       isReadOnly: false,

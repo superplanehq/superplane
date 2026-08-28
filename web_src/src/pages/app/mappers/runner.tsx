@@ -1,8 +1,10 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
 import { getColorClass } from "@/lib/colors";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
 import { getTriggerRenderer } from ".";
 
@@ -212,6 +214,18 @@ export const runnerMapper: ComponentBaseMapper = {
     details["Status"] = stringOrDash(payload.status);
     details["Exit code"] = stringOrDash(payload.exit_code);
     return details;
+  },
+};
+
+export const claudeCodeMapper: ComponentBaseMapper = {
+  ...runnerMapper,
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const props = runnerMapper.props(context);
+    const steps = agentRunnerStepTitles(context.node.configuration);
+    return {
+      ...props,
+      factoryBody: steps.length > 0 ? <FactoryNodeStepList steps={steps} /> : undefined,
+    };
   },
 };
 

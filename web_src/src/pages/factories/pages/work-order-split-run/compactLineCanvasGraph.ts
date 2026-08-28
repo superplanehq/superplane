@@ -1,7 +1,8 @@
 import type { Edge, Node } from "@xyflow/react";
 
 import type { ComponentsEdge, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { FACTORY_NODE_CARD_HEIGHT, FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
+import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { factoryEdgePalette, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { layoutFactoryRunLeafGraph } from "@/lib/layout/factoryRunLeafLayout";
 import { buildStyledCanvasEdges } from "@/ui/CanvasPage/factoryCanvasEdgeStyle";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
@@ -12,14 +13,17 @@ export type LineNodeData = {
   title: string;
   subtitle: string;
   iconSlug: string;
+  iconSrc?: string;
   status: FactoryNodeStatus;
   metrics: string;
   nodeId: string;
   isSelected: boolean;
   onSelect?: (id: string) => void;
+  editHref?: string;
   isSideSource: boolean;
   isSpineSource: boolean;
   isSideTarget: boolean;
+  steps: string[];
 } & Record<string, unknown>;
 
 function origin(nodes: ComponentsNode[]): { x: number; y: number } {
@@ -44,12 +48,15 @@ export function compactLineCanvasGraph(
   selectedId: string | null,
   onSelect: ((id: string) => void) | undefined,
   resolvedThemeIsDark: boolean,
+  nodeEditHref?: (nodeId: string) => string,
 ): { nodes: Node<LineNodeData>[]; edges: Edge[] } {
   const zero = origin(canvas.nodes);
   const rawNodes: Node<LineNodeData>[] = canvas.nodes
     .filter((node): node is ComponentsNode & { id: string } => Boolean(node.id))
     .map((node) => {
       const presentation = componentPresentation(node.component);
+      const steps = node.component === "runnerClaudeCode" ? agentRunnerStepTitles(node.configuration) : [];
+      const size = factoryNodeCardSize(steps.length);
       return {
         id: node.id,
         type: "lineCanvas",
@@ -61,25 +68,28 @@ export function compactLineCanvasGraph(
           title: presentation.title,
           subtitle: node.name ?? presentation.title,
           iconSlug: presentation.iconSlug,
+          iconSrc: presentation.iconSrc,
           status: canvas.statuses[node.id] ?? "pending",
           metrics: canvas.metrics[node.id] ?? "—",
           nodeId: node.id,
           isSelected: node.id === selectedId,
           onSelect,
+          editHref: node.id === selectedId ? nodeEditHref?.(node.id) : undefined,
           isSideSource: false,
           isSpineSource: false,
           isSideTarget: false,
+          steps,
         },
         selected: node.id === selectedId,
         draggable: false,
-        width: FACTORY_NODE_CARD_WIDTH,
-        height: FACTORY_NODE_CARD_HEIGHT,
+        width: size.width,
+        height: size.height,
       };
     });
 
   const rawEdges = canvas.edges.map((edge, index) => toFlowEdge(edge, index));
   const layout = layoutFactoryRunLeafGraph(
-    rawNodes.map((node) => ({ id: node.id, position: node.position })),
+    rawNodes.map((node) => ({ id: node.id, position: node.position, width: node.width, height: node.height })),
     rawEdges.map((edge) => ({
       id: edge.id,
       source: edge.source,
@@ -105,7 +115,7 @@ export function compactLineCanvasGraph(
       nodes,
       isVerticalFlow: true,
       resolvedThemeIsDark,
-      edgeDefaults: { type: "custom", style: { stroke: "#cbd5e1", strokeWidth: 1.5 } },
+      edgeDefaults: { type: "custom", style: factoryEdgePalette(resolvedThemeIsDark).default },
       hoveredEdgeId: null,
       isEditMode: false,
       isReadOnly: true,

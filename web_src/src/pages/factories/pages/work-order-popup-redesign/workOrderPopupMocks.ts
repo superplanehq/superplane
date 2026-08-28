@@ -1,4 +1,5 @@
 import type {
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderExecution,
@@ -7,7 +8,10 @@ import type {
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
-import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import {
+  OPEN_WORK_ORDER_ARTIFACTS,
+  OPEN_WORK_ORDER_PULL_REQUESTS,
+} from "../../__fixtures__/factoryPageFixtureVariants";
 import {
   HOUR_AGO,
   OPEN_WORK_ORDER,
@@ -34,6 +38,7 @@ export interface PopupLogEntry {
   duration: string;
   state: PopupLogState;
   artifactId?: string;
+  pullRequestId?: string;
 }
 
 export interface PopupFixture {
@@ -45,6 +50,7 @@ export interface PopupFixture {
   tokensLabel: string;
   description: FactoriesWorkOrderArtifact;
   outputs: FactoriesWorkOrderArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   checks: WorkOrderCheckPresentation[];
   waitingNotes: WorkOrderStatusNotePresentation[];
   log: PopupLogEntry[];
@@ -76,6 +82,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
   tokensLabel: "86k tokens",
   description: DESCRIPTION_ARTIFACT,
   outputs: OPEN_WORK_ORDER_ARTIFACTS,
+  pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
   checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence"),
   waitingNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
   log: [
@@ -89,7 +96,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
     },
     {
       id: "plan",
-      actor: "Plan",
+      actor: "Create plan",
       title: "Write investigation notes",
       duration: "1m 12s",
       state: "passed",
@@ -108,7 +115,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
       title: "Open PR #482",
       duration: "5s",
       state: "passed",
-      artifactId: "art-pr-1",
+      pullRequestId: "art-pr-1",
     },
     {
       id: "done",
@@ -143,7 +150,7 @@ export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
     },
     {
       id: "plan",
-      actor: "Plan",
+      actor: "Create plan",
       title: "Write test plan",
       duration: "1m 48s",
       state: "passed",
@@ -164,6 +171,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   }
 
   const artifacts = [fixture.description, ...fixture.outputs];
+  const pullRequests = fixture.pullRequests ?? [];
   let cursor = Date.parse(HOUR_AGO);
   const steps: WorkOrderTimelineStep[] = fixture.log.map((entry) => {
     const startedAt = new Date(cursor).toISOString();
@@ -172,6 +180,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
     cursor += durationMs ?? 60_000;
     const execution = logExecution(entry.state);
     const artifact = entry.artifactId ? artifacts.find((item) => item.id === entry.artifactId) : undefined;
+    const pullRequest = entry.pullRequestId ? pullRequests.find((item) => item.id === entry.pullRequestId) : undefined;
 
     return {
       id: entry.id,
@@ -188,6 +197,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
             },
           ]
         : undefined,
+      pullRequests: pullRequest ? [pullRequest] : undefined,
       comments: entry.title !== entry.actor ? [{ body: entry.title }] : undefined,
       execution: {
         id: entry.id,
@@ -211,19 +221,8 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   };
 }
 
-const PHASE_NAMES = ["Plan", "Implement", "Verify", "Done"] as const;
+const PHASE_NAMES = ["Implement", "Verify", "Done"] as const;
 const PR_CLOSURE_APP_NAME = "PR Closure";
-
-export const PR_CLOSURE_PR_ARTIFACT: FactoriesWorkOrderArtifact = {
-  id: "art-pr-closure",
-  type: "TYPE_PR",
-  data: {
-    url: "https://github.com/example/ledger/pull/510",
-    title: "Send refund receipts after provider confirm",
-    number: 510,
-    state: "merged",
-  },
-};
 
 function descriptionArtifactForOrder(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
   return {
@@ -256,7 +255,7 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
   const displayStatus = getWorkOrderDisplayStatus(order);
   const executions = latestDispatchExecutions(order);
   const current = pickCurrentExecution(executions);
-  const inVerify = current?.stepIndex === 2;
+  const inVerify = (current?.step ?? "").toLowerCase().includes("verify");
   const base = displayStatus === "running" ? AGENT_WORK_POPUP_RUNNING : AGENT_WORK_POPUP;
 
   return {
@@ -267,7 +266,7 @@ export function popupFixtureForWorkOrder(order?: FactoriesWorkOrder): PopupFixtu
       ? presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS).filter((check) => check.id !== "check-confidence")
       : [],
     description: descriptionArtifactForOrder(order),
-    outputs: executions.some(isPrClosureRun) ? [PR_CLOSURE_PR_ARTIFACT] : [],
+    outputs: [],
     log: [backlogLogEntry(order), ...executions.map((execution) => executionToLogEntry(order, execution))],
     elapsed: displayStatus === "draft" ? "Not started" : base.elapsed,
     owner: workOrderOwnerDisplay(order, base.owner),
@@ -317,16 +316,16 @@ function doneLogTitle(order: FactoriesWorkOrder, execution: FactoriesWorkOrderEx
 
 function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): PopupLogEntry {
   const stepIndex = execution.stepIndex ?? 0;
-  const actor = PHASE_NAMES[stepIndex] ?? execution.step ?? "Step";
+  const actor = execution.step?.trim() || PHASE_NAMES[stepIndex] || "Step";
   const state = logStateForExecution(execution);
-  const isDone = stepIndex === 3;
+  const isDone = stepIndex === 2 || (execution.step ?? "").toLowerCase().includes("done");
   return {
     id: execution.id ?? actor,
     actor,
     title: isDone ? doneLogTitle(order, execution) : (execution.step ?? actor),
     duration: state === "running" ? "4m so far" : "1m 12s",
     state,
-    artifactId: isDone && isPrClosureRun(execution) ? PR_CLOSURE_PR_ARTIFACT.id : undefined,
+    artifactId: undefined,
   };
 }
 

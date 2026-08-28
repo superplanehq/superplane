@@ -1,19 +1,28 @@
 import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+
+const NO_ORDERS: ReadonlySet<string> = new Set();
 
 /** Shared mutation state and callbacks for every surface that renders work order cards. */
 export function useWorkOrderCardActions(organizationId: string, factoryId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  // The mutation is shared by every card on the page, so its pending flag
+  // cannot say which card the user clicked. Track the work orders in flight
+  // instead, so only their controls show a busy state.
+  const [dispatchingOrderIds, setDispatchingOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
 
   const onDispatch = useCallback(
     async (orderId: string, input: { lineName: string }) => {
+      setDispatchingOrderIds((current) => withOrderId(current, orderId));
       try {
         await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName });
         showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {
         showErrorToast("Failed to dispatch work order.");
+      } finally {
+        setDispatchingOrderIds((current) => withoutOrderId(current, orderId));
       }
     },
     [dispatchWorkOrder],
@@ -32,9 +41,24 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
   );
 
   return {
-    isDispatching: dispatchWorkOrder.isPending,
+    dispatchingOrderIds,
     isAssigneesSaving: updateAssignees.isPending,
     onDispatch,
     onAssigneesSave,
   };
+}
+
+function withOrderId(orderIds: ReadonlySet<string>, orderId: string): ReadonlySet<string> {
+  const next = new Set(orderIds);
+  next.add(orderId);
+  return next;
+}
+
+function withoutOrderId(orderIds: ReadonlySet<string>, orderId: string): ReadonlySet<string> {
+  if (!orderIds.has(orderId)) {
+    return orderIds;
+  }
+  const next = new Set(orderIds);
+  next.delete(orderId);
+  return next;
 }

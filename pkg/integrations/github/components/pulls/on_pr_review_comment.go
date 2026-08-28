@@ -35,7 +35,10 @@ func (p *OnPRReviewComment) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Content Filter**: Optional regex pattern to filter comment/review body (e.g., ` + "`/solve`" + `)
+- **Content Filter**: Optional filter on comment/review body. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Include Review Submissions**: Also start a run when a pull request review is submitted
+- **Comment Scope**: All comments, or replies only
+- **Ignore Bots**: Skip comments and reviews written by GitHub Apps and bots
 
 ## Event Data
 
@@ -82,13 +85,24 @@ func (p *OnPRReviewComment) Color() string {
 }
 
 func (p *OnPRReviewComment) Configuration() []configuration.Field {
-	return prCommentConfigurationFields()
+	return prReviewCommentConfigurationFields()
 }
 
 func (p *OnPRReviewComment) Setup(ctx core.TriggerContext) error {
-	return setupPRCommentTrigger(ctx, common.WebhookConfiguration{
+	config, err := decodePRCommentConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	webhookConfig := common.WebhookConfiguration{
 		EventTypes: []string{"pull_request_review_comment", "pull_request_review"},
-	})
+	}
+	if !config.includeReviewSubmissions() {
+		webhookConfig.EventTypes = nil
+		webhookConfig.EventType = "pull_request_review_comment"
+	}
+
+	return setupPRCommentTrigger(ctx, webhookConfig)
 }
 
 func (p *OnPRReviewComment) Hooks() []core.Hook {
@@ -129,6 +143,23 @@ func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 	if !isExpectedPRCommentAction(eventType, data) {
 		action, _ := common.ExtractAction(data)
 		ctx.Logger.Infof("Ignoring event - action %q is not supported", action)
+		return http.StatusOK, nil, nil
+	}
+
+	if eventType == "pull_request_review" && !config.includeReviewSubmissions() {
+		ctx.Logger.Info("Ignoring event - review submissions are disabled")
+		return http.StatusOK, nil, nil
+	}
+
+	if eventType == "pull_request_review_comment" &&
+		config.commentScope() == prCommentScopeReplies &&
+		!isReviewReply(data) {
+		ctx.Logger.Info("Ignoring event - comment is not a reply")
+		return http.StatusOK, nil, nil
+	}
+
+	if config.IgnoreBots && isBotAuthor(eventType, data) {
+		ctx.Logger.Info("Ignoring event - author is a bot")
 		return http.StatusOK, nil, nil
 	}
 

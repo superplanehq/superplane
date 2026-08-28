@@ -13,6 +13,10 @@ export function isCapabilityBasedIntegrationDefinition(integration: Integrations
   return integration.legacySetupOnly === false;
 }
 
+export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationDefinition): boolean {
+  return definition?.name === "github" && definition.hostedAppInstall === true;
+}
+
 export function openRedirectPrompt(step: IntegrationSetupStepDefinition | null) {
   const redirectPrompt = step?.redirectPrompt;
   if (!redirectPrompt?.url) {

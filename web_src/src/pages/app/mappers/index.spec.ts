@@ -137,7 +137,11 @@ describe("getExecutionDetails", () => {
         isCollapsed: false,
         configuration: {
           machineType: "e1-large-amd64",
-          prompt: "Fix the failing tests",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Write implementation plan", type: "prompt" },
+            { name: "Use plan as output", type: "bash" },
+          ],
         },
         metadata: {},
       },
@@ -156,6 +160,7 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.customField).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 

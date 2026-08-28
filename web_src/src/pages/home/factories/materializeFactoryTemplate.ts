@@ -35,6 +35,7 @@ export function substituteInstallParams(content: string, params: Record<string, 
 }
 
 type YamlNode = {
+  id?: string;
   component?: string;
   integration?: { id?: string; name?: string };
   configuration?: Record<string, unknown>;
@@ -107,10 +108,17 @@ export function wireFactoryIntegrations(
 }
 
 const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
+const PLANNING_AGENT_NODE_ID = "planner-agent-no-issue";
 
 export type FactoryAgentRewrite = {
   component: string;
   model: string;
+  /**
+   * Model for the planning agent, which weighs evidence rather than writes
+   * code. Hosted runs reject a model that is not on the allowlist, so the
+   * caller resolves this against the same list as `model`.
+   */
+  planningModel?: string;
   credentials: { source: "hosted" } | { source: "integration"; name: string };
 };
 
@@ -128,8 +136,15 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
         integration: { name: rewrite.credentials.name },
       };
     }
-    configuration.model = rewrite.model;
+    configuration.model = planningAgentModel(node.id, rewrite);
   }
+}
+
+function planningAgentModel(nodeId: string | undefined, rewrite: FactoryAgentRewrite): string {
+  if (nodeId === PLANNING_AGENT_NODE_ID) {
+    return rewrite.planningModel || rewrite.model;
+  }
+  return rewrite.model;
 }
 
 export function materializeFactoryCanvas(args: {

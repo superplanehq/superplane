@@ -1,12 +1,32 @@
+import type { FactoriesFactory } from "@/api-client";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { factoryHomePath, factorySetupPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
+import {
+  factoryIntakePath,
+  factoryOverviewPath,
+  factorySetupPath,
+  firstFactoryLineId,
+} from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 function isWorkspaceSetupRoute(pathname: string) {
   return pathname.endsWith("/setup") || pathname.endsWith("/onboarding");
+}
+
+/**
+ * Where a finished workspace goes when it leaves setup: the line board with
+ * the Intake drawer open, the same place the Finish action opens. Finish and
+ * this redirect run in the same tick, so a different target here would drop
+ * the drawer whenever this redirect lands last.
+ */
+function pathAfterSetup(organizationId: string, factoryKey: string, factory: FactoriesFactory | null) {
+  const lineId = firstFactoryLineId(factory);
+  if (!lineId) {
+    return factoryOverviewPath(organizationId, factoryKey);
+  }
+  return factoryIntakePath(organizationId, factoryKey, lineId);
 }
 
 /**
@@ -24,7 +44,7 @@ export function OnboardingGate() {
 
   if (!isIncomplete) {
     if (isSetupRoute) {
-      return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
+      return <Navigate to={pathAfterSetup(organizationId, factoryKey, factory)} replace />;
     }
     return <Outlet />;
   }

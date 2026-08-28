@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -49,6 +50,10 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 		}
 
 		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
+		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name())
+		if hostedAppInstall {
+			useNewFlow = false
+		}
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),
@@ -59,6 +64,7 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
 			LegacySetupOnly:  !useNewFlow,
+			HostedAppInstall: hostedAppInstall,
 		}
 	}
 	return out

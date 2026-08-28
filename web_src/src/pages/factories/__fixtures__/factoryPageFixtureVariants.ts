@@ -1,9 +1,10 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import {
   CLOSED_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   HOUR_AGO,
+  OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   REFUND_FACTORY_LINES,
   REVIEWER_USER,
@@ -11,18 +12,18 @@ import {
   type FactoriesFixture,
 } from "./factoryPageResponses";
 
-export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
+export const OPEN_WORK_ORDER_PULL_REQUESTS: FactoriesFactoryPullRequest[] = [
   {
     id: "art-pr-1",
-    type: "TYPE_PR",
-    data: {
-      url: "https://github.com/example/ledger/pull/482",
-      title: "Fix duplicate refund on retry",
-      number: 482,
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
+    workOrderId: OPEN_WORK_ORDER.id,
+    number: "482",
+    url: "https://github.com/example/ledger/pull/482",
+    title: "Fix duplicate refund on retry",
+    state: "STATE_OPEN",
   },
+];
+
+export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
   {
     id: "art-md-1",
     type: "TYPE_MARKDOWN",
@@ -81,7 +82,7 @@ export const fiveStepLineFactoriesFixture: FactoriesFixture = {
           steps: [
             ...(line.steps ?? []),
             { name: "release", type: "runApp", app: { app: "app-refund-verifier", entrypoint: "start-verification" } },
-            { name: "observe", type: "runApp", app: { app: "app-refund-planner", entrypoint: "start-plan" } },
+            { name: "observe", type: "runApp", app: { app: "app-refund-implementer", entrypoint: "start-observe" } },
           ],
         };
       }),

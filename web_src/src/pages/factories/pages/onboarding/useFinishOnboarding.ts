@@ -9,17 +9,18 @@ import { factoryIntakePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import {
-  DEFAULT_LINE_NAME,
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionPRFeedbackHandler,
   type CreateFactoryIntake,
+  type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
   type ListFactoryIntakes,
+  type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
-import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -28,8 +29,6 @@ export function finishOnboardingError(args: {
   appRepository: string | null;
   backlogRepository: string | null;
   workspaceName: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
   githubReady: boolean;
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -46,9 +45,6 @@ export function finishOnboardingError(args: {
   if (agentError) return agentError;
   if (!args.workspaceName) {
     return "Enter a workspace name.";
-  }
-  if (!args.workOrderTitle || !args.workOrderDescription) {
-    return "Enter a work order title and description.";
   }
   return null;
 }
@@ -84,17 +80,12 @@ async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   workspaceName: string;
   takenNames: string[];
   appRepository: string;
   backlogRepository: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
   github: { id: string };
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
@@ -140,17 +131,15 @@ async function provisionWorkspace(args: {
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
   });
+  await provisionPRFeedbackHandler({
+    listHandlers: args.listPRFeedbackHandlers,
+    createHandler: args.createPRFeedbackHandler,
+    repository: args.appRepository,
+  });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
     complete: true,
-  });
-  await createAndDispatchInitialWorkOrder({
-    title: args.workOrderTitle,
-    description: args.workOrderDescription,
-    lineName: DEFAULT_LINE_NAME,
-    createWorkOrder: args.createWorkOrder,
-    dispatchWorkOrder: args.dispatchWorkOrder,
   });
   return { lineId, githubIntakeId: githubIntake.id ?? undefined };
 }
@@ -169,11 +158,8 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -184,15 +170,11 @@ export function useFinishOnboarding(args: {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
-    const workOrderTitle = args.setup.workOrderTitle.trim();
-    const workOrderDescription = args.setup.workOrderDescription.trim();
     const github = args.selections.github;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
       workspaceName,
-      workOrderTitle,
-      workOrderDescription,
       githubReady: Boolean(github?.ready),
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
@@ -213,8 +195,6 @@ export function useFinishOnboarding(args: {
         workspaceName,
         appRepository,
         backlogRepository,
-        workOrderTitle,
-        workOrderDescription,
         github,
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),

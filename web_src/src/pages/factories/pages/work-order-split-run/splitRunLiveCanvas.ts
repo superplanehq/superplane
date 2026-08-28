@@ -2,18 +2,23 @@ import type {
   CanvasesCanvas,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasRun,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrderArtifact,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
+import { formatCheckScore, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import {
   canvasKeyForAutomation,
   canvasKeyForPhase,
   componentPresentation,
+  componentTypeLabel,
   emptySplitRunCanvas,
   richStreamForCanvas,
   splitRunCanvasForPhase,
+  streamKindForNode,
   type SplitRunCanvasModel,
 } from "./splitRunCanvases";
 import { clockLabel } from "./splitRunFormat";
@@ -276,6 +281,13 @@ function streamLineForNode(
     componentName: node.name ?? presentation.title,
     status: streamStatusFromNode(status),
     duration: duration === "—" ? undefined : duration,
+    kind: streamKindForNode(node),
+    componentType: componentTypeLabel(node.component),
+    action: liveStreamAction(status, Boolean(execution)),
+    iconSlug: presentation.iconSlug,
+    iconSrc: presentation.iconSrc,
+    component: node.component,
+    executionId: execution?.id,
   };
 }
 
@@ -334,23 +346,320 @@ export function streamFromLiveRun(
   return lines;
 }
 
+function liveCanvasMatchesLineAutomation(line: SplitRunCanvasModel, live: SplitRunCanvasModel): boolean {
+  const liveIds = new Set(live.nodes.map((node) => node.id).filter((id): id is string => Boolean(id)));
+  const lineIds = line.nodes.map((node) => node.id).filter((id): id is string => Boolean(id));
+  if (lineIds.length === 0) {
+    return false;
+  }
+  const overlap = lineIds.filter((id) => liveIds.has(id)).length;
+  return overlap >= Math.ceil(lineIds.length / 2);
+}
+
 export function resolveSplitRunVisual(
   phase: SplitRunPhase,
   live: { enabled: boolean; isError?: boolean; canvas?: SplitRunCanvasModel; stream: SplitRunStreamLine[] },
+  options?: { demoArtifacts?: boolean },
 ): { canvas: SplitRunCanvasModel; stream: SplitRunStreamLine[] | undefined } {
+  const demoArtifacts = options?.demoArtifacts !== false;
+  const lineCanvas = splitRunCanvasForPhase(phase);
+  const lineStream = attachPhaseChecks(
+    attachPhasePullRequests(
+      attachPhaseArtifacts(
+        richStreamForCanvas(lineCanvas, descriptionArtifactFromPhase(phase), { demoArtifacts }),
+        demoArtifacts ? phase.artifacts : [],
+      ),
+      demoArtifacts ? pullRequestsFromPhase(phase) : [],
+    ),
+    phase.checks ?? [],
+  );
+  if (phase.canvasKey === null || lineCanvas.nodes.length === 0) {
+    return { canvas: lineCanvas, stream: phase.stream };
+  }
   if (live.isError) {
     return { canvas: emptySplitRunCanvas(phase), stream: [] };
   }
-  if (live.enabled) {
+  if (live.canvas && (!demoArtifacts || liveCanvasMatchesLineAutomation(lineCanvas, live.canvas))) {
     return {
-      canvas: live.canvas ?? emptySplitRunCanvas(phase),
-      stream: live.stream.length > 0 ? live.stream : phase.stream,
+      canvas: live.canvas,
+      stream:
+        live.stream.length > 0
+          ? demoArtifacts
+            ? attachMissingStreamChildren(live.stream, lineStream)
+            : live.stream
+          : lineStream,
     };
   }
-  const canvas = splitRunCanvasForPhase(phase);
-  return { canvas, stream: richStreamForCanvas(canvas) };
+  return { canvas: lineCanvas, stream: lineStream };
+}
+
+function attachPhaseArtifacts(
+  stream: SplitRunStreamLine[],
+  artifacts: FactoriesWorkOrderArtifact[],
+): SplitRunStreamLine[] {
+  if (artifacts.length === 0) {
+    return stream;
+  }
+  const queued = queueArtifactsByKind(artifacts);
+  const next = stream.map((line) => {
+    if (!line.artifact) {
+      return line;
+    }
+    const replacement = takeArtifactOfKind(queued, artifactKind(line.artifact));
+    return replacement ? { ...line, artifact: replacement } : line;
+  });
+  const pending = [...queued.values()].flat();
+  if (pending.length === 0) {
+    return next;
+  }
+
+  const hostIndex = hostIndexForArtifacts(next, pending);
+  if (hostIndex < 0) {
+    return next;
+  }
+
+  const host = next[hostIndex]!;
+  let insertAt = hostIndex + 1;
+  for (const [index, artifact] of pending.entries()) {
+    if (index === 0 && !host.artifact) {
+      next[hostIndex] = { ...host, artifact };
+      continue;
+    }
+    next.splice(insertAt, 0, {
+      id: `${host.id}-artifact-${artifact.id ?? insertAt}`,
+      nodeId: host.nodeId,
+      at: host.at,
+      componentName: artifactLabel(artifact),
+      status: host.status,
+      artifact,
+      note: true,
+    });
+    insertAt += 1;
+  }
+  return next;
+}
+
+function pullRequestsFromPhase(phase: SplitRunPhase): FactoriesFactoryPullRequest[] {
+  const seen = new Set<string>();
+  const pullRequests: FactoriesFactoryPullRequest[] = [];
+  for (const line of phase.stream) {
+    const pullRequest = line.pullRequest;
+    if (!pullRequest) {
+      continue;
+    }
+    const key = pullRequest.id ?? pullRequest.url ?? String(pullRequest.number ?? "");
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    pullRequests.push(pullRequest);
+  }
+  return pullRequests;
+}
+
+function attachPhasePullRequests(
+  stream: SplitRunStreamLine[],
+  pullRequests: FactoriesFactoryPullRequest[],
+): SplitRunStreamLine[] {
+  if (pullRequests.length === 0) {
+    return stream;
+  }
+  const queued = [...pullRequests];
+  const next = stream.map((line) => {
+    if (!line.pullRequest || queued.length === 0) {
+      return line;
+    }
+    return { ...line, pullRequest: queued.shift() };
+  });
+  if (queued.length === 0) {
+    return next;
+  }
+
+  const hostIndex = hostIndexForPullRequests(next);
+  if (hostIndex < 0) {
+    return next;
+  }
+
+  const host = next[hostIndex]!;
+  let insertAt = hostIndex + 1;
+  for (const [index, pullRequest] of queued.entries()) {
+    if (index === 0 && !host.pullRequest) {
+      next[hostIndex] = { ...host, pullRequest };
+      continue;
+    }
+    next.splice(insertAt, 0, {
+      id: `${host.id}-pull-request-${pullRequest.id ?? insertAt}`,
+      nodeId: host.nodeId,
+      at: host.at,
+      componentName: pullRequest.title ?? `#${pullRequest.number ?? ""}`,
+      status: host.status,
+      pullRequest,
+      note: true,
+    });
+    insertAt += 1;
+  }
+  return next;
+}
+
+function hostIndexForPullRequests(stream: SplitRunStreamLine[]): number {
+  const attachIndex = stream.findIndex((line) => line.nodeId === "attach-pr-artifact");
+  if (attachIndex >= 0) {
+    return attachIndex;
+  }
+  const branchIndex = stream.findIndex(
+    (line) =>
+      line.nodeId === "add-branch-artifact" || (line.artifact != null && artifactKind(line.artifact) === "branch"),
+  );
+  if (branchIndex >= 0) {
+    return branchIndex;
+  }
+  return stream.findIndex((line) => line.kind === "trigger");
+}
+
+function artifactKind(artifact: FactoriesWorkOrderArtifact): string {
+  return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase();
+}
+
+function queueArtifactsByKind(artifacts: FactoriesWorkOrderArtifact[]): Map<string, FactoriesWorkOrderArtifact[]> {
+  const queued = new Map<string, FactoriesWorkOrderArtifact[]>();
+  for (const artifact of artifacts) {
+    const kind = artifactKind(artifact);
+    const list = queued.get(kind) ?? [];
+    list.push(artifact);
+    queued.set(kind, list);
+  }
+  return queued;
+}
+
+function takeArtifactOfKind(
+  queued: Map<string, FactoriesWorkOrderArtifact[]>,
+  kind: string,
+): FactoriesWorkOrderArtifact | undefined {
+  const list = queued.get(kind);
+  if (!list || list.length === 0) {
+    return undefined;
+  }
+  const artifact = list.shift();
+  if (list.length === 0) {
+    queued.delete(kind);
+  }
+  return artifact;
+}
+
+function attachPhaseChecks(stream: SplitRunStreamLine[], checks: WorkOrderCheckPresentation[]): SplitRunStreamLine[] {
+  const check = checks[0];
+  if (!check) {
+    return stream;
+  }
+  const { value, scale } = formatCheckScore(check);
+  const action = `${value}${scale}`;
+  return stream.map((line) => (line.kind === "check" || line.nodeId === "ticket-score" ? { ...line, action } : line));
+}
+
+function hostIndexForArtifacts(stream: SplitRunStreamLine[], artifacts: FactoriesWorkOrderArtifact[]): number {
+  const names = artifacts.map(artifactName);
+  if (names.includes("plan.md")) {
+    const planIndex = stream.findIndex((line) => line.nodeId === "ticket-plan" || line.componentName === "Create plan");
+    if (planIndex >= 0) {
+      return planIndex;
+    }
+  }
+  const branchIndex = stream.findIndex(
+    (line) =>
+      line.nodeId === "add-branch-artifact" || (line.artifact != null && artifactKind(line.artifact) === "branch"),
+  );
+  if (branchIndex >= 0 && artifacts.some((artifact) => artifactKind(artifact) === "pr")) {
+    return branchIndex;
+  }
+  return stream.findIndex((line) => line.kind === "trigger");
+}
+
+function artifactName(artifact: FactoriesWorkOrderArtifact): string | undefined {
+  const data = artifact.data;
+  if (data && "name" in data && typeof data.name === "string") {
+    return data.name;
+  }
+  return undefined;
+}
+
+function artifactLabel(artifact: FactoriesWorkOrderArtifact): string {
+  const data = artifact.data;
+  if (data && "title" in data && typeof data.title === "string" && data.title) {
+    return data.title;
+  }
+  if (data && "name" in data && typeof data.name === "string" && data.name) {
+    return data.name;
+  }
+  return artifact.type ?? "Artifact";
+}
+
+function attachMissingStreamChildren(stream: SplitRunStreamLine[], source: SplitRunStreamLine[]): SplitRunStreamLine[] {
+  const artifacts = new Map<string, NonNullable<SplitRunStreamLine["artifact"]>>();
+  const notes = new Map<string, SplitRunStreamLine[]>();
+  for (const line of source) {
+    if (line.nodeId && line.artifact) {
+      artifacts.set(line.nodeId, line.artifact);
+    }
+    if (line.note && line.nodeId) {
+      const current = notes.get(line.nodeId) ?? [];
+      current.push(line);
+      notes.set(line.nodeId, current);
+    }
+  }
+  const withArtifacts = stream.map((line) => {
+    if (line.artifact || !line.nodeId) {
+      return line;
+    }
+    const artifact = artifacts.get(line.nodeId);
+    return artifact ? { ...line, artifact } : line;
+  });
+  const result: SplitRunStreamLine[] = [];
+  const seenNotes = new Set<string>();
+  for (const line of withArtifacts) {
+    result.push(line);
+    if (line.note && line.nodeId) {
+      seenNotes.add(line.nodeId);
+      continue;
+    }
+    if (!line.nodeId || seenNotes.has(line.nodeId)) {
+      continue;
+    }
+    const missing = notes.get(line.nodeId);
+    if (!missing?.length) {
+      continue;
+    }
+    seenNotes.add(line.nodeId);
+    result.push(...missing);
+  }
+  return result;
 }
 
 export function liveCanvasKeyForPhase(phase: SplitRunPhase): SplitRunCanvasModel["key"] {
   return canvasKeyForAutomation({ id: phase.appId, name: phase.componentName }) ?? canvasKeyForPhase(phase);
+}
+
+function descriptionArtifactFromPhase(phase: SplitRunPhase) {
+  return phase.artifacts.find((artifact) => {
+    const data = artifact.data;
+    return Boolean(data && "name" in data && data.name === "description.md");
+  });
+}
+
+function liveStreamAction(status: FactoryNodeStatus, hasExecution: boolean): string {
+  if (!hasExecution) {
+    return "did not run";
+  }
+  if (status === "running" || status === "cancelling") {
+    return "running";
+  }
+  if (status === "failed" || status === "error") {
+    return "failed";
+  }
+  if (status === "triggered") {
+    return "triggered";
+  }
+  if (status === "passed") {
+    return "passed";
+  }
+  return "—";
 }

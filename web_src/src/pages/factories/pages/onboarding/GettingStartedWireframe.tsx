@@ -4,7 +4,7 @@ import { Check } from "lucide-react";
 import { Link } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { linesPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
@@ -12,7 +12,7 @@ import { useOnboardingStorybook } from "./useOnboardingStorybook";
  * Shown on overview when tips are active for the current workspace.
  */
 export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void }) {
-  const { organizationId, factoryKey, openCreateWorkOrder } = useFactoriesLayout();
+  const { organizationId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
@@ -82,14 +82,14 @@ export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void 
               Each work order runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={linesPath(organizationId, factoryKey)}
+              to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))}
               onClick={onDismiss}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",
                 "text-foreground transition-colors hover:bg-accent",
               )}
             >
-              View lines
+              Open board
             </Link>
           </div>
         </div>

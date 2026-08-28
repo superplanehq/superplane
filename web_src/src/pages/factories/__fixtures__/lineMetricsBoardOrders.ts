@@ -13,6 +13,7 @@ import {
   LAST_WEEK,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   OPERATOR_USER,
   REFUND_LINE_FEATURE_ID,
@@ -22,8 +23,44 @@ import {
   STORYBOOK_ME_USER_NAME,
   TWO_HOURS_AGO,
   YESTERDAY,
+  minutesAgo,
 } from "./factoryPageResponses";
+import { INGEST_CREATED_BY, SENTRY_CREATED_BY, SLACK_CREATED_BY } from "./factoryPageWorkOrders";
 import { PLAN_LINE_DONE_APP_ID, planLineActiveDispatch, runAppStep } from "./lineMetricsPlanLine";
+
+export const BOARD_IMPLEMENT_NOTIFY_ORDER: FactoriesWorkOrder = {
+  id: "wo-board-implement-notify",
+  number: "114",
+  key: "RF-114",
+  title: "Notify on status change after a reopen",
+  description: [
+    "A user does not get a status-change notification when a work order is reopened.",
+    "",
+    "Send the same notification that a status change already sends, so the assignee sees the reopen.",
+  ].join("\n"),
+  state: "STATE_OPEN",
+  result: "RESULT_UNSPECIFIED",
+  createdAt: minutesAgo(40),
+  updatedAt: minutesAgo(12),
+  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
+  totalTokens: "4100",
+  totalCostCents: "128",
+  lineDispatches: [
+    planLineActiveDispatch("wo-board-implement-notify", [
+      {
+        id: "exec-notify-implement",
+        step: "Implement",
+        stepIndex: 0,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: minutesAgo(36),
+        updatedAt: minutesAgo(12),
+        run: { id: LINE_RUN_IMPLEMENT_NOTIFY_ID, appId: "app-refund-implementer", appName: "Implementation" },
+      },
+    ]),
+  ],
+};
 
 export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
   id: "wo-board-implement-failed",
@@ -36,7 +73,7 @@ export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
   result: "RESULT_FAILED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   totalTokens: "6400",
   totalCostCents: "210",
@@ -44,24 +81,14 @@ export const BOARD_IMPLEMENT_FAILED_ORDER: FactoriesWorkOrder = {
     {
       ...planLineActiveDispatch("wo-board-implement-failed", [
         {
-          id: "exec-failed-plan",
-          step: "Plan",
-          stepIndex: 0,
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          createdAt: TWO_HOURS_AGO,
-          updatedAt: TWO_HOURS_AGO,
-          run: { id: "run-failed-plan", appId: "app-refund-planner", appName: "Plan" },
-        },
-        {
           id: "exec-failed-implement",
           step: "Implement",
-          stepIndex: 1,
+          stepIndex: 0,
           state: "STATE_FINISHED",
           result: "RESULT_FAILED",
           createdAt: TWO_HOURS_AGO,
           updatedAt: HOUR_AGO,
-          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+          run: { id: LINE_RUN_IMPLEMENT_FAILED_ID, appId: "app-refund-implementer", appName: "Implementation" },
         },
       ]),
       state: "STATE_FINISHED",
@@ -81,6 +108,7 @@ function boardDoneOrder({
   doneResult,
   updatedAt,
   assignee,
+  createdBy = INGEST_CREATED_BY,
 }: {
   id: string;
   number: string;
@@ -92,6 +120,7 @@ function boardDoneOrder({
   doneResult: FactoriesWorkOrderExecution["result"];
   updatedAt: string;
   assignee: { id: string; name: string };
+  createdBy?: FactoriesWorkOrder["createdBy"];
 }): FactoriesWorkOrder {
   return {
     id,
@@ -103,25 +132,15 @@ function boardDoneOrder({
     result,
     createdAt: LAST_WEEK,
     updatedAt,
-    createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+    createdBy,
     assignees: [assignee],
     lineDispatches: [
       {
         ...planLineActiveDispatch(id, [
           {
-            id: `exec-done-plan-${id}`,
-            step: "Plan",
-            stepIndex: 0,
-            state: "STATE_FINISHED",
-            result: "RESULT_PASSED",
-            createdAt: LAST_WEEK,
-            updatedAt: LAST_WEEK,
-            run: { id: `run-done-plan-${id}`, appId: "app-refund-planner", appName: "Plan" },
-          },
-          {
             id: `exec-done-implement-${id}`,
             step: "Implement",
-            stepIndex: 1,
+            stepIndex: 0,
             state: "STATE_FINISHED",
             result: "RESULT_PASSED",
             createdAt: LAST_WEEK,
@@ -131,7 +150,7 @@ function boardDoneOrder({
           {
             id: `exec-done-verify-${id}`,
             step: "Verify",
-            stepIndex: 2,
+            stepIndex: 1,
             state: "STATE_FINISHED",
             result: "RESULT_PASSED",
             createdAt: LAST_WEEK,
@@ -141,7 +160,7 @@ function boardDoneOrder({
           {
             id: `exec-done-${id}`,
             step: "Done",
-            stepIndex: 3,
+            stepIndex: 2,
             state: "STATE_FINISHED",
             result: doneResult,
             createdAt: updatedAt,
@@ -180,6 +199,7 @@ export const BOARD_DONE_COMPLETED_PLAYBOOK: FactoriesWorkOrder = boardDoneOrder(
   doneResult: "RESULT_PASSED",
   updatedAt: YESTERDAY,
   assignee: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+  createdBy: SLACK_CREATED_BY,
 });
 
 export const BOARD_DONE_REJECTED_ORDER: FactoriesWorkOrder = boardDoneOrder({
@@ -213,33 +233,29 @@ export const ONBOARDING_FACTORY_LINE: FactoriesFactoryLine = {
   name: "onboarding",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
-  steps: [runAppStep("app-refund-planner", "start-plan"), runAppStep("app-refund-implementer", "start-implementation")],
+  steps: [runAppStep("app-refund-implementer", "start-implementation")],
 };
 
-const FEATURE_PLAN_STEP = "plan";
 const FEATURE_IMPLEMENT_STEP = "implement";
 const FEATURE_PR_STEP = "pr";
 const FEATURE_CI_STEP = "ci";
 
 const FEATURE_STEP_INDEX: Record<string, number> = {
-  [FEATURE_PLAN_STEP]: 0,
-  [FEATURE_IMPLEMENT_STEP]: 1,
-  [FEATURE_PR_STEP]: 2,
-  [FEATURE_CI_STEP]: 3,
+  [FEATURE_IMPLEMENT_STEP]: 0,
+  [FEATURE_PR_STEP]: 1,
+  [FEATURE_CI_STEP]: 2,
 };
 
 const FEATURE_STEP_LABEL: Record<string, string> = {
-  [FEATURE_PLAN_STEP]: "Refund Planner",
-  [FEATURE_IMPLEMENT_STEP]: "Refund Implementer",
-  [FEATURE_PR_STEP]: "Refund Implementer",
-  [FEATURE_CI_STEP]: "Refund Verifier",
+  [FEATURE_IMPLEMENT_STEP]: "Implementation",
+  [FEATURE_PR_STEP]: "Implementation",
+  [FEATURE_CI_STEP]: "Risk Assessment",
 };
 
 const FEATURE_DELIVERY_STEPS: NonNullable<FactoriesWorkOrderLineDispatch["steps"]> = [
-  { name: FEATURE_STEP_LABEL[FEATURE_PLAN_STEP], stepIndex: 0 },
-  { name: FEATURE_STEP_LABEL[FEATURE_IMPLEMENT_STEP], stepIndex: 1 },
-  { name: FEATURE_STEP_LABEL[FEATURE_PR_STEP], stepIndex: 2 },
-  { name: FEATURE_STEP_LABEL[FEATURE_CI_STEP], stepIndex: 3 },
+  { name: FEATURE_STEP_LABEL[FEATURE_IMPLEMENT_STEP], stepIndex: 0 },
+  { name: FEATURE_STEP_LABEL[FEATURE_PR_STEP], stepIndex: 1 },
+  { name: FEATURE_STEP_LABEL[FEATURE_CI_STEP], stepIndex: 2 },
 ];
 
 export const FEATURE_DELIVERY_LINE: FactoriesFactoryLine = {
@@ -248,7 +264,6 @@ export const FEATURE_DELIVERY_LINE: FactoriesFactoryLine = {
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
   steps: [
-    runAppStep("app-refund-planner", "start-plan"),
     runAppStep("app-refund-implementer", "start-implementation"),
     runAppStep("app-refund-implementer", "start-pull-request"),
     runAppStep("app-refund-verifier", "start-ci-loop"),
@@ -270,7 +285,7 @@ function featureLineExecution(
     run: {
       id: `run-feature-${step}`,
       appId: "app-refund-implementer",
-      appName: "Refund Implementer",
+      appName: "Implementation",
     },
     ...overrides,
   };
@@ -304,21 +319,24 @@ export const FEATURE_RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   number: "201",
   key: "RF-201",
   title: "Ship ledger retry window",
-  description: "Implement the retry window from the plan and open a pull request.",
+  description: "Implement the retry window and open a pull request.",
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
+  createdBy: SLACK_CREATED_BY,
+  origin: {
+    url: "https://acme.slack.com/archives/C0REFUNDS/p1710000000000000",
+    label: "acme#C0REFUNDS",
+  },
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-1" }),
       featureLineExecution(FEATURE_IMPLEMENT_STEP, {
         id: "impl-1",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Refund Implementer" },
+        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
       }),
     ]),
   ],
@@ -329,16 +347,15 @@ export const FEATURE_PR_WORK_ORDER: FactoriesWorkOrder = {
   number: "202",
   key: "RF-202",
   title: "Open refund schema pull request",
-  description: "Plan and implementation passed. Pull request is waiting for review.",
+  description: "Implementation passed. Pull request is waiting for review.",
   state: "STATE_OPEN",
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
+  createdBy: INGEST_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-2" }),
       featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-2" }),
       featureLineExecution(FEATURE_PR_STEP, {
         id: "pr-2",
@@ -359,18 +376,17 @@ export const FEATURE_CI_WORK_ORDER: FactoriesWorkOrder = {
   result: "RESULT_UNSPECIFIED",
   createdAt: YESTERDAY,
   updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
+  createdBy: SENTRY_CREATED_BY,
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
     featureLineDispatch([
-      featureLineExecution(FEATURE_PLAN_STEP, { id: "plan-3" }),
       featureLineExecution(FEATURE_IMPLEMENT_STEP, { id: "impl-3" }),
       featureLineExecution(FEATURE_PR_STEP, { id: "pr-3" }),
       featureLineExecution(FEATURE_CI_STEP, {
         id: "ci-3",
         state: "STATE_STARTED",
         result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Refund Verifier" },
+        run: { id: LINE_RUN_VERIFY_PASSED_ID, appId: "app-refund-verifier", appName: "Risk Assessment" },
       }),
     ]),
   ],

@@ -1,37 +1,42 @@
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { IntegrationsBasePathProvider, organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import { Navigate, NavLink, Outlet, useParams } from "react-router";
-import { factoryDetailPath, factoryListPath, organizationSettingsSectionPath } from "../../lib/factoryPagePaths";
+import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
+import {
+  organizationSettingsBackPath,
+  organizationSettingsSectionPath,
+  type OrganizationSettingsLocationState,
+} from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { ORGANIZATION_SETTINGS_NAV_ITEMS, type OrganizationSettingsNavItem } from "./organizationSettingsNavItems";
 
 export function OrganizationSettingsLayout() {
-  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
 
-  if (!organizationId || !factoryKey) {
+  if (!organizationId) {
     return null;
   }
 
-  return <OrganizationSettingsLayoutContent organizationId={organizationId} factoryKey={factoryKey} />;
+  return (
+    <IntegrationsBasePathProvider basePath={organizationIntegrationsPath(organizationId)}>
+      <OrganizationSettingsLayoutContent organizationId={organizationId} />
+    </IntegrationsBasePathProvider>
+  );
 }
 
-function OrganizationSettingsLayoutContent({
-  organizationId,
-  factoryKey,
-}: {
-  organizationId: string;
-  factoryKey: string;
-}) {
+function OrganizationSettingsLayoutContent({ organizationId }: { organizationId: string }) {
   useFactoriesThemeClass();
+  const location = useLocation();
+  const fromFactoryKey = (location.state as OrganizationSettingsLocationState | null)?.fromFactoryKey;
   const { data: organization, isLoading, error } = useOrganization(organizationId);
   const organizationName = organization?.metadata?.name || "Organization";
 
   usePageTitle([organizationName, "Settings"], { enabled: !organization });
 
   if (!isLoading && error) {
-    return <Navigate to={factoryListPath(organizationId)} replace />;
+    return <Navigate to={organizationSettingsBackPath(organizationId, fromFactoryKey)} replace />;
   }
 
   if (!organization) {
@@ -50,12 +55,13 @@ function OrganizationSettingsLayoutContent({
       >
         <div className="border-b border-sidebar-border px-3 py-3">
           <NavLink
-            to={factoryDetailPath(organizationId, factoryKey)}
+            to={organizationSettingsBackPath(organizationId, fromFactoryKey)}
+            state={location.state}
             className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
             data-testid="organization-settings-back"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
-            Back to workspace
+            {fromFactoryKey ? "Back to workspace" : "Back to workspaces"}
           </NavLink>
           <p
             className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
@@ -66,11 +72,7 @@ function OrganizationSettingsLayoutContent({
           </p>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-4">
-          <SettingsNavGroup
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            items={ORGANIZATION_SETTINGS_NAV_ITEMS}
-          />
+          <SettingsNavGroup organizationId={organizationId} items={ORGANIZATION_SETTINGS_NAV_ITEMS} />
         </nav>
       </aside>
       <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
@@ -80,15 +82,9 @@ function OrganizationSettingsLayoutContent({
   );
 }
 
-function SettingsNavGroup({
-  organizationId,
-  factoryKey,
-  items,
-}: {
-  organizationId: string;
-  factoryKey: string;
-  items: OrganizationSettingsNavItem[];
-}) {
+function SettingsNavGroup({ organizationId, items }: { organizationId: string; items: OrganizationSettingsNavItem[] }) {
+  const location = useLocation();
+
   return (
     <ul className="flex flex-col gap-0.5">
       {items.map((item) => {
@@ -96,7 +92,8 @@ function SettingsNavGroup({
         return (
           <li key={item.id}>
             <NavLink
-              to={organizationSettingsSectionPath(organizationId, factoryKey, item.id)}
+              to={organizationSettingsSectionPath(organizationId, item.id)}
+              state={location.state}
               className={({ isActive }) =>
                 cn(
                   "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",

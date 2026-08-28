@@ -1,9 +1,6 @@
-import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleAlert, CircleCheck, ExternalLink, Hourglass, Loader2, Minus, Play, TriangleAlert } from "lucide-react";
+import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,14 +9,20 @@ import {
   type WorkOrderCheckLevel,
   type WorkOrderCheckPresentation,
 } from "../../lib/workOrderChecks";
-import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
-import type { SplitRunFooterTone } from "./splitRunMocks";
+import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
+import {
+  splitRunDecisionTone,
+  type SplitRunFooter,
+  type SplitRunFooterAction,
+  type SplitRunStopChoice,
+} from "./splitRunFooter";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
   neutral: "border-slate-400/40 bg-slate-500/10 text-slate-700 dark:text-slate-300",
-  caution: "border-red-800/30 bg-red-700 text-white hover:bg-red-700/90",
+  caution: "border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
   critical: "border-red-900/40 bg-red-700 text-white hover:bg-red-700/90",
 };
 
@@ -30,161 +33,88 @@ const PILL_ICON = {
   critical: CircleAlert,
 } as const;
 
-const FOOTER_TONE: Record<
-  SplitRunFooterTone,
-  { panel: string; label: string; iconWrap: string; icon: string; Icon: typeof Hourglass }
-> = {
-  waiting: {
-    panel: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
-    label: "text-[color:var(--status-waiting-fg)]",
-    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
-    icon: "text-[color:var(--status-waiting-fg)]",
-    Icon: Hourglass,
-  },
-  draft: {
-    panel: "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)]",
-    label: "text-[color:var(--status-waiting-fg)]",
-    iconWrap: "bg-[color:var(--status-waiting-dot)]/15",
-    icon: "text-[color:var(--status-waiting-fg)]",
-    Icon: Play,
-  },
-  failed: {
-    panel: "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)]",
-    label: "text-[color:var(--status-failed-fg)]",
-    iconWrap: "bg-[color:var(--status-failed-dot)]/15",
-    icon: "text-[color:var(--status-failed-fg)]",
-    Icon: CircleAlert,
-  },
-};
-
-/**
- * Sticky next-step footer at the bottom of the Log. Check pills sit in
- * the header next to owner and cost.
- */
-export function SplitRunReview({
-  notes,
-  tone = "waiting",
-  className,
-  onAction,
-  actionBusy = false,
-  actionDisabled = false,
-}: {
-  notes: WorkOrderStatusNotePresentation[];
-  tone?: SplitRunFooterTone;
-  className?: string;
-  onAction?: () => void | Promise<void>;
-  actionBusy?: boolean;
-  actionDisabled?: boolean;
-}) {
-  const note = notes[0];
-
-  if (!note) {
+function reviewRunHref(
+  organizationId: string | undefined,
+  factoryKey: string | undefined,
+  run: SplitRunFooter["run"],
+  orderNumber?: string,
+) {
+  if (!organizationId || !factoryKey || !run) {
     return null;
   }
-
-  const chrome = FOOTER_TONE[tone];
-  const Icon = chrome.Icon;
-
-  return (
-    <aside
-      className={cn(
-        "flex h-[11.5rem] shrink-0 flex-col justify-between border-t px-4 py-3 text-foreground",
-        chrome.panel,
-        className,
-      )}
-      role="complementary"
-      aria-label="Next step"
-      data-testid="split-run-review"
-    >
-      <div className="min-h-0">
-        <p className={cn("text-[11px] font-semibold tracking-[0.06em] uppercase", chrome.label)}>Next step</p>
-        <div className="mt-1.5 flex items-start gap-2.5">
-          <span
-            className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", chrome.iconWrap)}
-            aria-hidden
-          >
-            <Icon className={cn("size-4", chrome.icon)} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-[15px] font-semibold tracking-[-0.01em]">{note.headline}</h3>
-            {note.text ? (
-              <div className="mt-1 line-clamp-3 text-[13px] leading-5 [&_a]:underline">
-                <MarkdownContent content={note.text} variant="workspace" />
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        {note.source?.name ? (
-          <p className="truncate text-[12px] text-muted-foreground">{note.source.name}</p>
-        ) : (
-          <span />
-        )}
-        <ReviewCta
-          cta={note.cta}
-          tone={tone}
-          onAction={onAction}
-          actionBusy={actionBusy}
-          actionDisabled={actionDisabled}
-        />
-      </div>
-    </aside>
-  );
+  return getWorkOrderRunHref(organizationId, factoryKey, run.appId, run.runId, { orderNumber });
 }
 
-function ReviewCta({
-  cta,
-  tone,
-  onAction,
-  actionBusy,
-  actionDisabled,
+/**
+ * Decision note under Description and Automations. Header stays Close only.
+ */
+export function SplitRunReview({
+  footer,
+  className,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  canAct = true,
+  onStart,
+  onReject,
+  onStop,
+  startBusy = false,
+  actionBusy = false,
+  startDisabled = false,
 }: {
-  cta?: WorkOrderStatusNotePresentation["cta"];
-  tone: SplitRunFooterTone;
-  onAction?: () => void | Promise<void>;
-  actionBusy: boolean;
-  actionDisabled: boolean;
+  footer: SplitRunFooter;
+  className?: string;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  canAct?: boolean;
+  onStart?: () => void | Promise<void>;
+  onReject?: () => void | Promise<void>;
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  startBusy?: boolean;
+  actionBusy?: boolean;
+  startDisabled?: boolean;
 }) {
-  if (!cta) {
+  if (!footer.attentionCard || !footer.note) {
     return null;
   }
+  const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
+  const actions = canAct ? footer.actions : [];
+  const onAction = (action: SplitRunFooterAction) => {
+    if (action.kind === "start") {
+      void onStart?.();
+      return;
+    }
+    if (action.kind === "reject") {
+      void onReject?.();
+      return;
+    }
+    if (action.kind === "approve") {
+      void onStop?.("completed");
+      return;
+    }
+    if (action.kind === "rerun") {
+      void onStop?.("rerun-step");
+      return;
+    }
+    if (action.kind === "reopen") {
+      void onStop?.("reopen");
+    }
+  };
 
-  const failedClass = tone === "failed" ? "bg-red-700 text-white hover:bg-red-700/90" : undefined;
-  if (onAction) {
-    return (
-      <Button
-        type="button"
-        className={cn("shrink-0", failedClass)}
-        disabled={actionDisabled || actionBusy}
-        onClick={() => void onAction()}
-        data-testid="split-run-review-cta"
-      >
-        {actionBusy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        {cta.label}
-      </Button>
-    );
-  }
-  if (cta.href) {
-    const inApp = cta.href.startsWith("/");
-    return (
-      <Button asChild className={cn("shrink-0", failedClass)}>
-        {inApp ? (
-          <Link href={cta.href}>{cta.label}</Link>
-        ) : (
-          <a href={cta.href} target="_blank" rel="noreferrer">
-            {cta.label}
-            <ExternalLink className="size-3.5" aria-hidden />
-          </a>
-        )}
-      </Button>
-    );
-  }
   return (
-    <Button type="button" className="shrink-0" disabled data-testid="split-run-review-cta">
-      {cta.label}
-    </Button>
+    <div className={cn("shrink-0", className)} data-testid="split-run-review">
+      <SplitRunAttentionNote
+        note={footer.note}
+        tone={splitRunDecisionTone(footer)}
+        actions={actions}
+        runHref={runHref}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        onAction={onAction}
+      />
+    </div>
   );
 }
 

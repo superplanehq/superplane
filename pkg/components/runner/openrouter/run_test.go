@@ -44,7 +44,17 @@ func TestRunPromptRunsLegacyFunctionCall(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{legacyFunctionCall: true, maxTurns: 2})
 	assert.Equal(t, 0, result.exitCode)
 	require.GreaterOrEqual(t, len(result.requests), 2)
-	assert.Contains(t, result.output, "[bash]")
+	assert.Contains(t, result.output, `"type":"tool_start"`)
+	assert.Contains(t, result.output, `"kind":"bash"`)
+	assert.NotContains(t, result.output, "[bash]")
+}
+
+func TestRunPromptMarksFilesystemToolErrorsFailed(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{missingRead: true, maxTurns: 2})
+	assert.Equal(t, 0, result.exitCode)
+	assert.Contains(t, result.output, `"type":"tool_end"`)
+	assert.Contains(t, result.output, `"status":"failed"`)
+	assert.Contains(t, result.output, `"kind":"read"`)
 }
 
 func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
@@ -71,6 +81,7 @@ func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 type promptHarness struct {
 	alwaysTools        bool
 	legacyFunctionCall bool
+	missingRead        bool
 	maxTurns           int
 	failOnRequest      int
 }
@@ -107,6 +118,7 @@ const { runPrompt } = require(%q);
 const requests = [];
 const alwaysTools = %t;
 const legacyFunctionCall = %t;
+const missingRead = %t;
 const failOnRequest = %d;
 let toolTurns = 0;
 let requestCount = 0;
@@ -138,6 +150,16 @@ global.fetch = async (_url, init) => {
       content: "working",
       function_call: { name: "bash", arguments: JSON.stringify({ command: "true" }) },
     };
+  } else if (missingRead && hasTools && toolTurns === 0) {
+    toolTurns += 1;
+    message = {
+      content: "working",
+      tool_calls: [{
+        id: "call_read",
+        type: "function",
+        function: { name: "read", arguments: JSON.stringify({ path: "/definitely/missing/file.txt" }) },
+      }],
+    };
   }
   return {
     ok: true,
@@ -157,7 +179,7 @@ runPrompt(%q, "openai/gpt-4.1", %d)
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, harness.alwaysTools, harness.legacyFunctionCall, harness.failOnRequest, promptFile, harness.maxTurns)), 0o644))
+`, script, harness.alwaysTools, harness.legacyFunctionCall, harness.missingRead, harness.failOnRequest, promptFile, harness.maxTurns)), 0o644))
 
 	cmd := exec.Command("node", harnessFile)
 	cmd.Dir = dir

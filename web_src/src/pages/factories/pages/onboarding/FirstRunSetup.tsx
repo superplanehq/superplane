@@ -15,7 +15,7 @@ import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
-import { WIZARD_STEPS, type IntegrationId, type WizardStepId } from "./onboardingFixtures";
+import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -31,7 +31,6 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   // The first-run screens derive the workspace name from the repository, so the
   // last saved answer opens the coding agent screen.
   name: "agent",
-  start: "agent",
 };
 
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
@@ -54,6 +53,13 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
  * wizard step copy, because provisioning needs a connected agent.
  */
 const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
+
+/**
+ * GitHub Issues is the only source setup can connect, so the tickets screen
+ * opens with it selected. Jira and Linear stay marked as coming soon.
+ */
+const DEFAULT_TICKET_SOURCE: FirstRunTicketSource = "github-issues";
+const DEFAULT_ISSUES_CHOICE: IssuesChoiceId = "vcs";
 
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
@@ -181,16 +187,17 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   };
 
   const continueFromTickets = async () => {
+    setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
     setup.commitIssuesStep();
-    if (!(await model.saveIssues())) return;
+    if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
     goToScreen("agent");
   };
 
   const selectTicketSource = (source: FirstRunTicketSource) => {
     // Jira and Linear are not connectable yet, so the screen shows them as
     // coming soon and reports GitHub Issues only.
-    if (source !== "github-issues") return;
-    setup.setIssuesChoice("vcs");
+    if (source !== DEFAULT_TICKET_SOURCE) return;
+    setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
   };
 
   return {
@@ -256,7 +263,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "tickets") {
     return (
       <FirstRunTicketsScreen
-        ticketSource={setup.issuesChoice === "vcs" ? "github-issues" : null}
+        ticketSource={DEFAULT_TICKET_SOURCE}
         chrome={chromeFor("tickets")}
         continueLabel={FIRST_RUN_COPY.tickets.continue}
         onSelectTicketSource={flow.selectTicketSource}

@@ -139,6 +139,64 @@ service Organizations {
     };
   }
 
+  rpc ListBYOKLLMModels(ListBYOKLLMModelsRequest) returns (ListBYOKLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/byok-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List BYOK LLM models";
+      description: "Returns the organization selected-model list and candidate models from the connected provider key";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateBYOKLLMModels(UpdateBYOKLLMModelsRequest) returns (UpdateBYOKLLMModelsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/organizations/{id}/byok-models"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update BYOK LLM models";
+      description: "Replaces the organization selected-model list for one BYOK provider";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListHostedCreditProducts(ListHostedCreditProductsRequest) returns (ListHostedCreditProductsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/hosted-credit-products"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List hosted credit products";
+      description: "Returns prepaid hosted-credit packs when billing is configured";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreateHostedCreditCheckout(CreateHostedCreditCheckoutRequest) returns (CreateHostedCreditCheckoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/hosted-credit-checkout"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create hosted credit checkout";
+      description: "Creates a checkout session for a prepaid hosted-credit pack";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreateBillingPortalSession(CreateBillingPortalSessionRequest) returns (CreateBillingPortalSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/billing-portal-session"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create billing portal session";
+      description: "Creates a customer portal session for invoices and receipts";
+      tags: "Organization";
+    };
+  }
+
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
       post: "/api/v1/invite-links/{token}/accept"
@@ -407,11 +465,25 @@ message DescribeOrganizationLLMSpendResponse {
   int64 grant_total_cents = 6;
   int64 hosted_billed_cents = 7;
   bool remaining_credit_warning = 8;
+  bool billing_enabled = 9;
+  bool has_billing_customer = 10;
+  int64 superplane_grant_cents = 11;
+  int64 purchased_credit_cents = 12;
+  repeated HostedCreditInvoice invoices = 13;
+}
+
+message HostedCreditInvoice {
+  string id = 1;
+  string created_at = 2;
+  int64 amount_cents = 3;
+  string status = 4;
+  string product_name = 5;
 }
 
 message ListHostedLLMModelsRequest {
   string id = 1;
   string provider = 2;
+  string factory_id = 3;
 }
 
 message ListHostedLLMModelsResponse {
@@ -422,6 +494,63 @@ message ListHostedLLMModelsResponse {
 message HostedLLMModel {
   string id = 1;
   string name = 2;
+}
+
+message ListBYOKLLMModelsRequest {
+  string id = 1;
+  string provider = 2;
+  string factory_id = 3;
+}
+
+message ListBYOKLLMModelsResponse {
+  bool connected = 1;
+  string integration_id = 2;
+  repeated HostedLLMModel selected = 3;
+  repeated HostedLLMModel candidates = 4;
+}
+
+message UpdateBYOKLLMModelsRequest {
+  string id = 1;
+  string provider = 2;
+  repeated string allowed_models = 3;
+}
+
+message UpdateBYOKLLMModelsResponse {
+  repeated HostedLLMModel selected = 1;
+}
+
+message ListHostedCreditProductsRequest {
+  string id = 1;
+}
+
+message HostedCreditProduct {
+  string id = 1;
+  string name = 2;
+  int64 amount_cents = 3;
+}
+
+message ListHostedCreditProductsResponse {
+  bool billing_enabled = 1;
+  repeated HostedCreditProduct products = 2;
+}
+
+message CreateHostedCreditCheckoutRequest {
+  string id = 1;
+  string product_id = 2;
+  // Ignored. SuperPlane sends Polar the client IP from proxy headers only.
+  string customer_ip_address = 3;
+}
+
+message CreateHostedCreditCheckoutResponse {
+  string checkout_url = 1;
+}
+
+message CreateBillingPortalSessionRequest {
+  string id = 1;
+}
+
+message CreateBillingPortalSessionResponse {
+  string portal_url = 1;
 }
 
 message LLMSpendByModel {

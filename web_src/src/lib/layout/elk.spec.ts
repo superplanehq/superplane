@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActionsAction, CanvasesCanvas, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { FACTORY_NODE_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
+import { FACTORY_NODE_CARD_WIDTH, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { ElkLayoutEngine } from "@/lib/layout";
 import { resolveForwardLayoutEdges } from "./layoutGraph";
 
@@ -22,6 +22,22 @@ type ElkLayoutEngineInternals = {
 };
 
 describe("ElkLayoutEngine", () => {
+  it("reserves room for Claude Code steps in vertical layouts", () => {
+    const autoLayout = new ElkLayoutEngine();
+    const node: ComponentsNode = {
+      id: "agent",
+      component: "runnerClaudeCode",
+      configuration: {
+        steps: [{ name: "Clone Repo" }, { name: "Write Implementation Plan" }, { name: "Use plan as output" }],
+      },
+    };
+
+    expect(autoLayout.estimateNodeSize(node, "vertical")).toEqual(factoryNodeCardSize(3));
+    expect(autoLayout.estimateNodeSize({ id: "bash", component: "runnerBash" }, "vertical")).toEqual(
+      factoryNodeCardSize(),
+    );
+  });
+
   it("does not crash when an edge channel is missing from outputChannelsByNodeId", async () => {
     const workflow: CanvasesCanvas = {
       metadata: {
