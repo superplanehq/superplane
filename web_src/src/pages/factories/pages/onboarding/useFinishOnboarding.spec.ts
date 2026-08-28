@@ -39,7 +39,7 @@ describe("afterOnboardingPath", () => {
     ).toBe("/org-1/workspaces/SP/lines/line-1?intake=1");
   });
 
-  it("expands the GitHub intake chevron", () => {
+  it("names the GitHub intake on the line URL", () => {
     expect(
       afterOnboardingPath({
         organizationId: "org-1",

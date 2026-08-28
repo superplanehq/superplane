@@ -12,8 +12,6 @@ export interface LineIntakeDrawerProps {
   initialSettingsOpen?: boolean;
   initialSettingsTab?: IntakeSettingsTab;
   configuredSources?: ConfiguredLineIntakeSource[];
-  /** Shown under a source that has no runs yet, for Storybook and first run. */
-  analyzingTickets?: LineIntakeAnalyzingTicket[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
   onSelectIntakeTemplate?: (template: AddIntakeTemplate) => void;
   organizationId?: string;
