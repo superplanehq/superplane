@@ -18,7 +18,11 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
-import { BOARD_IMPLEMENT_FAILED_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
+import {
+  BOARD_DONE_REJECTED_ORDER,
+  BOARD_IMPLEMENT_FAILED_ORDER,
+  BOARD_IMPLEMENT_NOTIFY_ORDER,
+} from "../../__fixtures__/lineMetricsBoardOrders";
 import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
   LINE_BOARD_VERIFY_ENUM_ORDER,
@@ -595,8 +599,11 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    const start = within(note).getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(start.parentElement).toHaveClass("shrink-0");
+    expect(start.parentElement).not.toHaveClass("mt-3");
     expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-overview-sidebar")).queryByTestId("split-run-review"),
@@ -744,14 +751,26 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("opens a done card on the description tab with Reopen on the note", () => {
+  it("opens a done card on the description tab and explains the completed result", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER) });
 
+    const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Reopen" }),
-    ).toBeInTheDocument();
+    expect(within(note).getByRole("heading", { name: "This task finished successfully" })).toBeInTheDocument();
+    expect(within(note).getByText("The line automations completed every step.")).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("explains a rejected result without Reopen", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER) });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "This task is rejected" })).toBeInTheDocument();
+    expect(
+      within(note).getByText("A person closed this task. The line automations did not finish the work."),
+    ).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
   });
 
   it("hides invented files and ledger pull requests on a live work order", async () => {

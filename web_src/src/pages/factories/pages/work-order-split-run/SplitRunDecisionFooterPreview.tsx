@@ -73,17 +73,17 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
   },
   completed: {
     title: "Add refund reconciliation test",
-    headline: "This task is completed",
-    text: "Reopen this task if more work is needed.",
+    headline: "This task finished successfully",
+    text: "The line automations completed every step.",
     tone: "done",
-    actions: [{ id: "reopen", label: "Reopen", emphasis: "primary" }],
+    actions: [],
   },
   rejected: {
     title: "Add refund reconciliation test",
     headline: "This task is rejected",
-    text: "Reopen this task if the work should continue.",
+    text: "A person closed this task. The line automations did not finish the work.",
     tone: "rejected",
-    actions: [{ id: "reopen", label: "Reopen", emphasis: "primary" }],
+    actions: [],
   },
   closedFailed: {
     title: "Add refund reconciliation test",
@@ -161,7 +161,7 @@ function DecisionNote({ copy }: { copy: DecisionCopy }) {
 
   return (
     <div className={cn("shrink-0 border-t px-4 py-3", visual.strip)} data-testid="split-run-decision-note">
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <span
           className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
           aria-hidden
@@ -171,10 +171,8 @@ function DecisionNote({ copy }: { copy: DecisionCopy }) {
         <div className="min-w-0 flex-1">
           <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{copy.headline}</h3>
           <p className="mt-1 text-[13px] text-foreground/80">{copy.text}</p>
-          <div className="mt-3">
-            <NoteActions copy={copy} />
-          </div>
         </div>
+        <NoteActions copy={copy} />
       </div>
     </div>
   );

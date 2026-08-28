@@ -54,12 +54,12 @@ const KINDS: { kind: DecisionFooterKind; label: string; note: string }[] = [
   {
     kind: "completed",
     label: "Completed",
-    note: "Reopen in the note.",
+    note: "Result copy. No Reopen.",
   },
   {
     kind: "rejected",
     label: "Rejected",
-    note: "Reopen in the note.",
+    note: "Result copy. No Reopen.",
   },
   {
     kind: "closedFailed",

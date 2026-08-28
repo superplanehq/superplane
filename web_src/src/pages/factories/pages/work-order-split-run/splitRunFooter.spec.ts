@@ -129,26 +129,26 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 
-  it("shows a done summary with Reopen on the decision strip", () => {
+  it("explains a completed or rejected result without Reopen", () => {
     expect(doneFooterForStatus("completed")).toEqual({
       kind: "done",
       sentence: "Work order completed successfully.",
       note: {
-        headline: "This task is completed",
-        text: "Reopen this task if more work is needed.",
+        headline: "This task finished successfully",
+        text: "The line automations completed every step.",
       },
       attentionCard: true,
-      actions: [REOPEN],
+      actions: [],
       status: "completed",
     });
     expect(doneFooterForStatus("rejected")).toMatchObject({
       sentence: "A person rejected this work order.",
       note: {
         headline: "This task is rejected",
-        text: "Reopen this task if the work should continue.",
+        text: "A person closed this task. The line automations did not finish the work.",
       },
       attentionCard: true,
-      actions: [REOPEN],
+      actions: [],
     });
     expect(doneFooterForStatus("cancelled")).toMatchObject({
       sentence: "This work order was canceled.",
@@ -156,6 +156,7 @@ describe("buildSplitRunFooter", () => {
         headline: "This task is canceled",
         text: "Reopen this task if the work should continue.",
       },
+      actions: [REOPEN],
     });
     expect(doneFooterForStatus("failed")).toMatchObject({
       sentence: "Closed as failed. Line execution did not pass.",
@@ -163,6 +164,7 @@ describe("buildSplitRunFooter", () => {
         headline: "This task is closed as failed",
         text: "Reopen this task to start the line again.",
       },
+      actions: [REOPEN],
     });
   });
 
