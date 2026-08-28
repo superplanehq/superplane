@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Implement
-  description: Create a branch, implement the plan, and open a draft pull request.
+  description: Create a branch, implement the plan, and open a pull request.
 spec:
   edges:
     - channel: default
@@ -16,9 +16,9 @@ spec:
       targetId: implementation-agent-no-issue
     - channel: passed
       sourceId: implementation-agent-no-issue
-      targetId: create-draft-pr
+      targetId: create-pr
     - channel: default
-      sourceId: create-draft-pr
+      sourceId: create-pr
       targetId: attach-pr-artifact
     - channel: default
       sourceId: attach-pr-artifact
@@ -84,8 +84,8 @@ spec:
           git clone --depth 1 "$GITURL" "$WORKDIR"
           cd "$WORKDIR"
 
-          # Create an empty branch off the base: a single empty commit so a draft PR can be opened,
-          # with no files added.
+          # Create an empty branch off the base: a single empty commit so a pull request can be
+          # opened, with no files added.
           git checkout -b "$BRANCH"
           git commit -s --allow-empty -m "chore: initialize ${BRANCH}"
           git push -u origin "$BRANCH"
@@ -250,8 +250,8 @@ spec:
         x: 1475
         'y': 648
       isCollapsed: false
-    - id: create-draft-pr
-      name: Create Draft Pull Request
+    - id: create-pr
+      name: Create Pull Request
       type: TYPE_ACTION
       component: github.createPullRequest
       concurrency:
@@ -266,7 +266,7 @@ spec:
           <hr>
 
           Created via [SuperPlane](https://superplane.com).
-        draft: true
+        draft: false
         head: '{{ $["Create Branch"].data.result.branch }}'
         repository: '{{ install_params.appRepository }}'
         title: '{{ fromBase64(previous().data.result.title) }}'
@@ -284,11 +284,11 @@ spec:
         orderId: '{{ order().id }}'
         provider: github
         repository: '{{ install_params.appRepository }}'
-        number: '{{ $["Create Draft Pull Request"].data.number }}'
-        url: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
-        title: '{{ $["Create Draft Pull Request"].data.title }}'
+        number: '{{ $["Create Pull Request"].data.number }}'
+        url: '{{ $["Create Pull Request"].data._links.html.href }}'
+        title: '{{ $["Create Pull Request"].data.title }}'
         state: open
-        externalId: '{{ $["Create Draft Pull Request"].data.id }}'
+        externalId: '{{ $["Create Pull Request"].data.id }}'
       position:
         x: 1442
         'y': 1152
@@ -302,8 +302,8 @@ spec:
         noteKey: pr-closure
         headline: Waiting for user review
         body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
-        ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
-        ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
+        ctaLabel: 'Review PR #{{ $["Create Pull Request"].data.number }}'
+        ctaUrl: '{{ $["Create Pull Request"].data.html_url }}'
         showOnlyWhenWaiting: true
       position:
         x: 1442

@@ -169,19 +169,19 @@ describe("setup factory line apps", () => {
       "create-branch",
       "add-branch-artifact",
       "implementation-agent-no-issue",
-      "create-draft-pr",
+      "create-pr",
       "attach-pr-artifact",
       "set-pr-closure-note",
       "add-run-error",
     ]);
     expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
-    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-draft-pr/);
+    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
-    expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
+    expect(implementation).toMatch(/sourceId: create-pr\n\s+targetId: attach-pr-artifact/);
     expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
     expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*component: addPullRequest/);
     expect(implementation).toMatch(
-      /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
+      /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Pull Request"\]\.data\._links\.html\.href \}\}'/,
     );
     expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*state: open/);
     expect(Object.fromEntries(canvasNodes(implementation).map((node) => [node.id, node.concurrency?.max]))).toEqual({
@@ -189,7 +189,7 @@ describe("setup factory line apps", () => {
       "create-branch": 5,
       "add-branch-artifact": 100,
       "implementation-agent-no-issue": 5,
-      "create-draft-pr": 100,
+      "create-pr": 100,
       "attach-pr-artifact": 100,
       "set-pr-closure-note": undefined,
       "add-run-error": undefined,
@@ -218,6 +218,8 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(
       /component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/,
     );
+    // Reviewers get a pull request they can review and merge right away.
+    expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*draft: false/);
     expect(implementation).toContain("Created via [SuperPlane](https://superplane.com)");
   });
 
@@ -233,7 +235,7 @@ describe("setup factory line apps", () => {
     expect(implementation).toContain(
       "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes.",
     );
-    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
+    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Pull Request\"].data.html_url }}'");
     expect(implementation).toContain("showOnlyWhenWaiting: true");
   });
 

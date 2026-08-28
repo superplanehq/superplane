@@ -149,7 +149,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "line-implementation": buildLineApp({
     id: "line-implementation",
     title: "Implement",
-    description: "Create a branch, implement the plan, and open a draft pull request.",
+    description: "Create a branch, implement the plan, and open a pull request.",
     canvasYaml: implementationCanvasYaml,
     entrypointNodeId: "onrun-implement",
   }),
