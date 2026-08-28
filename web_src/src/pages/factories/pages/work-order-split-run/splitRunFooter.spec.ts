@@ -171,6 +171,10 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.actions).toEqual([REOPEN]);
     expect(footer.attentionCard).toBe(true);
+    expect(footer.note).toEqual({
+      headline: "This task is closed as failed",
+      text: "Reopen this task to start the line again.",
+    });
   });
 });
 

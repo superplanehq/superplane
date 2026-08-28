@@ -710,6 +710,10 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-106", "#506"]);
     expect(fixture.footerTone).toBe("failed");
+    expect(fixture.footer.note).toEqual({
+      headline: "This task is closed as failed",
+      text: "Reopen this task to start the line again.",
+    });
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
   });
 
