@@ -294,13 +294,13 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
     {
       name: "adminKey",
       type: "string",
-      description: "Admin API key, required for fetching usage and cost reports.",
+      description: "Use this key only to fetch usage and cost reports.",
       required: false,
       label: "Admin API Key",
       visibilityConditions: [],
       requiredConditions: [],
       sensitive: true,
-      togglable: false,
+      togglable: true,
     },
   ]),
   storybookIntegrationDefinition("openai", "OpenAI", "Generate text responses with OpenAI models", [
