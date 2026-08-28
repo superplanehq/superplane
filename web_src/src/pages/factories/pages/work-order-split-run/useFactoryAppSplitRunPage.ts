@@ -80,7 +80,10 @@ export function useFactoryAppSplitRunPage() {
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, order?.id);
   const visual = useMemo(() => resolveSplitRunVisual(phase, live, { demoArtifacts: false }), [live, phase]);
-  const stream = useMemo(() => attachArtifactsToStream(visual.stream, artifactIndex), [artifactIndex, visual.stream]);
+  const stream = useMemo(
+    () => attachArtifactsToStream(visual.stream, artifactIndex, phase.runId),
+    [artifactIndex, phase.runId, visual.stream],
+  );
   const back = useMemo(
     () =>
       resolveFactoryAppBackNav(organizationId, factoryKey, {

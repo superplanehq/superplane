@@ -36,12 +36,14 @@ function artifactAddedEvent(
   at: string,
   artifact: { id?: string; type?: string; data?: Record<string, unknown> },
   automation?: { nodeId?: string; nodeName?: string },
+  run?: { id?: string },
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.artifact.added",
     timestamp: at,
     event: {
       ...(automation ? { automation } : {}),
+      ...(run ? { run } : {}),
       artifact,
     },
   };
@@ -167,5 +169,53 @@ describe("attachStreamArtifacts", () => {
       url: "https://github.com/example/ledger/pull/482",
       state: "STATE_OPEN",
     });
+  });
+
+  it("does not attach an artifact produced by a different run when scoped by nodeId", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }, { id: "run-a" })],
+      undefined,
+      undefined,
+      "run-b",
+    );
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
+  });
+
+  it("attaches an artifact produced by the matching run when scoped by nodeId", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }, { id: "run-a" })],
+      undefined,
+      undefined,
+      "run-a",
+    );
+
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
+  });
+
+  it("does not attach an artifact produced by a different run when scoped by nodeName", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("node-2", "Add Plan Artifact")],
+      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "Add Plan Artifact" }, { id: "run-planning" })],
+      undefined,
+      undefined,
+      "run-pr-feedback",
+    );
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
+  });
+
+  it("attaches an artifact with no run reference regardless of the requested run", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" })],
+      undefined,
+      undefined,
+      "run-b",
+    );
+
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
   });
 });
