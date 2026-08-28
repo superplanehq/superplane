@@ -212,48 +212,4 @@ describe("LinesPage backlog create", () => {
     expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
     expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
-
-  it("explains running Intake under the create ghost when the backlog is empty", () => {
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderLinesBoard();
-
-    const hint = screen.getByTestId("lines-backlog-intake-empty-hint");
-    expect(hint).toHaveTextContent("Intake is running. Import an issue or create a task while you wait.");
-    expect(within(hint).getByRole("button", { name: "Show Intake" })).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
-  });
-
-  it("hides the Intake hint when the backlog already has tasks", () => {
-    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    renderLinesBoard();
-
-    expect(screen.queryByTestId("lines-backlog-intake-empty-hint")).not.toBeInTheDocument();
-  });
-
-  it("opens the Intake window from the empty-backlog hint", async () => {
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show Intake" }));
-
-    expect(screen.getByTestId("line-intake-drawer")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("intake=1");
-  });
-
-  it("highlights an open Intake window from the empty-backlog hint", async () => {
-    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
-
-    const drawer = screen.getByTestId("line-intake-drawer");
-    expect(drawer).not.toHaveAttribute("data-highlighted");
-    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
-    await user.click(screen.getByRole("button", { name: "Show Intake" }));
-
-    expect(drawer).toHaveAttribute("data-highlighted", "true");
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
-  });
 });

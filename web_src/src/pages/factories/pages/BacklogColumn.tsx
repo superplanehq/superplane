@@ -2,7 +2,6 @@ import type { FactoriesWorkOrder } from "@/api-client";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
-import { BACKLOG_INTAKE_EMPTY_HINT, shouldShowBacklogIntakeEmptyHint } from "./backlogIntakeEmptyHint";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
@@ -29,8 +28,6 @@ export type BacklogColumnProps = {
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
-  hasIntake: boolean;
-  onShowIntake: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 };
@@ -52,20 +49,12 @@ export function BacklogColumn({
   canRename,
   onRename,
   onCreateWorkOrder,
-  hasIntake,
-  onShowIntake,
   workOrderCardContext,
   onOpenWorkOrder,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
-  const onboarding = isFirstRunOnboardingFactory(factoryKey);
-  const showIntakeHint = shouldShowBacklogIntakeEmptyHint({
-    empty: orders.length === 0,
-    hasIntake,
-    onboarding,
-  });
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
   const createPopover = {
     canAdd,
@@ -97,7 +86,7 @@ export function BacklogColumn({
         tone="neutral"
         surfaceClassName={surfaceClassName}
         emptyDescription="No tasks in the backlog."
-        emptyContent={onboarding ? <BacklogOnboardingCard /> : undefined}
+        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         keepChildrenWhenEmpty
         className={surfaceClassName ? undefined : "bg-muted"}
         actions={
@@ -129,24 +118,6 @@ export function BacklogColumn({
               <BacklogCreatePopover variant="ghost" {...createPopover} />
             </li>
           )}
-          {showIntakeHint ? (
-            <li>
-              <p
-                className="px-1 pt-1 text-[12px] leading-5 text-muted-foreground"
-                data-testid="lines-backlog-intake-empty-hint"
-              >
-                <button
-                  type="button"
-                  onClick={onShowIntake}
-                  aria-label="Show Intake"
-                  className="underline underline-offset-2 hover:text-foreground"
-                >
-                  {BACKLOG_INTAKE_EMPTY_HINT.linkLabel}
-                </button>
-                {BACKLOG_INTAKE_EMPTY_HINT.afterLink}
-              </p>
-            </li>
-          ) : null}
         </ul>
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
