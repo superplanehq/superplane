@@ -16,6 +16,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { selectCreateStepFields, selectVisibleFields, selectWebhookStepFields } from "./configurationFields";
 import { createWithGeneratedName, useGeneratedIntegrationName } from "./generatedName";
 import { IntegrationCreateDialogFooter } from "./IntegrationCreateDialogFooter";
 import { useBrowserActionSetup } from "./useBrowserActionSetup";
@@ -50,6 +51,8 @@ export interface IntegrationCreateDialogProps {
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
   initialStepFieldNames?: string[];
+  /** Configuration field names this flow never shows, e.g. optional keys that would distract during onboarding. */
+  hiddenFieldNames?: string[];
   /** Optional custom description for the webhook completion step. */
   webhookStepDescription?: ReactNode;
   /** Pre-created integration state for resuming a flow started inline (e.g. browser action after inline creation). */
@@ -65,6 +68,7 @@ export interface IntegrationCreateDialogProps {
 }
 
 const NO_EXISTING_NAMES: Set<string> = new Set();
+const NO_HIDDEN_FIELDS: string[] = [];
 
 export function IntegrationCreateDialog({
   open,
@@ -79,6 +83,7 @@ export function IntegrationCreateDialog({
   onCapabilitySetupRequired,
   instructionsEndBeforeHeading,
   initialStepFieldNames,
+  hiddenFieldNames = NO_HIDDEN_FIELDS,
   webhookStepDescription,
   initialCreatedIntegrationId,
   initialBrowserAction,
@@ -109,11 +114,13 @@ export function IntegrationCreateDialog({
     return idx >= 0 ? raw.slice(0, idx).trim() : raw;
   }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
-  const configurationFields = useMemo(() => {
-    const fields = integrationDefinition?.configuration ?? [];
-    if (!initialStepFieldNames?.length) return fields;
-    return fields.filter((f) => f.name && initialStepFieldNames.includes(f.name));
-  }, [integrationDefinition?.configuration, initialStepFieldNames]);
+  const { createStepFields, webhookStepFields } = useMemo(() => {
+    const visibleFields = selectVisibleFields(integrationDefinition?.configuration, hiddenFieldNames);
+    return {
+      createStepFields: selectCreateStepFields(visibleFields, initialStepFieldNames),
+      webhookStepFields: selectWebhookStepFields(visibleFields, initialStepFieldNames),
+    };
+  }, [integrationDefinition?.configuration, hiddenFieldNames, initialStepFieldNames]);
 
   const isGitHub = integrationDefinition?.name === "github";
   const {
@@ -360,27 +367,21 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
-              {(integrationDefinition?.configuration ?? [])
-                .filter((f: ConfigurationField) => {
-                  if (!f.name) return false;
-                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
-                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                })
-                .map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={configuration[field.name!]}
-                    onChange={(value) =>
-                      setConfiguration((prev) => ({
-                        ...prev,
-                        [field.name!]: value,
-                      }))
-                    }
-                    allValues={configuration}
-                    organizationId={organizationId}
-                  />
-                ))}
+              {webhookStepFields.map((field: ConfigurationField) => (
+                <ConfigurationFieldRenderer
+                  key={field.name}
+                  field={field}
+                  value={configuration[field.name!]}
+                  onChange={(value) =>
+                    setConfiguration((prev) => ({
+                      ...prev,
+                      [field.name!]: value,
+                    }))
+                  }
+                  allValues={configuration}
+                  organizationId={organizationId}
+                />
+              ))}
             </>
           ) : (
             <>
@@ -399,9 +400,9 @@ export function IntegrationCreateDialog({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
               )}
-              {configurationFields.length > 0 && (
+              {createStepFields.length > 0 && (
                 <div className="space-y-4">
-                  {configurationFields.map((field: ConfigurationField) => {
+                  {createStepFields.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
                       <ConfigurationFieldRenderer
