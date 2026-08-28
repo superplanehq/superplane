@@ -35,7 +35,9 @@ function superplane(
   isFactoryApp: boolean,
 ): BuildingBlockCategory | null {
   const blocks: BuildingBlock[] = [
-    ...triggers.filter((t) => isSuperPlaneBlock(t)).map((t) => toTriggerBlock(t)),
+    ...triggers
+      .filter((t) => isSuperPlaneBlock(t) || (isFactoryApp && isFactoryBlock(t)))
+      .map((t) => toTriggerBlock(t)),
     ...components
       .filter((c) => isSuperPlaneBlock(c) || (isFactoryApp && isFactoryBlock(c)))
       .map((c) => toComponentBlock(c)),
@@ -215,6 +217,7 @@ function isRunnerBlock(component: { name?: string }): boolean {
 
 const SUPERPLANE_BLOCK_NAMES = new Set(["onBroadcast", "broadcastMessage", "onRun", "runApp", "addRunError"]);
 const FACTORY_BLOCK_NAMES = new Set([
+  "onWorkOrder",
   "createWorkOrder",
   "findWorkOrder",
   "updateWorkOrderStatus",
