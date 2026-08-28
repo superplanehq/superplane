@@ -274,8 +274,9 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     expect(within(dialog).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    const waitingNote = within(dialog).getByTestId("split-run-attention-note");
+    expect(within(waitingNote).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(waitingNote).getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
@@ -284,9 +285,10 @@ describe("Line board job popup", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Fix refund dispatcher timeout loop" }));
     dialog = await screen.findByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: "Review the run" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    const failedNote = within(dialog).getByTestId("split-run-attention-note");
+    expect(within(failedNote).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
+    expect(within(failedNote).queryByRole("link", { name: "Review the run" })).not.toBeInTheDocument();
+    expect(within(failedNote).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
