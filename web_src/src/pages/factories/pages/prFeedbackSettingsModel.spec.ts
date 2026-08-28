@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasesCanvasRunRef, FactoriesFactoryPullRequest } from "@/api-client";
 
+import type { FactoriesFactoryPrFeedbackHandler } from "@/api-client";
+
 import {
   activePRFeedbackWorkOrderIds,
+  normalizePRFeedbackDraft,
   oldestActivePRFeedbackRun,
+  prFeedbackDraftFromHandler,
   prFeedbackDraftIsValid,
 } from "./prFeedbackSettingsModel";
 import { prFeedbackLogRunsFromPullRequests } from "./useWorkOrderPRFeedbackRunHref";
@@ -110,8 +114,66 @@ describe("prFeedbackDraftIsValid", () => {
         repository: "acme/app",
         mention: "@bot",
         ignoreBots: true,
+        allowedBots: [],
       }),
     ).toBe(true);
-    expect(prFeedbackDraftIsValid({ name: "", repository: "acme/app", mention: "@bot", ignoreBots: true })).toBe(false);
+    expect(
+      prFeedbackDraftIsValid({
+        name: "",
+        repository: "acme/app",
+        mention: "@bot",
+        ignoreBots: true,
+        allowedBots: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("does not require an allowed bots list", () => {
+    expect(
+      prFeedbackDraftIsValid({
+        name: "Address PR feedback",
+        repository: "acme/app",
+        mention: "@bot",
+        ignoreBots: true,
+        allowedBots: ["coderabbitai"],
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("prFeedbackDraftFromHandler", () => {
+  it("reads the allowed bots list from the handler settings", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Address PR feedback",
+      settings: {
+        subject: { repository: "acme/app" },
+        discussion: { mention: "@superplaneagent", ignoreBots: true, allowedBots: ["coderabbitai", "bugbot"] },
+      },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).allowedBots).toEqual(["coderabbitai", "bugbot"]);
+  });
+
+  it("defaults to an empty allowed bots list", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Address PR feedback",
+      settings: { subject: { repository: "acme/app" }, discussion: { mention: "@superplaneagent" } },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).allowedBots).toEqual([]);
+  });
+});
+
+describe("normalizePRFeedbackDraft", () => {
+  it("trims entries, strips a leading @, drops blanks, and de-duplicates", () => {
+    const normalized = normalizePRFeedbackDraft({
+      name: "Address PR feedback",
+      repository: "acme/app",
+      mention: "@bot",
+      ignoreBots: true,
+      allowedBots: [" @CodeRabbitAI ", "coderabbitai", "bugbot", "", "   "],
+    });
+
+    expect(normalized.allowedBots).toEqual(["CodeRabbitAI", "bugbot"]);
   });
 });

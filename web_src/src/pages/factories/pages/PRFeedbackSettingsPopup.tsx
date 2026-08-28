@@ -193,6 +193,8 @@ function PRFeedbackGeneralTab({
               </span>
             </Label>
           </div>
+
+          <PRFeedbackAllowedBotsField value={draft.allowedBots} onChange={(value) => onUpdate("allowedBots", value)} />
         </div>
       </div>
       <PRFeedbackSettingsFooter
@@ -233,6 +235,38 @@ function PRFeedbackTextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         data-testid={id}
+      />
+    </section>
+  );
+}
+
+function PRFeedbackAllowedBotsField({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
+  const [text, setText] = useState(value.join(", "));
+
+  useEffect(() => {
+    setText(value.join(", "));
+  }, [value]);
+
+  function commit(nextText: string) {
+    const bots = nextText
+      .split(",")
+      .map((bot) => bot.trim())
+      .filter((bot) => bot.length > 0);
+    onChange(bots);
+  }
+
+  return (
+    <section>
+      <Label htmlFor="pr-feedback-allowed-bots">{PR_FEEDBACK_SETTINGS_COPY.allowedBotsLabel}</Label>
+      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.allowedBotsHelper}</p>
+      <Input
+        id="pr-feedback-allowed-bots"
+        className="mt-2"
+        placeholder="coderabbitai, bugbot"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={(event) => commit(event.target.value)}
+        data-testid="pr-feedback-allowed-bots"
       />
     </section>
   );
