@@ -5,7 +5,7 @@ ALTER TABLE organization_llm_credit_grants
 
 ALTER TABLE organization_llm_credit_grants
   ADD CONSTRAINT organization_llm_credit_grants_kind
-    CHECK (kind IN ('welcome', 'admin', 'polar'));
+    CHECK (kind IN ('welcome', 'admin', 'polar', 'polar_refund'));
 
 ALTER TABLE organization_llm_credit_grants
   ADD COLUMN IF NOT EXISTS polar_order_id TEXT;

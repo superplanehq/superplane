@@ -11,6 +11,9 @@ ALTER TABLE organization_llm_credit_grants
   DROP CONSTRAINT IF EXISTS organization_llm_credit_grants_amount_positive;
 
 ALTER TABLE organization_llm_credit_grants
+  DROP CONSTRAINT IF EXISTS organization_llm_credit_grants_amount_sign;
+
+ALTER TABLE organization_llm_credit_grants
   ADD CONSTRAINT organization_llm_credit_grants_amount_sign
     CHECK (
       (kind = 'polar_refund' AND amount_micros < 0)
