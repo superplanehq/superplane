@@ -588,10 +588,32 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("failed");
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
+  });
+
+  it("marks a cancelled implement step as canceled, not waiting", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Stopped job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_CANCELLED" },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.lineStatus).toBe("waiting");
+    expect(fixture.phases.at(-1)?.status).toBe("cancelled");
+    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Canceled");
+    expect(fixture.footerTone).toBe("stopped");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
+    expect(fixture.footer.note?.cta).toBeUndefined();
+    expect(fixture.waitingNotes[0]?.cta).toBeUndefined();
   });
 
   it("logs a manual create when a person opens a draft", () => {

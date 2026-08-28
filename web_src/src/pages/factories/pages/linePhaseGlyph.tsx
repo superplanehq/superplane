@@ -27,6 +27,13 @@ export function PhaseGlyph({ kind, className }: { kind: PhaseGlyphKind; classNam
       </StatusDisk>
     );
   }
+  if (kind === "cancelled") {
+    return (
+      <StatusDisk className={shared} tone="bg-[color:var(--status-cancelled-dot)]">
+        <X className={MARK} />
+      </StatusDisk>
+    );
+  }
   if (kind === "passed") {
     return (
       <StatusDisk className={shared} tone="bg-[color:var(--status-completed-dot)]">

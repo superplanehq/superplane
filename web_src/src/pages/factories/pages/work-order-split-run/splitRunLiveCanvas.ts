@@ -74,6 +74,9 @@ export function streamStatusFromNode(status: FactoryNodeStatus): SplitRunPhaseSt
   if (status === "passed" || status === "triggered") {
     return "passed";
   }
+  if (status === "cancelled") {
+    return "cancelled";
+  }
   return "pending";
 }
 

@@ -23,7 +23,7 @@ const FAILED_NOTE = {
   key: "implement-failed",
   headline: "Implement did not pass",
   text: "Backend tests failed on the reconciliation worker.",
-  cta: { label: "Review the run" },
+  cta: { label: "Debug", icon: "bug" },
   source: { name: "Implementation" },
 };
 
@@ -118,12 +118,36 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
+  it("treats a stopped open implement as To Backlog, Reject, and Rerun", () => {
+    const footer = buildSplitRunFooter({ kind: "stopped" });
+
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note?.headline).toBe("A person stopped this automation");
+    expect(footer.note?.text).toBe(
+      "The line is not running. Rerun this step, send the task to the Backlog, or reject it.",
+    );
+    expect(footer.note?.cta).toBeUndefined();
+    expect(footer.note?.actor).toBeUndefined();
+    expect(footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
+    expect(footer.actions[0]?.icon).toBe("undo-2");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["back-to-draft", "reject", "rerun"]);
+    expect(splitRunCloseNeedsConfirm("stopped")).toBe(false);
+  });
+
+  it("keeps the stopped verb phrase when the person who stopped it is known", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A" };
+    const footer = buildSplitRunFooter({ kind: "stopped", actor });
+
+    expect(footer.note?.headline).toBe("stopped this automation");
+    expect(footer.note?.actor).toEqual(actor);
+  });
+
   it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
-    expect(footer.note?.cta?.label).toBe("Review the run");
+    expect(footer.note?.cta?.label).toBe("Debug");
     expect(footer.sentence).toBe("This work order needs attention.");
     expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);

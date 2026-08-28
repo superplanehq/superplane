@@ -179,6 +179,17 @@ describe("useSplitRunFooterActions", () => {
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
   });
 
+  it("sends a stopped task back to the Backlog", async () => {
+    const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
+
+    const moved = await result.current.handleBackToDraft();
+
+    expect(moved).toBe(true);
+    expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_DRAFT" });
+    expect(closeMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).toHaveBeenCalledWith("Task returned to the Backlog.");
+  });
+
   it("closes a draft from Reject", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
@@ -194,6 +205,7 @@ describe("useSplitRunFooterActions", () => {
 
     await result.current.handleStop("canceled", { kind: "running" });
     await result.current.handleReject();
+    await result.current.handleBackToDraft();
 
     expect(closeMutateAsync).not.toHaveBeenCalled();
     expect(updateMutateAsync).not.toHaveBeenCalled();

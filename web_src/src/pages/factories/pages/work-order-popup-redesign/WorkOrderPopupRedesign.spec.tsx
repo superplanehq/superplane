@@ -287,7 +287,7 @@ describe("Line board job popup", () => {
     dialog = await screen.findByTestId("work-order-split-run");
     const failedNote = within(dialog).getByTestId("split-run-attention-note");
     expect(within(failedNote).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
-    expect(within(failedNote).queryByRole("link", { name: "Review the run" })).not.toBeInTheDocument();
+    expect(within(failedNote).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
     expect(within(failedNote).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();

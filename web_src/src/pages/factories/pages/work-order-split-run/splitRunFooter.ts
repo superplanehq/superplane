@@ -1,12 +1,14 @@
+import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
+
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 
-export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "done";
+export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "rerun" | "reopen";
+export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "rerun" | "reopen" | "back-to-draft";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -106,7 +108,7 @@ export function defaultSplitRunStopChoice(
   kind?: SplitRunFooterKind,
 ): SplitRunStopChoice | undefined {
   const available = availableSplitRunStopChoices(status);
-  const preferred = kind === "failed" ? "rerun-step" : DEFAULT_SPLIT_RUN_STOP_CHOICE;
+  const preferred = kind === "failed" || kind === "stopped" ? "rerun-step" : DEFAULT_SPLIT_RUN_STOP_CHOICE;
   if (available.some((item) => item.id === preferred)) {
     return preferred;
   }
@@ -118,6 +120,7 @@ export interface SplitRunFooterAction {
   kind: SplitRunFooterActionKind;
   label: string;
   emphasis: "primary" | "quiet";
+  icon?: "undo-2";
 }
 
 export interface SplitRunFooterNote {
@@ -126,7 +129,8 @@ export interface SplitRunFooterNote {
   sourceName?: string;
   sourceAppId?: string;
   updatedAt?: string;
-  cta?: { label: string; href?: string };
+  cta?: { label: string; href?: string; icon?: "bug" };
+  actor?: OrgUserDisplay;
 }
 
 export interface SplitRunFooter {
@@ -145,6 +149,13 @@ const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+const BACK_TO_DRAFT: SplitRunFooterAction = {
+  id: "back-to-draft",
+  kind: "back-to-draft",
+  label: "To Backlog",
+  emphasis: "quiet",
+  icon: "undo-2",
+};
 
 export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
   headline: "This task waits on a person",
@@ -153,6 +164,12 @@ export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
 
 export const SPLIT_RUN_FAILED_NOTE_TEXT =
   "This automation failed. Open the run to review the error. Fix the automation, then click Rerun. Or close this task.";
+
+export const SPLIT_RUN_STOPPED_NOTE_TEXT =
+  "The line is not running. Rerun this step, send the task to the Backlog, or reject it.";
+
+export const SPLIT_RUN_STOPPED_HEADLINE = "stopped this automation";
+export const SPLIT_RUN_STOPPED_HEADLINE_UNKNOWN = "A person stopped this automation";
 
 export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
   headline: "This task is ready to start",
@@ -171,7 +188,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.status === "rejected" || footer.status === "cancelled") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "cancelled") {
     return "rejected";
   }
   return "done";
@@ -227,6 +244,7 @@ type FooterInput = {
   decision?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
+  actor?: OrgUserDisplay;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
@@ -276,6 +294,24 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
   });
 }
 
+function stoppedNote(note: SplitRunFooterNote | undefined, actor?: OrgUserDisplay): SplitRunFooterNote {
+  return {
+    headline: actor ? SPLIT_RUN_STOPPED_HEADLINE : SPLIT_RUN_STOPPED_HEADLINE_UNKNOWN,
+    text: note?.text ?? SPLIT_RUN_STOPPED_NOTE_TEXT,
+    ...(actor ? { actor } : {}),
+  };
+}
+
+function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  return withFooterMeta(input, {
+    kind: "stopped",
+    sentence: "This work order needs attention.",
+    note: stoppedNote(note, input.actor),
+    attentionCard: true,
+    actions: [BACK_TO_DRAFT, REJECT, RERUN],
+  });
+}
+
 function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
   return withFooterMeta(input, {
@@ -297,6 +333,9 @@ export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {
   }
   if (isClosedWorkOrderDisplayStatus(input.status) || input.kind === "done") {
     return closedDecisionFooter(input, note);
+  }
+  if (input.kind === "stopped") {
+    return stoppedDecisionFooter(input, note);
   }
   if (input.kind === "waiting" || input.kind === "failed") {
     return openDecisionFooter(input, note);

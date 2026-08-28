@@ -533,7 +533,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task is closed as failed" })).toBeInTheDocument();
     expect(within(note).getByText("Reopen this task to start the line again.")).toBeInTheDocument();
-    expect(within(note).queryByRole("link", { name: "Review the run" })).not.toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
@@ -572,6 +572,76 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose how to stop" })).not.toBeInTheDocument();
+  });
+
+  it("offers To Backlog, Reject, and Rerun after a person stops the run", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        id: "wo-stopped",
+        title: "Stopped job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_CANCELLED",
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "A person stopped this automation" })).toBeInTheDocument();
+    expect(within(note).getByText(/The line is not running/)).toBeInTheDocument();
+    const toBacklog = within(note).getByRole("button", { name: "To Backlog" });
+    expect(toBacklog).toBeInTheDocument();
+    expect(toBacklog.querySelector("svg.lucide-undo-2")).toBeTruthy();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+    expect(within(note).queryByRole("link", { name: "Debug" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/split-run-phase-rerun-/)).not.toBeInTheDocument();
+  });
+
+  it("names the person who stopped the automation", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(
+        {
+          id: "wo-stopped-named",
+          title: "Stopped job",
+          state: "STATE_OPEN",
+          lineDispatches: [
+            {
+              id: "d-1",
+              line: { id: "line-1", name: "Software delivery" },
+              state: "STATE_FINISHED",
+              stepExecutions: [
+                {
+                  id: "e-impl",
+                  step: "Implement",
+                  stepIndex: 0,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_CANCELLED",
+                },
+              ],
+            },
+          ],
+        },
+        { stoppedBy: { id: "user-1", name: "Alex", initials: "A" } },
+      ),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByTestId("work-order-mention")).toHaveTextContent("Alex");
+    expect(within(note).getByRole("heading", { name: /stopped this automation/ })).toBeInTheDocument();
   });
 
   it("keeps Reject and Approve off the header on a running order", () => {
