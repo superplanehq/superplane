@@ -94,20 +94,6 @@ func TestPrepareHostedRunChecksFactoryAllowlist(t *testing.T) {
 	assert.Equal(t, "sk-hosted", access.APIKey)
 }
 
-func TestPrepareBYOKRunChecksAllowlistWhenModelIsEmpty(t *testing.T) {
-	t.Parallel()
-
-	require.NoError(t, PrepareBYOKRun(core.ExecutionContext{}, "anthropic", ""))
-
-	stub := &byokHostedLLM{}
-	err := PrepareBYOKRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "model is required")
-	assert.True(t, stub.called)
-
-	require.NoError(t, PrepareBYOKRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "claude-sonnet-4-6"))
-}
-
 type hostedAllowlistLLM struct {
 	access     core.HostedLLMAccess
 	selectable map[string]bool
@@ -128,24 +114,4 @@ func (c *hostedAllowlistLLM) AssertModelSelectable(_, _, model string) error {
 		return nil
 	}
 	return fmt.Errorf("model %s is not on the selected-model list", model)
-}
-
-type byokHostedLLM struct {
-	called bool
-}
-
-func (c *byokHostedLLM) Resolve(string) (core.HostedLLMAccess, error) {
-	return core.HostedLLMAccess{}, nil
-}
-
-func (c *byokHostedLLM) AssertCreditAvailable() error {
-	return nil
-}
-
-func (c *byokHostedLLM) AssertModelSelectable(_, _, model string) error {
-	c.called = true
-	if strings.TrimSpace(model) == "" {
-		return fmt.Errorf("model is required")
-	}
-	return nil
 }

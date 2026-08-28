@@ -107,6 +107,19 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
 		assert.NotContains(t, checkout, "pr-feedback")
 	})
+
+	t.Run("the runner names the model it runs", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Agent: &intakeAgent{
+				Component:   "runnerClaudeCode",
+				Credentials: map[string]any{"source": "integration"},
+			},
+		})
+
+		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+		assert.Equal(t, "opus", runner.Configuration["model"])
+	})
 }
 
 func yamlEdgeChannels(canvas *yaml.Canvas) []string {

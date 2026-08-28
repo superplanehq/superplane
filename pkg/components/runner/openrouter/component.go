@@ -185,14 +185,8 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
-		if err := runner.PrepareBYOKRun(ctx, "openrouter", model); err != nil {
-			return nil, err
-		}
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenRouterAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
-		if err := runner.PrepareBYOKRun(ctx, "openrouter", model); err != nil {
-			return nil, err
-		}
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		access, err := runner.PrepareHostedRun(ctx, "openrouter", model)

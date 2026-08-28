@@ -1,4 +1,4 @@
-import { pickHostedModel } from "@/lib/hostedLLMModels";
+import { pickHostedModel, pickModelMatching } from "@/lib/hostedLLMModels";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 
 import type { IntegrationId } from "./onboardingFixtures";
@@ -18,6 +18,8 @@ export type OnboardingAgentPlan = {
   integrationName: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
+  /** Model for agents that weigh evidence rather than write code, such as planning. */
+  planningModel: string;
 };
 
 export type HostedModelsByProvider = Record<HostedLLMProviderId, string[]>;
@@ -27,6 +29,10 @@ type AgentProviderSpec = {
   hostedProvider: HostedLLMProviderId;
   harness: OnboardingAgentHarness;
   defaultModel: string;
+  /** Default for planning-style agents when no allowlist is available. */
+  defaultPlanningModel: string;
+  /** Substring that finds the planning model on an allowlist. */
+  planningModelHint: string;
 };
 
 const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
@@ -35,20 +41,34 @@ const AGENT_PROVIDER_SPECS: Record<AgentProviderId, AgentProviderSpec> = {
     hostedProvider: "anthropic",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
     defaultModel: "sonnet",
+    defaultPlanningModel: "opus",
+    planningModelHint: "opus",
   },
   openai: {
     component: "runnerCodex",
     hostedProvider: "openai",
     harness: "AGENT_HARNESS_CODEX",
     defaultModel: "gpt-5",
+    defaultPlanningModel: "gpt-5",
+    planningModelHint: "gpt-5",
   },
   openrouter: {
     component: "runnerOpenRouter",
     hostedProvider: "openrouter",
     harness: "AGENT_HARNESS_CLAUDE_CODE",
     defaultModel: "anthropic/claude-sonnet-4-6",
+    defaultPlanningModel: "anthropic/claude-opus-4-6",
+    planningModelHint: "opus",
   },
 };
+
+// A hosted run only accepts a model id from the allowlist, so the planning
+// model has to come from the same list as the standard model. An empty list
+// means no allowlist applies, and the agent CLI resolves the alias itself.
+function planningModelFor(spec: AgentProviderSpec, modelIds: string[], model: string): string {
+  if (modelIds.length === 0) return spec.defaultPlanningModel;
+  return pickModelMatching(modelIds, spec.planningModelHint) ?? model;
+}
 
 export function isAgentProviderConnected(connected: Set<IntegrationId>): boolean {
   return AGENT_PROVIDER_IDS.some((id) => connected.has(id));
@@ -72,7 +92,8 @@ export function resolveOnboardingAgent(args: {
 
   for (const providerId of AGENT_PROVIDER_IDS) {
     const spec = AGENT_PROVIDER_SPECS[providerId];
-    const model = pickHostedModel(spec.hostedProvider, args.hostedModels[spec.hostedProvider]);
+    const modelIds = args.hostedModels[spec.hostedProvider];
+    const model = pickHostedModel(spec.hostedProvider, modelIds);
     if (!model) continue;
     return {
       providerId,
@@ -81,6 +102,7 @@ export function resolveOnboardingAgent(args: {
       integrationName: providerId,
       harness: spec.harness,
       model,
+      planningModel: planningModelFor(spec, modelIds, model),
     };
   }
 
@@ -122,12 +144,15 @@ function planForConnectedProvider(
   hostedModels: HostedModelsByProvider,
 ): OnboardingAgentPlan {
   const spec = AGENT_PROVIDER_SPECS[providerId];
+  const modelIds = hostedModels[spec.hostedProvider];
+  const model = pickHostedModel(spec.hostedProvider, modelIds) ?? spec.defaultModel;
   return {
     providerId,
     component: spec.component,
     credentialsSource: "integration",
     integrationName: providerId,
     harness: spec.harness,
-    model: pickHostedModel(spec.hostedProvider, hostedModels[spec.hostedProvider]) ?? spec.defaultModel,
+    model,
+    planningModel: planningModelFor(spec, modelIds, model),
   };
 }

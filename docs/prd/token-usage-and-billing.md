@@ -52,7 +52,7 @@ Do not reinvent these pieces:
 | Billing unit | Ledger stores tokens by type and USD cents. Money is the source of truth. |
 | Welcome grant | Once per organization, not per user. |
 | Hosted catalog | Admin picks one hosted provider and an allowlist of models. |
-| BYOK catalog | User connects keys. SuperPlane lists models. User picks the allowlist. |
+| BYOK catalog | User connects keys. SuperPlane lists models. The list guides the picker. It does not gate a run. |
 | BYOK cost | Store estimated or provider-reported dollars. Mark `funding_source=byok`. |
 | Compute | Same ledger, `usage_kind=compute`, later. Phase 1 is model usage only. |
 | Self-hosted | Tracking ships. Welcome credit and Polar checkout are cloud-only. |
@@ -109,11 +109,17 @@ hosted remaining credit is empty.
 ### Phase 4 — BYOK model pools
 
 Reuse org integrations. The organization selects the BYOK model list per
-provider. Empty list means no BYOK models for that provider. Factory Settings
-→ Models may subset the org BYOK list and the installation hosted allowlist.
-An empty factory list inherits the parent list. The agent picker uses the
-resolved list for hosted and BYOK credentials. `funding_source=byok` is
-tracked and does not debit the wallet.
+provider. Factory Settings → Models may subset the org BYOK list and the
+installation hosted allowlist. An empty factory list inherits the parent list.
+The agent picker uses the resolved list for hosted and BYOK credentials.
+`funding_source=byok` is tracked and does not debit the wallet.
+
+The BYOK list guides the picker only. It does not stop a run. A BYOK run
+spends the key of the organization, not SuperPlane credit, so the list gives
+SuperPlane no cost to protect. A gate there only stops the organization from
+using the key it connected. It also rejects an agent CLI alias such as `opus`,
+because the list holds full model ids. Only `PrepareHostedRun` keeps a
+selected-model gate, because hosted spend debits the wallet.
 
 ### Phase 5 — Polar prepaid checkout
 

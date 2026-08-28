@@ -22,9 +22,15 @@ type intakeAgentSpec struct {
 	// hostedModelHint is the part of a model id an intake looks for first on a
 	// hosted allowlist. An allowlist without it falls back to its first model.
 	hostedModelHint string
-	// model is the model the runner asks for when it authenticates with an
-	// installation. Only OpenRouter needs one; the other runners have a
-	// default of their own.
+	// model is the model the generated nodes name. A runner has a default of
+	// its own, but a node that leaves the field empty shows the user no model
+	// and runs on whatever the agent CLI picks, so each spec names one.
+	//
+	// Both nodes an intake generates weigh evidence rather than write code:
+	// the analysis scores an item, and the PR feedback runner judges which
+	// review requests are safe to apply. Anthropic therefore reaches for
+	// Opus, the way the planning agent of the factory line does, while the
+	// implementation agent stays on Sonnet.
 	model string
 }
 
@@ -33,13 +39,15 @@ var intakeAgentSpecs = []intakeAgentSpec{
 		component:       "runnerClaudeCode",
 		integrationApp:  "claude",
 		hostedProvider:  models.UsageProviderAnthropic,
-		hostedModelHint: "sonnet",
+		hostedModelHint: "opus",
+		model:           "opus",
 	},
 	{
 		component:       "runnerCodex",
 		integrationApp:  "openai",
 		hostedProvider:  models.UsageProviderOpenAI,
 		hostedModelHint: "gpt-5",
+		model:           "gpt-5",
 	},
 	{
 		component:       "runnerOpenRouter",
@@ -73,11 +81,24 @@ func (a *intakeAgent) credentials() map[string]any {
 	return a.Credentials
 }
 
+// model is the model the generated node names. An agent that carries no model
+// of its own takes the default of its runner, so the node always shows the
+// model the analysis runs on.
 func (a *intakeAgent) model() string {
-	if a == nil {
+	if a != nil && a.Model != "" {
+		return a.Model
+	}
+	return defaultIntakeAgentModel(a.component())
+}
+
+func defaultIntakeAgentModel(component string) string {
+	index := slices.IndexFunc(intakeAgentSpecs, func(spec intakeAgentSpec) bool {
+		return spec.component == component
+	})
+	if index < 0 {
 		return ""
 	}
-	return a.Model
+	return intakeAgentSpecs[index].model
 }
 
 // resolveIntakeAgent picks the runner and the credentials of the analysis node.

@@ -109,11 +109,16 @@ export function wireFactoryIntegrations(
 
 const CLAUDE_CODE_COMPONENT = "runnerClaudeCode";
 const PLANNING_AGENT_NODE_ID = "planner-agent-no-issue";
-const PLANNING_AGENT_MODEL = "opus";
 
 export type FactoryAgentRewrite = {
   component: string;
   model: string;
+  /**
+   * Model for the planning agent, which weighs evidence rather than writes
+   * code. Hosted runs reject a model that is not on the allowlist, so the
+   * caller resolves this against the same list as `model`.
+   */
+  planningModel?: string;
   credentials: { source: "hosted" } | { source: "integration"; name: string };
 };
 
@@ -136,8 +141,8 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
 }
 
 function planningAgentModel(nodeId: string | undefined, rewrite: FactoryAgentRewrite): string {
-  if (nodeId === PLANNING_AGENT_NODE_ID && rewrite.component === CLAUDE_CODE_COMPONENT) {
-    return PLANNING_AGENT_MODEL;
+  if (nodeId === PLANNING_AGENT_NODE_ID) {
+    return rewrite.planningModel || rewrite.model;
   }
   return rewrite.model;
 }
