@@ -882,6 +882,7 @@ describe("line board work-order examples", () => {
 
     const analysis = fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis");
 
+    expect(analysis?.name).toBe("Analysis");
     expect(analysis?.status).toBe("running");
     expect(analysis?.componentName).toBe("Confidence score");
     expect(analysis?.appId).toBe("canvas-backlog");

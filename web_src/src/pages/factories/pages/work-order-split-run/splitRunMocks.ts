@@ -565,7 +565,7 @@ function analysisRunToPhase(entry: BacklogAnalysisRun, checks?: WorkOrderCheckPr
   };
   return {
     id: `${ANALYSIS_PHASE_ID_PREFIX}${entry.run.id}`,
-    name: "Backlog",
+    name: "Analysis",
     status,
     duration,
     componentName,
