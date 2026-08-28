@@ -178,8 +178,12 @@ export type FactoryAppNavOptions = {
    * AppPage auto-edit cleanup does not tear down the Configure UI mid-bootstrap.
    */
   configure?: boolean;
+  /** Open the agent sidebar in factory edit mode (`agent=1`). */
+  agent?: boolean;
   /** Open the components panel in factory edit mode (`blocks=1`). */
   blocks?: boolean;
+  /** Open the component sidebar on this node (`sidebar=1&node=`). */
+  nodeId?: string;
 };
 
 function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
@@ -193,8 +197,15 @@ function buildFactoryAppSearchParams(options?: FactoryAppNavOptions): string {
   if (options.configure) {
     params.set("configure", "1");
   }
+  if (options.agent) {
+    params.set("agent", "1");
+  }
   if (options.blocks) {
     params.set("blocks", "1");
+  }
+  if (options.nodeId) {
+    params.set("sidebar", "1");
+    params.set("node", options.nodeId);
   }
   if (options.from) {
     params.set("from", options.from);
@@ -218,6 +229,10 @@ export function factoryAppConfigurePath(
   return factoryAppPath(organizationId, factoryKey, appId, {
     ...options,
     configure: true,
+    agent: options?.agent ?? true,
+    // Component edit is not run inspection. A leftover `run` param would hide
+    // the editor sidebar and strip `node` while Configure starts.
+    runId: options?.nodeId ? undefined : options?.runId,
   });
 }
 
@@ -284,12 +299,23 @@ export function factorySettingsSectionPath(organizationId: string, factoryKey: s
   return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
 }
 
-export function organizationSettingsPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/organization`;
+export type OrganizationSettingsLocationState = {
+  fromFactoryKey?: string;
+};
+
+export function organizationSettingsPath(organizationId: string) {
+  return `/${organizationId}/organization`;
 }
 
-export function organizationSettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${organizationSettingsPath(organizationId, factoryKey)}/${section}`;
+export function organizationSettingsSectionPath(organizationId: string, section: string) {
+  return `${organizationSettingsPath(organizationId)}/${section}`;
+}
+
+export function organizationSettingsBackPath(organizationId: string, fromFactoryKey?: string) {
+  if (fromFactoryKey) {
+    return factoryDetailPath(organizationId, fromFactoryKey);
+  }
+  return factoryListPath(organizationId);
 }
 
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */

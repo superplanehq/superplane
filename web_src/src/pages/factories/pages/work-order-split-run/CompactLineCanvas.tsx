@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTheme } from "@/contexts/useTheme";
 import { FACTORY_HANDLE_STYLE, factoryCanvasBackground, factoryEdgePalette } from "@/lib/factoryCanvasChrome";
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
@@ -14,9 +15,16 @@ import { FACTORY_HANDLE_OUTSET_PX } from "@/ui/CanvasPage/Block/handleStyle";
 import { CustomEdge } from "@/ui/CanvasPage/CustomEdge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { FactoryNodeCardShell } from "@/ui/factoryNodeChrome/FactoryNodeCardShell";
+import { FACTORY_NODE_SELECTED_RING_CLASSNAME } from "@/ui/factoryNodeChrome/factoryNodeSelectedRing";
 import { FactoryNodeStepList } from "@/ui/factoryNodeChrome/FactoryNodeStepList";
 
-import { COMPACT_CANVAS_FIT_SETTLE_MS, compactCanvasFitKey, shouldFitCompactCanvas } from "./compactCanvasFit";
+import {
+  COMPACT_CANVAS_FIT_SETTLE_MS,
+  COMPACT_FIT_VIEW_OPTIONS,
+  compactCanvasFitKey,
+  compactCanvasNodeFocusRequest,
+  shouldFitCompactCanvas,
+} from "./compactCanvasFit";
 import { compactLineCanvasGraph, type LineNodeData } from "./compactLineCanvasGraph";
 import type { SplitRunCanvasModel } from "./splitRunCanvases";
 
@@ -60,11 +68,7 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
       onClick={() => data.onSelect?.(data.nodeId)}
     >
       <div
-        className={cn(
-          "relative overflow-visible rounded-2xl",
-          data.isSelected &&
-            "ring-2 ring-[color:var(--status-running-dot)] ring-offset-2 ring-offset-[color:var(--status-running-bg)]",
-        )}
+        className={cn("relative overflow-visible rounded-2xl", data.isSelected && FACTORY_NODE_SELECTED_RING_CLASSNAME)}
       >
         <LineCanvasTargetHandle isSideTarget={data.isSideTarget} />
         <FactoryNodeCardShell
@@ -77,6 +81,7 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
           selected={data.isSelected}
           body={data.steps.length > 0 ? <FactoryNodeStepList steps={data.steps} /> : undefined}
         />
+        {data.isSelected && data.editHref ? <SelectedNodeEditButton href={data.editHref} /> : null}
         <Handle
           id={FACTORY_SPINE_HANDLE_ID}
           type="source"
@@ -107,20 +112,53 @@ function LineCanvasNode({ data }: NodeProps<Node<LineNodeData>>) {
 const nodeTypes = { lineCanvas: LineCanvasNode };
 const edgeTypes = { custom: CustomEdge };
 
-const COMPACT_FIT_VIEW_OPTIONS = { padding: 0.2 } as const;
+const EDIT_COMPONENT_LABEL = "Edit component";
 
-function FitCompactCanvas({ contentKey }: { contentKey: string }) {
-  const { fitView } = useReactFlow();
+function SelectedNodeEditButton({ href }: { href: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          href={href}
+          aria-label={EDIT_COMPONENT_LABEL}
+          data-testid="split-run-canvas-node-edit"
+          className="nodrag nopan absolute top-2 right-2 z-20 flex size-7 items-center justify-center rounded-md bg-foreground text-background shadow-sm transition-colors hover:bg-foreground/90"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Pencil className="size-3.5" aria-hidden />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="top">{EDIT_COMPONENT_LABEL}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function CompactCanvasViewport({ contentKey, selectedId }: { contentKey: string; selectedId: string | null }) {
+  const { fitView, getNode } = useReactFlow();
 
   useEffect(() => {
-    if (!shouldFitCompactCanvas(contentKey)) {
+    if (!shouldFitCompactCanvas(contentKey) || selectedId) {
       return;
     }
     const timer = window.setTimeout(() => {
       void fitView(COMPACT_FIT_VIEW_OPTIONS);
     }, COMPACT_CANVAS_FIT_SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [contentKey, fitView]);
+  }, [contentKey, fitView, selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const request = compactCanvasNodeFocusRequest(getNode(selectedId));
+      if (!request) {
+        return;
+      }
+      void fitView(request);
+    }, COMPACT_CANVAS_FIT_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [contentKey, fitView, getNode, selectedId]);
 
   return null;
 }
@@ -138,6 +176,7 @@ export function CompactLineCanvas({
   headerEdit = "menu",
   editLabel = "Edit Automation",
   onEdit,
+  nodeEditHref,
 }: {
   canvas: SplitRunCanvasModel;
   selectedId: string | null;
@@ -148,12 +187,13 @@ export function CompactLineCanvas({
   headerEdit?: "menu" | "button";
   editLabel?: string;
   onEdit?: () => void;
+  nodeEditHref?: (nodeId: string) => string;
 }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const { nodes, edges } = useMemo(
-    () => compactLineCanvasGraph(canvas, selectedId, onSelect, isDark),
-    [canvas, isDark, onSelect, selectedId],
+    () => compactLineCanvasGraph(canvas, selectedId, onSelect, isDark, nodeEditHref),
+    [canvas, isDark, nodeEditHref, onSelect, selectedId],
   );
   const background = factoryCanvasBackground(isDark);
   const palette = factoryEdgePalette(isDark);
@@ -222,7 +262,7 @@ export function CompactLineCanvas({
           colorMode={isDark ? "dark" : "light"}
           defaultEdgeOptions={{ type: "custom", style: palette.default }}
         >
-          <FitCompactCanvas contentKey={contentKey} />
+          <CompactCanvasViewport contentKey={contentKey} selectedId={selectedId} />
           <Background
             gap={background.gap}
             size={background.size}

@@ -2,6 +2,8 @@ package organizations
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
 
 	"github.com/google/uuid"
@@ -74,6 +76,49 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 	assert.Equal(t, "openai", resp.ByModel[0].Provider)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.RemainingCreditCents)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.GrantTotalCents)
+	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
+	assert.Equal(t, int64(0), resp.PurchasedCreditCents)
 	assert.Equal(t, int64(0), resp.HostedBilledCents)
 	assert.False(t, resp.RemainingCreditWarning)
+	assert.Empty(t, resp.Invoices)
+}
+
+func Test__DescribeOrganizationLLMSpendListsPolarInvoices(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_1"))
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
+	require.NoError(t, err)
+
+	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+		assert.Equal(t, "/orders/", req.URL.Path)
+		assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":           "ord_100",
+					"created_at":   "2026-08-27T12:00:00Z",
+					"status":       "paid",
+					"total_amount": 10000,
+					"product":      map[string]any{"name": "$100 pack"},
+				},
+			},
+			"pagination": map[string]any{"max_page": 1},
+		}))
+	})
+	usePolarTestServer(t, server)
+
+	resp, err := DescribeOrganizationLLMSpend(
+		context.Background(),
+		r.Organization.ID.String(),
+		&pb.DescribeOrganizationLLMSpendRequest{},
+	)
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
+	assert.Equal(t, int64(10000), resp.PurchasedCreditCents)
+	require.Len(t, resp.Invoices, 1)
+	assert.Equal(t, "ord_100", resp.Invoices[0].Id)
+	assert.Equal(t, int64(10000), resp.Invoices[0].AmountCents)
+	assert.Equal(t, "paid", resp.Invoices[0].Status)
+	assert.Equal(t, "$100 pack", resp.Invoices[0].ProductName)
 }

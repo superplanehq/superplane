@@ -98,6 +98,16 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(scroll.className).toMatch(/\bpb-3\b/);
   });
 
+  it("does not show elapsed time or a spend icon on the owner row", () => {
+    renderSplitRun();
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(within(row).queryByText(/so far/)).not.toBeInTheDocument();
+    expect(row.querySelector(".lucide-clock")).toBeNull();
+    expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
+    expect(row).toHaveTextContent("$0.73");
+    expect(row).toHaveTextContent("2.7k tokens");
+  });
+
   it("does not put an Open work order link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),

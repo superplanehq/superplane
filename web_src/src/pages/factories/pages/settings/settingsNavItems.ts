@@ -40,6 +40,7 @@ export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
 const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>([
   "general",
   "automations",
+  "models",
   "usage",
   "profile",
   "notifications",

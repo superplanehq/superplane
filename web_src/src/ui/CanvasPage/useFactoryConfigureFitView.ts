@@ -1,6 +1,9 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
-import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "./canvasFitOptions";
-import { FACTORY_CONFIGURE_FIT_SETTLE_MS, shouldFitFactoryConfigureEnter } from "./factoryConfigureFitView";
+import {
+  FACTORY_CONFIGURE_FIT_SETTLE_MS,
+  factoryConfigureEnterFitViewOptions,
+  shouldFitFactoryConfigureEnter,
+} from "./factoryConfigureFitView";
 
 type Viewport = { x: number; y: number; zoom: number };
 
@@ -10,6 +13,7 @@ type UseFactoryConfigureFitViewInput = {
   hasReactFlowInitialized: boolean;
   nodeCount: number;
   getNodeCount: () => number;
+  getFocusNode: () => { id: string } | undefined;
   fitView: (options: Record<string, unknown>) => Promise<unknown>;
   getViewport: () => Viewport;
   viewportRef: MutableRefObject<Viewport | undefined>;
@@ -23,6 +27,7 @@ export function useFactoryConfigureFitView({
   hasReactFlowInitialized,
   nodeCount,
   getNodeCount,
+  getFocusNode,
   fitView,
   getViewport,
   viewportRef,
@@ -58,7 +63,7 @@ export function useFactoryConfigureFitView({
         return;
       }
       fittedThisVisitRef.current = true;
-      void fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 }).then(
+      void fitView(factoryConfigureEnterFitViewOptions(getFocusNode())).then(
         () => {
           const nextViewport = getViewport();
           viewportRef.current = nextViewport;
@@ -72,6 +77,7 @@ export function useFactoryConfigureFitView({
   }, [
     factoryConfigure,
     fitView,
+    getFocusNode,
     getNodeCount,
     getViewport,
     hasReactFlowInitialized,

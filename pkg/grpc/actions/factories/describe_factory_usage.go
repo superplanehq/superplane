@@ -34,7 +34,8 @@ func DescribeFactoryUsage(
 	since := time.Now().AddDate(0, 0, -period)
 
 	db := database.DB(ctx)
-	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
+	factory, err := models.FindFactory(db, orgID, factoryID)
+	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
@@ -52,16 +53,28 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
-	return &pb.DescribeFactoryUsageResponse{
-		TotalTokens:            totals.TotalTokens,
-		TotalCostCents:         totals.CostCents(),
-		PeriodDays:             int32(period),
-		ByModel:                serializeUsageByModel(byModel),
-		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
-		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
-		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
-		RemainingCreditWarning: credit.Warning,
-	}, nil
+	budget, err := models.DescribeFactoryHostedBudget(db, factory)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
+	}
+
+	resp := &pb.DescribeFactoryUsageResponse{
+		TotalTokens:                   totals.TotalTokens,
+		TotalCostCents:                totals.CostCents(),
+		PeriodDays:                    int32(period),
+		ByModel:                       serializeUsageByModel(byModel),
+		RemainingCreditCents:          pricebook.MicrosToCents(credit.RemainingMicros),
+		GrantTotalCents:               pricebook.MicrosToCents(credit.GrantMicros),
+		HostedBilledCents:             pricebook.MicrosToCents(credit.BilledMicros),
+		RemainingCreditWarning:        credit.Warning,
+		FactoryHostedBilledCents:      pricebook.MicrosToCents(budget.BilledMicros),
+		FactoryRemainingCreditCents:   pricebook.MicrosToCents(budget.RemainingMicros),
+		FactoryRemainingCreditWarning: budget.Warning,
+	}
+	if budget.BudgetCents != nil {
+		resp.HostedSpendBudgetCents = budget.BudgetCents
+	}
+	return resp, nil
 }
 
 func clampUsagePeriodDays(period int) int {

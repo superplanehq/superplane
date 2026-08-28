@@ -46,6 +46,8 @@ interface RequestBody {
   title?: unknown;
   description?: unknown;
   key?: unknown;
+  hostedSpendBudgetCents?: unknown;
+  clearHostedSpendBudget?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -167,6 +169,13 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           if (typeof request.description === "string") {
             factory.description = request.description;
           }
+          if (request.clearHostedSpendBudget === true) {
+            factory.hostedSpendBudgetCents = undefined;
+          } else if (typeof request.hostedSpendBudgetCents === "number") {
+            factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
+          } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
+            factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
+          }
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
@@ -189,6 +198,25 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/llm-models"),
+      resolve: (_match, method, body, url) => {
+        const request = (body ?? {}) as { provider?: string; fundingSource?: string; allowedModels?: unknown };
+        const provider =
+          url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
+        const models = storybookHostedLlmModels(provider).models;
+        if (method === "PUT") {
+          const allowed = stringArrayOrEmpty(request.allowedModels);
+          return {
+            json: {
+              selected: allowed.map((id) => ({ id, name: id })),
+              inheritParent: allowed.length === 0,
+            },
+          };
+        }
+        return { json: { parent: models, selected: models, inheritParent: true } };
+      },
     },
   ];
 }
@@ -537,6 +565,56 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
+function byokModelsRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/byok-models"),
+    resolve: (_match, method, body, url) => {
+      const request = (body ?? {}) as { provider?: string; allowedModels?: unknown };
+      const provider =
+        url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
+      const models = storybookHostedLlmModels(provider).models;
+      if (method === "PUT") {
+        const allowed = stringArrayOrEmpty(request.allowedModels);
+        return { json: { selected: allowed.map((id) => ({ id, name: id })) } };
+      }
+      return {
+        json: {
+          connected: models.length > 0,
+          integrationId: models.length > 0 ? "int-byok" : "",
+          selected: models,
+          candidates: models,
+        },
+      };
+    },
+  };
+}
+
+function hostedCreditProductsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-products"),
+    resolve: () => ({
+      json: {
+        billingEnabled: Boolean(fixture.hostedCreditProducts?.length),
+        products: fixture.hostedCreditProducts ?? [],
+      },
+    }),
+  };
+}
+
+function hostedCreditCheckoutRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout"),
+    resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_storybook" } }),
+  };
+}
+
+function billingPortalSessionRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing-portal-session"),
+    resolve: () => ({ json: { portalUrl: "https://polar.sh/portal/storybook" } }),
+  };
+}
+
 const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
   ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
 );
@@ -590,6 +668,10 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
     hostedLlmModelsRoute(),
+    byokModelsRoute(),
+    hostedCreditProductsRoute(fixture),
+    hostedCreditCheckoutRoute(),
+    billingPortalSessionRoute(),
   ];
 }
 

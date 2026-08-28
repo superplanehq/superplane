@@ -254,7 +254,12 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; description?: string; key?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      description?: string;
+      key?: string;
+      hostedSpendBudgetCents?: number | null;
+    }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
           organizationId,
@@ -263,6 +268,11 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
             name: input.name,
             description: input.description,
             key: input.key,
+            hostedSpendBudgetCents:
+              input.hostedSpendBudgetCents === null || input.hostedSpendBudgetCents === undefined
+                ? undefined
+                : String(input.hostedSpendBudgetCents),
+            clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
           },
         }),
       );

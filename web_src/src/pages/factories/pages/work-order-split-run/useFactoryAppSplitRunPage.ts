@@ -2,7 +2,7 @@ import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactory
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -101,12 +101,20 @@ export function useFactoryAppSplitRunPage() {
       visual.canvas.title,
     ],
   );
-  const editHref = factoryAppConfigurePath(organizationId, factoryKey, appId, {
-    from: parseFactoryAppNavFrom(query.from),
-    lineId: query.lineId ?? undefined,
-    runId: query.runId ?? undefined,
-    orderNumber: query.orderNumber ?? undefined,
-  });
+  const configureNav = useMemo(
+    () => ({
+      from: parseFactoryAppNavFrom(query.from),
+      lineId: query.lineId ?? undefined,
+      runId: query.runId ?? undefined,
+      orderNumber: query.orderNumber ?? undefined,
+    }),
+    [query.from, query.lineId, query.orderNumber, query.runId],
+  );
+  const editHref = factoryAppConfigurePath(organizationId, factoryKey, appId, configureNav);
+  const nodeEditHref = useCallback(
+    (nodeId: string) => factoryAppConfigurePath(organizationId, factoryKey, appId, { ...configureNav, nodeId }),
+    [appId, configureNav, factoryKey, organizationId],
+  );
 
   usePageTitle([splitRunPageTitle(!order, isLoading, visual.canvas.title), factory?.name ?? "Workspace"]);
 
@@ -118,6 +126,7 @@ export function useFactoryAppSplitRunPage() {
     isLoading,
     liveError: live.isError,
     nodeId,
+    nodeEditHref,
     organizationId,
     phase,
     setNodeId,

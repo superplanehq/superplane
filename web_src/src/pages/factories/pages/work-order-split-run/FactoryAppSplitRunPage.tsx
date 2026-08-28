@@ -134,6 +134,7 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
             selectedId={model.nodeId}
             onSelect={model.setNodeId}
             showHeader={false}
+            nodeEditHref={model.nodeEditHref}
           />
         </section>
       </div>
