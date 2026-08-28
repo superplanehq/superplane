@@ -650,6 +650,24 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("heading", { name: /stopped this automation/ })).toBeInTheDocument();
   });
 
+  it("names the person who marked the task successful, with avatar", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, {
+        closer: {
+          actor: { id: "user-1", name: "Alex", initials: "A", avatarUrl: "https://example.com/alex.png" },
+        },
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByTestId("work-order-mention")).toHaveTextContent("Alex");
+    expect(within(note).getByTestId("work-order-mention").querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.com/alex.png",
+    );
+    expect(within(note).getByRole("heading", { name: /marked this task as successful/ })).toBeInTheDocument();
+  });
+
   it("keeps Reject and Approve off the header on a running order", () => {
     renderSplitRun();
 
