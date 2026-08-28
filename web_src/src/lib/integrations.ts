@@ -17,9 +17,14 @@ export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationD
   return definition?.name === "github" && definition.hostedAppInstall === true;
 }
 
-/** Customer GitHub App wizard. Hosted Connect stays the default; this needs new_integration_setup_flow. */
+/** Show Create your own GitHub App beside hosted Connect. */
 export function offersPrivateGitHubAppSetup(definition?: IntegrationsIntegrationDefinition): boolean {
-  return usesHostedGitHubAppInstall(definition) && isCapabilityBasedIntegrationDefinition(definition ?? {});
+  return usesHostedGitHubAppInstall(definition);
+}
+
+/** New setup wizard. Feature off uses the legacy Sync manifest instead. */
+export function usesPrivateGitHubAppWizard(definition?: IntegrationsIntegrationDefinition): boolean {
+  return offersPrivateGitHubAppSetup(definition) && isCapabilityBasedIntegrationDefinition(definition ?? {});
 }
 
 export function openRedirectPrompt(step: IntegrationSetupStepDefinition | null) {

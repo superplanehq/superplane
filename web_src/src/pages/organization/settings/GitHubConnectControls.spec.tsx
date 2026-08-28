@@ -67,10 +67,25 @@ describe("GitHubConnectControls", () => {
     expect(screen.getByTestId("location-path")).toHaveTextContent(githubPrivateAppSetupPath("org-1"));
   });
 
-  it("hides the private-app link when the setup flow feature is off", () => {
-    renderControls(vi.fn(), { name: "github", label: "GitHub", hostedAppInstall: true, legacySetupOnly: true });
+  it("keeps the private-app link when the setup flow feature is off", async () => {
+    const user = userEvent.setup();
+    const onCreatePrivateApp = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/org-1/settings/integrations"]}>
+        <TooltipProvider>
+          <GitHubConnectControls
+            organizationId="org-1"
+            definition={{ name: "github", label: "GitHub", hostedAppInstall: true, legacySetupOnly: true }}
+            canCreateIntegrations
+            permissionsLoading={false}
+            onConnect={vi.fn()}
+            onCreatePrivateApp={onCreatePrivateApp}
+          />
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
 
-    expect(screen.getByTestId("integrations-connect-github")).toBeInTheDocument();
-    expect(screen.queryByTestId("integrations-create-private-github-app")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("integrations-create-private-github-app"));
+    expect(onCreatePrivateApp).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { peekIntegrationSetupReturn } from "./integrationSetupReturn";
+
+vi.mock("@/lib/browserAction", () => ({
+  followBrowserAction: vi.fn(() => true),
+}));
 import {
+  connectPrivateGitHubApp,
   githubPrivateAppSetupPath,
   privateGitHubAppCreateConfiguration,
   startPrivateGitHubAppSetup,
@@ -39,5 +44,51 @@ describe("startPrivateGitHubAppSetup", () => {
 
     expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup");
     expect(peekIntegrationSetupReturn("org-1")).toBe("/org-1/workspaces/ws/setup?step=vcs&pick=newest");
+  });
+});
+
+describe("connectPrivateGitHubApp", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("opens the wizard when the setup flow feature is on", async () => {
+    const goTo = vi.fn();
+    const create = vi.fn();
+
+    await connectPrivateGitHubApp({
+      useWizard: true,
+      organizationId: "org-1",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+    });
+
+    expect(goTo).toHaveBeenCalledWith("/org-1/settings/integrations/github/setup");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("creates with privateApp when the setup flow feature is off", async () => {
+    const goTo = vi.fn();
+    const create = vi.fn().mockResolvedValue({
+      integration: { status: { browserAction: { method: "POST", url: "https://github.com/settings/apps/new" } } },
+    });
+
+    await connectPrivateGitHubApp({
+      useWizard: false,
+      organizationId: "org-1",
+      goTo,
+      existingNames: new Set(),
+      connected: [],
+      create,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      integrationName: "github",
+      name: "github",
+      configuration: { privateApp: true },
+    });
+    expect(goTo).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ interface GitHubConnectControlsProps {
   canCreateIntegrations: boolean;
   permissionsLoading: boolean;
   onConnect: () => void;
+  onCreatePrivateApp?: () => void;
 }
 
 export function GitHubConnectControls({
@@ -20,6 +21,7 @@ export function GitHubConnectControls({
   canCreateIntegrations,
   permissionsLoading,
   onConnect,
+  onCreatePrivateApp,
 }: GitHubConnectControlsProps) {
   const navigate = useNavigate();
   const integrationsBasePath = useIntegrationsBasePath(organizationId);
@@ -53,14 +55,18 @@ export function GitHubConnectControls({
           variant="link"
           className="h-auto p-0 text-xs text-gray-500 dark:text-gray-400"
           data-testid="integrations-create-private-github-app"
-          onClick={() =>
+          onClick={() => {
+            if (onCreatePrivateApp) {
+              onCreatePrivateApp();
+              return;
+            }
             startPrivateGitHubAppSetup({
               organizationId,
               returnTo: integrationsBasePath,
               integrationsBasePath,
               goTo: navigate,
-            })
-          }
+            });
+          }}
         >
           {CREATE_PRIVATE_GITHUB_APP_LABEL}
         </Button>
