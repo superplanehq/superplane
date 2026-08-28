@@ -14,6 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
+  <LinkCard title="On Work Order" href="#on-work-order" description="Start when a work order is created in this factory" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
@@ -201,6 +202,57 @@ Handle runs started from another app
   },
   "timestamp": "2026-07-19T12:00:00Z",
   "type": "app.invocation"
+}
+```
+
+<a id="on-work-order"></a>
+
+## On Work Order
+
+**Trigger key:** `onWorkOrder`
+
+The On Work Order trigger starts a workflow when a work order is created in the factory that owns this app.
+
+Use it on a factory-owned app, such as the generated Backlog automation that scores new work orders.
+
+### Event Data
+
+Each event has type `workOrder.created`. The payload is:
+
+```
+{
+  "workOrder": {
+    "id": "...",
+    "title": "...",
+    "description": "...",
+    "number": 12,
+    "state": "draft",
+    "origin": { "url": "...", "label": "..." }
+  }
+}
+```
+
+`origin` is present only when the work order was created from an intake item.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "workOrder": {
+      "description": "The billing page empty state does not name the next action.",
+      "id": "123",
+      "number": 12,
+      "origin": {
+        "label": "acme/app#42",
+        "url": "https://github.com/acme/app/issues/42"
+      },
+      "state": "draft",
+      "title": "Show a clearer empty state"
+    }
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "workOrder.created"
 }
 ```
 
