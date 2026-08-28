@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -128,6 +129,14 @@ func (s *gitHubIntakeItemSource) Get(ctx context.Context, id string) (*IntakeIte
 	}
 
 	item := gitHubIssueItem(issue)
+	if issue.GetComments() > 0 {
+		comments, err := s.github.ListIssueComments(ctx, s.repository, number)
+		if err != nil {
+			return nil, err
+		}
+		item.Body = composeImportedDescription(item.Body, comments)
+	}
+
 	return &item, nil
 }
 
@@ -189,6 +198,60 @@ func gitHubIssueItem(issue *github.Issue) IntakeItem {
 		Body:  issue.GetBody(),
 		URL:   issue.GetHTMLURL(),
 	}
+}
+
+const (
+	importedCommentsSeparator     = "____"
+	importedCommentsHeader        = "Imported Comments:"
+	importedCommentsUnknownAuthor = "unknown"
+)
+
+// composeImportedDescription appends an issue's comments to its body when
+// creating a draft work order from an imported GitHub issue. Comments are
+// expected oldest first (see Client.ListIssueComments); this function trusts
+// that order and does not re-sort. If there are no usable comments, the body
+// is returned unchanged.
+func composeImportedDescription(body string, comments []*github.IssueComment) string {
+	usable := make([]*github.IssueComment, 0, len(comments))
+	for _, comment := range comments {
+		if comment != nil {
+			usable = append(usable, comment)
+		}
+	}
+	if len(usable) == 0 {
+		return body
+	}
+
+	var builder strings.Builder
+	if body != "" {
+		builder.WriteString(body)
+		builder.WriteString("\n")
+	}
+	builder.WriteString(importedCommentsSeparator)
+	builder.WriteString("\n")
+	builder.WriteString(importedCommentsHeader)
+	builder.WriteString("\n")
+
+	for i, comment := range usable {
+		builder.WriteString(importedCommentAuthor(comment))
+		builder.WriteString(" ")
+		builder.WriteString(comment.GetCreatedAt().UTC().Format(time.RFC3339))
+		builder.WriteString("\n")
+		builder.WriteString(comment.GetBody())
+		if i < len(usable)-1 {
+			builder.WriteString("\n\n")
+		}
+	}
+
+	return builder.String()
+}
+
+func importedCommentAuthor(comment *github.IssueComment) string {
+	login := comment.GetUser().GetLogin()
+	if login == "" {
+		return importedCommentsUnknownAuthor
+	}
+	return login
 }
 
 func gitHubIssueSearchQuery(repository, query string) string {
