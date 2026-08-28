@@ -240,6 +240,41 @@ func PolarRefundMicrosForOrder(tx *gorm.DB, polarOrderID string) (int64, error) 
 	return refundedMicros, nil
 }
 
+// ReversePolarOrderCredit inserts a Polar refund so the reversed total equals
+// reverseMicros, and never more than the purchase grant. Concurrent callers
+// serialize on the purchase grant row.
+func ReversePolarOrderCredit(tx *gorm.DB, orgID uuid.UUID, polarOrderID string, reverseMicros int64, polarRefundID string) error {
+	if reverseMicros <= 0 {
+		return nil
+	}
+	return tx.Transaction(func(inner *gorm.DB) error {
+		grant, err := FindLLMCreditGrantByPolarOrderID(
+			inner.Clauses(clause.Locking{Strength: "UPDATE"}),
+			polarOrderID,
+		)
+		if err != nil {
+			return err
+		}
+		already, err := PolarRefundMicrosForOrder(inner, polarOrderID)
+		if err != nil {
+			return err
+		}
+		remaining := grant.AmountMicros - already
+		if remaining <= 0 {
+			return nil
+		}
+		additional := reverseMicros - already
+		if additional <= 0 {
+			return nil
+		}
+		if additional > remaining {
+			additional = remaining
+		}
+		_, err = AddPolarLLMCreditRefund(inner, orgID, additional, polarOrderID, polarRefundID)
+		return err
+	})
+}
+
 func SetOrganizationPolarCustomerID(tx *gorm.DB, orgID uuid.UUID, customerID string) error {
 	customerID = strings.TrimSpace(customerID)
 	if customerID == "" {

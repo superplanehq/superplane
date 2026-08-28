@@ -94,15 +94,12 @@ function HostedCreditSummaryCard({
   showGrantBreakdown: boolean;
 }) {
   const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled);
-  const showBillingActions = Boolean(billingEnabled && canManageBilling && (products.length > 0 || hasBillingCustomer));
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
-  const metricGridClassName = showGrantBreakdown
-    ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-    : "grid gap-3 sm:grid-cols-2";
+  const showBilling = showHostedBillingActions(billingEnabled, canManageBilling, products.length, hasBillingCustomer);
 
   return (
     <div className={cardClassName}>
-      <div className={innerCardClassName ? `${metricGridClassName} ${innerCardClassName}` : metricGridClassName}>
+      <div className={creditMetricsClassName(showGrantBreakdown, innerCardClassName)}>
         <CreditMetric
           label="Remaining hosted credit"
           labelClassName={labelClassName}
@@ -110,20 +107,12 @@ function HostedCreditSummaryCard({
           valueClassName={valueClassName}
         />
         {showGrantBreakdown ? (
-          <>
-            <CreditMetric
-              label="SuperPlane grant"
-              labelClassName={labelClassName}
-              value={superplaneGrant}
-              valueClassName={valueClassName}
-            />
-            <CreditMetric
-              label="Purchased hosted credit"
-              labelClassName={labelClassName}
-              value={purchasedCredit}
-              valueClassName={valueClassName}
-            />
-          </>
+          <GrantBreakdownMetrics
+            labelClassName={labelClassName}
+            purchasedCredit={purchasedCredit}
+            superplaneGrant={superplaneGrant}
+            valueClassName={valueClassName}
+          />
         ) : null}
         <CreditMetric
           label="Hosted billed spend"
@@ -136,7 +125,7 @@ function HostedCreditSummaryCard({
         <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
       ) : null}
       {warningMessage ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warningMessage}</p> : null}
-      {showBillingActions ? (
+      {showBilling ? (
         <BillingActions
           invoices={invoices}
           products={products}
@@ -148,6 +137,55 @@ function HostedCreditSummaryCard({
         />
       ) : null}
     </div>
+  );
+}
+
+function creditMetricsClassName(showGrantBreakdown: boolean, innerCardClassName?: string) {
+  const grid = showGrantBreakdown ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-4" : "grid gap-3 sm:grid-cols-2";
+  if (!innerCardClassName) {
+    return grid;
+  }
+  return `${grid} ${innerCardClassName}`;
+}
+
+function showHostedBillingActions(
+  billingEnabled: boolean,
+  canManageBilling: boolean,
+  productCount: number,
+  hasBillingCustomer: boolean,
+) {
+  if (!billingEnabled || !canManageBilling) {
+    return false;
+  }
+  return productCount > 0 || hasBillingCustomer;
+}
+
+function GrantBreakdownMetrics({
+  superplaneGrant,
+  purchasedCredit,
+  labelClassName,
+  valueClassName,
+}: {
+  superplaneGrant: number;
+  purchasedCredit: number;
+  labelClassName: string;
+  valueClassName: string;
+}) {
+  return (
+    <>
+      <CreditMetric
+        label="SuperPlane grant"
+        labelClassName={labelClassName}
+        value={superplaneGrant}
+        valueClassName={valueClassName}
+      />
+      <CreditMetric
+        label="Purchased hosted credit"
+        labelClassName={labelClassName}
+        value={purchasedCredit}
+        valueClassName={valueClassName}
+      />
+    </>
   );
 }
 

@@ -268,6 +268,28 @@ func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
 	assert.Equal(t, models.CentsToMicros(1500), summary.PurchasedCreditMicros)
 }
 
+func Test__ReversePolarOrderCreditDoesNotOverDebitConcurrently(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+
+	errs := make(chan error, 2)
+	go func() {
+		errs <- models.ReversePolarOrderCredit(db, r.Organization.ID, orderID, models.CentsToMicros(2500), orderID+":full")
+	}()
+	go func() {
+		errs <- models.ReversePolarOrderCredit(db, r.Organization.ID, orderID, models.CentsToMicros(1000), orderID+":partial")
+	}()
+	require.NoError(t, <-errs)
+	require.NoError(t, <-errs)
+
+	reversed, err := models.PolarRefundMicrosForOrder(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(2500), reversed)
+}
+
 func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)

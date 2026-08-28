@@ -103,22 +103,8 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 	}
 
 	reverseMicros := refundReverseMicros(grant.AmountMicros, event.Data)
-	if reverseMicros <= 0 {
-		return nil
-	}
-
-	already, err := models.PolarRefundMicrosForOrder(tx, event.Data.ID)
-	if err != nil {
-		return err
-	}
-	additional := reverseMicros - already
-	if additional <= 0 {
-		return nil
-	}
-
 	refundID := polarRefundID(event.Data, reverseMicros)
-	_, err = models.AddPolarLLMCreditRefund(tx, orgID, additional, event.Data.ID, refundID)
-	return err
+	return models.ReversePolarOrderCredit(tx, orgID, event.Data.ID, reverseMicros, refundID)
 }
 
 func parseOrganizationID(externalID string) (uuid.UUID, error) {

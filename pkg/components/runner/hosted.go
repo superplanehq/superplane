@@ -63,12 +63,15 @@ func PrepareHostedRun(ctx core.ExecutionContext, provider, model string) (core.H
 	if err := ctx.HostedLLM.AssertCreditAvailable(); err != nil {
 		return core.HostedLLMAccess{}, err
 	}
+	if strings.TrimSpace(model) == "" {
+		return core.HostedLLMAccess{}, fmt.Errorf("model is required for SuperPlane-hosted credentials")
+	}
+	if err := ctx.HostedLLM.AssertModelSelectable(provider, "hosted", model); err != nil {
+		return core.HostedLLMAccess{}, err
+	}
 	access, err := ctx.HostedLLM.Resolve(provider)
 	if err != nil {
 		return core.HostedLLMAccess{}, err
-	}
-	if strings.TrimSpace(model) == "" {
-		return core.HostedLLMAccess{}, fmt.Errorf("model is required for SuperPlane-hosted credentials")
 	}
 	if !access.AllowsModel(model) {
 		return core.HostedLLMAccess{}, fmt.Errorf("model %s is not on the SuperPlane-hosted allowlist", model)

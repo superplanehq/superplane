@@ -211,6 +211,30 @@ func Test__ApplyOrderRefundedUsesExistingGrantWithoutPackMetadata(t *testing.T) 
 	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
 }
 
+func Test__ApplyOrderRefundedDoesNotOverDebitConcurrently(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	require.NoError(t, ApplyOrderPaid(context.Background(), db, paidPackEvent(r.Organization.ID, orderID, 2500), nil))
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+
+	errs := make(chan error, 2)
+	go func() {
+		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "refunded", 2500), nil)
+	}()
+	go func() {
+		errs <- ApplyOrderRefunded(context.Background(), db, refundedPackEvent(r.Organization.ID, orderID, "partially_refunded", 1000), nil)
+	}()
+	require.NoError(t, <-errs)
+	require.NoError(t, <-errs)
+
+	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, before.GrantMicros-models.CentsToMicros(2500), after.GrantMicros)
+	assert.GreaterOrEqual(t, after.RemainingMicros, int64(0))
+}
+
 func Test__ApplyOrderRefundedRetriesUntilGrantExists(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
