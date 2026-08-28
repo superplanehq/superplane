@@ -82,7 +82,6 @@ export function WorkOrderCard({
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";
-  const analysisPending = isAnalyzing && confidenceScore == null;
   const attentionReason = getWorkOrderAttentionReason(entry.order, {
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
   });
@@ -126,18 +125,9 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidenceScore != null || analysisPending || showStart ? (
+          {confidenceScore != null || isAnalyzing || showStart ? (
             <div className="flex shrink-0 items-center gap-1.5">
-              {confidenceScore != null ? (
-                <ConfidenceMeter
-                  score={confidenceScore}
-                  className="shrink-0"
-                  testId={`work-order-card-score-${entry.id}`}
-                />
-              ) : null}
-              {analysisPending ? (
-                <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entry.id}`} />
-              ) : null}
+              <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
               {showStart ? (
                 <StartDraftButton
                   entry={entry}
@@ -155,6 +145,21 @@ export function WorkOrderCard({
       </div>
     </article>
   );
+}
+
+/**
+ * Score meter, or a spinner while the Backlog automation still analyzes the
+ * work order. Both take the same slot, so the card does not move when the
+ * score arrives.
+ */
+function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
+  if (score != null) {
+    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
+  }
+  if (isAnalyzing) {
+    return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+  }
+  return null;
 }
 
 function WorkOrderAttentionChip({ reason }: { reason: WorkOrderAttentionReason }) {
