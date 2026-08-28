@@ -274,12 +274,23 @@ export function factorySettingsSectionPath(organizationId: string, factoryKey: s
   return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
 }
 
-export function organizationSettingsPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/organization`;
+export type OrganizationSettingsLocationState = {
+  fromFactoryKey?: string;
+};
+
+export function organizationSettingsPath(organizationId: string) {
+  return `/${organizationId}/organization`;
 }
 
-export function organizationSettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${organizationSettingsPath(organizationId, factoryKey)}/${section}`;
+export function organizationSettingsSectionPath(organizationId: string, section: string) {
+  return `${organizationSettingsPath(organizationId)}/${section}`;
+}
+
+export function organizationSettingsBackPath(organizationId: string, fromFactoryKey?: string) {
+  if (fromFactoryKey) {
+    return factoryDetailPath(organizationId, fromFactoryKey);
+  }
+  return factoryListPath(organizationId);
 }
 
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */

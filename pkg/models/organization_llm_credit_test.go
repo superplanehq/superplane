@@ -167,12 +167,12 @@ func Test__ReserveHostedCreditBlocksConcurrentStarts(t *testing.T) {
 	first := pendingHostedExecution(t, r)
 	second := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
-	err := models.ReserveHostedCredit(db, r.Organization.ID, second.ID)
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
+	err := models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil)
 	require.ErrorIs(t, err, models.ErrHostedRunInFlight)
 
 	require.NoError(t, models.ReleaseHostedCreditHold(db, first.ID))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
 }
 
 func Test__ReserveHostedCreditIsIdempotentForSameExecution(t *testing.T) {
@@ -181,8 +181,8 @@ func Test__ReserveHostedCreditIsIdempotentForSameExecution(t *testing.T) {
 	db := database.Conn()
 	execution := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, nil))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, nil))
 }
 
 func Test__ReserveHostedCreditReleasesHoldWhenExecutionFinishes(t *testing.T) {
@@ -192,9 +192,9 @@ func Test__ReserveHostedCreditReleasesHoldWhenExecutionFinishes(t *testing.T) {
 	first := pendingHostedExecution(t, r)
 	second := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
 	require.NoError(t, db.Model(first).Update("state", models.CanvasNodeExecutionStateFinished).Error)
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
 }
 
 func Test__ReserveHostedCreditReleasesHoldWhenExecutionIsDeleted(t *testing.T) {
@@ -204,9 +204,109 @@ func Test__ReserveHostedCreditReleasesHoldWhenExecutionIsDeleted(t *testing.T) {
 	first := pendingHostedExecution(t, r)
 	second := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
 	require.NoError(t, db.Delete(first).Error)
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID))
+	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
+}
+
+func Test__PolarGrantIsIdempotentByOrderID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+
+	first, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+	second, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.GrantMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(2500), summary.PurchasedCreditMicros)
+}
+
+func Test__DescribeOrganizationLLMCreditSplitsSuperPlaneAndPurchasedGrants(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
+	require.NoError(t, err)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(10000), summary.PurchasedCreditMicros)
+	assert.Equal(t, summary.SuperPlaneGrantMicros+summary.PurchasedCreditMicros, summary.GrantMicros)
+	assert.Equal(t, summary.GrantMicros, summary.RemainingMicros)
+}
+
+func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	orderID := uuid.NewString()
+	refundID := uuid.NewString()
+
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+
+	first, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, refundID)
+	require.NoError(t, err)
+	second, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, refundID)
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+
+	reversed, err := models.PolarRefundMicrosForOrder(db, orderID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(1000), reversed)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(1500), summary.GrantMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(1500), summary.PurchasedCreditMicros)
+}
+
+func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	zero := int64(0)
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, &zero))
+
+	execution := pendingHostedExecution(t, r)
+	err = models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, &factory.ID)
+	require.ErrorIs(t, err, models.ErrFactoryHostedBudgetEmpty)
+}
+
+func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	workOrderExecution := dispatchWorkOrderExecution(t, r)
+	factory, err := models.FindFactory(db, r.Organization.ID, workOrderExecution.FactoryID)
+	require.NoError(t, err)
+	budget := int64(1)
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, &budget))
+
+	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, workOrderExecution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	node := pendingHostedExecution(t, r)
+	err = models.ReserveHostedCredit(db, r.Organization.ID, node.ID, &factory.ID)
+	require.ErrorIs(t, err, models.ErrFactoryHostedBudgetEmpty)
 }
 
 func pendingHostedExecution(t *testing.T, r *support.ResourceRegistry) *models.CanvasNodeExecution {

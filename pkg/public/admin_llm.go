@@ -63,6 +63,8 @@ type hostedLLMModelResponse struct {
 type organizationLLMCreditResponse struct {
 	RemainingCreditCents int64 `json:"remaining_credit_cents"`
 	GrantTotalCents      int64 `json:"grant_total_cents"`
+	SuperplaneGrantCents int64 `json:"superplane_grant_cents"`
+	PurchasedCreditCents int64 `json:"purchased_credit_cents"`
 	HostedBilledCents    int64 `json:"hosted_billed_cents"`
 	MarkupBPS            int   `json:"markup_bps"`
 	MarkupOverrideBPS    *int  `json:"markup_override_bps"`
@@ -388,6 +390,8 @@ func describeOrganizationLLMCreditJSON(tx *gorm.DB, orgID uuid.UUID) (organizati
 	return organizationLLMCreditResponse{
 		RemainingCreditCents: pricebook.MicrosToCents(summary.RemainingMicros),
 		GrantTotalCents:      pricebook.MicrosToCents(summary.GrantMicros),
+		SuperplaneGrantCents: pricebook.MicrosToCents(summary.SuperPlaneGrantMicros),
+		PurchasedCreditCents: pricebook.MicrosToCents(summary.PurchasedCreditMicros),
 		HostedBilledCents:    pricebook.MicrosToCents(summary.BilledMicros),
 		MarkupBPS:            summary.MarkupBPS,
 		MarkupOverrideBPS:    override,

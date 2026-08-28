@@ -355,6 +355,8 @@ CREATE TABLE public.factories (
     next_work_order_number bigint DEFAULT 1 NOT NULL,
     onboarding_completed_at timestamp with time zone,
     onboarding_config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    hosted_spend_budget_cents bigint,
+    CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
 
@@ -386,6 +388,21 @@ CREATE TABLE public.factory_lines (
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_llm_model_allowlists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_llm_model_allowlists (
+    factory_id uuid NOT NULL,
+    provider text NOT NULL,
+    funding_source text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
 );
 
 
@@ -676,6 +693,19 @@ CREATE TABLE public.llm_usage_events (
 
 
 --
+-- Name: organization_byok_model_allowlists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_byok_model_allowlists (
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -717,8 +747,10 @@ CREATE TABLE public.organization_llm_credit_grants (
     note text DEFAULT ''::text NOT NULL,
     actor_account_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_llm_credit_grants_amount_positive CHECK ((amount_micros > 0)),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text])))
+    polar_order_id text,
+    polar_refund_id text,
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
 );
 
 
@@ -731,6 +763,7 @@ CREATE TABLE public.organization_llm_credit_holds (
     organization_id uuid NOT NULL,
     amount_micros bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    factory_id uuid,
     CONSTRAINT organization_llm_credit_holds_amount_positive CHECK ((amount_micros > 0))
 );
 
@@ -743,6 +776,7 @@ CREATE TABLE public.organization_llm_settings (
     organization_id uuid NOT NULL,
     markup_bps integer,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    polar_customer_id text,
     CONSTRAINT organization_llm_settings_markup_non_negative CHECK (((markup_bps IS NULL) OR (markup_bps >= 0)))
 );
 
@@ -1350,6 +1384,14 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_llm_model_allowlists factory_llm_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_llm_model_allowlists
+    ADD CONSTRAINT factory_llm_model_allowlists_pkey PRIMARY KEY (factory_id, provider, funding_source);
+
+
+--
 -- Name: factory_work_order_artifacts factory_work_order_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1499,6 +1541,14 @@ ALTER TABLE ONLY public.llm_usage_events
 
 ALTER TABLE ONLY public.llm_usage_events
     ADD CONSTRAINT llm_usage_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_byok_model_allowlists organization_byok_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_byok_model_allowlists
+    ADD CONSTRAINT organization_byok_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
 
 
 --
@@ -2242,6 +2292,20 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 --
 
 CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_grants USING btree (organization_id, created_at DESC);
+
+
+--
+-- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+
+
+--
+-- Name: idx_org_llm_credit_grants_polar_refund; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_refund ON public.organization_llm_credit_grants USING btree (polar_refund_id) WHERE (polar_refund_id IS NOT NULL);
 
 
 --
@@ -3407,7 +3471,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260826112304	f
+20260827005912	f
 \.
 
 

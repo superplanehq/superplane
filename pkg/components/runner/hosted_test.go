@@ -1,10 +1,14 @@
 package runner
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
@@ -67,4 +71,38 @@ func TestValidateHostedAgentSpecRejectsReservedBaseURL(t *testing.T) {
 		[]EnvironmentVariable{{Name: "ANTHROPIC_BASE_URL"}},
 		"ANTHROPIC_BASE_URL",
 	))
+}
+
+func TestPrepareBYOKRunChecksAllowlistWhenModelIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	require.NoError(t, PrepareBYOKRun(core.ExecutionContext{}, "anthropic", ""))
+
+	stub := &byokHostedLLM{}
+	err := PrepareBYOKRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "model is required")
+	assert.True(t, stub.called)
+
+	require.NoError(t, PrepareBYOKRun(core.ExecutionContext{HostedLLM: stub}, "anthropic", "claude-sonnet-4-6"))
+}
+
+type byokHostedLLM struct {
+	called bool
+}
+
+func (c *byokHostedLLM) Resolve(string) (core.HostedLLMAccess, error) {
+	return core.HostedLLMAccess{}, nil
+}
+
+func (c *byokHostedLLM) AssertCreditAvailable() error {
+	return nil
+}
+
+func (c *byokHostedLLM) AssertModelSelectable(_, _, model string) error {
+	c.called = true
+	if strings.TrimSpace(model) == "" {
+		return fmt.Errorf("model is required")
+	}
+	return nil
 }
