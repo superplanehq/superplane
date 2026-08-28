@@ -69,7 +69,8 @@ export const FIRST_RUN_COPY = {
   },
   board: {
     backlogHintTitle: "Tickets land here first.",
-    backlogHintBody: "Intake is scoring issues now. Review the ones SuperPlane can implement, then start the work.",
+    backlogHintBody:
+      "New issues become work orders here. SuperPlane scores them for how well an agent can complete the work.",
   },
 } as const;
 

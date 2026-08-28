@@ -65,7 +65,7 @@ func Test__IntakeSeed(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, runs.GetRuns(), len(titles))
 
-		// The newest issue leads the list, and nothing is scored yet.
+		// The newest issue leads the list. The work order is not created yet.
 		reported := []string{}
 		for _, run := range runs.GetRuns() {
 			assert.Equal(t, pb.FactoryIntakeRun_PLACEMENT_ANALYZING, run.GetPlacement())

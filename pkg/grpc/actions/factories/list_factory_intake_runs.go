@@ -284,20 +284,30 @@ func latestDispatchStage(record models.FactoryWorkOrderLineDispatchRecord) strin
 }
 
 func intakeRunPlacement(run models.CanvasRun, context intakeRunContext) pb.FactoryIntakeRun_Placement {
-	analysis, ok := context.analyses[run.ID]
-	if !ok || analysis.State != models.CanvasNodeExecutionStateFinished {
-		return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
-	}
+	if context.graph.AnalysisNodeID != "" {
+		analysis, ok := context.analyses[run.ID]
+		if !ok || analysis.State != models.CanvasNodeExecutionStateFinished {
+			return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
+		}
 
-	// A failed analysis is reported as a rejection: the intake looked at the
-	// item and did not put it in the backlog.
-	if analysis.Result == models.CanvasNodeExecutionResultFailed {
-		return pb.FactoryIntakeRun_PLACEMENT_REJECTED
-	}
+		// A failed analysis is reported as a rejection: the intake looked at the
+		// item and did not put it in the backlog.
+		if analysis.Result == models.CanvasNodeExecutionResultFailed {
+			return pb.FactoryIntakeRun_PLACEMENT_REJECTED
+		}
 
-	creation, ok := context.creations[run.ID]
-	if !ok || creation.Result != models.CanvasNodeExecutionResultPassed {
-		return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
+		creation, ok := context.creations[run.ID]
+		if !ok || creation.Result != models.CanvasNodeExecutionResultPassed {
+			return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
+		}
+	} else {
+		creation, ok := context.creations[run.ID]
+		if !ok || creation.State != models.CanvasNodeExecutionStateFinished {
+			return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
+		}
+		if creation.Result != models.CanvasNodeExecutionResultPassed {
+			return pb.FactoryIntakeRun_PLACEMENT_REJECTED
+		}
 	}
 
 	if context.stages[run.ID] != "" {

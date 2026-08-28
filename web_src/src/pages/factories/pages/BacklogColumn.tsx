@@ -30,6 +30,8 @@ export type BacklogColumnProps = {
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  /** Work orders the Backlog automation analyzes right now. */
+  analyzingOrderIds?: ReadonlySet<string>;
 };
 
 export function BacklogColumn({
@@ -51,6 +53,7 @@ export function BacklogColumn({
   onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
+  analyzingOrderIds,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -110,6 +113,7 @@ export function BacklogColumn({
                 order={order}
                 workOrderCardContext={workOrderCardContext}
                 onOpenWorkOrder={onOpenWorkOrder}
+                isAnalyzing={Boolean(order.id && analyzingOrderIds?.has(order.id))}
               />
             </li>
           ))}

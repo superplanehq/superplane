@@ -12,7 +12,7 @@ import {
 import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { ConfidenceMeter } from "./ConfidenceMeter";
+import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
@@ -45,6 +45,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   onOpen?: () => void;
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
+  /**
+   * True while the Backlog automation analyzes this work order. The card
+   * shows a spinner in the meter slot until the score arrives.
+   */
+  isAnalyzing?: boolean;
 }
 
 /**
@@ -70,12 +75,14 @@ export function WorkOrderCard({
   href,
   onOpen,
   confidenceScore,
+  isAnalyzing = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";
+  const analysisPending = isAnalyzing && confidenceScore == null;
   const attentionReason = getWorkOrderAttentionReason(entry.order, {
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
   });
@@ -119,7 +126,7 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidenceScore != null || showStart ? (
+          {confidenceScore != null || analysisPending || showStart ? (
             <div className="flex shrink-0 items-center gap-1.5">
               {confidenceScore != null ? (
                 <ConfidenceMeter
@@ -127,6 +134,9 @@ export function WorkOrderCard({
                   className="shrink-0"
                   testId={`work-order-card-score-${entry.id}`}
                 />
+              ) : null}
+              {analysisPending ? (
+                <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entry.id}`} />
               ) : null}
               {showStart ? (
                 <StartDraftButton

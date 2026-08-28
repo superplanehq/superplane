@@ -97,9 +97,10 @@ func CreateFactoryIntake(
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}
 
-	confidencePct := DefaultIntakeConfidencePct
-	if req.ConfidencePct != nil {
-		confidencePct = int(req.GetConfidencePct())
+	// Score new work orders on the Backlog canvas before the intake starts
+	// creating them, so a seeded batch is scored as soon as it lands.
+	if err := ensureBacklogCanvas(ctx, deps, db, factory); err != nil {
+		log.Warnf("factory %s: intake starts without a Backlog scorer: %v", factory.ID, err)
 	}
 
 	binding := resolveIntakeBinding(db, factory, source)
@@ -108,9 +109,7 @@ func CreateFactoryIntake(
 		FactoryID:      factoryID,
 		Source:         source,
 		Name:           name,
-		ConfidencePct:  confidencePct,
 		Binding:        binding,
-		Agent:          resolveIntakeAgent(db, factory),
 	})
 	if err != nil {
 		return nil, err
@@ -151,9 +150,7 @@ type intakeCanvasRequest struct {
 	FactoryID      uuid.UUID
 	Source         string
 	Name           string
-	ConfidencePct  int
 	Binding        *intakeBinding
-	Agent          *intakeAgent
 }
 
 // createIntakeCanvas builds the intake graph and commits it as the canvas's
