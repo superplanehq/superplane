@@ -8,6 +8,10 @@ import {
 } from "../../lib/workOrderPullRequest";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
+interface EventRunRef {
+  id?: string;
+}
+
 interface ArtifactAddedPayload {
   automation?: {
     nodeId?: string;
@@ -18,6 +22,7 @@ interface ArtifactAddedPayload {
     type?: string;
     data?: Record<string, unknown>;
   };
+  run?: EventRunRef;
 }
 
 interface PullRequestEventPayload {
@@ -34,13 +39,24 @@ interface PullRequestEventPayload {
     title?: string;
     state?: string;
   };
+  run?: EventRunRef;
+}
+
+/**
+ * An indexed value plus the id of the run that produced it. `runId` is
+ * undefined when the source event has no run reference (older data);
+ * callers that scope by run treat that as "attach regardless of run".
+ */
+interface RunScoped<T> {
+  value: T;
+  runId?: string;
 }
 
 export interface StreamArtifactIndex {
-  byNodeId: Map<string, FactoriesWorkOrderArtifact>;
-  byNodeName: Map<string, FactoriesWorkOrderArtifact>;
-  pullRequestsByNodeId: Map<string, FactoriesFactoryPullRequest>;
-  pullRequestsByNodeName: Map<string, FactoriesFactoryPullRequest>;
+  byNodeId: Map<string, RunScoped<FactoriesWorkOrderArtifact>>;
+  byNodeName: Map<string, RunScoped<FactoriesWorkOrderArtifact>>;
+  pullRequestsByNodeId: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
+  pullRequestsByNodeName: Map<string, RunScoped<FactoriesFactoryPullRequest>>;
 }
 
 export function streamArtifactIndexFromEvents(
@@ -48,10 +64,10 @@ export function streamArtifactIndexFromEvents(
   liveArtifacts: FactoriesWorkOrderArtifact[] | undefined,
   livePullRequests?: FactoriesFactoryPullRequest[],
 ): StreamArtifactIndex {
-  const byNodeId = new Map<string, FactoriesWorkOrderArtifact>();
-  const byNodeName = new Map<string, FactoriesWorkOrderArtifact>();
-  const pullRequestsByNodeId = new Map<string, FactoriesFactoryPullRequest>();
-  const pullRequestsByNodeName = new Map<string, FactoriesFactoryPullRequest>();
+  const byNodeId = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
+  const byNodeName = new Map<string, RunScoped<FactoriesWorkOrderArtifact>>();
+  const pullRequestsByNodeId = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
+  const pullRequestsByNodeName = new Map<string, RunScoped<FactoriesFactoryPullRequest>>();
   const liveById = liveArtifactsById(liveArtifacts);
   const latestDataById = buildLatestArtifactDataById(liveArtifacts ?? []);
   const livePullRequestsById = indexPullRequestsById(livePullRequests);
@@ -60,22 +76,23 @@ export function streamArtifactIndexFromEvents(
     const automation = eventAutomation(event);
     const nodeId = automation?.nodeId?.trim();
     const nodeName = automation?.nodeName?.trim();
+    const runId = eventRunId(event);
 
     const artifact = artifactFromStreamEvent(event, liveById, latestDataById);
     if (artifact) {
       if (nodeId) {
-        byNodeId.set(nodeId, artifact);
+        byNodeId.set(nodeId, { value: artifact, runId });
       } else if (nodeName) {
-        byNodeName.set(nodeName, artifact);
+        byNodeName.set(nodeName, { value: artifact, runId });
       }
     }
 
     const pullRequest = pullRequestFromStreamEvent(event, livePullRequestsById);
     if (pullRequest) {
       if (nodeId) {
-        pullRequestsByNodeId.set(nodeId, pullRequest);
+        pullRequestsByNodeId.set(nodeId, { value: pullRequest, runId });
       } else if (nodeName) {
-        pullRequestsByNodeName.set(nodeName, pullRequest);
+        pullRequestsByNodeName.set(nodeName, { value: pullRequest, runId });
       }
     }
   }
@@ -83,15 +100,27 @@ export function streamArtifactIndexFromEvents(
   return { byNodeId, byNodeName, pullRequestsByNodeId, pullRequestsByNodeName };
 }
 
+/**
+ * Attaches artifacts/pull requests to a phase's stream lines.
+ *
+ * `runId` scopes the attachment to the canvas run that owns this stream
+ * (a phase's `runId`). An indexed value produced by a different run is
+ * skipped, so one run's artifacts never leak onto another run's phase
+ * (e.g. a PLAN.md produced by a planning run should not show up on an
+ * unrelated PR-activity run). When `runId` is omitted, attachment is
+ * unscoped (matches prior behavior, used for previews and tests that
+ * don't track runs).
+ */
 export function attachArtifactsToStream(
   stream: SplitRunStreamLine[] | undefined,
   index: StreamArtifactIndex,
+  runId?: string,
 ): SplitRunStreamLine[] | undefined {
   if (!stream) {
     return undefined;
   }
 
-  return stream.map((line) => attachLineArtifact(line, index));
+  return stream.map((line) => attachLineArtifact(line, index, runId));
 }
 
 export function attachStreamArtifacts(
@@ -99,8 +128,9 @@ export function attachStreamArtifacts(
   events: FactoriesWorkOrderEvent[],
   liveArtifacts?: FactoriesWorkOrderArtifact[],
   livePullRequests?: FactoriesFactoryPullRequest[],
+  runId?: string,
 ): SplitRunStreamLine[] | undefined {
-  return attachArtifactsToStream(stream, streamArtifactIndexFromEvents(events, liveArtifacts, livePullRequests));
+  return attachArtifactsToStream(stream, streamArtifactIndexFromEvents(events, liveArtifacts, livePullRequests), runId);
 }
 
 function artifactFromStreamEvent(
@@ -134,16 +164,32 @@ function eventAutomation(event: FactoriesWorkOrderEvent): { nodeId?: string; nod
   return payload.automation;
 }
 
-function attachLineArtifact(line: SplitRunStreamLine, index: StreamArtifactIndex): SplitRunStreamLine {
+function eventRunId(event: FactoriesWorkOrderEvent): string | undefined {
+  const payload = (event.event ?? {}) as ArtifactAddedPayload & PullRequestEventPayload;
+  return payload.run?.id?.trim() || undefined;
+}
+
+/** Keeps `entry` only when it belongs to `runId` (or either side is unscoped). */
+function matchesRun<T>(entry: RunScoped<T> | undefined, runId: string | undefined): T | undefined {
+  if (!entry) {
+    return undefined;
+  }
+  if (runId && entry.runId && entry.runId !== runId) {
+    return undefined;
+  }
+  return entry.value;
+}
+
+function attachLineArtifact(line: SplitRunStreamLine, index: StreamArtifactIndex, runId?: string): SplitRunStreamLine {
   const next = { ...line };
-  const artifactById = line.nodeId ? index.byNodeId.get(line.nodeId) : undefined;
-  const artifactByName = index.byNodeName.get(line.componentName);
+  const artifactById = matchesRun(line.nodeId ? index.byNodeId.get(line.nodeId) : undefined, runId);
+  const artifactByName = matchesRun(index.byNodeName.get(line.componentName), runId);
   if (artifactById || artifactByName) {
     next.artifact = artifactById ?? artifactByName;
   }
 
-  const pullRequestById = line.nodeId ? index.pullRequestsByNodeId.get(line.nodeId) : undefined;
-  const pullRequestByName = index.pullRequestsByNodeName.get(line.componentName);
+  const pullRequestById = matchesRun(line.nodeId ? index.pullRequestsByNodeId.get(line.nodeId) : undefined, runId);
+  const pullRequestByName = matchesRun(index.pullRequestsByNodeName.get(line.componentName), runId);
   if (pullRequestById || pullRequestByName) {
     next.pullRequest = pullRequestById ?? pullRequestByName;
   }
