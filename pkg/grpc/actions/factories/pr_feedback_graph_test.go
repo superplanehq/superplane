@@ -106,6 +106,10 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, checkout, `git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`)
 		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
 		assert.NotContains(t, checkout, "pr-feedback")
+
+		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "order().assignees")
+		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
+		assert.Contains(t, dco, `${COAUTHORS:-}`)
 	})
 
 	t.Run("the runner names the model it runs", func(t *testing.T) {

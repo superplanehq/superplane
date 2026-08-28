@@ -60,7 +60,9 @@ references it (e.g. `none(order().artifacts, {#.type == "pr"})`).
 `order().comments` is likewise a list field loaded lazily only when the
 expression references it (e.g. `len(order().comments)`), returning each
 comment as `{id, body, author, created_at, run}` decoded from the
-`order.comment.added` events. `root().data.work_order` remains the onRun
+`order.comment.added` events. `order().assignees` is a list field loaded
+lazily only when the expression references it, returning each assignee as
+`{id, name, email}`. `root().data.work_order` remains the onRun
 snapshot and does not include artifacts or comments.
 
 ## Work order lifecycle
