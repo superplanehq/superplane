@@ -52,11 +52,11 @@ export function WorkOrdersTrueEmptyState({
       </div>
       <PermissionTooltip
         allowed={canCreate || permissionsLoading}
-        message="You don't have permission to create work orders."
+        message="You do not have permission to create tasks."
       >
         <Button type="button" disabled={!canCreate} onClick={onCreateWorkOrder} data-testid="work-orders-empty-create">
           <Icon name="plus" />
-          New work order
+          New task
         </Button>
       </PermissionTooltip>
     </div>

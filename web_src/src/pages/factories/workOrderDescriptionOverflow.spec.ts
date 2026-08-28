@@ -66,6 +66,10 @@ describe("collapsedDescriptionMaxHeight", () => {
   it("leaves room for the Show more control", () => {
     expect(collapsedDescriptionMaxHeight(472)).toBe(440);
   });
+
+  it("keeps at least 100px of description when collapsed", () => {
+    expect(collapsedDescriptionMaxHeight(50)).toBe(100);
+  });
 });
 
 describe("nearestScrollParent", () => {
