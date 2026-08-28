@@ -187,7 +187,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -206,9 +206,9 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task waits on a person");
+    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -310,8 +310,8 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.footer.sentence).toBe("Work order completed successfully.");
     expect(done.footer.actions).toEqual([]);
     expect(done.footer.note).toEqual({
-      headline: "This task finished successfully",
-      text: "The line automations completed every step.",
+      headline: "This task succeeded",
+      text: "The work is done. The result met the goal.",
     });
   });
 
@@ -569,6 +569,48 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Pending");
   });
 
+  it("does not treat an earlier failed step as the current footer when a later step passed", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Chore: Add health check endpoint",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl-5",
+              step: "Implement",
+              stepIndex: 5,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              updatedAt: "2026-08-28T10:00:00.000Z",
+            },
+            {
+              id: "e-impl-6",
+              step: "Implement",
+              stepIndex: 6,
+              state: "STATE_FINISHED",
+              result: "RESULT_CANCELLED",
+              updatedAt: "2026-08-28T10:10:00.000Z",
+            },
+            {
+              id: "e-impl-7",
+              step: "Implement",
+              stepIndex: 7,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              updatedAt: "2026-08-28T11:00:00.000Z",
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.footerTone).toBe("waiting");
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
+  });
+
   it("marks a failed implement step as failed", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
@@ -588,10 +630,32 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.phases.at(-1)?.canvasSteps.at(-1)?.status).toBe("failed");
     expect(fixture.footerTone).toBe("failed");
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
-    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
+    expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
+  });
+
+  it("marks a cancelled implement step as canceled, not waiting", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Stopped job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_CANCELLED" },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.lineStatus).toBe("waiting");
+    expect(fixture.phases.at(-1)?.status).toBe("cancelled");
+    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Canceled");
+    expect(fixture.footerTone).toBe("stopped");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
+    expect(fixture.footer.note?.cta).toBeUndefined();
+    expect(fixture.waitingNotes[0]?.cta).toBeUndefined();
   });
 
   it("logs a manual create when a person opens a draft", () => {
@@ -958,8 +1022,8 @@ describe("line board work-order examples", () => {
       state: "STATE_CLOSED",
     });
     expect(fixture.footer.note).toEqual({
-      headline: "This task is rejected",
-      text: "A person closed this task. The line automations did not finish the work.",
+      headline: "This task did not succeed",
+      text: "The work is done. The result did not meet the goal.",
     });
     expect(fixture.footer.actions).toEqual([]);
   });

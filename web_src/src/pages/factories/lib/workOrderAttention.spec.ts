@@ -106,6 +106,64 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing user feedback");
   });
 
+  it("labels a cancelled latest step as Stopped", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [
+                {
+                  id: "e1",
+                  step: "implement",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_CANCELLED",
+                  updatedAt: "2024-06-02T00:00:00Z",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toBe("stopped");
+    expect(WORK_ORDER_ATTENTION_LABEL.stopped).toBe("Stopped");
+  });
+
+  it("labels an earlier failed step as Needs attention when a later step passed", () => {
+    expect(
+      getWorkOrderAttentionReason(
+        order({
+          lineDispatches: [
+            {
+              id: "d1",
+              state: "STATE_FINISHED",
+              stepExecutions: [
+                {
+                  id: "e-failed",
+                  step: "implement",
+                  stepIndex: 5,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_FAILED",
+                  updatedAt: "2024-06-02T10:00:00Z",
+                },
+                {
+                  id: "e-passed",
+                  step: "implement",
+                  stepIndex: 7,
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  updatedAt: "2024-06-02T11:00:00Z",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toBe("stalled");
+  });
+
   it("labels idle waiting work as Needs attention", () => {
     expect(getWorkOrderAttentionReason(order())).toBe("stalled");
     expect(WORK_ORDER_ATTENTION_LABEL.stalled).toBe("Needs attention");
