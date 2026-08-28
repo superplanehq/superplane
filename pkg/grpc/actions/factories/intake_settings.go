@@ -24,7 +24,7 @@ const (
 )
 
 // intakeSettings is what a user can change about an intake without editing the
-// canvas by hand. Every field is stored in, and read back from, the threshold
+// canvas by hand. Filter fields are stored in, and read back from, the filter
 // expression: the graph is what the workers run, so nothing is kept twice.
 type intakeSettings struct {
 	ConfidencePct   int
@@ -64,17 +64,16 @@ func (s intakeSettings) normalized() intakeSettings {
 	return s
 }
 
-// intakeThresholdExpressionFor builds the gate in front of the work order: the
-// score, plus the filters the source supports.
-func intakeThresholdExpressionFor(source string, settings intakeSettings) string {
+// intakeFilterExpressionFor builds the gate in front of the work order from
+// the filters the source supports. An empty filter set is `true`, so every
+// matching event still creates a work order.
+func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 	settings = settings.normalized()
-	conditions := []string{intakeThresholdExpression(settings.ConfidencePct)}
-
-	// Only GitHub issues carry labels and assignees in their payload.
 	if source != models.FactoryIntakeSourceGitHubIssues {
-		return conditions[0]
+		return "true"
 	}
 
+	conditions := []string{}
 	if len(settings.Labels) > 0 {
 		if labels, err := json.Marshal(settings.Labels); err == nil {
 			matches := fmt.Sprintf("root().data.issue.labels.exists(label, label.name in %s)", labels)
@@ -92,24 +91,46 @@ func intakeThresholdExpressionFor(source string, settings intakeSettings) string
 		conditions = append(conditions, intakeUnassignedCondition)
 	}
 
+	if len(conditions) == 0 {
+		return "true"
+	}
+
 	return strings.Join(conditions, " && ")
+}
+
+func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
+	if current.LabelFilterMode != updated.LabelFilterMode {
+		return true
+	}
+	if current.Assignment != updated.Assignment {
+		return true
+	}
+	if len(current.Labels) != len(updated.Labels) {
+		return true
+	}
+	for i := range current.Labels {
+		if current.Labels[i] != updated.Labels[i] {
+			return true
+		}
+	}
+	return false
 }
 
 var intakeLabelsPattern = regexp.MustCompile(`(!\()?root\(\)\.data\.issue\.labels\.exists\(label, label\.name in (\[[^\]]*\])\)`)
 
-// intakeSettingsFromGraph reads the settings back out of the threshold
+// intakeSettingsFromGraph reads the settings back out of the filter
 // expression. A hand-edited expression that no longer matches reports defaults
 // rather than a wrong value.
 func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.ConfidencePct = graph.ConfidencePct
 
-	threshold := findIntakeNode(spec.Nodes, graph.ThresholdNodeID)
-	if threshold == nil {
+	filter := findIntakeNode(spec.Nodes, graph.FilterNodeID)
+	if filter == nil {
 		return settings
 	}
 
-	expression, _ := threshold.Configuration["expression"].(string)
+	expression, _ := filter.Configuration["expression"].(string)
 	if expression == "" {
 		return settings
 	}

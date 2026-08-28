@@ -109,16 +109,20 @@ func applyIntakeSettings(
 
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
 		graph := resolveIntakeGraph(intake.Source, spec)
-		if graph.ThresholdNodeID == "" {
-			return invalidArgument("intake automation has no confidence threshold to update")
+		current := intakeSettingsFromGraph(graph, spec)
+		updated := parseIntakeSettings(current, settings)
+		if graph.FilterNodeID == "" {
+			if intake.Source == models.FactoryIntakeSourceGitHubIssues && intakeSettingsChangeFilters(current, updated) {
+				return invalidArgument("intake automation has no filter to update")
+			}
+			return nil
 		}
 
-		updated := parseIntakeSettings(intakeSettingsFromGraph(graph, spec), settings)
-		expression := intakeThresholdExpressionFor(intake.Source, updated)
+		expression := intakeFilterExpressionFor(intake.Source, updated)
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
-			if nodes[i].ID != graph.ThresholdNodeID {
+			if nodes[i].ID != graph.FilterNodeID {
 				continue
 			}
 			// Copy the configuration so the edit does not reach into the live

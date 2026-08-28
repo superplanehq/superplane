@@ -12,7 +12,7 @@ import {
 import { factoryHomePath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { ConfidenceMeter } from "./ConfidenceMeter";
+import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
@@ -45,6 +45,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   onOpen?: () => void;
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
+  /**
+   * True while the Backlog automation analyzes this work order. The card
+   * shows a spinner in the meter slot until the score arrives.
+   */
+  isAnalyzing?: boolean;
 }
 
 /**
@@ -70,6 +75,7 @@ export function WorkOrderCard({
   href,
   onOpen,
   confidenceScore,
+  isAnalyzing = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
@@ -119,15 +125,9 @@ export function WorkOrderCard({
               {startedLabel}
             </span>
           </div>
-          {confidenceScore != null || showStart ? (
+          {confidenceScore != null || isAnalyzing || showStart ? (
             <div className="flex shrink-0 items-center gap-1.5">
-              {confidenceScore != null ? (
-                <ConfidenceMeter
-                  score={confidenceScore}
-                  className="shrink-0"
-                  testId={`work-order-card-score-${entry.id}`}
-                />
-              ) : null}
+              <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
               {showStart ? (
                 <StartDraftButton
                   entry={entry}
@@ -145,6 +145,21 @@ export function WorkOrderCard({
       </div>
     </article>
   );
+}
+
+/**
+ * Score meter, or a spinner while the Backlog automation still analyzes the
+ * work order. Both take the same slot, so the card does not move when the
+ * score arrives.
+ */
+function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {
+  if (score != null) {
+    return <ConfidenceMeter score={score} className="shrink-0" testId={`work-order-card-score-${entryId}`} />;
+  }
+  if (isAnalyzing) {
+    return <ConfidenceAnalyzingIndicator className="shrink-0" testId={`work-order-card-analyzing-${entryId}`} />;
+  }
+  return null;
 }
 
 function WorkOrderAttentionChip({ reason }: { reason: WorkOrderAttentionReason }) {

@@ -10,22 +10,23 @@ import (
 // identifiers are an implementation detail of the generated graph, so they are
 // resolved on read and never stored on the intake row or sent over the API.
 type intakeGraph struct {
-	TriggerNodeID   string
-	AnalysisNodeID  string
-	ThresholdNodeID string
-	CreateNodeID    string
-	ConfidencePct   int
+	TriggerNodeID  string
+	AnalysisNodeID string
+	FilterNodeID   string
+	CreateNodeID   string
+	ConfidencePct  int
 }
 
 // Healthy reports whether the graph can still do the intake's job: receive an
-// item, score it, and reach the node that creates the work order.
+// item and reach the node that creates the work order. Analysis is optional:
+// a generated graph creates first, and a legacy graph that still scores stays
+// healthy as long as create is reachable.
 func (g intakeGraph) Healthy(edges []models.Edge) bool {
-	if g.TriggerNodeID == "" || g.AnalysisNodeID == "" || g.CreateNodeID == "" {
+	if g.TriggerNodeID == "" || g.CreateNodeID == "" {
 		return false
 	}
 
-	return hasCanvasPath(edges, g.TriggerNodeID, g.AnalysisNodeID) &&
-		hasCanvasPath(edges, g.AnalysisNodeID, g.CreateNodeID)
+	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID)
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls
@@ -44,15 +45,13 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 	graph.AnalysisNodeID = resolveIntakeNode(nodes, intakeAnalysisNodeID, func(node *models.Node) bool {
 		return slices.Contains(intakeAnalysisComponents, node.ComponentName())
 	})
-	graph.ThresholdNodeID = resolveIntakeNode(nodes, intakeThresholdNodeID, func(node *models.Node) bool {
-		return node.ComponentName() == intakeThresholdComponent
-	})
+	graph.FilterNodeID = resolveIntakeFilterNode(nodes)
 	graph.CreateNodeID = resolveIntakeNode(nodes, intakeCreateNodeID, func(node *models.Node) bool {
 		return node.ComponentName() == intakeCreateComponent
 	})
 
-	if threshold := findIntakeNode(nodes, graph.ThresholdNodeID); threshold != nil {
-		if expression, ok := threshold.Configuration["expression"].(string); ok {
+	if filter := findIntakeNode(nodes, graph.FilterNodeID); filter != nil {
+		if expression, ok := filter.Configuration["expression"].(string); ok {
 			if confidence, ok := intakeConfidenceFromExpression(expression); ok {
 				graph.ConfidencePct = confidence
 			}
@@ -60,6 +59,18 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 	}
 
 	return graph
+}
+
+func resolveIntakeFilterNode(nodes []models.Node) string {
+	if id := resolveIntakeNode(nodes, intakeFilterNodeID, func(node *models.Node) bool {
+		return node.ComponentName() == intakeFilterComponent
+	}); id != "" {
+		return id
+	}
+
+	return resolveIntakeNode(nodes, intakeThresholdNodeID, func(node *models.Node) bool {
+		return node.ComponentName() == intakeFilterComponent
+	})
 }
 
 func resolveIntakeNode(nodes []models.Node, preferredID string, matches func(*models.Node) bool) string {
