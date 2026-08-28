@@ -78,7 +78,7 @@ func ImportFactoryIntakeItem(
 		item.Title,
 		item.Body,
 		&createdByID,
-		nil,
+		[]uuid.UUID{createdByID},
 		nil,
 		origin,
 	)

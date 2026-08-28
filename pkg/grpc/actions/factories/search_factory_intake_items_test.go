@@ -174,6 +174,8 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, item.URL, response.GetOrder().GetOrigin().GetUrl())
 		assert.Equal(t, "acme/payments#12", response.GetOrder().GetOrigin().GetLabel())
 		assert.Equal(t, r.User.String(), response.GetOrder().GetCreatedBy().GetUser().GetId())
+		require.Len(t, response.GetOrder().GetAssignees(), 1)
+		assert.Equal(t, r.User.String(), response.GetOrder().GetAssignees()[0].GetId())
 	})
 
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {

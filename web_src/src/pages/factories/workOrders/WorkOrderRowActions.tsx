@@ -2,13 +2,10 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { cn } from "@/lib/utils";
-import { Forward, UserPlus } from "lucide-react";
+import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
-import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
 /** Actions callable from list and table rows. Cards do not change the owner. */
@@ -62,81 +59,28 @@ interface AssigneeGroupProps {
 }
 
 /**
- * Single owner avatar, or an Assign chip when nobody owns the work order.
- * The picker replaces the owner; a work order cannot have two people.
+ * Single owner avatar. The owner cannot be changed here.
  */
-export function AssigneeGroup({
-  entry,
-  organizationId,
-  canAssign,
-  isAssigneesSaving,
-  onAssigneesSave,
-  size = "sm",
-}: AssigneeGroupProps) {
+export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGroupProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const owner = entry.order.assignees?.[0];
-
-  const stack = (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full transition-colors",
-        canAssign ? "hover:bg-accent" : "cursor-default",
-      )}
-      aria-label="Change owner"
-      data-testid={`work-order-row-assignees-${entry.id}`}
-      disabled={!canAssign}
-    >
-      {owner ? (
-        <OrgUserReference
-          display={resolveUser(owner.id, owner.name)}
-          size={size}
-          showName={false}
-          className="rounded-full ring-2 ring-background"
-        />
-      ) : (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground",
-            canAssign && "hover:border-foreground hover:text-foreground",
-          )}
-        >
-          <UserPlus className="size-3" aria-hidden />
-          Assign
-        </span>
-      )}
-    </button>
-  );
-
-  const trigger = canAssign ? (
-    stack
-  ) : (
-    <Tooltip>
-      <TooltipTrigger asChild>{stack}</TooltipTrigger>
-      <TooltipContent>You don't have permission to update the owner.</TooltipContent>
-    </Tooltip>
-  );
-
-  if (!canAssign) {
-    return (
-      <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-        {trigger}
-      </div>
-    );
+  if (!owner) {
+    return null;
   }
 
   return (
-    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <WorkOrderAssigneesPopover
-        organizationId={organizationId}
-        selectedIds={entry.assigneeIds}
-        canEdit={canAssign}
-        isSaving={isAssigneesSaving}
-        onSave={(ids) => onAssigneesSave(entry.id, ids)}
-      >
-        {trigger}
-      </WorkOrderAssigneesPopover>
-    </div>
+    <span
+      className="pointer-events-none inline-flex items-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size={size}
+        showName={false}
+        className="rounded-full ring-2 ring-background"
+      />
+    </span>
   );
 }
 

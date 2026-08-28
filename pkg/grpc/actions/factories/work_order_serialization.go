@@ -7,10 +7,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
 func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, order *models.FactoryWorkOrder) (*pb.WorkOrder, error) {
 	db := database.DB(ctx)
+	if err := loadWorkOrderAssigneeUsers(db, order); err != nil {
+		return nil, err
+	}
+
 	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, []uuid.UUID{order.ID})
 	if err != nil {
 		return nil, err
@@ -35,11 +40,17 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 	}
 
 	workOrderIDs := make([]uuid.UUID, len(orders))
+	orderRefs := make([]*models.FactoryWorkOrder, len(orders))
 	for i := range orders {
 		workOrderIDs[i] = orders[i].ID
+		orderRefs[i] = &orders[i]
 	}
 
 	db := database.DB(ctx)
+	if err := loadWorkOrderAssigneeUsers(db, orderRefs...); err != nil {
+		return nil, err
+	}
+
 	dispatchesByOrderID, err := models.ListWorkOrderLineDispatchesByWorkOrderIDs(db, workOrderIDs)
 	if err != nil {
 		return nil, err
@@ -65,4 +76,36 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 	}
 
 	return result, nil
+}
+
+// loadWorkOrderAssigneeUsers reloads assignees with User so the API can
+// return the owner name. Mutations such as Start rebuild the in-memory
+// slice with IDs only.
+func loadWorkOrderAssigneeUsers(db *gorm.DB, orders ...*models.FactoryWorkOrder) error {
+	ids := make([]uuid.UUID, 0, len(orders))
+	byID := make(map[uuid.UUID]*models.FactoryWorkOrder, len(orders))
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		ids = append(ids, order.ID)
+		byID[order.ID] = order
+		order.Assignees = nil
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	var assignees []models.FactoryWorkOrderAssignee
+	if err := db.Preload("User").Where("work_order_id IN ?", ids).Find(&assignees).Error; err != nil {
+		return err
+	}
+	for i := range assignees {
+		order := byID[assignees[i].WorkOrderID]
+		if order == nil {
+			continue
+		}
+		order.Assignees = append(order.Assignees, assignees[i])
+	}
+	return nil
 }
