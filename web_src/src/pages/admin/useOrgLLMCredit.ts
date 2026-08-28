@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 export type OrganizationLLMCredit = {
   remaining_credit_cents: number;
   grant_total_cents: number;
+  superplane_grant_cents: number;
+  purchased_credit_cents: number;
   hosted_billed_cents: number;
   markup_bps: number;
   markup_override_bps: number | null;
