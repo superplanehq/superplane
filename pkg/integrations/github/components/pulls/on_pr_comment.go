@@ -35,7 +35,8 @@ func (p *OnPRComment) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Content Filter**: Optional regex pattern to filter comments (e.g., ` + "`/solve`" + ` to only trigger on comments containing "/solve")
+- **Content Filter**: Optional filter on comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Ignore Bots**: Skip comments written by GitHub Apps and bots
 
 ## Event Data
 
@@ -117,6 +118,11 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	if !isExpectedPRCommentAction(eventType, data) {
 		action, _ := common.ExtractAction(data)
 		ctx.Logger.Infof("Ignoring event - action %q is not supported", action)
+		return http.StatusOK, nil, nil
+	}
+
+	if config.IgnoreBots && isBotAuthor(eventType, data) {
+		ctx.Logger.Info("Ignoring event - author is a bot")
 		return http.StatusOK, nil, nil
 	}
 

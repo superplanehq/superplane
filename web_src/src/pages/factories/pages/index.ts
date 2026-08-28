@@ -23,6 +23,7 @@ export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNoti
 export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
+export { FactorySettingsModelsPage } from "./settings/FactorySettingsModelsPage";
 export { FACTORY_SETTINGS_NAV_ITEMS, isFactorySettingsComingSoon } from "./settings/settingsNavItems";
 export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
 export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";

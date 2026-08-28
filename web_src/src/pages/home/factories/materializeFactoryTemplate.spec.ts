@@ -218,7 +218,9 @@ spec:
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
   });
 
-  it("keeps the planning agent on Opus when Claude Code credentials become hosted", () => {
+  // A hosted run rejects a model that is not on the allowlist, so the planner
+  // takes the Opus id the caller resolved, not the "opus" alias.
+  it("gives the planning agent the resolved Opus id on hosted credentials", () => {
     const canvasYaml = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-planning"),
       canvasName: "Plan",
@@ -230,12 +232,14 @@ spec:
       agentRewrite: {
         component: "runnerClaudeCode",
         model: "claude-sonnet-4-6",
+        planningModel: "claude-opus-4-6",
         credentials: { source: "hosted" },
       },
     });
 
-    expect(canvasYaml).toMatch(/id: planner-agent-no-issue[\s\S]*model: opus/);
+    expect(canvasYaml).toMatch(/id: planner-agent-no-issue[\s\S]*model: claude-opus-4-6/);
     expect(canvasYaml).not.toContain("model: claude-sonnet-4-6");
+    expect(canvasYaml).not.toMatch(/model: opus$/m);
   });
 
   it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
@@ -283,8 +287,8 @@ spec:
 
   it("rewrites Claude Code nodes to an OpenRouter integration", () => {
     const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-pr"),
-      canvasName: "Verify",
+      definition: getFactoryDefinition("line-implementation"),
+      canvasName: "Implement",
       canvasId: "canvas-or-byok",
       installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
       integrations: {

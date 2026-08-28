@@ -8,13 +8,17 @@ import {
   factoryDetailPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryPRFeedbackPath,
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
+  organizationSettingsBackPath,
   organizationSettingsPath,
   organizationSettingsSectionPath,
   parseFactoryAppNavFrom,
@@ -66,6 +70,29 @@ describe("factoryIntakePath", () => {
   it("reads the settings tab from the search string", () => {
     expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
     expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
+  });
+});
+
+describe("factoryPRFeedbackPath", () => {
+  it("opens the line board with the PR feedback query", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan?prFeedback=1");
+  });
+
+  it("reads the PR feedback query from the search string", () => {
+    expect(isPRFeedbackSearchOpen("?prFeedback=1")).toBe(true);
+    expect(isPRFeedbackSearchOpen("prFeedback=1")).toBe(true);
+    expect(isPRFeedbackSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board on a settings tab", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackSettings=automation",
+    );
+  });
+
+  it("reads the settings tab from the search string", () => {
+    expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
+    expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
   });
 });
 
@@ -130,20 +157,37 @@ describe("factorySettingsGeneralPathAfterKeyChange", () => {
 });
 
 describe("factoryAppConfigurePath", () => {
-  it("adds configure=1 and keeps the components panel closed", () => {
-    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1");
+  it("adds configure=1, opens the agent panel, and keeps the components panel closed", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1")).toBe("/org-1/workspaces/SP/apps/app-1?configure=1&agent=1");
   });
 
   it("keeps the run when entering edit from a run page", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { from: "lines", lineId: "line-1", runId: "run-9" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&from=lines&lineId=line-1",
+      "/org-1/workspaces/SP/apps/app-1?run=run-9&configure=1&agent=1&from=lines&lineId=line-1",
     );
   });
 
   it("opens components only when blocks is requested", () => {
     expect(factoryAppConfigurePath("org-1", "SP", "app-1", { blocks: true })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?configure=1&blocks=1",
+      "/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&blocks=1",
     );
+  });
+
+  it("opens the component sidebar on the selected node", () => {
+    expect(factoryAppConfigurePath("org-1", "SP", "app-1", { nodeId: "create-pr" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr",
+    );
+  });
+
+  it("does not keep run inspection when opening a component for edit", () => {
+    expect(
+      factoryAppConfigurePath("org-1", "SP", "app-1", {
+        from: "lines",
+        lineId: "line-1",
+        runId: "run-9",
+        nodeId: "create-pr",
+      }),
+    ).toBe("/org-1/workspaces/SP/apps/app-1?configure=1&agent=1&sidebar=1&node=create-pr&from=lines&lineId=line-1");
   });
 });
 
@@ -190,8 +234,13 @@ describe("parseFactoryAppNavFrom", () => {
 });
 
 describe("organizationSettingsPath", () => {
-  it("builds organization settings under the current workspace", () => {
-    expect(organizationSettingsPath("org-1", "RF")).toBe("/org-1/workspaces/RF/organization");
-    expect(organizationSettingsSectionPath("org-1", "RF", "general")).toBe("/org-1/workspaces/RF/organization/general");
+  it("builds organization settings under the organization, not a workspace", () => {
+    expect(organizationSettingsPath("org-1")).toBe("/org-1/organization");
+    expect(organizationSettingsSectionPath("org-1", "general")).toBe("/org-1/organization/general");
+  });
+
+  it("returns to the workspace when settings opened from a factory, otherwise the list", () => {
+    expect(organizationSettingsBackPath("org-1", "RF")).toBe("/org-1/workspaces/RF");
+    expect(organizationSettingsBackPath("org-1")).toBe("/org-1/workspaces");
   });
 });

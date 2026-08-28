@@ -44,6 +44,48 @@ describe("activateCanvasVersionForEditing", () => {
     expect(next.get("version")).toBeNull();
   });
 
+  it("keeps the Configure component selection when activating the live version for edit", () => {
+    const setSearchParams = vi.fn();
+
+    activateCanvasVersionForEditing({
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+      versionID: "version-live",
+      version: { metadata: { id: "version-live" }, spec: {} },
+      options: { preserveStagedLayer: true },
+      liveCanvasVersionId: "version-live",
+      queryClient: {
+        cancelQueries: vi.fn(),
+      } as never,
+      draftCanvasSpec: null,
+      draftCanvasSpecsRef: { current: new Map() },
+      activeCanvasVersionIdRef: { current: "" },
+      lastAppliedVersionSnapshotRef: { current: "" },
+      clearPendingAutoSaveWork: vi.fn(),
+      setDraftCanvasSpec: vi.fn(),
+      setActiveCanvasVersion: vi.fn(),
+      setLastSavedWorkflowSnapshot: vi.fn(),
+      setSearchParams,
+      initializeFromWorkflow: vi.fn(),
+    });
+
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    const next = updater(
+      new URLSearchParams({
+        run: "run-42",
+        configure: "1",
+        agent: "1",
+        sidebar: "1",
+        node: "create-pr",
+      }),
+    );
+
+    expect(next.get("run")).toBeNull();
+    expect(next.get("configure")).toBe("1");
+    expect(next.get("sidebar")).toBe("1");
+    expect(next.get("node")).toBe("create-pr");
+  });
+
   it("returns the same searchParams instance when activation is a no-op rewrite", () => {
     const setSearchParams = vi.fn();
     const current = new URLSearchParams("configure=1&from=automations");

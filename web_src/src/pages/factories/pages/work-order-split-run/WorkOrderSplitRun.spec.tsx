@@ -65,12 +65,47 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: "Open automation run" })).not.toBeInTheDocument();
   });
 
+  it("lists PR feedback runs on the Log tab after line steps", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-fb",
+            handlerName: "Address PR feedback",
+            pullRequestNumber: "12",
+            run: {
+              id: "run-fb",
+              canvasId: "canvas-fb",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    await openLogTab(user);
+    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Address feedback on PR #12");
+  });
+
   it("keeps the log scroller flush so sticky phase headers cover scrolled lines", () => {
     renderSplitRun();
     const scroll = screen.getByTestId("split-run-log-scroll");
     expect(scroll.className).not.toMatch(/\bpy-\d/);
     expect(scroll.className).not.toMatch(/\bpt-\d/);
     expect(scroll.className).toMatch(/\bpb-3\b/);
+  });
+
+  it("does not show elapsed time or a spend icon on the owner row", () => {
+    renderSplitRun();
+    const row = screen.getByTestId("popup-owner-time-cost");
+    expect(within(row).queryByText(/so far/)).not.toBeInTheDocument();
+    expect(row.querySelector(".lucide-clock")).toBeNull();
+    expect(row.querySelector(".lucide-circle-dollar-sign")).toBeNull();
+    expect(row).toHaveTextContent("$0.73");
+    expect(row).toHaveTextContent("2.7k tokens");
   });
 
   it("does not put an Open work order link next to close", () => {
@@ -400,8 +435,9 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER) });
 
     const note = screen.getByTestId("split-run-attention-note");
-    expect(within(note).getByRole("heading", { name: "Listening for user review" })).toBeInTheDocument();
-    expect(note).toHaveTextContent("This automation finished and opened PR #6812.");
+    expect(within(note).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
+    expect(note).toHaveTextContent("The pull request is open and waiting for user review.");
+    expect(note).toHaveTextContent("Mention @superplaneagent in a pull request comment or review to request changes.");
     expect(note).toHaveTextContent("Task will automatically close when the pull request is closed or merged.");
     expect(within(note).getByRole("link", { name: "Review PR #6812" })).toHaveAttribute(
       "href",
@@ -919,10 +955,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(stream).getByRole("link", { name: /merge-screenshot/ })).toBeInTheDocument();
     expect(within(stream).getByRole("link", { name: /#510/ })).toBeInTheDocument();
 
-    await user.click(within(screen.getByTestId("split-run-stream-line-find-work-order")).getByRole("button"));
+    await user.click(within(screen.getByTestId("split-run-stream-line-find-pull-request")).getByRole("button"));
 
-    expect(screen.getByTestId("split-run-stream-line-find-work-order")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.queryByTestId("split-run-canvas-node-find-work-order")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-find-pull-request")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.queryByTestId("split-run-canvas-node-find-pull-request")).not.toBeInTheDocument();
   });
 
   it("lets you rename the title and edit the description on a draft", async () => {

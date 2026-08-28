@@ -18,10 +18,12 @@ import {
   factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
+  factoriesListFactoryPullRequests,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
@@ -36,6 +38,22 @@ import {
 } from "@/pages/factories/lib/workOrderEventsPagination";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+export type FactoryPullRequestFilters = {
+  order?: number | string;
+  workOrderIds?: string[];
+};
+
+type NormalizedFactoryPullRequestFilters = {
+  order?: string;
+  workOrderIds: string[];
+};
+
+function normalizeFactoryPullRequestFilters(filters?: FactoryPullRequestFilters): NormalizedFactoryPullRequestFilters {
+  const workOrderIds = [...new Set(filters?.workOrderIds ?? [])].filter(Boolean).sort();
+  const order = filters?.order == null || String(filters.order) === "" ? undefined : String(filters.order);
+  return { order, workOrderIds };
+}
+
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
   detail: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId] as const,
@@ -49,6 +67,8 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
   workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
+  pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
+    ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
   velocity: (
     organizationId: string,
@@ -135,6 +155,32 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
   });
 }
 
+export function factoryPullRequestsKey(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
+  return factoryQueryKeys.pullRequests(organizationId, factoryId, normalizeFactoryPullRequestFilters(filters));
+}
+
+export function useFactoryPullRequests(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
+  const normalized = normalizeFactoryPullRequestFilters(filters);
+  return useQuery({
+    queryKey: factoryQueryKeys.pullRequests(organizationId, factoryId, normalized),
+    queryFn: async (): Promise<FactoriesFactoryPullRequest[]> => {
+      const response = await factoriesListFactoryPullRequests(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          query: {
+            order: normalized.order,
+            workOrderIds: normalized.workOrderIds.length > 0 ? normalized.workOrderIds : undefined,
+          },
+        }),
+      );
+      return response.data?.pullRequests ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId),
+    staleTime: 0,
+  });
+}
+
 export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {
   return useQuery({
     queryKey: workOrderDetailKey(organizationId, factoryId, orderId),
@@ -208,7 +254,12 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; description?: string; key?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      description?: string;
+      key?: string;
+      hostedSpendBudgetCents?: number | null;
+    }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
           organizationId,
@@ -217,6 +268,11 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
             name: input.name,
             description: input.description,
             key: input.key,
+            hostedSpendBudgetCents:
+              input.hostedSpendBudgetCents === null || input.hostedSpendBudgetCents === undefined
+                ? undefined
+                : String(input.hostedSpendBudgetCents),
+            clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
           },
         }),
       );

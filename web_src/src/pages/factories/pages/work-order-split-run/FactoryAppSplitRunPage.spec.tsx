@@ -44,6 +44,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
+    expect(within(page).getByRole("complementary", { name: "Automations" })).toHaveStyle({ width: "65%" });
   }, 10000);
 
   it("does not invent a planning ingest phase for a live order", async () => {

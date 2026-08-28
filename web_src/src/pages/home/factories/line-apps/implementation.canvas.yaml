@@ -16,13 +16,25 @@ spec:
       targetId: implementation-agent-no-issue
     - channel: passed
       sourceId: implementation-agent-no-issue
+      targetId: generate-pr-text
+    - channel: passed
+      sourceId: generate-pr-text
       targetId: create-draft-pr
     - channel: default
       sourceId: create-draft-pr
       targetId: attach-pr-artifact
     - channel: default
       sourceId: attach-pr-artifact
+      targetId: add-pr-label
+    - channel: default
+      sourceId: add-pr-label
       targetId: set-pr-closure-note
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
+    - channel: failed
+      sourceId: generate-pr-text
+      targetId: add-run-error
   nodes:
     - id: onrun-implement
       name: Start
@@ -217,6 +229,92 @@ spec:
         x: 1475
         'y': 648
       isCollapsed: false
+    - id: generate-pr-text
+      name: Generate PR title and description
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ install_params.appRepository }}'
+            valueSource: literal
+          - name: PLAN
+            value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}'
+            valueSource: literal
+          - name: BRANCH
+            value: '{{ $["Create Branch"].data.result.branch }}'
+            valueSource: literal
+          - name: ORDER_DESCRIPTION
+            value: '{{ toBase64(order().description) }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: sonnet
+        steps:
+          - name: Inject Plan
+            type: bash
+            command: |-
+              echo $PLAN | base64 -d > /tmp/PLAN.md
+              cat /tmp/PLAN.md
+          - name: Inject order description
+            type: bash
+            command: |-
+              echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
+              cat /tmp/ORDER.md
+          - name: Checkout Branch
+            type: bash
+            command: |-
+              set -euo pipefail
+              rm -rf repo
+              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+              cd repo
+          - name: Generate PR title and description
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are writing a pull request title and description for an implementation done to complete a SuperPlane Work Order.
+              The repository is cloned out in your current working directory.
+
+              Work order title: {{ order().title }}
+
+              1/ The work order description is at /tmp/ORDER.md
+              2/ The plan used for the implementation is in the /tmp/PLAN.md file.
+              3/ Analyze the plan and the changes in the current branch, compared to main, and compose a concise title and description for the pull request.
+              4/ The title should follow conventional commits structure. Use only feat, fix, chore, or docs.
+              5/ The description should have a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
+              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md
+
+              Write clearly, for humans, in ASD-STE100 / Simplified Technical English
+          - name: Push output
+            type: bash
+            command: |-
+              if [ -s /tmp/TITLE ] && [ -s /tmp/DESCRIPTION.md ]; then
+                echo "Title and description found. Using as output"
+                jq -n \
+                  --rawfile title /tmp/TITLE \
+                  --rawfile description /tmp/DESCRIPTION.md \
+                  '{title: ($title | @base64), description: ($description | @base64)}' \
+                  > "$SUPERPLANE_RESULT_FILE"
+              else
+                jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
+                  > "$SUPERPLANE_RESULT_FILE"
+                echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
+                exit 1
+              fi
+      position:
+        x: 1442
+        'y': 984
+      isCollapsed: false
     - id: create-draft-pr
       name: Create Draft Pull Request
       type: TYPE_ACTION
@@ -228,7 +326,7 @@ spec:
         body: |-
           [Work Order]({{ order().url }}).
 
-          {{ order().title }}
+          {{ fromBase64(previous().data.result.description) }}
 
           <hr>
 
@@ -236,26 +334,43 @@ spec:
         draft: true
         head: '{{ $["Create Branch"].data.result.branch }}'
         repository: '{{ install_params.appRepository }}'
-        title: '{{ order().title }}'
+        title: '{{ fromBase64(previous().data.result.title) }}'
       position:
         x: 1442
-        'y': 1032
+        'y': 1152
+      isCollapsed: true
+    - id: add-pr-label
+      name: Add Label to Pull Request
+      type: TYPE_ACTION
+      component: github.addIssueLabel
+      configuration:
+        issueNumber: '{{ $["Create Draft Pull Request"].data.number }}'
+        labels:
+          - factory
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 1442
+        'y': 1320
       isCollapsed: true
     - id: attach-pr-artifact
       name: Attach PR to Work Order
       type: TYPE_ACTION
-      component: addWorkOrderArtifact
+      component: addPullRequest
       concurrency:
         max: 100
       configuration:
-        artifactType: pr
         orderId: '{{ order().id }}'
-        state: open
+        provider: github
+        repository: '{{ install_params.appRepository }}'
+        number: '{{ $["Create Draft Pull Request"].data.number }}'
         url: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
+        title: '{{ $["Create Draft Pull Request"].data.title }}'
+        state: open
+        externalId: '{{ $["Create Draft Pull Request"].data.id }}'
       position:
         x: 1442
-        'y': 1200
-      isCollapsed: false
+        'y': 1488
+      isCollapsed: true
     - id: set-pr-closure-note
       name: Set PR closure note
       type: TYPE_ACTION
@@ -263,12 +378,21 @@ spec:
       configuration:
         orderId: '{{ order().id }}'
         noteKey: pr-closure
-        headline: Listening for user review
-        body: This automation finished and opened this pull request. Task will automatically close when the pull request is closed or merged.
+        headline: Waiting for user review
+        body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
         ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
-        ctaUrl: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
+        ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
         showOnlyWhenWaiting: true
       position:
         x: 1442
-        'y': 1368
+        'y': 1656
+      isCollapsed: true
+    - id: add-run-error
+      name: addRunError
+      type: TYPE_ACTION
+      component: addRunError
+      configuration: {}
+      position:
+        x: 1770
+        'y': 984
       isCollapsed: true

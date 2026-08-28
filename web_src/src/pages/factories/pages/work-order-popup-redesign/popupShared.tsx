@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleDollarSign, Clock, FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
+import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
@@ -129,9 +129,9 @@ export function PopupHeader({
   );
 }
 
-type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "startedLabel" | "elapsed" | "costUsd" | "tokensLabel">;
+type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
 
-/** Owner, elapsed time, and spend. No status, author, or ticket key. */
+/** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
   className,
@@ -191,15 +191,8 @@ export function OwnerTimeCostRow({
       ) : (
         ownerMark
       )}
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground" title={fixture.startedLabel}>
-        <Clock className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">{fixture.elapsed}</span>
-      </span>
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-        <CircleDollarSign className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">
-          {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
-        </span>
+      <span className="text-foreground">
+        {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
       </span>
       {children}
     </div>

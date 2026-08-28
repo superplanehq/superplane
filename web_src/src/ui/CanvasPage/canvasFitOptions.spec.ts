@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
+  FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
 } from "./canvasFitOptions";
@@ -16,5 +17,11 @@ describe("canvasFitOptions", () => {
 
   it("does not clamp run participant fitting to a minimum zoom", () => {
     expect(RUN_CANVAS_FIT_VIEW_OPTIONS).not.toHaveProperty("minZoom");
+  });
+
+  it("locks Factory Configure fitting to 100% zoom", () => {
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.minZoom).toBe(1);
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.maxZoom).toBe(1);
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.includeHiddenNodes).toBe(true);
   });
 });

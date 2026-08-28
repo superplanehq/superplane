@@ -6,6 +6,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
+import "canvases.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
 
@@ -189,6 +190,116 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List factory intake runs";
       description: "Returns what an intake received, how it scored, and where it went";
+      tags: "Factory";
+    };
+  }
+
+  // Factory PR feedback handler APIs
+
+  rpc ListFactoryPRFeedbackHandlers(
+    ListFactoryPRFeedbackHandlersRequest
+  ) returns (ListFactoryPRFeedbackHandlersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory PR feedback handlers";
+      description: "Returns the PR feedback handlers of a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryPRFeedbackHandler(
+    CreateFactoryPRFeedbackHandlerRequest
+  ) returns (CreateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/pr-feedback-handlers"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory PR feedback handler";
+      description: "Creates a PR feedback handler and the canvas that runs it";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryPRFeedbackHandler(
+    UpdateFactoryPRFeedbackHandlerRequest
+  ) returns (UpdateFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory PR feedback handler";
+      description: "Updates the name and settings of a PR feedback handler";
+      tags: "Factory";
+    };
+  }
+
+  rpc DeleteFactoryPRFeedbackHandler(
+    DeleteFactoryPRFeedbackHandlerRequest
+  ) returns (DeleteFactoryPRFeedbackHandlerResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/pr-feedback-handlers/{handler_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete factory PR feedback handler";
+      description: "Deletes a PR feedback handler and its canvas";
+      tags: "Factory";
+    };
+  }
+
+  rpc ListFactoryPullRequests(
+    ListFactoryPullRequestsRequest
+  ) returns (ListFactoryPullRequestsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory pull requests";
+      description: "Returns pull requests tracked by a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribeFactoryPullRequest(
+    DescribeFactoryPullRequestRequest
+  ) returns (DescribeFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/prs/{pr_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe factory pull request";
+      description: "Returns a factory pull request by its ID";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreateFactoryPullRequest(
+    CreateFactoryPullRequestRequest
+  ) returns (CreateFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/prs"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create factory pull request";
+      description: "Tracks a pull request on a work order";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryPullRequest(
+    UpdateFactoryPullRequestRequest
+  ) returns (UpdateFactoryPullRequestResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/prs/{pr_id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory pull request";
+      description: "Updates a tracked factory pull request";
       tags: "Factory";
     };
   }
@@ -391,6 +502,29 @@ service Factories {
     };
   }
 
+  rpc ListFactoryLLMModels(ListFactoryLLMModelsRequest) returns (ListFactoryLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/llm-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List factory LLM models";
+      description: "Returns the parent model list and the workspace subset for one provider";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdateFactoryLLMModels(UpdateFactoryLLMModelsRequest) returns (UpdateFactoryLLMModelsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/factories/{factory_id}/llm-models"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory LLM models";
+      description: "Sets the workspace subset of parent models. An empty list inherits the parent list.";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -428,6 +562,10 @@ message UpdateFactoryRequest {
   // New workspace key. 2 to 5 uppercase letters, unique per organization.
   // Updating this changes the identifier shown for every work order.
   optional string key = 4;
+  // Hosted spend cap in USD cents. Unset leaves the current cap unchanged.
+  optional int64 hosted_spend_budget_cents = 5;
+  // When true, remove the hosted spend cap. Takes precedence over hosted_spend_budget_cents.
+  bool clear_hosted_spend_budget = 6;
 }
 
 message UpdateFactoryResponse {
@@ -508,6 +646,8 @@ message Factory {
   // Workspace key. 2 to 5 uppercase letters, unique per organization.
   string key = 5;
   FactoryOnboarding onboarding = 6;
+  // Hosted spend cap in USD cents. Unset means this workspace has no cap.
+  optional int64 hosted_spend_budget_cents = 7;
 }
 
 message FactoryLine {
@@ -690,6 +830,178 @@ message ListFactoryIntakeRunsRequest {
 message ListFactoryIntakeRunsResponse {
   repeated FactoryIntakeRun runs = 1;
   google.protobuf.Timestamp last_timestamp = 2;
+}
+
+// Factory PR feedback handlers
+
+message FactoryPRFeedbackHandler {
+  // Object this handler can change.
+  enum Subject {
+    SUBJECT_UNSPECIFIED = 0;
+    SUBJECT_GITHUB_PULL_REQUEST = 1;
+  }
+
+  // Signal that starts a run.
+  enum Source {
+    SOURCE_UNSPECIFIED = 0;
+    SOURCE_PULL_REQUEST_DISCUSSION = 1;
+  }
+
+  message SubjectSettings {
+    string repository = 1;
+  }
+
+  message DiscussionSettings {
+    string mention = 1;
+    bool ignore_bots = 2;
+  }
+
+  // Settings stored in the canvas graph. This block is a read/write facade
+  // over that graph.
+  message Settings {
+    SubjectSettings subject = 1;
+    DiscussionSettings discussion = 2;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  string canvas_id = 3;
+  string name = 4;
+  string description = 5;
+  // Unspecified defaults to a GitHub pull request.
+  Subject subject = 6;
+  // Unspecified defaults to pull request discussion.
+  Source source = 7;
+  Settings settings = 8;
+  // False when the canvas can no longer receive a mention and address it.
+  // The handler stays listed so the user can repair it.
+  bool healthy = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message ListFactoryPRFeedbackHandlersRequest {
+  string factory_id = 1;
+}
+
+message ListFactoryPRFeedbackHandlersResponse {
+  repeated FactoryPRFeedbackHandler handlers = 1;
+}
+
+message CreateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string name = 2;
+  FactoryPRFeedbackHandler.Subject subject = 3;
+  FactoryPRFeedbackHandler.Source source = 4;
+  FactoryPRFeedbackHandler.Settings settings = 5;
+}
+
+message CreateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message UpdateFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+  optional string name = 3;
+  optional FactoryPRFeedbackHandler.Settings settings = 4;
+}
+
+message UpdateFactoryPRFeedbackHandlerResponse {
+  FactoryPRFeedbackHandler handler = 1;
+}
+
+message DeleteFactoryPRFeedbackHandlerRequest {
+  string factory_id = 1;
+  string handler_id = 2;
+}
+
+message DeleteFactoryPRFeedbackHandlerResponse {}
+
+message FactoryPullRequest {
+  enum Provider {
+    PROVIDER_UNSPECIFIED = 0;
+    PROVIDER_GITHUB = 1;
+    PROVIDER_BITBUCKET = 2;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_OPEN = 1;
+    STATE_DRAFT = 2;
+    STATE_CLOSED = 3;
+    STATE_MERGED = 4;
+  }
+
+  string id = 1;
+  string factory_id = 2;
+  string work_order_id = 3;
+  int64 work_order_number = 4;
+  Provider provider = 5;
+  string external_id = 6;
+  string repository = 7;
+  int64 number = 8;
+  string url = 9;
+  string title = 10;
+  State state = 11;
+  google.protobuf.Timestamp merged_at = 12;
+  google.protobuf.Timestamp closed_at = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  repeated Superplane.Canvases.CanvasRunRef runs = 16;
+}
+
+message ListFactoryPullRequestsRequest {
+  string factory_id = 1;
+  optional int64 order = 2;
+  repeated string work_order_ids = 3;
+}
+
+message ListFactoryPullRequestsResponse {
+  repeated FactoryPullRequest pull_requests = 1;
+}
+
+message DescribeFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+}
+
+message DescribeFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message CreateFactoryPullRequestRequest {
+  string factory_id = 1;
+  string work_order_id = 2;
+  FactoryPullRequest.Provider provider = 3;
+  string external_id = 4;
+  string repository = 5;
+  int64 number = 6;
+  string url = 7;
+  string title = 8;
+  FactoryPullRequest.State state = 9;
+  google.protobuf.Timestamp merged_at = 10;
+  google.protobuf.Timestamp closed_at = 11;
+}
+
+message CreateFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
+}
+
+message UpdateFactoryPullRequestRequest {
+  string factory_id = 1;
+  string pr_id = 2;
+  optional string external_id = 3;
+  optional string repository = 4;
+  optional string url = 5;
+  optional string title = 6;
+  optional FactoryPullRequest.State state = 7;
+  google.protobuf.Timestamp merged_at = 8;
+  google.protobuf.Timestamp closed_at = 9;
+}
+
+message UpdateFactoryPullRequestResponse {
+  FactoryPullRequest pull_request = 1;
 }
 
 message FactoryIntakeItem {
@@ -1088,10 +1400,9 @@ message CreateWorkOrderArtifactResponse {
 message WorkOrderArtifact {
   enum Type {
     TYPE_UNSPECIFIED = 0;
-    TYPE_PR = 1;
-    TYPE_MARKDOWN = 2;
-    TYPE_BRANCH = 3;
-    TYPE_LINK = 4;
+    TYPE_MARKDOWN = 1;
+    TYPE_BRANCH = 2;
+    TYPE_LINK = 3;
   }
 
   string id = 1;
@@ -1257,6 +1568,39 @@ message DescribeFactoryUsageResponse {
   int64 grant_total_cents = 6;
   int64 hosted_billed_cents = 7;
   bool remaining_credit_warning = 8;
+  optional int64 hosted_spend_budget_cents = 9;
+  int64 factory_hosted_billed_cents = 10;
+  int64 factory_remaining_credit_cents = 11;
+  bool factory_remaining_credit_warning = 12;
+}
+
+message ListFactoryLLMModelsRequest {
+  string factory_id = 1;
+  string provider = 2;
+  string funding_source = 3;
+}
+
+message FactoryLLMModel {
+  string id = 1;
+  string name = 2;
+}
+
+message ListFactoryLLMModelsResponse {
+  repeated FactoryLLMModel parent = 1;
+  repeated FactoryLLMModel selected = 2;
+  bool inherit_parent = 3;
+}
+
+message UpdateFactoryLLMModelsRequest {
+  string factory_id = 1;
+  string provider = 2;
+  string funding_source = 3;
+  repeated string allowed_models = 4;
+}
+
+message UpdateFactoryLLMModelsResponse {
+  repeated FactoryLLMModel selected = 1;
+  bool inherit_parent = 2;
 }
 
 message UsageByModel {

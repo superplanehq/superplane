@@ -317,7 +317,7 @@ func TestFactoryContext_AddWorkOrderArtifact_EmptyOrderIDIsRejected(t *testing.T
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 	_, err = ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type: "pr",
+		Type: "link",
 		Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
 	})
 	require.Error(t, err)
@@ -413,7 +413,7 @@ func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *t
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: order.ID.String(),
-		Type:    "pr",
+		Type:    "link",
 		Data: map[string]any{
 			"url": "https://github.com/example/repo/pull/7",
 		},
@@ -534,7 +534,7 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
-		Type: "pr",
+		Type: "link",
 		Data: map[string]any{"url": "https://github.com/example/repo/pull/99"},
 		Key:  "https://github.com/example/repo/pull/99",
 	})
@@ -701,16 +701,15 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: order.ID.String(),
-		Type:    "pr",
+		Type:    "link",
 		Data: map[string]any{
-			"url":    "https://github.com/example/repo/pull/1",
-			"title":  "Draft",
-			"number": "1",
+			"url":   "https://github.com/example/repo/pull/1",
+			"title": "Draft",
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, artifact)
-	assert.Equal(t, "pr", artifact.Type)
+	assert.Equal(t, "link", artifact.Type)
 	assert.Equal(t, "https://github.com/example/repo/pull/1", artifact.Data["url"])
 
 	artifacts, err := order.ListArtifacts(database.Conn())

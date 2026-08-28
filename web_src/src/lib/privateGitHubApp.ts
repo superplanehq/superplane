@@ -1,4 +1,5 @@
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { integrationSetupPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
 
 export const PRIVATE_GITHUB_APP_CONFIG = { privateApp: true } as const;
 
@@ -12,15 +13,16 @@ export function privateGitHubAppCreateConfiguration(integrationName: string): { 
   return { ...PRIVATE_GITHUB_APP_CONFIG };
 }
 
-export function githubPrivateAppSetupPath(organizationId: string): string {
-  return `/${organizationId}/settings/integrations/github/setup`;
+export function githubPrivateAppSetupPath(organizationId: string, basePath?: string): string {
+  return integrationSetupPath(basePath ?? legacySettingsIntegrationsPath(organizationId), "github");
 }
 
 export function startPrivateGitHubAppSetup(args: {
   organizationId: string;
   returnTo?: string;
+  integrationsBasePath?: string;
   goTo: (path: string) => void;
 }): void {
   rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-  args.goTo(githubPrivateAppSetupPath(args.organizationId));
+  args.goTo(githubPrivateAppSetupPath(args.organizationId, args.integrationsBasePath));
 }

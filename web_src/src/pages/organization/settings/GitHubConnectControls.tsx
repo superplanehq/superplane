@@ -2,6 +2,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { CREATE_PRIVATE_GITHUB_APP_LABEL, startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
+import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { useNavigate } from "react-router";
 
 interface GitHubConnectControlsProps {
@@ -20,6 +21,7 @@ export function GitHubConnectControls({
   onConnect,
 }: GitHubConnectControlsProps) {
   const navigate = useNavigate();
+  const integrationsBasePath = useIntegrationsBasePath(organizationId);
   const canCreate = Boolean(definition) && canCreateIntegrations;
 
   return (
@@ -52,7 +54,8 @@ export function GitHubConnectControls({
           onClick={() =>
             startPrivateGitHubAppSetup({
               organizationId,
-              returnTo: `/${organizationId}/settings/integrations`,
+              returnTo: integrationsBasePath,
+              integrationsBasePath,
               goTo: navigate,
             })
           }

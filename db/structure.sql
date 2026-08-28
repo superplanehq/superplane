@@ -355,6 +355,8 @@ CREATE TABLE public.factories (
     next_work_order_number bigint DEFAULT 1 NOT NULL,
     onboarding_completed_at timestamp with time zone,
     onboarding_config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    hosted_spend_budget_cents bigint,
+    CONSTRAINT factories_hosted_spend_budget_non_negative CHECK (((hosted_spend_budget_cents IS NULL) OR (hosted_spend_budget_cents >= 0))),
     CONSTRAINT factories_key_format_check CHECK (((key)::text ~ '^[A-Z]{2,5}$'::text))
 );
 
@@ -390,6 +392,74 @@ CREATE TABLE public.factory_lines (
 
 
 --
+-- Name: factory_llm_model_allowlists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_llm_model_allowlists (
+    factory_id uuid NOT NULL,
+    provider text NOT NULL,
+    funding_source text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT factory_llm_model_allowlists_funding CHECK ((funding_source = ANY (ARRAY['hosted'::text, 'byok'::text]))),
+    CONSTRAINT factory_llm_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
+-- Name: factory_pr_feedback_handlers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_pr_feedback_handlers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    subject character varying(64) NOT NULL,
+    source character varying(64) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_pull_request_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_pull_request_runs (
+    pull_request_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_pull_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_pull_requests (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    provider text NOT NULL,
+    external_id text,
+    repository text NOT NULL,
+    number bigint NOT NULL,
+    url text NOT NULL,
+    title text DEFAULT ''::text NOT NULL,
+    state text NOT NULL,
+    merged_at timestamp with time zone,
+    closed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT factory_pull_requests_number_positive CHECK ((number > 0)),
+    CONSTRAINT factory_pull_requests_state_valid CHECK ((state = ANY (ARRAY['open'::text, 'draft'::text, 'closed'::text, 'merged'::text])))
+);
+
+
+--
 -- Name: factory_work_order_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -402,9 +472,7 @@ CREATE TABLE public.factory_work_order_artifacts (
     data jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    key character varying(512),
-    merged_at timestamp with time zone,
-    closed_at timestamp with time zone
+    key character varying(512)
 );
 
 
@@ -676,6 +744,19 @@ CREATE TABLE public.llm_usage_events (
 
 
 --
+-- Name: organization_byok_model_allowlists; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_byok_model_allowlists (
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    allowed_models jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT organization_byok_model_allowlists_known_provider CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -717,8 +798,10 @@ CREATE TABLE public.organization_llm_credit_grants (
     note text DEFAULT ''::text NOT NULL,
     actor_account_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT organization_llm_credit_grants_amount_positive CHECK ((amount_micros > 0)),
-    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text])))
+    polar_order_id text,
+    polar_refund_id text,
+    CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
+    CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
 );
 
 
@@ -731,6 +814,7 @@ CREATE TABLE public.organization_llm_credit_holds (
     organization_id uuid NOT NULL,
     amount_micros bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    factory_id uuid,
     CONSTRAINT organization_llm_credit_holds_amount_positive CHECK ((amount_micros > 0))
 );
 
@@ -743,6 +827,7 @@ CREATE TABLE public.organization_llm_settings (
     organization_id uuid NOT NULL,
     markup_bps integer,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    polar_customer_id text,
     CONSTRAINT organization_llm_settings_markup_non_negative CHECK (((markup_bps IS NULL) OR (markup_bps >= 0)))
 );
 
@@ -1350,6 +1435,38 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_llm_model_allowlists factory_llm_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_llm_model_allowlists
+    ADD CONSTRAINT factory_llm_model_allowlists_pkey PRIMARY KEY (factory_id, provider, funding_source);
+
+
+--
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_pull_request_runs factory_pull_request_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_request_runs
+    ADD CONSTRAINT factory_pull_request_runs_pkey PRIMARY KEY (pull_request_id, run_id);
+
+
+--
+-- Name: factory_pull_requests factory_pull_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_requests
+    ADD CONSTRAINT factory_pull_requests_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_work_order_artifacts factory_work_order_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1470,6 +1587,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 
 --
+-- Name: factory_pull_request_runs idx_factory_pull_request_runs_run_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_request_runs
+    ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
 -- Name: installation_llm_settings installation_llm_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1499,6 +1624,14 @@ ALTER TABLE ONLY public.llm_usage_events
 
 ALTER TABLE ONLY public.llm_usage_events
     ADD CONSTRAINT llm_usage_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_byok_model_allowlists organization_byok_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_byok_model_allowlists
+    ADD CONSTRAINT organization_byok_model_allowlists_pkey PRIMARY KEY (organization_id, provider);
 
 
 --
@@ -2035,6 +2168,69 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
+-- Name: idx_factory_pr_feedback_handlers_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_pr_feedback_handlers_canvas_id ON public.factory_pr_feedback_handlers USING btree (canvas_id);
+
+
+--
+-- Name: idx_factory_pr_feedback_handlers_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pr_feedback_handlers_factory_id ON public.factory_pr_feedback_handlers USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_closed_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pull_requests_factory_closed_at ON public.factory_pull_requests USING btree (factory_id, closed_at DESC) WHERE (closed_at IS NOT NULL);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_merged_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pull_requests_factory_merged_at ON public.factory_pull_requests USING btree (factory_id, merged_at DESC) WHERE (merged_at IS NOT NULL);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_provider_external; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_external ON public.factory_pull_requests USING btree (factory_id, provider, external_id) WHERE (external_id IS NOT NULL);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_provider_repo_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_provider_repo_number ON public.factory_pull_requests USING btree (factory_id, provider, repository, number);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pull_requests_factory_state ON public.factory_pull_requests USING btree (factory_id, state);
+
+
+--
+-- Name: idx_factory_pull_requests_factory_url; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_pull_requests_factory_url ON public.factory_pull_requests USING btree (factory_id, url);
+
+
+--
+-- Name: idx_factory_pull_requests_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_requests USING btree (work_order_id, created_at);
+
+
+--
 -- Name: idx_factory_work_order_artifacts_factory_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2046,20 +2242,6 @@ CREATE INDEX idx_factory_work_order_artifacts_factory_created ON public.factory_
 --
 
 CREATE UNIQUE INDEX idx_factory_work_order_artifacts_factory_key_unique ON public.factory_work_order_artifacts USING btree (factory_id, key) WHERE (key IS NOT NULL);
-
-
---
--- Name: idx_factory_work_order_artifacts_pr_closed_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_artifacts_pr_closed_at ON public.factory_work_order_artifacts USING btree (factory_id, closed_at DESC) WHERE (((type)::text = 'pr'::text) AND (closed_at IS NOT NULL));
-
-
---
--- Name: idx_factory_work_order_artifacts_pr_merged_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_artifacts_pr_merged_at ON public.factory_work_order_artifacts USING btree (factory_id, merged_at DESC) WHERE (((type)::text = 'pr'::text) AND (merged_at IS NOT NULL));
 
 
 --
@@ -2242,6 +2424,20 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 --
 
 CREATE INDEX idx_org_llm_credit_grants_org ON public.organization_llm_credit_grants USING btree (organization_id, created_at DESC);
+
+
+--
+-- Name: idx_org_llm_credit_grants_polar_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_order ON public.organization_llm_credit_grants USING btree (polar_order_id) WHERE ((polar_order_id IS NOT NULL) AND (kind = 'polar'::text));
+
+
+--
+-- Name: idx_org_llm_credit_grants_polar_refund; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_refund ON public.organization_llm_credit_grants USING btree (polar_refund_id) WHERE (polar_refund_id IS NOT NULL);
 
 
 --
@@ -2717,6 +2913,62 @@ ALTER TABLE ONLY public.factory_intakes
 
 ALTER TABLE ONLY public.factory_lines
     ADD CONSTRAINT factory_lines_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pr_feedback_handlers
+    ADD CONSTRAINT factory_pr_feedback_handlers_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pull_request_runs factory_pull_request_runs_pull_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_request_runs
+    ADD CONSTRAINT factory_pull_request_runs_pull_request_id_fkey FOREIGN KEY (pull_request_id) REFERENCES public.factory_pull_requests(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pull_request_runs factory_pull_request_runs_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_request_runs
+    ADD CONSTRAINT factory_pull_request_runs_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pull_requests factory_pull_requests_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_requests
+    ADD CONSTRAINT factory_pull_requests_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pull_requests factory_pull_requests_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_requests
+    ADD CONSTRAINT factory_pull_requests_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_pull_requests factory_pull_requests_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_pull_requests
+    ADD CONSTRAINT factory_pull_requests_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
 
 
 --
@@ -3407,7 +3659,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260826112304	f
+20260828012533	f
 \.
 
 

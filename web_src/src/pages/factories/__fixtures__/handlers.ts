@@ -9,12 +9,17 @@ import {
   toStorybookOrganizationUser,
   type FactoriesFixture,
 } from "./factoryPageResponses";
-import { DEFAULT_ARTIFACTS_BY_ORDER_ID, DEFAULT_EVENTS_BY_ORDER_ID } from "./factoryPageEventFixtures";
+import {
+  DEFAULT_ARTIFACTS_BY_ORDER_ID,
+  DEFAULT_EVENTS_BY_ORDER_ID,
+  DEFAULT_PULL_REQUESTS_BY_ORDER_ID,
+} from "./factoryPageEventFixtures";
 import { DEFAULT_CHECKS_BY_ORDER_ID } from "./workOrderCheckFixtures";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesFactoryOnboarding,
+  FactoriesFactoryPullRequest,
   FactoriesUpdateFactoryOnboardingBody,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -41,6 +46,8 @@ interface RequestBody {
   title?: unknown;
   description?: unknown;
   key?: unknown;
+  hostedSpendBudgetCents?: unknown;
+  clearHostedSpendBudget?: unknown;
   assigneeIds?: unknown;
   assignee_ids?: unknown;
   lineName?: unknown;
@@ -162,6 +169,13 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           if (typeof request.description === "string") {
             factory.description = request.description;
           }
+          if (request.clearHostedSpendBudget === true) {
+            factory.hostedSpendBudgetCents = undefined;
+          } else if (typeof request.hostedSpendBudgetCents === "number") {
+            factory.hostedSpendBudgetCents = String(request.hostedSpendBudgetCents);
+          } else if (typeof request.hostedSpendBudgetCents === "string" && request.hostedSpendBudgetCents.trim()) {
+            factory.hostedSpendBudgetCents = request.hostedSpendBudgetCents;
+          }
           return { json: { factory: factoryWithLineMetrics(factory) } };
         }
 
@@ -184,6 +198,25 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/llm-models"),
+      resolve: (_match, method, body, url) => {
+        const request = (body ?? {}) as { provider?: string; fundingSource?: string; allowedModels?: unknown };
+        const provider =
+          url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
+        const models = storybookHostedLlmModels(provider).models;
+        if (method === "PUT") {
+          const allowed = stringArrayOrEmpty(request.allowedModels);
+          return {
+            json: {
+              selected: allowed.map((id) => ({ id, name: id })),
+              inheritParent: allowed.length === 0,
+            },
+          };
+        }
+        return { json: { parent: models, selected: models, inheritParent: true } };
+      },
     },
   ];
 }
@@ -217,6 +250,37 @@ function factoryOnboardingRoute(fixture: FactoriesFixture): FactoriesRoute {
       return { json: { factory: factoryWithLineMetrics(factory) } };
     },
   };
+}
+
+function factoryPullRequestRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
+  return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/prs"),
+      resolve: (match, method, _body, url) => {
+        if (method !== "GET") return { json: {} };
+        const factoryId = match[1];
+        const orderNumber = (url.searchParams.get("order") ?? "").trim();
+        const workOrderIds = [
+          ...url.searchParams.getAll("workOrderIds"),
+          ...url.searchParams.getAll("work_order_ids"),
+        ].filter(Boolean);
+        const orders = fixture.workOrdersByFactoryId[factoryId] ?? [];
+        let pullRequests = orders.flatMap((order) => (order.id ? orderPullRequests(fixture, order.id) : []));
+        if (orderNumber) {
+          const order = orders.find((entry) => entry.number === orderNumber || entry.id === orderNumber);
+          pullRequests = order?.id ? orderPullRequests(fixture, order.id) : [];
+        } else if (workOrderIds.length > 0) {
+          const allowed = new Set(workOrderIds);
+          pullRequests = pullRequests.filter((pr) => pr.workOrderId && allowed.has(pr.workOrderId));
+        }
+        return { json: { pullRequests } };
+      },
+    },
+  ];
+}
+
+function orderPullRequests(fixture: FactoriesFixture, orderId: string): FactoriesFactoryPullRequest[] {
+  return fixture.pullRequestsByOrderId?.[orderId] ?? DEFAULT_PULL_REQUESTS_BY_ORDER_ID[orderId] ?? [];
 }
 
 function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
@@ -317,12 +381,28 @@ function orderEvents(fixture: FactoriesFixture, orderId: string): FactoriesWorkO
   return fixture.eventsByOrderId?.[orderId] ?? DEFAULT_EVENTS_BY_ORDER_ID[orderId] ?? [];
 }
 
+function cancelActiveDispatches(order: FactoriesWorkOrder, now: string) {
+  order.lineDispatches = (order.lineDispatches ?? []).map((dispatch) =>
+    dispatch.state === "STATE_ACTIVE"
+      ? { ...dispatch, state: "STATE_FINISHED", result: "RESULT_CANCELLED", finishedAt: now }
+      : dispatch,
+  );
+}
+
+function dispatchRequestOptions(request: RequestBody) {
+  return {
+    lineName: stringOrEmpty(request.lineName ?? request.line_name),
+    startStepIndex: Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0,
+    replaceActive: request.replaceActive === true || request.replace_active === true,
+  };
+}
+
 function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: string, request: RequestBody) {
   const order = findOrder(fixture, factoryId, orderId);
   if (!order) return { json: {} };
   const factory = fixture.factories.find((entry) => entry.id === factoryId);
-  const lineName = stringOrEmpty(request.lineName ?? request.line_name);
-  const line = factory?.lines?.find((entry) => entry.name === lineName) ?? factory?.lines?.[0];
+  const options = dispatchRequestOptions(request);
+  const line = factory?.lines?.find((entry) => entry.name === options.lineName) ?? factory?.lines?.[0];
   const now = new Date().toISOString();
   order.updatedAt = now;
   if (order.state === "STATE_DRAFT") {
@@ -330,16 +410,10 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   }
 
   const apps = fixture.appsByFactoryId[factoryId] ?? [];
-  const startStepIndex = Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0;
-  const replaceActive = request.replaceActive === true || request.replace_active === true;
-  if (replaceActive) {
-    order.lineDispatches = (order.lineDispatches ?? []).map((dispatch) =>
-      dispatch.state === "STATE_ACTIVE"
-        ? { ...dispatch, state: "STATE_FINISHED", result: "RESULT_CANCELLED", finishedAt: now }
-        : dispatch,
-    );
+  if (options.replaceActive) {
+    cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(line, lineName, now, apps, startStepIndex);
+  const newDispatch = buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex);
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
@@ -491,6 +565,56 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
+function byokModelsRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/byok-models"),
+    resolve: (_match, method, body, url) => {
+      const request = (body ?? {}) as { provider?: string; allowedModels?: unknown };
+      const provider =
+        url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
+      const models = storybookHostedLlmModels(provider).models;
+      if (method === "PUT") {
+        const allowed = stringArrayOrEmpty(request.allowedModels);
+        return { json: { selected: allowed.map((id) => ({ id, name: id })) } };
+      }
+      return {
+        json: {
+          connected: models.length > 0,
+          integrationId: models.length > 0 ? "int-byok" : "",
+          selected: models,
+          candidates: models,
+        },
+      };
+    },
+  };
+}
+
+function hostedCreditProductsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-products"),
+    resolve: () => ({
+      json: {
+        billingEnabled: Boolean(fixture.hostedCreditProducts?.length),
+        products: fixture.hostedCreditProducts ?? [],
+      },
+    }),
+  };
+}
+
+function hostedCreditCheckoutRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-credit-checkout"),
+    resolve: () => ({ json: { checkoutUrl: "https://buy.polar.sh/polar_c_storybook" } }),
+  };
+}
+
+function billingPortalSessionRoute(): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/billing-portal-session"),
+    resolve: () => ({ json: { portalUrl: "https://polar.sh/portal/storybook" } }),
+  };
+}
+
 const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
   ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
 );
@@ -540,9 +664,14 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     ...factoryLinesRoutes(fixture),
+    ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationLlmSpendRoute(fixture),
     hostedLlmModelsRoute(),
+    byokModelsRoute(),
+    hostedCreditProductsRoute(fixture),
+    hostedCreditCheckoutRoute(),
+    billingPortalSessionRoute(),
   ];
 }
 

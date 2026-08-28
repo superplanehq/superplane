@@ -29,21 +29,23 @@ var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 var ErrFactoryKeyRequired = errors.New("factory key is required")
 var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
+var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
 
 var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
 
 type Factory struct {
-	ID                    uuid.UUID
-	OrganizationID        uuid.UUID
-	Name                  string
-	Description           string
-	Key                   string
-	NextWorkOrderNumber   int64
-	OnboardingConfig      datatypes.JSONType[FactoryOnboardingConfig]
-	OnboardingCompletedAt *time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
-	DeletedAt             gorm.DeletedAt `gorm:"index"`
+	ID                     uuid.UUID
+	OrganizationID         uuid.UUID
+	Name                   string
+	Description            string
+	Key                    string
+	NextWorkOrderNumber    int64
+	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt  *time.Time
+	HostedSpendBudgetCents *int64
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 // NormalizeFactoryKey uppercases and trims whitespace so callers can accept
@@ -328,6 +330,27 @@ func (f *Factory) Update(tx *gorm.DB, name, description, key *string) error {
 	return nil
 }
 
+func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error {
+	if budgetCents != nil && *budgetCents < 0 {
+		return ErrFactoryHostedSpendBudgetNegative
+	}
+
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("hosted_spend_budget_cents", "updated_at").
+		Updates(map[string]any{
+			"hosted_spend_budget_cents": budgetCents,
+			"updated_at":                now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	var canvases []Canvas
 	err := tx.
@@ -589,6 +612,71 @@ func (f *Factory) FindWorkOrderByArtifactKey(tx *gorm.DB, key string) (*FactoryW
 	}
 
 	return f.FindWorkOrder(tx, artifact.WorkOrderID)
+}
+
+// ListWorkOrdersByArtifactKeys resolves work orders from artifact keys in one
+// query. Missing keys are omitted rather than reported as not found.
+func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[string]FactoryWorkOrder, error) {
+	ordersByKey := map[string]FactoryWorkOrder{}
+	uniqueKeys := make([]string, 0, len(keys))
+	seen := map[string]bool{}
+	for _, key := range keys {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		uniqueKeys = append(uniqueKeys, trimmed)
+	}
+	if len(uniqueKeys) == 0 {
+		return ordersByKey, nil
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key IN ?", f.OrganizationID, f.ID, uniqueKeys).
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	orderIDs := make([]uuid.UUID, 0, len(artifacts))
+	orderIDSeen := map[uuid.UUID]bool{}
+	for _, artifact := range artifacts {
+		if orderIDSeen[artifact.WorkOrderID] {
+			continue
+		}
+		orderIDSeen[artifact.WorkOrderID] = true
+		orderIDs = append(orderIDs, artifact.WorkOrderID)
+	}
+	if len(orderIDs) == 0 {
+		return ordersByKey, nil
+	}
+
+	var orders []FactoryWorkOrder
+	err = tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", f.OrganizationID, f.ID, orderIDs).Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	ordersByID := make(map[uuid.UUID]FactoryWorkOrder, len(orders))
+	for _, order := range orders {
+		ordersByID[order.ID] = order
+	}
+
+	for _, artifact := range artifacts {
+		if artifact.Key == nil {
+			continue
+		}
+		order, ok := ordersByID[artifact.WorkOrderID]
+		if !ok {
+			continue
+		}
+		ordersByKey[*artifact.Key] = order
+	}
+
+	return ordersByKey, nil
 }
 
 func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {

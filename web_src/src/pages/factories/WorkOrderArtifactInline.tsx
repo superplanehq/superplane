@@ -1,15 +1,6 @@
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
-import {
-  ExternalLink,
-  FileText,
-  GitBranch,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Link as LinkIcon,
-} from "lucide-react";
+import { ExternalLink, FileText, GitBranch, Link as LinkIcon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -19,9 +10,6 @@ import {
   extractArtifactName,
   extractArtifactTitle,
   extractArtifactUrl,
-  extractPrArtifactState,
-  formatPrArtifactLabel,
-  type PrArtifactState,
 } from "./lib/workOrderArtifact";
 import { WorkOrderMarkdownArtifactDialog } from "./WorkOrderMarkdownArtifactDialog";
 
@@ -100,16 +88,6 @@ function MarkdownArtifactInline({
   );
 }
 
-// GitHub-style icon + color per PR lifecycle state. `open` is also the
-// back-compat default for artifacts attached before `state` existed (or
-// carrying an unrecognized value) — same look as today, zero regression.
-const PR_STATE_PRESENTATION: Record<PrArtifactState, { icon: typeof GitPullRequest; className: string }> = {
-  open: { icon: GitPullRequest, className: "text-emerald-600 dark:text-emerald-400" },
-  draft: { icon: GitPullRequestDraft, className: "text-muted-foreground" },
-  closed: { icon: GitPullRequestClosed, className: "text-red-600 dark:text-red-400" },
-  merged: { icon: GitMerge, className: "text-purple-600 dark:text-purple-400" },
-};
-
 /** Branch names run long enough to push everything else off the row. */
 const BRANCH_LABEL_MAX_CHARS = 25;
 
@@ -126,14 +104,6 @@ function artifactLinkPresentation(kind: string, artifact: WorkOrderArtifactPrese
   const url = extractArtifactUrl(artifact.data);
 
   switch (kind) {
-    case "pr": {
-      const { icon, className } = PR_STATE_PRESENTATION[extractPrArtifactState(artifact.data) ?? "open"];
-      return presentation(
-        icon,
-        firstLabel(formatPrArtifactLabel(artifact.data), title, name, compactUrlLabel(url), "Pull request"),
-        className,
-      );
-    }
     case "branch": {
       const branch = firstLabel(name, title, compactUrlLabel(url), "Branch");
       return { icon: GitBranch, label: capLabel(branch, BRANCH_LABEL_MAX_CHARS), fullLabel: branch };

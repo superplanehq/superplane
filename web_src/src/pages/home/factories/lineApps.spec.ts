@@ -4,6 +4,8 @@ import yaml from "js-yaml";
 import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
 
+const AGENT_COMPONENTS = ["runnerClaudeCode", "runnerCodex", "runnerOpenRouter"];
+
 type AgentStep = { name?: string; command?: string; workingDirectory?: string };
 
 type CanvasNode = {
@@ -63,7 +65,7 @@ describe("setup factory line apps", () => {
     }
   });
 
-  it("keeps the planning agent on Opus when the coding agent stays Claude Code", () => {
+  it("gives the planning agent the deeper model the rewrite resolved", () => {
     const planning = materializeOnboardingApp("line-planning");
     const implementation = materializeOnboardingApp("line-implementation");
     const planningAgent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
@@ -72,6 +74,8 @@ describe("setup factory line apps", () => {
     expect(planningAgent?.configuration?.model).toBe("opus");
     expect(implementationAgent?.configuration?.model).toBe("sonnet");
 
+    // A hosted run rejects a model that is not on the allowlist, so the
+    // planner takes the resolved Opus id rather than the "opus" alias.
     const rewrittenPlanning = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-planning"),
       canvasName: "Plan",
@@ -82,12 +86,45 @@ describe("setup factory line apps", () => {
       },
       agentRewrite: {
         component: "runnerClaudeCode",
-        model: "sonnet",
+        model: "claude-sonnet-4-6",
+        planningModel: "claude-opus-4-6",
         credentials: { source: "hosted" },
       },
     });
     const rewrittenAgent = canvasNodes(rewrittenPlanning).find((node) => node.id === "planner-agent-no-issue");
-    expect(rewrittenAgent?.configuration?.model).toBe("opus");
+    expect(rewrittenAgent?.configuration?.model).toBe("claude-opus-4-6");
+  });
+
+  it("falls back to the standard model when the rewrite resolved no planning model", () => {
+    const planning = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Plan",
+      canvasId: "canvas-abc",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: { github: { id: "int-1", name: "acme-github", ready: true } },
+      agentRewrite: {
+        component: "runnerCodex",
+        model: "gpt-5",
+        credentials: { source: "hosted" },
+      },
+    });
+    const agent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
+
+    expect(agent?.component).toBe("runnerCodex");
+    expect(agent?.configuration?.model).toBe("gpt-5");
+  });
+
+  it("names a model on every agent node, with or without an onboarding rewrite", () => {
+    for (const factoryId of ["line-planning", "line-implementation"]) {
+      const agentNodes = canvasNodes(materializeOnboardingApp(factoryId)).filter((node) =>
+        AGENT_COMPONENTS.includes(node.component ?? ""),
+      );
+
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      for (const node of agentNodes) {
+        expect(node.configuration?.model, `${factoryId}/${node.id}`).toBeTruthy();
+      }
+    }
   });
 
   it("uses the agent provider and model selected during onboarding", () => {
@@ -108,8 +145,8 @@ describe("setup factory line apps", () => {
       });
       const agentNodes = canvasNodes(canvasYaml).filter((node) => node.component === "runnerOpenRouter");
 
-      expect(agentNodes).toHaveLength(1);
-      expect(agentNodes[0]?.configuration?.model).toBe("openai/gpt-4.1");
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      expect(agentNodes.every((node) => node.configuration?.model === "openai/gpt-4.1")).toBe(true);
     }
   });
 
@@ -131,58 +168,63 @@ describe("setup factory line apps", () => {
       "create-branch",
       "add-branch-artifact",
       "implementation-agent-no-issue",
+      "generate-pr-text",
       "create-draft-pr",
+      "add-pr-label",
       "attach-pr-artifact",
       "set-pr-closure-note",
+      "add-run-error",
     ]);
     expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
-    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-draft-pr/);
+    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: generate-pr-text/);
+    expect(implementation).toMatch(/sourceId: generate-pr-text\n\s+targetId: create-draft-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
-    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: add-pr-label/);
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*component: addPullRequest/);
     expect(implementation).toMatch(
-      /id: attach-pr-artifact[\s\S]*artifactType: pr[\s\S]*state: open[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
+      /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
     );
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*state: open/);
     expect(Object.fromEntries(canvasNodes(implementation).map((node) => [node.id, node.concurrency?.max]))).toEqual({
       "onrun-implement": undefined,
       "create-branch": 5,
       "add-branch-artifact": 100,
       "implementation-agent-no-issue": 5,
+      "generate-pr-text": 5,
       "create-draft-pr": 100,
+      "add-pr-label": undefined,
       "attach-pr-artifact": 100,
       "set-pr-closure-note": undefined,
+      "add-run-error": undefined,
     });
-
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
   });
 
-  it("links the pull request back to the work order", () => {
-    const pr = materializeOnboardingApp("line-pr");
+  it("writes the pull request title and description before it opens the draft", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
-    expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
+    expect(implementation).toContain("id: generate-pr-text");
+    expect(implementation).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
+    );
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/,
+    );
+    expect(implementation).toContain("Created via [SuperPlane](https://superplane.com)");
   });
 
   it("announces the PR-merge wait after the work order attaches the pull request", () => {
-    const pr = materializeOnboardingApp("line-pr");
-
-    expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
-    expect(pr).toContain("component: setWorkOrderStatusNote");
-    expect(pr).toContain("noteKey: pr-closure");
-    expect(pr).toContain("headline: Listening for user review");
-    expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
-    expect(pr).toContain("showOnlyWhenWaiting: true");
-  });
-
-  it("announces the PR-merge wait after the implement app attaches the pull request", () => {
     const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(implementation).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).toMatch(/sourceId: add-pr-label[\s\S]*targetId: set-pr-closure-note/);
     expect(implementation).toContain("component: setWorkOrderStatusNote");
     expect(implementation).toContain("noteKey: pr-closure");
-    expect(implementation).toContain("headline: Listening for user review");
-    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data._links.html.href }}'");
+    expect(implementation).toContain("headline: Waiting for user review");
+    expect(implementation).toContain(
+      "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes.",
+    );
+    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(implementation).toContain("showOnlyWhenWaiting: true");
   });
 
@@ -190,12 +232,6 @@ describe("setup factory line apps", () => {
     const planning = materializeOnboardingApp("line-planning");
     expect(planning).toContain("No plan produced at /tmp/plan.md");
     expect(planning).toContain("exit 1");
-  });
-
-  it("fails PR title generation when the agent does not write title files", () => {
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
-    expect(pr).toContain("exit 1");
   });
 
   it("fails implementation when the agent pushes no file commits", () => {
@@ -231,6 +267,7 @@ describe("setup factory event apps", () => {
   it("provisions PR closure outside the factory line", () => {
     expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
   it("closes the work order when a factory pull request is closed", () => {
@@ -238,9 +275,9 @@ describe("setup factory event apps", () => {
 
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*actions:[\s\S]*- closed/);
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
-    expect(canvasYaml).toContain("component: findWorkOrder");
-    expect(canvasYaml).toContain("by: artifactKey");
-    expect(canvasYaml).toContain("component: updateWorkOrderArtifact");
+    expect(canvasYaml).toContain("component: findPullRequest");
+    expect(canvasYaml).toContain("component: addPullRequestActivity");
+    expect(canvasYaml).toContain("component: updatePullRequest");
     expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
     expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");
     expect(canvasYaml).toContain("result: completed");

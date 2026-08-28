@@ -29,4 +29,15 @@ describe("FactoryNodeCard", () => {
 
     expect(screen.getByTestId("factory-node-run-bash")).toHaveStyle({ width: "280px" });
   });
+
+  it("uses the same blue selection ring as the run canvas", () => {
+    const { container } = render(
+      <FactoryNodeCard title="Create Pull Request" componentLabel="Create Pull Request" selected canvasMode="edit" />,
+    );
+
+    const frame = container.querySelector("[data-selected='true']");
+    expect(frame).not.toBeNull();
+    expect(frame?.className).toContain("ring-4");
+    expect(frame?.className).toContain("--status-running-dot");
+  });
 });

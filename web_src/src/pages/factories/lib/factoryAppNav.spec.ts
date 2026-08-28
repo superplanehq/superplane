@@ -64,9 +64,9 @@ describe("factoryAppPath", () => {
     );
   });
 
-  it("builds configure path with configure=1 and components closed", () => {
+  it("builds configure path with the agent panel open and components closed", () => {
     expect(factoryAppConfigurePath("org", "fac", "app-1", { from: "automations" })).toBe(
-      "/org/workspaces/fac/apps/app-1?configure=1&from=automations",
+      "/org/workspaces/fac/apps/app-1?configure=1&agent=1&from=automations",
     );
   });
 });

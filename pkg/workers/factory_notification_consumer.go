@@ -445,8 +445,6 @@ func statusNoteDetail(message messages.FactoryWorkOrderNotificationMessage) stri
 
 func artifactTypeLabel(artifactType string) string {
 	switch artifactType {
-	case factory.ArtifactTypePR:
-		return "pull request"
 	case factory.ArtifactTypeMarkdown:
 		return "markdown"
 	case factory.ArtifactTypeBranch:
