@@ -294,6 +294,8 @@ export type SplitRunFixtureOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   /** Person who stopped the current automation, when known. */
   stoppedBy?: OrgUserDisplay;
+  /** Person or automation that closed the work order, when known. */
+  closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this work order, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
 };
@@ -337,7 +339,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       apiChecks: options?.checks,
       demoArtifacts,
       addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
-      stoppedBy: options?.stoppedBy,
+      stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
+      closer: options?.closer,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -356,6 +359,7 @@ function reviewSurfaces(
     demoArtifacts?: boolean;
     addressingFeedback?: boolean;
     stoppedBy?: OrgUserDisplay;
+    closer?: { actor?: OrgUserDisplay; automationName?: string };
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -372,7 +376,7 @@ function reviewSurfaces(
     );
   }
   if (displayStatus === "completed" || displayStatus === "rejected" || displayStatus === "cancelled") {
-    return surfaces(doneFooterForStatus(displayStatus), [], checks);
+    return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
     return failedReviewSurface(current, displayStatus, checks);
@@ -395,7 +399,7 @@ function reviewSurfaces(
       checks,
     );
   }
-  return surfaces(doneFooterForStatus(displayStatus), [], checks);
+  return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
 }
 
 function stoppedReviewSurface(

@@ -37,11 +37,11 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns the line board when from=work-order", () => {
+  it("returns the work-order permalink when from=work-order has a number", () => {
     expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42", lineId: "line-1" })).toEqual(
       {
         label: "Back",
-        href: "/org/workspaces/fac/lines/line-1",
+        href: "/org/workspaces/fac/work-order/42",
       },
     );
   });

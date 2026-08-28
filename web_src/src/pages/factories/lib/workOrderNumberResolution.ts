@@ -114,3 +114,54 @@ export function canonicalWorkOrderNumber(order: FactoriesWorkOrder | null): stri
   const parsed = Number(order.number);
   return Number.isFinite(parsed) ? String(parsed) : null;
 }
+
+/**
+ * Order stashed on `navigate(..., { state })` so a just-imported work order
+ * can open before the list query includes it (and so remount after permalink
+ * navigation does not drop the peek).
+ */
+export function peekOrderFromNavigationState(state: unknown): FactoriesWorkOrder | undefined {
+  if (!state || typeof state !== "object" || !("peekOrder" in state)) {
+    return undefined;
+  }
+  const order = (state as { peekOrder?: unknown }).peekOrder;
+  if (!order || typeof order !== "object" || !("id" in order)) {
+    return undefined;
+  }
+  const id = (order as { id?: unknown }).id;
+  if (typeof id !== "string" || id.length === 0) {
+    return undefined;
+  }
+  return order as FactoriesWorkOrder;
+}
+
+/**
+ * Prefer the list match. Fall back to a navigation hint that matches the
+ * route, then to a local hint when there is no permalink yet (import that
+ * returned no `number`).
+ */
+export function resolvePeekWorkOrder(
+  permalink: WorkOrderResolution,
+  routeNumber: string | undefined,
+  navigationHint: FactoriesWorkOrder | undefined,
+  localHint: FactoriesWorkOrder | null,
+): FactoriesWorkOrder | undefined {
+  if (permalink.status === "found" && permalink.order) {
+    return permalink.order;
+  }
+  if (navigationHint && peekHintMatchesRoute(navigationHint, routeNumber)) {
+    return navigationHint;
+  }
+  if (!routeNumber && localHint) {
+    return localHint;
+  }
+  return undefined;
+}
+
+function peekHintMatchesRoute(order: FactoriesWorkOrder, routeNumber: string | undefined): boolean {
+  if (!routeNumber) {
+    return true;
+  }
+  const number = canonicalWorkOrderNumber(order);
+  return number === routeNumber || order.id === routeNumber;
+}
