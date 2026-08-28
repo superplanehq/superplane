@@ -889,6 +889,42 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
   });
 
+  // Scoring runs on the work order before a line plans it. The log must read
+  // in that order: the intake that created the order, the score, then the plan.
+  it("puts the Backlog analysis before the line steps", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Handle duplicate refunds on retry",
+        state: "STATE_OPEN",
+        createdBy: { automation: { appId: "app-github-issues-intake", appName: "GitHub issues" } },
+        lineDispatches: [
+          dispatch("STATE_ACTIVE", [
+            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+          ]),
+        ],
+      }),
+      {
+        demoArtifacts: false,
+        analysisRuns: [
+          {
+            canvasId: "canvas-backlog",
+            workOrderId: "wo-1",
+            run: {
+              id: "run-analysis",
+              canvasId: "canvas-backlog",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-28T12:00:00Z",
+              finishedAt: "2026-08-28T12:00:20Z",
+            },
+          },
+        ],
+      },
+    );
+
+    expect(fixture.phases.map((phase) => phase.id)).toEqual(["backlog", "backlog-analysis-run-analysis", "plan-0"]);
+  });
+
   it("puts the reported score on the newest analysis phase", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
