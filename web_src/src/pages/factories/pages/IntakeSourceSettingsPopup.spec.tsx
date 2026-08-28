@@ -26,18 +26,24 @@ function githubIntakeGraph(): IntakeAutomationGraph {
       spec: {
         nodes: [
           { id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-          { id: "analysis", name: "Analyze intake", type: "TYPE_ACTION", component: "runnerClaudeCode" },
+          {
+            id: "filter",
+            name: "Matches filters?",
+            type: "TYPE_ACTION",
+            component: "if",
+            configuration: { expression: "true" },
+          },
           { id: "create", name: "Create Work Order", type: "TYPE_ACTION", component: "createWorkOrder" },
         ],
         edges: [
-          { channel: "default", sourceId: "trigger", targetId: "analysis" },
-          { channel: "passed", sourceId: "analysis", targetId: "create" },
+          { channel: "default", sourceId: "trigger", targetId: "filter" },
+          { channel: "true", sourceId: "filter", targetId: "create" },
         ],
       },
     },
     [{ name: "github.onIssue", label: "On Issue" }],
     [
-      { name: "runnerClaudeCode", label: "Run Claude Code" },
+      { name: "if", label: "If" },
       { name: "createWorkOrder", label: "Create Work Order" },
     ],
     {},
@@ -95,7 +101,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByLabelText("Name")).toHaveValue("GitHub issues");
     expect(screen.getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Run on a schedule/ })).not.toBeChecked();
-    expect(screen.getByTestId("intake-confidence-value")).toHaveTextContent("65%");
+    expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Include these labels" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "Exclude these labels" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "bug" })).not.toBeChecked();
@@ -116,7 +122,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(automation).toHaveAccessibleName("Automation");
     expect(within(automation).getByTestId("rf__node-trigger")).toBeInTheDocument();
     expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
-    expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
+    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getAllByText("Create Work Order").length).toBeGreaterThan(0);
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",

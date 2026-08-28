@@ -4,6 +4,7 @@ import { buildBuildingBlockCategories } from "./buildingBlocks";
 const triggers = [
   { name: "onBroadcast", label: "On Broadcast" },
   { name: "onRun", label: "On Run" },
+  { name: "onWorkOrder", label: "On Work Order" },
 ];
 
 const components = [
@@ -62,6 +63,7 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "onWorkOrder",
       "addPullRequest",
       "addRunError",
       "broadcastMessage",

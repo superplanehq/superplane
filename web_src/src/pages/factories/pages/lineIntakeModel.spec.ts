@@ -24,6 +24,8 @@ describe("lineIntakeModel", () => {
     const github = lineIntakeSourceById("github-issues");
     expect(github?.listen.kind).toBe("webhook");
     expect(github?.accept.destination).toBe("backlog");
+    expect(github?.evaluate.label).toBe("Create a work order");
+    expect(github?.evaluate.rule).toContain("scores it there");
   });
 
   it("maps declared intakes to configured sources, keyed by intake id", () => {
@@ -278,25 +280,19 @@ describe("lineIntakeModel", () => {
     expect(fixture.waitingNotes[0]?.text).toContain("Backlog");
 
     const canvas = fixture.phases[0]?.canvas;
-    expect(canvas?.nodes.map((node) => node.component)).toEqual([
-      "github.onIssue",
-      "runnerClaudeCode",
-      "createWorkOrder",
-    ]);
+    expect(canvas?.nodes.map((node) => node.component)).toEqual(["github.onIssue", "createWorkOrder"]);
   });
 
   it("builds Sentry and PagerDuty canvases from catalogue triggers", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
-      "runnerClaudeCode",
       "createWorkOrder",
     ]);
 
     const pagerduty = intakeAutomationFixture(lineIntakeSourceById("pagerduty-incidents")!);
     expect(pagerduty.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "pagerduty.onIncident",
-      "runnerClaudeCode",
       "createWorkOrder",
     ]);
   });
