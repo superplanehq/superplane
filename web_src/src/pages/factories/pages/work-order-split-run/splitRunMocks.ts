@@ -59,7 +59,7 @@ import { withNotifyImplementLog } from "./splitRunNotifyFixture";
 
 export type SplitRunPhaseId = string;
 
-export type SplitRunPhaseStatus = "passed" | "running" | "pending" | "waiting" | "failed";
+export type SplitRunPhaseStatus = "passed" | "running" | "pending" | "waiting" | "failed" | "cancelled";
 
 export type SplitRunStreamEvent = "started" | "expanded" | "completed";
 
@@ -174,7 +174,7 @@ function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): Wor
     key: "step-failed",
     headline: step ? `${step} did not pass` : "The run did not pass",
     text: SPLIT_RUN_FAILED_NOTE_TEXT,
-    cta: { label: "Review the run" },
+    cta: { label: "Debug", icon: "bug" },
   };
 }
 
@@ -250,7 +250,7 @@ function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): Wo
   };
 }
 
-const AUTO_EXPAND_STATUSES = new Set<SplitRunPhaseStatus>(["running", "waiting", "failed"]);
+const AUTO_EXPAND_STATUSES = new Set<SplitRunPhaseStatus>(["running", "waiting", "failed", "cancelled"]);
 
 /** Open the current step only when it is running, waiting, or failed. */
 export function autoExpandedPhaseId(fixture: SplitRunFixture): SplitRunPhaseId | null {
@@ -277,6 +277,7 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   if (status === "running") return "Running";
   if (status === "waiting") return "Needs attention";
   if (status === "failed") return "Failed";
+  if (status === "cancelled") return "Canceled";
   return "Pending";
 }
 
@@ -287,6 +288,8 @@ export type SplitRunFixtureOptions = {
   demoArtifacts?: boolean;
   /** PR-feedback canvas runs for this work order, shown as extra Log phases. */
   prFeedbackRuns?: PRFeedbackLogRun[];
+  /** Person who stopped the current automation, when known. */
+  stoppedBy?: OrgUserDisplay;
   /** Backlog analysis runs for this work order, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
 };
@@ -334,6 +337,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       apiChecks: options?.checks,
       demoArtifacts,
       addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
+      stoppedBy: options?.stoppedBy,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -351,6 +355,7 @@ function reviewSurfaces(
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
     addressingFeedback?: boolean;
+    stoppedBy?: OrgUserDisplay;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -372,6 +377,9 @@ function reviewSurfaces(
   if (current?.result === "RESULT_FAILED") {
     return failedReviewSurface(current, displayStatus, checks);
   }
+  if (current?.result === "RESULT_CANCELLED") {
+    return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
+  }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
     return waitingReviewSurface(order, displayStatus, checks, input.addressingFeedback);
   }
@@ -388,6 +396,24 @@ function reviewSurfaces(
     );
   }
   return surfaces(doneFooterForStatus(displayStatus), [], checks);
+}
+
+function stoppedReviewSurface(
+  current: FactoriesWorkOrderExecution | undefined,
+  displayStatus: WorkOrderDisplayStatus,
+  checks: WorkOrderCheckPresentation[],
+  stoppedBy?: OrgUserDisplay,
+): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
+  return surfaces(
+    buildSplitRunFooter({
+      kind: "stopped",
+      actor: stoppedBy,
+      run: footerRun(current),
+      status: displayStatus,
+    }),
+    [],
+    checks,
+  );
 }
 
 function failedReviewSurface(
@@ -977,7 +1003,7 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 }
 
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
-  if (status === "waiting") return "pending";
+  if (status === "waiting" || status === "cancelled") return "pending";
   return status;
 }
 
@@ -990,6 +1016,9 @@ function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPha
   }
   if (execution.result === "RESULT_FAILED") {
     return "failed";
+  }
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
   }
   if (execution.result === "RESULT_PASSED") {
     return "passed";
@@ -1063,17 +1092,21 @@ function missingEarlierStepIndexes(present: Set<number>): number[] {
 }
 
 function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | undefined {
-  const active = executions.filter(
+  const inFlight = executions.filter(
     (execution) =>
       execution.state === "STATE_STARTED" ||
       execution.state === "STATE_PENDING" ||
-      execution.state === "STATE_CANCELLING" ||
-      execution.result === "RESULT_FAILED",
+      execution.state === "STATE_CANCELLING",
   );
-  const pool = active.length > 0 ? active : executions;
+  const pool = inFlight.length > 0 ? inFlight : executions;
   return pool.reduce<FactoriesWorkOrderExecution | undefined>((best, candidate) => {
     if (!best) {
       return candidate;
+    }
+    const bestAt = Date.parse(best.updatedAt ?? best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.updatedAt ?? candidate.createdAt ?? "") || 0;
+    if (candidateAt !== bestAt) {
+      return candidateAt > bestAt ? candidate : best;
     }
     return (candidate.stepIndex ?? -1) >= (best.stepIndex ?? -1) ? candidate : best;
   }, undefined);

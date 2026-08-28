@@ -26,6 +26,7 @@ function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
   if (status === "passed") return "passed";
   if (status === "waiting") return "waiting";
+  if (status === "cancelled") return "cancelled";
   if (status === "failed") return "failed";
   return "pending";
 }
@@ -42,6 +43,9 @@ function statusTimeTone(status: SplitRunPhaseStatus): string {
   }
   if (status === "failed") {
     return "text-[color:var(--status-failed-fg)]";
+  }
+  if (status === "cancelled") {
+    return "text-[color:var(--status-cancelled-fg)]";
   }
   return "text-muted-foreground";
 }
@@ -657,6 +661,9 @@ function statusTimeName(status: SplitRunPhaseStatus): string | undefined {
   }
   if (status === "waiting") {
     return "Waiting";
+  }
+  if (status === "cancelled") {
+    return "Canceled";
   }
   return undefined;
 }

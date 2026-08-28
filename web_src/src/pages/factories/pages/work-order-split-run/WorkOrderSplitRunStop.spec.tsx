@@ -5,15 +5,17 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { handleStopMock, handleRejectMock } = vi.hoisted(() => ({
+const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
   handleRejectMock: vi.fn(),
+  handleBackToDraftMock: vi.fn(),
 }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
+    handleBackToDraft: handleBackToDraftMock,
     handleStopAutomation: vi.fn(),
     busy: false,
   }),
@@ -45,6 +47,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
   beforeEach(() => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
+    handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
   it("keeps Reject and Approve off a running work order", () => {
@@ -97,6 +100,75 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(within(note).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens Description after To Backlog", async () => {
+    const user = userEvent.setup();
+    renderPopup(
+      splitRunFixtureForWorkOrder({
+        id: "wo-stopped",
+        title: "Stopped job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_CANCELLED",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    await user.click(
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
+    );
+    expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("keeps Automations open when To Backlog does not succeed", async () => {
+    handleBackToDraftMock.mockResolvedValueOnce(false);
+    const user = userEvent.setup();
+    renderPopup(
+      splitRunFixtureForWorkOrder({
+        id: "wo-stopped",
+        title: "Stopped job",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "d-1",
+            line: { id: "line-1", name: "Software delivery" },
+            state: "STATE_FINISHED",
+            stepExecutions: [
+              {
+                id: "e-impl",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_FINISHED",
+                result: "RESULT_CANCELLED",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
+    await user.click(
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "To Backlog" }),
+    );
+    expect(handleBackToDraftMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
   });
 
   it("reruns a failed open work order from the note", async () => {
