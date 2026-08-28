@@ -27,7 +27,7 @@ export function descriptionLeftoverCapacity(paneCapacity: number, reservedHeight
 }
 
 export function descriptionNeedsCollapse(contentHeight: number, paneCapacity: number): boolean {
-  return contentHeight > paneCapacity + HEIGHT_SLACK_PX;
+  return contentHeight > Math.max(paneCapacity, MIN_COLLAPSED_DESCRIPTION_HEIGHT_PX) + HEIGHT_SLACK_PX;
 }
 
 export function collapsedDescriptionMaxHeight(paneCapacity: number): number {

@@ -23,6 +23,7 @@ import {
   collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
+  type SplitRunPopupTab,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
@@ -342,8 +343,8 @@ function SplitRunPopupTabs({
   orderId?: string;
   orderNumber?: string;
   lineId?: string;
-  tab: string;
-  onTabChange: (tab: string) => void;
+  tab: SplitRunPopupTab;
+  onTabChange: (tab: SplitRunPopupTab) => void;
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
 }) {
@@ -351,7 +352,15 @@ function SplitRunPopupTabs({
   const follow = useFollowLogScroll(runningSplitRunPhaseId(fixture.phases), streamTick);
 
   return (
-    <Tabs value={tab} onValueChange={onTabChange} className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <Tabs
+      value={tab}
+      onValueChange={(value) => {
+        if (value === "description" || value === "log") {
+          onTabChange(value);
+        }
+      }}
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+    >
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-2">
         <TabsList aria-label="Work order views">
           <TabsTrigger value="description">Description</TabsTrigger>
