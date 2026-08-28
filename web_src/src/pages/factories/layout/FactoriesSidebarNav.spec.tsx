@@ -9,7 +9,6 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factorySettingsPath,
-  factoryVelocityPath,
 } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
@@ -33,7 +32,7 @@ const org = FACTORIES_ORGANIZATION_ID;
 const key = REFUND_FACTORY.key!;
 
 describe("FactoriesSidebarNav", () => {
-  it("places Intake, PR feedback, Board, Velocity, and Settings under the switcher", () => {
+  it("places Intake, PR feedback, Board, and Settings under the switcher", () => {
     renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`);
 
     const nav = screen.getByTestId("factories-sidebar-nav");
@@ -41,12 +40,12 @@ describe("FactoriesSidebarNav", () => {
       screen.getByTestId("factories-nav-intake"),
       screen.getByTestId("factories-nav-pr-feedback"),
       screen.getByTestId("factories-nav-board"),
-      screen.getByTestId("factories-nav-velocity"),
       screen.getByTestId("factories-workspace-settings-link"),
     ];
 
-    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true, true, true]);
+    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true, true]);
     expect(screen.queryByTestId("factories-sidebar-create-work-order")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-nav-velocity")).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-nav-intake")).toHaveAttribute(
       "href",
       factoryIntakePath(org, key, REFUND_LINE_PLAN_ID),
@@ -59,7 +58,6 @@ describe("FactoriesSidebarNav", () => {
       "href",
       factoryHomePath(org, key, REFUND_LINE_PLAN_ID),
     );
-    expect(screen.getByTestId("factories-nav-velocity")).toHaveAttribute("href", factoryVelocityPath(org, key));
     expect(screen.getByTestId("factories-workspace-settings-link")).toHaveAttribute(
       "href",
       factorySettingsPath(org, key),
