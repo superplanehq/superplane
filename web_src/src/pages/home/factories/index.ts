@@ -43,7 +43,6 @@ function buildSoftwareFactory(): FactoryDefinition {
 // phase — mirroring the production setup. Each app exposes a single onRun
 // entrypoint that the line calls in order, passing the work order through.
 const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
-  "github.addIssueLabel": "github",
   "github.createIssueComment": "github",
   "github.createPullRequest": "github",
 };
