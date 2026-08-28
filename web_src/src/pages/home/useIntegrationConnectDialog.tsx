@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import type { OrganizationsIntegration } from "@/api-client";
+import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
-import { usesHostedGitHubAppInstall } from "@/lib/integrations";
+import { offersPrivateGitHubAppSetup, usesHostedGitHubAppInstall } from "@/lib/integrations";
 import { startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
@@ -105,7 +105,7 @@ export function useIntegrationConnectDialog({
       }),
     [organizationId, dialogIntegrationName, dialogMode, dialogPendingInstance?.metadata?.id, selections],
   );
-  const useHostedGitHubApp = usesHostedGitHubAppInstall(availableIntegrations.find((item) => item.name === "github"));
+  const githubConnect = githubConnectFlags(availableIntegrations);
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
@@ -141,7 +141,7 @@ export function useIntegrationConnectDialog({
   );
 
   const requestConnect = (integrationName: string) => {
-    if (integrationName === "github" && useHostedGitHubApp) {
+    if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog();
       return;
     }
@@ -157,7 +157,7 @@ export function useIntegrationConnectDialog({
   }, [navigate, organizationId, returnTo]);
 
   const createNew = (integrationName: string) => {
-    if (integrationName === "github" && useHostedGitHubApp) {
+    if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog(true);
       return;
     }
@@ -215,10 +215,19 @@ export function useIntegrationConnectDialog({
     integrationData,
     requestConnect,
     requestPrivateGitHubConnect,
-    hostedGitHubAppInstall: useHostedGitHubApp,
+    hostedGitHubAppInstall: githubConnect.hosted,
+    offersPrivateGitHubAppSetup: githubConnect.privateApp,
     createNew,
     selectInstance,
     configure: openConfigureDialog,
     dialogs,
+  };
+}
+
+function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefinition[]) {
+  const githubDefinition = availableIntegrations.find((item) => item.name === "github");
+  return {
+    hosted: usesHostedGitHubAppInstall(githubDefinition),
+    privateApp: offersPrivateGitHubAppSetup(githubDefinition),
   };
 }
