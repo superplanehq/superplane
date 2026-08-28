@@ -29,24 +29,13 @@ describe("finishOnboardingError", () => {
 });
 
 describe("afterOnboardingPath", () => {
-  it("opens the intake drawer on the provisioned line", () => {
+  it("opens the board of the provisioned line, where the intake sits in Backlog", () => {
     expect(
       afterOnboardingPath({
         organizationId: "org-1",
         factoryKey: "SP",
         lineId: "line-1",
       }),
-    ).toBe("/org-1/workspaces/SP/lines/line-1?intake=1");
-  });
-
-  it("names the GitHub intake on the line URL", () => {
-    expect(
-      afterOnboardingPath({
-        organizationId: "org-1",
-        factoryKey: "SP",
-        lineId: "line-1",
-        githubIntakeId: "intake-github",
-      }),
-    ).toBe("/org-1/workspaces/SP/lines/line-1?intake=1&intakeId=intake-github");
+    ).toBe("/org-1/workspaces/SP/lines/line-1");
   });
 });

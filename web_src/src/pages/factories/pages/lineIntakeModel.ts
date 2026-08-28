@@ -233,6 +233,11 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
   return undefined;
 }
 
+/** Row title on the board. It says what the intake listens to, and nothing else. */
+export function lineIntakeListenTitle(source: LineIntakeSource): string {
+  return `Listening to ${source.name}`;
+}
+
 export const LINE_INTAKE_COPY = {
   needsRepair: "Needs repair",
   needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
