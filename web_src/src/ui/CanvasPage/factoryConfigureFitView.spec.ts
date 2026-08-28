@@ -58,7 +58,7 @@ describe("factoryConfigureEnterFitViewOptions", () => {
   });
 
   it("centers a deep-linked node at 100% zoom", () => {
-    const focusNode = { id: "generate-pr-text" };
+    const focusNode = { id: "implementation-agent-no-issue" };
     expect(factoryConfigureEnterFitViewOptions(focusNode)).toEqual({
       includeHiddenNodes: true,
       minZoom: 1,
