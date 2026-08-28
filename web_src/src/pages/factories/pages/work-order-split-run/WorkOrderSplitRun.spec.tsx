@@ -421,6 +421,11 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "This task waits on a person" })).toBeInTheDocument();
+    expect(within(note).getByText(/No automation is running/)).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
   it("keeps the running log visible when the work order has no note or checks", () => {
@@ -446,8 +451,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByText("PR Closure")).not.toBeInTheDocument();
     expect(within(note).queryByText(/ago/)).not.toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: /Update manually/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
@@ -511,10 +516,10 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
-    expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/split-run-phase-rerun-/)).not.toBeInTheDocument();
   });
 
-  it("pins a default failed note and keeps Reopen in the header", () => {
+  it("pins a default failed note and keeps Reopen on the note", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryKey: PRIMARY_FACTORY_KEY,
@@ -523,9 +528,8 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const note = screen.getByTestId("split-run-attention-note");
-    const header = screen.getByTestId("split-run-header-actions");
     expect(within(note).getByRole("heading", { name: "Implement did not pass" })).toBeInTheDocument();
-    expect(within(note).getByText(/Open the run to see what failed/)).toBeInTheDocument();
+    expect(within(note).getByText(/This automation failed/)).toBeInTheDocument();
     expect(within(note).getByRole("link", { name: "Review the run" })).toHaveAttribute(
       "href",
       expect.stringContaining(LINE_RUN_IMPLEMENT_FAILED_ID),
@@ -534,12 +538,12 @@ describe("WorkOrderSplitRunPopup", () => {
       "href",
       expect.stringContaining("orderNumber=106"),
     );
-    expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
-    expect(within(header).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reopen" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
-  it("offers no Reject or Approve on a failed open implement", () => {
+  it("offers Reject and Rerun on a failed open implement", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         id: "wo-2",
@@ -565,9 +569,11 @@ describe("WorkOrderSplitRunPopup", () => {
       }),
     });
 
+    const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Choose how to stop" })).not.toBeInTheDocument();
   });
@@ -595,21 +601,19 @@ describe("WorkOrderSplitRunPopup", () => {
     const source = screen.getByTestId("split-run-source");
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
-    const header = screen.getByTestId("split-run-header-actions");
-    expect(within(header).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("split-run-work-order-tab")).queryByRole("button", { name: "Start" }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText("This work order is a draft.")).not.toBeInTheDocument();
-    expect(screen.queryByText("Start this work order")).not.toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(screen.getByText("This task is ready to start")).toBeInTheDocument();
     expect(
       within(screen.getByTestId("split-run-overview-sidebar")).queryByTestId("split-run-review"),
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
     await openLogTab(user);
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
-    expect(within(header).getByRole("button", { name: "Start" })).toBeInTheDocument();
-    expect(within(header).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
     expect(within(backlog).queryByText(/Created manually/)).not.toBeInTheDocument();
@@ -648,7 +652,10 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(tab).getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
     expect(within(tab).getByText(/The change replaces the retry policy/)).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-header-actions")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Start" }),
+    ).toBeInTheDocument();
   });
 
   it("scores a review draft by how suitable the GitHub issue is for an agent", () => {
@@ -745,11 +752,12 @@ describe("WorkOrderSplitRunPopup", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("opens a done card on the description tab with Reopen in the header", () => {
+  it("opens a done card on the description tab with Reopen on the note", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER) });
 
+    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-header-actions")).getByRole("button", { name: "Reopen" }),
+      within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Reopen" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
   });
@@ -772,12 +780,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   });
 
-  it("shows a failed implement stream without Reject or Approve in the header", () => {
+  it("shows a failed implement stream with Reject and Rerun on the note", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(FAILED_WORK_ORDER) });
 
+    const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Rerun" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
   });
 
