@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 
 import type { FactoriesFactory } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -16,7 +16,15 @@ import { LinesPage } from "./LinesPage";
 
 export function LocationProbe() {
   const location = useLocation();
-  return <div data-testid="lines-test-location">{`${location.pathname}${location.search}`}</div>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <div data-testid="lines-test-location">{`${location.pathname}${location.search}`}</div>
+      <button type="button" data-testid="lines-test-back" onClick={() => navigate(-1)}>
+        Back
+      </button>
+    </>
+  );
 }
 
 export function LinesBoardSpecHarness({
@@ -49,6 +57,7 @@ export function LinesBoardSpecHarness({
                 <Routes>
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId/edit" element={<div>Edit line</div>} />
+                  <Route path="/org-1/workspaces/:factoryKey/work-order/:orderNumber" element={<LinesPage />} />
                 </Routes>
                 <LocationProbe />
               </FactoriesLayoutContext.Provider>
