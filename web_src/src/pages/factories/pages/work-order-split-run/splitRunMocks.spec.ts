@@ -798,6 +798,83 @@ describe("line board work-order examples", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).not.toContain("Waiting for user review");
   });
 
+  it("shows the Backlog analysis run as a log phase and opens it while it runs", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-analysis",
+            canvasId: "canvas-backlog",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-28T12:00:00Z",
+            updatedAt: "2026-08-28T12:00:00Z",
+          },
+        },
+      ],
+    });
+
+    const analysis = fixture.phases.find((phase) => phase.id === "backlog-analysis-run-analysis");
+
+    expect(analysis?.status).toBe("running");
+    expect(analysis?.componentName).toBe("Confidence score");
+    expect(analysis?.appId).toBe("canvas-backlog");
+    expect(analysis?.runId).toBe("run-analysis");
+    expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
+  });
+
+  it("puts the reported score on the newest analysis phase", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-confidence",
+          key: "confidence",
+          name: "Confidence score",
+          score: 4,
+          maxScore: 5,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_POSITIVE",
+        },
+      ],
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-old",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T11:00:00Z",
+            finishedAt: "2026-08-28T11:00:20Z",
+          },
+        },
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-new",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:00:20Z",
+          },
+        },
+      ],
+    });
+
+    const analysis = fixture.phases.filter((phase) => phase.id.startsWith("backlog-analysis-"));
+
+    expect(analysis.map((phase) => phase.runId)).toEqual(["run-old", "run-new"]);
+    expect(analysis[0].checks).toBeUndefined();
+    expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
+    expect(fixture.openPhaseId).toBeUndefined();
+  });
+
   it("appends matching PR feedback runs after line steps, oldest first", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [

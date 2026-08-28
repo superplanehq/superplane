@@ -121,10 +121,10 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
 export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
 
-// The GitHub intake scores new issues and opens a work order for the ones it
-// trusts. The backend reads the connection and the backlog repository from the
-// saved onboarding config, so this runs after the wizard choices are stored. A
-// retried finish must not add a second copy.
+// The GitHub intake opens a work order for each matching issue. The Backlog
+// canvas scores those work orders. The backend reads the connection and the
+// backlog repository from the saved onboarding config, so this runs after the
+// wizard choices are stored. A retried finish must not add a second copy.
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;

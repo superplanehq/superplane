@@ -11,15 +11,18 @@ export function LineBoardOrderCard({
   order,
   workOrderCardContext,
   onOpenWorkOrder,
+  isAnalyzing = false,
 }: {
   order: FactoriesWorkOrder;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  isAnalyzing?: boolean;
 }) {
   return (
     <LineBoardWorkOrderCard
       order={order}
       workOrderCardContext={workOrderCardContext}
+      isAnalyzing={isAnalyzing}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id);
@@ -33,10 +36,12 @@ export function LineBoardWorkOrderCard({
   order,
   workOrderCardContext,
   onOpen,
+  isAnalyzing = false,
 }: {
   order: FactoriesWorkOrder;
   workOrderCardContext: WorkOrderCardContext;
   onOpen: () => void;
+  isAnalyzing?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
@@ -53,6 +58,7 @@ export function LineBoardWorkOrderCard({
       {...workOrderCardContext}
       entry={entry}
       confidenceScore={showConfidence ? confidenceScoreFromChecks(checks) : undefined}
+      isAnalyzing={showConfidence && isAnalyzing}
       onOpen={onOpen}
     />
   );

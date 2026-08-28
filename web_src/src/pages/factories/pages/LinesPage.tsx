@@ -1,5 +1,6 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import {
   useFactoryApps,
   useFactoryPullRequests,
@@ -21,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Clock, MoreHorizontal, Pencil } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
+import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
@@ -403,6 +405,7 @@ function LineDetail({
   const peekOrder =
     workOrders.find((order) => order.id === peekOrderId) ??
     (peekOrderHint?.id === peekOrderId ? peekOrderHint : undefined);
+  const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
 
   const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
     setPeekOrderHint(order);
@@ -428,6 +431,7 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={openWorkOrder}
+          analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
         />
       )}
       {peekOrderId && peekOrder ? (
@@ -443,6 +447,7 @@ function LineDetail({
           canUpdate={workOrderCardContext.canAssign}
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
+          analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           onClose={() => {
             setPeekOrderHint(undefined);
             setPeekOrderId(null);
@@ -465,6 +470,7 @@ function LineBoardSplitRunPopup({
   canUpdate,
   isDispatching,
   onDispatch,
+  analysisRuns,
   onClose,
 }: {
   organizationId: string;
@@ -478,6 +484,7 @@ function LineBoardSplitRunPopup({
   canUpdate: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  analysisRuns: BacklogAnalysisRun[];
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
@@ -501,6 +508,7 @@ function LineBoardSplitRunPopup({
         lineId,
         demoArtifacts: false,
         prFeedbackRuns,
+        analysisRuns,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
@@ -629,6 +637,7 @@ function PhaseBoard({
   onCreateWorkOrder,
   workOrderCardContext,
   onOpenWorkOrder,
+  analyzingOrderIds,
 }: {
   organizationId: string;
   factoryId: string;
@@ -643,6 +652,7 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+  analyzingOrderIds: ReadonlySet<string>;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
@@ -709,6 +719,7 @@ function PhaseBoard({
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
+          analyzingOrderIds={analyzingOrderIds}
         />
       </div>
       {columns.map((column, index) => {

@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
@@ -56,6 +57,8 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
+
+	workersctx.EmitWorkOrderCreated(db, factory, order)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
