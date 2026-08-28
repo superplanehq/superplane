@@ -106,7 +106,7 @@ go build -o bin/task-broker ./task-broker/cmd/task-broker
 
 **One command:** **`make dev`** starts Postgres, task-broker, SuperPlane fleets (`local` plus `e1-*`), and one runner worker. Broker is on **http://127.0.0.1:8091** (host **8081** is SuperPlane pgweb). **`make dev.down`** stops the stack.
 
-SuperPlane compose defaults already point at this stack. Full steps, webhook URLs, and a host worker for Claude Code: [docs/local-dev.md](./docs/local-dev.md).
+SuperPlane compose defaults already point at this stack. Full steps, webhook URLs, and factory CLIs on the Compose worker: [docs/local-dev.md](./docs/local-dev.md).
 
 **Manual (separate terminals):** **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`**). **`make register-superplane-fleets`** also registers SuperPlane machine types. **`make fleet-manager`** is only for the EC2 provisioner. **`make local-dev-help`** lists this. Host **`make task-broker`** still listens on **:8081**. Enqueue with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`**.
 

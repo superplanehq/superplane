@@ -26,7 +26,7 @@ export TASK_BROKER_HOST_PORT AUTH_TOKEN
 N ?= 1
 
 .PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-linux-arm64 runner-linux-all runner-publish-s3 runner-publish-s3-all
-.PHONY: dev dev.down fleet-manager task-broker runner register-local-fleet register-superplane-fleets local-dev-help
+.PHONY: dev dev.down doctor-local fleet-manager task-broker runner register-local-fleet register-superplane-fleets local-dev-help
 
 build:
 	go build -o bin/fleet-manager ./fleet-manager/cmd/fleet-manager
@@ -39,6 +39,7 @@ test:
 local-dev-help:
 	@echo "Local dev:"
 	@echo "  make dev"
+	@echo "  make doctor-local"
 	@echo "  make dev.down"
 	@echo "Manual (separate terminals):"
 	@echo "  make task-broker"
@@ -64,6 +65,24 @@ dev:
 
 dev.down:
 	docker compose down
+
+# Confirm factory host-mode CLIs exist on the Compose worker PATH.
+doctor-local:
+	docker compose exec runner sh -c '\
+	  missing=0; \
+	  for cmd in claude codex node git gh jq python3 bash; do \
+	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
+	      echo "$$cmd missing" >&2; \
+	      missing=1; \
+	      continue; \
+	    fi; \
+	    echo "$$cmd=$$(command -v "$$cmd")"; \
+	  done; \
+	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
+	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
+	  echo "node=$$(node --version 2>/dev/null)"; \
+	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
+	  test "$$missing" -eq 0'
 
 # Long-running: run in its own terminal. Requires a JSON config; set FM_CONFIG_FILE.
 # Example:
