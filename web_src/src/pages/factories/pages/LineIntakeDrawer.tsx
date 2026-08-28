@@ -45,23 +45,52 @@ function useExpandLoneIntake(
   }, [configuredSources, initialIntakeId, setExpandedIntakeIds]);
 }
 
+function useFocusIntakeWindow(
+  focusNonce: number | undefined,
+  configuredSources: ConfiguredLineIntakeSource[],
+  setExpandedIntakeIds: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void,
+) {
+  const [highlighted, setHighlighted] = useState(false);
+
+  useEffect(() => {
+    if (!focusNonce) {
+      return;
+    }
+    setExpandedIntakeIds((current) => {
+      if (current.size > 0) {
+        return current;
+      }
+      const first = configuredSources[0];
+      return first ? new Set([first.intakeId]) : current;
+    });
+    setHighlighted(true);
+    const timer = window.setTimeout(() => setHighlighted(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [configuredSources, focusNonce, setExpandedIntakeIds]);
+
+  return highlighted;
+}
+
 function useLineIntakeDrawerState({
   initialIntakeId,
   initialSettingsOpen,
   configuredSources,
   onOpenTicket,
   onSelectIntakeTemplate,
+  focusNonce,
 }: {
   initialIntakeId?: string;
   initialSettingsOpen: boolean;
   configuredSources: ConfiguredLineIntakeSource[];
   onOpenTicket?: (ticket: LineIntakeAnalyzingTicket) => void;
   onSelectIntakeTemplate?: (template: AddIntakeTemplate) => void;
+  focusNonce?: number;
 }) {
   const [expandedIntakeIds, setExpandedIntakeIds] = useState<ReadonlySet<string>>(
     () => new Set(initialIntakeId ? [initialIntakeId] : []),
   );
   useExpandLoneIntake(configuredSources, initialIntakeId, setExpandedIntakeIds);
+  const highlighted = useFocusIntakeWindow(focusNonce, configuredSources, setExpandedIntakeIds);
   const [openTicket, setOpenTicket] = useState<LineIntakeAnalyzingTicket | null>(null);
   const [previewIntakeId, setPreviewIntakeId] = useState<string | null>(null);
   const [settingsIntakeId, setSettingsIntakeId] = useState<string | null>(
@@ -110,6 +139,7 @@ function useLineIntakeDrawerState({
   }
 
   return {
+    highlighted,
     expandedIntakeIds,
     openTicket,
     pickerOpen,
@@ -145,6 +175,7 @@ export function LineIntakeDrawer({
   previewSource,
   onSettingsSaved,
   showAddIntakeControl = false,
+  focusNonce,
 }: LineIntakeDrawerProps) {
   const drawer = useLineIntakeDrawerState({
     initialIntakeId,
@@ -152,13 +183,18 @@ export function LineIntakeDrawer({
     configuredSources,
     onOpenTicket,
     onSelectIntakeTemplate,
+    focusNonce,
   });
 
   return (
     <>
       <aside
-        className="flex h-full min-h-0 w-[26rem] shrink-0 flex-col border-r border-border bg-slate-200 dark:bg-slate-800"
+        className={cn(
+          "flex h-full min-h-0 w-[26rem] shrink-0 flex-col border-r border-border bg-slate-200 dark:bg-slate-800",
+          drawer.highlighted && "ring-2 ring-foreground/25 ring-inset",
+        )}
         data-testid="line-intake-drawer"
+        data-highlighted={drawer.highlighted ? "true" : undefined}
         aria-label="Intake"
       >
         <header className="flex shrink-0 items-center justify-between gap-2 px-3 pb-2 pt-3">
