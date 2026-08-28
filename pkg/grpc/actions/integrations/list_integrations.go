@@ -49,11 +49,10 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
+		// Hosted GitHub install and the setup wizard are independent.
+		// Connect uses HostedAppInstall. The wizard needs new_integration_setup_flow.
 		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
 		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name())
-		if hostedAppInstall {
-			useNewFlow = false
-		}
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),

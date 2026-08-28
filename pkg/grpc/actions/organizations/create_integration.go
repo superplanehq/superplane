@@ -87,9 +87,8 @@ func CreateIntegrationWithUsage(
 	//
 	// If the integration and organization support the new flow, use it.
 	// Public GitHub App install skips the wizard and uses Sync instead.
-	// CreateIntegration configuration privateApp=true opts out of hosted
-	// install and uses the customer GitHub App wizard even when the
-	// new_integration_setup_flow feature is off.
+	// privateApp opts out of hosted install. The wizard still needs
+	// new_integration_setup_flow.
 	//
 	if usesSetupWizard(registry, org, integrationName, configMap) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
@@ -129,10 +128,7 @@ func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName st
 	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
 		return false
 	}
-	if reg.UseNewSetupFlow(orgID, integrationName) {
-		return true
-	}
-	return github.WantsPrivateApp(integrationName, config) && reg.SupportsNewSetupFlow(integrationName)
+	return reg.UseNewSetupFlow(orgID, integrationName)
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {

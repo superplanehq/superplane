@@ -1,6 +1,7 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
+import { offersPrivateGitHubAppSetup } from "@/lib/integrations";
 import { CREATE_PRIVATE_GITHUB_APP_LABEL, startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { useNavigate } from "react-router";
@@ -11,6 +12,7 @@ interface GitHubConnectControlsProps {
   canCreateIntegrations: boolean;
   permissionsLoading: boolean;
   onConnect: () => void;
+  onCreatePrivateApp?: () => void;
 }
 
 export function GitHubConnectControls({
@@ -19,10 +21,12 @@ export function GitHubConnectControls({
   canCreateIntegrations,
   permissionsLoading,
   onConnect,
+  onCreatePrivateApp,
 }: GitHubConnectControlsProps) {
   const navigate = useNavigate();
   const integrationsBasePath = useIntegrationsBasePath(organizationId);
   const canCreate = Boolean(definition) && canCreateIntegrations;
+  const showPrivateApp = offersPrivateGitHubAppSetup(definition) && canCreateIntegrations;
 
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">
@@ -45,20 +49,24 @@ export function GitHubConnectControls({
           {definition ? "Connect" : "Unavailable"}
         </Button>
       </PermissionTooltip>
-      {definition && canCreateIntegrations ? (
+      {showPrivateApp ? (
         <Button
           type="button"
           variant="link"
           className="h-auto p-0 text-xs text-gray-500 dark:text-gray-400"
           data-testid="integrations-create-private-github-app"
-          onClick={() =>
+          onClick={() => {
+            if (onCreatePrivateApp) {
+              onCreatePrivateApp();
+              return;
+            }
             startPrivateGitHubAppSetup({
               organizationId,
               returnTo: integrationsBasePath,
               integrationsBasePath,
               goTo: navigate,
-            })
-          }
+            });
+          }}
         >
           {CREATE_PRIVATE_GITHUB_APP_LABEL}
         </Button>

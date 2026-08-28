@@ -278,7 +278,7 @@ export function useOnboardingPageModel(args: {
     setOpenSection,
     requestConnect: connect.requestConnect,
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
-    hostedGitHubAppInstall: connect.hostedGitHubAppInstall,
+    offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
     createVcsConnection: () => connect.createNew("github"),
     selectVcsConnection: (integrationId: string) => connect.selectInstance("github", integrationId),
     githubConnections,

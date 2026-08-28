@@ -1,5 +1,9 @@
 import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
-import { isCapabilityBasedIntegration, isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import {
+  isCapabilityBasedIntegration,
+  isCapabilityBasedIntegrationDefinition,
+  usesHostedGitHubAppInstall,
+} from "@/lib/integrations";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 type ConnectDialogMode = "create" | "resume";
@@ -48,6 +52,10 @@ export function useHomeIntegrationConnectActions({
     const definition = availableIntegrations.find((item) => item.name === integrationName) as
       | IntegrationsIntegrationDefinition
       | undefined;
+    // Hosted Connect is started by requestConnect, not this dialog.
+    if (usesHostedGitHubAppInstall(definition)) {
+      return;
+    }
     if (definition && isCapabilityBasedIntegrationDefinition(definition)) {
       const pending = connected.find(
         (item) => item.metadata?.integrationName === integrationName && item.status?.state !== "ready",

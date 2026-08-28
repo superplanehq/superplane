@@ -7,7 +7,12 @@ import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
-import { isCapabilityBasedIntegrationDefinition, usesHostedGitHubAppInstall } from "@/lib/integrations";
+import {
+  isCapabilityBasedIntegrationDefinition,
+  usesHostedGitHubAppInstall,
+  usesPrivateGitHubAppWizard,
+} from "@/lib/integrations";
+import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
@@ -88,6 +93,17 @@ export function useIntegrationCatalog(organizationId: string) {
     createIntegrationNotice: createIntegrationMutation.isError
       ? getUsageLimitNotice(createIntegrationMutation.error, organizationId)
       : null,
+    handlePrivateAppClick: (definition?: IntegrationsIntegrationDefinition) =>
+      startCatalogPrivateGitHubApp({
+        organizationId,
+        integrationsBasePath,
+        navigate,
+        integrationNames,
+        organizationIntegrations: organizationIntegrations ?? [],
+        currentUserId: me?.id,
+        createIntegrationMutation,
+        definition,
+      }),
     ...actions,
   };
 }
@@ -229,4 +245,41 @@ function useIntegrationCatalogActions({
       }
     },
   };
+}
+
+function startCatalogPrivateGitHubApp({
+  organizationId,
+  integrationsBasePath,
+  navigate,
+  integrationNames,
+  organizationIntegrations,
+  currentUserId,
+  createIntegrationMutation,
+  definition,
+}: {
+  organizationId: string;
+  integrationsBasePath: string;
+  navigate: ReturnType<typeof useNavigate>;
+  integrationNames: Set<string>;
+  organizationIntegrations: NonNullable<ReturnType<typeof useConnectedIntegrations>["data"]>;
+  currentUserId?: string;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+  definition?: IntegrationsIntegrationDefinition;
+}) {
+  void connectPrivateGitHubApp({
+    useWizard: usesPrivateGitHubAppWizard(definition),
+    organizationId,
+    returnTo: integrationsBasePath,
+    integrationsBasePath,
+    existingNames: integrationNames,
+    connected: organizationIntegrations,
+    currentUserId,
+    goTo: navigate,
+    create: async (payload) => {
+      const response = await createIntegrationMutation.mutateAsync(payload);
+      return response.data;
+    },
+  }).catch((error) => {
+    showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+  });
 }

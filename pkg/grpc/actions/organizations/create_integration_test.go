@@ -349,7 +349,7 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/apps/superplane/installations/new")
 	})
 
-	t.Run("github uses setup provider when privateApp is set even if setup flow feature is off", func(t *testing.T) {
+	t.Run("github keeps legacy create when privateApp is set and setup flow feature is off", func(t *testing.T) {
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
@@ -368,10 +368,9 @@ func Test__CreateIntegration(t *testing.T) {
 		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response.Integration)
-		require.NotNil(t, response.Integration.Status.SetupState)
-		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
-		assert.Equal(t, "selectOwner", response.Integration.Status.SetupState.CurrentStep.Name)
-		assert.Nil(t, response.Integration.Status.BrowserAction)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "POST", response.Integration.Status.BrowserAction.Method)
 	})
 
 	t.Run("github uses setup provider when privateApp is set even if hosted install is on", func(t *testing.T) {
