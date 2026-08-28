@@ -313,6 +313,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
+		assert.NotContains(t, payload, "assignees")
 
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
@@ -446,6 +447,38 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		secondRunID, err := builder.ResolveExpression(`order().comments[1].run.id`)
 		require.NoError(t, err)
 		assert.Equal(t, run.ID.String(), secondRunID)
+	})
+
+	t.Run("assignees are omitted until referenced and empty when none are assigned", func(t *testing.T) {
+		full, err := builder.ResolveExpression(`order().assignees`)
+		require.NoError(t, err)
+		assert.Equal(t, []any{}, full)
+
+		count, err := builder.ResolveExpression(`len(order().assignees)`)
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("assigned people expose name and email for commit co-authors", func(t *testing.T) {
+		require.NoError(t, order.UpdateAssignees(database.Conn(), []uuid.UUID{r.User}, r.User))
+
+		full, err := builder.ResolveExpression(`order().assignees`)
+		require.NoError(t, err)
+		assignees, ok := full.([]any)
+		require.True(t, ok)
+		require.Len(t, assignees, 1)
+
+		first, ok := assignees[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, r.User.String(), first["id"])
+		assert.Equal(t, r.UserModel.Name, first["name"])
+		assert.Equal(t, r.UserModel.GetEmail(), first["email"])
+
+		trailer, err := builder.ResolveExpression(
+			`join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n")`,
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "Co-authored-by: "+r.UserModel.Name+" <"+r.UserModel.GetEmail()+">", trailer)
 	})
 
 	t.Run("none and any over artifact types", func(t *testing.T) {

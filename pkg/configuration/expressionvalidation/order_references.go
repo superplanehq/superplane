@@ -23,6 +23,10 @@ func ExpressionUsesOrderPullRequests(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "pullRequests")
 }
 
+func ExpressionUsesOrderAssignees(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "assignees")
+}
+
 // ExpressionUsesOrderURL reports whether the expression accesses order().url
 // (dot or bracket). Used to resolve the work order permalink only when needed,
 // since it costs an extra lookup of the factory that owns the order.

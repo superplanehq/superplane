@@ -1013,8 +1013,8 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order().
 // Returns nil when the run is not attached to a factory work-order execution.
-// The url, artifacts, and comments are loaded only when the expression AST
-// references order().url / order().artifacts / order().comments.
+// The url, artifacts, comments, and assignees are loaded only when the expression AST
+// references order().url / order().artifacts / order().comments / order().assignees.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1129,6 +1129,23 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["pullRequests"] = payloads
 	}
 
+	usesAssignees, err := expressionvalidation.ExpressionUsesOrderAssignees(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesAssignees {
+		assignees, err := order.ListAssignees(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load assignees: %w", err)
+		}
+
+		assigneePayloads := make([]any, 0, len(assignees))
+		for i := range assignees {
+			assigneePayloads = append(assigneePayloads, assigneeExpressionPayload(&assignees[i]))
+		}
+		payload["assignees"] = assigneePayloads
+	}
+
 	return payload, nil
 }
 
@@ -1152,6 +1169,19 @@ func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[
 		payload["source"] = normalizeExpressionValue(source)
 	}
 	return nil
+}
+
+func assigneeExpressionPayload(assignee *models.FactoryWorkOrderAssignee) map[string]any {
+	payload := map[string]any{
+		"id":    assignee.UserID.String(),
+		"name":  "",
+		"email": "",
+	}
+	if assignee.User != nil {
+		payload["name"] = assignee.User.Name
+		payload["email"] = assignee.User.GetEmail()
+	}
+	return payload
 }
 
 func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
