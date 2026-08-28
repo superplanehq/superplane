@@ -31,6 +31,10 @@ describe("descriptionNeedsCollapse", () => {
   it("collapses only when the body is taller than the pane", () => {
     expect(descriptionNeedsCollapse(600, 472)).toBe(true);
   });
+
+  it("does not collapse when content fits the 100px minimum", () => {
+    expect(descriptionNeedsCollapse(80, 50)).toBe(false);
+  });
 });
 
 describe("descriptionLeftoverCapacity", () => {
