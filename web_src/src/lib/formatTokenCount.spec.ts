@@ -7,12 +7,13 @@ describe("formatCompactTokenValue", () => {
     expect(formatCompactTokenValue(500)).toBe("500");
   });
 
-  it("uses whole-number k notation at 1,000", () => {
+  it("uses k notation at 1,000 and strips a trailing .0", () => {
     expect(formatCompactTokenValue(1_000)).toBe("1k");
   });
 
-  it("rounds k-range values to the nearest whole thousand", () => {
-    expect(formatCompactTokenValue(1_500)).toBe("2k");
+  it("keeps one decimal place for k-range values", () => {
+    expect(formatCompactTokenValue(1_500)).toBe("1.5k");
+    expect(formatCompactTokenValue(2_700)).toBe("2.7k");
   });
 
   it("switches to M notation for the reported bug case", () => {

@@ -6,11 +6,11 @@
  * Rounding rules, applied consistently across the app:
  * - >= 1,000,000,000 -> one decimal place with a "B" suffix.
  * - >= 1,000,000      -> one decimal place with an "M" suffix.
- * - >= 1,000          -> whole number with a "k" suffix.
+ * - >= 1,000          -> one decimal place with a "k" suffix.
  * - otherwise         -> the plain number.
  *
  * A trailing ".0" is stripped so exact multiples read as "3M" instead of
- * "3.0M".
+ * "3.0M" (and "1k" instead of "1.0k").
  */
 export function formatCompactTokenValue(tokens: number): string {
   if (tokens >= 1_000_000_000) {
@@ -20,7 +20,7 @@ export function formatCompactTokenValue(tokens: number): string {
     return `${stripTrailingZero((tokens / 1_000_000).toFixed(1))}M`;
   }
   if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(0)}k`;
+    return `${stripTrailingZero((tokens / 1_000).toFixed(1))}k`;
   }
   return `${tokens}`;
 }
