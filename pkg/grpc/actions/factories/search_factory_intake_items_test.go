@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -176,6 +177,43 @@ func Test__ImportFactoryIntakeItem(t *testing.T) {
 		assert.Equal(t, r.User.String(), response.GetOrder().GetCreatedBy().GetUser().GetId())
 		require.Len(t, response.GetOrder().GetAssignees(), 1)
 		assert.Equal(t, r.User.String(), response.GetOrder().GetAssignees()[0].GetId())
+	})
+
+	t.Run("forwards a description that already includes imported comments", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := createIntake(t, factory)
+		itemWithComments := IntakeItem{
+			ID:    "13",
+			Key:   "#13",
+			Title: "Handle duplicate refunds",
+			Body: strings.Join([]string{
+				"Retrying a refund posts twice.",
+				importedCommentsSeparator,
+				importedCommentsHeader,
+				"ana 2026-08-01T10:00:00Z",
+				"Confirmed on staging.",
+			}, "\n"),
+			URL: "https://github.com/acme/payments/issues/13",
+		}
+		depsWithComments := IntakeDependencies{
+			NewItemSource: func(context.Context, *gorm.DB, *models.FactoryIntake) (intakeItemSource, error) {
+				return stubIntakeItemSource{items: []IntakeItem{itemWithComments}}, nil
+			},
+		}
+
+		response, err := ImportFactoryIntakeItem(ctx, depsWithComments, orgID, &pb.ImportFactoryIntakeItemRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.ID.String(),
+			ItemId:    itemWithComments.ID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, response.GetOrder())
+		assert.Equal(t, itemWithComments.Title, response.GetOrder().GetTitle())
+		assert.Equal(t, itemWithComments.Body, response.GetOrder().GetDescription())
+		assert.Contains(t, response.GetOrder().GetDescription(), importedCommentsSeparator)
+		assert.Contains(t, response.GetOrder().GetDescription(), importedCommentsHeader)
+		require.NotNil(t, response.GetOrder().GetOrigin())
+		assert.Equal(t, itemWithComments.URL, response.GetOrder().GetOrigin().GetUrl())
 	})
 
 	t.Run("a second import of the same ticket creates a new work order", func(t *testing.T) {
