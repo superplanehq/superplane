@@ -47,7 +47,7 @@ func FetchLiveLogRecords(ctx context.Context, brokerTaskID string, opts LiveLogF
 		now = time.Now()
 	}
 
-	session, err := NewLiveLogSession(brokerTaskID, now)
+	session, err := newInternalLiveLogSession(brokerTaskID, now)
 	if err != nil {
 		return nil, err
 	}

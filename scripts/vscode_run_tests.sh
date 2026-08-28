@@ -21,13 +21,14 @@ COMPOSE="docker compose -f docker-compose.dev.yml"
 docker_exec() {
   # Pass DB_NAME=superplane_test to match Makefile test environment.
   # Match docker-compose.dev.yml: caches live on the go-pkg-cache volume under /go.
-  echo "+ ${COMPOSE} exec -e DB_NAME=superplane_test -e GOCACHE=/go/go-build-cache -e XDG_CACHE_HOME=/go/xdg-cache app bash -lc \"$*\""
+  # Clear TASK_BROKER_* so tests do not inherit local-broker compose defaults.
+  echo "+ ${COMPOSE} exec -e DB_NAME=superplane_test -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL= -e GOCACHE=/go/go-build-cache -e XDG_CACHE_HOME=/go/xdg-cache app bash -lc \"$*\""
   echo ""
   echo "--------------------------------------------------------------------------------"
   echo ""
   # Run command while capturing exit status even with set -e
   set +e
-  ${COMPOSE} exec -e DB_NAME=superplane_test -e GOCACHE=/go/go-build-cache -e XDG_CACHE_HOME=/go/xdg-cache app bash -lc "$*"
+  ${COMPOSE} exec -e DB_NAME=superplane_test -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL= -e GOCACHE=/go/go-build-cache -e XDG_CACHE_HOME=/go/xdg-cache app bash -lc "$*"
   status=$?
   set -e
   if [ "$status" -eq 0 ]; then
