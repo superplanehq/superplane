@@ -59,7 +59,11 @@ describe("PreCreateIntegrationSetup", () => {
   it("does not ask users to name a GitHub connection", async () => {
     renderIntegrationSetup();
 
-    expect(await screen.findByRole("button", { name: "Next" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Continue" })).toBeEnabled();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("SuperPlane will create a GitHub App on your user account or organization."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("The next step asks which account owns the app.")).toBeInTheDocument();
   });
 });

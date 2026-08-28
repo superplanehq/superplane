@@ -5,6 +5,7 @@ import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegratio
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { usesHostedGitHubAppInstall } from "@/lib/integrations";
+import { startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
 import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
@@ -147,6 +148,14 @@ export function useIntegrationConnectDialog({
     openConnectDialog(integrationName);
   };
 
+  const requestPrivateGitHubConnect = useCallback(() => {
+    startPrivateGitHubAppSetup({
+      organizationId,
+      returnTo,
+      goTo: navigate,
+    });
+  }, [navigate, organizationId, returnTo]);
+
   const createNew = (integrationName: string) => {
     if (integrationName === "github" && useHostedGitHubApp) {
       void connectGitHubWithoutDialog(true);
@@ -205,6 +214,8 @@ export function useIntegrationConnectDialog({
   return {
     integrationData,
     requestConnect,
+    requestPrivateGitHubConnect,
+    hostedGitHubAppInstall: useHostedGitHubApp,
     createNew,
     selectInstance,
     configure: openConfigureDialog,
