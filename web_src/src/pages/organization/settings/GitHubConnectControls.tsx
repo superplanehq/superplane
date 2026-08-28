@@ -44,9 +44,10 @@ export function GitHubConnectControls({
         </Button>
       </PermissionTooltip>
       {definition && canCreateIntegrations ? (
-        <button
+        <Button
           type="button"
-          className="text-xs text-gray-500 hover:underline dark:text-gray-400"
+          variant="link"
+          className="h-auto p-0 text-xs text-gray-500 dark:text-gray-400"
           data-testid="integrations-create-private-github-app"
           onClick={() =>
             startPrivateGitHubAppSetup({
@@ -57,7 +58,7 @@ export function GitHubConnectControls({
           }
         >
           {CREATE_PRIVATE_GITHUB_APP_LABEL}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

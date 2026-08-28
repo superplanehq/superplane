@@ -503,10 +503,10 @@ function IntegrationsLoaded(props: {
                       ) : null}
                     </div>
                   </div>
-                  {usesHostedGitHubAppInstall(item.integrationDef) ? (
+                  {usesHostedGitHubAppInstall(item.integrationDef ?? undefined) ? (
                     <GitHubConnectControls
                       organizationId={organizationId}
-                      definition={item.integrationDef}
+                      definition={item.integrationDef ?? undefined}
                       canCreateIntegrations={canCreateIntegrations}
                       permissionsLoading={permissionsLoading}
                       onConnect={() => {
