@@ -1,16 +1,12 @@
+import { formatCompactTokenLabel } from "@/lib/formatTokenCount";
+
 export function parseWorkOrderMetric(value: string | number | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function formatCompactTokens(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(0)}k tokens`;
-  }
-  return `${tokens} tokens`;
+  return formatCompactTokenLabel(tokens);
 }
 
 export function formatUsdCents(cents: number): string {
