@@ -3,7 +3,7 @@ import type { FactoriesFactoryIntake } from "@/api-client";
 import { lineIntakeSourceForApiSource } from "./lineIntakeModel";
 
 export const BACKLOG_CREATE_COPY = {
-  createWorkOrder: "Create work order",
+  createWorkOrder: "Create task",
   createManually: "Create task manually",
   empty: "No matching items.",
   loading: "Loading items.",

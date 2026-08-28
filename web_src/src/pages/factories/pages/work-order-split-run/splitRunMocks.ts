@@ -37,6 +37,9 @@ import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
   doneFooterForStatus,
+  SPLIT_RUN_DRAFT_NOTE,
+  SPLIT_RUN_FAILED_NOTE_TEXT,
+  SPLIT_RUN_WAITING_NOTE,
   type SplitRunFooter,
   type SplitRunFooterKind,
   type SplitRunFooterTone,
@@ -169,7 +172,7 @@ function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): Wor
   return {
     key: "step-failed",
     headline: step ? `${step} did not pass` : "The run did not pass",
-    text: "Open the run to see what failed. Then start the line again.",
+    text: SPLIT_RUN_FAILED_NOTE_TEXT,
     cta: { label: "Review the run" },
   };
 }
@@ -185,14 +188,13 @@ function footerRun(current: FactoriesWorkOrderExecution | undefined): { appId: s
 
 const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "waiting-person",
-  headline: "A person must act",
-  text: "The line stopped and waits on a person. Open the last step in the log to see what stopped it.",
+  ...SPLIT_RUN_WAITING_NOTE,
 };
 
 /**
- * The footer note for a draft: where the order came from, that a plan
- * exists and is editable, and the confidence reasoning. The log holds the
- * step-by-step detail; this is the readable summary.
+ * The footer note for a draft. A scored review candidate keeps the plan
+ * and confidence. Other drafts tell the person to review the details and
+ * start. The log holds the source line.
  */
 function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresentation {
   const candidate = reviewCandidateForWorkOrderId(order.id);
@@ -201,7 +203,9 @@ function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresenta
       key: "draft-plan-ready",
       headline: "Review the plan, then start",
       text: [
-        `From GitHub issue [${candidate.ticketKey}](${candidate.issue.url}). SuperPlane analyzed the ticket and wrote an implementation plan. Open **plan.md** in the Create plan step to review or edit it.`,
+        "Review **plan.md**. Change anything you need. Then click Start to send it to the line.",
+        "",
+        `From GitHub issue [${candidate.ticketKey}](${candidate.issue.url}).`,
         "",
         `Confidence ${candidate.confidenceScore}/${CONFIDENCE_SCORE_MAX} (${candidate.confidenceBand}):`,
         ...candidate.reasons.map((reason) => `- ${reason}`),
@@ -210,8 +214,7 @@ function draftFooterNote(order: FactoriesWorkOrder): WorkOrderStatusNotePresenta
   }
   return {
     key: "draft-start",
-    headline: "Start this work order",
-    text: `${draftSourceSentence(order)} The details are in **description.md**. Start it to plan and implement the change.`,
+    ...SPLIT_RUN_DRAFT_NOTE,
   };
 }
 
@@ -219,13 +222,13 @@ function draftSourceSentence(order: FactoriesWorkOrder): string {
   const automation = order.createdBy?.automation;
   if (automation) {
     const { componentName } = lineAutomationPresentation({ id: automation.appId, name: automation.appName });
-    return `${componentName} created this work order.`;
+    return `${componentName} created this task.`;
   }
   const creator = order.createdBy?.user?.name?.trim();
   if (creator) {
-    return `${creator} created this work order manually.`;
+    return `${creator} created this task.`;
   }
-  return "A person created this work order manually.";
+  return "A person created this task.";
 }
 
 function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
@@ -392,7 +395,6 @@ function failedReviewSurface(
     buildSplitRunFooter({
       kind: "failed",
       note,
-      attentionCard: true,
       run: footerRun(current),
       status: displayStatus,
     }),
@@ -407,12 +409,14 @@ function waitingReviewSurface(
   checks: WorkOrderCheckPresentation[],
   addressingFeedback?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  const notes = addressingFeedback ? [] : presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  if (addressingFeedback) {
+    return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
+  }
+  const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
       note: notes[0] ?? WAITING_FALLBACK_NOTE,
-      attentionCard: notes.length > 0,
       status: displayStatus,
     }),
     notes,
@@ -689,9 +693,8 @@ function automationBacklogPhase(
 }
 
 function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWorkOrderArtifact): SplitRunPhase {
-  const creator = order.createdBy?.user?.name?.trim();
   const at = clockLabel(order.createdAt);
-  const line = creator ? `${creator} created this work order manually.` : "Created this work order manually.";
+  const line = draftSourceSentence(order);
   return {
     id: "backlog",
     name: "Backlog",

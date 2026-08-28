@@ -7,7 +7,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { PhaseLogCard } from "./PhaseLogCard";
-import { SplitRunHeaderActions } from "./SplitRunHeaderActions";
 import { SplitRunFollowSwitch } from "./SplitRunLogHeader";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
@@ -41,9 +40,10 @@ import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
   if (!canUpdate) {
-    return { onStop: undefined };
+    return {};
   }
   return {
+    onReject: () => void footerActions.handleReject(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
       void footerActions.handleStop(choice, {
         ...fixture.footer,
@@ -175,12 +175,6 @@ export function WorkOrderSplitRunBody({
           </li>
         ))}
       </ol>
-      <SplitRunReview
-        footer={fixture.footer}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-      />
     </div>
   );
 }
@@ -253,16 +247,6 @@ export function WorkOrderSplitRunPopup({
         onTitleSave={(next) => void edits.saveTitle(next)}
         expanded={fullPage}
         onToggleExpanded={() => setFullPage((current) => !current)}
-        actions={
-          <SplitRunHeaderActions
-            footer={fixture.footer}
-            onStart={draftStart}
-            onStop={mutations.onStop}
-            startBusy={isDispatching}
-            stopBusy={footerActions.busy}
-            startDisabled={!canDispatch}
-          />
-        }
       >
         <OwnerTimeCostRow
           fixture={{ ...fixture, owner: edits.owner }}
@@ -287,6 +271,19 @@ export function WorkOrderSplitRunPopup({
         initialTab={initialTab}
         canUpdate={canUpdate}
         footerActions={footerActions}
+      />
+      <SplitRunReview
+        footer={fixture.footer}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        canAct={canUpdate}
+        onStart={draftStart}
+        onReject={mutations.onReject}
+        onStop={mutations.onStop}
+        startBusy={isDispatching}
+        actionBusy={footerActions.busy}
+        startDisabled={!canDispatch}
       />
     </PopupShell>
   );
@@ -378,7 +375,6 @@ function SplitRunPopupTabs({
           descriptionBusy={edits.descriptionBusy}
           onDescriptionSave={edits.saveDescription}
           source={fixture.source}
-          footer={fixture.footer}
         />
       </TabsContent>
       <TabsContent value="log" className="mt-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
