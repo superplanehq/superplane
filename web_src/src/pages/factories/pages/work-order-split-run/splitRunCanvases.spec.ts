@@ -81,17 +81,17 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.title).toBe("Implement");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
     expect(canvas.nodes.map((node) => node.name)).toContain("Agent - Implement from order description");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Create Draft Pull Request");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Work Order");
     expect(canvas.statuses["create-branch"]).toBe("passed");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
-    expect(canvas.statuses["create-draft-pr"]).toBe("did_not_run");
+    expect(canvas.statuses["create-pr"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
-  it("opens a draft pull request after a finished implement run", () => {
+  it("opens a pull request after a finished implement run", () => {
     const canvas = splitRunCanvasForPhase({
       id: "implement-0",
       name: "Implement",
@@ -104,15 +104,15 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
-    expect(canvas.statuses["create-draft-pr"]).toBe("passed");
+    expect(canvas.statuses["create-pr"]).toBe("passed");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
     expect(canvas.statuses["set-pr-closure-note"]).toBe("passed");
     expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);
-    expect(stream.find((line) => line.id === "create-draft-pr")).toMatchObject({
+    expect(stream.find((line) => line.id === "create-pr")).toMatchObject({
       componentType: "github.createPullRequest",
-      componentName: "Create Draft Pull Request",
+      componentName: "Create Pull Request",
       action: "passed",
     });
     expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
