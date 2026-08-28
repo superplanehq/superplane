@@ -35,6 +35,17 @@ function statusEvent(
   };
 }
 
+function stepFinishedEvent(at: string, payload: { userId?: string; runResult?: string }): FactoriesWorkOrderEvent {
+  return {
+    type: "step.execution.finished",
+    timestamp: at,
+    event: {
+      ...(payload.userId ? { user: { id: payload.userId } } : {}),
+      run: { id: "run-1", result: payload.runResult ?? "cancelled" },
+    },
+  };
+}
+
 describe("footerCloserFromEvents", () => {
   it("names the person who completed the work order, including avatar", () => {
     expect(
@@ -79,7 +90,17 @@ describe("footerCloserFromEvents", () => {
     ).toBe(ALEX.id);
   });
 
-  it("names the person who stopped the automation from a cancelled result", () => {
+  it("names the person who stopped the automation from a cancelled step finish", () => {
+    expect(
+      footerCloserFromEvents(
+        [stepFinishedEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id })],
+        "waiting",
+        resolveUser,
+      ),
+    ).toEqual({ actor: ALEX });
+  });
+
+  it("falls back to a cancelled status event when no step finish is present", () => {
     expect(
       footerCloserFromEvents(
         [statusEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id, toState: "open", toResult: "cancelled" })],
@@ -87,6 +108,19 @@ describe("footerCloserFromEvents", () => {
         resolveUser,
       ),
     ).toEqual({ actor: ALEX });
+  });
+
+  it("prefers a cancelled step finish over an older status event", () => {
+    expect(
+      footerCloserFromEvents(
+        [
+          statusEvent("2026-08-04T10:00:00.000Z", { userId: "user-old", toState: "open", toResult: "cancelled" }),
+          stepFinishedEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id }),
+        ],
+        "running",
+        resolveUser,
+      ).actor?.id,
+    ).toBe(ALEX.id);
   });
 
   it("returns empty when no matching event exists, so the footer keeps A person", () => {

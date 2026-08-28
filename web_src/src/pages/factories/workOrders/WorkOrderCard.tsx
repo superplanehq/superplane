@@ -118,10 +118,7 @@ export function WorkOrderCard({
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-            <span
-              className="truncate text-[11px] leading-4 text-muted-foreground"
-              title={startedAt?.toLocaleString()}
-            >
+            <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
               {startedLabel}
             </span>
           </div>

@@ -8,11 +8,12 @@ export type SplitRunFooterCloser = {
   automationName?: string;
 };
 
-interface StatusEventPayload {
+interface FooterActorPayload {
   user?: { id?: string };
   automation?: { nodeName?: string; appName?: string };
   toState?: string;
   toResult?: string;
+  run?: { result?: string };
 }
 
 const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> = {
@@ -23,8 +24,10 @@ const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> 
 };
 
 /**
- * Person or automation that closed or stopped this work order, taken from
- * the latest matching `order.status.updated` event. Empty when that event
+ * Person or automation that closed or stopped this work order. Close
+ * attribution comes from `order.status.updated`. Stop attribution comes
+ * from a cancelled `step.execution.finished` (cancelling a run leaves the
+ * order open and does not write a status event). Empty when that event
  * has no user and no automation name — callers keep the "A person" copy.
  */
 export function footerCloserFromEvents(
@@ -32,7 +35,7 @@ export function footerCloserFromEvents(
   displayStatus: WorkOrderDisplayStatus,
   resolveUser: OrgUserDisplayLookup,
 ): SplitRunFooterCloser {
-  const payload = latestMatchingStatusPayload(events, displayStatus);
+  const payload = latestMatchingActorPayload(events, displayStatus);
   if (!payload) {
     return {};
   }
@@ -45,24 +48,32 @@ export function footerCloserFromEvents(
   };
 }
 
-function latestMatchingStatusPayload(
+function latestMatchingActorPayload(
   events: FactoriesWorkOrderEvent[],
   displayStatus: WorkOrderDisplayStatus,
-): StatusEventPayload | undefined {
+): FooterActorPayload | undefined {
   const sorted = [...events].sort(compareEventsNewestFirst);
+  const stoppedOpen = displayStatus === "waiting" || displayStatus === "running";
   for (const event of sorted) {
-    if (event.type !== "order.status.updated") {
-      continue;
+    const payload = (event.event ?? {}) as FooterActorPayload;
+    if (stoppedOpen && isCancelledStepFinished(event, payload)) {
+      return payload;
     }
-    const payload = (event.event ?? {}) as StatusEventPayload;
-    if (statusEventMatchesFooter(payload, displayStatus)) {
+    if (event.type === "order.status.updated" && statusEventMatchesFooter(payload, displayStatus)) {
       return payload;
     }
   }
   return undefined;
 }
 
-function statusEventMatchesFooter(payload: StatusEventPayload, displayStatus: WorkOrderDisplayStatus): boolean {
+function isCancelledStepFinished(event: FactoriesWorkOrderEvent, payload: FooterActorPayload): boolean {
+  if (event.type !== "step.execution.finished") {
+    return false;
+  }
+  return (payload.run?.result ?? "").toLowerCase() === "cancelled";
+}
+
+function statusEventMatchesFooter(payload: FooterActorPayload, displayStatus: WorkOrderDisplayStatus): boolean {
   const result = (payload.toResult ?? "").toLowerCase();
   if (displayStatus === "waiting" || displayStatus === "running") {
     return result === "cancelled";
