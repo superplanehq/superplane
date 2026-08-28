@@ -309,11 +309,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const executions = latestDispatchExecutions(order, options?.lineId);
   const current = pickCurrentExecution(executions);
   const demoArtifacts = options?.demoArtifacts !== false;
-  const phases = [
-    ...phasesForOrder(order, executions, options?.checks, demoArtifacts),
-    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], options?.checks),
-    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
-  ];
+  const phases = phasesForOrder(order, executions, options, demoArtifacts);
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Work order",
@@ -509,15 +505,23 @@ function boardColumnFor(current: FactoriesWorkOrderExecution | undefined, execut
 
 const VERIFY_STEP_KEYS = new Set(VERIFY_STEP_CHECKS.map((check) => check.key).filter(Boolean));
 
+/**
+ * The log reads in the order the work happened: the source that created the
+ * order, the Backlog analysis that scored it, the line steps that acted on it,
+ * and last the PR feedback runs.
+ */
 function phasesForOrder(
   order: FactoriesWorkOrder,
   executions: FactoriesWorkOrderExecution[],
-  apiChecks?: FactoriesWorkOrderCheck[],
-  demoArtifacts = true,
+  options: SplitRunFixtureOptions | undefined,
+  demoArtifacts: boolean,
 ): SplitRunPhase[] {
+  const apiChecks = options?.checks;
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
+    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
     ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
+    ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
 }
 
