@@ -1907,14 +1907,6 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflows workflows_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.workflows
-    ADD CONSTRAINT workflows_organization_id_name_key UNIQUE (organization_id, name);
-
-
---
 -- Name: workflows workflows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2753,6 +2745,20 @@ CREATE UNIQUE INDEX unique_api_key_in_organization ON public.users USING btree (
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
+
+
+--
+-- Name: workflows_factory_id_name_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX workflows_factory_id_name_active_key ON public.workflows USING btree (factory_id, name) WHERE ((factory_id IS NOT NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: workflows_organization_id_name_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflows USING btree (organization_id, name) WHERE ((factory_id IS NULL) AND (deleted_at IS NULL));
 
 
 --
@@ -3659,7 +3665,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260828012533	f
+20260828094719	f
 \.
 
 

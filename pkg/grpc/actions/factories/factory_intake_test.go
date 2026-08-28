@@ -151,7 +151,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		assert.NotEqual(t, first.GetId(), second.GetId())
 		assert.NotEqual(t, first.GetCanvasId(), second.GetCanvasId())
-		// Canvas names are unique per organization, so the second one steps
+		// Canvas names are unique inside a workspace, so the second one steps
 		// aside instead of failing.
 		assert.NotEqual(t, first.GetName(), second.GetName())
 
