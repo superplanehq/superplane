@@ -198,7 +198,7 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 	singleCommandText, hasSingleCommand := dockerSingleCommandText(task)
 	startedAt := time.Now()
 	if hasSingleCommand {
-		writeLiveLogCommandStart(live, 0, singleCommandText, startedAt)
+		writeLiveLogCommandStart(live, 0, singleCommandText, "", "", startedAt)
 	}
 	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
 	if hasSingleCommand {
@@ -222,7 +222,7 @@ func dockerExecJavaScript(ctx context.Context, name string, task *api.TaskPayloa
 
 	startedAt := time.Now()
 	jsIndex := len(setup)
-	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, startedAt)
+	writeLiveLogCommandStart(live, jsIndex, "node "+javaScriptProgramName, "javascript", "", startedAt)
 	exit, nodeOut, err := dockerExecNode(ctx, name, task, live)
 	writeLiveLogCommandEnd(live, jsIndex, exit, time.Since(startedAt))
 	combined.WriteString(nodeOut)
@@ -268,7 +268,7 @@ func dockerExecPython(ctx context.Context, name string, task *api.TaskPayload, l
 
 	startedAt := time.Now()
 	pyIndex := len(setup)
-	writeLiveLogCommandStart(live, pyIndex, "python3 "+pythonProgramName, startedAt)
+	writeLiveLogCommandStart(live, pyIndex, "python3 "+pythonProgramName, "python", "", startedAt)
 	exit, pyOut, err := dockerExecPython3(ctx, name, task, live)
 	writeLiveLogCommandEnd(live, pyIndex, exit, time.Since(startedAt))
 	combined.WriteString(pyOut)
@@ -299,7 +299,7 @@ func dockerExecBash(ctx context.Context, name string, task *api.TaskPayload, liv
 
 	startedAt := time.Now()
 	bashIndex := len(setup)
-	writeLiveLogCommandStart(live, bashIndex, "bash "+bashProgramName, startedAt)
+	writeLiveLogCommandStart(live, bashIndex, "bash "+bashProgramName, "bash", liveLogPreview(task.Script), startedAt)
 	exit, bashOut, err := dockerExecBashScript(ctx, name, task, live)
 	writeLiveLogCommandEnd(live, bashIndex, exit, time.Since(startedAt))
 	combined.WriteString(bashOut)
@@ -403,13 +403,8 @@ func dockerCommandsScript(directives []shellDirective) string {
 	script.WriteString("}\n")
 
 	for i, directive := range directives {
-		textJSON, _ := json.Marshal(directive.Text)
 		script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
-		script.WriteString(`printf '{"type":"cmd_start","index":`)
-		script.WriteString(strconv.Itoa(i))
-		script.WriteString(`,"text":`)
-		script.WriteString(string(textJSON))
-		script.WriteString(`,"started_at":%s}\n' "$__sp_cmd_start"`)
+		writeDockerCmdStart(&script, i, directive)
 		script.WriteString("\n")
 		script.WriteString("if {\n")
 		script.WriteString(directive.Shell)
@@ -431,6 +426,33 @@ func dockerCommandsScript(directives []shellDirective) string {
 	}
 
 	return script.String()
+}
+
+func writeDockerCmdStart(script *strings.Builder, index int, directive shellDirective) {
+	rec := map[string]any{
+		"type":  "cmd_start",
+		"index": index,
+		"text":  directive.Text,
+	}
+	if kind := strings.TrimSpace(directive.Kind); kind != "" {
+		rec["kind"] = kind
+	}
+	if preview := strings.TrimSpace(directive.Preview); preview != "" {
+		rec["preview"] = preview
+	}
+	raw, err := json.Marshal(rec)
+	if err != nil {
+		raw = []byte(`{"type":"cmd_start","index":` + strconv.Itoa(index) + `,"text":""}`)
+	}
+	body := strings.TrimSuffix(string(raw), "}")
+	script.WriteString("printf '%s' ")
+	script.WriteString(bashSingleQuoted(body + `,"started_at":`))
+	script.WriteString("\n")
+	script.WriteString(`printf '%s}\n' "$__sp_cmd_start"`)
+}
+
+func bashSingleQuoted(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
 func stripLiveLogControlLines(output string) string {
@@ -473,6 +495,18 @@ func isLiveLogControlLine(line string) bool {
 			return false
 		}
 		return rec.Index >= 0 && rec.DurationMS >= 0 && (rec.Status == liveLogCommandPassed || rec.Status == liveLogCommandFailed)
+	case "tool_start":
+		var rec liveLogToolStartRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return false
+		}
+		return rec.Type == "tool_start"
+	case "tool_end":
+		var rec liveLogToolEndRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return false
+		}
+		return rec.DurationMS >= 0 && (rec.Status == liveLogCommandPassed || rec.Status == liveLogCommandFailed)
 	default:
 		return false
 	}

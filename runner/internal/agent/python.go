@@ -125,7 +125,7 @@ func runPythonHost(
 
 	startedAt := time.Now()
 	pyIndex := len(setup)
-	writeLiveLogCommandStart(live, pyIndex, "python3 "+pythonProgramName, startedAt)
+	writeLiveLogCommandStart(live, pyIndex, "python3 "+pythonProgramName, "python", "", startedAt)
 	runErr := cmd.Run()
 	combinedOut.WriteString(buf.String())
 	out := truncateString(combinedOut.String(), max)
