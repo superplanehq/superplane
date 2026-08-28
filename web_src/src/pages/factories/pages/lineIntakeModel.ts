@@ -69,7 +69,7 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
     id: "github-issues",
     name: "GitHub issues",
-    description: "Open issues from connected repositories.",
+    description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
     listen: {
@@ -223,14 +223,6 @@ export function isBelowThresholdTicket(ticket: LineIntakeAnalyzingTicket): boole
   return ticket.outcome === "below-threshold";
 }
 
-/** Analyzing tickets stay on top. Tickets that did not make it stay below. */
-export function sortIntakeTicketsByOutcome(tickets: LineIntakeAnalyzingTicket[]): LineIntakeAnalyzingTicket[] {
-  return [
-    ...tickets.filter((ticket) => !isBelowThresholdTicket(ticket)),
-    ...tickets.filter((ticket) => isBelowThresholdTicket(ticket)),
-  ];
-}
-
 export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): number | undefined {
   if (ticket.confidenceScore != null) {
     return ticket.confidenceScore;
@@ -242,12 +234,6 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
 }
 
 export const LINE_INTAKE_COPY = {
-  analyzingTitle: "Creating",
-  analyzingHelper: "Tickets from this intake.",
-  analyzingStatus: "Creating",
-  analyzingEmpty: "No intake runs in progress.",
-  belowThresholdStatus: "Not accepted",
-  belowThresholdHelper: "Not accepted. The score is below the minimum confidence.",
   needsRepair: "Needs repair",
   needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
@@ -255,21 +241,6 @@ export const LINE_INTAKE_COPY = {
   analysisCompleteHeadline: "Ticket analysis finished",
   analysisCompleteHelper: "SuperPlane did not change the ticket. Review the plan before work starts.",
 } as const;
-
-/** GitHub issues pulled in for first-run analysis. Scores land on the board later. */
-export const GITHUB_ISSUES_ANALYZING_TICKETS: LineIntakeAnalyzingTicket[] = [
-  { id: "gh-issue-1", title: "Handle duplicate refunds on retry" },
-  { id: "gh-issue-2", title: "Return 409 when the invoice is already paid" },
-  { id: "gh-issue-3", title: "Show a clearer empty state on the billing page" },
-  { id: "gh-issue-4", title: "Upgrade the Node 20 base image" },
-  { id: "gh-issue-5", title: "Add a flake retry to the checkout e2e suite" },
-  { id: "gh-issue-6", title: "Document the refund webhook contract", outcome: "below-threshold", confidencePct: 58 },
-  { id: "gh-issue-7", title: "Make the billing dashboard faster", outcome: "below-threshold", confidencePct: 52 },
-  { id: "gh-issue-8", title: "Redesign the invoice settings page", outcome: "below-threshold", confidencePct: 44 },
-  { id: "gh-issue-9", title: "Investigate flaky payouts in staging", outcome: "below-threshold", confidencePct: 38 },
-  { id: "gh-issue-10", title: "Move the ledger to a new database", outcome: "below-threshold", confidencePct: 27 },
-  { id: "gh-issue-11", title: "Payments break for some customers", outcome: "below-threshold", confidencePct: 12 },
-];
 
 const OWNER = {
   id: STORYBOOK_ME_USER_ID,

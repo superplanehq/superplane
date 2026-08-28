@@ -11,7 +11,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { refundLineCanvasFixture } from "../__fixtures__/factoryOwnedCanvasFixture";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
-import { GITHUB_ISSUES_ANALYZING_TICKETS, intakeSourcesFromFactoryIntakes } from "./lineIntakeModel";
+import { intakeSourcesFromFactoryIntakes } from "./lineIntakeModel";
 
 const meta = {
   title: "Factories/Pages/Intake tree",
@@ -35,16 +35,11 @@ const CONFIGURED_INTAKES = intakeSourcesFromFactoryIntakes([
 
 const storyDrawerProps = { showAddIntakeControl: true, onClose: () => undefined } as const;
 
-export const GitHubIssuesExpanded: Story = {
-  name: "GitHub issues expanded",
+export const GitHubIssues: Story = {
+  name: "GitHub issues",
   render: () => (
     <ComponentStoryShell className="flex h-svh bg-slate-300 p-0 dark:bg-slate-900">
-      <LineIntakeDrawer
-        {...storyDrawerProps}
-        configuredSources={CONFIGURED_INTAKES}
-        analyzingTickets={GITHUB_ISSUES_ANALYZING_TICKETS}
-        initialIntakeId={GITHUB_ISSUES_INTAKE_ID}
-      />
+      <LineIntakeDrawer {...storyDrawerProps} configuredSources={CONFIGURED_INTAKES} />
     </ComponentStoryShell>
   ),
 };
@@ -71,8 +66,6 @@ export const TwoGitHubIntakes: Story = {
             healthy: false,
           },
         ])}
-        analyzingTickets={GITHUB_ISSUES_ANALYZING_TICKETS}
-        initialIntakeId={GITHUB_ISSUES_INTAKE_ID}
       />
     </ComponentStoryShell>
   ),
