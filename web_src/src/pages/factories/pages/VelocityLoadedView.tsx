@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { formatCompactTokenValue } from "@/lib/formatTokenCount";
+
 import {
   formatDurationHours,
   type FactoryVelocityFlow,
@@ -78,11 +80,7 @@ function formatUsd(value: number) {
 }
 
 function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
-  }
-  return String(value);
+  return formatCompactTokenValue(value);
 }
 
 function formatPct(value: number) {
