@@ -94,6 +94,8 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toMatch(/^implement-/);
     const implement = fixture.phases.find((phase) => phase.name === "Implement");
     expect(implement?.status).toBe("running");
+    expect(implement?.costCents).toBe("28");
+    expect(implement?.totalTokens).toBe("900");
     expect(implement?.componentName).toBe("Implementation");
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id);
@@ -1034,6 +1036,9 @@ describe("line board work-order examples", () => {
           canvasId: "canvas-fb",
           handlerName: "Address PR feedback",
           pullRequestNumber: "6812",
+          description: "Please add tests for the retry path.",
+          costCents: "45",
+          totalTokens: "1200",
           run: {
             id: "run-comment",
             canvasId: "canvas-fb",
@@ -1041,13 +1046,14 @@ describe("line board work-order examples", () => {
             result: "RESULT_PASSED",
             createdAt: "2026-08-26T11:00:00Z",
             finishedAt: "2026-08-26T11:05:00Z",
-            description: "Please add tests for the retry path.",
           },
         },
       ],
     });
     expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-comment")).toMatchObject({
       name: "Please add tests for the retry path.",
+      costCents: "45",
+      totalTokens: "1200",
     });
   });
 

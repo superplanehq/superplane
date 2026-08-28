@@ -1,4 +1,5 @@
 import { formatClockDurationLabel } from "@/lib/duration";
+import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, Pencil, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -10,6 +11,7 @@ import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLog
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
+import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
@@ -496,7 +498,7 @@ function AutomationHeader({
             ))}
           </span>
         ) : null}
-        <PhaseDuration phase={phase} />
+        <PhaseMetrics phase={phase} />
       </span>
     </div>
   );
@@ -678,21 +680,33 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
   return null;
 }
 
-function PhaseDuration({ phase }: { phase: SplitRunPhase }) {
+function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? tickingRunningClock(phase.duration, sampledAt, now)
     : formatClockDurationLabel(phase.duration);
-  if (!clock || clock === "—") {
+  const tokens = parseWorkOrderMetric(phase.totalTokens);
+  const cents = parseWorkOrderMetric(phase.costCents);
+  const parts: string[] = [];
+  if (cents > 0) {
+    parts.push(formatUsdCents(cents));
+  }
+  if (tokens > 0) {
+    parts.push(formatCompactTokenValue(tokens));
+  }
+  if (clock && clock !== "—") {
+    parts.push(clock);
+  }
+  if (parts.length === 0) {
     return null;
   }
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className={cn(LOG_FACE, "min-w-[5ch] text-right tabular-nums text-muted-foreground")}
+      className={cn(LOG_FACE, "tabular-nums text-muted-foreground")}
     >
-      {clock}
+      {parts.join(" · ")}
     </span>
   );
 }
