@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -43,6 +44,8 @@ func DescribeOrganizationLLMSpend(
 		return nil, grpcerrors.Internal(err, "failed to describe organization LLM credit")
 	}
 
+	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+
 	return &pb.DescribeOrganizationLLMSpendResponse{
 		TotalTokens:            totals.TotalTokens,
 		TotalCostCents:         totals.CostCents(),
@@ -52,6 +55,11 @@ func DescribeOrganizationLLMSpend(
 		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
 		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
 		RemainingCreditWarning: credit.Warning,
+		BillingEnabled:         billingEnabled,
+		HasBillingCustomer:     hasCustomer,
+		SuperplaneGrantCents:   pricebook.MicrosToCents(credit.SuperPlaneGrantMicros),
+		PurchasedCreditCents:   pricebook.MicrosToCents(credit.PurchasedCreditMicros),
+		Invoices:               listHostedCreditInvoices(ctx, organizationID, billingEnabled, hasCustomer),
 	}, nil
 }
 
@@ -76,4 +84,32 @@ func serializeLLMSpendByModel(rows []models.UsageByModel) []*pb.LLMSpendByModel 
 		})
 	}
 	return out
+}
+
+func listHostedCreditInvoices(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	billingEnabled bool,
+	hasCustomer bool,
+) []*pb.HostedCreditInvoice {
+	if !billingEnabled || !hasCustomer || !polar.Configured() {
+		return nil
+	}
+
+	orders, err := polar.NewClientFromEnv().ListOrders(ctx, organizationID.String())
+	if err != nil {
+		return nil
+	}
+
+	invoices := make([]*pb.HostedCreditInvoice, 0, len(orders))
+	for _, order := range orders {
+		invoices = append(invoices, &pb.HostedCreditInvoice{
+			Id:          order.ID,
+			CreatedAt:   order.CreatedAt,
+			AmountCents: order.AmountCents,
+			Status:      order.Status,
+			ProductName: order.ProductName,
+		})
+	}
+	return invoices
 }

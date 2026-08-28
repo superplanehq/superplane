@@ -1,4 +1,9 @@
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
+} from "@/api-client";
 
 import {
   CLOSED_FAILED_WORK_ORDER,
@@ -8,6 +13,8 @@ import {
   HOUR_AGO,
   INGEST_DRAFT_WORK_ORDER,
   LAST_WEEK,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
@@ -22,7 +29,8 @@ import {
   TWO_HOURS_AGO,
   YESTERDAY,
 } from "./factoryPageResponses";
-import { OPEN_WORK_ORDER_ARTIFACTS } from "./factoryPageFixtureVariants";
+import { OPEN_WORK_ORDER_ARTIFACTS, OPEN_WORK_ORDER_PULL_REQUESTS } from "./factoryPageFixtureVariants";
+import { BOARD_IMPLEMENT_NOTIFY_ORDER } from "./lineMetricsBoardOrders";
 
 const REFUND_LINE = { id: "line-plan-and-implement", name: "plan-and-implement" };
 
@@ -171,7 +179,7 @@ function artifactAddedEvent(
   at: string,
   artifact: {
     id: string;
-    type: "pr" | "markdown" | "branch";
+    type: "markdown" | "branch";
     data?: Record<string, unknown>;
   },
   actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },
@@ -185,6 +193,31 @@ function artifactAddedEvent(
       ...(automation ? { automation } : {}),
       order: { id: order.id, title: order.title },
       artifact,
+    },
+  };
+}
+
+function pullRequestAddedEvent(
+  order: FactoriesWorkOrder,
+  at: string,
+  pullRequest: {
+    id: string;
+    number?: number | string;
+    url?: string;
+    title?: string;
+    state?: string;
+  },
+  actor: { id: string } | null = { id: STORYBOOK_ME_USER_ID },
+  automation?: AutomationRefFixture,
+): FactoriesWorkOrderEvent {
+  return {
+    type: "order.pull_request.added",
+    timestamp: at,
+    event: {
+      ...(actor ? { user: { id: actor.id } } : {}),
+      ...(automation ? { automation } : {}),
+      order: { id: order.id, title: order.title },
+      pullRequest,
     },
   };
 }
@@ -261,6 +294,32 @@ export const INGEST_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       nodeName: "On Issue Label",
     },
     app: { id: "app-refund-backlog" },
+  }),
+];
+
+export const SENTRY_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(SENTRY_DRAFT_WORK_ORDER, YESTERDAY, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-sentry",
+      appName: "Sentry",
+      nodeName: "On Issue",
+    },
+    app: { id: "app-refund-sentry" },
+  }),
+];
+
+export const SLACK_DRAFT_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
+  statusUpdatedEvent(SLACK_DRAFT_WORK_ORDER, TWO_HOURS_AGO, {
+    fromState: "",
+    toState: "draft",
+    automation: {
+      appId: "app-refund-slack",
+      appName: "Slack",
+      nodeName: "On Mention",
+    },
+    app: { id: "app-refund-slack" },
   }),
 ];
 
@@ -456,17 +515,15 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
       automation: { nodeName: "reproduce-failure", appName: "Refund Diagnostics" },
     },
   ),
-  artifactAddedEvent(
+  pullRequestAddedEvent(
     OPEN_WORK_ORDER,
     HOUR_AGO,
     {
       id: "art-pr-1",
-      type: "pr",
-      data: {
-        url: "https://github.com/example/ledger/pull/482",
-        title: "Fix duplicate refund on retry",
-        number: 482,
-      },
+      url: "https://github.com/example/ledger/pull/482",
+      title: "Fix duplicate refund on retry",
+      number: 482,
+      state: "open",
     },
     { id: REVIEWER_USER.id },
   ),
@@ -483,17 +540,15 @@ export const RICH_OPEN_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] = [
     },
     { id: REVIEWER_USER.id },
   ),
-  artifactAddedEvent(
+  pullRequestAddedEvent(
     OPEN_WORK_ORDER,
     HOUR_AGO,
     {
       id: "art-auto-1",
-      type: "pr",
-      data: {
-        url: "https://github.com/example/ledger/pull/483",
-        title: "Automated retry fix",
-        number: 483,
-      },
+      url: "https://github.com/example/ledger/pull/483",
+      title: "Automated retry fix",
+      number: 483,
+      state: "open",
     },
     null,
     { nodeName: "attach-artifact", appName: "Refund Diagnostics", lineName: "Plan", stepName: "Refund Diagnostics" },
@@ -546,12 +601,35 @@ export const DEFAULT_EVENTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderEvent[
   [FAILED_WORK_ORDER.id!]: FAILED_WORK_ORDER_EVENTS,
   [DRAFT_WORK_ORDER.id!]: DRAFT_WORK_ORDER_EVENTS,
   [INGEST_DRAFT_WORK_ORDER.id!]: INGEST_DRAFT_WORK_ORDER_EVENTS,
+  [SENTRY_DRAFT_WORK_ORDER.id!]: SENTRY_DRAFT_WORK_ORDER_EVENTS,
+  [SLACK_DRAFT_WORK_ORDER.id!]: SLACK_DRAFT_WORK_ORDER_EVENTS,
   [CLOSED_WORK_ORDER.id!]: CLOSED_WORK_ORDER_EVENTS,
   [PR_CLOSURE_COMPLETED_WORK_ORDER.id!]: PR_CLOSURE_COMPLETED_WORK_ORDER_EVENTS,
   [CLOSED_FAILED_WORK_ORDER.id!]: CLOSED_FAILED_WORK_ORDER_EVENTS,
 };
 
 /** Artifacts served by the fixture HTTP handlers (`GET …/orders/{orderId}/artifacts`). */
+function descriptionArtifact(order: FactoriesWorkOrder): FactoriesWorkOrderArtifact {
+  return {
+    id: `art-description-${order.id}`,
+    type: "TYPE_MARKDOWN",
+    data: {
+      name: "description.md",
+      title: "description.md",
+      body: order.description ?? "",
+    },
+  };
+}
+
 export const DEFAULT_ARTIFACTS_BY_ORDER_ID: Record<string, FactoriesWorkOrderArtifact[]> = {
   [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_ARTIFACTS,
+  [DRAFT_WORK_ORDER.id!]: [descriptionArtifact(DRAFT_WORK_ORDER)],
+  [INGEST_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(INGEST_DRAFT_WORK_ORDER)],
+  [SENTRY_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SENTRY_DRAFT_WORK_ORDER)],
+  [SLACK_DRAFT_WORK_ORDER.id!]: [descriptionArtifact(SLACK_DRAFT_WORK_ORDER)],
+  [BOARD_IMPLEMENT_NOTIFY_ORDER.id!]: [descriptionArtifact(BOARD_IMPLEMENT_NOTIFY_ORDER)],
+};
+
+export const DEFAULT_PULL_REQUESTS_BY_ORDER_ID: Record<string, FactoriesFactoryPullRequest[]> = {
+  [OPEN_WORK_ORDER.id!]: OPEN_WORK_ORDER_PULL_REQUESTS,
 };

@@ -5,15 +5,15 @@ import type { FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-
 import { attachStreamArtifacts } from "./attachStreamArtifacts";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
-const OPEN_PR: FactoriesWorkOrderArtifact = {
-  id: "art-pr-1",
-  type: "TYPE_PR",
-  data: { number: 482, state: "open", url: "https://github.com/example/ledger/pull/482" },
+const NOTE: FactoriesWorkOrderArtifact = {
+  id: "art-md-1",
+  type: "TYPE_MARKDOWN",
+  data: { title: "PLAN.md", body: "Ship the retry fix." },
 };
 
-const MERGED_PR: FactoriesWorkOrderArtifact = {
-  ...OPEN_PR,
-  data: { ...OPEN_PR.data, state: "merged" },
+const UPDATED_NOTE: FactoriesWorkOrderArtifact = {
+  ...NOTE,
+  data: { ...NOTE.data, title: "PLAN.md", body: "Ship the retry fix. Updated." },
 };
 
 const BRANCH: FactoriesWorkOrderArtifact = {
@@ -36,12 +36,14 @@ function artifactAddedEvent(
   at: string,
   artifact: { id?: string; type?: string; data?: Record<string, unknown> },
   automation?: { nodeId?: string; nodeName?: string },
+  run?: { id?: string },
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.artifact.added",
     timestamp: at,
     event: {
       ...(automation ? { automation } : {}),
+      ...(run ? { run } : {}),
       artifact,
     },
   };
@@ -50,38 +52,38 @@ function artifactAddedEvent(
 describe("attachStreamArtifacts", () => {
   it("hangs the matching artifact on a stream line by event nodeId", () => {
     const stream = attachStreamArtifacts(
-      [streamLine("add-pr"), streamLine("noop")],
+      [streamLine("add-output"), streamLine("noop")],
       [
-        artifactAddedEvent("2026-08-24T16:32:18.000Z", OPEN_PR, { nodeId: "add-pr" }),
+        artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
         { type: "order.comment.added", timestamp: "2026-08-24T16:33:00.000Z", event: {} },
       ],
     );
 
-    expect(stream?.[0]?.artifact).toEqual(OPEN_PR);
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
     expect(stream?.[1]?.artifact).toBeUndefined();
   });
 
   it("overlays live artifact data on the event snapshot", () => {
     const stream = attachStreamArtifacts(
-      [streamLine("add-pr")],
+      [streamLine("add-output")],
       [
         artifactAddedEvent(
           "2026-08-24T16:32:18.000Z",
-          { id: "art-pr-1", type: "pr", data: { number: 482, state: "open" } },
-          { nodeId: "add-pr" },
+          { id: "art-md-1", type: "markdown", data: { title: "PLAN.md", body: "Ship the retry fix." } },
+          { nodeId: "add-output" },
         ),
       ],
-      [MERGED_PR],
+      [UPDATED_NOTE],
     );
 
-    expect(stream?.[0]?.artifact).toEqual(MERGED_PR);
+    expect(stream?.[0]?.artifact).toEqual(UPDATED_NOTE);
   });
 
   it("keeps the later artifact when the same node adds twice", () => {
     const stream = attachStreamArtifacts(
       [streamLine("add-output")],
       [
-        artifactAddedEvent("2026-08-24T16:32:18.000Z", OPEN_PR, { nodeId: "add-output" }),
+        artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
         artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "add-output" }),
       ],
     );
@@ -94,7 +96,7 @@ describe("attachStreamArtifacts", () => {
       [streamLine("add-output")],
       [
         artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "add-output" }),
-        artifactAddedEvent("2026-08-24T16:32:18.000Z", OPEN_PR, { nodeId: "add-output" }),
+        artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
       ],
     );
 
@@ -103,7 +105,7 @@ describe("attachStreamArtifacts", () => {
 
   it("leaves the stream unchanged when the event has no node", () => {
     const lines = [streamLine("noop")];
-    const stream = attachStreamArtifacts(lines, [artifactAddedEvent("2026-08-24T16:32:18.000Z", OPEN_PR)]);
+    const stream = attachStreamArtifacts(lines, [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE)]);
 
     expect(stream?.[0]?.artifact).toBeUndefined();
     expect(stream?.[0]).toEqual(lines[0]);
@@ -112,7 +114,7 @@ describe("attachStreamArtifacts", () => {
   it("leaves the stream unchanged when no line matches the nodeId", () => {
     const stream = attachStreamArtifacts(
       [streamLine("noop")],
-      [artifactAddedEvent("2026-08-24T16:32:18.000Z", OPEN_PR, { nodeId: "add-pr" })],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" })],
     );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
@@ -121,16 +123,16 @@ describe("attachStreamArtifacts", () => {
   it("matches nodeName to the line component name when nodeId is missing", () => {
     const stream = attachStreamArtifacts(
       [streamLine("node-2", "noop 2")],
-      [artifactAddedEvent("2026-08-24T16:35:18.000Z", OPEN_PR, { nodeName: "noop 2" })],
+      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "noop 2" })],
     );
 
-    expect(stream?.[0]?.artifact).toEqual(OPEN_PR);
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
   });
 
   it("does not use nodeName when the event already has a nodeId", () => {
     const stream = attachStreamArtifacts(
       [streamLine("other-node", "noop 2")],
-      [artifactAddedEvent("2026-08-24T16:35:18.000Z", OPEN_PR, { nodeId: "add-pr", nodeName: "noop 2" })],
+      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeId: "add-output", nodeName: "noop 2" })],
     );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
@@ -138,5 +140,82 @@ describe("attachStreamArtifacts", () => {
 
   it("returns undefined when the stream is missing", () => {
     expect(attachStreamArtifacts(undefined, [])).toBeUndefined();
+  });
+
+  it("hangs a pull request event on a stream line by nodeId", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-pr")],
+      [
+        {
+          type: "order.pull_request.added",
+          timestamp: "2026-08-24T16:32:18.000Z",
+          event: {
+            automation: { nodeId: "add-pr" },
+            pullRequest: {
+              id: "pr-1",
+              number: 482,
+              url: "https://github.com/example/ledger/pull/482",
+              state: "open",
+            },
+          },
+        },
+      ],
+    );
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
+    expect(stream?.[0]?.pullRequest).toMatchObject({
+      id: "pr-1",
+      number: "482",
+      url: "https://github.com/example/ledger/pull/482",
+      state: "STATE_OPEN",
+    });
+  });
+
+  it("does not attach an artifact produced by a different run when scoped by nodeId", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }, { id: "run-a" })],
+      undefined,
+      undefined,
+      "run-b",
+    );
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
+  });
+
+  it("attaches an artifact produced by the matching run when scoped by nodeId", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }, { id: "run-a" })],
+      undefined,
+      undefined,
+      "run-a",
+    );
+
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
+  });
+
+  it("does not attach an artifact produced by a different run when scoped by nodeName", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("node-2", "Add Plan Artifact")],
+      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "Add Plan Artifact" }, { id: "run-planning" })],
+      undefined,
+      undefined,
+      "run-pr-feedback",
+    );
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
+  });
+
+  it("attaches an artifact with no run reference regardless of the requested run", () => {
+    const stream = attachStreamArtifacts(
+      [streamLine("add-output")],
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" })],
+      undefined,
+      undefined,
+      "run-b",
+    );
+
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
   });
 });

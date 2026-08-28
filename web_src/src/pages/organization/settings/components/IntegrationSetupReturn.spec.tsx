@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router";
 
@@ -36,13 +36,27 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
-  it("consumes the marker so a later visit stays on the integration page", async () => {
+  it("keeps the marker so a remount can still return to setup", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
 
-    renderAt("/org-1/settings/integrations/abc", <div>integration details</div>);
+    const first = renderAt("/org-1/settings/integrations/an-id-created-during-setup", <div>integration details</div>);
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
+    first.unmount();
 
-    await screen.findByText("workspace setup");
-    await waitFor(() => expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull());
+    renderAt("/org-1/settings/integrations/an-id-created-during-setup", <div>integration details</div>);
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
+  });
+
+  it("stays on the integration page when setupStay is set", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/abc?setupStay=1", <div>integration details</div>);
+
+    expect(await screen.findByText("integration details")).toBeInTheDocument();
+    expect(screen.queryByText("workspace setup")).not.toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
   });
 
   it("renders the page when no setup is in progress", () => {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { simpleFactoryRunCanvasSpec, simpleFactoryRunExecutions } from "../../__fixtures__/simpleFactoryRunCanvas";
-import { emptySplitRunCanvas } from "./splitRunCanvases";
+import { intakeTicketAnalysisFixture } from "../lineIntakeModel";
+import { emptySplitRunCanvas, splitRunCanvasForPhase } from "./splitRunCanvases";
 import { clockLabel } from "./splitRunFormat";
 import {
   metricFromExecution,
@@ -10,8 +12,9 @@ import {
   resolveSplitRunVisual,
   splitRunCanvasFromLive,
   streamFromLiveRun,
+  streamStatusFromNode,
 } from "./splitRunLiveCanvas";
-import { SPLIT_RUN_RUNNING } from "./splitRunMocks";
+import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
 const LIVE_CANVAS = {
   metadata: { id: "app-refund-implementer", name: "Refund Implementer" },
@@ -24,6 +27,13 @@ describe("nodeStatusFromExecution", () => {
     expect(nodeStatusFromExecution({ state: "STATE_STARTED" }, false)).toBe("running");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_PASSED" }, true)).toBe("triggered");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_FAILED" }, false)).toBe("failed");
+    expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }, false)).toBe("cancelled");
+  });
+});
+
+describe("streamStatusFromNode", () => {
+  it("keeps a cancelled node as canceled, not pending", () => {
+    expect(streamStatusFromNode("cancelled")).toBe("cancelled");
   });
 });
 
@@ -63,7 +73,11 @@ describe("streamFromLiveRun", () => {
 
     expect(stream.map((line) => line.nodeId)).toContain("on-run");
     expect(workflow?.status).toBe("passed");
+    expect(workflow?.component).toBe("semaphore.runWorkflow");
+    expect(workflow?.executionId).toBe("exec-run-workflow");
     expect(claude?.status).toBe("pending");
+    expect(claude?.component).toBe("runnerClaudeCode");
+    expect(claude?.executionId).toBeUndefined();
   });
 
   it("orders log lines by canvas topology, not execution time", () => {
@@ -151,7 +165,7 @@ describe("orderCanvasNodesTopologically", () => {
 });
 
 describe("resolveSplitRunVisual", () => {
-  it("uses the live canvas when the phase has a run", () => {
+  it("keeps the line automation when the live canvas is a different graph", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     expect(implement).toBeDefined();
     const liveCanvas = splitRunCanvasFromLive({
@@ -166,25 +180,121 @@ describe("resolveSplitRunVisual", () => {
       stream: liveStream,
     });
 
-    expect(visual.canvas.title).toBe("Refund Implementer");
-    expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(true);
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(false);
+    expect(visual.canvas.title).toBe("Implement");
+    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
+  });
+
+  it("uses the live canvas for a custom app when demo artifacts are off", () => {
+    const phase = {
+      id: "build-0",
+      name: "Build",
+      status: "running" as const,
+      duration: "1s",
+      componentName: "Wide chain",
+      artifacts: [],
+      stream: [],
+      canvasSteps: [],
+      appId: "app-custom",
+      runId: "run-wide",
+    };
+    const liveCanvas = splitRunCanvasFromLive({
+      canvas: {
+        metadata: { id: "app-custom", name: "Wide chain" },
+        spec: {
+          nodes: [
+            { id: "kickoff", name: "Kickoff", type: "TYPE_TRIGGER" },
+            { id: "step-11", name: "Step 11", type: "TYPE_ACTION" },
+          ],
+          edges: [{ sourceId: "kickoff", targetId: "step-11" }],
+        },
+      },
+      fallbackTitle: "Wide chain",
+    });
+    const visual = resolveSplitRunVisual(
+      phase,
+      { enabled: true, canvas: liveCanvas, stream: [] },
+      { demoArtifacts: false },
+    );
+
+    expect(visual.canvas.nodes.map((node) => node.id)).toEqual(["kickoff", "step-11"]);
+  });
+
+  it("uses the live canvas when it is the same line automation", () => {
+    const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
+    const yaml = splitRunCanvasForPhase(implement!);
+    const visual = resolveSplitRunVisual(implement!, {
+      enabled: true,
+      canvas: { ...yaml, title: "Implementation (live)" },
+      stream: [
+        {
+          id: "live-create-branch",
+          nodeId: "create-branch",
+          at: "00:00:01",
+          componentName: "Create Branch",
+          status: "passed",
+        },
+      ],
+    });
+
+    expect(visual.canvas.title).toBe("Implementation (live)");
+    expect(visual.stream?.some((line) => line.id === "live-create-branch")).toBe(true);
+  });
+
+  it("replaces the canned implement branch and adds the order pull request", () => {
+    const implement = splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER).phases.find(
+      (phase) => phase.id === "implement-0",
+    );
+    const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
+    const branches = (visual.stream ?? [])
+      .map((line) => line.artifact)
+      .filter((artifact) => artifact?.type === "TYPE_BRANCH")
+      .map((artifact) => artifact?.data?.name);
+    const pullRequests = (visual.stream ?? []).filter((line) => line.pullRequest);
+
+    expect(branches).toEqual(["feature/rf-103"]);
+    expect(pullRequests).toHaveLength(1);
+    expect(pullRequests[0]?.pullRequest).toMatchObject({ number: "503" });
+  });
+
+  it("does not copy demo YAML artifacts onto a live stream", () => {
+    const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
+    const yaml = splitRunCanvasForPhase(implement!);
+    const visual = resolveSplitRunVisual(
+      implement!,
+      {
+        enabled: true,
+        canvas: yaml,
+        stream: [
+          {
+            id: "add-branch-artifact",
+            nodeId: "add-branch-artifact",
+            at: "00:00:01",
+            componentName: "Add Branch Artifact",
+            status: "passed",
+          },
+        ],
+      },
+      { demoArtifacts: false },
+    );
+
+    expect(visual.stream?.some((line) => line.artifact)).toBe(false);
   });
 
   it("keeps the YAML canvas when no live run is wired", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
 
-    expect(visual.canvas.title).toBe("Implementation");
+    expect(visual.canvas.title).toBe("Implement");
     expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
   });
 
-  it("does not fall back to YAML while the live canvas loads", () => {
+  it("shows the line automation while the live canvas loads", () => {
     const implement = SPLIT_RUN_RUNNING.phases.find((phase) => phase.id === "implement");
     const visual = resolveSplitRunVisual(implement!, { enabled: true, stream: [] });
 
-    expect(visual.canvas).toEqual(emptySplitRunCanvas(implement!));
-    expect(visual.stream).toEqual(implement?.stream);
+    expect(visual.canvas.title).toBe("Implement");
+    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
   });
 
   it("does not keep YAML logs when the live canvas fails", () => {
@@ -193,5 +303,49 @@ describe("resolveSplitRunVisual", () => {
 
     expect(visual.canvas).toEqual(emptySplitRunCanvas(implement!));
     expect(visual.stream).toEqual([]);
+  });
+
+  it("writes the Score check onto the report line", () => {
+    const fixture = intakeTicketAnalysisFixture(
+      {
+        id: "wo-review-pay-842",
+        title: "Add retry handling to webhook delivery",
+        confidenceScore: 5,
+      },
+      { complete: true },
+    );
+    const score = fixture.phases.find((phase) => phase.id === "score");
+    expect(score).toBeDefined();
+    const visual = resolveSplitRunVisual(score!, { enabled: false, stream: [] });
+
+    expect(visual.stream?.find((line) => line.nodeId === "ticket-score")).toMatchObject({
+      kind: "check",
+      action: "5/5",
+    });
+  });
+
+  it("keeps the manual create log when there is no automation canvas", () => {
+    const backlog = {
+      id: "backlog",
+      name: "Backlog",
+      status: "passed" as const,
+      duration: "2s",
+      componentName: "Created manually",
+      artifacts: [],
+      stream: [
+        {
+          id: "backlog-created",
+          at: "12:24:02",
+          componentName: "Leonardo DiCaprio created this task.",
+          status: "passed" as const,
+        },
+      ],
+      canvasSteps: [],
+      canvasKey: null,
+    };
+    const visual = resolveSplitRunVisual(backlog, { enabled: false, stream: [] });
+
+    expect(visual.canvas.nodes).toEqual([]);
+    expect(visual.stream).toEqual(backlog.stream);
   });
 });

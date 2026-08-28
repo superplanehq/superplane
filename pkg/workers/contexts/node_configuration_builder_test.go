@@ -265,9 +265,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	prArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
-		Type: models.FactoryWorkOrderArtifactTypePR,
-		Data: map[string]any{"url": "https://github.com/org/repo/pull/7", "number": 7},
+	linkArtifact, err := order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{"url": "https://preview.example.com/pr-7", "title": "Preview"},
 	})
 	require.NoError(t, err)
 
@@ -366,7 +366,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	})
 
 	t.Run("artifacts equivalents", func(t *testing.T) {
-		// ListArtifacts orders created_at DESC, id DESC — PR was created last.
+		// ListArtifacts orders created_at DESC, id DESC — link was created last.
 		full, err := builder.ResolveExpression(`order().artifacts`)
 		require.NoError(t, err)
 		artifacts, ok := full.([]any)
@@ -383,19 +383,19 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 
 		firstType, err := builder.ResolveExpression(`order().artifacts[0].type`)
 		require.NoError(t, err)
-		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, firstType)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypeLink, firstType)
 
 		firstID, err := builder.ResolveExpression(`order().artifacts[0].id`)
 		require.NoError(t, err)
-		assert.Equal(t, prArtifact.ID.String(), firstID)
+		assert.Equal(t, linkArtifact.ID.String(), firstID)
 
-		prURL, err := builder.ResolveExpression(`order().artifacts[0].data.url`)
+		linkURL, err := builder.ResolveExpression(`order().artifacts[0].data.url`)
 		require.NoError(t, err)
-		assert.Equal(t, "https://github.com/org/repo/pull/7", prURL)
+		assert.Equal(t, "https://preview.example.com/pr-7", linkURL)
 
 		bracketType, err := builder.ResolveExpression(`order()["artifacts"][0]["type"]`)
 		require.NoError(t, err)
-		assert.Equal(t, models.FactoryWorkOrderArtifactTypePR, bracketType)
+		assert.Equal(t, models.FactoryWorkOrderArtifactTypeLink, bracketType)
 
 		secondType, err := builder.ResolveExpression(`order().artifacts[1].type`)
 		require.NoError(t, err)
@@ -449,13 +449,13 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	})
 
 	t.Run("none and any over artifact types", func(t *testing.T) {
-		hasNoPR, err := builder.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		hasNoLink, err := builder.ResolveExpression(`none(order().artifacts, {#.type == "link"})`)
 		require.NoError(t, err)
-		assert.Equal(t, false, hasNoPR)
+		assert.Equal(t, false, hasNoLink)
 
-		hasPR, err := builder.ResolveExpression(`any(order().artifacts, {#.type == "pr"})`)
+		hasLink, err := builder.ResolveExpression(`any(order().artifacts, {#.type == "link"})`)
 		require.NoError(t, err)
-		assert.Equal(t, true, hasPR)
+		assert.Equal(t, true, hasLink)
 
 		orderWithoutPR, err := factoryModel.CreateWorkOrder(database.Conn(), "No PR yet", "", &r.User, nil, nil)
 		require.NoError(t, err)
@@ -470,9 +470,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		builderNoPR := NewNodeConfigurationBuilder(database.Conn(), canvas2.ID).
 			WithRootEvent(&nodeExecution2.RootEventID)
 
-		nonePR, err := builderNoPR.ResolveExpression(`none(order().artifacts, {#.type == "pr"})`)
+		noneLink, err := builderNoPR.ResolveExpression(`none(order().artifacts, {#.type == "link"})`)
 		require.NoError(t, err)
-		assert.Equal(t, true, nonePR)
+		assert.Equal(t, true, noneLink)
 
 		// A work order with no comments should still resolve order().comments
 		// as an empty list, not nil, matching artifacts' behavior.

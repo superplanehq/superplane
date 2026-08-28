@@ -8,6 +8,7 @@ import {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
   PRIMARY_FACTORY_ID,
@@ -28,13 +29,22 @@ export {
   LINE_RUN_IMPLEMENT_FAILED_ID,
   LINE_RUN_IMPLEMENT_FAILED_ROOT_EVENT_ID,
   LINE_RUN_IMPLEMENT_ID,
+  LINE_RUN_IMPLEMENT_NOTIFY_ID,
   LINE_RUN_IMPLEMENT_PASSED_ID,
   LINE_RUN_VERIFY_PASSED_ID,
 };
 
-export const REFUND_PLANNER_APP = REFUND_FACTORY_APPS[0];
-export const REFUND_IMPLEMENTER_APP = REFUND_FACTORY_APPS[1];
-export const REFUND_VERIFIER_APP = REFUND_FACTORY_APPS[2];
+function refundFactoryApp(id: string): FactoryApp {
+  const app = REFUND_FACTORY_APPS.find((candidate) => candidate.id === id);
+  if (!app) {
+    throw new Error(`Unknown refund factory app: ${id}`);
+  }
+  return app;
+}
+
+export const REFUND_PLANNER_APP = refundFactoryApp("app-refund-planner");
+export const REFUND_IMPLEMENTER_APP = refundFactoryApp("app-refund-implementer");
+export const REFUND_VERIFIER_APP = refundFactoryApp("app-refund-verifier");
 
 /**
  * Clone of the captured Software Factory canvas, owned by Semaphore
@@ -104,6 +114,15 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         },
       },
       {
+        id: LINE_RUN_IMPLEMENT_NOTIFY_ID,
+        canvasId: implementerId,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: HOUR_AGO,
+        updatedAt: HOUR_AGO,
+        rootEvent: { customName: "Notify on status change after a reopen" },
+      },
+      {
         id: LINE_RUN_IMPLEMENT_PASSED_ID,
         canvasId: implementerId,
         state: "STATE_FINISHED",
@@ -122,7 +141,7 @@ export function refundFactoryLineRuns(): NonNullable<CanvasAppFixture["runs"]> {
         rootEvent: { customName: "Backfill refund audit trail" },
       },
     ],
-    totalCount: 4,
+    totalCount: 5,
     hasNextPage: false,
   };
 }

@@ -5,21 +5,22 @@ import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useNavigate } from "react-router";
 
-import { factoryOverviewPath, workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { factoryIntakePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import {
-  DEFAULT_LINE_NAME,
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionPRFeedbackHandler,
   type CreateFactoryIntake,
+  type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
   type ListFactoryIntakes,
+  type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
-import { createAndDispatchInitialWorkOrder } from "./onboardingWorkOrder";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -28,8 +29,6 @@ export function finishOnboardingError(args: {
   appRepository: string | null;
   backlogRepository: string | null;
   workspaceName: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
   githubReady: boolean;
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -47,23 +46,26 @@ export function finishOnboardingError(args: {
   if (!args.workspaceName) {
     return "Enter a workspace name.";
   }
-  if (!args.workOrderTitle || !args.workOrderDescription) {
-    return "Enter a work order title and description.";
-  }
   return null;
+}
+
+export function afterOnboardingPath(args: {
+  organizationId: string;
+  factoryKey: string;
+  lineId: string;
+  githubIntakeId?: string;
+}) {
+  return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, args.githubIntakeId);
 }
 
 function navigateAfterFinish(
   navigate: ReturnType<typeof useNavigate>,
   organizationId: string,
   factoryKey: string,
-  orderNumber: number | string | null | undefined,
+  lineId: string,
+  githubIntakeId?: string,
 ) {
-  if (orderNumber != null && orderNumber !== "") {
-    navigate(workOrderDetailPath(organizationId, factoryKey, orderNumber), { replace: true });
-    return;
-  }
-  navigate(factoryOverviewPath(organizationId, factoryKey), { replace: true });
+  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId, githubIntakeId }), { replace: true });
 }
 
 async function provisionWorkspace(args: {
@@ -78,22 +80,17 @@ async function provisionWorkspace(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   workspaceName: string;
   takenNames: string[];
   appRepository: string;
   backlogRepository: string;
-  workOrderTitle: string;
-  workOrderDescription: string;
   github: { id: string };
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
-}): Promise<{ number?: number | string | null }> {
+}): Promise<{ lineId: string; githubIntakeId?: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
@@ -130,22 +127,21 @@ async function provisionWorkspace(args: {
     installFactory: args.installFactory,
   });
   // The intake needs the line: it opens work orders that the line runs.
-  await provisionGithubIntake({
+  const githubIntake = await provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+  });
+  await provisionPRFeedbackHandler({
+    listHandlers: args.listPRFeedbackHandlers,
+    createHandler: args.createPRFeedbackHandler,
+    repository: args.appRepository,
   });
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
     complete: true,
   });
-  return createAndDispatchInitialWorkOrder({
-    title: args.workOrderTitle,
-    description: args.workOrderDescription,
-    lineName: DEFAULT_LINE_NAME,
-    createWorkOrder: args.createWorkOrder,
-    dispatchWorkOrder: args.dispatchWorkOrder,
-  });
+  return { lineId, githubIntakeId: githubIntake.id ?? undefined };
 }
 
 export function useFinishOnboarding(args: {
@@ -162,11 +158,8 @@ export function useFinishOnboarding(args: {
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-  createWorkOrder: (input: {
-    title: string;
-    description: string;
-  }) => Promise<{ id?: string | null; number?: number | string | null }>;
-  dispatchWorkOrder: (input: { orderId: string; lineName: string }) => Promise<unknown>;
+  listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
+  createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -177,15 +170,11 @@ export function useFinishOnboarding(args: {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
-    const workOrderTitle = args.setup.workOrderTitle.trim();
-    const workOrderDescription = args.setup.workOrderDescription.trim();
     const github = args.selections.github;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
       workspaceName,
-      workOrderTitle,
-      workOrderDescription,
       githubReady: Boolean(github?.ready),
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
@@ -201,13 +190,11 @@ export function useFinishOnboarding(args: {
 
     args.setSaving(true);
     try {
-      const order = await provisionWorkspace({
+      const provisioned = await provisionWorkspace({
         ...args,
         workspaceName,
         appRepository,
         backlogRepository,
-        workOrderTitle,
-        workOrderDescription,
         github,
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
@@ -215,7 +202,13 @@ export function useFinishOnboarding(args: {
           args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, order.number);
+      navigateAfterFinish(
+        navigate,
+        args.organizationId,
+        args.factoryKey,
+        provisioned.lineId,
+        provisioned.githubIntakeId,
+      );
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

@@ -20,15 +20,15 @@ function order(overrides: FactoriesWorkOrder): FactoriesWorkOrder {
 }
 
 describe("popupFixtureForWorkOrder", () => {
-  it("hides notes and scores on a running plan job", () => {
+  it("hides notes and scores on a running implement job", () => {
     const fixture = popupFixtureForWorkOrder(
       order({
-        title: "Plan job",
+        title: "Implement job",
         state: "STATE_OPEN",
         statusNotes: WAITING_NOTE,
         lineDispatches: [
           dispatch("STATE_ACTIVE", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
           ]),
         ],
       }),
@@ -38,7 +38,7 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.map((entry) => [entry.actor, entry.state])).toEqual([
       ["Backlog", "passed"],
-      ["Plan", "running"],
+      ["Implement", "running"],
     ]);
     expect(fixture.log[0]?.title).toBe("Create work order");
     expect(fixture.log[0]?.artifactId).toBe("art-description");
@@ -52,9 +52,8 @@ describe("popupFixtureForWorkOrder", () => {
         statusNotes: WAITING_NOTE,
         lineDispatches: [
           dispatch("STATE_ACTIVE", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-verify", step: "Verify", stepIndex: 1, state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
           ]),
         ],
       }),
@@ -62,7 +61,7 @@ describe("popupFixtureForWorkOrder", () => {
 
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.checks.length).toBeGreaterThan(0);
-    expect(fixture.log.map((entry) => entry.actor)).toEqual(["Backlog", "Plan", "Implement", "Verify"]);
+    expect(fixture.log.map((entry) => entry.actor)).toEqual(["Backlog", "Implement", "Verify"]);
     expect(fixture.log.at(-1)?.state).toBe("running");
   });
 
@@ -74,14 +73,13 @@ describe("popupFixtureForWorkOrder", () => {
         statusNotes: WAITING_NOTE,
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_FAILED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_FAILED" },
           ]),
         ],
       }),
     );
 
-    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Review the pull request"]);
+    expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Waiting for user review"]);
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.at(-1)?.state).toBe("failed");
   });
@@ -95,10 +93,9 @@ describe("popupFixtureForWorkOrder", () => {
         statusNotes: WAITING_NOTE,
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-done", step: "Done", stepIndex: 3, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-verify", step: "Verify", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-done", step: "Done", stepIndex: 2, state: "STATE_FINISHED", result: "RESULT_PASSED" },
           ]),
         ],
       }),
@@ -108,7 +105,6 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.checks).toEqual([]);
     expect(fixture.log.map((entry) => [entry.actor, entry.title])).toEqual([
       ["Backlog", "Create work order"],
-      ["Plan", "Plan"],
       ["Implement", "Implement"],
       ["Verify", "Verify"],
       ["Done", "Complete work order"],
@@ -123,13 +119,12 @@ describe("popupFixtureForWorkOrder", () => {
         result: "RESULT_COMPLETED",
         lineDispatches: [
           dispatch("STATE_FINISHED", [
-            { id: "e-plan", step: "Plan", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-impl", step: "Implement", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
-            { id: "e-verify", step: "Verify", stepIndex: 2, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-impl", step: "Implement", stepIndex: 0, state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { id: "e-verify", step: "Verify", stepIndex: 1, state: "STATE_FINISHED", result: "RESULT_PASSED" },
             {
               id: "e-done",
               step: "Done",
-              stepIndex: 3,
+              stepIndex: 2,
               state: "STATE_FINISHED",
               result: "RESULT_PASSED",
               run: { appId: "app-refund-done", appName: "PR Closure" },
@@ -142,7 +137,6 @@ describe("popupFixtureForWorkOrder", () => {
     expect(fixture.log.at(-1)).toMatchObject({
       actor: "Done",
       title: "Complete work order from merged pull request",
-      artifactId: "art-pr-closure",
     });
   });
 
@@ -157,7 +151,7 @@ describe("popupFixtureForWorkOrder", () => {
             {
               id: "e-done",
               step: "Done",
-              stepIndex: 3,
+              stepIndex: 2,
               state: "STATE_FINISHED",
               result: "RESULT_PASSED",
             },
@@ -175,7 +169,7 @@ describe("popupFixtureForWorkOrder", () => {
             {
               id: "e-done",
               step: "Done",
-              stepIndex: 3,
+              stepIndex: 2,
               state: "STATE_FINISHED",
               result: "RESULT_PASSED",
               run: { appId: "app-refund-done", appName: "PR Closure" },

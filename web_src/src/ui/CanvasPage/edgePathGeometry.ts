@@ -1,3 +1,5 @@
+import { FACTORY_EDGE_STROKE } from "@/lib/factoryCanvasChrome";
+
 export type Point = { x: number; y: number };
 
 export type PathSamplePoint = Point & { angleDeg: number };
@@ -15,7 +17,7 @@ const FLOW_ARROW_MAX_COUNT = 3;
 export const TOUCHING_EDGE_STROKE = "#64748b";
 export const TOUCHING_EDGE_STROKE_DARK = "#94a3b8";
 /** Default factory edge stroke — chevrons match this when not contrast. */
-export const DEFAULT_FACTORY_EDGE_STROKE = "#cbd5e1";
+export const DEFAULT_FACTORY_EDGE_STROKE = FACTORY_EDGE_STROKE;
 /** Class stamped on contrast edges — must beat `--xy-edge-stroke !important`. */
 export const FACTORY_TOUCHING_EDGE_CLASS = "sp-edge-factory-touching";
 

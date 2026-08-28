@@ -5,45 +5,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
 func Test__ResolveIntakeGraph(t *testing.T) {
-	t.Run("resolves a generated graph and its threshold", func(t *testing.T) {
-		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues, 80)
+	t.Run("resolves a generated GitHub graph", func(t *testing.T) {
+		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues)
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
 		assert.Equal(t, intakeTriggerNodeID, graph.TriggerNodeID)
-		assert.Equal(t, intakeAnalysisNodeID, graph.AnalysisNodeID)
-		assert.Equal(t, intakeThresholdNodeID, graph.ThresholdNodeID)
+		assert.Equal(t, intakeFilterNodeID, graph.FilterNodeID)
 		assert.Equal(t, intakeCreateNodeID, graph.CreateNodeID)
-		assert.Equal(t, 80, graph.ConfidencePct)
+		assert.Empty(t, graph.AnalysisNodeID)
 		assert.True(t, graph.Healthy(spec.Edges))
 	})
 
-	t.Run("resolves renamed nodes by component", func(t *testing.T) {
-		spec := models.LiveCanvasSpec{
-			Nodes: []models.Node{
-				triggerNode("listen-here", "github.onIssue"),
-				componentNode("score-it", "runnerCodex"),
-				componentNode("gate", intakeThresholdComponent),
-				componentNode("file-it", intakeCreateComponent),
-			},
-			Edges: []models.Edge{
-				{SourceID: "listen-here", TargetID: "score-it"},
-				{SourceID: "score-it", TargetID: "gate"},
-				{SourceID: "gate", TargetID: "file-it"},
-			},
-		}
-
-		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
-		assert.Equal(t, "listen-here", graph.TriggerNodeID)
-		assert.Equal(t, "score-it", graph.AnalysisNodeID)
-		assert.Equal(t, "file-it", graph.CreateNodeID)
-		assert.True(t, graph.Healthy(spec.Edges))
-	})
-
-	t.Run("a graph without a score step is not healthy", func(t *testing.T) {
+	t.Run("a graph without a score step is healthy", func(t *testing.T) {
 		spec := models.LiveCanvasSpec{
 			Nodes: []models.Node{
 				triggerNode(intakeTriggerNodeID, "github.onIssue"),
@@ -54,11 +34,30 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
 		assert.Empty(t, graph.AnalysisNodeID)
-		assert.False(t, graph.Healthy(spec.Edges))
+		assert.True(t, graph.Healthy(spec.Edges))
+	})
+
+	t.Run("resolves renamed nodes by component", func(t *testing.T) {
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode("listen-here", "github.onIssue"),
+				componentNode("gate", intakeFilterComponent),
+				componentNode("file-it", intakeCreateComponent),
+			},
+			Edges: []models.Edge{
+				{SourceID: "listen-here", TargetID: "gate"},
+				{SourceID: "gate", TargetID: "file-it"},
+			},
+		}
+
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+		assert.Equal(t, "listen-here", graph.TriggerNodeID)
+		assert.Equal(t, "file-it", graph.CreateNodeID)
+		assert.True(t, graph.Healthy(spec.Edges))
 	})
 
 	t.Run("a disconnected graph is not healthy", func(t *testing.T) {
-		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues, DefaultIntakeConfidencePct)
+		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues)
 		spec.Edges = nil
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
@@ -66,36 +65,83 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 	})
 
 	t.Run("extra nodes on the path keep the graph healthy", func(t *testing.T) {
-		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues, DefaultIntakeConfidencePct)
+		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues)
 		spec.Nodes = append(spec.Nodes, componentNode("label-filter", "filter"))
 		spec.Edges = []models.Edge{
 			{SourceID: intakeTriggerNodeID, TargetID: "label-filter"},
-			{SourceID: "label-filter", TargetID: intakeAnalysisNodeID},
-			{SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-			{SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+			{SourceID: "label-filter", TargetID: intakeFilterNodeID},
+			{SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
 		}
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
 		assert.True(t, graph.Healthy(spec.Edges))
 	})
 
-	t.Run("a hand-edited threshold falls back to the default", func(t *testing.T) {
-		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues, DefaultIntakeConfidencePct)
-		for i := range spec.Nodes {
-			if spec.Nodes[i].ID == intakeThresholdNodeID {
-				spec.Nodes[i].Configuration = map[string]any{"expression": "$.result == 'ship it'"}
-			}
+	t.Run("a legacy analysis graph stays healthy", func(t *testing.T) {
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				triggerNode(intakeTriggerNodeID, "github.onIssue"),
+				componentNode(intakeAnalysisNodeID, "runnerCodex"),
+				componentNode(intakeCreateNodeID, intakeCreateComponent),
+			},
+			Edges: []models.Edge{
+				{SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
+				{SourceID: intakeAnalysisNodeID, TargetID: intakeCreateNodeID},
+			},
 		}
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
-		assert.Equal(t, DefaultIntakeConfidencePct, graph.ConfidencePct)
+		assert.Equal(t, intakeAnalysisNodeID, graph.AnalysisNodeID)
+		assert.True(t, graph.Healthy(spec.Edges))
 	})
 }
 
-func intakeSpecFromTemplate(t *testing.T, source string, confidencePct int) models.LiveCanvasSpec {
+func Test__BuildBacklogCanvas(t *testing.T) {
+	t.Run("the item flows from a new work order to the confidence check", func(t *testing.T) {
+		canvas := buildBacklogCanvas(backlogCanvasRequest{})
+
+		assert.Equal(t, backlogDefaultName, canvas.Metadata.Name)
+		assert.Equal(t, []yaml.Edge{
+			{Channel: "default", SourceID: backlogTriggerNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+		}, canvas.Spec.Edges)
+
+		trigger := findSpecNode(t, canvas, backlogTriggerNodeID)
+		assert.Equal(t, factory.OnWorkOrderTriggerName, trigger.Component)
+
+		report := findSpecNode(t, canvas, intakeReportConfidenceNodeID)
+		assert.Equal(t, intakeReportConfidenceComponent, report.Component)
+		assert.Equal(t, "{{ root().data.workOrder.id }}", report.Configuration["orderId"])
+		assert.Equal(t, "confidence", report.Configuration["checkKey"])
+		assert.Equal(t, "Confidence score", report.Configuration["name"])
+	})
+
+	t.Run("the analysis runner authenticates with the workspace agent", func(t *testing.T) {
+		canvas := buildBacklogCanvas(backlogCanvasRequest{
+			Agent: &intakeAgent{
+				Component: "runnerCodex",
+				Credentials: map[string]any{
+					"source":      runner.CredentialsSourceIntegration,
+					"integration": map[string]any{"name": "acme-openai"},
+				},
+			},
+		})
+
+		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
+		assert.Equal(t, "runnerCodex", analysis.Component)
+		assert.Equal(t, map[string]any{
+			"source":      runner.CredentialsSourceIntegration,
+			"integration": map[string]any{"name": "acme-openai"},
+		}, analysis.Configuration["credentials"])
+		assert.Equal(t, "gpt-5", analysis.Configuration["model"])
+		assert.Equal(t, runner.MachineTypeE1LargeAMD64, analysis.Configuration["machineType"])
+	})
+}
+
+func intakeSpecFromTemplate(t *testing.T, source string) models.LiveCanvasSpec {
 	t.Helper()
 
-	canvas, err := buildIntakeCanvas(source, "", confidencePct, nil)
+	canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 	require.NoError(t, err)
 
 	return models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}

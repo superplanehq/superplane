@@ -44,6 +44,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, run.ID, *persisted.SourceRunID)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, persisted.State,
 			"work orders now start as draft and are promoted to open on first dispatch")
+		assert.Empty(t, persisted.Assignees)
 
 		// Creation emits a single `order.status.updated` ("" → draft).
 		events, err := persisted.ListEvents(database.Conn(), 0, nil)
@@ -82,6 +83,32 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		require.NotNil(t, opened.App)
 		assert.Equal(t, canvas.ID, opened.App.ID)
 		assert.Nil(t, opened.User)
+	})
+
+	t.Run("sets origin from an intake source event", func(t *testing.T) {
+		factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas, nodeExecution, _ := setupFactoryAppExecutionWithPayload(t, r, factory.ID, map[string]any{
+			"type": "github.issue",
+			"data": map[string]any{
+				"issue": map[string]any{
+					"html_url": "https://github.com/acme/payments/issues/12",
+					"title":    "Handle duplicate refunds",
+				},
+			},
+		})
+		_, err = factory.CreateIntake(database.Conn(), canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+		created, err := ctx.CreateWorkOrder(core.WorkOrderParams{Title: "Handle duplicate refunds"})
+		require.NoError(t, err)
+
+		persisted, err := factory.FindWorkOrder(database.Conn(), uuid.MustParse(created.ID))
+		require.NoError(t, err)
+		require.NotNil(t, persisted.Origin())
+		assert.Equal(t, "https://github.com/acme/payments/issues/12", persisted.Origin().URL)
+		assert.Equal(t, "acme/payments#12", persisted.Origin().Label)
 	})
 
 	t.Run("rejects blank title", func(t *testing.T) {
@@ -291,7 +318,7 @@ func TestFactoryContext_AddWorkOrderArtifact_EmptyOrderIDIsRejected(t *testing.T
 
 	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 	_, err = ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
-		Type: "pr",
+		Type: "link",
 		Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
 	})
 	require.Error(t, err)
@@ -387,7 +414,7 @@ func TestFactoryContext_AddWorkOrderArtifact_ExplicitOrderIDOnUnattachedRun(t *t
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: order.ID.String(),
-		Type:    "pr",
+		Type:    "link",
 		Data: map[string]any{
 			"url": "https://github.com/example/repo/pull/7",
 		},
@@ -508,7 +535,7 @@ func TestFactoryContext_FindWorkOrder_ByArtifactKey(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = order.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
-		Type: "pr",
+		Type: "link",
 		Data: map[string]any{"url": "https://github.com/example/repo/pull/99"},
 		Key:  "https://github.com/example/repo/pull/99",
 	})
@@ -675,16 +702,15 @@ func TestFactoryContext_AddWorkOrderArtifact(t *testing.T) {
 
 	artifact, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: order.ID.String(),
-		Type:    "pr",
+		Type:    "link",
 		Data: map[string]any{
-			"url":    "https://github.com/example/repo/pull/1",
-			"title":  "Draft",
-			"number": "1",
+			"url":   "https://github.com/example/repo/pull/1",
+			"title": "Draft",
 		},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, artifact)
-	assert.Equal(t, "pr", artifact.Type)
+	assert.Equal(t, "link", artifact.Type)
 	assert.Equal(t, "https://github.com/example/repo/pull/1", artifact.Data["url"])
 
 	artifacts, err := order.ListArtifacts(database.Conn())
@@ -792,6 +818,16 @@ func setupFactoryAppExecution(
 	factoryID uuid.UUID,
 ) (*models.Canvas, *models.CanvasNodeExecution, *models.CanvasRun) {
 	t.Helper()
+	return setupFactoryAppExecutionWithPayload(t, r, factoryID, map[string]any{"key": "value"})
+}
+
+func setupFactoryAppExecutionWithPayload(
+	t *testing.T,
+	r *support.ResourceRegistry,
+	factoryID uuid.UUID,
+	payload map[string]any,
+) (*models.Canvas, *models.CanvasNodeExecution, *models.CanvasRun) {
+	t.Helper()
 
 	const nodeID = "create-work-order"
 
@@ -807,7 +843,7 @@ func setupFactoryAppExecution(
 	require.NoError(t, database.Conn().Model(canvas).Update("factory_id", factoryID).Error)
 	canvas.FactoryID = &factoryID
 
-	triggerEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
+	triggerEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, payload)
 	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(database.Conn(), triggerEvent)
 	require.NoError(t, err)
 

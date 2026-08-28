@@ -1,0 +1,18 @@
+#
+# CI-only overlay for docker-compose.dev.yml. The Makefile adds this file when
+# the CI environment variable is set.
+#
+# In development, GOMODCACHE and GOCACHE live on the `go-pkg-cache` named volume.
+# On CI that volume starts empty on every machine, so `go mod download` and every
+# compile step run cold in each job. Bind both caches to host directories that the
+# CI cache restores before the job and stores after it (tmp/go, tmp/go-build).
+#
+# Do not use this overlay in development: with the module cache on the bind mount,
+# two concurrent `go build` processes (for example two Air instances) corrupt the
+# same module download temp files.
+#
+services:
+  app:
+    volumes:
+      - ./tmp/go:/go/pkg/mod
+      - ./tmp/go-build:/go/go-build-cache

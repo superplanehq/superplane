@@ -16,7 +16,8 @@ interface WorkOrdersTableViewProps {
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
-  isDispatching: boolean;
+  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
@@ -75,7 +76,7 @@ function TableRow({
   factoryLines,
   canDispatch,
   canAssign,
-  isDispatching,
+  dispatchingOrderIds,
   isAssigneesSaving,
   onDispatch,
   onAssigneesSave,
@@ -128,7 +129,7 @@ function TableRow({
           entry={entry}
           lines={factoryLines}
           canDispatch={canDispatch}
-          isDispatching={isDispatching}
+          isDispatching={dispatchingOrderIds.has(entry.id)}
           onDispatch={onDispatch}
           visible={entry.isDispatchable}
         />

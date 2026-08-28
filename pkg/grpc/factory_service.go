@@ -112,6 +112,56 @@ func (s *FactoryService) ListFactoryIntakeRuns(ctx context.Context, req *pb.List
 	return actions.ListFactoryIntakeRuns(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryPRFeedbackHandlers(ctx context.Context, req *pb.ListFactoryPRFeedbackHandlersRequest) (*pb.ListFactoryPRFeedbackHandlersResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryPRFeedbackHandlers(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryPRFeedbackHandler(ctx context.Context, req *pb.CreateFactoryPRFeedbackHandlerRequest) (*pb.CreateFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryPRFeedbackHandler(ctx context.Context, req *pb.UpdateFactoryPRFeedbackHandlerRequest) (*pb.UpdateFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryPRFeedbackHandler(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req *pb.DeleteFactoryPRFeedbackHandlerRequest) (*pb.DeleteFactoryPRFeedbackHandlerResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryPullRequests(ctx context.Context, req *pb.ListFactoryPullRequestsRequest) (*pb.ListFactoryPullRequestsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryPullRequests(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DescribeFactoryPullRequest(ctx context.Context, req *pb.DescribeFactoryPullRequestRequest) (*pb.DescribeFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribeFactoryPullRequest(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreateFactoryPullRequest(ctx context.Context, req *pb.CreateFactoryPullRequestRequest) (*pb.CreateFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryPullRequest(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryPullRequest(ctx context.Context, req *pb.UpdateFactoryPullRequestRequest) (*pb.UpdateFactoryPullRequestResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryPullRequest(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SearchFactoryIntakeItems(ctx context.Context, req *pb.SearchFactoryIntakeItemsRequest) (*pb.SearchFactoryIntakeItemsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SearchFactoryIntakeItems(ctx, s.intakeDeps, organizationID, req)
+}
+
+func (s *FactoryService) ImportFactoryIntakeItem(ctx context.Context, req *pb.ImportFactoryIntakeItemRequest) (*pb.ImportFactoryIntakeItemResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ImportFactoryIntakeItem(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListWorkOrders(ctx context.Context, req *pb.ListWorkOrdersRequest) (*pb.ListWorkOrdersResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListWorkOrders(ctx, organizationID, req)
@@ -138,6 +188,14 @@ func (s *FactoryService) UpdateWorkOrderAssignees(
 ) (*pb.UpdateWorkOrderAssigneesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateWorkOrderAssignees(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdateWorkOrder(
+	ctx context.Context,
+	req *pb.UpdateWorkOrderRequest,
+) (*pb.UpdateWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateWorkOrder(ctx, organizationID, req)
 }
 
 func (s *FactoryService) DispatchWorkOrder(ctx context.Context, req *pb.DispatchWorkOrderRequest) (*pb.DispatchWorkOrderResponse, error) {
@@ -183,4 +241,14 @@ func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWo
 func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.DescribeFactoryUsageRequest) (*pb.DescribeFactoryUsageResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeFactoryUsage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListFactoryLLMModelsRequest) (*pb.ListFactoryLLMModelsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryLLMModels(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.UpdateFactoryLLMModelsRequest) (*pb.UpdateFactoryLLMModelsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)
 }

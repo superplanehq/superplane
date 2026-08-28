@@ -6,10 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	appconfig "github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	ghub "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
@@ -249,6 +251,63 @@ func TestListIntegrationsLegacySetupOnlyRespectsExperimentalFeature(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, resp.Integrations, 1)
 	require.False(t, resp.Integrations[0].LegacySetupOnly)
+}
+
+func TestListIntegrationsHostedGitHubAppInstall(t *testing.T) {
+	setup := support.Setup(t)
+	reg := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"github": &ghub.GitHub{},
+		},
+		SetupProviders: map[string]core.IntegrationSetupProvider{
+			"github": &ghub.SetupProvider{},
+		},
+	}
+	ctx := contextWithOrganizationID(setup.Organization.ID.String())
+	require.NoError(t, models.EnableExperimentalFeature(setup.Organization.ID, features.FeatureNewIntegrationSetupFlow))
+	require.NoError(t, models.EnableExperimentalFeature(setup.Organization.ID, features.FeatureFactories))
+
+	t.Run("false without hosted app env", func(t *testing.T) {
+		t.Setenv(appconfig.EnvGitHubAppID, "")
+		t.Setenv(appconfig.EnvGitHubAppSlug, "")
+		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "")
+		t.Setenv(appconfig.EnvGitHubAppWebhookSecret, "")
+
+		resp, err := ListIntegrations(ctx, reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.False(t, resp.Integrations[0].HostedAppInstall)
+		require.False(t, resp.Integrations[0].LegacySetupOnly)
+	})
+
+	t.Run("true when factories and env are set", func(t *testing.T) {
+		t.Setenv(appconfig.EnvGitHubAppID, "99")
+		t.Setenv(appconfig.EnvGitHubAppSlug, "superplane")
+		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(appconfig.EnvGitHubAppWebhookSecret, "whsec")
+
+		resp, err := ListIntegrations(ctx, reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].HostedAppInstall)
+		require.False(t, resp.Integrations[0].LegacySetupOnly)
+	})
+
+	t.Run("hosted install does not enable the setup wizard when the feature is off", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+		t.Setenv(appconfig.EnvGitHubAppID, "99")
+		t.Setenv(appconfig.EnvGitHubAppSlug, "superplane")
+		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(appconfig.EnvGitHubAppWebhookSecret, "whsec")
+
+		resp, err := ListIntegrations(contextWithOrganizationID(org.ID.String()), reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].HostedAppInstall)
+		require.True(t, resp.Integrations[0].LegacySetupOnly)
+	})
 }
 
 func TestListIntegrationsRequiresOrganization(t *testing.T) {

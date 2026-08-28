@@ -16,7 +16,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
 		} {
-			canvas, err := buildIntakeCanvas(source, "", DefaultIntakeConfidencePct, nil)
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
 
 			trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -25,49 +25,64 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		}
 	})
 
-	t.Run("the item flows from the trigger to the work order", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+	t.Run("a GitHub issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
 		require.NoError(t, err)
 
 		assert.Equal(t, []yaml.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
-			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-			{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAnalysisNodeID))
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeReportConfidenceNodeID))
+
+		filter := findSpecNode(t, canvas, intakeFilterNodeID)
+		assert.Equal(t, intakeFilterComponent, filter.Component)
+		assert.Equal(t, "true", filter.Configuration["expression"])
 	})
 
-	t.Run("the threshold gates on the analysis score", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", 80, nil)
+	t.Run("Sentry and PagerDuty create a work order without a filter", func(t *testing.T) {
+		for _, source := range []string{
+			models.FactoryIntakeSourceSentryExceptions,
+			models.FactoryIntakeSourcePagerDutyIncidents,
+		} {
+			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
+			require.NoError(t, err)
+			assert.Equal(t, []yaml.Edge{
+				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+			}, canvas.Spec.Edges)
+			assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
+		}
+	})
+
+	t.Run("every action node works on a whole batch at once", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
 		require.NoError(t, err)
 
-		threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
-		assert.Equal(t, `int($["Analyze intake"].data[0].result.result) >= 80`, threshold.Configuration["expression"])
-	})
+		for _, node := range canvas.Spec.Nodes {
+			if node.Type == yaml.NodeTypeTrigger {
+				assert.Nilf(t, node.Concurrency, "trigger %s caps its concurrency", node.ID)
+				continue
+			}
 
-	t.Run("confidence outside the scale is clamped", func(t *testing.T) {
-		for confidence, expected := range map[int]int{-20: 0, 0: 0, 65: 65, 100: 100, 140: 100} {
-			canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", confidence, nil)
-			require.NoError(t, err)
-
-			threshold := findSpecNode(t, canvas, intakeThresholdNodeID)
-			parsed, ok := intakeConfidenceFromExpression(threshold.Configuration["expression"].(string))
-			require.True(t, ok)
-			assert.Equal(t, expected, parsed)
+			require.NotNilf(t, node.Concurrency, "node %s has no concurrency", node.ID)
+			require.NotNilf(t, node.Concurrency.Max, "node %s has no concurrency max", node.ID)
+			assert.Equalf(t, intakeConcurrencyMax, *node.Concurrency.Max, "node %s", node.ID)
 		}
 	})
 
 	t.Run("a given name wins over the source default", func(t *testing.T) {
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "Backlog triage", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Name: "Backlog triage"})
 		require.NoError(t, err)
 		assert.Equal(t, "Backlog triage", canvas.Metadata.Name)
 
-		canvas, err = buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "   ", DefaultIntakeConfidencePct, nil)
+		canvas, err = buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, Name: "   "})
 		require.NoError(t, err)
 		assert.Equal(t, "GitHub issues", canvas.Metadata.Name)
 	})
 
 	t.Run("an unknown source has no graph", func(t *testing.T) {
-		_, err := buildIntakeCanvas("linear-issues", "", DefaultIntakeConfidencePct, nil)
+		_, err := buildIntakeCanvas(intakeCanvasRequest{Source: "linear-issues"})
 		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
 	})
 
@@ -76,23 +91,28 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			Integration:   &yaml.IntegrationRef{ID: "integration-1", Name: "acme-github"},
 			Configuration: map[string]any{"repository": "acme/backlog"},
 		}
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, binding)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source:  models.FactoryIntakeSourceGitHubIssues,
+			Binding: binding,
+		})
 		require.NoError(t, err)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
 		assert.Equal(t, binding.Integration, trigger.Integration)
 		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
-		// The binding names the resource; the template still picks the events.
 		assert.Equal(t, []any{"opened"}, trigger.Configuration["actions"])
 	})
 
 	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
-		_, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, &intakeBinding{
-			Configuration: map[string]any{"repository": "acme/backlog"},
+		_, err := buildIntakeCanvas(intakeCanvasRequest{
+			Source: models.FactoryIntakeSourceGitHubIssues,
+			Binding: &intakeBinding{
+				Configuration: map[string]any{"repository": "acme/backlog"},
+			},
 		})
 		require.NoError(t, err)
 
-		canvas, err := buildIntakeCanvas(models.FactoryIntakeSourceGitHubIssues, "", DefaultIntakeConfidencePct, nil)
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
 		require.NoError(t, err)
 
 		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
@@ -101,28 +121,42 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 	})
 }
 
-func Test__IntakeConfidenceFromExpression(t *testing.T) {
-	t.Run("reads back a generated expression", func(t *testing.T) {
-		confidence, ok := intakeConfidenceFromExpression(intakeThresholdExpression(42))
-		require.True(t, ok)
-		assert.Equal(t, 42, confidence)
+func Test__IntakeFilterExpression(t *testing.T) {
+	t.Run("an empty GitHub filter is true", func(t *testing.T) {
+		assert.Equal(t, "true", intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings()))
 	})
 
-	t.Run("reports failure for a hand-written expression", func(t *testing.T) {
-		_, ok := intakeConfidenceFromExpression("$.result == 'ship it'")
-		assert.False(t, ok)
+	t.Run("GitHub labels and assignment join without a score", func(t *testing.T) {
+		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, intakeSettings{
+			Labels:          []string{"bug"},
+			LabelFilterMode: intakeLabelFilterExclude,
+			Assignment:      intakeAssignmentUnassigned,
+		})
+		assert.NotContains(t, expression, ">=")
+		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
+		assert.Contains(t, expression, intakeUnassignedCondition)
 	})
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {
 	t.Helper()
 
-	for _, node := range canvas.Spec.Nodes {
-		if node.ID == nodeID {
-			return node
+	node := findSpecNodeOrNil(canvas, nodeID)
+	if node == nil {
+		require.Failf(t, "node not found", "canvas has no node %q", nodeID)
+		return yaml.Node{}
+	}
+	return *node
+}
+
+func findSpecNodeOrNil(canvas *yaml.Canvas, nodeID string) *yaml.Node {
+	if canvas == nil || canvas.Spec == nil {
+		return nil
+	}
+	for i := range canvas.Spec.Nodes {
+		if canvas.Spec.Nodes[i].ID == nodeID {
+			return &canvas.Spec.Nodes[i]
 		}
 	}
-
-	require.Failf(t, "node not found", "canvas has no node %q", nodeID)
-	return yaml.Node{}
+	return nil
 }

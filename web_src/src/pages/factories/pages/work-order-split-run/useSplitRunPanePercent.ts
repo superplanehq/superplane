@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 
-const DEFAULT_LOG_PERCENT = 40;
+export const DEFAULT_LOG_PERCENT = 65;
 const MIN_LOG_PERCENT = 22;
 const MAX_LOG_PERCENT = 72;
 

@@ -2,6 +2,7 @@ package claude
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -105,9 +106,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Contains(t, req.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-status.sh"`)
 	assert.Contains(t, string(body), `"name":"Clone"`)
 	assert.Empty(t, req.DockerImage)
-	require.Len(t, req.Environment, 1)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-test-key", req.Environment[0].Value)
+	assert.Equal(t, "sk-test-key", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 	assert.NotContains(t, string(body), `"message_chain"`)
 
 	require.Len(t, req.Files, 7)
@@ -201,6 +200,50 @@ func TestRunClaudeCodeExecuteRequiresAPIKeySecret(t *testing.T) {
 	assert.Contains(t, err.Error(), "secret not found")
 }
 
+// A BYOK run spends the key of the organization, not SuperPlane credit, so no
+// selected-model list stands between it and the provider. An organization that
+// connects a key must be able to run without an administrator selecting models
+// first, and an agent CLI alias such as "opus" must reach the provider as it is.
+func TestRunClaudeCodeExecuteDoesNotGateBYOKModels(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-byok-1"}`))},
+		},
+	}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"model":       "opus",
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
+		},
+		HTTP:    httpContext,
+		Secrets: &contexts.SecretsContext{Values: map[string][]byte{"anthropic/api_key": []byte("sk-byok")}},
+		Webhook: &contexts.NodeWebhookContext{},
+		HostedLLM: &contexts.HostedLLMContext{
+			SelectableErr: fmt.Errorf("model opus is not on the selected-model list"),
+		},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, "sk-byok", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
+}
+
 func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
@@ -241,9 +284,7 @@ func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
 	require.NoError(t, err)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	require.Len(t, req.Environment, 1)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-hosted", req.Environment[0].Value)
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
 func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
@@ -287,11 +328,8 @@ func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
 	require.NoError(t, err)
 	var req createTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	require.Len(t, req.Environment, 2)
-	assert.Equal(t, envAnthropicAPIKey, req.Environment[0].Name)
-	assert.Equal(t, "sk-hosted", req.Environment[0].Value)
-	assert.Equal(t, envAnthropicBaseURL, req.Environment[1].Name)
-	assert.Equal(t, "https://proxy.example/v1", req.Environment[1].Value)
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
+	assert.Equal(t, "https://proxy.example/v1", requireEnvironmentValue(t, req.Environment, envAnthropicBaseURL))
 }
 
 func TestRunClaudeCodeExecuteRejectsPrivateHostedBaseURL(t *testing.T) {

@@ -7,9 +7,12 @@ spec:
   edges:
     - channel: default
       sourceId: on-pr-closed
-      targetId: find-work-order
+      targetId: find-pull-request
     - channel: found
-      sourceId: find-work-order
+      sourceId: find-pull-request
+      targetId: add-pr-activity
+    - channel: default
+      sourceId: add-pr-activity
       targetId: is-pr-merged
     - channel: "true"
       sourceId: is-pr-merged
@@ -36,16 +39,29 @@ spec:
         x: 1272
         'y': 72
       isCollapsed: true
-    - id: find-work-order
-      name: Find Work Order
+    - id: find-pull-request
+      name: Find Pull Request
       type: TYPE_ACTION
-      component: findWorkOrder
+      component: findPullRequest
       configuration:
-        artifactKey: '{{ root().data.pull_request.html_url }}'
-        by: artifactKey
+        provider: github
+        repository: '{{ root().data.repository.full_name }}'
+        number: '{{ root().data.pull_request.number }}'
+        url: '{{ root().data.pull_request.html_url }}'
       position:
         x: 1272
         'y': 432
+      isCollapsed: true
+    - id: add-pr-activity
+      name: Add Pull Request Activity
+      type: TYPE_ACTION
+      component: addPullRequestActivity
+      configuration:
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        description: '{{ "PR #" + string(root().data.pull_request.number) + " was " + (root().data.pull_request.merged == true ? "merged" : "closed") }}'
+      position:
+        x: 1272
+        'y': 612
       isCollapsed: true
     - id: is-pr-merged
       name: PR Merged?
@@ -60,12 +76,11 @@ spec:
     - id: stamp-pr-merged
       name: Stamp Merged Pull Request
       type: TYPE_ACTION
-      component: updateWorkOrderArtifact
+      component: updatePullRequest
       configuration:
-        artifactKey: '{{ root().data.pull_request.html_url }}'
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
         merged: '{{ root().data.pull_request.merged }}'
         mergedAt: '{{ root().data.pull_request.merged_at }}'
-        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
         state: '{{ root().data.pull_request.state }}'
       position:
         x: 1132
@@ -74,12 +89,11 @@ spec:
     - id: stamp-pr-closed
       name: Stamp Closed Pull Request
       type: TYPE_ACTION
-      component: updateWorkOrderArtifact
+      component: updatePullRequest
       configuration:
-        artifactKey: '{{ root().data.pull_request.html_url }}'
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
         closedAt: '{{ root().data.pull_request.closed_at }}'
         merged: '{{ root().data.pull_request.merged }}'
-        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
         state: '{{ root().data.pull_request.state }}'
       position:
         x: 1600
@@ -90,7 +104,7 @@ spec:
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:
-        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
         result: completed
         status: closed
       position:
@@ -102,7 +116,7 @@ spec:
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:
-        orderId: '{{ $["Find Work Order"].data.workOrder.id }}'
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
         result: rejected
         status: closed
       position:

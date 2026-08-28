@@ -1,4 +1,4 @@
-import type { FactoriesFactoryIntakeRun, FactoryIntakeSettings } from "@/api-client";
+import type { FactoriesFactoryIntakeRun, FactoriesFactoryIntakeSettings } from "@/api-client";
 import { formatTimeAgo } from "@/lib/date";
 
 export type IntakeListenMode = "listen" | "schedule";
@@ -10,7 +10,7 @@ export function isIntakeSettingsTab(value: string | null | undefined): value is 
   return value === "general" || value === "runs" || value === "automation";
 }
 export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
-export type IntakeLineStage = "plan" | "implement" | "verify" | "done";
+export type IntakeLineStage = "implement" | "verify" | "done";
 
 export interface IntakeAutomationRun {
   id: string;
@@ -71,19 +71,16 @@ export const INTAKE_SETTINGS_COPY = {
   rejectedActivity: "A person rejected this ticket.",
   belowThreshold: "Not moved to Backlog",
   belowThresholdActivity: "Score is below the minimum confidence.",
-  stagePlan: "Plan",
   stageImplement: "Implement",
   stageVerify: "Verify",
   stageDone: "Done",
   nameLabel: "Name",
   nameHelper: "Shown in the Intake list.",
-  listenLabel: "When to analyze",
+  listenLabel: "When to create",
   listenOption: "Listen for new issues",
-  listenHelper: "Analyze a GitHub issue when it is created.",
+  listenHelper: "Create a work order when a GitHub issue is opened.",
   scheduleOption: "Run on a schedule",
   scheduleHelper: "Scheduled intake is not available.",
-  confidenceLabel: "Minimum confidence",
-  confidenceHelper: "Move a ticket to Backlog when the score is this value or higher.",
   filtersLabel: "Filters",
   labelsLabel: "Labels",
   includeLabels: "Include these labels",
@@ -99,7 +96,6 @@ export const INTAKE_SETTINGS_COPY = {
 } as const;
 
 const STAGE_LABEL: Record<IntakeLineStage, string> = {
-  plan: INTAKE_SETTINGS_COPY.stagePlan,
   implement: INTAKE_SETTINGS_COPY.stageImplement,
   verify: INTAKE_SETTINGS_COPY.stageVerify,
   done: INTAKE_SETTINGS_COPY.stageDone,
@@ -127,8 +123,8 @@ export const GITHUB_INTAKE_RUNS: IntakeAutomationRun[] = [
     ranMinutesAgo: 120,
     analyzedMinutesAgo: 110,
     placement: "progressed",
-    stage: "plan",
-    activity: "Drafting the 409 response plan.",
+    stage: "verify",
+    activity: "Checking the 409 response.",
   },
   {
     id: "gh-issue-3",
@@ -204,7 +200,10 @@ export function normalizeIntakeSourceSettings(draft: IntakeSourceSettings): Inta
   return { ...draft, name, confidencePct };
 }
 
-export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSettings | undefined): IntakeSourceSettings {
+export function intakeSettingsFromApi(
+  name: string,
+  settings: FactoriesFactoryIntakeSettings | undefined,
+): IntakeSourceSettings {
   return {
     name,
     listenMode: "listen",
@@ -215,7 +214,7 @@ export function intakeSettingsFromApi(name: string, settings: FactoryIntakeSetti
   };
 }
 
-export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryIntakeSettings {
+export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFactoryIntakeSettings {
   return {
     confidencePct: settings.confidencePct,
     labels: settings.labels,
@@ -229,7 +228,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoryInta
   };
 }
 
-function assignmentFromApi(assignment: FactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
+function assignmentFromApi(assignment: FactoriesFactoryIntakeSettings["assignment"]): IntakeAssignmentFilter {
   if (assignment === "ASSIGNMENT_ASSIGNED") {
     return "assigned";
   }
@@ -247,8 +246,8 @@ const PLACEMENT_BY_API: Record<string, IntakeTicketPlacement> = {
 };
 
 const STAGE_BY_NAME: Record<string, IntakeLineStage> = {
-  plan: "plan",
-  planning: "plan",
+  plan: "implement",
+  planning: "implement",
   implement: "implement",
   implementation: "implement",
   verify: "verify",
@@ -288,21 +287,6 @@ export function intakeRunsFromApi(
         ...(stage ? { stage } : {}),
       },
     ];
-  });
-}
-
-/** Runs the intake is still analyzing, shown as tickets under the source. */
-export function analyzingTicketsFromApi(
-  runs: FactoriesFactoryIntakeRun[],
-  appId: string | undefined,
-): Array<{ id: string; title: string; appId?: string; runId?: string }> {
-  return runs.flatMap((run) => {
-    const id = run.id?.trim();
-    const title = run.title?.trim();
-    if (!id || !title || run.placement !== "PLACEMENT_ANALYZING") {
-      return [];
-    }
-    return [{ id, title, runId: id, ...(appId ? { appId } : {}) }];
   });
 }
 

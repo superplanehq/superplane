@@ -89,6 +89,9 @@ describe("useFactoryWebsocket", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: factoryQueryKeys.workOrderArtifacts("org-1", "factory-1", "order-1"),
     });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
+    });
   });
 
   it("invalidates described canvas runs for the updated work order", () => {

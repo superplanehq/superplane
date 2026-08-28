@@ -1,5 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -35,6 +35,7 @@ export function WorkOrdersPage() {
   } = useFactoryWorkOrders(organizationId, factoryId);
 
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
 
   const canCreate = canAct("work_orders", "create");
   const canDispatch = canAct("work_orders", "update");
@@ -71,6 +72,7 @@ export function WorkOrdersPage() {
       factory={factory}
       factoryLines={factory.lines ?? []}
       workOrders={workOrders}
+      pullRequests={pullRequests}
       state={state}
       currentUserId={me?.id}
       canCreate={canCreate}

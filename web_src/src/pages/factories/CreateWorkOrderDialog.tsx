@@ -1,18 +1,13 @@
-import type { FactoriesFactoryLine } from "@/api-client";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, Play, XIcon } from "lucide-react";
+import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
-import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
-import { firstFactoryLineName } from "./lib/factoryPagePaths";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
@@ -38,11 +33,8 @@ function CreateWorkOrderDialogSession({
   onCreated: (orderNumber: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
-  const { canAct } = usePermissions();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
-  const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
-  const canDispatch = canAct("work_orders", "update");
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -51,7 +43,7 @@ function CreateWorkOrderDialogSession({
   };
 
   const handleClose = () => {
-    if (composer.isSaving) {
+    if (composer.isCreating) {
       return;
     }
     onClose();
@@ -73,8 +65,8 @@ function CreateWorkOrderDialogSession({
           isExpanded={isExpanded}
           onToggleExpanded={() => setIsExpanded((current) => !current)}
         >
-          <DialogTitle className="text-[13px] font-medium text-foreground">New work order</DialogTitle>
-          <DialogDescription className="sr-only">Create a work order for this workspace.</DialogDescription>
+          <DialogTitle className="text-[13px] font-medium text-foreground">New task</DialogTitle>
+          <DialogDescription className="sr-only">Create a task for this workspace.</DialogDescription>
         </CreateWorkOrderDialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
@@ -86,7 +78,7 @@ function CreateWorkOrderDialogSession({
             data-testid="work-order-title-input"
             value={composer.title}
             onChange={(event) => composer.updateTitle(event.target.value)}
-            placeholder="Work order title"
+            placeholder="Task title"
             maxLength={composer.maxTitleLength}
             autoFocus
             className="h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none placeholder:font-semibold placeholder:text-muted-foreground/70 focus-visible:ring-0"
@@ -100,29 +92,16 @@ function CreateWorkOrderDialogSession({
             <WorkOrderDescriptionEditor
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
-              disabled={composer.isSaving}
+              disabled={composer.isCreating}
               onChange={composer.updateDescription}
             />
           </div>
         </div>
 
         <CreateWorkOrderDialogFooter
-          organizationId={organizationId}
-          assigneeIds={composer.assigneeIds}
-          lines={lines}
-          isSaving={composer.isSaving}
-          canDispatch={canDispatch}
-          canSaveDraft={composer.canSaveDraft}
-          isSavingDraft={composer.isSavingDraft}
-          isSendingToLine={composer.isSendingToLine}
-          onAssigneeChange={composer.setAssigneeIds}
-          onSaveDraft={() => void composer.handleSaveDraft()}
-          onStart={() => {
-            const lineName = firstFactoryLineName({ lines });
-            if (lineName) {
-              void composer.handleSendToLine(lineName);
-            }
-          }}
+          canCreate={composer.canCreate}
+          isCreating={composer.isCreating}
+          onCreate={() => void composer.handleCreate()}
         />
       </DialogContent>
     </Dialog>
@@ -178,98 +157,27 @@ function CreateWorkOrderDialogHeader({
 }
 
 function CreateWorkOrderDialogFooter({
-  organizationId,
-  assigneeIds,
-  lines,
-  isSaving,
-  canDispatch,
-  canSaveDraft,
-  isSavingDraft,
-  isSendingToLine,
-  onAssigneeChange,
-  onSaveDraft,
-  onStart,
+  canCreate,
+  isCreating,
+  onCreate,
 }: {
-  organizationId: string;
-  assigneeIds: string[];
-  lines: FactoriesFactoryLine[];
-  isSaving: boolean;
-  canDispatch: boolean;
-  canSaveDraft: boolean;
-  isSavingDraft: boolean;
-  isSendingToLine: boolean;
-  onAssigneeChange: (ids: string[]) => void;
-  onSaveDraft: () => void;
-  onStart: () => void;
+  canCreate: boolean;
+  isCreating: boolean;
+  onCreate: () => void;
 }) {
   return (
-    <div className="relative z-10 flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-      <CreateWorkOrderPropertyPills
-        organizationId={organizationId}
-        assigneeIds={assigneeIds}
-        isSaving={isSaving}
-        onAssigneeChange={onAssigneeChange}
-      />
-
-      <div className="flex shrink-0 items-center gap-2">
-        <LoadingButton
-          type="button"
-          variant="outline"
-          disabled={!canSaveDraft}
-          loading={isSavingDraft}
-          loadingText="Saving..."
-          onClick={onSaveDraft}
-          className="h-8 rounded-full px-4"
-          data-testid="work-order-create-draft-button"
-        >
-          Save as draft
-        </LoadingButton>
-
-        <StartWorkOrderButton
-          lines={lines}
-          canDispatch={canDispatch}
-          canSaveDraft={canSaveDraft}
-          isSendingToLine={isSendingToLine}
-          onStart={onStart}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StartWorkOrderButton({
-  lines,
-  canDispatch,
-  canSaveDraft,
-  isSendingToLine,
-  onStart,
-}: {
-  lines: FactoriesFactoryLine[];
-  canDispatch: boolean;
-  canSaveDraft: boolean;
-  isSendingToLine: boolean;
-  onStart: () => void;
-}) {
-  const hasLines = Boolean(firstFactoryLineName({ lines }));
-  const isDisabled = !canDispatch || !canSaveDraft || !hasLines;
-  const tooltipMessage = !canDispatch
-    ? "You don't have permission to start work orders."
-    : "This workspace has no line to start this work order on.";
-
-  return (
-    <PermissionTooltip allowed={canDispatch && hasLines} message={tooltipMessage}>
+    <div className="relative z-10 flex items-center justify-end gap-3 border-t border-border px-4 py-3">
       <LoadingButton
         type="button"
-        disabled={isDisabled}
-        loading={isSendingToLine}
-        loadingText="Starting..."
-        onClick={onStart}
-        className="h-8 shrink-0 rounded-full px-4"
-        data-testid="work-order-create-start"
+        disabled={!canCreate}
+        loading={isCreating}
+        loadingText="Creating..."
+        onClick={onCreate}
+        className="h-8 rounded-full px-4"
+        data-testid="work-order-create-button"
       >
-        <Play className="size-3.5" aria-hidden />
-        Start
+        Create
       </LoadingButton>
-    </PermissionTooltip>
+    </div>
   );
 }

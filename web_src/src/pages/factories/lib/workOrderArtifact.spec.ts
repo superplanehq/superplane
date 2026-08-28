@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  branchTreeUrl,
   buildLatestArtifactDataById,
   extractArtifactMarkdownBody,
   extractArtifactName,
@@ -11,6 +12,45 @@ import {
   overlayLiveArtifactData,
   toArtifactDataRecord,
 } from "./workOrderArtifact";
+
+describe("branchTreeUrl", () => {
+  it("builds a GitHub tree URL from owner/repo and the branch name", () => {
+    expect(branchTreeUrl({ repository: "example/repo", name: "feature/refund-retry" })).toBe(
+      "https://github.com/example/repo/tree/feature/refund-retry",
+    );
+  });
+
+  it("accepts the free-form `repo` key the artifact component also reads", () => {
+    expect(branchTreeUrl({ repo: "acme/storefront", name: "hotfix" })).toBe(
+      "https://github.com/acme/storefront/tree/hotfix",
+    );
+  });
+
+  it("keeps the host of a repository URL, so Enterprise branches resolve", () => {
+    expect(branchTreeUrl({ repository: "https://git.example.com/acme/storefront/", name: "hotfix" })).toBe(
+      "https://git.example.com/acme/storefront/tree/hotfix",
+    );
+  });
+
+  it("drops credentials, query, and fragment from a repository URL", () => {
+    expect(
+      branchTreeUrl({ repository: "https://oauth2:token@git.example.com/acme/repo?tab=readme#readme", name: "hotfix" }),
+    ).toBe("https://git.example.com/acme/repo/tree/hotfix");
+  });
+
+  it("escapes branch characters that would break the path", () => {
+    expect(branchTreeUrl({ repository: "example/repo", name: "feat/#42-fix" })).toBe(
+      "https://github.com/example/repo/tree/feat/%2342-fix",
+    );
+  });
+
+  it("returns undefined when the repository or the name is unusable", () => {
+    expect(branchTreeUrl({ name: "hotfix" })).toBeUndefined();
+    expect(branchTreeUrl({ repository: "example/repo" })).toBeUndefined();
+    expect(branchTreeUrl({ repository: "ledger", name: "hotfix" })).toBeUndefined();
+    expect(branchTreeUrl({ repository: "ssh://git@github.com/example/repo", name: "hotfix" })).toBeUndefined();
+  });
+});
 
 describe("formatPrArtifactLabel", () => {
   it("returns #<number> when data.number is set (backend convention)", () => {

@@ -17,6 +17,23 @@ type liveLogReadResult struct {
 	err    error
 }
 
+func TestParseLiveLogRecordKeepsKindPreviewAndTools(t *testing.T) {
+	t.Parallel()
+
+	cmd, ok := parseLiveLogRecord(`{"type":"cmd_start","index":1,"text":"Clone","kind":"bash","preview":"git clone"}`)
+	require.True(t, ok)
+	require.Equal(t, "cmd_start", cmd.Type)
+	require.Equal(t, "bash", cmd.Kind)
+	require.Equal(t, "git clone", cmd.Preview)
+
+	tool, ok := parseLiveLogRecord(`{"type":"tool_start","id":"toolu_a","kind":"read","text":"pkg/foo.go"}`)
+	require.True(t, ok)
+	require.Equal(t, "tool_start", tool.Type)
+	require.Equal(t, "toolu_a", tool.ID)
+	require.Equal(t, "read", tool.Kind)
+	require.Equal(t, "pkg/foo.go", tool.Text)
+}
+
 func TestReadLiveLogRecordsReturnsAfterLimitOnOpenStream(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer reader.Close()

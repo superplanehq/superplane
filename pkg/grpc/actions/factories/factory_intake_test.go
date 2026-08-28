@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -65,8 +66,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 4)
-		assert.Len(t, liveVersion.Edges, 3)
+		assert.Len(t, liveVersion.Nodes, 3)
+		assert.Len(t, liveVersion.Edges, 2)
 	})
 
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
@@ -95,6 +96,95 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.NotContains(t, trigger.Configuration, "repository")
 	})
 
+	t.Run("creating an intake also creates a Backlog scorer", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		require.NotNil(t, liveBacklogCanvas(t, factory))
+	})
+
+	t.Run("creating a work order emits to the Backlog trigger", func(t *testing.T) {
+		factoryModel := newFactory(t)
+		create(t, factoryModel, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		_, err := CreateWorkOrder(ctx, orgID, &pb.CreateWorkOrderRequest{
+			FactoryId: factoryModel.ID.String(),
+			Title:     "Show a clearer empty state",
+		})
+		require.NoError(t, err)
+
+		backlog := liveBacklogCanvas(t, factoryModel)
+		events, err := models.ListCanvasEvents(database.DB(t.Context()), backlog.ID, backlogTriggerNodeID, 10, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		payload, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, factory.OnWorkOrderPayloadType, payload["type"])
+	})
+
+	t.Run("the Backlog canvas does not create work orders", func(t *testing.T) {
+		factoryModel := newFactory(t)
+		create(t, factoryModel, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		backlog := liveBacklogCanvas(t, factoryModel)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), backlog)
+		require.NoError(t, err)
+
+		for _, node := range liveVersion.Nodes {
+			assert.NotEqual(t, intakeCreateComponent, node.ComponentName())
+		}
+	})
+
+	t.Run("a second intake reuses the Backlog scorer", func(t *testing.T) {
+		factory := newFactory(t)
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+		create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
+
+		canvases, err := factory.ListCanvases(database.DB(t.Context()))
+		require.NoError(t, err)
+		assert.Len(t, canvases, 3)
+	})
+
+	t.Run("an intake of a set up workspace has no incomplete node", func(t *testing.T) {
+		factory := newFactory(t)
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+		}))
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
+			if node.ID == intakeTriggerNodeID {
+				continue
+			}
+			assert.Nilf(t, node.ErrorMessage, "node %s is incomplete: %s", node.ID, nodeErrorMessage(node))
+		}
+	})
+
+	t.Run("an intake analyzes a batch of items in parallel", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		// A node without a concurrency spec runs one execution at a time, so a
+		// seeded batch would take as long as the sum of its analyses. Both the
+		// canvas version and the node record have to carry the spec: the
+		// scheduler reads the record.
+		canvasID := uuid.MustParse(intake.GetCanvasId())
+		for _, node := range liveIntakeNodes(t, r.Organization.ID, intake) {
+			if node.ID == intakeTriggerNodeID {
+				continue
+			}
+
+			assert.Equalf(t, intakeConcurrencyMax, node.Concurrency.EffectiveMax(), "version node %s", node.ID)
+
+			stored, err := models.FindCanvasNode(database.DB(t.Context()), canvasID, node.ID)
+			require.NoError(t, err)
+			assert.Equalf(t, intakeConcurrencyMax, stored.ConcurrencySpec().EffectiveMax(), "node record %s", node.ID)
+		}
+	})
+
 	t.Run("a source can have several intakes", func(t *testing.T) {
 		factory := newFactory(t)
 		first := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
@@ -102,7 +192,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		assert.NotEqual(t, first.GetId(), second.GetId())
 		assert.NotEqual(t, first.GetCanvasId(), second.GetCanvasId())
-		// Canvas names are unique per organization, so the second one steps
+		// Canvas names are unique inside a workspace, so the second one steps
 		// aside instead of failing.
 		assert.NotEqual(t, first.GetName(), second.GetName())
 
@@ -111,17 +201,14 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Len(t, response.GetIntakes(), 2)
 	})
 
-	t.Run("the caller can name the intake and set its threshold", func(t *testing.T) {
+	t.Run("the caller can name the intake", func(t *testing.T) {
 		factory := newFactory(t)
-		confidence := int32(90)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
-			Source:        pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
-			Name:          "Crash triage",
-			ConfidencePct: &confidence,
+			Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS,
+			Name:   "Crash triage",
 		})
 
 		assert.Equal(t, "Crash triage", intake.GetName())
-		assert.Equal(t, int32(90), intake.GetSettings().GetConfidencePct())
 	})
 
 	t.Run("an unspecified source is rejected", func(t *testing.T) {
@@ -134,7 +221,7 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
-	t.Run("renaming and rethresholding go through one call", func(t *testing.T) {
+	t.Run("renaming goes through the update call", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS})
 
@@ -143,28 +230,13 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Name:      &name,
-			Settings:  &pb.FactoryIntake_Settings{ConfidencePct: 40},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, "Incident triage", response.GetIntake().GetName())
-		assert.Equal(t, int32(40), response.GetIntake().GetSettings().GetConfidencePct())
 		assert.True(t, response.GetIntake().GetHealthy())
-
-		// The threshold has to end up in the live graph, because that is what
-		// the workers read.
-		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
-		require.NoError(t, err)
-		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
-		require.NoError(t, err)
-
-		graph := resolveIntakeGraph(models.FactoryIntakeSourcePagerDutyIncidents, models.LiveCanvasSpec{
-			Nodes: liveVersion.Nodes,
-			Edges: liveVersion.Edges,
-		})
-		assert.Equal(t, 40, graph.ConfidencePct)
 	})
 
-	t.Run("label and assignment filters reach the threshold expression", func(t *testing.T) {
+	t.Run("label and assignment filters reach the filter expression", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
 
@@ -172,7 +244,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Settings: &pb.FactoryIntake_Settings{
-				ConfidencePct:   70,
 				Labels:          []string{"bug", "bug", "  "},
 				LabelFilterMode: pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE,
 				Assignment:      pb.FactoryIntake_Settings_ASSIGNMENT_UNASSIGNED,
@@ -181,7 +252,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		require.NoError(t, err)
 
 		settings := response.GetIntake().GetSettings()
-		assert.Equal(t, int32(70), settings.GetConfidencePct())
 		assert.Equal(t, []string{"bug"}, settings.GetLabels())
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 		assert.Equal(t, pb.FactoryIntake_Settings_ASSIGNMENT_UNASSIGNED, settings.GetAssignment())
@@ -193,16 +263,16 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		expression := ""
 		for _, node := range liveVersion.Nodes {
-			if node.ID == intakeThresholdNodeID {
+			if node.ID == intakeFilterNodeID {
 				expression, _ = node.Configuration["expression"].(string)
 			}
 		}
-		assert.Contains(t, expression, ">= 70")
+		assert.NotContains(t, expression, ">=")
 		assert.Contains(t, expression, `!(root().data.issue.labels.exists(label, label.name in ["bug"]))`)
 		assert.Contains(t, expression, "size(root().data.issue.assignees) == 0")
 	})
 
-	t.Run("a source without labels keeps a plain threshold", func(t *testing.T) {
+	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})
 
@@ -210,23 +280,11 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Settings: &pb.FactoryIntake_Settings{
-				ConfidencePct: 55,
-				Labels:        []string{"bug"},
-				Assignment:    pb.FactoryIntake_Settings_ASSIGNMENT_ASSIGNED,
+				Labels:     []string{"bug"},
+				Assignment: pb.FactoryIntake_Settings_ASSIGNMENT_ASSIGNED,
 			},
 		})
 		require.NoError(t, err)
-
-		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
-		require.NoError(t, err)
-		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
-		require.NoError(t, err)
-
-		for _, node := range liveVersion.Nodes {
-			if node.ID == intakeThresholdNodeID {
-				assert.Equal(t, intakeThresholdExpression(55), node.Configuration["expression"])
-			}
-		}
 	})
 
 	t.Run("updating one setting leaves the others alone", func(t *testing.T) {
@@ -237,7 +295,6 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Settings: &pb.FactoryIntake_Settings{
-				ConfidencePct:   70,
 				Labels:          []string{"bug"},
 				LabelFilterMode: pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE,
 			},
@@ -248,14 +305,12 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			FactoryId: factory.ID.String(),
 			IntakeId:  intake.GetId(),
 			Settings: &pb.FactoryIntake_Settings{
-				ConfidencePct: 30,
-				Labels:        []string{"bug"},
+				Labels: []string{"bug"},
 			},
 		})
 		require.NoError(t, err)
 
 		settings := response.GetIntake().GetSettings()
-		assert.Equal(t, int32(30), settings.GetConfidencePct())
 		assert.Equal(t, pb.FactoryIntake_Settings_LABEL_FILTER_MODE_EXCLUDE, settings.GetLabelFilterMode())
 	})
 
@@ -301,7 +356,62 @@ func Test__FactoryIntakeActions(t *testing.T) {
 	})
 }
 
+func liveBacklogCanvas(t *testing.T, factoryModel *models.Factory) *models.Canvas {
+	t.Helper()
+
+	canvases, err := factoryModel.ListCanvases(database.DB(t.Context()))
+	require.NoError(t, err)
+
+	ids := make([]uuid.UUID, 0, len(canvases))
+	byID := make(map[uuid.UUID]*models.Canvas, len(canvases))
+	for i := range canvases {
+		if canvases[i].LiveVersionID == nil {
+			continue
+		}
+		ids = append(ids, canvases[i].ID)
+		byID[canvases[i].ID] = &canvases[i]
+	}
+
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(database.DB(t.Context()), ids)
+	require.NoError(t, err)
+
+	for canvasID, spec := range specs {
+		if onWorkOrderNodeIDFromSpec(spec) != "" {
+			return byID[canvasID]
+		}
+	}
+
+	require.Fail(t, "factory has no Backlog canvas")
+	return nil
+}
+
 func liveIntakeTrigger(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) models.Node {
+	t.Helper()
+
+	return liveIntakeNode(t, organizationID, intake, intakeTriggerNodeID)
+}
+
+func liveIntakeNode(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake, nodeID string) models.Node {
+	t.Helper()
+
+	for _, node := range liveIntakeNodes(t, organizationID, intake) {
+		if node.ID == nodeID {
+			return node
+		}
+	}
+
+	require.Failf(t, "node not found", "intake canvas %s has no node %q", intake.GetCanvasId(), nodeID)
+	return models.Node{}
+}
+
+func nodeErrorMessage(node models.Node) string {
+	if node.ErrorMessage == nil {
+		return ""
+	}
+	return *node.ErrorMessage
+}
+
+func liveIntakeNodes(t *testing.T, organizationID uuid.UUID, intake *pb.FactoryIntake) []models.Node {
 	t.Helper()
 
 	canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), organizationID, uuid.MustParse(intake.GetCanvasId()))
@@ -310,12 +420,5 @@ func liveIntakeTrigger(t *testing.T, organizationID uuid.UUID, intake *pb.Factor
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 	require.NoError(t, err)
 
-	for _, node := range liveVersion.Nodes {
-		if node.ID == intakeTriggerNodeID {
-			return node
-		}
-	}
-
-	require.Failf(t, "trigger not found", "intake canvas %s has no node %q", intake.GetCanvasId(), intakeTriggerNodeID)
-	return models.Node{}
+	return liveVersion.Nodes
 }

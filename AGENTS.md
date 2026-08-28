@@ -79,7 +79,9 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
-- After editing JS/TS code: `make format.js`, then `make check.build.ui`.
+- After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
+  `make check.build.ui`. Run `make check.lint.ui` locally before you open a
+  pull request. CI fails when the ESLint budget grows.
 - After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
   SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
   After removing proto fields, renumber remaining fields so message field numbers
@@ -284,7 +286,8 @@ contractions, slang, or idioms).
   (`Signed-off-by: Name <email>`). Use `git commit -s` (or `git commit --amend -s`).
 - Before submitting, run the checks relevant to your change:
   - Backend: `make format.go`, `make lint`, `make check.build.app`, `make test`.
-  - Frontend: `make format.js`, `make check.build.ui`.
+  - Frontend: `make format.js`, `make check.lint.ui`, `make check.build.ui`.
+    Run ESLint locally (`make check.lint.ui`) before you open a pull request.
   - Protos: `make pb.gen` and `make check.proto.field.numbers`.
 
 For user-facing UI strings while designing or implementing frontend work, follow

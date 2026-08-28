@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -54,7 +54,7 @@ describe("FactoriesHarness work orders", () => {
     expect(body.canvas?.metadata?.factoryId).toBe(PRIMARY_FACTORY_ID);
   }, 10000);
 
-  it("sends a canvas run view to the split-run page with Edit", async () => {
+  it("keeps a canvas run view on the factory inspector page", async () => {
     const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
     const lineId = REFUND_FACTORY_LINES[0]?.id ?? "line-plan-and-implement";
 
@@ -66,9 +66,9 @@ describe("FactoriesHarness work orders", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("factory-app-edit", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("factory-app-canvas-page")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-split-run-page")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factory-app-workspace-toggles")).not.toBeInTheDocument();
   }, 15000);
 
@@ -91,6 +91,24 @@ describe("FactoriesHarness work orders", () => {
     expect(screen.getByTestId("factory-app-workspace-components")).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("factory-app-more-options")).toBeInTheDocument();
     expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("opens an edit session in factory Configure", async () => {
+    const implementerAppId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
+
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/${implementerAppId}?configure=1&from=automations`}
+        factoriesFixture={defaultFactoriesFixture}
+        appFixture={refundLineCanvasFixture()}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    // `sp-canvas-editing` marks the active edit session. Without it the canvas
+    // stays live, so a component click opens the run inspector and never the
+    // component editor sidebar.
+    await waitFor(() => expect(document.querySelector(".sp-canvas-editing")).not.toBeNull(), { timeout: 8000 });
   }, 15000);
 
   it("opens the agent sidebar from the factory Configure header", async () => {
@@ -189,7 +207,11 @@ describe("FactoriesHarness work orders", () => {
     await user.click(trigger);
     const orgCog = await screen.findByTestId("factories-sidebar-organization-settings-link");
     await user.click(orgCog);
-    expect(await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 })).toBeInTheDocument();
+    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
+    const backLink = within(sidebar).getByTestId("organization-settings-back");
+    expect(backLink).toHaveTextContent("Back to workspace");
+    expect(backLink).toHaveAttribute("href", `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`);
+    expect(within(sidebar).getByTestId("organization-settings-nav-general")).toHaveAttribute("aria-current", "page");
   }, 10000);
 });
 
@@ -271,6 +293,7 @@ describe("FactoriesHarness workspace setup", () => {
 
     expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled(), { timeout: 8000 });
   }, 15000);
 });
 
@@ -298,17 +321,17 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
     await waitFor(() => {
-      expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Plan");
+      expect(screen.getByTestId("lines-column-title-phase-0")).toHaveTextContent("Implement");
     });
-    expect(screen.getByTestId("lines-column-title-phase-1")).toHaveTextContent("Implement");
-    expect(screen.getByTestId("lines-column-title-phase-2")).toHaveTextContent("Verify");
-    expect(screen.getByTestId("lines-column-title-phase-3")).toHaveTextContent("Done");
+    expect(screen.getByTestId("lines-column-title-verify")).toHaveTextContent("Verify");
+    expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
+    expect(screen.queryByTestId("lines-column-title-phase-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No work orders in the backlog.");
+    expect(screen.getByTestId("lines-backlog-column")).not.toHaveTextContent("No tasks in the backlog.");
     expect(screen.getByTestId("lines-phase-column-0")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-2")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-phase-column-3")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.queryByTestId("lines-phase-column-1")).not.toBeInTheDocument();
     expect(screen.queryAllByTestId(/^work-order-card-/)).toHaveLength(0);
   }, 15000);
 
@@ -331,8 +354,6 @@ describe("FactoriesHarness Acme onboarding", () => {
     expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("workspace-setup")).not.toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getAllByTestId(/^work-order-card-/).length).toBeGreaterThan(0);
-    });
+    expect((await screen.findAllByTestId(/^work-order-card-/, {}, { timeout: 8000 })).length).toBeGreaterThan(0);
   }, 15000);
 });

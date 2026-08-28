@@ -1,16 +1,17 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromLine, Gauge, Kanban, Settings } from "lucide-react";
+import { ArrowRightFromLine, Kanban, MessageSquare, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
   factoryHomePath,
   factoryIntakePath,
+  factoryPRFeedbackPath,
   factorySettingsPath,
-  factoryVelocityPath,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
 } from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
+import { factoriesRailControlClassName, isBoardPath, isSettingsPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
@@ -52,8 +53,8 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: intake drawer on the line board,
- * the line board, velocity, then settings.
+ * Icon rail under the workspace switcher: intake drawer, PR feedback,
+ * the line board, then settings.
  */
 export function FactoriesSidebarNav({
   organizationId,
@@ -65,12 +66,13 @@ export function FactoriesSidebarNav({
   const { pathname, search } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const intakeOpen = isIntakeSearchOpen(search);
+  const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const intakeHref = intakeOpen ? boardHref : factoryIntakePath(organizationId, factoryKey, lineId);
-  const velocityHref = factoryVelocityPath(organizationId, factoryKey);
+  const prFeedbackHref = prFeedbackOpen ? boardHref : factoryPRFeedbackPath(organizationId, factoryKey, lineId);
   const settingsHref = factorySettingsPath(organizationId, factoryKey);
   const intakeCurrent = intakeOpen;
-  const boardCurrent = isBoardPath(pathname) && !intakeOpen;
-  const velocityCurrent = isVelocityPath(pathname);
+  const prFeedbackCurrent = prFeedbackOpen;
+  const boardCurrent = isBoardPath(pathname) && !intakeOpen && !prFeedbackOpen;
   const settingsCurrent = isSettingsPath(pathname);
 
   return (
@@ -82,14 +84,14 @@ export function FactoriesSidebarNav({
         testId="factories-nav-intake"
         isCurrent={intakeCurrent}
       />
-      <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
       <RailNavLink
-        to={velocityHref}
-        label="Velocity"
-        Icon={Gauge}
-        testId="factories-nav-velocity"
-        isCurrent={velocityCurrent}
+        to={prFeedbackHref}
+        label="PR feedback"
+        Icon={MessageSquare}
+        testId="factories-nav-pr-feedback"
+        isCurrent={prFeedbackCurrent}
       />
+      <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."

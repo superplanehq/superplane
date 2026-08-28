@@ -270,7 +270,7 @@ import {
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { forEachMapper, FOR_EACH_STATE_REGISTRY } from "./forEach";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
+import { claudeCodeMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
@@ -313,7 +313,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runnerJS: runnerMapper,
   runnerBash: runnerMapper,
   runnerPython: runnerMapper,
-  runnerClaudeCode: runnerMapper,
+  runnerClaudeCode: claudeCodeMapper,
   runnerCodex: runnerMapper,
   runnerOpenRouter: runnerMapper,
   timeGate: timeGateMapper,

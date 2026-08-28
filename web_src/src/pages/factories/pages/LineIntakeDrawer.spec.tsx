@@ -12,11 +12,7 @@ import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
-import {
-  GITHUB_ISSUES_ANALYZING_TICKETS,
-  lineIntakeSourceById,
-  type ConfiguredLineIntakeSource,
-} from "./lineIntakeModel";
+import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS } from "./intakeSourceSettingsModel";
 import type { LineIntakeDrawerProps } from "./lineIntakeDrawerTypes";
 
@@ -85,18 +81,24 @@ const GITHUB_INTAKE_CANVAS = {
   spec: {
     nodes: [
       { id: "github-issues-trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-      { id: "github-issues-analysis", name: "Analyze intake", type: "TYPE_ACTION", component: "runnerClaudeCode" },
+      {
+        id: "github-issues-filter",
+        name: "Matches filters?",
+        type: "TYPE_ACTION",
+        component: "if",
+        configuration: { expression: "true" },
+      },
       { id: "github-issues-create", name: "Create Work Order", type: "TYPE_ACTION", component: "createWorkOrder" },
     ],
     edges: [
-      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-analysis" },
-      { channel: "true", sourceId: "github-issues-analysis", targetId: "github-issues-create" },
+      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-filter" },
+      { channel: "true", sourceId: "github-issues-filter", targetId: "github-issues-create" },
     ],
   },
 };
 
-function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
-  return render(
+function drawerElement(props: Partial<LineIntakeDrawerProps>) {
+  return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <ThemeProvider>
@@ -109,8 +111,12 @@ function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
+  return render(drawerElement(props));
 }
 
 function intakeRuns(runs: unknown[]) {
@@ -128,7 +134,7 @@ describe("LineIntakeDrawer", () => {
     useTriggers.mockReturnValue({ data: [{ name: "github.onIssue", label: "On Issue" }], isLoading: false });
     useComponents.mockReturnValue({
       data: [
-        { name: "runnerClaudeCode", label: "Run Claude Code" },
+        { name: "if", label: "If" },
         { name: "createWorkOrder", label: "Create Work Order" },
       ],
       isLoading: false,
@@ -192,9 +198,15 @@ describe("LineIntakeDrawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("hides the Add intake control by default", () => {
+    renderDrawer();
+
+    expect(screen.queryByTestId("line-intake-add")).not.toBeInTheDocument();
+  });
+
   it("opens a searchable picker with six intake templates", async () => {
     const user = userEvent.setup();
-    renderDrawer();
+    renderDrawer({ showAddIntakeControl: true });
 
     await user.click(screen.getByTestId("line-intake-add"));
 
@@ -209,7 +221,7 @@ describe("LineIntakeDrawer", () => {
 
   it("filters templates from the picker search", async () => {
     const user = userEvent.setup();
-    renderDrawer();
+    renderDrawer({ showAddIntakeControl: true });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.type(screen.getByTestId("add-intake-search"), "runtime");
@@ -221,7 +233,7 @@ describe("LineIntakeDrawer", () => {
   it("reports the chosen template to the caller and closes the picker", async () => {
     const onSelectIntakeTemplate = vi.fn();
     const user = userEvent.setup();
-    renderDrawer({ onSelectIntakeTemplate });
+    renderDrawer({ showAddIntakeControl: true, onSelectIntakeTemplate });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
@@ -230,80 +242,15 @@ describe("LineIntakeDrawer", () => {
     expect(screen.queryByTestId("add-intake-picker")).not.toBeInTheDocument();
   });
 
-  it("lets each intake expand and collapse on its own", async () => {
-    const user = userEvent.setup();
-    renderDrawer({ analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "Expand Sentry exceptions" })).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(screen.getByRole("button", { name: "Expand GitHub issues" }));
+  it("lists each intake without an expand control or empty run list", () => {
+    renderDrawer({ configuredSources: [GITHUB_INTAKE] });
 
     const github = screen.getByTestId("line-intake-source-intake-github");
-    const analyzing = within(github).getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getAllByTestId("line-intake-analyzing-spinner")).toHaveLength(5);
-    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(github).getByText("Analyzing")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
-  });
-
-  it("collapses an intake on a second header click", async () => {
-    const user = userEvent.setup();
-    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    expect(screen.getByTestId("line-intake-analyzing")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
-
-    expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("expands the intake named in the URL", () => {
-    renderDrawer({ initialIntakeId: "intake-sentry" });
-
-    expect(
-      within(screen.getByTestId("line-intake-source-intake-sentry")).getByTestId("line-intake-empty"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse Sentry exceptions" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("lists the runs the intake is still analyzing", () => {
-    intakeRuns([
-      { id: "run-1", title: "Handle duplicate refunds on retry", placement: "PLACEMENT_ANALYZING" },
-      { id: "run-2", title: "Already in Backlog", placement: "PLACEMENT_BACKLOG" },
-    ]);
-    renderDrawer({
-      configuredSources: [GITHUB_INTAKE],
-      initialIntakeId: "intake-github",
-      organizationId: "org-1",
-      factoryId: "factory-1",
-    });
-
-    const analyzing = screen.getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
-  });
-
-  it("opens the analysis popup from an analyzing ticket", async () => {
-    const onOpenTicket = vi.fn();
-    const user = userEvent.setup();
-    renderDrawer({
-      initialIntakeId: "intake-github",
-      analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS,
-      onOpenTicket,
-    });
-
-    await user.click(screen.getByRole("button", { name: "Open Handle duplicate refunds on retry" }));
-
-    expect(onOpenTicket).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "gh-issue-1", title: "Handle duplicate refunds on retry" }),
-    );
-    const dialog = screen.getByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Handle duplicate refunds on retry" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
+    expect(within(github).getByRole("heading", { name: "GitHub issues" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand GitHub issues" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse GitHub issues" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-empty")).not.toBeInTheDocument();
+    expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
   });
 
   it("opens intake settings from the gear", async () => {
@@ -316,7 +263,6 @@ describe("LineIntakeDrawer", () => {
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Name")).toHaveValue("GitHub issues");
     expect(within(dialog).getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
-    expect(within(dialog).getByTestId("intake-confidence-value")).toHaveTextContent("65%");
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -344,7 +290,6 @@ describe("LineIntakeDrawer", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Triage issues");
-    expect(within(dialog).getByTestId("intake-confidence-value")).toHaveTextContent("80%");
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -353,7 +298,7 @@ describe("LineIntakeDrawer", () => {
       configuredSources: [GITHUB_INTAKE],
       organizationId: "org-1",
       factoryId: "factory-1",
-      editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+      editAutomationHref: "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines",
     });
 
     await user.click(screen.getByRole("button", { name: "Open GitHub issues settings" }));
@@ -362,10 +307,10 @@ describe("LineIntakeDrawer", () => {
     expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
+    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&from=lines",
+      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines",
     );
   });
 

@@ -9,10 +9,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -80,10 +82,15 @@ func CreateIntegrationWithUsage(
 		AppName: integrationName,
 	})
 
+	configMap := configurationMap(appConfig)
+
 	//
 	// If the integration and organization support the new flow, use it.
+	// Public GitHub App install skips the wizard and uses Sync instead.
+	// privateApp opts out of hosted install. The wizard still needs
+	// new_integration_setup_flow.
 	//
-	if registry.UseNewSetupFlow(org, integrationName) {
+	if usesSetupWizard(registry, org, integrationName, configMap) {
 		newIntegration, err := models.CreateIntegration(integrationID, org, integrationName, name, nil)
 		if err != nil {
 			integrationLogger.WithError(err).Error("failed to create integration")
@@ -101,7 +108,7 @@ func CreateIntegrationWithUsage(
 	//
 	// Otherwise, use the old flow.
 	//
-	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, appConfig.AsMap(), integrationID, nil)
+	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, configMap, integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
 		return nil, grpcerrors.Internal(err, "failed to encrypt sensitive configuration")
@@ -113,7 +120,15 @@ func CreateIntegrationWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to create integration")
 	}
 
-	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration)
+	userID, _ := authentication.GetUserIdFromMetadata(ctx)
+	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
+}
+
+func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {
+	if github.PreferHostedInstall(orgID.String(), integrationName, config) {
+		return false
+	}
+	return reg.UseNewSetupFlow(orgID, integrationName)
 }
 
 func allCapabilities(setupProvider core.IntegrationSetupProvider) []core.Capability {
@@ -169,6 +184,7 @@ func syncIntegration(
 	orgID string,
 	newIntegration *models.Integration,
 	integrationImpl core.Integration,
+	actorUserID string,
 ) (*pb.CreateIntegrationResponse, error) {
 	logrus.Infof("syncing integration %s", newIntegration.ID)
 
@@ -190,6 +206,7 @@ func syncIntegration(
 		BaseURL:         baseURL,
 		WebhooksBaseURL: webhooksBaseURL,
 		OrganizationID:  orgID,
+		ActorUserID:     actorUserID,
 		OIDC:            oidcProvider,
 	})
 
@@ -524,4 +541,11 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
+}
+
+func configurationMap(appConfig *structpb.Struct) map[string]any {
+	if appConfig == nil {
+		return map[string]any{}
+	}
+	return appConfig.AsMap()
 }

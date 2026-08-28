@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,6 +70,8 @@ type FactoryWorkOrder struct {
 	Result         string
 	CreatedByID    *uuid.UUID
 	SourceRunID    *uuid.UUID
+	OriginURL      *string
+	OriginLabel    *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -102,6 +105,27 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 // the first dispatch from `draft` also promotes it to `open`.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+}
+
+func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
+	if o == nil || o.OriginURL == nil {
+		return nil
+	}
+
+	url := strings.TrimSpace(*o.OriginURL)
+	if url == "" {
+		return nil
+	}
+
+	label := ""
+	if o.OriginLabel != nil {
+		label = strings.TrimSpace(*o.OriginLabel)
+	}
+	if label == "" {
+		label = OriginLabelFromURL(url)
+	}
+
+	return &WorkOrderOrigin{URL: url, Label: label}
 }
 
 type FactoryWorkOrderAssignee struct {
@@ -222,6 +246,27 @@ func ResolveFactoryWorkOrderCreatorAutomations(
 	return result, nil
 }
 
+func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description *string) error {
+	if title == nil && description == nil {
+		return nil
+	}
+
+	updates := map[string]any{}
+	if title != nil {
+		o.Title = *title
+		updates["title"] = *title
+	}
+	if description != nil {
+		o.Description = *description
+		updates["description"] = *description
+	}
+
+	now := time.Now()
+	o.UpdatedAt = now
+	updates["updated_at"] = now
+	return tx.Model(o).Omit(clause.Associations).Updates(updates).Error
+}
+
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {
 	previousAssignees := o.AssigneeIDs()
 
@@ -253,7 +298,8 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // `order.status.updated` event enriched with the caller's attribution
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
-// can always trace an order back to the run that created it.
+// can always trace an order back to the run that created it. When a
+// person opens the draft, they become the owner.
 //
 // The bool return reports whether a transition was actually recorded:
 // `true` on a real state change, `false` when SkipSame swallowed a no-op
@@ -327,6 +373,12 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// queue; a queued dispatch has no run to finish it later.
 		if toState == FactoryWorkOrderStateClosed {
 			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
+		}
+
+		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
+			if err := o.assignPersonWhoOpened(tx, *update.Actor); err != nil {
 				return err
 			}
 		}
@@ -416,6 +468,19 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 		Actor:   actor,
 	})
 	return err
+}
+
+func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
+	if err := tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
+		return err
+	}
+	if len(o.Assignees) == 1 && o.Assignees[0].UserID == actor {
+		return nil
+	}
+	if err := o.UpdateAssignees(tx, []uuid.UUID{actor}, actor); err != nil {
+		return err
+	}
+	return tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error
 }
 
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
@@ -536,6 +601,34 @@ func (o *FactoryWorkOrder) RecordArtifactAdded(
 	}
 
 	return o.recordEvent(tx, factory.EventTypeOrderArtifactAdded, data)
+}
+
+func (o *FactoryWorkOrder) RecordPullRequestAdded(
+	tx *gorm.DB,
+	pullRequest *factory.PullRequestRef,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+) error {
+	return o.recordEvent(tx, factory.EventTypeOrderPullRequestAdded, factory.WorkOrderPullRequestAdded{
+		Order:       o.Ref(),
+		PullRequest: pullRequest,
+		Automation:  automation,
+		Run:         run,
+	})
+}
+
+func (o *FactoryWorkOrder) RecordPullRequestUpdated(
+	tx *gorm.DB,
+	pullRequest *factory.PullRequestRef,
+	automation *factory.AutomationRef,
+	run *factory.RunRef,
+) error {
+	return o.recordEvent(tx, factory.EventTypeOrderPullRequestUpdated, factory.WorkOrderPullRequestUpdated{
+		Order:       o.Ref(),
+		PullRequest: pullRequest,
+		Automation:  automation,
+		Run:         run,
+	})
 }
 
 func (o *FactoryWorkOrder) RecordAssigneesUpdated(

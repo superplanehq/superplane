@@ -18,7 +18,6 @@ import (
 )
 
 type githubManifest struct {
-	DefaultEvents      []string          `json:"default_events"`
 	DefaultPermissions map[string]string `json:"default_permissions"`
 }
 
@@ -36,7 +35,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
+		assertManifestContainsChecksPermission(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -61,7 +60,7 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
 		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
 		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/organizations/testhq/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
+		assertManifestContainsChecksPermission(t, integrationCtx.BrowserAction.FormFields["manifest"])
 
 		//
 		// Metadata is set
@@ -70,6 +69,155 @@ func Test__GitHub__Sync(t *testing.T) {
 		metadata := integrationCtx.Metadata.(common.Metadata)
 		assert.Equal(t, metadata.Owner, "testhq")
 		assert.NotEmpty(t, metadata.State)
+	})
+
+	t.Run("hosted public app", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			ActorUserID:    "starter-user",
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "GET", integrationCtx.BrowserAction.Method)
+		assert.Empty(t, integrationCtx.BrowserAction.FormFields)
+		assert.Contains(t, integrationCtx.BrowserAction.URL, "https://github.com/apps/superplane/installations/new?state=")
+		assert.NotContains(t, integrationCtx.BrowserAction.URL, "settings/apps/new")
+
+		require.NotNil(t, integrationCtx.Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
+		assert.True(t, metadata.HostedApp)
+		assert.Equal(t, int64(99), metadata.GitHubApp.ID)
+		assert.Equal(t, "superplane", metadata.GitHubApp.Slug)
+		assert.Equal(t, "starter-user", metadata.StartedByUserID)
+		assert.NotEmpty(t, metadata.State)
+		assert.Empty(t, metadata.InstallationID)
+	})
+
+	t.Run("hosted env with privateApp keeps manifest flow", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Configuration:  Configuration{PrivateApp: true},
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "POST", integrationCtx.BrowserAction.Method)
+		assert.Equal(t, "https://github.com/settings/apps/new", integrationCtx.BrowserAction.URL)
+		assert.NotContains(t, integrationCtx.BrowserAction.URL, "/apps/superplane/installations/new")
+
+		require.NotNil(t, integrationCtx.Metadata)
+		metadata := integrationCtx.Metadata.(common.Metadata)
+		assert.False(t, metadata.HostedApp)
+	})
+
+	t.Run("hosted env without factories keeps manifest flow", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return false })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Integration:    integrationCtx,
+		}))
+
+		require.NotNil(t, integrationCtx.BrowserAction)
+		assert.Equal(t, "POST", integrationCtx.BrowserAction.Method)
+		assert.Equal(t, "https://github.com/settings/apps/new", integrationCtx.BrowserAction.URL)
+	})
+}
+
+func Test__isPendingInstallationSetupAction(t *testing.T) {
+	assert.True(t, isPendingInstallationSetupAction("install"))
+	assert.True(t, isPendingInstallationSetupAction("update"))
+	assert.False(t, isPendingInstallationSetupAction(""))
+	assert.False(t, isPendingInstallationSetupAction("request"))
+}
+
+func Test__ownerFromRepositories(t *testing.T) {
+	assert.Equal(t, "acme", ownerFromRepositories([]common.Repository{
+		{URL: "https://github.com/acme/payments"},
+	}))
+	assert.Empty(t, ownerFromRepositories(nil))
+}
+
+func Test__ownerFromInstallationAccount(t *testing.T) {
+	assert.Empty(t, ownerFromInstallationAccount(nil))
+	assert.Empty(t, ownerFromInstallationAccount(&gh.Installation{}))
+	assert.Equal(t, "acme", ownerFromInstallationAccount(&gh.Installation{
+		Account: &gh.User{Login: gh.Ptr("acme")},
+	}))
+}
+
+func Test__ownerFromAppInstallation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/app/installations/42", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	client := gh.NewClient(srv.Client())
+	baseURL, err := url.Parse(srv.URL + "/")
+	require.NoError(t, err)
+	client.BaseURL = baseURL
+
+	owner, err := ownerFromAppInstallation(context.Background(), client, "42")
+	require.NoError(t, err)
+	assert.Equal(t, "acme", owner)
+}
+
+func Test__resolveInstallationOwner(t *testing.T) {
+	t.Run("uses repository owner first", func(t *testing.T) {
+		assert.Equal(
+			t,
+			"acme",
+			resolveInstallationOwner(context.Background(), nil, "42", []common.Repository{
+				{URL: "https://github.com/acme/payments"},
+			}),
+		)
+	})
+
+	t.Run("uses app installation when no repositories", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/app/installations/42", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme"}}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		client := gh.NewClient(srv.Client())
+		baseURL, err := url.Parse(srv.URL + "/")
+		require.NoError(t, err)
+		client.BaseURL = baseURL
+
+		assert.Equal(t, "acme", resolveInstallationOwner(context.Background(), client, "42", nil))
+	})
+
+	t.Run("empty when installation lookup fails and no repositories", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, "/app/installations/42", r.URL.Path)
+			w.WriteHeader(http.StatusForbidden)
+		}))
+		t.Cleanup(srv.Close)
+
+		client := gh.NewClient(srv.Client())
+		baseURL, err := url.Parse(srv.URL + "/")
+		require.NoError(t, err)
+		client.BaseURL = baseURL
+
+		assert.Empty(t, resolveInstallationOwner(context.Background(), client, "42", nil))
 	})
 }
 
@@ -146,13 +294,12 @@ func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	require.Equal(t, "https://github.com/test/repo2", repos[1].URL)
 }
 
-func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
+func assertManifestContainsChecksPermission(t *testing.T, manifestJSON string) {
 	t.Helper()
 
 	require.NotEmpty(t, manifestJSON)
 
 	var manifest githubManifest
 	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
-	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
 	require.Equal(t, "read", manifest.DefaultPermissions["checks"])
 }

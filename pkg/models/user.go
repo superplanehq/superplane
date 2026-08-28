@@ -303,6 +303,19 @@ func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, erro
 	return &user, err
 }
 
+func FindActiveHumanUserByAccountAndOrganization(tx *gorm.DB, orgID, accountID uuid.UUID) (*User, error) {
+	var user User
+
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("account_id = ?", accountID).
+		Where("type = ?", UserTypeHuman).
+		First(&user).
+		Error
+
+	return &user, err
+}
+
 func FindActiveUserByEmail(orgID, email string) (*User, error) {
 	return FindActiveUserByEmailInTransaction(database.Conn(), orgID, email)
 }

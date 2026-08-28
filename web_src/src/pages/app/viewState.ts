@@ -118,11 +118,40 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+export function componentSidebarFromSearchParams(params: URLSearchParams): {
+  isOpen: boolean;
+  nodeId: string | null;
+} {
+  return {
+    isOpen: params.get("sidebar") === "1",
+    nodeId: params.get("node") || null,
+  };
+}
+
+/**
+ * Run inspection uses `sidebar`/`node` for the run detail pane. Configure uses
+ * the same params for the component editor. Prefer the editor when Configure
+ * is active, including the brief window where `run` is still on the URL.
+ */
+export function resolveCanvasPageInitialSidebar(args: {
+  factoryConfigure: boolean;
+  runInspectionChromeActive: boolean;
+  searchParams: URLSearchParams;
+}): { isOpen: boolean; nodeId: string | null } {
+  if (args.runInspectionChromeActive && !args.factoryConfigure) {
+    return { isOpen: false, nodeId: null };
+  }
+  return componentSidebarFromSearchParams(args.searchParams);
+}
+
 export function clearRunInspectionSearchParams(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
+  const keepComponentEditorSelection = next.get("configure") === "1" && Boolean(next.get("node"));
   next.delete("run");
-  next.delete("sidebar");
-  next.delete("node");
+  if (!keepComponentEditorSelection) {
+    next.delete("sidebar");
+    next.delete("node");
+  }
   return next;
 }
 

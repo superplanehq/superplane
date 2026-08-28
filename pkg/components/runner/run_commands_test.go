@@ -451,7 +451,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
-	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
+	assert.Equal(t, []BrokerCommand{{Command: "echo hello", Kind: LiveLogKindBash, Preview: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Equal(t, map[string]string{
 		"canvas_id":       "canvas-1",
@@ -493,7 +493,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	assert.Equal(t, MachineTypeE1LargeARM64, req.FleetID)
 }
 
-func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
+func TestRunnerExecuteSendsOnlyPagerDefaultsWithoutConfiguredEnvironment(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 	t.Setenv("TASK_BROKER_FLEET_ID", "")
@@ -520,7 +520,10 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
-	assert.NotContains(t, string(body), "environment")
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, pagerDefaults, req.Environment)
 }
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {

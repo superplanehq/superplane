@@ -1,4 +1,5 @@
 import type {
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderEvent,
@@ -10,7 +11,6 @@ import {
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   STORYBOOK_ME_USER_ID,
-  STORYBOOK_ME_USER_NAME,
   type FactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
 
@@ -117,28 +117,33 @@ function agentComment(
   };
 }
 
-function prArtifact(order: FactoriesWorkOrder, atHours: number, pr: { number: number; title: string; repo: string }) {
-  const artifact: FactoriesWorkOrderArtifact = {
-    id: `art-overview-${order.number}`,
-    type: "TYPE_PR",
-    data: { url: `https://github.com/${pr.repo}/pull/${pr.number}`, title: pr.title, number: pr.number },
-    createdBy: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
+function prRecord(order: FactoriesWorkOrder, atHours: number, pr: { number: number; title: string; repo: string }) {
+  const merged = order.state === "STATE_CLOSED" && order.result === "RESULT_COMPLETED";
+  const pullRequest: FactoriesFactoryPullRequest = {
+    id: `pr-overview-${order.number}`,
+    workOrderId: order.id,
+    number: String(pr.number),
+    url: `https://github.com/${pr.repo}/pull/${pr.number}`,
+    title: pr.title,
+    state: merged ? "STATE_MERGED" : "STATE_OPEN",
     createdAt: hoursAgo(atHours),
   };
   const event: FactoriesWorkOrderEvent = {
-    type: "order.artifact.added",
+    type: "order.pull_request.added",
     timestamp: hoursAgo(atHours),
     event: {
       user: { id: STORYBOOK_ME_USER_ID },
       order: { id: order.id, title: order.title },
-      artifact: {
-        id: artifact.id,
-        type: "pr",
-        data: artifact.data as Record<string, unknown>,
+      pullRequest: {
+        id: pullRequest.id,
+        number: pullRequest.number,
+        url: pullRequest.url,
+        title: pullRequest.title,
+        state: merged ? "merged" : "open",
       },
     },
   };
-  return { artifact, event };
+  return { pullRequest, event };
 }
 
 function closed(
@@ -176,6 +181,7 @@ interface OverviewOrderFixture {
   order: FactoriesWorkOrder;
   events: FactoriesWorkOrderEvent[];
   artifacts?: FactoriesWorkOrderArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
 }
 
 function attentionOrderFixtures(): OverviewOrderFixture[] {
@@ -390,22 +396,22 @@ function shippedOrderFixtures(): OverviewOrderFixture[] {
     { state: "STATE_CLOSED", result: "RESULT_COMPLETED", ageHours: 72 },
   );
 
-  const expiredTokensPr = prArtifact(expiredTokens, 3, {
+  const expiredTokensPr = prRecord(expiredTokens, 3, {
     number: 482,
     title: "Return clear errors for expired refund tokens",
     repo: "superplane/superplane",
   });
-  const paginationPr = prArtifact(pagination, 5, {
+  const paginationPr = prRecord(pagination, 5, {
     number: 479,
     title: "Add cursor pagination to the refunds list endpoint",
     repo: "superplane/superplane",
   });
-  const dedupeEmailsPr = prArtifact(dedupeEmails, 25, {
+  const dedupeEmailsPr = prRecord(dedupeEmails, 25, {
     number: 474,
     title: "Dedupe customer notification emails",
     repo: "superplane/notifications",
   });
-  const webhookLatencyPr = prArtifact(webhookLatency, 73, {
+  const webhookLatencyPr = prRecord(webhookLatency, 73, {
     number: 468,
     title: "Log webhook delivery latency per provider",
     repo: "superplane/superplane",
@@ -415,7 +421,7 @@ function shippedOrderFixtures(): OverviewOrderFixture[] {
     {
       order: expiredTokens,
       events: [opened(expiredTokens), expiredTokensPr.event, closed(expiredTokens, 2, "completed")],
-      artifacts: [expiredTokensPr.artifact],
+      pullRequests: [expiredTokensPr.pullRequest],
     },
     {
       order: pagination,
@@ -424,12 +430,12 @@ function shippedOrderFixtures(): OverviewOrderFixture[] {
         stepEvent(pagination, { line: "Backend", stepName: "Review", atHours: 6, runId: "run-ov-56-review" }),
         paginationPr.event,
       ],
-      artifacts: [paginationPr.artifact],
+      pullRequests: [paginationPr.pullRequest],
     },
     {
       order: dedupeEmails,
       events: [opened(dedupeEmails), dedupeEmailsPr.event, closed(dedupeEmails, 24, "completed")],
-      artifacts: [dedupeEmailsPr.artifact],
+      pullRequests: [dedupeEmailsPr.pullRequest],
     },
     {
       order: reconciliationJob,
@@ -449,7 +455,7 @@ function shippedOrderFixtures(): OverviewOrderFixture[] {
     {
       order: webhookLatency,
       events: [opened(webhookLatency), webhookLatencyPr.event, closed(webhookLatency, 72, "completed")],
-      artifacts: [webhookLatencyPr.artifact],
+      pullRequests: [webhookLatencyPr.pullRequest],
     },
   ];
 }
@@ -469,5 +475,11 @@ export const overviewRedesignFixture: FactoriesFixture = {
   eventsByOrderId: Object.fromEntries(OVERVIEW_ORDER_FIXTURES.map((entry) => [entry.order.id!, entry.events])),
   artifactsByOrderId: Object.fromEntries(
     OVERVIEW_ORDER_FIXTURES.filter((entry) => entry.artifacts).map((entry) => [entry.order.id!, entry.artifacts!]),
+  ),
+  pullRequestsByOrderId: Object.fromEntries(
+    OVERVIEW_ORDER_FIXTURES.filter((entry) => entry.pullRequests).map((entry) => [
+      entry.order.id!,
+      entry.pullRequests!,
+    ]),
   ),
 };

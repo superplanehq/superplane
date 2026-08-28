@@ -3,6 +3,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeSource,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesUpdateFactoryOnboardingBody,
   FactoryLineStep,
 } from "@/api-client";
@@ -10,7 +11,7 @@ import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSect
 import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
-export const DEFAULT_LINE_NAME = "Software delivery";
+export const DEFAULT_LINE_NAME = "plan-and-implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 
@@ -120,20 +121,43 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
 export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
 
-// The GitHub intake scores new issues and opens a work order for the ones it
-// trusts. The backend reads the connection and the backlog repository from the
-// saved onboarding config, so this runs after the wizard choices are stored. A
-// retried finish must not add a second copy.
+// The GitHub intake opens a work order for each matching issue. The Backlog
+// canvas scores those work orders. The backend reads the connection and the
+// backlog repository from the saved onboarding config, so this runs after the
+// wizard choices are stored. A retried finish must not add a second copy.
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
-}): Promise<void> {
+}): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
-  if (intakes.some((intake) => intake.source === GITHUB_INTAKE_SOURCE)) {
-    return;
+  const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
+  if (existing) {
+    return existing;
   }
 
-  await args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+  return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+}
+
+export type ListFactoryPRFeedbackHandlers = () => Promise<FactoriesFactoryPrFeedbackHandler[]>;
+
+export type CreateFactoryPRFeedbackHandler = (input: {
+  repository?: string;
+}) => Promise<FactoriesFactoryPrFeedbackHandler>;
+
+// The PR feedback handler addresses review comments after a work-order PR
+// opens. Match by repository so a retried finish does not add a second copy.
+export async function provisionPRFeedbackHandler(args: {
+  listHandlers: ListFactoryPRFeedbackHandlers;
+  createHandler: CreateFactoryPRFeedbackHandler;
+  repository: string;
+}): Promise<FactoriesFactoryPrFeedbackHandler> {
+  const handlers = await args.listHandlers();
+  const existing = handlers.find((handler) => handler.settings?.subject?.repository === args.repository);
+  if (existing) {
+    return existing;
+  }
+
+  return args.createHandler({ repository: args.repository });
 }
 
 export async function provisionLine(args: {
@@ -162,10 +186,10 @@ export async function provisionLine(args: {
     installFactory: args.installFactory,
   });
   const primaryAppId = steps[0]?.app?.app;
-  if (!primaryAppId) throw new Error("Software delivery apps were not created");
+  if (!primaryAppId) throw new Error("Line apps were not created");
 
   const line = await args.createLine({ name: DEFAULT_LINE_NAME, steps });
-  if (!line.id) throw new Error("Software delivery line was not created");
+  if (!line.id) throw new Error("Line was not created");
   await args.updateOnboarding({ provisionedAppId: primaryAppId, provisionedLineId: line.id });
   return { lineId: line.id, primaryAppId };
 }

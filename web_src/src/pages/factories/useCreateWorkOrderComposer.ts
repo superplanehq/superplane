@@ -1,4 +1,4 @@
-import { useCreateWorkOrder, useDispatchWorkOrder } from "@/hooks/useFactoryData";
+import { useCreateWorkOrder } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
@@ -21,18 +21,16 @@ export function useCreateWorkOrderComposer({
   onCreated,
 }: UseCreateWorkOrderComposerArgs) {
   const createWorkOrder = useCreateWorkOrder(organizationId, factoryId);
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const { data: me } = useMe(false, organizationId);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeIds, setAssigneeIdsInternal] = useState<string[]>([]);
   const [titleError, setTitleError] = useState("");
-  const [inFlightAction, setInFlightAction] = useState<"draft" | "send" | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const hasSeededOwner = useRef(false);
 
-  const isSaving = inFlightAction !== null;
-  const canSaveDraft = Boolean(title.trim()) && !isSaving;
+  const canCreate = Boolean(title.trim()) && !isCreating;
 
   const setAssigneeIds = (ids: string[]) => {
     hasSeededOwner.current = true;
@@ -55,58 +53,25 @@ export function useCreateWorkOrderComposer({
     onClose();
   };
 
-  const saveOrder = async () => {
+  const handleCreate = async () => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setTitleError("Title is required");
-      return null;
+      return;
     }
 
+    setIsCreating(true);
     try {
-      return await createWorkOrder.mutateAsync({
+      const order = await createWorkOrder.mutateAsync({
         title: trimmedTitle,
         description: description.trim(),
         assigneeIds,
       });
+      goToOrder(order);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create work order"));
-      return null;
-    }
-  };
-
-  const handleSaveDraft = async () => {
-    setInFlightAction("draft");
-    try {
-      const order = await saveOrder();
-      if (order) {
-        goToOrder(order);
-      }
     } finally {
-      setInFlightAction(null);
-    }
-  };
-
-  const handleSendToLine = async (lineName: string) => {
-    if (!lineName) {
-      return;
-    }
-
-    setInFlightAction("send");
-    try {
-      const order = await saveOrder();
-      if (!order?.id) {
-        return;
-      }
-
-      try {
-        await dispatchWorkOrder.mutateAsync({ orderId: order.id, lineName });
-        goToOrder(order);
-      } catch (error) {
-        showErrorToast(getApiErrorMessage(error, "Failed to send work order to line"));
-        goToOrder(order);
-      }
-    } finally {
-      setInFlightAction(null);
+      setIsCreating(false);
     }
   };
 
@@ -126,16 +91,13 @@ export function useCreateWorkOrderComposer({
     description,
     assigneeIds,
     titleError,
-    isSaving,
-    isSavingDraft: inFlightAction === "draft",
-    isSendingToLine: inFlightAction === "send",
-    canSaveDraft,
+    isCreating,
+    canCreate,
     maxDescriptionLength: MAX_DESCRIPTION_LENGTH,
     maxTitleLength: MAX_TITLE_LENGTH,
     setAssigneeIds,
     updateTitle,
     updateDescription,
-    handleSaveDraft,
-    handleSendToLine,
+    handleCreate,
   };
 }

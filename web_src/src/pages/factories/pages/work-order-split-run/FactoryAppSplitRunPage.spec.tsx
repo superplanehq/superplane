@@ -30,35 +30,38 @@ describe("FactoryAppSplitRunPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("split-run-phase-refund-implementer-1")).toBeInTheDocument();
+      expect(screen.getByTestId("split-run-phase-implement-0")).toBeInTheDocument();
     });
     const page = screen.getByTestId("factory-app-split-run-page");
     expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
     expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
-    expect(within(page).getByTestId("split-run-stream-refund-implementer-1")).toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpy-\d/);
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpt-\d/);
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
+    expect(within(page).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
+    expect(within(page).getByRole("complementary", { name: "Automations" })).toHaveStyle({ width: "65%" });
   }, 10000);
 
-  it("opens the planner canvas when the URL omits canvas", async () => {
+  it("does not invent a planning ingest phase for a live order", async () => {
     const line = REFUND_FACTORY_LINES[0];
 
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner/split-run?from=lines&lineId=${line.id}&run=run-plan-open&orderNumber=101`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/apps/app-refund-planner/split-run?from=lines&lineId=${line.id}&orderNumber=103&canvas=planning`}
         factoriesFixture={lineMetricsFactoriesFixture}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("split-run-phase-plan-0")).toBeInTheDocument();
+      expect(screen.getByTestId("factory-app-split-run-page")).toBeInTheDocument();
     });
-    expect(
-      within(screen.getByTestId("factory-app-split-run-page")).queryByTestId("split-run-phase-refund-implementer-1"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
+    expect(screen.queryByText("Create plan")).not.toBeInTheDocument();
   }, 10000);
 
   it("does not show the demo run when no run is selected", async () => {
@@ -96,7 +99,7 @@ describe("FactoryAppSplitRunPage", () => {
     expect(screen.queryByText("Add refund reconciliation test")).not.toBeInTheDocument();
   }, 10000);
 
-  it("redirects the deprecated canvas run view to the split run page", async () => {
+  it("keeps the canvas run view on the factory run inspector page", async () => {
     const line = REFUND_FACTORY_LINES[0];
     const appId = REFUND_IMPLEMENTER_APP.id ?? "app-refund-implementer";
 
@@ -107,7 +110,8 @@ describe("FactoryAppSplitRunPage", () => {
       />,
     );
 
-    expect(await screen.findByTestId("factory-app-split-run-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("factory-app-canvas-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-app-split-run-page")).not.toBeInTheDocument();
   }, 10000);
 
   it("points Edit at the configure canvas", async () => {

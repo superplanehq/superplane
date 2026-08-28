@@ -141,10 +141,13 @@ type BrokerTaskFile struct {
 }
 
 // BrokerCommand is one command_list entry sent as {"name","command"} (name optional).
-// Unmarshal still accepts legacy plain strings for tests/fixtures.
+// Kind and Preview are optional live-log labels. Unmarshal still accepts legacy
+// plain strings for tests/fixtures.
 type BrokerCommand struct {
 	Name    string `json:"name,omitempty"`
 	Command string `json:"command"`
+	Kind    string `json:"kind,omitempty"`
+	Preview string `json:"preview,omitempty"`
 }
 
 func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
@@ -164,11 +167,18 @@ func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Name    string `json:"name"`
 		Command string `json:"command"`
+		Kind    string `json:"kind"`
+		Preview string `json:"preview"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	*c = BrokerCommand{Name: strings.TrimSpace(raw.Name), Command: strings.TrimSpace(raw.Command)}
+	*c = BrokerCommand{
+		Name:    strings.TrimSpace(raw.Name),
+		Command: strings.TrimSpace(raw.Command),
+		Kind:    strings.TrimSpace(raw.Kind),
+		Preview: strings.TrimSpace(raw.Preview),
+	}
 	return nil
 }
 
@@ -180,7 +190,11 @@ func BrokerCommandsFromLines(lines []string) []BrokerCommand {
 		if line == "" {
 			continue
 		}
-		out = append(out, BrokerCommand{Command: line})
+		out = append(out, BrokerCommand{
+			Command: line,
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogPreview(line),
+		})
 	}
 	return out
 }

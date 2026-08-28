@@ -100,7 +100,7 @@ function renderView(
           preferredLineName={extras.preferredLineName}
           canDispatch={true}
           canAssign={true}
-          isDispatching={false}
+          dispatchingOrderIds={new Set()}
           isAssigneesSaving={false}
           onDispatch={onDispatch}
           onAssigneesSave={onAssigneesSave}
@@ -265,19 +265,12 @@ describe.each(views)("$name click handling", ({ Component }) => {
 });
 
 describe.each(viewsWithAssignee)("$name assignee control", ({ Component }) => {
-  it("keeps the assignee control clickable", () => {
+  it("shows the owner without a change control", () => {
     const { row } = renderView(Component);
 
-    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("auto");
-  });
-
-  it("does not navigate when the assignee control is clicked", async () => {
-    const user = userEvent.setup();
-    const { router, row } = renderView(Component);
-
-    await user.click(within(row).getByTestId(`work-order-row-assignees-${entry.id}`));
-
-    expect(router.state.location.pathname).toBe("/");
+    expect(within(row).getByTestId(`work-order-row-assignees-${entry.id}`)).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
+    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("none");
   });
 });
 
@@ -297,7 +290,7 @@ describe.each(viewsWithDispatch)("$name dispatch control", ({ Component }) => {
 });
 
 describe("WorkOrderCard scores", () => {
-  it("shows a score and hides Start on a scored draft card", () => {
+  it("shows a score and a Start button to the right of the score", () => {
     const draft = buildWorkOrderListEntry(
       {
         id: "wo-draft-scored",
@@ -322,18 +315,128 @@ describe("WorkOrderCard scores", () => {
             factoryLines={[{ id: "line-a", name: "hotfix" }]}
             canDispatch
             canAssign
-            isDispatching={false}
+            dispatchingOrderIds={new Set()}
             isAssigneesSaving={false}
             onDispatch={vi.fn()}
             onAssigneesSave={vi.fn()}
-            confidencePct={95}
+            confidenceScore={5}
             onOpen={vi.fn()}
           />
         </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    expect(screen.getByTestId("work-order-card-score-wo-draft-scored")).toHaveTextContent("95%");
-    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
+    expect(score).toHaveAttribute("aria-valuenow", "5");
+    expect(score).toHaveAttribute("aria-valuemax", "5");
+    expect(score.querySelectorAll("[data-filled='true']")).toHaveLength(5);
+    expect(score.querySelectorAll("[data-filled='false']")).toHaveLength(0);
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).toBeInTheDocument();
+    expect(score.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows the check name and score when the bars are hovered", async () => {
+    const user = userEvent.setup();
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft-scored",
+        number: "842",
+        title: "Add retry handling to webhook delivery",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+        assignees: [],
+      },
+      factory,
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={draft}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            factoryLines={[{ id: "line-a", name: "hotfix" }]}
+            canDispatch
+            canAssign
+            dispatchingOrderIds={new Set()}
+            isAssigneesSaving={false}
+            onDispatch={vi.fn()}
+            onAssigneesSave={vi.fn()}
+            confidenceScore={4}
+            onOpen={vi.fn()}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const score = screen.getByTestId("work-order-card-score-wo-draft-scored");
+    expect(effectivePointerEvents(score)).toBe("auto");
+
+    await user.hover(score);
+
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("4/5");
+  });
+});
+
+describe("WorkOrderCard attention", () => {
+  const waitingOrder: FactoriesWorkOrder = {
+    id: "wo-waiting",
+    number: "12",
+    title: "Ship refund retries",
+    state: "STATE_OPEN",
+    createdAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2024-06-02T00:00:00Z",
+    statusNotes: [{ key: "pr-closure", headline: "Waiting for user review", body: "Tag the agent." }],
+    lineDispatches: [],
+    assignees: [],
+  };
+
+  const cardProps = {
+    organizationId,
+    factoryKey,
+    factoryLines: [{ id: "line-a", name: "hotfix" }] as FactoriesFactoryLine[],
+    canDispatch: true,
+    canAssign: true,
+    dispatchingOrderIds: new Set<string>(),
+    isAssigneesSaving: false,
+    onDispatch: vi.fn(),
+    onAssigneesSave: vi.fn(),
+    onOpen: vi.fn(),
+  };
+
+  it("shows Waiting for user review when the work order has a status note", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard entry={buildWorkOrderListEntry(waitingOrder, factory)} {...cardProps} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
+    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+  });
+
+  it("shows Addressing user feedback when a PR-feedback run is active", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });

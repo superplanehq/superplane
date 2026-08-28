@@ -3,8 +3,11 @@ import { cn } from "@/lib/utils";
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
 import { CompactLineCanvas } from "./CompactLineCanvas";
 import { PhaseLogCard } from "./PhaseLogCard";
+import { SplitRunLogHeader } from "./SplitRunLogHeader";
+import { runningSplitRunPhaseId } from "./followLogScroll";
 import { splitRunMissingCopy } from "./splitRunPageModel";
 import { useFactoryAppSplitRunPage } from "./useFactoryAppSplitRunPage";
+import { useFollowLogScroll } from "./useFollowLogScroll";
 
 /**
  * Copy of the factory Automation Run page. The body is a resizable split:
@@ -63,6 +66,7 @@ function SplitRunMissingPage({
 }
 
 function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppSplitRunPage> }) {
+  const follow = useFollowLogScroll(runningSplitRunPhaseId(model.fixture?.phases ?? []), model.stream?.length ?? 0);
   return (
     <div className="absolute inset-0 flex flex-col bg-background" data-testid="factory-app-split-run-page">
       <FactoryAppCanvasHeader
@@ -78,12 +82,22 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
       />
       <div ref={model.split.containerRef} className="flex min-h-0 flex-1 overflow-hidden">
         <aside
-          className="flex min-h-0 min-w-[12rem] flex-col border-r border-border bg-muted/25"
+          className="flex min-h-0 min-w-[12rem] flex-col overflow-hidden border-r border-border bg-muted/25"
           style={{ width: `${model.split.percent}%` }}
-          aria-label="Log"
+          aria-label="Automations"
         >
-          <ol className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-            <li>
+          <SplitRunLogHeader
+            following={follow.following}
+            onFollowingChange={follow.setFollowing}
+            className="px-4 pt-3 pb-2"
+          />
+          <ol
+            ref={follow.scrollRef}
+            onScroll={follow.onScroll}
+            className="min-h-0 min-w-0 flex-1 list-none overflow-x-hidden overflow-y-auto px-4 pb-3"
+            data-testid="split-run-log-scroll"
+          >
+            <li className="min-w-0">
               <PhaseLogCard
                 phase={model.phase}
                 expanded
@@ -91,6 +105,9 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
                 stream={model.stream}
                 selectedNodeId={model.nodeId}
                 onSelectNode={model.setNodeId}
+                organizationId={model.organizationId}
+                canvasId={model.phase.appId}
+                editHref={model.editHref}
               />
             </li>
           </ol>
@@ -117,6 +134,7 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
             selectedId={model.nodeId}
             onSelect={model.setNodeId}
             showHeader={false}
+            nodeEditHref={model.nodeEditHref}
           />
         </section>
       </div>

@@ -1,7 +1,10 @@
 import { useNavigate } from "react-router";
 
-import { factoryHomePath } from "../../lib/factoryPagePaths";
+import type { FactoriesFactory } from "@/api-client";
+
+import { firstFactoryLineId } from "../../lib/factoryPagePaths";
 import type { OnboardingRepo } from "./onboardingMocks";
+import { afterOnboardingPath } from "./useFinishOnboarding";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -17,7 +20,7 @@ function storybookRepos(setup: OnboardingSetupApi): OnboardingRepo[] {
 }
 
 /**
- * Picks the Start action for the last setup step. The app provisions the
+ * Picks the Finish action for the last setup step. The app provisions the
  * workspace. Provisioning creates a canvas and materializes a template, which
  * the Storybook fixture backend cannot serve, so stories mark the workspace
  * ready through the setup context and open the line board instead.
@@ -26,6 +29,7 @@ export function useFinishSetupAction(args: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  factory: FactoriesFactory | null;
   setup: OnboardingSetupApi;
   finish: () => void | Promise<void>;
 }): () => void | Promise<void> {
@@ -38,6 +42,12 @@ export function useFinishSetupAction(args: {
 
   return () => {
     onboarding.completeOnboarding(args.factoryId, storybookRepos(args.setup));
-    navigate(factoryHomePath(args.organizationId, args.factoryKey), { replace: true });
+    const lineId = firstFactoryLineId(args.factory) ?? args.factory?.onboarding?.provisionedLineId;
+    if (!lineId) {
+      return;
+    }
+    navigate(afterOnboardingPath({ organizationId: args.organizationId, factoryKey: args.factoryKey, lineId }), {
+      replace: true,
+    });
   };
 }

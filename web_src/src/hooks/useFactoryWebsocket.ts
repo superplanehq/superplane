@@ -80,6 +80,9 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.detail(organizationId, factoryId),
   });
+  void queryClient.invalidateQueries({
+    queryKey: ["factories", organizationId, factoryId, "pull-requests"],
+  });
 
   for (const run of canvasRunsForWorkOrders(
     cachedWorkOrdersForInvalidation(queryClient, organizationId, factoryId, orderId),
@@ -99,10 +102,8 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderEvents(organizationId, factoryId, orderId),
   });
-  // Artifact state (e.g. a PR flipping open/draft/closed/merged via
-  // updateWorkOrderArtifact) and new artifacts (addWorkOrderArtifact)
-  // both land here — without this, the sidebar artifact list and the
-  // timeline's live-data overlay silently go stale until a manual reload.
+  // Artifact adds (addWorkOrderArtifact) land here. Pull request adds
+  // and state updates invalidate factoryQueryKeys.pullRequests above.
   void queryClient.invalidateQueries({
     queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, orderId),
   });

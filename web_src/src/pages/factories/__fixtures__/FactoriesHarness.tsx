@@ -4,18 +4,21 @@ import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fi
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
 import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
+import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "../pages/factoryPreviewFlagsContext";
 import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
 import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
 import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
 import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
 import { WikiWireframe } from "../pages/wiki/WikiWireframe";
 import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
+import { defaultBacklogIntakeItemCatalog } from "./backlogIntakeItemFixtures";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
 import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
 import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
 import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { BacklogIntakeItemsProvider } from "../pages/BacklogIntakeItemsContext";
 
 interface FactoriesHarnessProps {
   /** Path under the org. Defaults to `workspaces` (list page). */
@@ -47,6 +50,9 @@ function DefaultWikiWireframe() {
 }
 
 const defaultFactoryAppFixture = refundLineCanvasFixture();
+
+/** Stories keep hidden-in-app surfaces visible for design review. */
+const PREVIEW_FLAGS: FactoryPreviewFlags = { addIntakeControl: true };
 
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
@@ -102,16 +108,24 @@ export function FactoriesHarness({
   );
 
   const withMissions = (
-    <MissionAssignmentProvider>
-      <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
-        {harness}
-      </WorkOrderOverviewMissionSlotContext.Provider>
-    </MissionAssignmentProvider>
+    <FactoryPreviewFlagsContext.Provider value={PREVIEW_FLAGS}>
+      <MissionAssignmentProvider>
+        <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
+          {harness}
+        </WorkOrderOverviewMissionSlotContext.Provider>
+      </MissionAssignmentProvider>
+    </FactoryPreviewFlagsContext.Provider>
+  );
+
+  const withIntakeItems = (
+    <BacklogIntakeItemsProvider catalog={factoriesFixture.intakeItemCatalog ?? defaultBacklogIntakeItemCatalog}>
+      {withMissions}
+    </BacklogIntakeItemsProvider>
   );
 
   if (!enableOnboarding) {
-    return withMissions;
+    return withIntakeItems;
   }
 
-  return <OnboardingStorybookProvider initial={onboardingSeed}>{withMissions}</OnboardingStorybookProvider>;
+  return <OnboardingStorybookProvider initial={onboardingSeed}>{withIntakeItems}</OnboardingStorybookProvider>;
 }

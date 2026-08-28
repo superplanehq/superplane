@@ -10,10 +10,8 @@ import {
 import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFactoriesFixture";
 
 /**
- * Line board with the terminal-log run popup. Open a card: finished steps
- * stay collapsed, the current step expands, and a log line click selects
- * that component on the canvas (running-blue ring). Expand opens the full
- * automation run page.
+ * Line board with the work-order popup. Open a card: finished steps stay
+ * collapsed and the current step expands into a log.
  */
 const meta = {
   title: "Factories/Pages/Work Order Split Run",
@@ -28,7 +26,7 @@ export default meta;
 type Story = StoryObj;
 
 export const Running: Story = {
-  name: "Terminal log and canvas",
+  name: "Terminal log",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (

@@ -1,3 +1,5 @@
+import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
+
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
@@ -15,6 +17,7 @@ export const FIRST_RUN_COPY = {
     body: "SuperPlane reads your repositories. It does not start work yet.",
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
+    createPrivateApp: CREATE_PRIVATE_GITHUB_APP_LABEL,
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
@@ -69,7 +72,8 @@ export const FIRST_RUN_COPY = {
   },
   board: {
     backlogHintTitle: "Tickets land here first.",
-    backlogHintBody: "Intake is scoring issues now. Review the ones SuperPlane can implement, then start the work.",
+    backlogHintBody:
+      "New issues become work orders here. SuperPlane scores them for how well an agent can complete the work.",
   },
 } as const;
 

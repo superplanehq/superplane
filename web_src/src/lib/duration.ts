@@ -86,6 +86,64 @@ export function formatDuration(durationMs: number, options?: FormatDurationOptio
   return formatDurationFallback(duration);
 }
 
+/** Clock time for a scan column: `02:59`, or `1:10:22` after one hour. */
+export function formatClockDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.round(durationMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${mm}:${ss}`;
+  }
+  return `${mm}:${ss}`;
+}
+
+const KNOWN_DURATION_WORDS = new Set(["—", "-", "Running", "Waiting", "Pending"]);
+
+function parseSpokenDurationMs(label: string): number | null {
+  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
+    return null;
+  }
+  if (/^<\s*1s$/i.test(trimmed)) {
+    return 0;
+  }
+  const clock = trimmed.match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  if (clock) {
+    const hours = Number(clock[1] ?? 0);
+    const minutes = Number(clock[2]);
+    const seconds = Number(clock[3]);
+    return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+  }
+  if (!/\d+\s*[hms]/i.test(trimmed)) {
+    return null;
+  }
+  const hours = Number(trimmed.match(/(\d+)\s*h\b/i)?.[1] ?? 0);
+  const minutes = Number(trimmed.match(/(\d+)\s*m\b/i)?.[1] ?? 0);
+  const seconds = Number(trimmed.match(/(\d+)\s*s\b/i)?.[1] ?? 0);
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+}
+
+/** Parse a stored label such as `4m so far` into milliseconds. Unknown labels are 0. */
+export function durationLabelMs(label: string): number {
+  return parseSpokenDurationMs(label) ?? 0;
+}
+
+/** Turn a stored label such as `2m 59s` into a clock column value. */
+export function formatClockDurationLabel(label: string): string {
+  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  if (!trimmed) {
+    return "—";
+  }
+  const ms = parseSpokenDurationMs(trimmed);
+  if (ms === null) {
+    return trimmed;
+  }
+  return formatClockDuration(ms);
+}
+
 export function formatMinutesSecondsDuration(durationMs: number): string {
   if (durationMs <= 0) return "";
   if (durationMs < 1000) return "<1s";

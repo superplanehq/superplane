@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesFactoryIntake } from "@/api-client";
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler } from "@/api-client";
 
 import {
   DEFAULT_LINE_NAME,
@@ -8,6 +8,7 @@ import {
   provisionEventApps,
   provisionGithubIntake,
   provisionLine,
+  provisionPRFeedbackHandler,
 } from "./onboardingProvision";
 
 describe("provisionLine", () => {
@@ -40,7 +41,7 @@ describe("provisionLine", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("creates a line named Software delivery when none exists", async () => {
+  it("installs plan and implement, and creates a line that runs both", async () => {
     const createLine = vi.fn().mockResolvedValue({ id: "line-new" });
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
@@ -58,11 +59,23 @@ describe("provisionLine", () => {
       updateOnboarding,
     });
 
-    expect(createLine).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: DEFAULT_LINE_NAME,
-      }),
-    );
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "line-planning",
+      "line-implementation",
+    ]);
+    expect(createLine).toHaveBeenCalledWith({
+      name: DEFAULT_LINE_NAME,
+      steps: [
+        {
+          type: "runApp",
+          app: { app: "canvas-line-planning", entrypoint: "onrun-create-plan" },
+        },
+        {
+          type: "runApp",
+          app: { app: "canvas-line-implementation", entrypoint: "onrun-implement" },
+        },
+      ],
+    });
     expect(result.lineId).toBe("line-new");
     expect(updateOnboarding).toHaveBeenCalledWith({
       provisionedAppId: result.primaryAppId,
@@ -105,26 +118,77 @@ describe("provisionGithubIntake", () => {
     const listIntakes = vi.fn().mockResolvedValue([]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-1" } as FactoriesFactoryIntake);
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(intake.id).toBe("intake-1");
   });
 
   it("leaves an existing GitHub intake alone so a retry adds no second copy", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: GITHUB_INTAKE_SOURCE }]);
     const createIntake = vi.fn();
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).not.toHaveBeenCalled();
+    expect(intake.id).toBe("intake-1");
   });
 
   it("creates the GitHub intake next to an intake of another source", async () => {
     const listIntakes = vi.fn().mockResolvedValue([{ id: "intake-1", source: "SOURCE_SENTRY_EXCEPTIONS" }]);
     const createIntake = vi.fn().mockResolvedValue({ id: "intake-2" } as FactoriesFactoryIntake);
 
-    await provisionGithubIntake({ listIntakes, createIntake });
+    const intake = await provisionGithubIntake({ listIntakes, createIntake });
 
     expect(createIntake).toHaveBeenCalledWith({ source: GITHUB_INTAKE_SOURCE });
+    expect(intake.id).toBe("intake-2");
+  });
+});
+
+describe("provisionPRFeedbackHandler", () => {
+  it("creates a handler for a workspace that has none", async () => {
+    const listHandlers = vi.fn().mockResolvedValue([]);
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-1" } as FactoriesFactoryPrFeedbackHandler);
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
+    expect(handler.id).toBe("handler-1");
+  });
+
+  it("leaves a handler for the same repository alone so a retry adds no second copy", async () => {
+    const listHandlers = vi
+      .fn()
+      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/app" } } }]);
+    const createHandler = vi.fn();
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).not.toHaveBeenCalled();
+    expect(handler.id).toBe("handler-1");
+  });
+
+  it("creates a handler next to one that watches a different repository", async () => {
+    const listHandlers = vi
+      .fn()
+      .mockResolvedValue([{ id: "handler-1", settings: { subject: { repository: "acme/other" } } }]);
+    const createHandler = vi.fn().mockResolvedValue({ id: "handler-2" } as FactoriesFactoryPrFeedbackHandler);
+
+    const handler = await provisionPRFeedbackHandler({
+      listHandlers,
+      createHandler,
+      repository: "acme/app",
+    });
+
+    expect(createHandler).toHaveBeenCalledWith({ repository: "acme/app" });
+    expect(handler.id).toBe("handler-2");
   });
 });

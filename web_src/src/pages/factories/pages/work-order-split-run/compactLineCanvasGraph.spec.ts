@@ -1,6 +1,7 @@
 import { Position, type Edge } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
+import { factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import { FACTORY_SIDE_HANDLE_ID, FACTORY_SPINE_HANDLE_ID } from "@/lib/layout/factoryRunLeafLayout";
 
 import { compactLineCanvasGraph } from "./compactLineCanvasGraph";
@@ -36,6 +37,13 @@ function messyIfCanvas(): SplitRunCanvasModel {
         id: "false-agent",
         name: "Agent - No GH Issue Plan",
         component: "runnerClaudeCode",
+        configuration: {
+          steps: [
+            { name: "Clone Repo", type: "bash" },
+            { name: "Write Implementation Plan", type: "prompt" },
+            { name: "Use plan as output", type: "bash" },
+          ],
+        },
         position: { x: 480, y: 400 },
       },
     ],
@@ -77,6 +85,9 @@ describe("compactLineCanvasGraph", () => {
     expect(falseAgent.position.x).toBeGreaterThan(ifNode.position.x);
     expect(falseAgent.position.y).toBe(ifNode.position.y);
     expect(falseAgent.data.isSideTarget).toBe(true);
+    expect(falseAgent.data.steps).toEqual(["Clone Repo", "Write Implementation Plan", "Use plan as output"]);
+    expect({ width: falseAgent.width, height: falseAgent.height }).toEqual(factoryNodeCardSize(3));
+    expect({ width: trueAgent.width, height: trueAgent.height }).toEqual(factoryNodeCardSize());
 
     const trueEdge = edges.find((edge) => edge.source === "if" && edge.target === "comment");
     const falseEdge = edges.find((edge) => edge.source === "if" && edge.target === "false-agent") as
@@ -90,5 +101,23 @@ describe("compactLineCanvasGraph", () => {
     expect(falseEdge?.data).toMatchObject({ channelLabel: "false" });
     expect(mergeEdge?.data).toMatchObject({ channelLabel: "passed" });
     expect(trueEdge?.type).toBe("custom");
+  });
+
+  it("marks the selected node so the compact canvas can highlight it", () => {
+    const { nodes } = compactLineCanvasGraph(messyIfCanvas(), "comment", undefined, false);
+    expect(nodes.find((node) => node.id === "comment")?.data.isSelected).toBe(true);
+    expect(nodes.find((node) => node.id === "on-run")?.data.isSelected).toBe(false);
+  });
+
+  it("attaches an edit href only to the selected node", () => {
+    const { nodes } = compactLineCanvasGraph(
+      messyIfCanvas(),
+      "comment",
+      undefined,
+      false,
+      (nodeId) => `/edit?node=${nodeId}`,
+    );
+    expect(nodes.find((node) => node.id === "comment")?.data.editHref).toBe("/edit?node=comment");
+    expect(nodes.find((node) => node.id === "on-run")?.data.editHref).toBeUndefined();
   });
 });

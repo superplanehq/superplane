@@ -4,11 +4,16 @@ import yaml from "js-yaml";
 import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
 
+const AGENT_COMPONENTS = ["runnerClaudeCode", "runnerCodex", "runnerOpenRouter"];
+
 type AgentStep = { name?: string; command?: string; workingDirectory?: string };
 
 type CanvasNode = {
   id?: string;
-  configuration?: { steps?: AgentStep[] };
+  name?: string;
+  component?: string;
+  concurrency?: { max?: number };
+  configuration?: { model?: string; message?: string; steps?: AgentStep[] };
 };
 
 function canvasNodes(canvasYaml: string): CanvasNode[] {
@@ -36,15 +41,12 @@ function materializeOnboardingApp(factoryId: string) {
 }
 
 describe("setup factory line apps", () => {
-  it("orders the apps as plan, implement, open PR", () => {
-    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual([
-      "line-planning",
-      "line-implementation",
-      "line-pr",
-    ]);
+  it("installs plan and implement only, and leaves verify out of the workspace", () => {
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).toEqual(["line-planning", "line-implementation"]);
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
-  it("exposes a single onRun entrypoint per app that the line calls", () => {
+  it("exposes a single onRun entrypoint per installed app", () => {
     for (const app of ONBOARDING_LINE_APPS) {
       const canvasYaml = materializeOnboardingApp(app.factoryId);
       expect(canvasYaml).toMatch(new RegExp(`id: ${app.entrypointNodeId}[\\s\\S]*component: onRun`));
@@ -64,37 +66,192 @@ describe("setup factory line apps", () => {
     }
   });
 
+  it("gives the planning agent the deeper model the rewrite resolved", () => {
+    const planning = materializeOnboardingApp("line-planning");
+    const implementation = materializeOnboardingApp("line-implementation");
+    const planningAgent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
+    const implementationAgent = canvasNodes(implementation).find((node) => node.id === "implementation-agent-no-issue");
+
+    expect(planningAgent?.configuration?.model).toBe("opus");
+    expect(implementationAgent?.configuration?.model).toBe("sonnet");
+
+    // A hosted run rejects a model that is not on the allowlist, so the
+    // planner takes the resolved Opus id rather than the "opus" alias.
+    const rewrittenPlanning = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Plan",
+      canvasId: "canvas-abc",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerClaudeCode",
+        model: "claude-sonnet-4-6",
+        planningModel: "claude-opus-4-6",
+        credentials: { source: "hosted" },
+      },
+    });
+    const rewrittenAgent = canvasNodes(rewrittenPlanning).find((node) => node.id === "planner-agent-no-issue");
+    expect(rewrittenAgent?.configuration?.model).toBe("claude-opus-4-6");
+  });
+
+  it("falls back to the standard model when the rewrite resolved no planning model", () => {
+    const planning = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Plan",
+      canvasId: "canvas-abc",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: { github: { id: "int-1", name: "acme-github", ready: true } },
+      agentRewrite: {
+        component: "runnerCodex",
+        model: "gpt-5",
+        credentials: { source: "hosted" },
+      },
+    });
+    const agent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
+
+    expect(agent?.component).toBe("runnerCodex");
+    expect(agent?.configuration?.model).toBe("gpt-5");
+  });
+
+  it("names a model on every agent node, with or without an onboarding rewrite", () => {
+    for (const factoryId of ["line-planning", "line-implementation"]) {
+      const agentNodes = canvasNodes(materializeOnboardingApp(factoryId)).filter((node) =>
+        AGENT_COMPONENTS.includes(node.component ?? ""),
+      );
+
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      for (const node of agentNodes) {
+        expect(node.configuration?.model, `${factoryId}/${node.id}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("uses the agent provider and model selected during onboarding", () => {
+    for (const factoryId of ["line-planning", "line-implementation"]) {
+      const canvasYaml = materializeFactoryCanvas({
+        definition: getFactoryDefinition(factoryId),
+        canvasName: factoryId,
+        canvasId: "canvas-abc",
+        installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+        integrations: {
+          github: { id: "int-1", name: "acme-github", ready: true },
+        },
+        agentRewrite: {
+          component: "runnerOpenRouter",
+          model: "openai/gpt-4.1",
+          credentials: { source: "hosted" },
+        },
+      });
+      const agentNodes = canvasNodes(canvasYaml).filter((node) => node.component === "runnerOpenRouter");
+
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      expect(agentNodes.every((node) => node.configuration?.model === "openai/gpt-4.1")).toBe(true);
+    }
+  });
+
   it("routes code work to the app repository", () => {
     const planning = materializeOnboardingApp("line-planning");
+    const planningNodeIds = canvasNodes(planning).map((node) => node.id);
     expect(planning).toContain("acme/app");
-    expect(planning).toContain("acme/backlog");
+    expect(planningNodeIds).toEqual(["onrun-create-plan", "planner-agent-no-issue", "add-plan-artifact"]);
+    expect(planning).toMatch(/sourceId: onrun-create-plan\n\s+targetId: planner-agent-no-issue/);
 
     const implementation = materializeOnboardingApp("line-implementation");
+    const implementationNodeIds = canvasNodes(implementation).map((node) => node.id);
     expect(implementation).toContain("acme/app");
     expect(implementation).toMatch(
       /id: add-branch-artifact[\s\S]*component: addWorkOrderArtifact[\s\S]*repository: acme\/app/,
     );
-
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(implementationNodeIds).toEqual([
+      "onrun-implement",
+      "create-branch",
+      "add-branch-artifact",
+      "implementation-agent-no-issue",
+      "create-pr",
+      "attach-pr-artifact",
+      "set-pr-closure-note",
+      "add-run-error",
+    ]);
+    expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
+    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-pr/);
+    expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(implementation).toMatch(/sourceId: create-pr\n\s+targetId: attach-pr-artifact/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*component: addPullRequest/);
+    expect(implementation).toMatch(
+      /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Pull Request"\]\.data\._links\.html\.href \}\}'/,
+    );
+    expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*state: open/);
+    expect(Object.fromEntries(canvasNodes(implementation).map((node) => [node.id, node.concurrency?.max]))).toEqual({
+      "onrun-implement": undefined,
+      "create-branch": 5,
+      "add-branch-artifact": 100,
+      "implementation-agent-no-issue": 5,
+      "create-pr": 100,
+      "attach-pr-artifact": 100,
+      "set-pr-closure-note": undefined,
+      "add-run-error": undefined,
+    });
   });
 
-  it("links the pull request back to the work order", () => {
-    const pr = materializeOnboardingApp("line-pr");
+  it("writes the pull request title and description in the implementation agent", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+    const agentNodes = nodes.filter((node) => AGENT_COMPONENTS.includes(node.component ?? ""));
+    const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
 
-    expect(pr).toMatch(/component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/);
-    expect(pr).toContain("Created via [SuperPlane](https://superplane.com)");
+    // One agent writes the code and the pull request text, so the run clones
+    // the repository once and the column editor reaches the whole prompt.
+    expect(agentNodes.map((node) => node.id)).toEqual(["implementation-agent-no-issue"]);
+    expect(Object.keys(steps).slice(-3)).toEqual([
+      "Commit and Push",
+      "Generate PR title and description",
+      "Push output",
+    ]);
+    expect(steps["Generate PR title and description"]?.workingDirectory).toBe("repo");
+    expect(implementation).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
+    );
+    expect(implementation).toMatch(
+      /component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/,
+    );
+    // Reviewers get a pull request they can review and merge right away.
+    expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*draft: false/);
+    expect(implementation).toContain("Created via [SuperPlane](https://superplane.com)");
   });
 
   it("announces the PR-merge wait after the work order attaches the pull request", () => {
-    const pr = materializeOnboardingApp("line-pr");
+    const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(pr).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
-    expect(pr).toContain("component: setWorkOrderStatusNote");
-    expect(pr).toContain("noteKey: pr-closure");
-    expect(pr).toContain("headline: Review the pull request");
-    expect(pr).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
-    expect(pr).toContain("showOnlyWhenWaiting: true");
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).not.toContain("github.addIssueLabel");
+    expect(implementation).not.toMatch(/labels:[\s\S]*- factory/);
+    expect(implementation).toContain("component: setWorkOrderStatusNote");
+    expect(implementation).toContain("noteKey: pr-closure");
+    expect(implementation).toContain("headline: Waiting for user review");
+    expect(implementation).toContain(
+      "The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes.",
+    );
+    expect(implementation).toContain("ctaUrl: '{{ $[\"Create Pull Request\"].data.html_url }}'");
+    expect(implementation).toContain("showOnlyWhenWaiting: true");
+  });
+
+  it("names the error node and gives it the message addRunError requires", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const errorNode = canvasNodes(implementation).find((node) => node.id === "add-run-error");
+
+    // An empty message fails canvas validation, so the node carries a warning
+    // badge in the editor and fails when the agent reaches the failed channel.
+    expect(errorNode?.name).toBe("Record Implementation Failure");
+    expect(errorNode?.configuration?.message).toBe(
+      "The implementation agent failed. Open the agent logs to find the cause.",
+    );
+    expect(implementation).toMatch(
+      /channel: failed\n\s+sourceId: implementation-agent-no-issue\n\s+targetId: add-run-error/,
+    );
   });
 
   it("fails planning when the agent does not write the plan file", () => {
@@ -103,40 +260,30 @@ describe("setup factory line apps", () => {
     expect(planning).toContain("exit 1");
   });
 
-  it("fails PR title generation when the agent does not write title files", () => {
-    const pr = materializeOnboardingApp("line-pr");
-    expect(pr).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
-    expect(pr).toContain("exit 1");
-  });
-
   it("fails implementation when the agent pushes no file commits", () => {
     const implementation = materializeOnboardingApp("line-implementation");
     const nodes = canvasNodes(implementation);
 
-    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
-      const steps = nodeStepsByName(nodes, nodeId);
-      const checkout = steps["Checkout Branch"]?.command ?? "";
-      const commit = steps["Commit and Push"]?.command ?? "";
+    const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
+    const checkout = steps["Checkout Branch"]?.command ?? "";
+    const commit = steps["Commit and Push"]?.command ?? "";
 
-      expect(checkout).toContain("set -euo pipefail");
-      expect(commit).toContain("No file changes and no unpushed commits");
-      expect(commit).toContain("exit 1");
-      expect(commit).not.toContain("already up to date on origin");
-      expect(commit).toContain("git status");
-      expect(commit).toContain("git log --oneline -5");
-    }
+    expect(checkout).toContain("set -euo pipefail");
+    expect(commit).toContain("No file changes and no unpushed commits");
+    expect(commit).toContain("exit 1");
+    expect(commit).not.toContain("already up to date on origin");
+    expect(commit).toContain("git status");
+    expect(commit).toContain("git log --oneline -5");
   });
 
   it("runs implementation prompt and commit steps in the cloned repo", () => {
     const implementation = materializeOnboardingApp("line-implementation");
     const nodes = canvasNodes(implementation);
 
-    for (const nodeId of ["implementation-agent", "implementation-agent-no-issue"]) {
-      const steps = nodeStepsByName(nodes, nodeId);
-      expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
-      expect(steps["Implementation"]?.workingDirectory).toBe("repo");
-      expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
-    }
+    const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
+    expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
+    expect(steps["Implementation"]?.workingDirectory).toBe("repo");
+    expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
   });
 });
 
@@ -146,6 +293,7 @@ describe("setup factory event apps", () => {
   it("provisions PR closure outside the factory line", () => {
     expect(ONBOARDING_EVENT_APPS).toEqual(["pr-closure"]);
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("pr-closure");
+    expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
   it("closes the work order when a factory pull request is closed", () => {
@@ -153,9 +301,10 @@ describe("setup factory event apps", () => {
 
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*actions:[\s\S]*- closed/);
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
-    expect(canvasYaml).toContain("component: findWorkOrder");
-    expect(canvasYaml).toContain("by: artifactKey");
-    expect(canvasYaml).toContain("component: updateWorkOrderArtifact");
+    expect(canvasYaml).toContain("component: findPullRequest");
+    expect(canvasYaml).toContain("component: addPullRequestActivity");
+    expect(canvasYaml).toMatch(/description: .*was.*merged.*closed/);
+    expect(canvasYaml).toContain("component: updatePullRequest");
     expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
     expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");
     expect(canvasYaml).toContain("result: completed");

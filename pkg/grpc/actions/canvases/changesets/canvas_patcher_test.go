@@ -562,6 +562,29 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNodeCollapsed("node-a", false)
 	})
 
+	t.Run("add node -> keeps the concurrency spec of the change", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&CanvasChangeset{
+			Changes: []*Change{
+				{
+					Type: ChangeTypeAddNode,
+					Node: &ChangeNode{
+						ID:            "node-a",
+						Name:          "Node A",
+						Block:         "if",
+						Configuration: structFromMap(t, map[string]any{"expression": "true"}),
+						Concurrency:   concurrencyMax(100),
+					},
+				},
+			},
+		})
+
+		steps.assertNoError()
+		steps.assertNodeConcurrencyMax("node-a", 100)
+	})
+
 	t.Run("update node -> invalid configuration sets node error without returning error", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(
@@ -804,7 +827,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "integration is required for github.getIssue")
 	})
@@ -833,7 +859,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "invalid integration id")
 	})
@@ -864,7 +893,10 @@ func Test__CanvasPatcher(t *testing.T) {
 
 		steps.assertNoError()
 		steps.assertNodeCount(1)
-		steps.assertHasNode("node-a", "Node A", nil)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertNodeErrorContains("node-a", "integration "+missingIntegrationID+" not found")
 	})
@@ -1070,6 +1102,15 @@ func (s *CanvasPatcherSteps) assertNodeCollapsed(nodeID string, expected bool) {
 	require.Equal(s.t, expected, s.finalVersion.Nodes[i].IsCollapsed)
 }
 
+func (s *CanvasPatcherSteps) assertNodeConcurrencyMax(nodeID string, expected int) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Equal(s.t, expected, s.finalVersion.Nodes[i].Concurrency.EffectiveMax())
+}
+
 func (s *CanvasPatcherSteps) assertNodeErrorContains(nodeID string, text string) {
 	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
 		return node.ID == nodeID
@@ -1145,6 +1186,10 @@ func (s *CanvasPatcherSteps) assertEdgeOrder(edges []models.Edge) {
 
 func (s *CanvasPatcherSteps) assertGraphIsValid() {
 	require.NoError(s.t, CheckForCycles(s.finalVersion.Nodes, s.finalVersion.Edges))
+}
+
+func concurrencyMax(max int) *models.ConcurrencySpec {
+	return &models.ConcurrencySpec{Max: &max}
 }
 
 func structFromMap(t *testing.T, value map[string]any) *structpb.Struct {
