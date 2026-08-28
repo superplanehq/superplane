@@ -1,6 +1,12 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useFactoryApps, useFactoryWorkOrders, useUpdateFactoryLine } from "@/hooks/useFactoryData";
+import {
+  useFactoryApps,
+  useFactoryPullRequests,
+  useFactoryWorkOrders,
+  useUpdateFactoryLine,
+} from "@/hooks/useFactoryData";
+import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
@@ -24,11 +30,12 @@ import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
   collectLineDoneOrders,
+  collectLineVerifyOrders,
   findBacklogAutomationApp,
   findClosureAutomationApp,
   isDoneLineColumn,
-  lineStageColumns,
   LINE_PHASE_RUNS_PAGE_SIZE,
+  visibleLineStageColumns,
   resolveColumnGlyph,
   resolvePhaseRunStatus,
   type LinePhaseColumn,
@@ -71,6 +78,8 @@ import {
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  prFeedbackSettingsTabFromSearch,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -92,6 +101,9 @@ import {
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
+import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
+import { isPRFeedbackSettingsTab } from "./prFeedbackSettingsModel";
+import { useActivePRFeedbackWorkOrderIds, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
 function applyVisibleWorkOrders(
@@ -128,7 +140,10 @@ export function LinesPage() {
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
+  const prFeedbackOpen = isPRFeedbackSearchOpen(search);
+  const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const { data: workOrders = [] } = useFactoryWorkOrders(organizationId, factoryId);
+  const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
   const { data: me } = useMe(false);
   const listState = useWorkOrderListState(factoryId);
@@ -137,6 +152,7 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
@@ -216,6 +232,17 @@ export function LinesPage() {
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
+      {prFeedbackOpen ? (
+        <PRFeedbackSettingsHost
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          lineId={selectedLine.id}
+          canUpdate={canUpdate}
+          initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
+          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+        />
+      ) : null}
       <div className={factoryKanbanPageClassName}>
         <div className="shrink-0">
           <LineDetailHeader
@@ -248,6 +275,7 @@ export function LinesPage() {
               canDispatch: canUpdateWorkOrders,
               preferredLineName: selectedLine.name,
               canAssign: canUpdateWorkOrders,
+              addressingFeedbackOrderIds,
               ...cardActions,
             }}
           />
@@ -363,7 +391,8 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const board = useMemo(() => lineStageColumns(fullBoard), [fullBoard]);
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
+  const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const doneOrders = useMemo(
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
@@ -391,6 +420,7 @@ function LineDetail({
           factoryKey={factoryKey}
           line={line}
           backlogOrders={backlogOrders}
+          verifyOrders={verifyOrders}
           doneOrders={doneOrders}
           columns={board}
           canCreateWorkOrder={canCreateWorkOrder}
@@ -451,6 +481,11 @@ function LineBoardSplitRunPopup({
   onClose: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
+  const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
+    workOrderIds: [peekOrderId],
+  });
+  const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -461,7 +496,12 @@ function LineBoardSplitRunPopup({
       orderId={peekOrderId}
       orderNumber={peekOrder.number}
       lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(peekOrder, { checks: peekChecks, lineId, demoArtifacts: false })}
+      fixture={splitRunFixtureForWorkOrder(peekOrder, {
+        checks: peekChecks,
+        lineId,
+        demoArtifacts: false,
+        prFeedbackRuns,
+      })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
       isDispatching={isDispatching}
@@ -581,6 +621,7 @@ function PhaseBoard({
   factoryKey,
   line,
   backlogOrders,
+  verifyOrders,
   doneOrders,
   columns,
   canCreateWorkOrder,
@@ -594,6 +635,7 @@ function PhaseBoard({
   factoryKey: string;
   line: FactoriesFactoryLine;
   backlogOrders: FactoriesWorkOrder[];
+  verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
   columns: LinePhaseColumn[];
   canCreateWorkOrder: boolean;
@@ -698,6 +740,20 @@ function PhaseBoard({
         );
       })}
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+        <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
+        <VerifyColumn
+          orders={verifyOrders}
+          title={columnTitles.verify ?? "Verify"}
+          colorId={columnColors.verify ?? null}
+          onColorChange={(colorId) => setColumnColor("verify", colorId)}
+          canRename={canRename}
+          onRename={(title) => setColumnTitle("verify", title)}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
+        />
+      </div>
+      <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
+        <span className="absolute top-[21px] left-0 z-[1] h-px w-3 -translate-x-full bg-border" aria-hidden />
         <DoneColumn
           orders={doneOrders}
           title={columnTitles.done ?? "Done"}
@@ -710,6 +766,59 @@ function PhaseBoard({
         />
       </div>
     </WorkOrderKanbanBoard>
+  );
+}
+
+function VerifyColumn({
+  orders,
+  title,
+  colorId,
+  onColorChange,
+  canRename,
+  onRename,
+  workOrderCardContext,
+  onOpenWorkOrder,
+}: {
+  orders: FactoriesWorkOrder[];
+  title: string;
+  colorId: LineBoardColumnColorId | null;
+  onColorChange: (colorId: LineBoardColumnColorId | null) => void;
+  canRename: boolean;
+  onRename: (title: string) => void;
+  workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
+}) {
+  const surfaceClassName = lineBoardColumnLaneClassName(colorId);
+
+  return (
+    <WorkOrderBoardLane
+      title={title}
+      label={title}
+      canRename={canRename}
+      onRename={onRename}
+      titleTestId="lines-column-title-verify"
+      count={orders.length}
+      tone="neutral"
+      surfaceClassName={surfaceClassName}
+      emptyDescription="No work orders in Verify."
+      className={surfaceClassName ? undefined : "bg-muted"}
+      actions={
+        <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
+      }
+      testId="lines-verify-column"
+    >
+      <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-verify-column-scroll">
+        {orders.map((order) => (
+          <li key={order.id}>
+            <LineBoardOrderCard
+              order={order}
+              workOrderCardContext={workOrderCardContext}
+              onOpenWorkOrder={onOpenWorkOrder}
+            />
+          </li>
+        ))}
+      </ul>
+    </WorkOrderBoardLane>
   );
 }
 

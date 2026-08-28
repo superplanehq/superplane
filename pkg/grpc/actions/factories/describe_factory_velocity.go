@@ -2,7 +2,6 @@ package factories
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -182,8 +181,8 @@ type prArtifactMeta struct {
 }
 
 func listVelocityArtifacts(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time) ([]prArtifactMeta, error) {
-	merged, err := models.ListFactoryPRArtifacts(tx, factoryID, models.FactoryPRArtifactFilter{
-		State:      models.PrArtifactStateMerged,
+	merged, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{
+		State:      models.FactoryPullRequestStateMerged,
 		MergedFrom: &from,
 		MergedTo:   &to,
 	})
@@ -191,8 +190,8 @@ func listVelocityArtifacts(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time)
 		return nil, err
 	}
 
-	closed, err := models.ListFactoryPRArtifacts(tx, factoryID, models.FactoryPRArtifactFilter{
-		State:      models.PrArtifactStateClosed,
+	closed, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{
+		State:      models.FactoryPullRequestStateClosed,
 		ClosedFrom: &from,
 		ClosedTo:   &to,
 	})
@@ -217,53 +216,41 @@ func listVelocityArtifacts(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time)
 }
 
 func listKnownSuperPlanePRs(tx *gorm.DB, factoryID uuid.UUID) ([]prArtifactMeta, error) {
-	// Every SuperPlane PR URL, including artifacts that predate merged_at /
-	// closed_at. People search still returns those PRs; subtracting only
-	// windowed timestamps would count them as People.
-	artifacts, err := models.ListFactoryPRArtifacts(tx, factoryID, models.FactoryPRArtifactFilter{})
+	// Every SuperPlane PR URL, including pull requests that predate
+	// merged_at / closed_at. People search still returns those PRs;
+	// subtracting only windowed timestamps would count them as People.
+	pullRequests, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{})
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]prArtifactMeta, 0, len(artifacts))
-	for i := range artifacts {
-		if meta, ok := toPRMeta(&artifacts[i]); ok {
+	out := make([]prArtifactMeta, 0, len(pullRequests))
+	for i := range pullRequests {
+		if meta, ok := toPRMeta(&pullRequests[i]); ok {
 			out = append(out, meta)
 		}
 	}
 	return out, nil
 }
 
-func toPRMeta(artifact *models.FactoryWorkOrderArtifact) (prArtifactMeta, bool) {
-	if artifact.Type != models.FactoryWorkOrderArtifactTypePR {
+func toPRMeta(pullRequest *models.FactoryPullRequest) (prArtifactMeta, bool) {
+	if pullRequest == nil || strings.TrimSpace(pullRequest.URL) == "" {
 		return prArtifactMeta{}, false
 	}
 
-	url := readArtifactURL(artifact)
-	if url == "" {
-		return prArtifactMeta{}, false
+	owner, repo, ok := parseOwnerRepo(pullRequest.Repository)
+	number := int(pullRequest.Number)
+	if !ok || number == 0 {
+		owner, repo, number = parsePRURL(pullRequest.URL)
 	}
-	owner, repo, number := parsePRURL(url)
 	return prArtifactMeta{
-		url:      url,
+		url:      pullRequest.URL,
 		owner:    owner,
 		repo:     repo,
 		number:   number,
-		mergedAt: artifact.MergedAt,
-		closedAt: artifact.ClosedAt,
+		mergedAt: pullRequest.MergedAt,
+		closedAt: pullRequest.ClosedAt,
 	}, true
-}
-
-func readArtifactURL(artifact *models.FactoryWorkOrderArtifact) string {
-	if len(artifact.Data) == 0 {
-		return ""
-	}
-	var data map[string]any
-	if err := json.Unmarshal(artifact.Data, &data); err != nil {
-		return ""
-	}
-	raw, _ := data["url"].(string)
-	return strings.TrimSpace(raw)
 }
 
 func parsePRURL(url string) (owner, repo string, number int) {

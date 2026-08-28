@@ -9,7 +9,6 @@ import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
 import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
 import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
 import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
-import prCanvasYaml from "./line-apps/pr.canvas.yaml?raw";
 import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
@@ -121,9 +120,8 @@ function buildEventApp(args: {
 
 /**
  * Ordered factory-line apps provisioned during onboarding. Each entry maps to a
- * bundled app template and the line step that calls its onRun entrypoint. The
- * bundled Verify app stays available for manual install, because the line hands
- * the pull request to review from Implement.
+ * bundled app template and the line step that calls its onRun entrypoint.
+ * Implement opens the pull request and hands review to the wait note.
  */
 export interface OnboardingLineApp {
   factoryId: string;
@@ -155,13 +153,6 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Create a branch, implement the plan, and open a draft pull request.",
     canvasYaml: implementationCanvasYaml,
     entrypointNodeId: "onrun-implement",
-  }),
-  "line-pr": buildLineApp({
-    id: "line-pr",
-    title: "Verify",
-    description: "Open a draft pull request and hand the work order to review.",
-    canvasYaml: prCanvasYaml,
-    entrypointNodeId: "onrun-open-pr",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",

@@ -36,6 +36,15 @@ func parseOrderID(orderID string) (uuid.UUID, error) {
 	return id, nil
 }
 
+func parsePullRequestID(prID string) (uuid.UUID, error) {
+	id, err := uuid.Parse(prID)
+	if err != nil {
+		return uuid.Nil, invalidArgument("invalid pull request id")
+	}
+
+	return id, nil
+}
+
 func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []string) ([]uuid.UUID, error) {
 	if len(assigneeIDs) == 0 {
 		return nil, nil

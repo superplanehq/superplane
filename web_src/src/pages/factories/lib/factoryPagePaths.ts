@@ -78,6 +78,31 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(INTAKE_SETTINGS_SEARCH_PARAM);
 }
 
+export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
+/** Opens PR feedback settings on a tab: general or automation. */
+export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+
+export function factoryPRFeedbackPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId?: string | null,
+  settingsTab?: string,
+) {
+  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${PR_FEEDBACK_SEARCH_PARAM}=1`;
+  const settingsQuery = settingsTab ? `&${PR_FEEDBACK_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
+  return `${path}${settingsQuery}`;
+}
+
+export function isPRFeedbackSearchOpen(search: string): boolean {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SEARCH_PARAM) === "1";
+}
+
+export function prFeedbackSettingsTabFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }

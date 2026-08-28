@@ -7,6 +7,7 @@ import { onReleaseTriggerRenderer } from "./on_release";
 import { onTagCreatedTriggerRenderer } from "./on_tag_created";
 import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onPRCommentTriggerRenderer } from "./on_pr_comment";
+import { onPRReviewTriggerRenderer } from "./on_pr_review";
 import { onPRReviewCommentTriggerRenderer } from "./on_pr_review_comment";
 import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
 import { onCommitStatusTriggerRenderer } from "./on_commit_status";
@@ -102,6 +103,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onPush: onPushTriggerRenderer,
   onPullRequest: onPullRequestTriggerRenderer,
   onPRComment: onPRCommentTriggerRenderer,
+  onPRReview: onPRReviewTriggerRenderer,
   onPRReviewComment: onPRReviewCommentTriggerRenderer,
   onIssue: onIssueTriggerRenderer,
   onIssueComment: onIssueCommentTriggerRenderer,

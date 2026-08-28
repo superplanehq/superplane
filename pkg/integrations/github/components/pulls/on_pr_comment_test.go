@@ -168,6 +168,51 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
+	t.Run("ignoreBots skips bot comments", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":"@superplaneagent","user":{"type":"Bot"}}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"ignoreBots":    true,
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("near mention does not match", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"},"number":1},"comment":{"body":"@superplaneagent-old"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
 	t.Run("pull_request_review_comment event type -> ignored", func(t *testing.T) {
 		body := []byte(`{"action":"created","comment":{"body":"some comment"}}`)
 		headers := signedHeaders(body, "test-secret", "pull_request_review_comment")
