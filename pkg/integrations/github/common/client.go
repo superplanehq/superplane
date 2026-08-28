@@ -226,6 +226,33 @@ func (c *Client) ListPullRequestReviewComments(
 	}
 }
 
+// ListIssueComments returns an issue's comments oldest first, paginating
+// through every page. It uses the REST Issues.ListComments endpoint, which
+// returns issue comments only, never pull request review comments.
+func (c *Client) ListIssueComments(ctx context.Context, repository string, issueNumber int) ([]*github.IssueComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.IssueListCommentsOptions{
+		Sort:        github.Ptr("created"),
+		Direction:   github.Ptr("asc"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.IssueComment
+	for {
+		comments, resp, err := c.underlying.Issues.ListComments(ctx, owner, name, issueNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issue comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Edit(ctx, owner, name, pullNumber, pullRequest)
