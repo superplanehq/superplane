@@ -115,6 +115,10 @@ export interface SplitRunPhase {
   canvas?: SplitRunCanvasModel;
   /** Line step index used to rerun this automation. */
   stepIndex?: number;
+  /** Ledger cost for this phase, in USD cents. Hidden when zero. */
+  costCents?: string;
+  /** Ledger token count for this phase. Hidden when zero. */
+  totalTokens?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -618,7 +622,7 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const status = statusForCanvasRun(entry.run);
-  const description = entry.run.description?.trim();
+  const description = entry.description?.trim();
   const name = description
     ? description
     : entry.pullRequestNumber
@@ -654,6 +658,8 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: entry.canvasId,
     runId: entry.run.id,
+    costCents: entry.costCents,
+    totalTokens: entry.totalTokens,
   };
 }
 
@@ -893,6 +899,8 @@ function executionToPhase(
     appId: execution.run?.appId,
     runId: execution.run?.id,
     stepIndex: execution.stepIndex,
+    costCents: execution.costCents,
+    totalTokens: execution.totalTokens,
   };
 }
 

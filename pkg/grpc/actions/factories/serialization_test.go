@@ -23,7 +23,7 @@ func mustSerializeWorkOrder(
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
 	t.Helper()
-	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation)
+	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation, models.UsageTotals{})
 	require.NoError(t, err)
 	return serialized
 }
@@ -165,7 +165,11 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	}
 
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
-	serialized := mustSerializeWorkOrder(t, nil, order, dispatches, nil)
+	serialized, err := serializeWorkOrder(nil, order, dispatches, nil, models.UsageTotals{
+		TotalTokens: 10,
+		CostMicros:  50_000,
+	})
+	require.NoError(t, err)
 
 	require.Len(t, serialized.LineDispatches, 1)
 	dispatch := serialized.LineDispatches[0]
@@ -183,7 +187,7 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	assert.Equal(t, pb.WorkOrderExecution_STATE_FINISHED, execution.State)
 	assert.Equal(t, pb.WorkOrderExecution_RESULT_PASSED, execution.Result)
 
-	// Aggregate usage sums across every dispatch's step executions.
+	// Work-order totals come from the ledger, not from step-cache sums.
 	assert.EqualValues(t, 10, serialized.TotalTokens)
 	assert.EqualValues(t, 5, serialized.TotalCostCents)
 }

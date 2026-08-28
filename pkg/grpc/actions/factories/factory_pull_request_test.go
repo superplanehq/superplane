@@ -180,10 +180,12 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		assert.Equal(t, order.Number, described.GetWorkOrderNumber())
 		assert.Equal(t, "Fix retry", described.GetTitle())
 		require.Len(t, described.GetRuns(), 1)
-		assert.Equal(t, run.ID.String(), described.GetRuns()[0].GetId())
-		assert.Equal(t, canvas.ID.String(), described.GetRuns()[0].GetCanvasId())
-		assert.Equal(t, canvasespb.CanvasRun_STATE_STARTED, described.GetRuns()[0].GetState())
-		assert.Equal(t, "Please add tests for the retry path.", described.GetRuns()[0].GetDescription())
+		linked := described.GetRuns()[0]
+		require.NotNil(t, linked.GetRun())
+		assert.Equal(t, run.ID.String(), linked.GetRun().GetId())
+		assert.Equal(t, canvas.ID.String(), linked.GetRun().GetCanvasId())
+		assert.Equal(t, canvasespb.CanvasRun_STATE_STARTED, linked.GetRun().GetState())
+		assert.Equal(t, "Please add tests for the retry path.", linked.GetDescription())
 	})
 
 	t.Run("updates a tracked pull request", func(t *testing.T) {
