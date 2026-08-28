@@ -1,6 +1,6 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromLine, Gauge, Kanban, MessageSquare, Settings } from "lucide-react";
+import { ArrowRightFromLine, Kanban, MessageSquare, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import {
@@ -8,11 +8,10 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factorySettingsPath,
-  factoryVelocityPath,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
 } from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
+import { factoriesRailControlClassName, isBoardPath, isSettingsPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
@@ -55,7 +54,7 @@ function RailNavLink({
 
 /**
  * Icon rail under the workspace switcher: intake drawer, PR feedback,
- * the line board, velocity, then settings.
+ * the line board, then settings.
  */
 export function FactoriesSidebarNav({
   organizationId,
@@ -70,12 +69,10 @@ export function FactoriesSidebarNav({
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const intakeHref = intakeOpen ? boardHref : factoryIntakePath(organizationId, factoryKey, lineId);
   const prFeedbackHref = prFeedbackOpen ? boardHref : factoryPRFeedbackPath(organizationId, factoryKey, lineId);
-  const velocityHref = factoryVelocityPath(organizationId, factoryKey);
   const settingsHref = factorySettingsPath(organizationId, factoryKey);
   const intakeCurrent = intakeOpen;
   const prFeedbackCurrent = prFeedbackOpen;
   const boardCurrent = isBoardPath(pathname) && !intakeOpen && !prFeedbackOpen;
-  const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
 
   return (
@@ -95,13 +92,6 @@ export function FactoriesSidebarNav({
         isCurrent={prFeedbackCurrent}
       />
       <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
-      <RailNavLink
-        to={velocityHref}
-        label="Velocity"
-        Icon={Gauge}
-        testId="factories-nav-velocity"
-        isCurrent={velocityCurrent}
-      />
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."
