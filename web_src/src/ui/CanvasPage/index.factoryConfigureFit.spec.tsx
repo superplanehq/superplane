@@ -4,12 +4,13 @@ import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { LIVE_CANVAS_FIT_VIEW_OPTIONS } from "./canvasFitOptions";
+import { FACTORY_CONFIGURE_FIT_VIEW_OPTIONS } from "./canvasFitOptions";
 import { FACTORY_CONFIGURE_FIT_SETTLE_MS } from "./factoryConfigureFitView";
 
-const { fitViewMock, getViewportMock, reactFlowPropsRef } = vi.hoisted(() => ({
+const { fitViewMock, getViewportMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   fitViewMock: vi.fn().mockResolvedValue(true),
   getViewportMock: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
+  getNodesMock: vi.fn(() => [] as Array<{ id: string }>),
   reactFlowPropsRef: {
     current: null as null | {
       onInit?: (instance: { setViewport: (viewport: unknown) => void }) => void;
@@ -56,7 +57,7 @@ vi.mock("@xyflow/react", () => ({
     zoomTo: vi.fn(),
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
-    getNodes: vi.fn(() => []),
+    getNodes: getNodesMock,
     getZoom: vi.fn(() => 1),
   })),
   useStore: vi.fn((selector: (state: { minZoom: number; maxZoom: number }) => unknown) =>
@@ -138,6 +139,8 @@ function render(ui: ReactElement) {
 function canvasPage(overrides: {
   isEditing: boolean;
   factoryConfigure?: boolean;
+  initialSidebar?: { isOpen: boolean; nodeId: string };
+  initialFocusNodeId?: string;
   hasFitToViewRef: { current: boolean };
   viewportRef: { current: { x: number; y: number; zoom: number } };
 }) {
@@ -164,6 +167,8 @@ describe("CanvasPage factory Configure fit", () => {
     fitViewMock.mockResolvedValue(true);
     getViewportMock.mockReset();
     getViewportMock.mockReturnValue({ x: 0, y: 0, zoom: 1 });
+    getNodesMock.mockReset();
+    getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
@@ -200,7 +205,7 @@ describe("CanvasPage factory Configure fit", () => {
 
       expect(fitViewMock).toHaveBeenCalledTimes(1);
       expect(fitViewMock).toHaveBeenCalledWith({
-        ...LIVE_CANVAS_FIT_VIEW_OPTIONS,
+        ...FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
         duration: 500,
       });
       expect(viewportRef.current).toEqual(fittedViewport);
@@ -257,6 +262,40 @@ describe("CanvasPage factory Configure fit", () => {
       });
 
       expect(fitViewMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("centers the deep-linked node when Configure opens from a selected component", async () => {
+    vi.useFakeTimers();
+    try {
+      const hasFitToViewRef = { current: true };
+      const viewportRef = { current: { x: 0, y: 0, zoom: 1 } };
+      getNodesMock.mockReturnValue(singleNode);
+
+      render(
+        canvasPage({
+          isEditing: true,
+          factoryConfigure: true,
+          initialSidebar: { isOpen: true, nodeId: "node-1" },
+          hasFitToViewRef,
+          viewportRef,
+        }),
+      );
+      act(() => {
+        reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+      });
+      fitViewMock.mockClear();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(FACTORY_CONFIGURE_FIT_SETTLE_MS);
+      });
+
+      expect(fitViewMock).toHaveBeenCalledTimes(1);
+      expect(fitViewMock.mock.calls[0]?.[0]?.nodes?.[0]?.id).toBe("node-1");
+      expect(fitViewMock.mock.calls[0]?.[0]?.minZoom).toBe(1);
+      expect(fitViewMock.mock.calls[0]?.[0]?.maxZoom).toBe(1);
     } finally {
       vi.useRealTimers();
     }

@@ -40,7 +40,7 @@ describe("provisionLine", () => {
     expect(installFactory).not.toHaveBeenCalled();
   });
 
-  it("creates the plan-and-implement line when none exists", async () => {
+  it("installs plan and implement, and creates a line that runs both", async () => {
     const createLine = vi.fn().mockResolvedValue({ id: "line-new" });
     const updateOnboarding = vi.fn().mockResolvedValue({});
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
@@ -58,11 +58,23 @@ describe("provisionLine", () => {
       updateOnboarding,
     });
 
-    expect(createLine).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: DEFAULT_LINE_NAME,
-      }),
-    );
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "line-planning",
+      "line-implementation",
+    ]);
+    expect(createLine).toHaveBeenCalledWith({
+      name: DEFAULT_LINE_NAME,
+      steps: [
+        {
+          type: "runApp",
+          app: { app: "canvas-line-planning", entrypoint: "onrun-create-plan" },
+        },
+        {
+          type: "runApp",
+          app: { app: "canvas-line-implementation", entrypoint: "onrun-implement" },
+        },
+      ],
+    });
     expect(result.lineId).toBe("line-new");
     expect(updateOnboarding).toHaveBeenCalledWith({
       provisionedAppId: result.primaryAppId,

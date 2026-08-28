@@ -24,15 +24,13 @@ export type SplitRunSource =
       name: string;
       iconSrc: string;
       iconAlt: string;
-      ticket: { label: string; href: string };
+      ticket?: { label: string; href: string };
     }
   | {
       kind: "manual";
       person: OrgUserDisplay;
       detail: typeof CREATED_MANUALLY;
     };
-
-const GITHUB_REPO = "acme/payments-service";
 
 const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
   id: STORYBOOK_ME_USER_ID,
@@ -70,15 +68,25 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
 }
 
 export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSource {
+  const originHref = order.origin?.url?.trim();
+  if (originHref) {
+    return intakeSourceFromHref(
+      originHref,
+      intakeKindFromHref(originHref),
+      order.origin?.label?.trim() || sourceTicketLabel(originHref),
+    );
+  }
+
   const candidate = reviewCandidateForWorkOrderId(order.id);
   if (candidate?.issue.url) {
     return intakeSourceFromHref(candidate.issue.url);
   }
+
   const automation = order.createdBy?.automation;
   if (automation) {
-    const intakeKind = intakeKindForAutomation(automation);
-    return intakeSourceFromHref(ticketHrefForIntake(intakeKind, order), intakeKind);
+    return intakeSourceFromKind(intakeKindForAutomation(automation));
   }
+
   return {
     kind: "manual",
     person: sourcePerson(order),
@@ -90,17 +98,21 @@ export function isOriginTicketArtifact(artifact: FactoriesWorkOrderArtifact, sou
   if (artifact.id?.endsWith("-issue-link")) {
     return true;
   }
-  if (source?.kind !== "intake") {
+  if (source?.kind !== "intake" || !source.ticket) {
     return false;
   }
   return extractArtifactUrl(toArtifactDataRecord(artifact.data)) === source.ticket.href;
 }
 
-function intakeSourceFromHref(href: string, intakeKind = intakeKindFromHref(href)): SplitRunSource {
+function intakeSourceFromHref(
+  href: string,
+  intakeKind = intakeKindFromHref(href),
+  label = sourceTicketLabel(href),
+): SplitRunSource {
   return {
     kind: "intake",
     ...INTAKE_PRESENTATION[intakeKind],
-    ticket: { label: sourceTicketLabel(href), href },
+    ticket: { label, href },
   };
 }
 
@@ -118,6 +130,13 @@ function intakeKindForAutomation(automation: FactoriesAutomationRef): SplitRunIn
   return "github-issues";
 }
 
+function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunSource {
+  return {
+    kind: "intake",
+    ...INTAKE_PRESENTATION[intakeKind],
+  };
+}
+
 function intakeKindFromHref(href: string): SplitRunIntakeKind {
   const host = parseUrl(href)?.hostname ?? "";
   if (host.includes("sentry.io")) {
@@ -130,24 +149,6 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
     return "slack";
   }
   return "github-issues";
-}
-
-function ticketHrefForIntake(kind: SplitRunIntakeKind, order: FactoriesWorkOrder): string {
-  const number = ticketNumber(order);
-  if (kind === "sentry-exceptions") {
-    return `https://superplane.sentry.io/issues/${number}/`;
-  }
-  if (kind === "pagerduty-incidents") {
-    return `https://acme.pagerduty.com/incidents/P${number}`;
-  }
-  if (kind === "slack") {
-    return `https://acme.slack.com/archives/C0REFUNDS/p${number}`;
-  }
-  return `https://github.com/${GITHUB_REPO}/issues/${number}`;
-}
-
-function ticketNumber(order: FactoriesWorkOrder): string {
-  return `${order.key ?? order.number ?? "1"}`.replace(/\D/g, "") || "1";
 }
 
 function sourcePerson(order: FactoriesWorkOrder): OrgUserDisplay {

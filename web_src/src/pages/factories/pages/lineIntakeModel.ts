@@ -129,6 +129,14 @@ export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
   return LINE_INTAKE_SOURCES.find((source) => source.id === id);
 }
 
+export function lineIntakeSourceForApiSource(apiSource: string | undefined): LineIntakeSource | undefined {
+  if (!apiSource) {
+    return undefined;
+  }
+  const sourceId = LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[apiSource];
+  return sourceId ? lineIntakeSourceById(sourceId) : undefined;
+}
+
 export function isFirstRunOnboardingFactory(factoryKey: string | undefined): boolean {
   return factoryKey === ACME_ONBOARDING_FACTORY_KEY;
 }
@@ -170,8 +178,7 @@ export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryI
 export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
   return intakes.flatMap((intake) => {
     const intakeId = intake.id?.trim();
-    const sourceId = intake.source ? LINE_INTAKE_SOURCE_ID_BY_API_SOURCE[intake.source] : undefined;
-    const source = sourceId ? lineIntakeSourceById(sourceId) : undefined;
+    const source = lineIntakeSourceForApiSource(intake.source);
     if (!intakeId || !source) {
       return [];
     }
@@ -346,6 +353,7 @@ export function intakeTicketAnalysisFixture(
         detail: "Ticket received from GitHub issues.",
         canvas,
         artifacts: ingestArtifacts(ticket),
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "analyze",
@@ -355,6 +363,7 @@ export function intakeTicketAnalysisFixture(
         componentName: "Analyze ticket",
         detail: view.analyzeDetail,
         canvas,
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "plan",
@@ -365,6 +374,7 @@ export function intakeTicketAnalysisFixture(
         detail: view.planDetail,
         canvas,
         artifacts: complete ? planArtifact(ticket) : [],
+        appId: ticket.appId,
       }),
       ticketAnalysisPhase({
         id: "score",
@@ -375,6 +385,7 @@ export function intakeTicketAnalysisFixture(
         detail: view.scoreDetail,
         canvas,
         checks,
+        appId: ticket.appId,
       }),
     ],
   };
@@ -455,6 +466,7 @@ function ticketAnalysisPhase({
   canvas,
   artifacts = [],
   checks = [],
+  appId,
 }: {
   id: SplitRunPhase["id"];
   name: string;
@@ -465,6 +477,7 @@ function ticketAnalysisPhase({
   canvas: SplitRunCanvasModel;
   artifacts?: FactoriesWorkOrderArtifact[];
   checks?: WorkOrderCheckPresentation[];
+  appId?: string;
 }): SplitRunPhase {
   return {
     id,
@@ -476,6 +489,7 @@ function ticketAnalysisPhase({
     checks,
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `ticket-${id}`,
@@ -566,7 +580,7 @@ export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvas
   return intakeCanvasForSource(source);
 }
 
-export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixture {
+export function intakeAutomationFixture(source: LineIntakeSource, appId?: string): SplitRunFixture {
   const canvas = intakeAutomationCanvas(source);
   const waitingNotes: WorkOrderStatusNotePresentation[] = [
     {
@@ -597,11 +611,15 @@ export function intakeAutomationFixture(source: LineIntakeSource): SplitRunFixtu
       note: { headline: waitingNotes[0].headline, text: waitingNotes[0].text },
     },
     footerTone: "running",
-    phases: [listenPhase(source, canvas), evaluatePhase(source, canvas), backlogPhase(source, canvas)],
+    phases: [
+      listenPhase(source, canvas, appId),
+      evaluatePhase(source, canvas, appId),
+      backlogPhase(source, canvas, appId),
+    ],
   };
 }
 
-function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   return {
     id: "listen",
     name: "Listen",
@@ -611,6 +629,7 @@ function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Spl
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `${source.id}-listen`,
@@ -623,7 +642,7 @@ function listenPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Spl
   };
 }
 
-function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   return {
     id: "evaluate",
     name: "Evaluate",
@@ -633,6 +652,7 @@ function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): S
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream: [
       {
         id: `${source.id}-evaluate`,
@@ -645,7 +665,7 @@ function evaluatePhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): S
   };
 }
 
-function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): SplitRunPhase {
+function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel, appId?: string): SplitRunPhase {
   const stream: SplitRunStreamLine[] = [
     {
       id: `${source.id}-backlog`,
@@ -664,6 +684,7 @@ function backlogPhase(source: LineIntakeSource, canvas: SplitRunCanvasModel): Sp
     artifacts: [],
     canvas,
     canvasSteps: [],
+    appId,
     stream,
   };
 }

@@ -103,6 +103,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       componentName: "Create plan",
       artifacts: [PLAN_ARTIFACT],
       canvasKey: "planning",
+      appId: "app-refund-planner",
       stream: [
         {
           id: "plan-read",
@@ -149,6 +150,10 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       duration: "4m",
       componentName: "Implementation",
       artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
+      canvasKey: "implementation",
+      appId: "app-refund-implementer",
+      runId: LINE_RUN_IMPLEMENT_ID,
+      stepIndex: 0,
       stream: [
         {
           id: "impl-branch",

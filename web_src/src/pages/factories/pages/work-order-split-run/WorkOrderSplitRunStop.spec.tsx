@@ -14,6 +14,7 @@ vi.mock("./useSplitRunFooterActions", () => ({
   useSplitRunFooterActions: () => ({
     handleStop: handleStopMock,
     handleReject: handleRejectMock,
+    handleStopAutomation: vi.fn(),
     busy: false,
   }),
 }));
@@ -21,18 +22,18 @@ vi.mock("./useSplitRunFooterActions", () => ({
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { DRAFT_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../__fixtures__/lineMetricsBoardOrders";
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
-function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fixture"]) {
+function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fixture"], onClose?: () => void) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
-            <WorkOrderSplitRunPopup fixture={fixture} />
+            <WorkOrderSplitRunPopup fixture={fixture} onClose={onClose} />
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
@@ -40,82 +41,45 @@ function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fix
   );
 }
 
-describe("WorkOrderSplitRunPopup stop actions", () => {
+describe("WorkOrderSplitRunPopup header actions", () => {
   beforeEach(() => {
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
   });
 
-  it("closes as rejected when Stop and Close is used", async () => {
-    const user = userEvent.setup();
+  it("keeps Reject and Approve off a running work order", () => {
     renderPopup(SPLIT_RUN_RUNNING);
 
-    await user.click(screen.getByRole("button", { name: "Stop and Close" }));
-    expect(handleStopMock).toHaveBeenCalledWith("canceled", expect.objectContaining({ kind: "running" }));
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
   });
 
-  it("closes as completed after that Stop outcome is chosen", async () => {
-    const user = userEvent.setup();
-    renderPopup(SPLIT_RUN_RUNNING);
+  it("keeps Reject and Approve off a waiting work order", () => {
+    renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Stop and Complete/ }));
-    await user.click(screen.getByRole("button", { name: "Stop and Complete" }));
-    expect(handleStopMock).toHaveBeenCalledWith("completed", expect.objectContaining({ kind: "running" }));
+    expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
-  it("reruns the current step after that Stop outcome is chosen", async () => {
-    const user = userEvent.setup();
-    renderPopup(SPLIT_RUN_RUNNING);
-
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Rerun this step/ }));
-    await user.click(screen.getByRole("button", { name: "Rerun step" }));
-    expect(handleStopMock).toHaveBeenCalledWith("rerun-step", expect.objectContaining({ kind: "running" }));
-  });
-
-  it("reruns from the start after that Stop outcome is chosen", async () => {
-    const user = userEvent.setup();
-    renderPopup(SPLIT_RUN_RUNNING);
-
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    await user.click(await screen.findByRole("menuitem", { name: /Rerun from the start/ }));
-    await user.click(screen.getByRole("button", { name: "Rerun from start" }));
-    expect(handleStopMock).toHaveBeenCalledWith("rerun-start", expect.objectContaining({ kind: "running" }));
-  });
-
-  it("closes a draft as canceled from Reject", async () => {
-    const user = userEvent.setup();
+  it("keeps Start on a draft and omits Reject", () => {
     renderPopup(splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER));
 
-    await user.click(within(screen.getByTestId("split-run-review")).getByRole("button", { name: "Reject" }));
-    expect(handleRejectMock).toHaveBeenCalledTimes(1);
+    const header = screen.getByTestId("split-run-header-actions");
+    expect(within(header).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(header).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("reopens a closed work order from Reopen", async () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER));
 
-    expect(screen.queryByRole("button", { name: "Rerun step" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reopen" }));
+    const header = screen.getByTestId("split-run-header-actions");
+    expect(within(header).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+    await user.click(within(header).getByRole("button", { name: "Reopen" }));
     expect(handleStopMock).toHaveBeenCalledWith(
       "reopen",
       expect.objectContaining({ kind: "failed", status: "failed" }),
     );
-  });
-
-  it("hides Rerun when the work order is already a draft", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      ...SPLIT_RUN_RUNNING,
-      footer: { ...SPLIT_RUN_RUNNING.footer, status: "draft" },
-    });
-
-    await user.click(screen.getByRole("button", { name: "Choose how to stop" }));
-    const menu = await screen.findByRole("menu");
-    expect(within(menu).queryByRole("menuitem", { name: /Rerun this step/ })).not.toBeInTheDocument();
-    expect(within(menu).queryByRole("menuitem", { name: /Rerun from the start/ })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop and Close/ })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitem", { name: /Stop and Complete/ })).toBeInTheDocument();
   });
 });

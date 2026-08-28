@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
+  QUESTION_WORK_ORDER,
   RUNNING_WORK_ORDER,
   SENTRY_DRAFT_WORK_ORDER,
   SLACK_DRAFT_WORK_ORDER,
@@ -57,6 +59,34 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
+  it("uses the persisted origin label when the order has one", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: {
+          url: "https://github.com/acme/payments/issues/12",
+          label: "acme/payments#12",
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "GitHub issues",
+        ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
+      }),
+    );
+  });
+
+  it("maps automation-created orders without origin to the intake source", () => {
+    const sentry = splitRunSourceForOrder({ ...OPEN_WORK_ORDER_SECONDARY, origin: undefined });
+    expect(sentry).toEqual(expect.objectContaining({ kind: "intake", name: "Sentry exceptions" }));
+    expect(sentry).not.toHaveProperty("ticket");
+
+    const slack = splitRunSourceForOrder({ ...QUESTION_WORK_ORDER, origin: undefined });
+    expect(slack).toEqual(expect.objectContaining({ kind: "intake", name: "Slack" }));
+    expect(slack).not.toHaveProperty("ticket");
+  });
+
   it("maps ingest, Sentry, and Slack automations to the drawer intake names", () => {
     expect(splitRunSourceForOrder(RUNNING_WORK_ORDER)).toEqual(
       expect.objectContaining({
@@ -98,8 +128,10 @@ describe("splitRunSourceForOrder", () => {
       const source = splitRunSourceForOrder(order);
       if (source.kind === "intake") {
         expect(source.name, order.id).toBeTruthy();
-        expect(source.ticket.href, order.id).toMatch(/^https?:/);
-        expect(source.ticket.label, order.id).toBeTruthy();
+        if (source.ticket) {
+          expect(source.ticket.href, order.id).toMatch(/^https?:/);
+          expect(source.ticket.label, order.id).toBeTruthy();
+        }
       } else {
         expect(source.person.name, order.id).toBeTruthy();
         expect(source.detail, order.id).toBe("Created manually");

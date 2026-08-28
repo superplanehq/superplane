@@ -185,7 +185,7 @@ spec:
         orderId: '{{ order().id }}'
         noteKey: pr-closure
         headline: Listening for user review
-        body: This automation finished and opened this pull request. Tag `@superplaneagent` in comment to request changes. Task will automatically close when the pull request is closed or merged.
+        body: This automation finished and opened this pull request. Task will automatically close when the pull request is closed or merged.
         ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
         ctaUrl: '{{ $["Create Draft Pull Request"].data.html_url }}'
         showOnlyWhenWaiting: true

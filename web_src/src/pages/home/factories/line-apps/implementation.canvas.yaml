@@ -13,28 +13,16 @@ spec:
       targetId: add-branch-artifact
     - channel: default
       sourceId: add-branch-artifact
-      targetId: from-gh-issue-check
-    - channel: "true"
-      sourceId: from-gh-issue-check
-      targetId: implementation-agent
-    - channel: "false"
-      sourceId: from-gh-issue-check
       targetId: implementation-agent-no-issue
-    - channel: passed
-      sourceId: implementation-agent
-      targetId: create-draft-pr
     - channel: passed
       sourceId: implementation-agent-no-issue
       targetId: create-draft-pr
     - channel: default
       sourceId: create-draft-pr
       targetId: attach-pr-artifact
-    - channel: failed
-      sourceId: implementation-agent
-      targetId: add-run-error
-    - channel: failed
-      sourceId: implementation-agent-no-issue
-      targetId: add-run-error
+    - channel: default
+      sourceId: attach-pr-artifact
+      targetId: set-pr-closure-note
   nodes:
     - id: onrun-implement
       name: Start
@@ -42,13 +30,15 @@ spec:
       component: onRun
       configuration: {}
       position:
-        x: 1536
+        x: 1542
         'y': 144
       isCollapsed: true
     - id: create-branch
       name: Create Branch
       type: TYPE_ACTION
       component: runnerBash
+      concurrency:
+        max: 5
       configuration:
         enable_setup_commands: false
         environmentFrom:
@@ -102,135 +92,24 @@ spec:
           # Respond with branch and session id
           printf '{"branch":"%s", "session":"%s"}\n' "$BRANCH" "$SESSION_ID" > "$SUPERPLANE_RESULT_FILE"
       position:
-        x: 1536
+        x: 1542
         'y': 312
       isCollapsed: false
     - id: add-branch-artifact
       name: Add Branch Artifact
       type: TYPE_ACTION
       component: addWorkOrderArtifact
+      concurrency:
+        max: 100
       configuration:
         artifactType: branch
         name: '{{ $["Create Branch"].data.result.branch }}'
         orderId: '{{ order().id }}'
         repository: '{{ install_params.appRepository }}'
       position:
-        x: 1489
+        x: 1495
         'y': 480
       isCollapsed: true
-    - id: from-gh-issue-check
-      name: From GH issue?
-      type: TYPE_ACTION
-      component: if
-      configuration:
-        expression: '"source" in order()'
-      position:
-        x: 1489
-        'y': 648
-      isCollapsed: true
-    - id: implementation-agent
-      name: Agent - Implement from GH issue
-      type: TYPE_ACTION
-      component: runnerClaudeCode
-      concurrency:
-        max: 5
-      configuration:
-        credentials:
-          source: integration
-          integration:
-            name: claude
-        environmentFrom:
-          - source: integration
-            integration:
-              name: github
-        environment:
-          - name: REPO
-            value: '{{ order().source.repository.full_name }}'
-            valueSource: literal
-          - name: BRANCH
-            value: '{{ $["Create Branch"].data.result.branch }}'
-            valueSource: literal
-          - name: ISSUE_NUMBER
-            value: '{{ order().source.issue.number }}'
-            valueSource: literal
-          - name: PLAN
-            value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}'
-            valueSource: literal
-        executionTimeoutSeconds: 3600
-        machineType: e1-large-amd64
-        model: sonnet
-        steps:
-          - name: Set Up Git User
-            type: bash
-            command: |-
-              echo "Using superplaneagent@superplane.com"
-              git config --global user.email "superplaneagent@superplane.com"
-              git config --global user.name "SuperPlane Agent"
-          - name: Provide Plan
-            type: bash
-            command: |-
-              echo $PLAN | base64 -d > /tmp/PLAN.md
-              cat /tmp/PLAN.md
-          - name: Checkout Branch
-            type: bash
-            command: |-
-              set -euo pipefail
-              rm -rf repo
-              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
-              cd repo
-          - name: Set Up DCO Signing
-            type: bash
-            workingDirectory: repo
-            command: |-
-              cat > .git/hooks/prepare-commit-msg <<'HOOK'
-              printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
-              HOOK
-
-              chmod +x .git/hooks/prepare-commit-msg
-          - name: Implementation
-            type: prompt
-            workingDirectory: repo
-            prompt: |-
-              You are implementing a fix for a SuperPlane work order. The repository is already checked out in your current working directory, on the branch to work on.
-
-              Repository: {{ order().source.repository.full_name }}
-              Issue number: {{ order().source.issue.number }}
-              Issue title: {{ order().source.issue.title }}
-
-              1/ The preliminary plan is at /tmp/PLAN.md. Read it before writing any implementation.
-              2/ Gather context. Using the GitHub token in the GITHUB_TOKEN environment variable, read the FULL issue and ALL of its comments before writing any code.
-              3/ Implement. Make the code changes required to resolve the issue and address the discussion in the comments.
-              4/ Keep the change focused and commit your work to the current branch with clear commit messages.
-
-              Guidelines:
-
-              1/ Focus on clean code.
-              2/ Make long term fixes, not fast patches.
-              3/ Add tests where it makes sense.
-          - name: Commit and Push
-            type: bash
-            workingDirectory: repo
-            command: |-
-              set -euo pipefail
-              echo "cwd=$(pwd -P)"
-              git status
-              git log --oneline -5
-              git add -A
-              if ! git diff --cached --quiet; then
-                git commit -s -m "fix: implement issue #${ISSUE_NUMBER} via SuperPlane"
-              fi
-              if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
-                if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
-                  exit 1
-                fi
-              fi
-              git push origin "$BRANCH"
-              echo "Pushed implementation to $BRANCH"
-      position:
-        x: 1442
-        'y': 816
-      isCollapsed: false
     - id: implementation-agent-no-issue
       name: Agent - Implement from order description
       type: TYPE_ACTION
@@ -335,13 +214,15 @@ spec:
               git push origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
       position:
-        x: 1770
-        'y': 816
+        x: 1475
+        'y': 648
       isCollapsed: false
     - id: create-draft-pr
       name: Create Draft Pull Request
       type: TYPE_ACTION
       component: github.createPullRequest
+      concurrency:
+        max: 100
       configuration:
         base: main
         body: |-
@@ -358,31 +239,36 @@ spec:
         title: '{{ order().title }}'
       position:
         x: 1442
-        'y': 984
+        'y': 1032
       isCollapsed: true
     - id: attach-pr-artifact
       name: Attach PR to Work Order
       type: TYPE_ACTION
       component: addWorkOrderArtifact
+      concurrency:
+        max: 100
       configuration:
-        artifactKey: '{{ $["Create Draft Pull Request"].data.html_url }}'
         artifactType: pr
-        draft: true
-        number: '{{ $["Create Draft Pull Request"].data.number }}'
         orderId: '{{ order().id }}'
-        state: draft
-        title: '{{ $["Create Draft Pull Request"].data.title }}'
-        url: '{{ $["Create Draft Pull Request"].data.html_url }}'
+        state: open
+        url: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
       position:
         x: 1442
-        'y': 1152
-      isCollapsed: true
-    - id: add-run-error
-      name: addRunError
+        'y': 1200
+      isCollapsed: false
+    - id: set-pr-closure-note
+      name: Set PR closure note
       type: TYPE_ACTION
-      component: addRunError
-      configuration: {}
+      component: setWorkOrderStatusNote
+      configuration:
+        orderId: '{{ order().id }}'
+        noteKey: pr-closure
+        headline: Listening for user review
+        body: This automation finished and opened this pull request. Task will automatically close when the pull request is closed or merged.
+        ctaLabel: 'Review PR #{{ $["Create Draft Pull Request"].data.number }}'
+        ctaUrl: '{{ $["Create Draft Pull Request"].data._links.html.href }}'
+        showOnlyWhenWaiting: true
       position:
-        x: 1770
-        'y': 984
+        x: 1442
+        'y': 1368
       isCollapsed: true

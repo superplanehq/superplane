@@ -158,8 +158,9 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 	}
 
 	newNode := models.Node{
-		ID:   nodeID,
-		Name: node.Name,
+		ID:          nodeID,
+		Name:        node.Name,
+		Concurrency: node.Concurrency,
 	}
 	if node.IsCollapsed != nil {
 		newNode.IsCollapsed = *node.IsCollapsed

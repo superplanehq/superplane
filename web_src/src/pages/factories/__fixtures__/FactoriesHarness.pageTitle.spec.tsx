@@ -44,7 +44,7 @@ describe("client-side navigation updates document.title", () => {
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);
 
-  it("sets the tab title on the lines list", async () => {
+  it("sends /lines to the line board", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines`}
@@ -53,24 +53,6 @@ describe("client-side navigation updates document.title", () => {
       />,
     );
 
-    expect(await screen.findByTestId("lines-list", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Lines · Semaphore · SuperPlane");
-  }, 15000);
-
-  it("updates the tab title when selecting a line from the list", async () => {
-    const user = userEvent.setup();
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines`}
-        factoriesFixture={defaultFactoriesFixture}
-        pageOverrides={pageOverrides}
-      />,
-    );
-
-    expect(await screen.findByTestId("lines-list", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Lines · Semaphore · SuperPlane");
-
-    await user.click(screen.getByTestId("lines-card-line-plan-and-implement"));
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
   }, 15000);

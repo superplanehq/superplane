@@ -1,4 +1,5 @@
 export { FactoryNodeCard, type FactoryNodeCardProps } from "./FactoryNodeCard";
+export { FACTORY_NODE_SELECTED_RING_CLASSNAME } from "./factoryNodeSelectedRing";
 export { FactoryNodeStepList } from "./FactoryNodeStepList";
 export {
   factorySidebarCloseButtonClassName,

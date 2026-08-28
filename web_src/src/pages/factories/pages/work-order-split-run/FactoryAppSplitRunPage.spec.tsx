@@ -36,11 +36,15 @@ describe("FactoryAppSplitRunPage", () => {
     expect(screen.getByTestId("factory-app-canvas-title")).toHaveTextContent("Refund Implementer");
     expect(within(page).queryByTestId("split-run-phase-refund-planner-0")).not.toBeInTheDocument();
     expect(within(page).getByTestId("split-run-stream-implement-0")).toBeInTheDocument();
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpy-\d/);
+    expect(within(page).getByTestId("split-run-log-scroll").className).not.toMatch(/\bpt-\d/);
     expect(within(page).getByTestId("run-overlay-compact-canvas")).toBeInTheDocument();
     expect(within(page).getByTestId("split-run-resize-handle")).toBeInTheDocument();
+    expect(within(page).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-expand")).not.toBeInTheDocument();
     expect(within(page).queryByTestId("split-run-canvas-menu")).not.toBeInTheDocument();
     expect(within(page).getByTestId("factory-app-edit")).toHaveTextContent("Edit Automation");
+    expect(within(page).getByRole("complementary", { name: "Automations" })).toHaveStyle({ width: "65%" });
   }, 10000);
 
   it("does not invent a planning ingest phase for a live order", async () => {

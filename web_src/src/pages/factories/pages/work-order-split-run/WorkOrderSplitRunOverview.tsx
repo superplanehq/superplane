@@ -6,7 +6,7 @@ import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
 import { SplitRunReview } from "./SplitRunReview";
-import type { SplitRunFooter, SplitRunStopChoice } from "./splitRunFooter";
+import type { SplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_PANE_GRID_CLASSNAME, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
@@ -30,12 +30,6 @@ export function WorkOrderSplitRunOverview({
   onDescriptionSave,
   source,
   footer,
-  onStart,
-  onStop,
-  onReject,
-  startBusy = false,
-  stopBusy = false,
-  startDisabled = false,
 }: {
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -50,12 +44,6 @@ export function WorkOrderSplitRunOverview({
   onDescriptionSave?: (next: string) => void | Promise<void>;
   source?: SplitRunSource;
   footer?: SplitRunFooter;
-  onStart?: () => void | Promise<void>;
-  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
-  onReject?: () => void | Promise<void>;
-  startBusy?: boolean;
-  stopBusy?: boolean;
-  startDisabled?: boolean;
 }) {
   return (
     <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
@@ -94,12 +82,6 @@ export function WorkOrderSplitRunOverview({
             organizationId={organizationId}
             factoryKey={factoryKey}
             orderNumber={orderNumber}
-            onStart={onStart}
-            onStop={onStop}
-            onReject={onReject}
-            startBusy={startBusy}
-            stopBusy={stopBusy}
-            startDisabled={startDisabled}
           />
         ) : null}
       </div>

@@ -13,6 +13,7 @@ import type {
 } from "@/api-client";
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
+import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
@@ -301,6 +302,8 @@ export interface FactoriesFixture {
   artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
   /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
+  /** Storybook-only intake items for the Backlog create search. */
+  intakeItemCatalog?: BacklogIntakeItemCatalog;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {

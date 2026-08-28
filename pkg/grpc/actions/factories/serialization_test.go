@@ -239,6 +239,21 @@ func TestSerializeWorkOrder_StatusNotes(t *testing.T) {
 	assert.Empty(t, mustSerializeWorkOrder(t, nil, bare, nil, nil).GetStatusNotes())
 }
 
+func TestSerializeWorkOrder_Origin(t *testing.T) {
+	url := "https://github.com/acme/payments/issues/12"
+	label := "acme/payments#12"
+	serialized := mustSerializeWorkOrder(t, nil, &models.FactoryWorkOrder{
+		ID:          uuid.New(),
+		OriginURL:   &url,
+		OriginLabel: &label,
+	}, nil, nil)
+
+	require.NotNil(t, serialized.GetOrigin())
+	assert.Equal(t, url, serialized.GetOrigin().GetUrl())
+	assert.Equal(t, label, serialized.GetOrigin().GetLabel())
+	assert.Nil(t, mustSerializeWorkOrder(t, nil, &models.FactoryWorkOrder{ID: uuid.New()}, nil, nil).GetOrigin())
+}
+
 func TestSerializeWorkOrderExecution_OmitsRunWhenRunIDNil(t *testing.T) {
 	now := time.Now()
 	out := serializeWorkOrderExecution(models.FactoryWorkOrderExecutionRecord{

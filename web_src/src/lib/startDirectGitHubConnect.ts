@@ -7,7 +7,7 @@ import type {
 import { followBrowserAction } from "@/lib/browserAction";
 import { pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
 import { integrationDetailPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
-import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { INTEGRATION_SETUP_STAY_PARAM, rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -101,5 +101,9 @@ export async function startDirectGitHubConnect(args: {
 }
 
 function githubInstallPickerPath(organizationId: string, integrationId: string, integrationsBasePath?: string) {
-  return integrationDetailPath(integrationsBasePath ?? legacySettingsIntegrationsPath(organizationId), integrationId);
+  const path = integrationDetailPath(
+    integrationsBasePath ?? legacySettingsIntegrationsPath(organizationId),
+    integrationId,
+  );
+  return `${path}?${INTEGRATION_SETUP_STAY_PARAM}=1`;
 }

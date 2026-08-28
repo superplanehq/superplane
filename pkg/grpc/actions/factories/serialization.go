@@ -206,10 +206,10 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 }
 
-func serializeFactories(factories []models.Factory) []*pb.Factory {
+func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) []*pb.Factory {
 	result := make([]*pb.Factory, len(factories))
 	for i := range factories {
-		result[i] = serializeFactory(&factories[i])
+		result[i] = serializeFactoryWithLines(&factories[i], linesByFactory[factories[i].ID], nil)
 	}
 	return result
 }
@@ -256,7 +256,20 @@ func serializeWorkOrder(
 		TotalTokens:    totalTokens,
 		TotalCostCents: totalCostCents,
 		StatusNotes:    statusNotes,
+		Origin:         serializeWorkOrderOrigin(order),
 	}, nil
+}
+
+func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {
+	origin := order.Origin()
+	if origin == nil {
+		return nil
+	}
+
+	return &pb.WorkOrderOrigin{
+		Url:   origin.URL,
+		Label: origin.Label,
+	}
 }
 
 func serializeWorkOrderStatusNotes(order *models.FactoryWorkOrder) ([]*pb.WorkOrderStatusNote, error) {

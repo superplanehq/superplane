@@ -2,7 +2,7 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { CircleDollarSign, Clock, FileText, UserPlus, XIcon } from "lucide-react";
+import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
@@ -23,6 +23,7 @@ export function PopupShell({
   fixed = false,
   wide = false,
   canvas = false,
+  fullPage = false,
   onDismiss,
 }: {
   testId: string;
@@ -30,12 +31,40 @@ export function PopupShell({
   fixed?: boolean;
   wide?: boolean;
   canvas?: boolean;
+  fullPage?: boolean;
   onDismiss?: () => void;
 }) {
   return (
-    <RunOverlayFrame testId={testId} fixed={fixed} wide={wide} canvas={canvas} onDismiss={onDismiss}>
+    <RunOverlayFrame
+      testId={testId}
+      fixed={fixed}
+      wide={wide}
+      canvas={canvas}
+      fullPage={fullPage}
+      onDismiss={onDismiss}
+    >
       {children}
     </RunOverlayFrame>
+  );
+}
+
+const OPEN_FULL_SCREEN_LABEL = "Open full screen";
+const EXIT_FULL_SCREEN_LABEL = "Exit full screen";
+const POPUP_HEADER_ICON_BUTTON =
+  "flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10";
+
+function PopupFullScreenButton({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  const label = expanded ? EXIT_FULL_SCREEN_LABEL : OPEN_FULL_SCREEN_LABEL;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={POPUP_HEADER_ICON_BUTTON}
+      aria-label={label}
+      data-testid="popup-fullscreen-button"
+    >
+      {expanded ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+    </button>
   );
 }
 
@@ -43,53 +72,66 @@ export function PopupHeader({
   title,
   children,
   onClose,
+  actions,
+  expanded = false,
+  onToggleExpanded,
   canEditTitle = false,
   titleBusy = false,
   onTitleSave,
+  titleTestId = "popup-work-order-title",
+  titleAriaLabel = "Work order title",
 }: {
   title: string;
   children?: ReactNode;
   onClose?: () => void;
+  actions?: ReactNode;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
   canEditTitle?: boolean;
   titleBusy?: boolean;
   onTitleSave?: (next: string) => void;
+  titleTestId?: string;
+  titleAriaLabel?: string;
 }) {
   return (
-    <header className="relative shrink-0 border-b border-border px-5 py-3 pr-12">
-      <div className="flex min-w-0 items-center gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
-          {canEditTitle && onTitleSave ? (
-            <ClickToRename
-              value={title}
-              onSave={onTitleSave}
-              canEdit={canEditTitle}
-              busy={titleBusy}
-              testId="popup-work-order-title"
-              ariaLabel="Work order title"
-              className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
-              inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
-            />
-          ) : (
-            title
-          )}
-        </h2>
+    <header className="relative shrink-0 border-b border-border px-5 py-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-3">
+            <h2 className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-[-0.02em] text-foreground">
+              {canEditTitle && onTitleSave ? (
+                <ClickToRename
+                  value={title}
+                  onSave={onTitleSave}
+                  canEdit={canEditTitle}
+                  busy={titleBusy}
+                  testId={titleTestId}
+                  ariaLabel={titleAriaLabel}
+                  className="max-w-full text-[16px] font-semibold tracking-[-0.02em]"
+                  inputClassName="text-[16px] font-semibold tracking-[-0.02em]"
+                />
+              ) : (
+                title
+              )}
+            </h2>
+          </div>
+          {children}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          {onToggleExpanded ? <PopupFullScreenButton expanded={expanded} onToggle={onToggleExpanded} /> : null}
+          <button type="button" onClick={onClose} className={POPUP_HEADER_ICON_BUTTON} aria-label="Close">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
-      {children}
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-        aria-label="Close"
-      >
-        <XIcon className="h-4 w-4" />
-      </button>
     </header>
   );
 }
 
-type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "startedLabel" | "elapsed" | "costUsd" | "tokensLabel">;
+type OwnerTimeCostFields = Pick<PopupFixture, "owner" | "costUsd" | "tokensLabel">;
 
-/** Owner, elapsed time, and spend. No status, author, or ticket key. */
+/** Owner and spend. No elapsed time, status, author, or ticket key. */
 export function OwnerTimeCostRow({
   fixture,
   className,
@@ -149,15 +191,8 @@ export function OwnerTimeCostRow({
       ) : (
         ownerMark
       )}
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground" title={fixture.startedLabel}>
-        <Clock className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">{fixture.elapsed}</span>
-      </span>
-      <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-        <CircleDollarSign className="size-3.5 shrink-0" aria-hidden />
-        <span className="text-foreground">
-          {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
-        </span>
+      <span className="text-foreground">
+        {fixture.costUsd} <span className="text-muted-foreground">·</span> {fixture.tokensLabel}
       </span>
       {children}
     </div>
@@ -253,8 +288,8 @@ export function AgentLogList({ entries }: { entries: PopupLogEntry[] }) {
   );
 }
 
-export function PopupBody({ children }: { children: ReactNode }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>;
+export function PopupBody({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("min-h-0 flex-1 overflow-y-auto px-5 py-4", className)}>{children}</div>;
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {

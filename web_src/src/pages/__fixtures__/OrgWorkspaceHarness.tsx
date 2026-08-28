@@ -264,7 +264,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               </Route>
               <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
               <Route path="lines">
-                <Route index element={<LinesPage />} />
+                <Route index element={<FactoryHomeRedirect />} />
                 <Route path="new" element={<FactoryLineEditPage />} />
                 <Route path=":lineId" element={<LinesPage />} />
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />

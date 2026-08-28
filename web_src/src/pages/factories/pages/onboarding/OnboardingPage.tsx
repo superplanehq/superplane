@@ -1,9 +1,12 @@
+import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeIntegrationSetupReturnOnArrival";
+
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export function OnboardingPage() {
   const layout = useFactoriesLayout();
+  useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
   const model = useOnboardingPageModel(layout);
 
   if (!model.canConfigureWorkspace) {

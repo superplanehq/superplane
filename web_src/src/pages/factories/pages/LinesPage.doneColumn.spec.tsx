@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 import {
@@ -31,6 +32,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -38,6 +40,8 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
+  useSearchFactoryIntakeItems: () => ({ data: [], isLoading: false, isError: false }),
+  useImportFactoryIntakeItem: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
@@ -64,6 +68,16 @@ vi.mock("@/hooks/useMe", () => ({
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [] }),
 }));
+
+vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
+  const actual = await importOriginal<typeof canvasData>();
+  return {
+    ...actual,
+    useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
+    useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useCommitCanvasStaging: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  };
+});
 
 function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(

@@ -585,6 +585,8 @@ CREATE TABLE public.factory_work_orders (
     source_run_id uuid,
     number bigint NOT NULL,
     status_note jsonb,
+    origin_url text,
+    origin_label text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 

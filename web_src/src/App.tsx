@@ -6,6 +6,7 @@ import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
+import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -142,7 +143,7 @@ function organizationScopedRouteTree() {
             </Route>
             <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
             <Route path="lines">
-              <Route index element={<LinesPage />} />
+              <Route index element={<FactoryHomeRedirect />} />
               <Route path="new" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId" element={<LinesPage />} />
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
@@ -243,6 +244,7 @@ function PageObservabilityScope() {
 function OrganizationScope() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  useConsumeIntegrationSetupReturnOnArrival(organizationId);
 
   useEffect(() => {
     if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {

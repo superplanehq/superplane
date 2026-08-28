@@ -59,20 +59,6 @@ If no account has the App, GitHub will ask you to install it.
 `
 )
 
-var defaultGitHubAppEvents = []string{
-	"create",
-	"issue_comment",
-	"issues",
-	"pull_request",
-	"pull_request_review",
-	"pull_request_review_comment",
-	"push",
-	"release",
-	"status",
-	"check_run",
-	"workflow_run",
-}
-
 func init() {
 	registry.RegisterIntegrationWithOptions("github", &GitHub{}, registry.IntegrationRegistrationOptions{
 		WebhookHandler: &GitHubWebhookHandler{},
@@ -963,10 +949,9 @@ func (g *GitHub) browserActionURL(organization string) string {
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
-		"name":           `SuperPlane GH integration`,
-		"public":         false,
-		"url":            "https://superplane.com",
-		"default_events": defaultGitHubAppEvents,
+		"name":   `SuperPlane GH integration`,
+		"public": false,
+		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
