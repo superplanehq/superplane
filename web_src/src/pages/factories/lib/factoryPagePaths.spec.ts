@@ -8,9 +8,12 @@ import {
   factoryDetailPath,
   factoryHomePath,
   factoryIntakePath,
+  factoryPRFeedbackPath,
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
   firstFactoryLineId,
   firstFactoryLineName,
@@ -67,6 +70,29 @@ describe("factoryIntakePath", () => {
   it("reads the settings tab from the search string", () => {
     expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
     expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
+  });
+});
+
+describe("factoryPRFeedbackPath", () => {
+  it("opens the line board with the PR feedback query", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan")).toBe("/org-1/workspaces/SP/lines/line-plan?prFeedback=1");
+  });
+
+  it("reads the PR feedback query from the search string", () => {
+    expect(isPRFeedbackSearchOpen("?prFeedback=1")).toBe(true);
+    expect(isPRFeedbackSearchOpen("prFeedback=1")).toBe(true);
+    expect(isPRFeedbackSearchOpen("")).toBe(false);
+  });
+
+  it("opens the line board on a settings tab", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", "automation")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackSettings=automation",
+    );
+  });
+
+  it("reads the settings tab from the search string", () => {
+    expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
+    expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
   });
 });
 

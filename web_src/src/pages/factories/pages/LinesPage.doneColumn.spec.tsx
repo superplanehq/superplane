@@ -27,6 +27,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateFactoryLine: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
+  useFactoryPullRequests: () => ({ data: [] }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -67,6 +68,10 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks: () => ({ data: [] }),
+}));
+
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
 }));
 
 vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
@@ -118,8 +123,11 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-column-title-backlog")).toHaveTextContent("Backlog");
     expect(screen.getByTestId("lines-column-title-phase-0")).toBeInTheDocument();
     expect(screen.getByTestId("lines-column-title-phase-1")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-column-title-verify")).toHaveTextContent("Verify");
     expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
     expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No work orders in Verify.");
+    expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
@@ -137,6 +145,9 @@ describe("LinesPage Done column", () => {
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("lines-phase-column-1")).queryByText("Replace the refund batch exporter"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("lines-verify-column")).queryByText("Replace the refund batch exporter"),
     ).not.toBeInTheDocument();
   });
 
@@ -157,6 +168,7 @@ describe("LinesPage Done column", () => {
     const done = screen.getByTestId("lines-done-column");
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No work orders in Verify.");
   });
 
   it("keeps the bookend Done column when the line has its own Done automation", () => {

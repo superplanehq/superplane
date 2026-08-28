@@ -37,12 +37,12 @@ func TestArtifactAddCommand_BuildData(t *testing.T) {
 		assert.Contains(t, err.Error(), "--body or --file")
 	})
 
-	t.Run("pr requires url", func(t *testing.T) {
+	t.Run("unknown type includes pr", func(t *testing.T) {
 		cmd := &cobra.Command{}
 		c := &artifactAddCommand{}
 		_, _, err := c.buildData(core.CommandContext{Cmd: cmd}, "pr")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "--url")
+		assert.Contains(t, err.Error(), "unknown artifact type")
 	})
 
 	t.Run("branch requires name", func(t *testing.T) {

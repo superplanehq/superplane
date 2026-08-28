@@ -41,6 +41,19 @@ describe("useSplitRunLiveCanvas", () => {
     expect(useCanvasRuntimeWebsocketMock).toHaveBeenCalledWith("app-refund-implementer", "org-1", true);
   });
 
+  it("subscribes to the PR feedback canvas when that phase is selected", () => {
+    renderHook(() =>
+      useSplitRunLiveCanvas("org-1", {
+        ...PHASE,
+        id: "pr-feedback-run-9",
+        appId: "canvas-fb",
+        runId: "run-9",
+      }),
+    );
+
+    expect(useCanvasRuntimeWebsocketMock).toHaveBeenCalledWith("canvas-fb", "org-1", true);
+  });
+
   it("keeps the canvas websocket closed when the live app is missing", () => {
     renderHook(() => useSplitRunLiveCanvas("org-1", { ...PHASE, appId: undefined }));
 

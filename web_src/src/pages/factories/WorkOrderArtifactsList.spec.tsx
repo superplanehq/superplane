@@ -10,9 +10,9 @@ describe("WorkOrderArtifactsList", () => {
         isLoading={false}
         artifacts={[
           {
-            id: "pr",
-            type: "TYPE_PR",
-            data: { title: "#42", url: "https://example.com/pull/42" },
+            id: "link",
+            type: "TYPE_LINK",
+            data: { title: "Design doc", url: "https://example.com/design" },
           },
           {
             id: "note",
@@ -23,10 +23,10 @@ describe("WorkOrderArtifactsList", () => {
       />,
     );
 
-    const pullRequest = screen.getByRole("link");
+    const link = screen.getByRole("link");
     const note = screen.getByRole("button", { name: "Release note" });
 
-    expect(pullRequest).toHaveClass("inline-flex", "w-full", "justify-start");
+    expect(link).toHaveClass("inline-flex", "w-full", "justify-start");
     expect(note).toHaveClass("inline-flex", "w-full", "justify-start", "p-0");
     expect(note).not.toHaveAttribute("data-slot", "button");
 

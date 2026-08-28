@@ -85,8 +85,12 @@ describe("splitRunCanvasForPhase", () => {
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Work Order");
     expect(canvas.statuses["create-branch"]).toBe("passed");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
+    expect(canvas.statuses["generate-pr-text"]).toBe("did_not_run");
     expect(canvas.statuses["create-draft-pr"]).toBe("did_not_run");
+    expect(canvas.statuses["add-pr-label"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
+    expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
+    expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
   });
 
   it("opens a draft pull request after a finished implement run", () => {
@@ -102,8 +106,12 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("passed");
+    expect(canvas.statuses["generate-pr-text"]).toBe("passed");
     expect(canvas.statuses["create-draft-pr"]).toBe("passed");
+    expect(canvas.statuses["add-pr-label"]).toBe("passed");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("passed");
+    expect(canvas.statuses["set-pr-closure-note"]).toBe("passed");
+    expect(canvas.statuses["add-run-error"]).toBe("did_not_run");
 
     const stream = richStreamForCanvas(canvas);
     expect(stream.find((line) => line.id === "create-draft-pr")).toMatchObject({
@@ -111,7 +119,7 @@ describe("splitRunCanvasForPhase", () => {
       componentName: "Create Draft Pull Request",
       action: "passed",
     });
-    expect(stream.find((line) => line.id === "attach-pr-artifact")?.artifact?.type).toBe("TYPE_PR");
+    expect(stream.find((line) => line.id === "attach-pr-artifact")?.pullRequest?.number).toBe("482");
   });
 
   it("opens the planning canvas for a completed plan step", () => {
@@ -138,12 +146,13 @@ describe("splitRunCanvasForPhase", () => {
     });
     const stream = richStreamForCanvas(canvas);
 
+    expect(canvas.nodes.map((node) => node.id)).toContain("find-pull-request");
     expect(canvas.nodes.length).toBeGreaterThanOrEqual(5);
     expect(stream.filter((line) => !line.note).length).toBe(canvas.nodes.length);
-    expect(stream.filter((line) => line.nodeId === "find-work-order").map((line) => line.id)).toEqual([
-      "find-work-order",
+    expect(stream.filter((line) => line.nodeId === "find-pull-request").map((line) => line.id)).toEqual([
+      "find-pull-request",
     ]);
-    expect(stream.some((line) => line.artifact?.type === "TYPE_PR")).toBe(true);
+    expect(stream.some((line) => line.pullRequest)).toBe(true);
     expect(
       stream.some(
         (line) =>

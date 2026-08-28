@@ -74,13 +74,23 @@ func serializeCanvas(
 }
 
 func SerializeCanvasRunRef(run models.CanvasRun) *pb.CanvasRunRef {
-	return &pb.CanvasRunRef{
+	ref := &pb.CanvasRunRef{
 		Id:       run.ID.String(),
 		CanvasId: run.WorkflowID.String(),
 		State:    RunStateToProto(run.State),
 		Result:   RunResultToProto(run.Result),
 		Errors:   run.ErrorMessages(),
 	}
+	if run.CreatedAt != nil {
+		ref.CreatedAt = timestamppb.New(*run.CreatedAt)
+	}
+	if run.UpdatedAt != nil {
+		ref.UpdatedAt = timestamppb.New(*run.UpdatedAt)
+	}
+	if run.FinishedAt != nil {
+		ref.FinishedAt = timestamppb.New(*run.FinishedAt)
+	}
+	return ref
 }
 
 func SerializeCanvasRunRefs(runs []models.CanvasRun) []*pb.CanvasRunRef {
