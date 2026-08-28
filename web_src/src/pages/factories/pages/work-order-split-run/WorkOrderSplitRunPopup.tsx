@@ -45,6 +45,7 @@ function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFoote
   }
   return {
     onReject: () => void footerActions.handleReject(),
+    onBackToDraft: () => footerActions.handleBackToDraft(),
     onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
       void footerActions.handleStop(choice, {
         ...fixture.footer,
@@ -238,6 +239,7 @@ export function WorkOrderSplitRunPopup({
   const ownerOrganizationId = popupOwnerOrganizationId(organizationId, edits.canEdit);
   const [fullPage, setFullPage] = useState(false);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"));
+  const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
 
   return (
     <PopupShell testId="work-order-split-run" fixed={fixed} fullPage={fullPage} onDismiss={onClose}>
@@ -283,6 +285,7 @@ export function WorkOrderSplitRunPopup({
         canAct={canUpdate}
         onStart={draftStart}
         onReject={mutations.onReject}
+        onBackToDraft={backToDraft}
         onStop={mutations.onStop}
         startBusy={isDispatching}
         actionBusy={footerActions.busy}
@@ -303,6 +306,22 @@ function draftStartAction(
   return async () => {
     await onDispatch?.();
     openAutomations();
+  };
+}
+
+function returnToBacklogAction(
+  onBackToDraft: (() => void | Promise<boolean | void>) | undefined,
+  openDescription: () => void,
+) {
+  if (!onBackToDraft) {
+    return undefined;
+  }
+  return async () => {
+    const returned = await onBackToDraft();
+    if (returned === false) {
+      return;
+    }
+    openDescription();
   };
 }
 

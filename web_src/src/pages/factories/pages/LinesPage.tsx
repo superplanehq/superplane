@@ -918,6 +918,7 @@ const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
   queued: "running",
   failed: "done",
   passed: "done",
+  cancelled: "done",
   pending: "neutral",
 };
 

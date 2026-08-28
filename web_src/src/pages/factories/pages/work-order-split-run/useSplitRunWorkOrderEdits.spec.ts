@@ -8,6 +8,7 @@ describe("canEditSplitRunContent", () => {
     expect(canEditSplitRunContent("running")).toBe(true);
     expect(canEditSplitRunContent("waiting")).toBe(true);
     expect(canEditSplitRunContent("failed")).toBe(true);
+    expect(canEditSplitRunContent("stopped")).toBe(true);
     expect(canEditSplitRunContent("done")).toBe(false);
     expect(canEditSplitRunContent("draft", false)).toBe(false);
   });

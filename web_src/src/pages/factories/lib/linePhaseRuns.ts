@@ -14,7 +14,7 @@ export { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
-export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending";
+export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending" | "cancelled";
 
 export type LinePhaseRunCard = {
   executionId: string;
@@ -113,8 +113,8 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft work orders that are not on a line yet. Newest updated drafts
- * come first.
+ * Draft work orders. A draft that already ran on a line still belongs
+ * here after To Backlog. Newest updated drafts come first.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
   return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
@@ -240,10 +240,7 @@ export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "app
 }
 
 function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
-  if (!order.id || order.state !== "STATE_DRAFT") {
-    return false;
-  }
-  return (order.lineDispatches ?? []).length === 0;
+  return Boolean(order.id) && order.state === "STATE_DRAFT";
 }
 
 // A finished work order belongs on this board when it ran on this line, or
@@ -357,7 +354,7 @@ function appendCurrentRunForOrder(
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id || order.state === "STATE_CLOSED") {
+  if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
     return;
   }
 
