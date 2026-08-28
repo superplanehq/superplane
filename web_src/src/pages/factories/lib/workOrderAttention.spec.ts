@@ -106,8 +106,8 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing user feedback");
   });
 
-  it("labels idle waiting work as No progress", () => {
+  it("labels idle waiting work as Needs attention", () => {
     expect(getWorkOrderAttentionReason(order())).toBe("stalled");
-    expect(WORK_ORDER_ATTENTION_LABEL.stalled).toBe("No progress");
+    expect(WORK_ORDER_ATTENTION_LABEL.stalled).toBe("Needs attention");
   });
 });

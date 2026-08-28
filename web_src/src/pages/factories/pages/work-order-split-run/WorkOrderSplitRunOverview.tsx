@@ -5,8 +5,6 @@ import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
-import { SplitRunReview } from "./SplitRunReview";
-import type { SplitRunFooter } from "./splitRunFooter";
 import { SPLIT_RUN_PANE_GRID_CLASSNAME, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
@@ -29,7 +27,6 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy = false,
   onDescriptionSave,
   source,
-  footer,
 }: {
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -43,7 +40,6 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
   source?: SplitRunSource;
-  footer?: SplitRunFooter;
 }) {
   return (
     <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
@@ -76,14 +72,6 @@ export function WorkOrderSplitRunOverview({
             </section>
           ) : null}
         </div>
-        {footer ? (
-          <SplitRunReview
-            footer={footer}
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            orderNumber={orderNumber}
-          />
-        ) : null}
       </div>
 
       <aside className="min-h-0 overflow-y-auto px-6 py-6" data-testid="split-run-overview-sidebar">

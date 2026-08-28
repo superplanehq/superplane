@@ -119,7 +119,7 @@ describe("LinesPage backlog create", () => {
     const list = screen.getByTestId("lines-backlog-column-scroll");
     const items = within(list).getAllByRole("listitem");
     expect(items.at(-1)).toHaveAttribute("data-testid", "lines-backlog-create-ghost-item");
-    expect(within(items.at(-1)!).getByRole("button", { name: "Create work order" })).toBeInTheDocument();
+    expect(within(items.at(-1)!).getByRole("button", { name: "Create task" })).toBeInTheDocument();
     expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-backlog-create-ghost"));
