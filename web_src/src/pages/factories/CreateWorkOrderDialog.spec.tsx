@@ -11,9 +11,7 @@ import {
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
-const { canAct, permissions, createMutate, dispatchMutate, meUser } = vi.hoisted(() => ({
-  canAct: vi.fn((resource: string, action: string) => resource === "work_orders" && action === "create"),
-  permissions: { isLoading: false },
+const { createMutate, dispatchMutate, meUser } = vi.hoisted(() => ({
   createMutate: vi.fn(),
   dispatchMutate: vi.fn(),
   meUser: { current: null as { id: string; name: string } | null },
@@ -26,13 +24,6 @@ vi.mock("@/hooks/useFactoryData", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: meUser.current }),
-}));
-
-vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({
-    canAct,
-    isLoading: permissions.isLoading,
-  }),
 }));
 
 vi.mock("./WorkOrderDescriptionEditor", () => ({
@@ -58,8 +49,6 @@ function renderDialog(factory = REFUND_FACTORY) {
 
 describe("CreateWorkOrderDialog", () => {
   beforeEach(() => {
-    permissions.isLoading = false;
-    canAct.mockImplementation((resource: string, action: string) => resource === "work_orders" && action === "create");
     createMutate.mockReset();
     dispatchMutate.mockReset();
     meUser.current = null;
@@ -77,14 +66,14 @@ describe("CreateWorkOrderDialog", () => {
 
     const header = screen.getByTestId("work-order-create-header");
     expect(within(header).getByTestId("work-order-create-fullscreen-button")).toBeInTheDocument();
-    expect(within(header).queryByTestId("work-order-create-draft-button")).not.toBeInTheDocument();
+    expect(within(header).queryByTestId("work-order-create-button")).not.toBeInTheDocument();
   });
 
-  it("renders Save as draft in the footer next to Start, with no line picker", () => {
+  it("renders a single Create button in the footer, with no line picker", () => {
     renderDialog();
 
-    expect(screen.getByTestId("work-order-create-draft-button")).toBeInTheDocument();
-    expect(screen.getByTestId("work-order-create-start")).toHaveTextContent("Start");
+    expect(screen.getByTestId("work-order-create-button")).toHaveTextContent("Create");
+    expect(screen.queryByTestId("work-order-create-start")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-line-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
   });
@@ -97,41 +86,23 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.queryByTestId("mock-owner-pill")).not.toBeInTheDocument();
   });
 
-  it("disables Start when the user cannot dispatch work orders", () => {
-    renderDialog();
-
-    expect(screen.getByTestId("work-order-create-start").closest(".pointer-events-none")).toBeInTheDocument();
-  });
-
-  it("keeps Start closed while permissions load", () => {
-    permissions.isLoading = true;
-    canAct.mockReturnValue(false);
-    renderDialog();
-
-    expect(screen.getByTestId("work-order-create-start").closest(".pointer-events-none")).toBeInTheDocument();
-  });
-
-  it("starts the work order on the first line", async () => {
+  it("creates the work order without sending it to a line", async () => {
     const user = userEvent.setup();
-    canAct.mockReturnValue(true);
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
-    dispatchMutate.mockResolvedValue({});
     renderDialog();
 
     await user.type(screen.getByTestId("work-order-title-input"), "Ship the refunds line");
-    await user.click(screen.getByTestId("work-order-create-start"));
+    await user.click(screen.getByTestId("work-order-create-button"));
 
-    expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
-    expect(dispatchMutate).toHaveBeenCalledWith({ orderId: "order-1", lineName: "plan-and-implement" });
+    expect(createMutate).toHaveBeenCalled();
+    expect(dispatchMutate).not.toHaveBeenCalled();
   });
 
-  it("disables Start when the workspace has no lines, while Save as draft stays enabled", async () => {
-    canAct.mockReturnValue(true);
+  it("keeps Create enabled when the workspace has no lines", async () => {
     renderDialog(EMPTY_FACTORY);
 
     await userEvent.setup().type(screen.getByTestId("work-order-title-input"), "Draft only");
 
-    expect(screen.getByTestId("work-order-create-start")).toBeDisabled();
-    expect(screen.getByTestId("work-order-create-draft-button")).not.toBeDisabled();
+    expect(screen.getByTestId("work-order-create-button")).not.toBeDisabled();
   });
 });
