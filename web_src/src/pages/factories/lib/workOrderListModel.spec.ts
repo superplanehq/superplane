@@ -228,7 +228,7 @@ describe("buildWorkOrderListEntry", () => {
 
     expect(entry.totalTokens).toBe(1700);
     expect(entry.totalCostCents).toBe(60);
-    expect(entry.usageLabel).toBe("$0.60 · 2k tokens");
+    expect(entry.usageLabel).toBe("$0.60 · 1.7k tokens");
   });
 
   it("keeps closed orders out of the dispatchable set", () => {
