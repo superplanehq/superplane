@@ -13,7 +13,7 @@ export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string
   feedback: "Addressing user feedback",
   question: "Agent question",
   failed: "Run failed",
-  stalled: "No progress",
+  stalled: "Needs attention",
 };
 
 export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReason, string> = {
@@ -36,7 +36,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
  * Maps a work order to an attention reason. Closed failed orders and
  * waiting orders with a failed latest step are Run failed. An active
  * PR-feedback run is Addressing user feedback. A visible status note is
- * Waiting for user review. Waiting with no note is No progress.
+ * Waiting for user review. Waiting with no note is Needs attention.
  * Other statuses return null. The note body is not classified.
  */
 export function getWorkOrderAttentionReason(

@@ -33,7 +33,7 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         keepChildrenWhenEmpty
         testId="lane-ghost"
       >
@@ -42,7 +42,7 @@ describe("WorkOrderKanbanBoard", () => {
     );
 
     expect(screen.getByTestId("lane-children")).toHaveTextContent("Create work order");
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("renders custom empty content instead of the dashed copy", () => {
@@ -50,14 +50,14 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         emptyContent={<p data-testid="custom-empty">Tickets land here first.</p>}
         testId="lane-hint"
       />,
     );
 
     expect(screen.getByTestId("custom-empty")).toHaveTextContent("Tickets land here first.");
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("renames the lane title on Enter when canRename is set", async () => {
@@ -67,7 +67,7 @@ describe("WorkOrderKanbanBoard", () => {
       <WorkOrderBoardLane
         title="Backlog"
         count={0}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         canRename
         onRename={onRename}
         titleTestId="lane-title"
