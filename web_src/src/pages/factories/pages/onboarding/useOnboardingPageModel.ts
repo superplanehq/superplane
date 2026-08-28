@@ -36,6 +36,14 @@ import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
 
+/**
+ * Setup only needs the keys that make an agent run. The Anthropic admin key
+ * serves usage and cost reports, so users add it later in organization settings.
+ */
+const ONBOARDING_HIDDEN_CONFIGURATION_FIELDS: Record<string, string[]> = {
+  claude: ["adminKey"],
+};
+
 function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
   const connected = useMemo(() => {
@@ -208,6 +216,7 @@ export function useOnboardingPageModel(args: {
     integrationNames: ONBOARDING_INTEGRATIONS,
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
+    hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
   });
 
   const [saving, setSaving] = useState(false);

@@ -18,11 +18,12 @@ func TestClaude_Configuration(t *testing.T) {
 
 	// Use string here instead of configuration.FieldType to avoid type errors
 	expectedFields := map[string]struct {
-		Type     string
-		Required bool
+		Type      string
+		Required  bool
+		Togglable bool
 	}{
-		"apiKey":   {string(configuration.FieldTypeString), true},
-		"adminKey": {string(configuration.FieldTypeString), false},
+		"apiKey":   {string(configuration.FieldTypeString), true, false},
+		"adminKey": {string(configuration.FieldTypeString), false, true},
 	}
 
 	if len(configs) != len(expectedFields) {
@@ -41,6 +42,9 @@ func TestClaude_Configuration(t *testing.T) {
 		}
 		if field.Required != expected.Required {
 			t.Errorf("field %s: expected required %v, got %v", field.Name, expected.Required, field.Required)
+		}
+		if field.Togglable != expected.Togglable {
+			t.Errorf("field %s: expected togglable %v, got %v", field.Name, expected.Togglable, field.Togglable)
 		}
 	}
 }

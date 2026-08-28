@@ -14,6 +14,43 @@ const runTitleField: ConfigurationField = {
   placeholder: "{{ root().data.context }}",
 };
 
+describe("ConfigurationFieldRenderer togglable Claude admin key", () => {
+  const adminKeyField: ConfigurationField = {
+    name: "adminKey",
+    type: "string",
+    label: "Admin API Key",
+    description: "Use this key only to fetch usage and cost reports.",
+    required: false,
+    sensitive: true,
+    togglable: true,
+  };
+
+  it("hides the admin key input until the optional setting is enabled", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: undefined,
+        onChange: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByText("Admin API Key")).toBeInTheDocument();
+    expect(screen.queryByTestId("string-field-adminkey")).not.toBeInTheDocument();
+  });
+
+  it("shows the admin key input when the optional setting is enabled", () => {
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: "",
+        onChange: vi.fn(),
+      }),
+    );
+
+    expect(screen.getByTestId("string-field-adminkey")).toBeInTheDocument();
+  });
+});
+
 describe("ConfigurationFieldRenderer run title copy", () => {
   it("explains disabled trigger run title customization", () => {
     render(
