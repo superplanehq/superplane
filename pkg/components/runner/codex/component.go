@@ -164,8 +164,14 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
+		if err := runner.PrepareBYOKRun(ctx, "openai", model); err != nil {
+			return nil, err
+		}
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
+		if err := runner.PrepareBYOKRun(ctx, "openai", model); err != nil {
+			return nil, err
+		}
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		access, err := runner.PrepareHostedRun(ctx, "openai", model)

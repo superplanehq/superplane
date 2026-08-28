@@ -22,6 +22,10 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "workspace key already exists in this organization")
 	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.NotFound(err, "factory not found")
+	case errors.Is(err, models.ErrFactoryHostedSpendBudgetNegative):
+		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
+	case errors.Is(err, models.ErrModelNotInParentList):
+		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
 		return grpcerrors.InvalidArgument(err, "invalid issues source")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidAgentHarness):

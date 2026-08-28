@@ -129,6 +129,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		var credit organizationLLMCreditResponse
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
 		assert.Greater(t, credit.RemainingCreditCents, int64(0))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, credit.SuperplaneGrantCents)
+		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
 
 		body, err := json.Marshal(map[string]any{
 			"amount_cents": 1000,
@@ -145,6 +147,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		assert.Equal(t, http.StatusOK, response.Code)
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
 		assert.GreaterOrEqual(t, credit.GrantTotalCents, int64(6000))
+		assert.GreaterOrEqual(t, credit.SuperplaneGrantCents, int64(6000))
+		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
 
 		body, err = json.Marshal(map[string]any{"markup_bps": 0})
 		require.NoError(t, err)

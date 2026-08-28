@@ -473,9 +473,10 @@ func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string
 }
 
 type HostedLLMContext struct {
-	Access     core.HostedLLMAccess
-	CreditErr  error
-	ResolveErr error
+	Access        core.HostedLLMAccess
+	CreditErr     error
+	ResolveErr    error
+	SelectableErr error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -487,6 +488,10 @@ func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error
 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
 	return c.CreditErr
+}
+
+func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
+	return c.SelectableErr
 }
 
 type ExpressionContext struct {
