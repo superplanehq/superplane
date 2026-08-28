@@ -23,7 +23,7 @@ function CreateTriggerButton({
   onClick?: () => void;
 }) {
   return (
-    <PermissionTooltip allowed={canAdd} message="You don't have permission to create work orders.">
+    <PermissionTooltip allowed={canAdd} message="You do not have permission to create tasks.">
       <button
         type="button"
         disabled={!canAdd}
@@ -72,7 +72,7 @@ function CreateGhostCard({
   onClick?: () => void;
 }) {
   return (
-    <PermissionTooltip allowed={canAdd} message="You don't have permission to create work orders." className="w-full">
+    <PermissionTooltip allowed={canAdd} message="You do not have permission to create tasks." className="w-full">
       <button
         type="button"
         disabled={!canAdd}
