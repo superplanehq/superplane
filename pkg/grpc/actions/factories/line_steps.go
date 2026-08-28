@@ -119,7 +119,7 @@ func resolveFactoryOwnedApp(
 	if appID, parseErr := uuid.Parse(appRef); parseErr == nil {
 		canvas, err = models.FindCanvasInTransaction(tx, organizationID, appID)
 	} else {
-		canvas, err = models.FindCanvasByNameInTransaction(tx, appRef, organizationID)
+		canvas, err = models.FindCanvasByName(tx, organizationID, &factoryID, appRef)
 	}
 
 	if err != nil {

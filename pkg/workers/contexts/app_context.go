@@ -71,7 +71,7 @@ func (c *AppContext) getAppByID(id uuid.UUID) (*core.App, error) {
 }
 
 func (c *AppContext) getAppByName(name string) (*core.App, error) {
-	otherApp, err := models.FindCanvasByNameInTransaction(c.tx, name, c.canvas.OrganizationID)
+	otherApp, err := models.FindCanvasByName(c.tx, c.canvas.OrganizationID, c.canvas.FactoryID, name)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, core.ErrNotFound
