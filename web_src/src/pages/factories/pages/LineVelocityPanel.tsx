@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/chart";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { buildDailyVelocity } from "./buildDailyVelocity";
+import { formatTokens } from "./formatTokens";
 import { VELOCITY_BY_PERIOD, type VelocityPeriodDays, type VelocityPeriodStats } from "./lineVelocityMockData";
 
 const PERIOD_OPTIONS: { value: string; label: string; days: VelocityPeriodDays }[] = [
@@ -23,14 +24,6 @@ const dailyVelocityChartConfig = {
   failed: { label: "Failed", color: "#ef4444" },
   inProgress: { label: "Still in progress", color: "#60a5fa" },
 } satisfies ChartConfig;
-
-function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
-  }
-  return String(value);
-}
 
 function formatUsd(value: number) {
   return `$${value.toFixed(2)}`;

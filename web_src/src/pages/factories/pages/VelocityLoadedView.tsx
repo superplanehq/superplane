@@ -5,6 +5,7 @@ import {
   type FactoryVelocityFlow,
   type FactoryVelocityFlowPeriodDays,
 } from "../lib/factoryVelocityFlow";
+import { formatTokens } from "./formatTokens";
 import {
   CostSparkline,
   DailyOutputChart,
@@ -75,14 +76,6 @@ export interface VelocityLoadedViewProps {
 
 function formatUsd(value: number) {
   return `$${value.toFixed(2)}`;
-}
-
-function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
-  }
-  return String(value);
 }
 
 function formatPct(value: number) {
