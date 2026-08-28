@@ -328,7 +328,7 @@ describe("resolveSplitRunVisual", () => {
         {
           id: "backlog-created",
           at: "12:24:02",
-          componentName: "Leonardo DiCaprio created this work order manually.",
+          componentName: "Leonardo DiCaprio created this task.",
           status: "passed" as const,
         },
       ],

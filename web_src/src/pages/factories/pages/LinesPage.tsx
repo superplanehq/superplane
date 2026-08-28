@@ -800,7 +800,7 @@ function VerifyColumn({
       count={orders.length}
       tone="neutral"
       surfaceClassName={surfaceClassName}
-      emptyDescription="No work orders in Verify."
+      emptyDescription="No tasks in Verify."
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
         <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
@@ -853,7 +853,7 @@ function DoneColumn({
       count={orders.length}
       tone="done"
       surfaceClassName={surfaceClassName}
-      emptyDescription="No work orders in Done."
+      emptyDescription="No tasks in Done."
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
         <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
