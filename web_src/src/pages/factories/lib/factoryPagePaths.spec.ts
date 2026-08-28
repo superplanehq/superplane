@@ -131,6 +131,12 @@ describe("workOrderDetailPath", () => {
   it("is a sibling of, not nested under, the plural work-orders list path", () => {
     expect(workOrderDetailPath("org-1", "SP", "42")).not.toContain(workOrdersPath("org-1", "SP"));
   });
+
+  it("keeps the board line on the permalink when a line id is given", () => {
+    expect(workOrderDetailPath("org-1", "SP", "42", "line-hotfix")).toBe(
+      "/org-1/workspaces/SP/work-order/42?lineId=line-hotfix",
+    );
+  });
 });
 
 describe("workOrderOpenPath", () => {

@@ -14,6 +14,7 @@ import {
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
+  REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
@@ -253,7 +254,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -282,6 +283,26 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+  });
+
+  it("keeps the current line when a card opens from a second line", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`);
+
+    await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
+    );
+
+    await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
   });
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {

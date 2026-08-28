@@ -86,6 +86,7 @@ import {
   factoryPRFeedbackPath,
   firstFactoryLineId,
   workOrderDetailPath,
+  workOrderBoardLineIdFromSearch,
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
@@ -181,8 +182,13 @@ export function LinesPage() {
     () => resolveWorkOrderByNumber(workOrders, routeOrderNumber, workOrdersLoading),
     [routeOrderNumber, workOrders, workOrdersLoading],
   );
+  const boardLineId = workOrderBoardLineIdFromSearch(search);
+  const searchLineId = lines.some((line) => line.id === boardLineId) ? boardLineId : undefined;
   const selectedLineId =
-    routeLineId ?? latestDispatchForLine(permalink.order ?? undefined)?.line?.id ?? firstFactoryLineId(factory);
+    routeLineId ??
+    searchLineId ??
+    latestDispatchForLine(permalink.order ?? undefined)?.line?.id ??
+    firstFactoryLineId(factory);
   const selectedLine = useMemo(
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
@@ -193,7 +199,7 @@ export function LinesPage() {
 
   const canonicalNumber = canonicalWorkOrderNumber(permalink.order);
   if (routeOrderNumber && canonicalNumber && workOrderRouteNeedsCanonicalRedirect(permalink, routeOrderNumber)) {
-    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber)} replace />;
+    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, canonicalNumber, boardLineId)} replace />;
   }
 
   if (!selectedLine) {
@@ -260,7 +266,7 @@ export function LinesPage() {
     if (!number) {
       return;
     }
-    navigate(workOrderDetailPath(organizationId, factoryKey, number));
+    navigate(workOrderDetailPath(organizationId, factoryKey, number, selectedLine.id));
   };
 
   const closePeek = () => {
