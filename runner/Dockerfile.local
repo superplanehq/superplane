@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1
 # Context: repository root — docker build -f runner/Dockerfile.local .
 #
-# Local-dev image with host-mode interpreters (bash, python3, node) plus Docker CLI.
-# Mount the daemon socket for execution_mode=docker:
+# Local-dev image with factory host-mode tools (bash, python3, node, git, gh,
+# jq, Claude Code, Codex) plus Docker CLI. Mount the daemon socket for
+# execution_mode=docker:
 #   -v /var/run/docker.sock:/var/run/docker.sock
+#
+# Agent CLI versions match packer/scripts/install.sh. Bump both together.
 
 FROM golang:1.25-alpine AS build
 RUN apk add --no-cache git
@@ -16,8 +19,42 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./runner/cmd/runner
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mint-runner-registration ./scripts/mint-runner-registration
 
-FROM alpine:3.20
-RUN apk add --no-cache bash ca-certificates docker-cli python3 nodejs git
+FROM node:22-bookworm-slim
+
+ARG CLAUDE_CODE_VERSION=2.1.212
+ARG CODEX_VERSION=0.144.5
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    curl \
+    git \
+    gnupg \
+    jq \
+    openssl \
+    python3 \
+  && mkdir -p -m 755 /etc/apt/keyrings \
+  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+    > /etc/apt/sources.list.d/github-cli.list \
+  && curl -fsSL https://download.docker.com/linux/debian/gpg \
+    | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" \
+    > /etc/apt/sources.list.d/docker.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh docker-ce-cli \
+  && npm install -g \
+    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    "@openai/codex@${CODEX_VERSION}" \
+  && command -v claude \
+  && command -v codex \
+  && claude --version \
+  && codex --version \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /out/runner /usr/local/bin/runner
 COPY --from=build /out/mint-runner-registration /usr/local/bin/mint-runner-registration
 COPY runner/local-entrypoint.sh /usr/local/bin/local-entrypoint.sh
