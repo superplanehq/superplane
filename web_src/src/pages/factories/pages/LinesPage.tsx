@@ -49,6 +49,8 @@ import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExe
 import {
   latestDispatchForLine,
   canonicalWorkOrderNumber,
+  peekOrderFromNavigationState,
+  resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
   workOrderRouteNeedsCanonicalRedirect,
 } from "../lib/workOrderNumberResolution";
@@ -149,7 +151,7 @@ export function LinesPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { lineId: routeLineId, orderNumber: routeOrderNumber } = useParams<{ lineId?: string; orderNumber?: string }>();
-  const { search } = useLocation();
+  const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
@@ -167,6 +169,7 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
 
@@ -193,7 +196,12 @@ export function LinesPage() {
     () => (selectedLineId ? (lines.find((line) => line.id === selectedLineId) ?? null) : null),
     [lines, selectedLineId],
   );
-  const peekOrder = permalink.status === "found" ? permalink.order : undefined;
+  const peekOrder = resolvePeekWorkOrder(
+    permalink,
+    routeOrderNumber,
+    peekOrderFromNavigationState(locationState),
+    peekHint,
+  );
 
   usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
 
@@ -261,15 +269,19 @@ export function LinesPage() {
   };
 
   const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
-    const target = order ?? workOrders.find((item) => item.id === orderId);
-    const number = canonicalWorkOrderNumber(target ?? null);
+    const target = order ?? workOrders.find((item) => item.id === orderId) ?? { id: orderId };
+    const number = canonicalWorkOrderNumber(target);
     if (!number) {
+      setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, factoryKey, number, selectedLine.id));
+    navigate(workOrderDetailPath(organizationId, factoryKey, number, selectedLine.id), {
+      state: { peekOrder: target },
+    });
   };
 
   const closePeek = () => {
+    setPeekHint(null);
     navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id));
   };
 
