@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	// intakeSeedSize is how many items a new intake analyzes at once.
-	intakeSeedSize = 5
+	// intakeSeedSize is how many items a new intake analyzes at once. A source
+	// with few open items gives fewer, so the seed is an upper bound.
+	intakeSeedSize = 30
 
 	// intakeGitHubIssuePayloadType is the payload type the GitHub trigger emits.
 	// A seeded item uses the same one, so the graph reads it the same way.
