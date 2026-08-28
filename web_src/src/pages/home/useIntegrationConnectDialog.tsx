@@ -45,6 +45,7 @@ export function useIntegrationConnectDialog({
   selections,
   onSelectionsChange,
   preferredCreateNames,
+  hiddenConfigurationFields,
 }: {
   organizationId: string;
   returnTo?: string;
@@ -53,6 +54,8 @@ export function useIntegrationConnectDialog({
   onSelectionsChange: (selections: IntegrationSelections) => void;
   /** When set, a new connection uses this name instead of the integration type name. */
   preferredCreateNames?: Record<string, string>;
+  /** Configuration field names the create dialog never shows, keyed by integration name. */
+  hiddenConfigurationFields?: Record<string, string[]>;
 }) {
   const { data: me } = useMe();
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
@@ -207,6 +210,7 @@ export function useIntegrationConnectDialog({
         onRefetch={() => void refetch()}
         setupReturnTo={returnTo}
         preferredCreateName={preferredCreateName}
+        hiddenFieldNames={dialogIntegrationName ? hiddenConfigurationFields?.[dialogIntegrationName] : undefined}
       />
     </>
   );
