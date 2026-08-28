@@ -85,12 +85,18 @@ const GITHUB_INTAKE_CANVAS = {
   spec: {
     nodes: [
       { id: "github-issues-trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-      { id: "github-issues-analysis", name: "Analyze intake", type: "TYPE_ACTION", component: "runnerClaudeCode" },
+      {
+        id: "github-issues-filter",
+        name: "Matches filters?",
+        type: "TYPE_ACTION",
+        component: "if",
+        configuration: { expression: "true" },
+      },
       { id: "github-issues-create", name: "Create Work Order", type: "TYPE_ACTION", component: "createWorkOrder" },
     ],
     edges: [
-      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-analysis" },
-      { channel: "true", sourceId: "github-issues-analysis", targetId: "github-issues-create" },
+      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-filter" },
+      { channel: "true", sourceId: "github-issues-filter", targetId: "github-issues-create" },
     ],
   },
 };
@@ -137,7 +143,7 @@ describe("LineIntakeDrawer", () => {
     useTriggers.mockReturnValue({ data: [{ name: "github.onIssue", label: "On Issue" }], isLoading: false });
     useComponents.mockReturnValue({
       data: [
-        { name: "runnerClaudeCode", label: "Run Claude Code" },
+        { name: "if", label: "If" },
         { name: "createWorkOrder", label: "Create Work Order" },
       ],
       isLoading: false,
@@ -258,7 +264,7 @@ describe("LineIntakeDrawer", () => {
     const analyzing = within(github).getByTestId("line-intake-analyzing");
     expect(within(analyzing).getAllByTestId("line-intake-analyzing-spinner")).toHaveLength(5);
     expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(github).getByText("5 Analyzing")).toBeInTheDocument();
+    expect(within(github).getByText("5 Creating")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
@@ -424,7 +430,6 @@ describe("LineIntakeDrawer", () => {
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("Name")).toHaveValue("GitHub issues");
     expect(within(dialog).getByRole("radio", { name: /Listen for new issues/ })).toBeChecked();
-    expect(within(dialog).getByTestId("intake-confidence-value")).toHaveTextContent("65%");
     expect(
       within(dialog)
         .getAllByRole("tab")
@@ -452,7 +457,6 @@ describe("LineIntakeDrawer", () => {
 
     const dialog = screen.getByTestId("intake-source-settings");
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Triage issues");
-    expect(within(dialog).getByTestId("intake-confidence-value")).toHaveTextContent("80%");
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -470,7 +474,7 @@ describe("LineIntakeDrawer", () => {
     expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByText("Analyze intake")).toBeInTheDocument();
+    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
       "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines",

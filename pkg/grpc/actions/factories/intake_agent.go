@@ -26,11 +26,11 @@ type intakeAgentSpec struct {
 	// its own, but a node that leaves the field empty shows the user no model
 	// and runs on whatever the agent CLI picks, so each spec names one.
 	//
-	// Both nodes an intake generates weigh evidence rather than write code:
-	// the analysis scores an item, and the PR feedback runner judges which
-	// review requests are safe to apply. Anthropic therefore reaches for
-	// Opus, the way the planning agent of the factory line does, while the
-	// implementation agent stays on Sonnet.
+	// The Backlog scorer and the PR feedback runner weigh evidence rather than
+	// write code: the analysis scores a work order, and the PR feedback runner
+	// judges which review requests are safe to apply. Anthropic therefore
+	// reaches for Opus, the way the planning agent of the factory line does,
+	// while the implementation agent stays on Sonnet.
 	model string
 }
 
@@ -101,12 +101,12 @@ func defaultIntakeAgentModel(component string) string {
 	return intakeAgentSpecs[index].model
 }
 
-// resolveIntakeAgent picks the runner and the credentials of the analysis node.
-// The workspace setup records the coding agent of the workspace, so an intake
-// scores with the same one. A workspace that named no agent still has its
-// installations and the hosted providers to fall back on. An intake that finds
-// nothing keeps an incomplete analysis node, and the user completes it in the
-// canvas.
+// resolveIntakeAgent picks the runner and the credentials of the Backlog
+// analysis node. The workspace setup records the coding agent of the
+// workspace, so scoring uses the same one. A workspace that named no agent
+// still has its installations and the hosted providers to fall back on. A
+// graph that finds nothing keeps an incomplete analysis node, and the user
+// completes it in the canvas.
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
 	if agent := intakeAgentFromSetup(tx, factory, config.AgentIntegrationID); agent != nil {

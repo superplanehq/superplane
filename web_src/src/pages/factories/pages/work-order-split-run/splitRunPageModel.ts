@@ -1,6 +1,7 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderCheck } from "@/api-client";
 
 import { findWorkOrderByRunId, resolveWorkOrderByNumber } from "../../lib/workOrderNumberResolution";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } from "./splitRunCanvases";
 import {
@@ -43,6 +44,7 @@ export function fixtureForSplitRunPage(
   orderChecks: FactoriesWorkOrderCheck[],
   lineId: string | null,
   prFeedbackRuns?: PRFeedbackLogRun[],
+  analysisRuns?: BacklogAnalysisRun[],
 ): SplitRunFixture | null {
   if (!order) {
     return null;
@@ -52,6 +54,7 @@ export function fixtureForSplitRunPage(
     lineId,
     demoArtifacts: false,
     prFeedbackRuns,
+    analysisRuns,
   });
 }
 

@@ -14,18 +14,23 @@ import (
 const (
 	// Node identifiers of a generated intake graph. An intake owns its whole
 	// canvas, so the identifiers are fixed rather than derived from the source.
-	intakeTriggerNodeID          = "trigger"
+	intakeTriggerNodeID = "trigger"
+	intakeFilterNodeID  = "filter"
+	intakeCreateNodeID  = "create-work-order"
+
+	// Legacy node identifiers. A graph generated before intake became
+	// create-only still resolves so settings and health keep working.
 	intakeAnalysisNodeID         = "analyze"
 	intakeThresholdNodeID        = "threshold"
-	intakeCreateNodeID           = "create-work-order"
 	intakeReportConfidenceNodeID = "report-confidence"
 
-	// The threshold expression reads the analysis result by node name, so the
-	// name is part of the generated graph's contract.
+	// The analysis node name is part of the generated backlog graph's contract:
+	// the report-check fields read the score by this name.
 	intakeAnalysisNodeName = "Analyze intake"
 	intakeCreateNodeName   = "Create Work Order"
 
-	intakeThresholdComponent        = "if"
+	intakeFilterComponent           = "if"
+	intakeThresholdComponent        = intakeFilterComponent
 	intakeCreateComponent           = "createWorkOrder"
 	intakeReportConfidenceComponent = "reportWorkOrderCheck"
 
@@ -57,9 +62,9 @@ const (
 // name it.
 const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 
-// intakeAnalysisComponents are the runners an intake can score with. Creation
-// picks the runner of the workspace agent, but a graph the user re-pointed at
-// another runner still has to resolve.
+// intakeAnalysisComponents are the runners a backlog canvas can score with.
+// Creation picks the runner of the workspace agent, but a graph the user
+// re-pointed at another runner still has to resolve.
 var intakeAnalysisComponents = intakeAgentComponents()
 
 func intakeAgentComponents() []string {
@@ -85,7 +90,7 @@ type intakeSpec struct {
 var intakeSpecsBySource = map[string]intakeSpec{
 	models.FactoryIntakeSourceGitHubIssues: {
 		name:                 "GitHub issues",
-		description:          "Analyze new GitHub issues and create work orders for suitable changes.",
+		description:          "Create a work order when a GitHub issue is opened.",
 		triggerComponent:     "github.onIssue",
 		triggerName:          "On Issue",
 		triggerConfiguration: map[string]any{"actions": []any{"opened"}},
@@ -95,7 +100,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourceSentryExceptions: {
 		name:                 "Sentry exceptions",
-		description:          "Analyze new Sentry exceptions and create work orders for suitable fixes.",
+		description:          "Create a work order when a Sentry exception is reported.",
 		triggerComponent:     "sentry.onIssue",
 		triggerName:          "On Issue Event",
 		triggerConfiguration: map[string]any{"actions": []any{"created", "unresolved"}},
@@ -105,7 +110,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 	},
 	models.FactoryIntakeSourcePagerDutyIncidents: {
 		name:             "PagerDuty incidents",
-		description:      "Analyze triggered PagerDuty incidents and create work orders for suitable follow-up work.",
+		description:      "Create a work order when a PagerDuty incident is triggered.",
 		triggerComponent: "pagerduty.onIncident",
 		triggerName:      "On Incident",
 		triggerConfiguration: map[string]any{
@@ -136,10 +141,9 @@ func intakeDefaultDescription(source string) string {
 }
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
-// source, score the item with an agent, and create a work order when the score
-// clears the threshold. The binding tells the trigger which installation and
-// resource to listen on, and the agent tells the analysis node which runner to
-// score with; without them the user completes those nodes by hand.
+// source and create a work order. GitHub intakes keep a filter node so label
+// and assignment settings have somewhere to live. Confidence scoring happens
+// on the factory Backlog canvas after the work order exists.
 func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	spec, ok := intakeSpecsBySource[request.Source]
 	if !ok {
@@ -151,6 +155,54 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		name = spec.name
 	}
 
+	nodes := []yaml.Node{
+		{
+			ID:            intakeTriggerNodeID,
+			Name:          spec.triggerName,
+			Type:          yaml.NodeTypeTrigger,
+			Component:     spec.triggerComponent,
+			Configuration: intakeTriggerConfiguration(spec, request.Binding),
+			Integration:   request.Binding.integrationRef(),
+			Position:      yaml.Position{X: 160, Y: 80},
+		},
+	}
+	edges := []yaml.Edge{}
+	createY := 260
+
+	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+		nodes = append(nodes, yaml.Node{
+			ID:        intakeFilterNodeID,
+			Name:      "Matches filters?",
+			Type:      yaml.NodeTypeAction,
+			Component: intakeFilterComponent,
+			Configuration: map[string]any{
+				"expression": intakeFilterExpressionFor(request.Source, defaultIntakeSettings()),
+			},
+			Concurrency: intakeConcurrency(),
+			Position:    yaml.Position{X: 160, Y: 260},
+		})
+		edges = append(edges,
+			yaml.Edge{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
+			yaml.Edge{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+		)
+		createY = 440
+	} else {
+		edges = append(edges, yaml.Edge{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID})
+	}
+
+	nodes = append(nodes, yaml.Node{
+		ID:        intakeCreateNodeID,
+		Name:      intakeCreateNodeName,
+		Type:      yaml.NodeTypeAction,
+		Component: intakeCreateComponent,
+		Configuration: map[string]any{
+			"title":       spec.createTitle,
+			"description": spec.createDescription,
+		},
+		Concurrency: intakeConcurrency(),
+		Position:    yaml.Position{X: 160, Y: createY},
+	})
+
 	return &yaml.Canvas{
 		APIVersion: yaml.APIVersion,
 		Kind:       yaml.KindCanvas,
@@ -159,76 +211,8 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 			Description: spec.description,
 		},
 		Spec: &yaml.CanvasSpec{
-			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
-				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-				{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
-				{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
-			},
-			Nodes: []yaml.Node{
-				{
-					ID:            intakeTriggerNodeID,
-					Name:          spec.triggerName,
-					Type:          yaml.NodeTypeTrigger,
-					Component:     spec.triggerComponent,
-					Configuration: intakeTriggerConfiguration(spec, request.Binding),
-					Integration:   request.Binding.integrationRef(),
-					Position:      yaml.Position{X: 160, Y: 80},
-				},
-				{
-					ID:            intakeAnalysisNodeID,
-					Name:          intakeAnalysisNodeName,
-					Type:          yaml.NodeTypeAction,
-					Component:     request.Agent.component(),
-					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
-					Concurrency:   intakeConcurrency(),
-					Position:      yaml.Position{X: 160, Y: 260},
-				},
-				{
-					ID:        intakeThresholdNodeID,
-					Name:      "Meets confidence threshold?",
-					Type:      yaml.NodeTypeAction,
-					Component: intakeThresholdComponent,
-					Configuration: map[string]any{
-						"expression": intakeThresholdExpression(request.ConfidencePct),
-					},
-					Concurrency: intakeConcurrency(),
-					Position:    yaml.Position{X: 160, Y: 440},
-				},
-				{
-					ID:        intakeCreateNodeID,
-					Name:      intakeCreateNodeName,
-					Type:      yaml.NodeTypeAction,
-					Component: intakeCreateComponent,
-					Configuration: map[string]any{
-						"title":       spec.createTitle,
-						"description": spec.createDescription,
-					},
-					Concurrency: intakeConcurrency(),
-					Position:    yaml.Position{X: 160, Y: 620},
-				},
-				{
-					ID:        intakeReportConfidenceNodeID,
-					Name:      "Report Confidence",
-					Type:      yaml.NodeTypeAction,
-					Component: intakeReportConfidenceComponent,
-					Configuration: map[string]any{
-						"orderId":    intakeWorkOrderIDExpression(),
-						"checkKey":   intakeConfidenceCheckKey,
-						"name":       intakeConfidenceCheckName,
-						"score":      intakeConfidenceScoreExpression(),
-						"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
-						"format":     intakeConfidenceFormat,
-						"direction":  intakeConfidenceDirection,
-						"cautionAt":  float64(intakeConfidenceCautionAt),
-						"criticalAt": float64(intakeConfidenceCriticalAt),
-						"summary":    intakeConfidenceSummaryExpression(),
-						"analysis":   intakeConfidenceWriteupExpression(spec.analysisSubject),
-					},
-					Concurrency: intakeConcurrency(),
-					Position:    yaml.Position{X: 160, Y: 800},
-				},
-			},
+			Edges: edges,
+			Nodes: nodes,
 		},
 	}, nil
 }
@@ -256,9 +240,10 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration configures the runner that scores an item. The
-// runner components reject a node without a machine type or credentials, so the
-// generated node names the machine and the credentials of the workspace agent.
+// intakeAnalysisConfiguration configures the runner that scores a work order.
+// The runner components reject a node without a machine type or credentials, so
+// the generated node names the machine and the credentials of the workspace
+// agent.
 func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
 	configuration := map[string]any{
 		"machineType": intakeAnalysisMachineType,
@@ -307,8 +292,8 @@ func intakeAnalysisPrompt(subject string) string {
 // result, so the rest of the graph reads fields instead of parsing text. The
 // prompt asks for an exact shape, but this step accepts what an agent really
 // produces: a quoted number, a missing summary, or a different number of
-// reasons. Only the score is required, because the threshold cannot run without
-// it.
+// reasons. Only the score is required, because the report check cannot run
+// without it.
 func intakeAnalysisOutputCommand() string {
 	return fmt.Sprintf(`if ! jq -ce '{
   score: (.score | tonumber | floor),
@@ -324,12 +309,8 @@ func intakeAnalysisScorePath() string {
 	return fmt.Sprintf(`$[%q].data.result.score`, intakeAnalysisNodeName)
 }
 
-func intakeThresholdExpression(confidencePct int) string {
-	return fmt.Sprintf(`int(%s) >= %d`, intakeAnalysisScorePath(), clampIntakeConfidence(confidencePct))
-}
-
-func intakeWorkOrderIDExpression() string {
-	return fmt.Sprintf(`{{ $[%q].data.workOrder.id }}`, intakeCreateNodeName)
+func intakeWorkOrderIDFromRootExpression() string {
+	return `{{ root().data.workOrder.id }}`
 }
 
 func intakeConfidenceSummaryExpression() string {
@@ -359,11 +340,27 @@ func intakeConfidenceScoreExpression() string {
 	)
 }
 
+func intakeConfidenceReportConfiguration(subject string) map[string]any {
+	return map[string]any{
+		"orderId":    intakeWorkOrderIDFromRootExpression(),
+		"checkKey":   intakeConfidenceCheckKey,
+		"name":       intakeConfidenceCheckName,
+		"score":      intakeConfidenceScoreExpression(),
+		"maxScore":   strconv.Itoa(intakeConfidenceScoreMax),
+		"format":     intakeConfidenceFormat,
+		"direction":  intakeConfidenceDirection,
+		"cautionAt":  float64(intakeConfidenceCautionAt),
+		"criticalAt": float64(intakeConfidenceCriticalAt),
+		"summary":    intakeConfidenceSummaryExpression(),
+		"analysis":   intakeConfidenceWriteupExpression(subject),
+	}
+}
+
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)
 
-// intakeConfidenceFromExpression reads the threshold back out of a generated
-// expression. A hand-edited expression that no longer matches reports false so
-// callers can leave the value alone instead of guessing.
+// intakeConfidenceFromExpression reads a legacy score gate back out of a
+// generated expression. A hand-edited expression that no longer matches
+// reports false so callers can leave the value alone instead of guessing.
 func intakeConfidenceFromExpression(expression string) (int, bool) {
 	match := intakeThresholdPattern.FindStringSubmatch(expression)
 	if match == nil {
