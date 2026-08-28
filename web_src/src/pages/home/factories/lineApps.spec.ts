@@ -10,9 +10,10 @@ type AgentStep = { name?: string; command?: string; workingDirectory?: string };
 
 type CanvasNode = {
   id?: string;
+  name?: string;
   component?: string;
   concurrency?: { max?: number };
-  configuration?: { model?: string; steps?: AgentStep[] };
+  configuration?: { model?: string; message?: string; steps?: AgentStep[] };
 };
 
 function canvasNodes(canvasYaml: string): CanvasNode[] {
@@ -168,19 +169,16 @@ describe("setup factory line apps", () => {
       "create-branch",
       "add-branch-artifact",
       "implementation-agent-no-issue",
-      "generate-pr-text",
       "create-draft-pr",
-      "add-pr-label",
       "attach-pr-artifact",
       "set-pr-closure-note",
       "add-run-error",
     ]);
     expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
-    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: generate-pr-text/);
-    expect(implementation).toMatch(/sourceId: generate-pr-text\n\s+targetId: create-draft-pr/);
+    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-draft-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-draft-pr\n\s+targetId: attach-pr-artifact/);
-    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: add-pr-label/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
     expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*component: addPullRequest/);
     expect(implementation).toMatch(
       /id: attach-pr-artifact[\s\S]*url: '\{\{ \$\["Create Draft Pull Request"\]\.data\._links\.html\.href \}\}'/,
@@ -191,19 +189,28 @@ describe("setup factory line apps", () => {
       "create-branch": 5,
       "add-branch-artifact": 100,
       "implementation-agent-no-issue": 5,
-      "generate-pr-text": 5,
       "create-draft-pr": 100,
-      "add-pr-label": undefined,
       "attach-pr-artifact": 100,
       "set-pr-closure-note": undefined,
       "add-run-error": undefined,
     });
   });
 
-  it("writes the pull request title and description before it opens the draft", () => {
+  it("writes the pull request title and description in the implementation agent", () => {
     const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+    const agentNodes = nodes.filter((node) => AGENT_COMPONENTS.includes(node.component ?? ""));
+    const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
 
-    expect(implementation).toContain("id: generate-pr-text");
+    // One agent writes the code and the pull request text, so the run clones
+    // the repository once and the column editor reaches the whole prompt.
+    expect(agentNodes.map((node) => node.id)).toEqual(["implementation-agent-no-issue"]);
+    expect(Object.keys(steps).slice(-3)).toEqual([
+      "Commit and Push",
+      "Generate PR title and description",
+      "Push output",
+    ]);
+    expect(steps["Generate PR title and description"]?.workingDirectory).toBe("repo");
     expect(implementation).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
     expect(implementation).toMatch(
       /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
@@ -217,7 +224,9 @@ describe("setup factory line apps", () => {
   it("announces the PR-merge wait after the work order attaches the pull request", () => {
     const implementation = materializeOnboardingApp("line-implementation");
 
-    expect(implementation).toMatch(/sourceId: add-pr-label[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
+    expect(implementation).not.toContain("github.addIssueLabel");
+    expect(implementation).not.toMatch(/labels:[\s\S]*- factory/);
     expect(implementation).toContain("component: setWorkOrderStatusNote");
     expect(implementation).toContain("noteKey: pr-closure");
     expect(implementation).toContain("headline: Waiting for user review");
@@ -226,6 +235,21 @@ describe("setup factory line apps", () => {
     );
     expect(implementation).toContain("ctaUrl: '{{ $[\"Create Draft Pull Request\"].data.html_url }}'");
     expect(implementation).toContain("showOnlyWhenWaiting: true");
+  });
+
+  it("names the error node and gives it the message addRunError requires", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const errorNode = canvasNodes(implementation).find((node) => node.id === "add-run-error");
+
+    // An empty message fails canvas validation, so the node carries a warning
+    // badge in the editor and fails when the agent reaches the failed channel.
+    expect(errorNode?.name).toBe("Record Implementation Failure");
+    expect(errorNode?.configuration?.message).toBe(
+      "The implementation agent failed. Open the agent logs to find the cause.",
+    );
+    expect(implementation).toMatch(
+      /channel: failed\n\s+sourceId: implementation-agent-no-issue\n\s+targetId: add-run-error/,
+    );
   });
 
   it("fails planning when the agent does not write the plan file", () => {

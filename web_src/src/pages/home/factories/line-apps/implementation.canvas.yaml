@@ -16,24 +16,15 @@ spec:
       targetId: implementation-agent-no-issue
     - channel: passed
       sourceId: implementation-agent-no-issue
-      targetId: generate-pr-text
-    - channel: passed
-      sourceId: generate-pr-text
       targetId: create-draft-pr
     - channel: default
       sourceId: create-draft-pr
       targetId: attach-pr-artifact
     - channel: default
       sourceId: attach-pr-artifact
-      targetId: add-pr-label
-    - channel: default
-      sourceId: add-pr-label
       targetId: set-pr-closure-note
     - channel: failed
       sourceId: implementation-agent-no-issue
-      targetId: add-run-error
-    - channel: failed
-      sourceId: generate-pr-text
       targetId: add-run-error
   nodes:
     - id: onrun-implement
@@ -225,74 +216,18 @@ spec:
               fi
               git push origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
-      position:
-        x: 1475
-        'y': 648
-      isCollapsed: false
-    - id: generate-pr-text
-      name: Generate PR title and description
-      type: TYPE_ACTION
-      component: runnerClaudeCode
-      concurrency:
-        max: 5
-      configuration:
-        credentials:
-          source: integration
-          integration:
-            name: claude
-        environmentFrom:
-          - source: integration
-            integration:
-              name: github
-        environment:
-          - name: REPO
-            value: '{{ install_params.appRepository }}'
-            valueSource: literal
-          - name: PLAN
-            value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}'
-            valueSource: literal
-          - name: BRANCH
-            value: '{{ $["Create Branch"].data.result.branch }}'
-            valueSource: literal
-          - name: ORDER_DESCRIPTION
-            value: '{{ toBase64(order().description) }}'
-            valueSource: literal
-        executionTimeoutSeconds: 3600
-        machineType: e1-large-amd64
-        model: sonnet
-        steps:
-          - name: Inject Plan
-            type: bash
-            command: |-
-              echo $PLAN | base64 -d > /tmp/PLAN.md
-              cat /tmp/PLAN.md
-          - name: Inject order description
-            type: bash
-            command: |-
-              echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
-              cat /tmp/ORDER.md
-          - name: Checkout Branch
-            type: bash
-            command: |-
-              set -euo pipefail
-              rm -rf repo
-              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
-              cd repo
           - name: Generate PR title and description
             type: prompt
             workingDirectory: repo
             prompt: |-
-              You are writing a pull request title and description for an implementation done to complete a SuperPlane Work Order.
-              The repository is cloned out in your current working directory.
+              Write the pull request title and description for the change you pushed.
 
               Work order title: {{ order().title }}
 
-              1/ The work order description is at /tmp/ORDER.md
-              2/ The plan used for the implementation is in the /tmp/PLAN.md file.
-              3/ Analyze the plan and the changes in the current branch, compared to main, and compose a concise title and description for the pull request.
-              4/ The title should follow conventional commits structure. Use only feat, fix, chore, or docs.
-              5/ The description should have a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
-              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md
+              1/ Compare the current branch with main and review the commits you made.
+              2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
+              3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
+              4/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
 
               Write clearly, for humans, in ASD-STE100 / Simplified Technical English
           - name: Push output
@@ -312,8 +247,8 @@ spec:
                 exit 1
               fi
       position:
-        x: 1442
-        'y': 984
+        x: 1475
+        'y': 648
       isCollapsed: false
     - id: create-draft-pr
       name: Create Draft Pull Request
@@ -337,20 +272,7 @@ spec:
         title: '{{ fromBase64(previous().data.result.title) }}'
       position:
         x: 1442
-        'y': 1152
-      isCollapsed: true
-    - id: add-pr-label
-      name: Add Label to Pull Request
-      type: TYPE_ACTION
-      component: github.addIssueLabel
-      configuration:
-        issueNumber: '{{ $["Create Draft Pull Request"].data.number }}'
-        labels:
-          - factory
-        repository: '{{ install_params.appRepository }}'
-      position:
-        x: 1442
-        'y': 1320
+        'y': 984
       isCollapsed: true
     - id: attach-pr-artifact
       name: Attach PR to Work Order
@@ -369,7 +291,7 @@ spec:
         externalId: '{{ $["Create Draft Pull Request"].data.id }}'
       position:
         x: 1442
-        'y': 1488
+        'y': 1152
       isCollapsed: true
     - id: set-pr-closure-note
       name: Set PR closure note
@@ -385,13 +307,14 @@ spec:
         showOnlyWhenWaiting: true
       position:
         x: 1442
-        'y': 1656
+        'y': 1320
       isCollapsed: true
     - id: add-run-error
-      name: addRunError
+      name: Record Implementation Failure
       type: TYPE_ACTION
       component: addRunError
-      configuration: {}
+      configuration:
+        message: The implementation agent failed. Open the agent logs to find the cause.
       position:
         x: 1770
         'y': 984
