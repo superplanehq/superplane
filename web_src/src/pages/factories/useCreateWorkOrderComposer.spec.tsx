@@ -1,15 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createMutate, dispatchMutate, meResult } = vi.hoisted(() => ({
+const { createMutate, meResult } = vi.hoisted(() => ({
   createMutate: vi.fn(),
-  dispatchMutate: vi.fn(),
   meResult: { current: { data: null as { id: string; name: string } | null } },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
-  useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutate, isPending: false }),
 }));
 
 vi.mock("@/hooks/useMe", () => ({
@@ -28,13 +26,12 @@ describe("useCreateWorkOrderComposer", () => {
 
   beforeEach(() => {
     createMutate.mockReset();
-    dispatchMutate.mockReset();
     onClose.mockReset();
     onCreated.mockReset();
     meResult.current = { data: null };
   });
 
-  it("marks Send to line as loading while the work order is created", async () => {
+  it("marks Create as loading while the work order is created", async () => {
     let resolveCreate: (order: { id: string }) => void = () => {};
     createMutate.mockImplementation(
       () =>
@@ -42,7 +39,6 @@ describe("useCreateWorkOrderComposer", () => {
           resolveCreate = resolve;
         }),
     );
-    dispatchMutate.mockResolvedValue({});
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -58,62 +54,14 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     act(() => {
-      void result.current.handleSendToLine("plan-and-implement");
+      void result.current.handleCreate();
     });
 
-    expect(result.current.isSendingToLine).toBe(true);
-    expect(result.current.isSavingDraft).toBe(false);
+    expect(result.current.isCreating).toBe(true);
 
     await act(async () => {
       resolveCreate({ id: "order-1" });
     });
-  });
-
-  it("creates the order and dispatches it with the line name passed to handleSendToLine", async () => {
-    createMutate.mockResolvedValue({ id: "order-1", number: "101" });
-    dispatchMutate.mockResolvedValue({});
-
-    const { result } = renderHook(() =>
-      useCreateWorkOrderComposer({
-        organizationId: "org-1",
-        factoryId: "factory-1",
-        onClose,
-        onCreated,
-      }),
-    );
-
-    act(() => {
-      result.current.updateTitle("Ship the refunds line");
-    });
-
-    await act(async () => {
-      await result.current.handleSendToLine("hotfix");
-    });
-
-    expect(createMutate).toHaveBeenCalled();
-    expect(dispatchMutate).toHaveBeenCalledWith({ orderId: "order-1", lineName: "hotfix" });
-    expect(onCreated).toHaveBeenCalledWith("101");
-  });
-
-  it("does nothing when handleSendToLine is called without a line name", async () => {
-    const { result } = renderHook(() =>
-      useCreateWorkOrderComposer({
-        organizationId: "org-1",
-        factoryId: "factory-1",
-        onClose,
-        onCreated,
-      }),
-    );
-
-    act(() => {
-      result.current.updateTitle("Ship the refunds line");
-    });
-
-    await act(async () => {
-      await result.current.handleSendToLine("");
-    });
-
-    expect(createMutate).not.toHaveBeenCalled();
   });
 
   it("seeds assigneeIds with the current user once me resolves", () => {
@@ -202,7 +150,7 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     await act(async () => {
-      await result.current.handleSaveDraft();
+      await result.current.handleCreate();
     });
 
     expect(onCreated).toHaveBeenCalledWith("101");
