@@ -198,6 +198,9 @@ type LineStepExecutionFinished struct {
 	Line     *LineRef      `json:"line,omitempty"`
 	App      *AppRef       `json:"app,omitempty"`
 	Run      *RunRef       `json:"run,omitempty"`
+	// User is who cancelled the canvas run, when this finish is a
+	// cancellation. Passed finishes leave it empty.
+	User *UserRef `json:"user,omitempty"`
 }
 
 // Refs

@@ -212,6 +212,7 @@ func (e *FactoryWorkOrderExecution) RecordFinished(tx *gorm.DB, result string) e
 		Line:     dispatch.Ref(),
 		App:      &factory.AppRef{ID: run.WorkflowID, Name: e.StepName},
 		Run:      &factory.RunRef{ID: run.ID, State: run.State, Result: &run.Result},
+		User:     cancelledByUserRef(run.CancelledBy),
 	}
 
 	jsonData, err := json.Marshal(data)
@@ -321,4 +322,11 @@ func RootEventSourcePayload(eventData any) any {
 	}
 
 	return source
+}
+
+func cancelledByUserRef(cancelledBy *uuid.UUID) *factory.UserRef {
+	if cancelledBy == nil {
+		return nil
+	}
+	return &factory.UserRef{ID: *cancelledBy}
 }
