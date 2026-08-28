@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, XIcon } from "lucide-react";
+import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, RotateCcw, Undo2, XIcon } from "lucide-react";
 
 /**
  * Storybook-only: close actions in a note-style footer. Header stays Close
@@ -17,7 +17,7 @@ export type DecisionFooterKind =
   | "rejected"
   | "closedFailed";
 
-type DecisionAction = { id: string; label: string; emphasis: "primary" | "quiet" };
+type DecisionAction = { id: string; label: string; emphasis: "primary" | "quiet"; icon?: "undo-2" };
 
 type DecisionCopy = {
   title: string;
@@ -41,10 +41,11 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
   },
   waiting: {
     title: "Add refund reconciliation test",
-    headline: "This task waits on a person",
-    text: "No automation is running. Click Approve if the result is good. Click Reject to close this task as rejected.",
+    headline: "This task needs a decision",
+    text: "Every automation finished. This task is ready to complete.",
     tone: "waiting",
     actions: [
+      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "approve", label: "Approve", emphasis: "primary" },
     ],
@@ -56,6 +57,7 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     tone: "waiting",
     cta: { label: "Review PR", href: "https://github.com/superplanehq/superplane/pull/6812" },
     actions: [
+      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "approve", label: "Approve", emphasis: "primary" },
     ],
@@ -63,25 +65,26 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
   failed: {
     title: "Add refund reconciliation test",
     headline: "Implement did not pass",
-    text: "This automation failed. Open the run to review the error. Fix the automation, then click Rerun. Or close this task.",
+    text: "This automation did not finish. Fix the error, then run this step again.",
     tone: "failed",
     cta: { label: "Debug", href: "/run/implement", icon: "bug" },
     actions: [
+      { id: "back-to-draft", label: "To Backlog", emphasis: "quiet", icon: "undo-2" },
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "rerun", label: "Rerun", emphasis: "primary" },
     ],
   },
   completed: {
     title: "Add refund reconciliation test",
-    headline: "This task finished successfully",
-    text: "The line automations completed every step.",
+    headline: "This task succeeded",
+    text: "The work is done. The result met the goal.",
     tone: "done",
     actions: [],
   },
   rejected: {
     title: "Add refund reconciliation test",
-    headline: "This task is rejected",
-    text: "A person closed this task. The line automations did not finish the work.",
+    headline: "This task did not succeed",
+    text: "The work is done. The result did not meet the goal.",
     tone: "rejected",
     actions: [],
   },
@@ -146,7 +149,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
         {kind === "running"
           ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
-            ? "A Set Work Order Status Note supplies the headline, body, and Review PR link. Reject and Approve stay on this strip."
+            ? "A Set Work Order Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}
       </div>
       {model ? <DecisionNote copy={model} /> : null}
@@ -160,17 +163,17 @@ function DecisionNote({ copy }: { copy: DecisionCopy }) {
   const Icon = reopen ? RotateCcw : visual.Icon;
 
   return (
-    <div className={cn("shrink-0 border-t px-4 py-3", visual.strip)} data-testid="split-run-decision-note">
-      <div className="flex items-center gap-3">
+    <div className={cn("shrink-0 border-t px-5 py-4", visual.strip)} data-testid="split-run-decision-note">
+      <div className="flex items-center gap-3.5">
         <span
-          className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
+          className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
           aria-hidden
         >
-          <Icon className={cn("size-4", visual.icon)} />
+          <Icon className={cn("size-5", visual.icon)} />
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{copy.headline}</h3>
-          <p className="mt-1 text-[13px] text-foreground/80">{copy.text}</p>
+          <h3 className="workspace-section-title">{copy.headline}</h3>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-foreground/80">{copy.text}</p>
         </div>
         <NoteActions copy={copy} />
       </div>
@@ -196,6 +199,7 @@ function NoteActions({ copy }: { copy: DecisionCopy }) {
       {copy.cta ? <NoteCta cta={copy.cta} /> : null}
       {copy.actions.map((action) => (
         <Button key={action.id} type="button" size="sm" variant={action.emphasis === "primary" ? "default" : "outline"}>
+          {action.icon === "undo-2" ? <Undo2 className="size-3.5" aria-hidden /> : null}
           {action.label}
         </Button>
       ))}

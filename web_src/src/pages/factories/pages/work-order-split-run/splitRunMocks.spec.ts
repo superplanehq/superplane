@@ -187,7 +187,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -206,9 +206,9 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("This task waits on a person");
+    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -310,8 +310,8 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.footer.sentence).toBe("Work order completed successfully.");
     expect(done.footer.actions).toEqual([]);
     expect(done.footer.note).toEqual({
-      headline: "This task finished successfully",
-      text: "The line automations completed every step.",
+      headline: "This task succeeded",
+      text: "The work is done. The result met the goal.",
     });
   });
 
@@ -590,7 +590,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Debug");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -980,8 +980,8 @@ describe("line board work-order examples", () => {
       state: "STATE_CLOSED",
     });
     expect(fixture.footer.note).toEqual({
-      headline: "This task is rejected",
-      text: "A person closed this task. The line automations did not finish the work.",
+      headline: "This task did not succeed",
+      text: "The work is done. The result did not meet the goal.",
     });
     expect(fixture.footer.actions).toEqual([]);
   });

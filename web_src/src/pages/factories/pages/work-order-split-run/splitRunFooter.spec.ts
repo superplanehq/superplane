@@ -33,6 +33,13 @@ const DRAFT_NOTE = {
   text: "From GitHub issue PAY-842. Confidence 5/5.",
 };
 
+const BACK_TO_DRAFT = {
+  id: "back-to-draft",
+  kind: "back-to-draft",
+  label: "To Backlog",
+  emphasis: "quiet",
+  icon: "undo-2",
+};
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
@@ -82,7 +89,7 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("keeps a waiting note on the decision strip with Reject and Approve", () => {
+  it("keeps a waiting note on the decision strip with To Backlog, Reject, and Approve", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
     expect(footer.attentionCard).toBe(true);
@@ -93,7 +100,7 @@ describe("buildSplitRunFooter", () => {
       cta: PR_NOTE.cta,
     });
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([REJECT, APPROVE]);
+    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
@@ -102,11 +109,11 @@ describe("buildSplitRunFooter", () => {
       kind: "waiting",
       sentence: "This work order needs attention.",
       note: {
-        headline: "This task waits on a person",
-        text: "No automation is running. Click Approve if the result is good. Click Reject to close this task as rejected.",
+        headline: "This task needs a decision",
+        text: "Every automation finished. This task is ready to complete.",
       },
       attentionCard: true,
-      actions: [REJECT, APPROVE],
+      actions: [BACK_TO_DRAFT, REJECT, APPROVE],
     });
   });
 
@@ -124,7 +131,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("A person stopped this automation");
     expect(footer.note?.text).toBe(
-      "The line is not running. Rerun this step, send the task to the Backlog, or reject it.",
+      "This automation did not finish. This task still needs a decision.",
     );
     expect(footer.note?.cta).toBeUndefined();
     expect(footer.note?.actor).toBeUndefined();
@@ -142,14 +149,14 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.actor).toEqual(actor);
   });
 
-  it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
+  it("treats a failed open implement as a decision strip with To Backlog, Reject, and Rerun", () => {
     const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([REJECT, RERUN]);
+    expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 
@@ -158,8 +165,8 @@ describe("buildSplitRunFooter", () => {
       kind: "done",
       sentence: "Work order completed successfully.",
       note: {
-        headline: "This task finished successfully",
-        text: "The line automations completed every step.",
+        headline: "This task succeeded",
+        text: "The work is done. The result met the goal.",
       },
       attentionCard: true,
       actions: [],
@@ -168,8 +175,8 @@ describe("buildSplitRunFooter", () => {
     expect(doneFooterForStatus("rejected")).toMatchObject({
       sentence: "A person rejected this work order.",
       note: {
-        headline: "This task is rejected",
-        text: "A person closed this task. The line automations did not finish the work.",
+        headline: "This task did not succeed",
+        text: "The work is done. The result did not meet the goal.",
       },
       attentionCard: true,
       actions: [],
@@ -189,6 +196,19 @@ describe("buildSplitRunFooter", () => {
         text: "Reopen this task to start the line again.",
       },
       actions: [REOPEN],
+    });
+  });
+
+  it("names the person or automation that scored a completed or rejected task", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A" };
+    expect(doneFooterForStatus("completed", { actor }).note).toMatchObject({
+      headline: "marked this task as successful",
+      text: "The work is done. The result met the goal.",
+      actor,
+    });
+    expect(doneFooterForStatus("rejected", { automationName: "PR Closure" }).note).toMatchObject({
+      headline: "PR Closure marked this task as unsuccessful",
+      text: "The work is done. The result did not meet the goal.",
     });
   });
 

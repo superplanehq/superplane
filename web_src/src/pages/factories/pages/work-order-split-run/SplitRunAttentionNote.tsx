@@ -80,22 +80,26 @@ export function SplitRunAttentionNote({
   const Icon = actions.some((action) => action.kind === "reopen") ? RotateCcw : visual.Icon;
 
   return (
-    <div className={cn("border-t px-4 py-3", visual.strip)} data-testid="split-run-attention-note">
-      <div className="flex items-center gap-3">
+    <div className={cn("border-t px-5 py-4", visual.strip)} data-testid="split-run-attention-note">
+      <div className="flex items-center gap-3.5">
         <span
-          className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
+          className={cn("flex size-10 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
           aria-hidden
         >
-          <Icon className={cn("size-4", visual.icon)} />
+          <Icon className={cn("size-5", visual.icon)} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+          <h3 className="workspace-section-title">
             <StoppedHeadline note={note} />
           </h3>
           {note.text ? (
-            <div className="mt-1 text-[13px] text-foreground/80">
-              <MarkdownContent content={note.text} variant="workspace" />
+            <div className="mt-1.5">
+              <MarkdownContent
+                content={note.text}
+                variant="workspace"
+                className="max-w-none text-[14px] leading-relaxed text-foreground/80"
+              />
             </div>
           ) : null}
         </div>

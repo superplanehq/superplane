@@ -275,6 +275,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).getByRole("heading", { name: "Waiting for user review" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "Review PR #6812" })).toBeInTheDocument();
     const waitingNote = within(dialog).getByTestId("split-run-attention-note");
+    expect(within(waitingNote).getByRole("button", { name: "To Backlog" })).toBeInTheDocument();
     expect(within(waitingNote).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(within(waitingNote).getByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Open full screen" })).toBeInTheDocument();
