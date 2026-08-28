@@ -196,6 +196,12 @@
     <div class="detail">{{.Detail}}</div>
     {{end}}
 
+    {{if .DetailCtaURL}}
+    <div class="text">
+        <a href="{{.DetailCtaURL}}" class="link">{{if .DetailCtaLabel}}{{.DetailCtaLabel}}{{else}}{{.DetailCtaURL}}{{end}}</a>
+    </div>
+    {{end}}
+
     <div class="text">
         <a href="{{.WorkOrderLink}}" class="link">Open the work order in SuperPlane</a>
     </div>

@@ -301,6 +301,8 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 		WorkOrderKey:     "SP-52",
 		WorkOrderTitle:   "Metrics on list of lines",
 		Detail:           "Looks good",
+		DetailCtaLabel:   "Review PR #52",
+		DetailCtaURL:     "https://github.com/example/repo/pull/52",
 		WorkOrderLink:    "https://app.superplane.com/org/workspaces/sp/work-order/52",
 		StatusLabel:      "Waiting",
 		StatusFg:         "#b45309",
@@ -324,6 +326,8 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, html, "&#43;1")
 	assert.Contains(t, html, "#fffbeb")
 	assert.Contains(t, html, "https://app.superplane.com/org/workspaces/sp/work-order/52")
+	assert.Contains(t, html, "href=\"https://github.com/example/repo/pull/52\"")
+	assert.Contains(t, html, "Review PR #52")
 
 	text, err := renderEmailTemplate(templateRoot, "work_order_notification.txt", data)
 	require.NoError(t, err)
@@ -331,6 +335,7 @@ func TestWorkOrderNotificationTemplates_KanbanCard(t *testing.T) {
 	assert.Contains(t, text, "SP-52")
 	assert.Contains(t, text, "Bugs · CI Loop")
 	assert.Contains(t, text, "8h ago")
+	assert.Contains(t, text, "Review PR #52: https://github.com/example/repo/pull/52")
 }
 
 func TestBuildEmailService(t *testing.T) {

@@ -6,6 +6,8 @@
 {{end}}{{.UpdatedLabel}}
 {{if .Detail}}
 {{.Detail}}
+{{end}}{{if .DetailCtaURL}}
+{{if .DetailCtaLabel}}{{.DetailCtaLabel}}: {{end}}{{.DetailCtaURL}}
 {{end}}
 Open the work order in SuperPlane:
 {{.WorkOrderLink}}
