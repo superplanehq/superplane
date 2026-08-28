@@ -20,6 +20,7 @@ const LOG_TAB_DOT: Record<SplitRunPhaseStatus, string> = {
   waiting: "bg-[color:var(--status-waiting-dot)]",
   failed: "bg-[color:var(--status-failed-dot)]",
   pending: "bg-[color:var(--status-draft-dot)]",
+  cancelled: "bg-[color:var(--status-cancelled-dot)]",
 };
 
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
