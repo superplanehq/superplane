@@ -34,6 +34,10 @@ type WorkOrderNotificationTemplateData struct {
 	// Detail is optional supporting text (comment excerpt, state change).
 	Detail        string
 	WorkOrderLink string
+	// DetailCtaLabel and DetailCtaURL render a secondary HTML link under
+	// the detail block (status-note CTAs). Empty URL skips the link.
+	DetailCtaLabel string
+	DetailCtaURL   string
 	// Kanban-card fields. Colors are light-theme hex values so the HTML
 	// email matches the work order board card.
 	StatusLabel      string

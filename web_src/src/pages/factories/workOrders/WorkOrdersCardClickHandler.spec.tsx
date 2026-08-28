@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 
-import { factoryHomePath } from "../lib/factoryPagePaths";
+import { workOrderDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
@@ -38,7 +38,7 @@ const entry = buildWorkOrderListEntry(
   factory,
 );
 
-const boardHref = factoryHomePath(organizationId, factoryKey);
+const permalinkHref = workOrderDetailPath(organizationId, factoryKey, entry.order.number ?? "1");
 
 /**
  * Board and list views group entries into lanes based on display status.
@@ -107,7 +107,7 @@ function renderView(
         />
       ),
     },
-    { path: boardHref, element: <div>Line board</div> },
+    { path: permalinkHref, element: <div>Work order</div> },
   ]);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -254,13 +254,13 @@ describe.each(views)("$name click handling", ({ Component }) => {
     expect(effectivePointerEvents(status)).toBe("none");
   });
 
-  it("navigates to the line board when the overlay link is activated", async () => {
+  it("navigates to the work order permalink when the overlay link is activated", async () => {
     const user = userEvent.setup();
     const { router, row } = renderView(Component);
 
     await user.click(within(row).getByRole("link", { name: `Open ${entry.title}` }));
 
-    expect(router.state.location.pathname).toBe(boardHref);
+    expect(router.state.location.pathname).toBe(permalinkHref);
   });
 });
 

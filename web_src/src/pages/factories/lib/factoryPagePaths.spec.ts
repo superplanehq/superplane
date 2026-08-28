@@ -23,6 +23,7 @@ import {
   organizationSettingsSectionPath,
   parseFactoryAppNavFrom,
   workOrderDetailPath,
+  workOrderOpenPath,
   workOrdersPath,
 } from "./factoryPagePaths";
 
@@ -129,6 +130,16 @@ describe("workOrderDetailPath", () => {
 
   it("is a sibling of, not nested under, the plural work-orders list path", () => {
     expect(workOrderDetailPath("org-1", "SP", "42")).not.toContain(workOrdersPath("org-1", "SP"));
+  });
+});
+
+describe("workOrderOpenPath", () => {
+  it("uses the canonical permalink when the order has a number", () => {
+    expect(workOrderOpenPath("org-1", "SP", 42, "line-1")).toBe("/org-1/workspaces/SP/work-order/42");
+  });
+
+  it("falls back to the line board when the order has no number", () => {
+    expect(workOrderOpenPath("org-1", "SP", undefined, "line-1")).toBe("/org-1/workspaces/SP/lines/line-1");
   });
 });
 

@@ -252,6 +252,36 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`,
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+    );
+  });
+
+  it("opens the split run from a work-order permalink", () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`);
+
+    const popup = screen.getByTestId("work-order-split-run");
+    expect(within(popup).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`,
+    );
+  });
+
+  it("keeps the line board without a popup when the permalink is unknown", () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/999`);
+
+    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {

@@ -126,6 +126,22 @@ export function workOrderDetailPath(organizationId: string, factoryKey: string, 
 }
 
 /**
+ * Opens a work order at its canonical permalink. Falls back to the line
+ * board when the order has no number yet.
+ */
+export function workOrderOpenPath(
+  organizationId: string,
+  factoryKey: string,
+  orderNumber: string | number | null | undefined,
+  fallbackLineId?: string | null,
+) {
+  if (orderNumber === undefined || orderNumber === null || String(orderNumber).trim() === "") {
+    return factoryHomePath(organizationId, factoryKey, fallbackLineId);
+  }
+  return workOrderDetailPath(organizationId, factoryKey, orderNumber);
+}
+
+/**
  * Old id-based work order URL shape, kept around only so the legacy
  * redirect route can compare against it / build test fixtures. New code
  * should always call `workOrderDetailPath`.
