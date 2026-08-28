@@ -6,10 +6,19 @@ export interface StorybookUsageReport {
   byModel: Array<{ provider: string; model: string; totalTokens: string; costCents: string }>;
   remainingCreditCents?: string;
   grantTotalCents?: string;
+  superplaneGrantCents?: string;
+  purchasedCreditCents?: string;
   hostedBilledCents?: string;
   remainingCreditWarning?: boolean;
   billingEnabled?: boolean;
   hasBillingCustomer?: boolean;
+  invoices?: Array<{
+    id?: string;
+    createdAt?: string;
+    amountCents?: string;
+    status?: string;
+    productName?: string;
+  }>;
   hostedSpendBudgetCents?: string | number | null;
   factoryHostedBilledCents?: string;
   factoryRemainingCreditCents?: string;
@@ -23,6 +32,8 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   byModel: [],
   remainingCreditCents: "5000",
   grantTotalCents: "5000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
 };
@@ -34,6 +45,8 @@ export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
   byModel: [],
   remainingCreditCents: "0",
   grantTotalCents: "0",
+  superplaneGrantCents: "0",
+  purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
 };
@@ -49,6 +62,8 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   ],
   remainingCreditCents: "4124",
   grantTotalCents: "5000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "0",
   hostedBilledCents: "876",
   remainingCreditWarning: false,
 };

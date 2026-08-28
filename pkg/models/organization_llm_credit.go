@@ -70,11 +70,13 @@ func (OrganizationLLMCreditHold) TableName() string {
 
 // OrganizationLLMCreditSummary is remaining hosted credit for an org.
 type OrganizationLLMCreditSummary struct {
-	GrantMicros     int64
-	BilledMicros    int64
-	RemainingMicros int64
-	MarkupBPS       int
-	Warning         bool
+	GrantMicros           int64
+	SuperPlaneGrantMicros int64
+	PurchasedCreditMicros int64
+	BilledMicros          int64
+	RemainingMicros       int64
+	MarkupBPS             int
+	Warning               bool
 }
 
 func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
@@ -229,7 +231,7 @@ func FindLLMCreditRefundByPolarRefundID(tx *gorm.DB, polarRefundID string) (*Org
 func PolarRefundMicrosForOrder(tx *gorm.DB, polarOrderID string) (int64, error) {
 	var refundedMicros int64
 	err := tx.Model(&OrganizationLLMCreditGrant{}).
-		Select("COALESCE(SUM(-amount_micros), 0)").
+		Select("COALESCE(SUM(-amount_micros), 0) AS refunded_micros").
 		Where("polar_order_id = ? AND kind = ?", polarOrderID, LLMCreditGrantKindPolarRefund).
 		Scan(&refundedMicros).Error
 	if err != nil {
@@ -299,13 +301,28 @@ func ResolveOrganizationMarkupBPS(tx *gorm.DB, orgID uuid.UUID) (int, error) {
 }
 
 func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLLMCreditSummary, error) {
-	var grantMicros int64
+	var kindTotals []struct {
+		Kind  string
+		Total int64
+	}
 	err := tx.Model(&OrganizationLLMCreditGrant{}).
-		Select("COALESCE(SUM(amount_micros), 0)").
+		Select("kind, COALESCE(SUM(amount_micros), 0) as total").
 		Where("organization_id = ?", orgID).
-		Scan(&grantMicros).Error
+		Group("kind").
+		Scan(&kindTotals).Error
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err
+	}
+
+	var grantMicros, superplaneGrantMicros, purchasedCreditMicros int64
+	for _, row := range kindTotals {
+		grantMicros += row.Total
+		switch row.Kind {
+		case LLMCreditGrantKindWelcome, LLMCreditGrantKindAdmin:
+			superplaneGrantMicros += row.Total
+		case LLMCreditGrantKindPolar, LLMCreditGrantKindPolarRefund:
+			purchasedCreditMicros += row.Total
+		}
 	}
 
 	var billedMicros int64
@@ -339,11 +356,13 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	}
 
 	return OrganizationLLMCreditSummary{
-		GrantMicros:     grantMicros,
-		BilledMicros:    billedMicros,
-		RemainingMicros: remaining,
-		MarkupBPS:       markupBPS,
-		Warning:         warning,
+		GrantMicros:           grantMicros,
+		SuperPlaneGrantMicros: superplaneGrantMicros,
+		PurchasedCreditMicros: purchasedCreditMicros,
+		BilledMicros:          billedMicros,
+		RemainingMicros:       remaining,
+		MarkupBPS:             markupBPS,
+		Warning:               warning,
 	}, nil
 }
 

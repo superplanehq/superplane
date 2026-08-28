@@ -467,6 +467,17 @@ message DescribeOrganizationLLMSpendResponse {
   bool remaining_credit_warning = 8;
   bool billing_enabled = 9;
   bool has_billing_customer = 10;
+  int64 superplane_grant_cents = 11;
+  int64 purchased_credit_cents = 12;
+  repeated HostedCreditInvoice invoices = 13;
+}
+
+message HostedCreditInvoice {
+  string id = 1;
+  string created_at = 2;
+  int64 amount_cents = 3;
+  string status = 4;
+  string product_name = 5;
 }
 
 message ListHostedLLMModelsRequest {

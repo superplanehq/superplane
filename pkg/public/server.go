@@ -453,6 +453,9 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+		if user.AccountID != nil {
+			r2.Header.Set("x-account-id", user.AccountID.String())
+		}
 
 		//
 		// Remove the scoped token scopes from the request header,

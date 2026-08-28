@@ -45,10 +45,11 @@ function OrgHostedCreditCard(args: {
 }) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <CreditMetric label="Remaining" value={formatUsdCents(args.credit.remaining_credit_cents)} />
-        <CreditMetric label="Grant total" value={formatUsdCents(args.credit.grant_total_cents)} />
-        <CreditMetric label="Hosted billed" value={formatUsdCents(args.credit.hosted_billed_cents)} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <CreditMetric label="Remaining hosted credit" value={formatUsdCents(args.credit.remaining_credit_cents)} />
+        <CreditMetric label="SuperPlane grant" value={formatUsdCents(args.credit.superplane_grant_cents)} />
+        <CreditMetric label="Purchased hosted credit" value={formatUsdCents(args.credit.purchased_credit_cents)} />
+        <CreditMetric label="Hosted billed spend" value={formatUsdCents(args.credit.hosted_billed_cents)} />
       </div>
       {args.credit.warning ? (
         <Text className="mt-3 text-sm text-amber-700 dark:text-amber-400">

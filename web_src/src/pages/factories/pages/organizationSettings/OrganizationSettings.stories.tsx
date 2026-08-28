@@ -73,12 +73,23 @@ export const LLMSpendBillingInvoices: Story = {
         ...defaultFactoriesFixture,
         organizationLlmSpend: {
           ...EMPTY_USAGE_REPORT,
-          remainingCreditCents: "2500",
-          grantTotalCents: "2500",
-          hostedBilledCents: "0",
+          remainingCreditCents: "14630",
+          grantTotalCents: "15000",
+          superplaneGrantCents: "5000",
+          purchasedCreditCents: "10000",
+          hostedBilledCents: "370",
           remainingCreditWarning: false,
           billingEnabled: true,
           hasBillingCustomer: true,
+          invoices: [
+            {
+              id: "ord_100",
+              createdAt: "2026-08-27T12:00:00Z",
+              amountCents: "10000",
+              status: "paid",
+              productName: "$100 pack",
+            },
+          ],
         },
         hostedCreditProducts: [
           { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },

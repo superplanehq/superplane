@@ -123,6 +123,8 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
 		assert.Equal(t, "org-1", body["external_customer_id"])
+		_, hasCustomerEmail := body["customer_email"]
+		assert.False(t, hasCustomerEmail)
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"url":         "https://buy.polar.sh/polar_c_test",
 			"customer_id": "cust_1",
@@ -131,23 +133,28 @@ func Test__CreateCheckoutForwardsCustomerIP(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	session, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "owner@example.com", "http://localhost:8000/return", "203.0.113.10")
+	session, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost:8000/return", "203.0.113.10")
 	require.NoError(t, err)
 	assert.Equal(t, "https://buy.polar.sh/polar_c_test", session.URL)
 	assert.Equal(t, "cust_1", session.CustomerID)
 }
 
-func Test__CreateCustomerPostsTrailingSlash(t *testing.T) {
+func Test__CreateCustomerPostsTeamOwnerWithoutEmail(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/customers/", r.URL.Path)
 		var body map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "team", body["type"])
 		assert.Equal(t, "Acme", body["name"])
+		assert.Equal(t, "org-1", body["external_id"])
+		_, hasEmail := body["email"]
+		assert.False(t, hasEmail)
+		owner, _ := body["owner"].(map[string]any)
+		assert.Equal(t, "buyer@example.com", owner["email"])
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"id":          "cust_1",
 			"external_id": "org-1",
-			"email":       body["email"],
+			"email":       nil,
 			"name":        "Acme",
 		}))
 	}))
@@ -156,8 +163,8 @@ func Test__CreateCustomerPostsTrailingSlash(t *testing.T) {
 	client := NewClient(server.URL, "oat_test", server.Client())
 	customer, err := client.CreateCustomer(context.Background(), CreateCustomerInput{
 		ExternalID: "org-1",
-		Email:      "billing+org-1@billing.superplane.com",
 		Name:       "Acme",
+		OwnerEmail: "buyer@example.com",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "cust_1", customer.ID)
@@ -189,11 +196,65 @@ func Test__EnsureCustomerUsesExistingAfterConflict(t *testing.T) {
 	client := NewClient(server.URL, "oat_test", server.Client())
 	customer, err := client.EnsureCustomer(context.Background(), CreateCustomerInput{
 		ExternalID: "org-1",
-		Email:      "billing+org-1@billing.superplane.com",
 		Name:       "Acme",
+		OwnerEmail: "buyer@example.com",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "cust_existing", customer.ID)
+}
+
+func Test__EnsureCustomerReusesCustomerAfterUniqueness422(t *testing.T) {
+	created := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
+			if !created {
+				http.Error(w, "missing", http.StatusNotFound)
+				return
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"id":          "cust_existing",
+				"external_id": "org-1",
+			}))
+		case r.Method == http.MethodPost && r.URL.Path == "/customers/":
+			created = true
+			http.Error(w, `{"detail":[{"loc":["body","external_id"],"msg":"A customer with this external ID already exists."}]}`, http.StatusUnprocessableEntity)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	customer, err := client.EnsureCustomer(context.Background(), CreateCustomerInput{
+		ExternalID: "org-1",
+		OwnerEmail: "buyer@example.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "cust_existing", customer.ID)
+}
+
+func Test__EnsureCustomerDoesNotTreatValidationAsConflict(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/customers/external/"):
+			http.Error(w, "missing", http.StatusNotFound)
+		case r.Method == http.MethodPost && r.URL.Path == "/customers/":
+			http.Error(w, `{"detail":[{"loc":["body","owner","email"],"msg":"value is not a valid email address"}]}`, http.StatusUnprocessableEntity)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.EnsureCustomer(context.Background(), CreateCustomerInput{
+		ExternalID: "org-1",
+		OwnerEmail: "buyer@example.com",
+	})
+	require.Error(t, err)
+	assert.False(t, IsConflict(err))
+	assert.Contains(t, err.Error(), "not a valid email address")
 }
 
 func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
@@ -204,8 +265,106 @@ func Test__CreateCheckoutReportsRateLimit(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	client := NewClient(server.URL, "oat_test", server.Client())
-	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "", "http://localhost/return", "")
+	_, err := client.CreateCheckout(context.Background(), "prod_1", "org-1", "http://localhost/return", "")
 	require.ErrorIs(t, err, ErrRateLimited)
+}
+
+func Test__CreateCustomerSessionPrefersExternalID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/customer-sessions/", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "org-1", body["external_customer_id"])
+		assert.Equal(t, "org-1", body["external_member_id"])
+		_, hasCustomerID := body["customer_id"]
+		assert.False(t, hasCustomerID)
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"customer_portal_url": "https://polar.example/portal",
+			"customer_id":         "cust_1",
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	session, err := client.CreateCustomerSession(context.Background(), CustomerSessionRequest{
+		CustomerID:         "cust_ignored",
+		ExternalCustomerID: "org-1",
+		ExternalMemberID:   "org-1",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://polar.example/portal", session.PortalURL)
+	assert.Equal(t, "cust_1", session.CustomerID)
+}
+
+func Test__CreateCustomerSessionReportsTeamMemberRequired(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"detail":[{"loc":["body","member_id"],"msg":"member_id is required for team customers."}]}`, http.StatusUnprocessableEntity)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.CreateCustomerSession(context.Background(), CustomerSessionRequest{ExternalCustomerID: "org-1"})
+	require.ErrorIs(t, err, ErrTeamMemberRequired)
+}
+
+func Test__GetOwnerMemberFiltersByExternalCustomerID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/members/", r.URL.Path)
+		assert.Equal(t, "org-1", r.URL.Query().Get("external_customer_id"))
+		assert.Equal(t, "owner", r.URL.Query().Get("role"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"id": "mem_owner", "role": "owner"},
+			},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	memberID, err := client.GetOwnerMember(context.Background(), "org-1", "")
+	require.NoError(t, err)
+	assert.Equal(t, "mem_owner", memberID)
+}
+
+func Test__ListOrdersFiltersByExternalCustomerID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/orders/", r.URL.Path)
+		assert.Equal(t, "org-1", r.URL.Query().Get("external_customer_id"))
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{
+					"id":           "ord_1",
+					"created_at":   "2026-08-27T12:00:00Z",
+					"status":       "paid",
+					"total_amount": 10000,
+					"description":  "Hosted credit",
+					"product":      map[string]any{"name": "$100 pack"},
+				},
+			},
+			"pagination": map[string]any{"max_page": 1},
+		}))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	orders, err := client.ListOrders(context.Background(), "org-1")
+	require.NoError(t, err)
+	require.Len(t, orders, 1)
+	assert.Equal(t, "ord_1", orders[0].ID)
+	assert.Equal(t, int64(10000), orders[0].AmountCents)
+	assert.Equal(t, "paid", orders[0].Status)
+	assert.Equal(t, "$100 pack", orders[0].ProductName)
+}
+
+func Test__CreateCustomerSessionReportsUnauthorized(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewClient(server.URL, "oat_test", server.Client())
+	_, err := client.CreateCustomerSession(context.Background(), CustomerSessionRequest{ExternalCustomerID: "org-1"})
+	require.ErrorIs(t, err, ErrUnauthorized)
 }
 
 func Test__APIBaseURLUsesSandboxByDefault(t *testing.T) {

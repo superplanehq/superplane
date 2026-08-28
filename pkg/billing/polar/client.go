@@ -18,18 +18,19 @@ import (
 )
 
 const (
-	sandboxAPIBaseURL          = "https://sandbox-api.polar.sh/v1"
-	productionAPIBaseURL       = "https://api.polar.sh/v1"
-	creditPackMetadata         = "superplane_credit_pack"
-	httpTimeout                = 15 * time.Second
-	defaultCustomerEmailDomain = "billing.superplane.com"
+	sandboxAPIBaseURL    = "https://sandbox-api.polar.sh/v1"
+	productionAPIBaseURL = "https://api.polar.sh/v1"
+	creditPackMetadata   = "superplane_credit_pack"
+	httpTimeout          = 15 * time.Second
 )
 
 var (
-	errNotFound      = fmt.Errorf("polar resource not found")
-	ErrNotCreditPack = errors.New("product is not a hosted credit pack")
-	ErrRateLimited   = errors.New("polar rate limited")
-	ErrConflict      = errors.New("polar customer conflict")
+	errNotFound           = fmt.Errorf("polar resource not found")
+	ErrNotCreditPack      = errors.New("product is not a hosted credit pack")
+	ErrRateLimited        = errors.New("polar rate limited")
+	ErrConflict           = errors.New("polar customer conflict")
+	ErrUnauthorized       = errors.New("polar unauthorized")
+	ErrTeamMemberRequired = errors.New("polar team member required")
 )
 
 type Client struct {
@@ -53,8 +54,8 @@ type Customer struct {
 
 type CreateCustomerInput struct {
 	ExternalID string
-	Email      string
 	Name       string
+	OwnerEmail string
 }
 
 type CheckoutSession struct {
@@ -65,6 +66,21 @@ type CheckoutSession struct {
 type CustomerSession struct {
 	PortalURL  string
 	CustomerID string
+}
+
+type CustomerSessionRequest struct {
+	CustomerID         string
+	ExternalCustomerID string
+	MemberID           string
+	ExternalMemberID   string
+}
+
+type Order struct {
+	ID          string
+	CreatedAt   string
+	AmountCents int64
+	Status      string
+	ProductName string
 }
 
 func Configured() bool {
@@ -99,14 +115,6 @@ func APIBaseURL() string {
 		return productionAPIBaseURL
 	}
 	return sandboxAPIBaseURL
-}
-
-func BillingCustomerEmail(organizationID string) string {
-	domain := strings.TrimSpace(os.Getenv("POLAR_CUSTOMER_EMAIL_DOMAIN"))
-	if domain == "" {
-		domain = defaultCustomerEmailDomain
-	}
-	return "billing+" + strings.TrimSpace(organizationID) + "@" + domain
 }
 
 func (c *Client) ListCreditPacks(ctx context.Context) ([]Product, error) {
@@ -188,11 +196,13 @@ func (c *Client) GetCustomerByExternalID(ctx context.Context, externalID string)
 func (c *Client) CreateCustomer(ctx context.Context, input CreateCustomerInput) (*Customer, error) {
 	body := map[string]any{
 		"external_id": input.ExternalID,
-		"email":       input.Email,
 		"type":        "team",
 	}
 	if name := strings.TrimSpace(input.Name); name != "" {
 		body["name"] = name
+	}
+	if ownerEmail := strings.TrimSpace(input.OwnerEmail); ownerEmail != "" {
+		body["owner"] = map[string]any{"email": ownerEmail}
 	}
 	var payload customerJSON
 	err := c.post(ctx, "/customers/", body, &payload)
@@ -223,17 +233,14 @@ func (c *Client) EnsureCustomer(ctx context.Context, input CreateCustomerInput) 
 	if lookupErr == nil {
 		return existing, nil
 	}
-	return nil, fmt.Errorf("%w: polar customer email is already used by another customer", ErrConflict)
+	return nil, fmt.Errorf("%w: polar customer already exists for a different organization", ErrConflict)
 }
 
-func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomerID, email, successURL, customerIP string) (*CheckoutSession, error) {
+func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomerID, successURL, customerIP string) (*CheckoutSession, error) {
 	body := map[string]any{
 		"products":             []string{productID},
 		"external_customer_id": externalCustomerID,
 		"success_url":          successURL,
-	}
-	if strings.TrimSpace(email) != "" {
-		body["customer_email"] = email
 	}
 	if strings.TrimSpace(customerIP) != "" {
 		body["customer_ip_address"] = customerIP
@@ -252,11 +259,21 @@ func (c *Client) CreateCheckout(ctx context.Context, productID, externalCustomer
 	}, nil
 }
 
-func (c *Client) CreateCustomerSession(ctx context.Context, customerID string) (*CustomerSession, error) {
+func (c *Client) CreateCustomerSession(ctx context.Context, req CustomerSessionRequest) (*CustomerSession, error) {
+	body := map[string]any{}
+	if externalID := strings.TrimSpace(req.ExternalCustomerID); externalID != "" {
+		body["external_customer_id"] = externalID
+	} else {
+		body["customer_id"] = strings.TrimSpace(req.CustomerID)
+	}
+	if memberID := strings.TrimSpace(req.MemberID); memberID != "" {
+		body["member_id"] = memberID
+	}
+	if externalMemberID := strings.TrimSpace(req.ExternalMemberID); externalMemberID != "" {
+		body["external_member_id"] = externalMemberID
+	}
 	var payload customerSessionJSON
-	if err := c.post(ctx, "/customer-sessions/", map[string]any{
-		"customer_id": customerID,
-	}, &payload); err != nil {
+	if err := c.post(ctx, "/customer-sessions/", body, &payload); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(payload.CustomerPortalURL) == "" {
@@ -266,6 +283,66 @@ func (c *Client) CreateCustomerSession(ctx context.Context, customerID string) (
 		PortalURL:  payload.CustomerPortalURL,
 		CustomerID: payload.CustomerID,
 	}, nil
+}
+
+func (c *Client) GetOwnerMember(ctx context.Context, externalCustomerID, customerID string) (string, error) {
+	query := url.Values{}
+	query.Set("role", "owner")
+	query.Set("limit", "1")
+	if externalID := strings.TrimSpace(externalCustomerID); externalID != "" {
+		query.Set("external_customer_id", externalID)
+	} else {
+		id := strings.TrimSpace(customerID)
+		if id == "" {
+			return "", fmt.Errorf("customer id is required")
+		}
+		query.Set("customer_id", id)
+	}
+
+	var payload listMembersJSON
+	if err := c.get(ctx, "/members/?"+query.Encode(), &payload); err != nil {
+		return "", err
+	}
+	for _, item := range payload.Items {
+		if id := strings.TrimSpace(item.ID); id != "" {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("%w: polar owner member not found", errNotFound)
+}
+
+func (c *Client) ListOrders(ctx context.Context, externalCustomerID string) ([]Order, error) {
+	externalID := strings.TrimSpace(externalCustomerID)
+	if externalID == "" {
+		return nil, fmt.Errorf("external customer id is required")
+	}
+
+	var items []orderJSON
+	page := 1
+	for {
+		query := url.Values{}
+		query.Set("external_customer_id", externalID)
+		query.Set("limit", "100")
+		query.Set("page", strconv.Itoa(page))
+		var payload listOrdersJSON
+		if err := c.get(ctx, "/orders/?"+query.Encode(), &payload); err != nil {
+			return nil, err
+		}
+		items = append(items, payload.Items...)
+		if len(payload.Items) == 0 || len(payload.Items) < 100 {
+			break
+		}
+		if payload.Pagination.MaxPage > 0 && page >= payload.Pagination.MaxPage {
+			break
+		}
+		page++
+	}
+
+	orders := make([]Order, 0, len(items))
+	for _, item := range items {
+		orders = append(orders, item.toOrder())
+	}
+	return orders, nil
 }
 
 func (c *Client) get(ctx context.Context, path string, dest any) error {
@@ -296,6 +373,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 	}
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "SuperPlane")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -323,6 +401,12 @@ func (c *Client) do(ctx context.Context, method, path string, body any, dest any
 		}
 		return ErrRateLimited
 	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return fmt.Errorf("%w: %s", ErrUnauthorized, strings.TrimSpace(string(payload)))
+	}
+	if resp.StatusCode == http.StatusUnprocessableEntity && isTeamMemberRequiredPayload(payload) {
+		return fmt.Errorf("%w: %s", ErrTeamMemberRequired, strings.TrimSpace(string(payload)))
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("polar api %s %s: %d %s", method, path, resp.StatusCode, strings.TrimSpace(string(payload)))
 	}
@@ -344,6 +428,18 @@ func IsRateLimited(err error) bool {
 	return err != nil && errors.Is(err, ErrRateLimited)
 }
 
+func IsUnauthorized(err error) bool {
+	return err != nil && errors.Is(err, ErrUnauthorized)
+}
+
+func IsTeamMemberRequired(err error) bool {
+	return err != nil && errors.Is(err, ErrTeamMemberRequired)
+}
+
+func isTeamMemberRequiredPayload(payload []byte) bool {
+	return strings.Contains(strings.ToLower(string(payload)), "member_id is required")
+}
+
 func isCustomerCreateConflict(err error) bool {
 	if IsConflict(err) {
 		return true
@@ -351,7 +447,7 @@ func isCustomerCreateConflict(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), " 422 ")
+	return strings.Contains(strings.ToLower(err.Error()), "already exists")
 }
 
 type listProductsJSON struct {
@@ -415,6 +511,49 @@ type checkoutJSON struct {
 type customerSessionJSON struct {
 	CustomerPortalURL string `json:"customer_portal_url"`
 	CustomerID        string `json:"customer_id"`
+}
+
+type listOrdersJSON struct {
+	Items      []orderJSON `json:"items"`
+	Pagination struct {
+		MaxPage int `json:"max_page"`
+	} `json:"pagination"`
+}
+
+type listMembersJSON struct {
+	Items []memberJSON `json:"items"`
+}
+
+type memberJSON struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
+}
+
+type orderJSON struct {
+	ID          string `json:"id"`
+	CreatedAt   string `json:"created_at"`
+	Status      string `json:"status"`
+	TotalAmount int64  `json:"total_amount"`
+	Description string `json:"description"`
+	Product     *struct {
+		Name string `json:"name"`
+	} `json:"product"`
+}
+
+func (o orderJSON) toOrder() Order {
+	name := strings.TrimSpace(o.Description)
+	if o.Product != nil {
+		if productName := strings.TrimSpace(o.Product.Name); productName != "" {
+			name = productName
+		}
+	}
+	return Order{
+		ID:          o.ID,
+		CreatedAt:   o.CreatedAt,
+		AmountCents: o.TotalAmount,
+		Status:      o.Status,
+		ProductName: name,
+	}
 }
 
 func isCreditPack(metadata map[string]any) bool {

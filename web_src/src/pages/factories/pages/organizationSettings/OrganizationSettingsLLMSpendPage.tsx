@@ -106,12 +106,15 @@ function LLMSpendLoaded({
       <HostedCreditSummary
         remainingCreditCents={data.remainingCreditCents}
         grantTotalCents={data.grantTotalCents}
+        superplaneGrantCents={data.superplaneGrantCents}
+        purchasedCreditCents={data.purchasedCreditCents}
         hostedBilledCents={data.hostedBilledCents}
         remainingCreditWarning={data.remainingCreditWarning}
         billingEnabled={data.billingEnabled}
         hasBillingCustomer={data.hasBillingCustomer}
         canManageBilling={canAct("org", "update")}
         products={billing.products}
+        invoices={data.invoices}
         creditRefreshStatus={creditRefreshStatus}
         checkoutPending={billing.checkoutPending}
         portalPending={billing.portalPending}

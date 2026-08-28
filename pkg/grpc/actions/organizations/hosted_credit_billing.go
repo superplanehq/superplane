@@ -65,9 +65,9 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
 	}
 
-	email := actingUserEmail(accountID)
+	email := actingUserEmail(ctx, orgID, accountID)
 	if email == "" {
-		return nil, grpcerrors.FailedPrecondition(nil, "account email is required to start checkout")
+		return nil, grpcerrors.FailedPrecondition(nil, "A user email is required to start checkout.")
 	}
 
 	organization, err := models.FindOrganizationByIDInTransaction(database.DB(ctx), organizationID.String())
@@ -85,8 +85,8 @@ func CreateHostedCreditCheckout(
 
 	customer, err := client.EnsureCustomer(ctx, polar.CreateCustomerInput{
 		ExternalID: organizationID.String(),
-		Email:      polar.BillingCustomerEmail(organizationID.String()),
 		Name:       organization.Name,
+		OwnerEmail: email,
 	})
 	if err != nil {
 		if polar.IsConflict(err) {
@@ -102,7 +102,7 @@ func CreateHostedCreditCheckout(
 	// client-supplied body field (CreateHostedCreditCheckoutRequest.customer_ip_address is ignored).
 	customerIP := clientIPFromContext(ctx)
 
-	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), "", hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
+	session, err := client.CreateCheckout(ctx, productID, organizationID.String(), hostedCreditCheckoutSuccessURL(baseURL, organizationID), customerIP)
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create hosted credit checkout")
 	}
@@ -133,31 +133,61 @@ func CreateBillingPortalSession(
 	}
 
 	client := polar.NewClientFromEnv()
-	customerID := ""
-	if settings != nil && settings.PolarCustomerID != nil {
-		customerID = strings.TrimSpace(*settings.PolarCustomerID)
-	}
-	if customerID == "" {
-		resolved, lookupErr := lookupPolarCustomer(ctx, client, organizationID)
-		if lookupErr != nil {
-			return nil, lookupErr
+	session, err := openPolarPortal(ctx, client, polar.CustomerSessionRequest{
+		ExternalCustomerID: organizationID.String(),
+		ExternalMemberID:   organizationID.String(),
+	})
+	if err != nil && polar.IsNotFound(err) {
+		customerID := ""
+		if settings != nil && settings.PolarCustomerID != nil {
+			customerID = strings.TrimSpace(*settings.PolarCustomerID)
 		}
-		customerID = resolved
+		if customerID == "" {
+			resolved, lookupErr := lookupPolarCustomer(ctx, client, organizationID)
+			if lookupErr != nil {
+				return nil, lookupErr
+			}
+			customerID = resolved
+		}
+		session, err = openPolarPortal(ctx, client, polar.CustomerSessionRequest{
+			CustomerID:       customerID,
+			ExternalMemberID: organizationID.String(),
+		})
 	}
-
-	session, err := client.CreateCustomerSession(ctx, customerID)
 	if err != nil && polar.IsNotFound(err) {
 		resolved, lookupErr := lookupPolarCustomer(ctx, client, organizationID)
 		if lookupErr != nil {
 			return nil, lookupErr
 		}
-		customerID = resolved
-		session, err = client.CreateCustomerSession(ctx, customerID)
+		session, err = openPolarPortal(ctx, client, polar.CustomerSessionRequest{
+			CustomerID:       resolved,
+			ExternalMemberID: organizationID.String(),
+		})
 	}
 	if err != nil {
 		return nil, polarBillingError(err, "failed to create billing portal session")
 	}
+	if session.CustomerID != "" {
+		if err := models.SetOrganizationPolarCustomerID(database.DB(ctx), organizationID, session.CustomerID); err != nil {
+			return nil, grpcerrors.Internal(err, "failed to create billing portal session")
+		}
+	}
 	return &pb.CreateBillingPortalSessionResponse{PortalUrl: session.PortalURL}, nil
+}
+
+func openPolarPortal(ctx context.Context, client *polar.Client, req polar.CustomerSessionRequest) (*polar.CustomerSession, error) {
+	session, err := client.CreateCustomerSession(ctx, req)
+	if !polar.IsTeamMemberRequired(err) {
+		return session, err
+	}
+
+	memberID, memberErr := client.GetOwnerMember(ctx, req.ExternalCustomerID, req.CustomerID)
+	if memberErr != nil {
+		return nil, memberErr
+	}
+	req.MemberID = memberID
+	req.ExternalMemberID = ""
+	return client.CreateCustomerSession(ctx, req)
 }
 
 func lookupPolarCustomer(ctx context.Context, client *polar.Client, organizationID uuid.UUID) (string, error) {
@@ -178,10 +208,21 @@ func polarBillingError(err error, fallback string) error {
 	if polar.IsRateLimited(err) {
 		return grpcerrors.ResourceExhausted(err, "Hosted billing is busy. Try again shortly.")
 	}
+	if polar.IsUnauthorized(err) {
+		return grpcerrors.FailedPrecondition(err, "Hosted billing token is missing a required Polar scope.")
+	}
 	return grpcerrors.Internal(err, fallback)
 }
 
-func actingUserEmail(accountID string) string {
+func actingUserEmail(ctx context.Context, orgID, accountID string) string {
+	if userID := metadataValue(ctx, "x-user-id"); userID != "" {
+		user, err := models.FindActiveUserByIDInTransaction(database.DB(ctx), orgID, userID)
+		if err == nil && user != nil {
+			if email := strings.TrimSpace(user.GetEmail()); email != "" {
+				return email
+			}
+		}
+	}
 	if strings.TrimSpace(accountID) == "" {
 		return ""
 	}
@@ -190,6 +231,14 @@ func actingUserEmail(accountID string) string {
 		return ""
 	}
 	return strings.TrimSpace(account.Email)
+}
+
+func metadataValue(ctx context.Context, key string) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	return firstMetadataValue(md, key)
 }
 
 func billingState(ctx context.Context, orgID uuid.UUID) (enabled bool, hasCustomer bool) {

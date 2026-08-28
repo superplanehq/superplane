@@ -113,7 +113,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 	})
 
 	t.Run("creates checkout and stores customer id", func(t *testing.T) {
-		createdEmails := []string{}
+		createdOwners := []string{}
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			switch {
 			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/products/"):
@@ -132,15 +132,17 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 			case req.Method == http.MethodPost && req.URL.Path == "/customers/":
 				var body map[string]any
 				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
-				email, _ := body["email"].(string)
-				createdEmails = append(createdEmails, email)
+				_, hasEmail := body["email"]
+				assert.False(t, hasEmail)
 				assert.Equal(t, "team", body["type"])
 				assert.Equal(t, r.Organization.ID.String(), body["external_id"])
-				assert.NotEqual(t, r.Account.Email, email)
+				owner, _ := body["owner"].(map[string]any)
+				ownerEmail, _ := owner["email"].(string)
+				createdOwners = append(createdOwners, ownerEmail)
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 					"id":          "cust_1",
 					"external_id": r.Organization.ID.String(),
-					"email":       email,
+					"email":       nil,
 				}))
 			case req.Method == http.MethodPost && req.URL.Path == "/checkouts/":
 				var body map[string]any
@@ -169,8 +171,8 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.Equal(t, "https://buy.example/checkout", resp.CheckoutUrl)
-		require.Len(t, createdEmails, 1)
-		assert.Equal(t, "billing+"+r.Organization.ID.String()+"@billing.superplane.com", createdEmails[0])
+		require.Len(t, createdOwners, 1)
+		assert.Equal(t, r.Account.Email, createdOwners[0])
 
 		settings, err := models.FindOrganizationLLMSettings(database.Conn(), r.Organization.ID)
 		require.NoError(t, err)
@@ -198,6 +200,51 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		assert.False(t, calledPolar)
 	})
 
+	t.Run("uses org user email when account id is missing", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			switch {
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/products/"):
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":   "prod_25",
+					"name": "Hosted credit 25",
+					"metadata": map[string]any{
+						"superplane_credit_pack": true,
+					},
+					"prices": []map[string]any{
+						{"amount_type": "fixed", "price_amount": 2500},
+					},
+				}))
+			case req.Method == http.MethodGet && strings.HasPrefix(req.URL.Path, "/customers/external/"):
+				http.Error(w, "missing", http.StatusNotFound)
+			case req.Method == http.MethodPost && req.URL.Path == "/customers/":
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"id":          "cust_user_email",
+					"external_id": r.Organization.ID.String(),
+					"email":       nil,
+				}))
+			case req.Method == http.MethodPost && req.URL.Path == "/checkouts/":
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"url":         "https://buy.example/checkout",
+					"customer_id": "cust_user_email",
+				}))
+			default:
+				http.NotFound(w, req)
+			}
+		})
+		usePolarTestServer(t, server)
+
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-user-id", r.User.String()))
+		resp, err := CreateHostedCreditCheckout(
+			ctx,
+			r.Organization.ID.String(),
+			&pb.CreateHostedCreditCheckoutRequest{ProductId: "prod_25"},
+			"",
+			"http://localhost:8000",
+		)
+		require.NoError(t, err)
+		assert.Equal(t, "https://buy.example/checkout", resp.CheckoutUrl)
+	})
+
 	t.Run("reports polar rate limit", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Retry-After", "30")
@@ -215,7 +262,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
 	})
 
-	t.Run("uses unique billing email per organization", func(t *testing.T) {
+	t.Run("creates a polar team customer per organization with the same owner", func(t *testing.T) {
 		other, err := models.CreateOrganization(support.RandomName("billing-org"), "")
 		require.NoError(t, err)
 		created := map[string]string{}
@@ -236,12 +283,15 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 				var body map[string]any
 				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 				externalID, _ := body["external_id"].(string)
-				email, _ := body["email"].(string)
-				created[externalID] = email
+				_, hasEmail := body["email"]
+				assert.False(t, hasEmail)
+				owner, _ := body["owner"].(map[string]any)
+				ownerEmail, _ := owner["email"].(string)
+				created[externalID] = ownerEmail
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 					"id":          "cust_" + externalID[:8],
 					"external_id": externalID,
-					"email":       email,
+					"email":       nil,
 				}))
 			case req.Method == http.MethodPost && req.URL.Path == "/checkouts/":
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
@@ -271,9 +321,8 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Len(t, created, 2)
-		assert.NotEqual(t, created[r.Organization.ID.String()], created[other.ID.String()])
-		assert.NotEqual(t, r.Account.Email, created[r.Organization.ID.String()])
-		assert.NotEqual(t, r.Account.Email, created[other.ID.String()])
+		assert.Equal(t, r.Account.Email, created[r.Organization.ID.String()])
+		assert.Equal(t, r.Account.Email, created[other.ID.String()])
 	})
 }
 
@@ -301,13 +350,18 @@ func Test__CreateBillingPortalSession(t *testing.T) {
 		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
 	})
 
-	t.Run("opens portal for stored customer", func(t *testing.T) {
-		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_stored"))
+	t.Run("opens portal by organization external id", func(t *testing.T) {
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
 			assert.Equal(t, "/customer-sessions/", req.URL.Path)
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			assert.Equal(t, r.Organization.ID.String(), body["external_customer_id"])
+			assert.Equal(t, r.Organization.ID.String(), body["external_member_id"])
+			_, hasCustomerID := body["customer_id"]
+			assert.False(t, hasCustomerID)
 			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 				"customer_portal_url": "https://polar.example/portal",
-				"customer_id":         "cust_stored",
+				"customer_id":         "cust_ext",
 			}))
 		})
 		usePolarTestServer(t, server)
@@ -317,6 +371,29 @@ func Test__CreateBillingPortalSession(t *testing.T) {
 		assert.Equal(t, "https://polar.example/portal", resp.PortalUrl)
 	})
 
+	t.Run("falls back to stored customer id", func(t *testing.T) {
+		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_stored"))
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/customer-sessions/", req.URL.Path)
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+			if _, ok := body["external_customer_id"]; ok {
+				http.Error(w, "missing", http.StatusNotFound)
+				return
+			}
+			assert.Equal(t, "cust_stored", body["customer_id"])
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"customer_portal_url": "https://polar.example/portal-stored",
+				"customer_id":         "cust_stored",
+			}))
+		})
+		usePolarTestServer(t, server)
+
+		resp, err := CreateBillingPortalSession(context.Background(), r.Organization.ID.String(), &pb.CreateBillingPortalSessionRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, "https://polar.example/portal-stored", resp.PortalUrl)
+	})
+
 	t.Run("refreshes stale stored customer", func(t *testing.T) {
 		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_stale"))
 		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -324,6 +401,10 @@ func Test__CreateBillingPortalSession(t *testing.T) {
 			case req.Method == http.MethodPost && req.URL.Path == "/customer-sessions/":
 				var body map[string]any
 				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				if _, ok := body["external_customer_id"]; ok {
+					http.Error(w, "missing", http.StatusNotFound)
+					return
+				}
 				if body["customer_id"] == "cust_stale" {
 					http.Error(w, "missing", http.StatusNotFound)
 					return
@@ -352,6 +433,50 @@ func Test__CreateBillingPortalSession(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, settings.PolarCustomerID)
 		assert.Equal(t, "cust_fresh", *settings.PolarCustomerID)
+	})
+
+	t.Run("opens portal with owner member for team customers", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			switch {
+			case req.Method == http.MethodPost && req.URL.Path == "/customer-sessions/":
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				if _, ok := body["member_id"]; !ok {
+					http.Error(w, `{"detail":[{"loc":["body","member_id"],"msg":"member_id is required for team customers."}]}`, http.StatusUnprocessableEntity)
+					return
+				}
+				assert.Equal(t, r.Organization.ID.String(), body["external_customer_id"])
+				assert.Equal(t, "mem_owner", body["member_id"])
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"customer_portal_url": "https://polar.example/portal-member",
+					"customer_id":         "cust_ext",
+				}))
+			case req.Method == http.MethodGet && req.URL.Path == "/members/":
+				assert.Equal(t, r.Organization.ID.String(), req.URL.Query().Get("external_customer_id"))
+				assert.Equal(t, "owner", req.URL.Query().Get("role"))
+				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+					"items": []map[string]any{{"id": "mem_owner", "role": "owner"}},
+				}))
+			default:
+				http.NotFound(w, req)
+			}
+		})
+		usePolarTestServer(t, server)
+
+		resp, err := CreateBillingPortalSession(context.Background(), r.Organization.ID.String(), &pb.CreateBillingPortalSessionRequest{})
+		require.NoError(t, err)
+		assert.Equal(t, "https://polar.example/portal-member", resp.PortalUrl)
+	})
+
+	t.Run("reports missing polar scope", func(t *testing.T) {
+		server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+		})
+		usePolarTestServer(t, server)
+
+		_, err := CreateBillingPortalSession(context.Background(), r.Organization.ID.String(), &pb.CreateBillingPortalSessionRequest{})
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.Contains(t, err.Error(), "Hosted billing token is missing a required Polar scope.")
 	})
 }
 

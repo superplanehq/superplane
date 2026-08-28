@@ -223,19 +223,37 @@ func Test__PolarGrantIsIdempotentByOrderID(t *testing.T) {
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(2500), summary.GrantMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(2500), summary.PurchasedCreditMicros)
+}
+
+func Test__DescribeOrganizationLLMCreditSplitsSuperPlaneAndPurchasedGrants(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
+	require.NoError(t, err)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(10000), summary.PurchasedCreditMicros)
+	assert.Equal(t, summary.SuperPlaneGrantMicros+summary.PurchasedCreditMicros, summary.GrantMicros)
+	assert.Equal(t, summary.GrantMicros, summary.RemainingMicros)
 }
 
 func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	orderID := uuid.NewString()
+	refundID := uuid.NewString()
 
 	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
 	require.NoError(t, err)
 
-	first, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, "ref_1")
+	first, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, refundID)
 	require.NoError(t, err)
-	second, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, "ref_1")
+	second, err := models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(1000), orderID, refundID)
 	require.NoError(t, err)
 	assert.Equal(t, first.ID, second.ID)
 
@@ -246,6 +264,8 @@ func Test__PolarRefundIsIdempotentAndCapsAtGrant(t *testing.T) {
 	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents)+models.CentsToMicros(1500), summary.GrantMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, models.CentsToMicros(1500), summary.PurchasedCreditMicros)
 }
 
 func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {

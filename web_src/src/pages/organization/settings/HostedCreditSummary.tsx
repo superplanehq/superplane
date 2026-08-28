@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import { formatUsdCents, parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import { Button } from "@/components/ui/button";
 import { hostedCreditRefreshMessage, type HostedCreditRefreshStatus } from "@/lib/hostedCredit";
@@ -9,15 +10,26 @@ type HostedCreditProduct = {
   amountCents?: string | number;
 };
 
+type HostedCreditInvoice = {
+  id?: string;
+  createdAt?: string;
+  amountCents?: string | number;
+  status?: string;
+  productName?: string;
+};
+
 type HostedCreditSummaryProps = {
   remainingCreditCents?: string | number;
   grantTotalCents?: string | number;
+  superplaneGrantCents?: string | number;
+  purchasedCreditCents?: string | number;
   hostedBilledCents?: string | number;
   remainingCreditWarning?: boolean;
   billingEnabled?: boolean;
   hasBillingCustomer?: boolean;
   canManageBilling?: boolean;
   products?: HostedCreditProduct[];
+  invoices?: HostedCreditInvoice[];
   creditRefreshStatus?: HostedCreditRefreshStatus;
   checkoutPending?: boolean;
   portalPending?: boolean;
@@ -32,24 +44,39 @@ type HostedCreditSummaryProps = {
 export function HostedCreditSummary(props: HostedCreditSummaryProps) {
   const remaining = parseWorkOrderMetric(props.remainingCreditCents);
   const grantTotal = parseWorkOrderMetric(props.grantTotalCents);
+  const superplaneGrant = parseWorkOrderMetric(props.superplaneGrantCents);
+  const purchasedCredit = parseWorkOrderMetric(props.purchasedCreditCents);
   const billed = parseWorkOrderMetric(props.hostedBilledCents);
+  const showGrantBreakdown = props.superplaneGrantCents != null || props.purchasedCreditCents != null;
 
-  if (grantTotal <= 0 && !props.billingEnabled) {
+  if (grantTotal <= 0 && superplaneGrant <= 0 && purchasedCredit <= 0 && !props.billingEnabled) {
     return null;
   }
 
-  return <HostedCreditSummaryCard billed={billed} grantTotal={grantTotal} remaining={remaining} {...props} />;
+  return (
+    <HostedCreditSummaryCard
+      billed={billed}
+      purchasedCredit={purchasedCredit}
+      remaining={remaining}
+      showGrantBreakdown={showGrantBreakdown}
+      superplaneGrant={superplaneGrant}
+      {...props}
+    />
+  );
 }
 
 function HostedCreditSummaryCard({
   remaining,
-  grantTotal,
+  superplaneGrant,
+  purchasedCredit,
   billed,
+  showGrantBreakdown,
   remainingCreditWarning,
   billingEnabled = false,
   hasBillingCustomer = false,
   canManageBilling = false,
   products = [],
+  invoices = [],
   creditRefreshStatus = "idle",
   checkoutPending = false,
   portalPending = false,
@@ -59,28 +86,45 @@ function HostedCreditSummaryCard({
   innerCardClassName,
   labelClassName,
   valueClassName,
-}: HostedCreditSummaryProps & { remaining: number; grantTotal: number; billed: number }) {
+}: HostedCreditSummaryProps & {
+  remaining: number;
+  superplaneGrant: number;
+  purchasedCredit: number;
+  billed: number;
+  showGrantBreakdown: boolean;
+}) {
   const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled);
   const showBillingActions = Boolean(billingEnabled && canManageBilling && (products.length > 0 || hasBillingCustomer));
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
+  const metricGridClassName = showGrantBreakdown
+    ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+    : "grid gap-3 sm:grid-cols-2";
 
   return (
     <div className={cardClassName}>
-      <div
-        className={innerCardClassName ? `grid gap-3 sm:grid-cols-3 ${innerCardClassName}` : "grid gap-3 sm:grid-cols-3"}
-      >
+      <div className={innerCardClassName ? `${metricGridClassName} ${innerCardClassName}` : metricGridClassName}>
         <CreditMetric
           label="Remaining hosted credit"
           labelClassName={labelClassName}
           value={remaining}
           valueClassName={valueClassName}
         />
-        <CreditMetric
-          label="Grant total"
-          labelClassName={labelClassName}
-          value={grantTotal}
-          valueClassName={valueClassName}
-        />
+        {showGrantBreakdown ? (
+          <>
+            <CreditMetric
+              label="SuperPlane grant"
+              labelClassName={labelClassName}
+              value={superplaneGrant}
+              valueClassName={valueClassName}
+            />
+            <CreditMetric
+              label="Purchased hosted credit"
+              labelClassName={labelClassName}
+              value={purchasedCredit}
+              valueClassName={valueClassName}
+            />
+          </>
+        ) : null}
         <CreditMetric
           label="Hosted billed spend"
           labelClassName={labelClassName}
@@ -94,6 +138,7 @@ function HostedCreditSummaryCard({
       {warningMessage ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warningMessage}</p> : null}
       {showBillingActions ? (
         <BillingActions
+          invoices={invoices}
           products={products}
           hasBillingCustomer={hasBillingCustomer}
           checkoutPending={checkoutPending}
@@ -152,6 +197,7 @@ function hostedCreditWarning(
 
 function BillingActions({
   products,
+  invoices,
   hasBillingCustomer,
   checkoutPending,
   portalPending,
@@ -159,6 +205,7 @@ function BillingActions({
   onManageInvoices,
 }: {
   products: HostedCreditProduct[];
+  invoices: HostedCreditInvoice[];
   hasBillingCustomer: boolean;
   checkoutPending: boolean;
   portalPending: boolean;
@@ -195,9 +242,7 @@ function BillingActions({
         </div>
       ) : null}
       {hasBillingCustomer ? (
-        <Button className="mt-3" type="button" variant="ghost" disabled={portalPending} onClick={onManageInvoices}>
-          {portalPending ? "Opening invoices..." : "Manage invoices"}
-        </Button>
+        <InvoiceList invoices={invoices} portalPending={portalPending} onManageInvoices={onManageInvoices} />
       ) : packs.length > 0 ? (
         <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Add hosted credit first to manage invoices.</p>
       ) : null}
@@ -205,4 +250,74 @@ function BillingActions({
   );
 }
 
-export type { HostedCreditProduct };
+function InvoiceList({
+  invoices,
+  portalPending,
+  onManageInvoices,
+}: {
+  invoices: HostedCreditInvoice[];
+  portalPending: boolean;
+  onManageInvoices?: () => void;
+}) {
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="workspace-section-title">Polar invoices</p>
+        <Button type="button" variant="ghost" disabled={portalPending} onClick={onManageInvoices}>
+          {portalPending ? "Opening invoices..." : "Manage invoices"}
+          <ExternalLink className="size-3.5" aria-hidden />
+        </Button>
+      </div>
+      {invoices.length === 0 ? (
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No Polar invoices yet.</p>
+      ) : (
+        <table className="mt-2 w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-border text-muted-foreground">
+              <th className="py-2 font-medium">Date</th>
+              <th className="py-2 font-medium">Item</th>
+              <th className="py-2 font-medium">Amount</th>
+              <th className="py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((invoice) => (
+              <tr key={invoice.id} className="border-b border-border last:border-0">
+                <td className="py-2">{formatInvoiceDate(invoice.createdAt)}</td>
+                <td className="py-2">{invoice.productName || "Hosted credit"}</td>
+                <td className="py-2">{formatUsdCents(parseWorkOrderMetric(invoice.amountCents))}</td>
+                <td className="py-2">{invoiceStatusLabel(invoice.status)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function formatInvoiceDate(value: string | undefined) {
+  if (!value) {
+    return "-";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString();
+}
+
+function invoiceStatusLabel(status: string | undefined) {
+  switch (status) {
+    case "paid":
+      return "Paid";
+    case "refunded":
+      return "Refunded";
+    case "partially_refunded":
+      return "Partially refunded";
+    default:
+      return status || "Unknown";
+  }
+}
+
+export type { HostedCreditProduct, HostedCreditInvoice };
