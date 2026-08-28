@@ -17,6 +17,11 @@ export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationD
   return definition?.name === "github" && definition.hostedAppInstall === true;
 }
 
+/** Customer GitHub App wizard. Hosted Connect stays the default; this needs new_integration_setup_flow. */
+export function offersPrivateGitHubAppSetup(definition?: IntegrationsIntegrationDefinition): boolean {
+  return usesHostedGitHubAppInstall(definition) && isCapabilityBasedIntegrationDefinition(definition ?? {});
+}
+
 export function openRedirectPrompt(step: IntegrationSetupStepDefinition | null) {
   const redirectPrompt = step?.redirectPrompt;
   if (!redirectPrompt?.url) {

@@ -290,6 +290,22 @@ func TestListIntegrationsHostedGitHubAppInstall(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resp.Integrations, 1)
 		require.True(t, resp.Integrations[0].HostedAppInstall)
+		require.False(t, resp.Integrations[0].LegacySetupOnly)
+	})
+
+	t.Run("hosted install does not enable the setup wizard when the feature is off", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+		t.Setenv(appconfig.EnvGitHubAppID, "99")
+		t.Setenv(appconfig.EnvGitHubAppSlug, "superplane")
+		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "pem")
+		t.Setenv(appconfig.EnvGitHubAppWebhookSecret, "whsec")
+
+		resp, err := ListIntegrations(contextWithOrganizationID(org.ID.String()), reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].HostedAppInstall)
 		require.True(t, resp.Integrations[0].LegacySetupOnly)
 	})
 }

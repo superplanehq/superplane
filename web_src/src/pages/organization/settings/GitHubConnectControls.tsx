@@ -1,6 +1,7 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
+import { offersPrivateGitHubAppSetup } from "@/lib/integrations";
 import { CREATE_PRIVATE_GITHUB_APP_LABEL, startPrivateGitHubAppSetup } from "@/lib/privateGitHubApp";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { useNavigate } from "react-router";
@@ -23,6 +24,7 @@ export function GitHubConnectControls({
   const navigate = useNavigate();
   const integrationsBasePath = useIntegrationsBasePath(organizationId);
   const canCreate = Boolean(definition) && canCreateIntegrations;
+  const showPrivateApp = offersPrivateGitHubAppSetup(definition) && canCreateIntegrations;
 
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">
@@ -45,7 +47,7 @@ export function GitHubConnectControls({
           {definition ? "Connect" : "Unavailable"}
         </Button>
       </PermissionTooltip>
-      {definition && canCreateIntegrations ? (
+      {showPrivateApp ? (
         <Button
           type="button"
           variant="link"
