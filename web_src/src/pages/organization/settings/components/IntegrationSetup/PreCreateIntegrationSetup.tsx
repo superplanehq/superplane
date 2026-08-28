@@ -19,9 +19,16 @@ export function PreCreateIntegrationSetup({
   onCreate,
 }: PreCreateIntegrationSetupProps) {
   const usesAutomaticName = integrationName === "github";
+  const continueLabel = usesAutomaticName ? "Continue" : "Next";
 
   return (
     <div className="space-y-6">
+      {usesAutomaticName ? (
+        <div className="space-y-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+          <p>SuperPlane will create a GitHub App on your user account or organization.</p>
+          <p>The next step asks which account owns the app.</p>
+        </div>
+      ) : null}
       {!usesAutomaticName && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -56,7 +63,7 @@ export function PreCreateIntegrationSetup({
           disabled={isCreatePending || !instanceName.trim()}
           className="group justify-center gap-2 text-sm !px-7 hover:!bg-primary"
         >
-          {isCreatePending ? "Creating..." : "Next"}
+          {isCreatePending ? "Creating..." : continueLabel}
           <MoveRight
             aria-hidden
             className="size-4 shrink-0 transition-transform duration-200 ease-out group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
