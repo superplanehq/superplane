@@ -39,11 +39,17 @@ export function agentRewriteFromPlan(
   selections: IntegrationSelections,
 ): FactoryAgentRewrite {
   if (plan.credentialsSource === "hosted") {
-    return { component: plan.component, model: plan.model, credentials: { source: "hosted" } };
+    return {
+      component: plan.component,
+      model: plan.model,
+      planningModel: plan.planningModel,
+      credentials: { source: "hosted" },
+    };
   }
   return {
     component: plan.component,
     model: plan.model,
+    planningModel: plan.planningModel,
     credentials: {
       source: "integration",
       name: selections[plan.integrationName]?.name ?? plan.integrationName,

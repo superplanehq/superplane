@@ -9,6 +9,7 @@ const readyPlan = {
   integrationName: "openrouter",
   harness: "AGENT_HARNESS_CLAUDE_CODE",
   model: "openai/gpt-4.1",
+  planningModel: "openai/gpt-4.1",
 } as const;
 
 describe("finishOnboardingError", () => {

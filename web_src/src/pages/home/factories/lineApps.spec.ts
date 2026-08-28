@@ -4,6 +4,8 @@ import yaml from "js-yaml";
 import { getFactoryDefinition, ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS } from "./index";
 import { FACTORY_CANVAS_ID_PLACEHOLDER, materializeFactoryCanvas } from "./materializeFactoryTemplate";
 
+const AGENT_COMPONENTS = ["runnerClaudeCode", "runnerCodex", "runnerOpenRouter"];
+
 type AgentStep = { name?: string; command?: string; workingDirectory?: string };
 
 type CanvasNode = {
@@ -63,7 +65,7 @@ describe("setup factory line apps", () => {
     }
   });
 
-  it("keeps the planning agent on Opus when the coding agent stays Claude Code", () => {
+  it("gives the planning agent the deeper model the rewrite resolved", () => {
     const planning = materializeOnboardingApp("line-planning");
     const implementation = materializeOnboardingApp("line-implementation");
     const planningAgent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
@@ -72,6 +74,8 @@ describe("setup factory line apps", () => {
     expect(planningAgent?.configuration?.model).toBe("opus");
     expect(implementationAgent?.configuration?.model).toBe("sonnet");
 
+    // A hosted run rejects a model that is not on the allowlist, so the
+    // planner takes the resolved Opus id rather than the "opus" alias.
     const rewrittenPlanning = materializeFactoryCanvas({
       definition: getFactoryDefinition("line-planning"),
       canvasName: "Plan",
@@ -82,12 +86,45 @@ describe("setup factory line apps", () => {
       },
       agentRewrite: {
         component: "runnerClaudeCode",
-        model: "sonnet",
+        model: "claude-sonnet-4-6",
+        planningModel: "claude-opus-4-6",
         credentials: { source: "hosted" },
       },
     });
     const rewrittenAgent = canvasNodes(rewrittenPlanning).find((node) => node.id === "planner-agent-no-issue");
-    expect(rewrittenAgent?.configuration?.model).toBe("opus");
+    expect(rewrittenAgent?.configuration?.model).toBe("claude-opus-4-6");
+  });
+
+  it("falls back to the standard model when the rewrite resolved no planning model", () => {
+    const planning = materializeFactoryCanvas({
+      definition: getFactoryDefinition("line-planning"),
+      canvasName: "Plan",
+      canvasId: "canvas-abc",
+      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
+      integrations: { github: { id: "int-1", name: "acme-github", ready: true } },
+      agentRewrite: {
+        component: "runnerCodex",
+        model: "gpt-5",
+        credentials: { source: "hosted" },
+      },
+    });
+    const agent = canvasNodes(planning).find((node) => node.id === "planner-agent-no-issue");
+
+    expect(agent?.component).toBe("runnerCodex");
+    expect(agent?.configuration?.model).toBe("gpt-5");
+  });
+
+  it("names a model on every agent node, with or without an onboarding rewrite", () => {
+    for (const factoryId of ["line-planning", "line-implementation"]) {
+      const agentNodes = canvasNodes(materializeOnboardingApp(factoryId)).filter((node) =>
+        AGENT_COMPONENTS.includes(node.component ?? ""),
+      );
+
+      expect(agentNodes.length).toBeGreaterThanOrEqual(1);
+      for (const node of agentNodes) {
+        expect(node.configuration?.model, `${factoryId}/${node.id}`).toBeTruthy();
+      }
+    }
   });
 
   it("uses the agent provider and model selected during onboarding", () => {

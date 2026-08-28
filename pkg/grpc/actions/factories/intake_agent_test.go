@@ -39,6 +39,22 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, integrationName(t, organization.ID, agentID), integrationRefName(t, agent))
 	})
 
+	t.Run("an agent on an installation still names the model it runs", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+
+		for app, model := range map[string]string{"claude": "opus", "openai": "gpt-5"} {
+			factory := newFactoryIn(t, organization.ID)
+			agentID := createReadyOnboardingIntegration(t, organization.ID, app)
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				AgentIntegrationID: &agentID,
+			}))
+
+			agent := resolveIntakeAgent(db, factory)
+			require.NotNil(t, agent)
+			assert.Equal(t, model, agent.Model, "installation %s", app)
+		}
+	})
+
 	t.Run("OpenRouter needs the model the runner asks for", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
@@ -87,7 +103,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 			Provider:      models.UsageProviderAnthropic,
 			Enabled:       true,
 			APIKey:        []byte("test-hosted-key"),
-			AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-sonnet-4-6"},
+			AllowedModels: datatypes.JSONSlice[string]{"claude-haiku-4-6", "claude-opus-4-6", "claude-sonnet-4-6"},
 		})
 		require.NoError(t, err)
 
@@ -95,6 +111,25 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		require.NotNil(t, agent)
 		assert.Equal(t, "runnerClaudeCode", agent.Component)
 		assert.Equal(t, map[string]any{"source": runner.CredentialsSourceHosted}, agent.Credentials)
+		assert.Equal(t, "claude-opus-4-6", agent.Model)
+	})
+
+	t.Run("a hosted allowlist without Opus still serves the intake", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		clearHostedLLMProviders(t, db)
+		_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+			Provider:      models.UsageProviderAnthropic,
+			Enabled:       true,
+			APIKey:        []byte("test-hosted-key"),
+			AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		// The allowlist belongs to the installation admin, so a preference
+		// for Opus cannot become a requirement for it.
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
 		assert.Equal(t, "claude-sonnet-4-6", agent.Model)
 	})
 
@@ -124,6 +159,28 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		}))
 
 		assert.Nil(t, resolveIntakeAgent(db, factory))
+	})
+}
+
+func Test__IntakeAgentModel(t *testing.T) {
+	t.Run("keeps the model the agent carries", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerCodex", Model: "gpt-5-mini"}
+		assert.Equal(t, "gpt-5-mini", agent.model())
+	})
+
+	t.Run("takes the default of the runner when the agent names none", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerCodex"}
+		assert.Equal(t, "gpt-5", agent.model())
+	})
+
+	t.Run("an intake without an agent takes the default of the default runner", func(t *testing.T) {
+		var agent *intakeAgent
+		assert.Equal(t, intakeAgentSpecs[0].model, agent.model())
+	})
+
+	t.Run("a runner an intake cannot score with has no model to name", func(t *testing.T) {
+		agent := &intakeAgent{Component: "runnerBash"}
+		assert.Empty(t, agent.model())
 	})
 }
 

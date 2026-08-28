@@ -160,8 +160,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			"source":      runner.CredentialsSourceIntegration,
 			"integration": map[string]any{"name": "acme-openai"},
 		}, analysis.Configuration["credentials"])
-		// Codex reads its own default model, so the node leaves the model out.
-		assert.NotContains(t, analysis.Configuration, "model")
+		assert.Equal(t, "gpt-5", analysis.Configuration["model"])
 	})
 
 	t.Run("a hosted agent names the model it runs", func(t *testing.T) {
@@ -187,6 +186,9 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		analysis := findSpecNode(t, canvas, intakeAnalysisNodeID)
 		assert.Equal(t, intakeAgentSpecs[0].component, analysis.Component)
 		assert.NotContains(t, analysis.Configuration, "credentials")
+		// Only the credentials are missing. The user completes them on a node
+		// that already names the runner and the model.
+		assert.Equal(t, intakeAgentSpecs[0].model, analysis.Configuration["model"])
 	})
 
 	t.Run("the threshold gates on the analysis score", func(t *testing.T) {

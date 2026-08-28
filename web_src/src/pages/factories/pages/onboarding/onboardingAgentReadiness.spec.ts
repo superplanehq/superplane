@@ -52,6 +52,38 @@ describe("resolveOnboardingAgent", () => {
       integrationName: "openrouter",
       harness: "AGENT_HARNESS_CLAUDE_CODE",
       model: "anthropic/claude-sonnet-4-6",
+      planningModel: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("gives planning an Opus id when the allowlist has one", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("openrouter"),
+        remainingCreditCents: 5000,
+        hostedModels: {
+          ...noHostedModels,
+          openrouter: ["anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6"],
+        },
+      }),
+    ).toMatchObject({
+      model: "anthropic/claude-sonnet-4-6",
+      planningModel: "anthropic/claude-opus-4-6",
+    });
+  });
+
+  // With no allowlist to read, the agent CLI resolves the alias itself.
+  it("gives planning the Opus alias when no allowlist applies", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        remainingCreditCents: 0,
+        hostedModels: noHostedModels,
+      }),
+    ).toMatchObject({
+      credentialsSource: "integration",
+      model: "sonnet",
+      planningModel: "opus",
     });
   });
 
@@ -69,6 +101,7 @@ describe("resolveOnboardingAgent", () => {
       integrationName: "openrouter",
       harness: "AGENT_HARNESS_CLAUDE_CODE",
       model: "openai/gpt-4.1",
+      planningModel: "openai/gpt-4.1",
     });
   });
 
@@ -86,6 +119,7 @@ describe("resolveOnboardingAgent", () => {
       integrationName: "openai",
       harness: "AGENT_HARNESS_CODEX",
       model: "gpt-5",
+      planningModel: "gpt-5",
     });
   });
 
@@ -164,6 +198,7 @@ describe("firstWorkOrderAgentError", () => {
           integrationName: "openrouter",
           harness: "AGENT_HARNESS_CLAUDE_CODE",
           model: "openai/gpt-4.1",
+          planningModel: "openai/gpt-4.1",
         },
       }),
     ).toBeNull();
