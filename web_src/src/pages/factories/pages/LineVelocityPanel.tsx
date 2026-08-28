@@ -8,6 +8,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import { buildDailyVelocity } from "./buildDailyVelocity";
 import { VELOCITY_BY_PERIOD, type VelocityPeriodDays, type VelocityPeriodStats } from "./lineVelocityMockData";
@@ -25,11 +26,7 @@ const dailyVelocityChartConfig = {
 } satisfies ChartConfig;
 
 function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
-  }
-  return String(value);
+  return formatCompactTokenValue(value);
 }
 
 function formatUsd(value: number) {
