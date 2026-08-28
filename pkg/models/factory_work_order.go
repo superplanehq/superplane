@@ -505,6 +505,21 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 	return tx.Create(&assignees).Error
 }
 
+func (o *FactoryWorkOrder) ListAssignees(tx *gorm.DB) ([]FactoryWorkOrderAssignee, error) {
+	assignees := []FactoryWorkOrderAssignee{}
+	err := tx.
+		Preload("User").
+		Where("work_order_id = ?", o.ID).
+		Order("created_at ASC").
+		Find(&assignees).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return assignees, nil
+}
+
 func (o *FactoryWorkOrder) ListEvents(tx *gorm.DB, limit int, before *time.Time) ([]FactoryWorkOrderEvent, error) {
 	query := tx.Where("work_order_id = ?", o.ID)
 

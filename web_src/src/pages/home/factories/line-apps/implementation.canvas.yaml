@@ -58,6 +58,9 @@ spec:
           - name: BASE
             value: main
             valueSource: literal
+          - name: COAUTHORS
+            value: '{{ join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
+            valueSource: literal
         execution_mode: host
         execution_timeout_seconds: 3600
         machine_type: e1-large-amd64
@@ -83,6 +86,14 @@ spec:
 
           git clone --depth 1 "$GITURL" "$WORKDIR"
           cd "$WORKDIR"
+
+          cat > .git/hooks/prepare-commit-msg <<'HOOK'
+          printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
+          if [ -n "${COAUTHORS:-}" ]; then
+            printf '\n%s\n' "$COAUTHORS" >> "$1"
+          fi
+          HOOK
+          chmod +x .git/hooks/prepare-commit-msg
 
           # Create an empty branch off the base: a single empty commit so a pull request can be
           # opened, with no files added.
@@ -141,6 +152,9 @@ spec:
           - name: PLAN
             value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}'
             valueSource: literal
+          - name: COAUTHORS
+            value: '{{ join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
+            valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
         model: sonnet
@@ -174,6 +188,9 @@ spec:
             command: |-
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
               printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
+              if [ -n "${COAUTHORS:-}" ]; then
+                printf '\n%s\n' "$COAUTHORS" >> "$1"
+              fi
               HOOK
 
               chmod +x .git/hooks/prepare-commit-msg

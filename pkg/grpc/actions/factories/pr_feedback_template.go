@@ -169,6 +169,10 @@ func prFeedbackPRHeadExpression() string {
 	return "{{ root().data.pull_request?.head?.ref ?? \"\" }}"
 }
 
+func prFeedbackCoauthorsExpression() string {
+	return `{{ order() == nil ? "" : join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}`
+}
+
 func prFeedbackRunnerConcurrency() *yaml.ConcurrencySpec {
 	max := 1
 	return &yaml.ConcurrencySpec{
@@ -197,6 +201,11 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 			map[string]any{
 				"name":        "PR_HEAD",
 				"value":       prFeedbackPRHeadExpression(),
+				"valueSource": "literal",
+			},
+			map[string]any{
+				"name":        "COAUTHORS",
+				"value":       prFeedbackCoauthorsExpression(),
 				"valueSource": "literal",
 			},
 		},
@@ -264,6 +273,9 @@ func prFeedbackRunnerSteps() []any {
 			"command": strings.Join([]string{
 				"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
 				`printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"`,
+				`if [ -n "${COAUTHORS:-}" ]; then`,
+				`  printf '\n%s\n' "$COAUTHORS" >> "$1"`,
+				"fi",
 				"HOOK",
 				"",
 				"chmod +x .git/hooks/prepare-commit-msg",
