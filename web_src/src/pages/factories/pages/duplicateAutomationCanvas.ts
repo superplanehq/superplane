@@ -41,7 +41,7 @@ export type DuplicateAutomationCanvasDeps = {
   factoryId: string;
   app: FactoryApp;
   createCanvas: (input: CreateCanvasInput) => Promise<CreateCanvasResult>;
-  /** Names already taken in the org (used to pick "X copy", "X copy (2)", …). */
+  /** Names already taken in the workspace (used to pick "X copy", "X copy (2)", …). */
   existingCanvasNames?: Iterable<string>;
   /** When set, skip CreateCanvas and reuse this id (retry after failed stage/commit). */
   pendingCanvasId?: string;
