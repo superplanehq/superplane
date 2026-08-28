@@ -303,18 +303,6 @@ describe("LineIntakeDrawer", () => {
     expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("highlights the window and expands a collapsed intake on focus", async () => {
-    const user = userEvent.setup();
-    const { rerender } = renderDrawer({ configuredSources: [GITHUB_INTAKE], focusNonce: 0 });
-    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-
-    rerender(drawerElement({ configuredSources: [GITHUB_INTAKE], focusNonce: 1 }));
-
-    expect(screen.getByTestId("line-intake-drawer")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
-  });
-
   it("expands the intake named in the URL", () => {
     renderDrawer({ initialIntakeId: "intake-sentry" });
 

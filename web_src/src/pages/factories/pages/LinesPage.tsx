@@ -74,7 +74,6 @@ import {
   factoryAppConfigurePath,
   factoryAppRunPath,
   factoryHomePath,
-  factoryIntakePath,
   firstFactoryLineId,
   intakeIdFromSearch,
   intakeSettingsTabFromSearch,
@@ -140,7 +139,6 @@ export function LinesPage() {
   const navigate = useNavigate();
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
-  const [intakeFocusNonce, setIntakeFocusNonce] = useState(0);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
@@ -209,7 +207,6 @@ export function LinesPage() {
           factoryKey={factoryKey}
           editAutomationHrefFor={editAutomationHrefFor}
           showAddIntakeControl={showAddIntakeControl}
-          focusNonce={intakeFocusNonce}
           onSelectIntakeTemplate={(template) => {
             if (!isLineIntakeSourceId(template.id)) {
               showErrorToast("This intake template is not available yet.");
@@ -269,16 +266,6 @@ export function LinesPage() {
             workOrders={visibleWorkOrders}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
             canUpdate={canUpdate}
-            hasIntake={configuredIntakes.length > 0}
-            onShowIntake={() => {
-              if (!intakeOpen) {
-                navigate(
-                  factoryIntakePath(organizationId, factoryKey, selectedLine.id, configuredIntakes[0]?.intakeId),
-                );
-                return;
-              }
-              setIntakeFocusNonce((current) => current + 1);
-            }}
             onCreateWorkOrder={openCreateWorkOrder}
             workOrderCardContext={{
               organizationId,
@@ -388,8 +375,6 @@ function LineDetail({
   workOrders,
   canCreateWorkOrder,
   canUpdate,
-  hasIntake,
-  onShowIntake,
   onCreateWorkOrder,
   workOrderCardContext,
 }: {
@@ -401,8 +386,6 @@ function LineDetail({
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
   canUpdate: boolean;
-  hasIntake: boolean;
-  onShowIntake: () => void;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
 }) {
@@ -443,8 +426,6 @@ function LineDetail({
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
-          hasIntake={hasIntake}
-          onShowIntake={onShowIntake}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={openWorkOrder}
         />
@@ -646,8 +627,6 @@ function PhaseBoard({
   canCreateWorkOrder,
   canRename,
   onCreateWorkOrder,
-  hasIntake,
-  onShowIntake,
   workOrderCardContext,
   onOpenWorkOrder,
 }: {
@@ -662,8 +641,6 @@ function PhaseBoard({
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onCreateWorkOrder: () => void;
-  hasIntake: boolean;
-  onShowIntake: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
 }) {
@@ -730,8 +707,6 @@ function PhaseBoard({
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
           onCreateWorkOrder={onCreateWorkOrder}
-          hasIntake={hasIntake}
-          onShowIntake={onShowIntake}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
         />
