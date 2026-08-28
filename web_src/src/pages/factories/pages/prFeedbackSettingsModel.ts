@@ -66,6 +66,11 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
   };
 }
 
+/** Row title on the Verify lane. It says what the handler listens to. */
+export function prFeedbackListenTitle(): string {
+  return "Listening to PR comments";
+}
+
 export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeedbackDraftSettings {
   return {
     name: draft.name.trim(),

@@ -61,9 +61,9 @@ describe("OnboardingGate", () => {
     expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
   });
 
-  // Setup finishes with its own redirect to the intake drawer. This redirect
-  // can land after it, so both must open the same board with the drawer.
-  it("opens the intake drawer when a completed workspace leaves setup", async () => {
+  // Setup finishes with its own redirect to the line board. This redirect can
+  // land after it, so both must open the same board.
+  it("opens the line board when a completed workspace leaves setup", async () => {
     factory = {
       id: "factory-1",
       lines: [{ id: "line-plan" }],
@@ -71,6 +71,6 @@ describe("OnboardingGate", () => {
     };
     renderRoute("/org-1/workspaces/PAY/setup");
 
-    expect(await screen.findByText("/org-1/workspaces/PAY/lines/line-plan?intake=1")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/PAY/lines/line-plan")).toBeInTheDocument();
   });
 });

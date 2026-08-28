@@ -108,6 +108,9 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useFactoryPRFeedbackHandlers: () => ({ data: [] }),
+  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -251,18 +254,33 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
   });
 
-  it("opens the Intake drawer beside the board when the intake query is set", () => {
+  it("lists the intakes at the head of the Backlog column, without a drawer", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderLinesBoard();
 
-    expect(screen.getByTestId("line-intake-drawer")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Plan and Implement" })).toBeInTheDocument();
-    expect(screen.getByTestId("line-intake-close")).toBeInTheDocument();
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(within(backlog).getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(within(backlog).getByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(within(backlog).getByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-drawer")).not.toBeInTheDocument();
     expect(screen.queryByTestId("line-intake-add")).not.toBeInTheDocument();
-    expect(screen.getByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
+  });
+
+  it("names the mention the Verify column listens to", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    const verify = screen.getByTestId("lines-verify-column");
+    expect(within(verify).getByTestId("lines-verify-listener-pr-feedback")).toHaveTextContent(
+      "Listening to PR comments",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Open PR feedback settings" }));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1`,
+    );
   });
 
   it("lists two intakes on the same source", () => {
@@ -272,21 +290,18 @@ describe("LinesPage board", () => {
         { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
       ],
     });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`);
+    renderLinesBoard();
 
-    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent("GitHub issues");
-    expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Triage issues");
+    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
+      "Listening to GitHub issues",
+    );
+    expect(screen.getByTestId("line-intake-source-intake-triage")).toHaveTextContent("Listening to Triage issues");
   });
 
   it("creates an intake from the picker and opens its canvas", async () => {
     createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1`,
-      vi.fn(),
-      REFUND_FACTORY,
-      { addIntakeControl: true },
-    );
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
@@ -301,26 +316,25 @@ describe("LinesPage board", () => {
     });
   });
 
-  it("shows GitHub issues only on Acme onboarding intake", () => {
+  it("shows only declared intakes", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
-      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
     );
 
-    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Collapse GitHub issues" })).not.toBeInTheDocument();
-    expect(screen.queryByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
+      "Listening to GitHub issues",
+    );
+    expect(screen.queryByText("Listening to Sentry exceptions")).not.toBeInTheDocument();
     expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
 
-  it("opens the factory canvas editor from Edit automation", async () => {
+  it("opens intake settings from the row and links to the factory canvas editor", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
-    );
+    renderLinesBoard();
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
     await user.click(screen.getByRole("tab", { name: "Automation" }));
@@ -334,7 +348,22 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("does not list intake runs under the GitHub issues card", () => {
+  it("opens the settings of the intake whose row was used", async () => {
+    useFactoryIntakes.mockReturnValue({
+      data: [
+        GITHUB_ISSUES_INTAKE,
+        { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
+      ],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
+
+    expect(within(screen.getByTestId("intake-source-settings")).getByLabelText("Name")).toHaveValue("Triage issues");
+  });
+
+  it("does not list intake runs under the GitHub issues row", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,

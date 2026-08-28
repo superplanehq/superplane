@@ -1,11 +1,12 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
+import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
-import { isFirstRunOnboardingFactory } from "./lineIntakeModel";
+import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
@@ -32,6 +33,16 @@ export type BacklogColumnProps = {
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Work orders the Backlog automation analyzes right now. */
   analyzingOrderIds?: ReadonlySet<string>;
+  /** Intakes that open work orders in this backlog, listed at its head. */
+  intakePanel?: BacklogIntakePanel;
+};
+
+export type BacklogIntakePanel = {
+  sources: ConfiguredLineIntakeSource[];
+  /** Show Add intake. Hidden on the board until the flow is ready. */
+  showAddIntake: boolean;
+  onOpenSettings: (intake: ConfiguredLineIntakeSource) => void;
+  onAddIntake: () => void;
 };
 
 export function BacklogColumn({
@@ -54,6 +65,7 @@ export function BacklogColumn({
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
+  intakePanel,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -103,6 +115,16 @@ export function BacklogColumn({
               onColorChange={onColorChange}
             />
           </div>
+        }
+        banner={
+          intakePanel ? (
+            <BacklogIntakeSources
+              intakes={intakePanel.sources}
+              showAddIntake={intakePanel.showAddIntake}
+              onOpenSettings={intakePanel.onOpenSettings}
+              onAddIntake={intakePanel.onAddIntake}
+            />
+          ) : null
         }
         testId="lines-backlog-column"
       >

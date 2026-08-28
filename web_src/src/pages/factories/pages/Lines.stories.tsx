@@ -12,7 +12,11 @@ import {
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
 import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
-import { noIntakeFactoriesFixture, severalIntakeFactoriesFixture } from "../__fixtures__/backlogIntakeItemFixtures";
+import {
+  githubAndSentryIntakeFactoriesFixture,
+  noIntakeFactoriesFixture,
+  severalIntakeFactoriesFixture,
+} from "../__fixtures__/backlogIntakeItemFixtures";
 import { LinesPage } from "./LinesPage";
 
 /**
@@ -54,7 +58,7 @@ export const AcmeOnboardingEmpty: Story = {
 };
 
 export const AcmeOnboardingIntake: Story = {
-  name: "Acme onboarding — intake",
+  name: "Acme onboarding — intake settings",
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
@@ -64,27 +68,55 @@ export const AcmeOnboardingIntake: Story = {
   ),
 };
 
-export const LineBoardIntake: Story = {
-  name: "Line board — intake",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-      />
-    );
-  },
-};
-
-export const LineBoardIntakeAnalyzing: Story = {
-  name: "Line board — intake tree",
+export const LineBoardIntakeSettings: Story = {
+  name: "Line board — intake settings",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
         factoriesFixture={lineMetricsFactoriesFixture}
+      />
+    );
+  },
+};
+
+export const LineBoardIntakeAutomation: Story = {
+  name: "Line board — intake automation",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=automation`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
+      />
+    );
+  },
+};
+
+export const LineBoardIntakeRuns: Story = {
+  name: "Line board — intake runs",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=runs`}
+        factoriesFixture={lineMetricsFactoriesFixture}
+        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
+      />
+    );
+  },
+};
+
+export const LineBoardGithubAndSentry: Story = {
+  name: "Line board — GitHub and Sentry listeners",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
       />
     );
   },
