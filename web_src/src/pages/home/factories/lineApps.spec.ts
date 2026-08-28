@@ -303,6 +303,10 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
     expect(canvasYaml).toContain("component: findPullRequest");
     expect(canvasYaml).toContain("component: addPullRequestActivity");
+    // The PR-activity run needs a real description, or the log modal falls
+    // back to a misleading "Address feedback" label for a closure event.
+    expect(canvasYaml).toMatch(/id: add-pr-activity[\s\S]*description: .*was merged/);
+    expect(canvasYaml).toMatch(/id: add-pr-activity[\s\S]*description: .*was closed/);
     expect(canvasYaml).toContain("component: updatePullRequest");
     expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
     expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");

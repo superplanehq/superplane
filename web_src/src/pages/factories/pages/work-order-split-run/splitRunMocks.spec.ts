@@ -1010,14 +1010,14 @@ describe("line board work-order examples", () => {
 
     expect(feedback.map((phase) => phase.id)).toEqual(["pr-feedback-run-old", "pr-feedback-run-new"]);
     expect(feedback[0]).toMatchObject({
-      name: "Address feedback on PR #6812",
+      name: "Activity on PR #6812",
       status: "passed",
       appId: "canvas-fb",
       runId: "run-old",
       componentName: "Address PR feedback",
     });
     expect(feedback[1]).toMatchObject({
-      name: "Address feedback on PR #6812",
+      name: "Activity on PR #6812",
       status: "running",
       appId: "canvas-fb",
       runId: "run-new",
@@ -1048,6 +1048,51 @@ describe("line board work-order examples", () => {
     });
     expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-comment")).toMatchObject({
       name: "Please add tests for the retry path.",
+    });
+  });
+
+  it("falls back to a neutral PR activity label when the run has no description", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          pullRequestNumber: "7",
+          run: {
+            id: "run-closure",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-closure")).toMatchObject({
+      name: "Activity on PR #7",
+    });
+  });
+
+  it("falls back to a neutral activity label with no PR number when there is no description", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-fb",
+          run: {
+            id: "run-no-number",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+            finishedAt: "2026-08-26T11:05:00Z",
+          },
+        },
+      ],
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-no-number")).toMatchObject({
+      name: "Activity on pull request",
     });
   });
 

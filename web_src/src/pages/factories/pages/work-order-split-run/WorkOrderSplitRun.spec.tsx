@@ -90,7 +90,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     await openLogTab(user);
-    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Address feedback on PR #12");
+    expect(screen.getByTestId("split-run-phase-pr-feedback-run-fb")).toHaveTextContent("Activity on PR #12");
   });
 
   it("keeps the log scroller flush so sticky phase headers cover scrolled lines", () => {

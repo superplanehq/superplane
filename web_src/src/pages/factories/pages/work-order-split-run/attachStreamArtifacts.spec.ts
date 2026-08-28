@@ -32,16 +32,20 @@ function streamLine(nodeId: string, componentName = nodeId): SplitRunStreamLine 
   };
 }
 
+const RUN_A = "run-a";
+
 function artifactAddedEvent(
   at: string,
   artifact: { id?: string; type?: string; data?: Record<string, unknown> },
   automation?: { nodeId?: string; nodeName?: string },
+  runId: string = RUN_A,
 ): FactoriesWorkOrderEvent {
   return {
     type: "order.artifact.added",
     timestamp: at,
     event: {
       ...(automation ? { automation } : {}),
+      run: { id: runId },
       artifact,
     },
   };
@@ -55,6 +59,9 @@ describe("attachStreamArtifacts", () => {
         artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
         { type: "order.comment.added", timestamp: "2026-08-24T16:33:00.000Z", event: {} },
       ],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toEqual(NOTE);
@@ -72,6 +79,8 @@ describe("attachStreamArtifacts", () => {
         ),
       ],
       [UPDATED_NOTE],
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toEqual(UPDATED_NOTE);
@@ -84,6 +93,9 @@ describe("attachStreamArtifacts", () => {
         artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
         artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "add-output" }),
       ],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toEqual(BRANCH);
@@ -96,6 +108,9 @@ describe("attachStreamArtifacts", () => {
         artifactAddedEvent("2026-08-24T16:38:18.000Z", BRANCH, { nodeId: "add-output" }),
         artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" }),
       ],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toEqual(BRANCH);
@@ -103,7 +118,13 @@ describe("attachStreamArtifacts", () => {
 
   it("leaves the stream unchanged when the event has no node", () => {
     const lines = [streamLine("noop")];
-    const stream = attachStreamArtifacts(lines, [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE)]);
+    const stream = attachStreamArtifacts(
+      lines,
+      [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE)],
+      undefined,
+      undefined,
+      RUN_A,
+    );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
     expect(stream?.[0]).toEqual(lines[0]);
@@ -113,6 +134,9 @@ describe("attachStreamArtifacts", () => {
     const stream = attachStreamArtifacts(
       [streamLine("noop")],
       [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "add-output" })],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
@@ -122,6 +146,9 @@ describe("attachStreamArtifacts", () => {
     const stream = attachStreamArtifacts(
       [streamLine("node-2", "noop 2")],
       [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "noop 2" })],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toEqual(NOTE);
@@ -131,6 +158,9 @@ describe("attachStreamArtifacts", () => {
     const stream = attachStreamArtifacts(
       [streamLine("other-node", "noop 2")],
       [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeId: "add-output", nodeName: "noop 2" })],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
@@ -149,6 +179,7 @@ describe("attachStreamArtifacts", () => {
           timestamp: "2026-08-24T16:32:18.000Z",
           event: {
             automation: { nodeId: "add-pr" },
+            run: { id: RUN_A },
             pullRequest: {
               id: "pr-1",
               number: 482,
@@ -158,6 +189,9 @@ describe("attachStreamArtifacts", () => {
           },
         },
       ],
+      undefined,
+      undefined,
+      RUN_A,
     );
 
     expect(stream?.[0]?.artifact).toBeUndefined();
@@ -167,5 +201,53 @@ describe("attachStreamArtifacts", () => {
       url: "https://github.com/example/ledger/pull/482",
       state: "STATE_OPEN",
     });
+  });
+
+  it("does not attach an artifact from another run even when node ids collide", () => {
+    const events = [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeId: "implement" }, "run-a")];
+
+    const streamForRunB = attachStreamArtifacts([streamLine("implement")], events, undefined, undefined, "run-b");
+    expect(streamForRunB?.[0]?.artifact).toBeUndefined();
+
+    const streamForRunA = attachStreamArtifacts([streamLine("implement")], events, undefined, undefined, "run-a");
+    expect(streamForRunA?.[0]?.artifact).toEqual(NOTE);
+  });
+
+  it("does not attach an artifact from another run when component names collide", () => {
+    const events = [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, { nodeName: "Plan" }, "run-a")];
+
+    const streamForRunB = attachStreamArtifacts([streamLine("noop", "Plan")], events, undefined, undefined, "run-b");
+    expect(streamForRunB?.[0]?.artifact).toBeUndefined();
+
+    const streamForRunA = attachStreamArtifacts([streamLine("noop", "Plan")], events, undefined, undefined, "run-a");
+    expect(streamForRunA?.[0]?.artifact).toEqual(NOTE);
+  });
+
+  it("attaches a run's sole artifact to its no-node PR-activity line", () => {
+    const line: SplitRunStreamLine = {
+      id: "pr-activity",
+      at: "16:32:18",
+      componentName: "Add Pull Request Activity",
+      status: "passed",
+    };
+    const events = [artifactAddedEvent("2026-08-24T16:32:18.000Z", NOTE, undefined, "run-a")];
+
+    const stream = attachStreamArtifacts([line], events, undefined, undefined, "run-a");
+
+    expect(stream?.[0]?.artifact).toEqual(NOTE);
+  });
+
+  it("drops artifact events with no producing run instead of falling back to a shared bucket", () => {
+    const events: FactoriesWorkOrderEvent[] = [
+      {
+        type: "order.artifact.added",
+        timestamp: "2026-08-24T16:32:18.000Z",
+        event: { automation: { nodeId: "implement" }, artifact: NOTE },
+      },
+    ];
+
+    const stream = attachStreamArtifacts([streamLine("implement")], events, undefined, undefined, "run-a");
+
+    expect(stream?.[0]?.artifact).toBeUndefined();
   });
 });

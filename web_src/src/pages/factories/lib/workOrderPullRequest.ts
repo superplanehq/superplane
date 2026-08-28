@@ -88,9 +88,9 @@ export function prFeedbackRunTitle(pullRequest: FactoriesFactoryPullRequest): st
     .replace(/^#/, "")
     .trim();
   if (number) {
-    return `Address feedback on PR #${number}`;
+    return `Activity on PR #${number}`;
   }
-  return "Address PR feedback";
+  return "Activity on pull request";
 }
 
 export function indexPullRequestsById(

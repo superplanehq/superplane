@@ -31,6 +31,7 @@ describe("useSplitRunStreamArtifacts", () => {
                 timestamp: "2026-08-24T16:32:18.000Z",
                 event: {
                   automation: { nodeId: "add-pr" },
+                  run: { id: "run-1" },
                   artifact: { id: "art-branch-1", type: "branch", data: { name: "feature/retry" } },
                 },
               },
@@ -46,7 +47,7 @@ describe("useSplitRunStreamArtifacts", () => {
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", "order-1"));
 
-    expect(result.current.byNodeId.get("add-pr")).toEqual({
+    expect(result.current.byRun.get("run-1")?.byNodeId.get("add-pr")).toEqual({
       id: "art-branch-1",
       type: "TYPE_BRANCH",
       data: { name: "feature/retry-v2" },
@@ -60,7 +61,6 @@ describe("useSplitRunStreamArtifacts", () => {
 
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", undefined));
 
-    expect(result.current.byNodeId.size).toBe(0);
-    expect(result.current.byNodeName.size).toBe(0);
+    expect(result.current.byRun.size).toBe(0);
   });
 });

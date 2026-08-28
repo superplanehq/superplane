@@ -5,10 +5,7 @@ import { flattenWorkOrderEventsPages } from "../../lib/workOrderEventsPagination
 import { streamArtifactIndexFromEvents, type StreamArtifactIndex } from "./attachStreamArtifacts";
 
 const EMPTY_INDEX: StreamArtifactIndex = {
-  byNodeId: new Map(),
-  byNodeName: new Map(),
-  pullRequestsByNodeId: new Map(),
-  pullRequestsByNodeName: new Map(),
+  byRun: new Map(),
 };
 
 export function useSplitRunStreamArtifacts(
