@@ -597,6 +597,7 @@ function streamStatusForNode(status: FactoryNodeStatus): SplitRunPhaseStatus {
   if (status === "running") return "running";
   if (status === "passed" || status === "triggered") return "passed";
   if (status === "failed") return "failed";
+  if (status === "cancelled") return "cancelled";
   return "pending";
 }
 

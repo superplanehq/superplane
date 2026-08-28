@@ -34,17 +34,17 @@ const KINDS: { kind: DecisionFooterKind; label: string; note: string }[] = [
   {
     kind: "waiting",
     label: "Needs attention",
-    note: "Reject and Approve in the note.",
+    note: "To Backlog, Reject, and Approve in the note.",
   },
   {
     kind: "statusNote",
     label: "Status note + PR",
-    note: "Custom note, Review PR, Reject, and Approve.",
+    note: "Custom note, Review PR, To Backlog, Reject, and Approve.",
   },
   {
     kind: "failed",
     label: "Step failed",
-    note: "Review the run, Reject, and Rerun.",
+    note: "Debug, To Backlog, Reject, and Rerun.",
   },
   {
     kind: "draft",
