@@ -5,7 +5,7 @@ import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useNavigate } from "react-router";
 
-import { factoryIntakePath } from "../../lib/factoryPagePaths";
+import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import {
@@ -49,13 +49,9 @@ export function finishOnboardingError(args: {
   return null;
 }
 
-export function afterOnboardingPath(args: {
-  organizationId: string;
-  factoryKey: string;
-  lineId: string;
-  githubIntakeId?: string;
-}) {
-  return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, args.githubIntakeId);
+/** The line board, where the new GitHub intake sits at the foot of Backlog. */
+export function afterOnboardingPath(args: { organizationId: string; factoryKey: string; lineId: string }) {
+  return factoryHomePath(args.organizationId, args.factoryKey, args.lineId);
 }
 
 function navigateAfterFinish(
@@ -63,9 +59,8 @@ function navigateAfterFinish(
   organizationId: string,
   factoryKey: string,
   lineId: string,
-  githubIntakeId?: string,
 ) {
-  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId, githubIntakeId }), { replace: true });
+  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
 }
 
 async function provisionWorkspace(args: {
@@ -90,7 +85,7 @@ async function provisionWorkspace(args: {
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
-}): Promise<{ lineId: string; githubIntakeId?: string }> {
+}): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
@@ -127,7 +122,7 @@ async function provisionWorkspace(args: {
     installFactory: args.installFactory,
   });
   // The intake needs the line: it opens work orders that the line runs.
-  const githubIntake = await provisionGithubIntake({
+  await provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
   });
@@ -141,7 +136,7 @@ async function provisionWorkspace(args: {
     provisionedLineId: lineId,
     complete: true,
   });
-  return { lineId, githubIntakeId: githubIntake.id ?? undefined };
+  return { lineId };
 }
 
 export function useFinishOnboarding(args: {
@@ -202,13 +197,7 @@ export function useFinishOnboarding(args: {
           args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(
-        navigate,
-        args.organizationId,
-        args.factoryKey,
-        provisioned.lineId,
-        provisioned.githubIntakeId,
-      );
+      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

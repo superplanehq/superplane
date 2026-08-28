@@ -12,7 +12,6 @@ import {
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
   FACTORIES_ORGANIZATION_ID,
-  GITHUB_ISSUES_INTAKE_ID,
   LINE_RUN_IMPLEMENT_FAILED_ID,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
@@ -339,7 +338,7 @@ describe("FactoriesHarness Acme onboarding", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
+        pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
         factoriesFixture={lineMetricsFactoriesFixture}
         enableOnboarding={false}
       />,
