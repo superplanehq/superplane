@@ -24,4 +24,5 @@ func (a HostedLLMAccess) AllowsModel(model string) bool {
 type HostedLLMContext interface {
 	Resolve(provider string) (HostedLLMAccess, error)
 	AssertCreditAvailable() error
+	AssertModelSelectable(provider, fundingSource, model string) error
 }

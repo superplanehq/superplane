@@ -10,13 +10,17 @@ import (
 )
 
 func serializeFactory(factory *models.Factory) *pb.Factory {
-	return &pb.Factory{
+	serialized := &pb.Factory{
 		Id:          factory.ID.String(),
 		Name:        factory.Name,
 		Description: factory.Description,
 		Key:         factory.Key,
 		Onboarding:  serializeFactoryOnboarding(factory),
 	}
+	if factory.HostedSpendBudgetCents != nil {
+		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
+	}
+	return serialized
 }
 
 func serializeFactoryWithLines(
@@ -24,14 +28,9 @@ func serializeFactoryWithLines(
 	lines []models.FactoryLine,
 	metricsByLine map[uuid.UUID]*pb.FactoryLineMetrics,
 ) *pb.Factory {
-	return &pb.Factory{
-		Id:          factory.ID.String(),
-		Name:        factory.Name,
-		Description: factory.Description,
-		Key:         factory.Key,
-		Lines:       serializeFactoryLines(lines, metricsByLine),
-		Onboarding:  serializeFactoryOnboarding(factory),
-	}
+	serialized := serializeFactory(factory)
+	serialized.Lines = serializeFactoryLines(lines, metricsByLine)
+	return serialized
 }
 
 func serializeFactoryWithLineMetrics(

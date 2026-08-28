@@ -3,6 +3,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useAvailableIntegrations, useIntegrationMutations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
+import { integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Alert, AlertDescription } from "@/ui/alert";
 import { CircleX } from "lucide-react";
@@ -23,6 +24,7 @@ export function CapabilityBasedIntegrationDetails({
   integration,
 }: CapabilityBasedIntegrationDetailsProps) {
   const navigate = useNavigate();
+  const integrationsHref = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const integrationId = integration.metadata?.id;
   const integrationName = integration.metadata?.name;
@@ -43,7 +45,7 @@ export function CapabilityBasedIntegrationDetails({
     if (!canDeleteIntegrations) return;
     try {
       await integrationMutations.deleteMutation.mutateAsync({ integrationName: providerName });
-      navigate(`/${organizationId}/settings/integrations`);
+      navigate(integrationsHref);
     } catch {
       showErrorToast("Failed to delete integration");
     }
@@ -56,7 +58,7 @@ export function CapabilityBasedIntegrationDetails({
       const updated = response.data?.integration ?? null;
 
       if (updated?.status?.setupState?.currentStep) {
-        navigate(`/${organizationId}/settings/integrations/${providerName}/setup`, {
+        navigate(integrationSetupPath(integrationsHref, providerName), {
           state: { integrationId },
         });
         return;
