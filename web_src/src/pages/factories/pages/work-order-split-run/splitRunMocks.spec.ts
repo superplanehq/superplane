@@ -166,7 +166,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -187,7 +187,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
     expect(fixture.footer.note?.headline).toBe("Waiting for user review");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -206,9 +206,9 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("A person must act");
-    expect(fixture.footer.attentionCard).toBeUndefined();
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
+    expect(fixture.footer.note?.headline).toBe("This task waits on a person");
+    expect(fixture.footer.attentionCard).toBe(true);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Approve"]);
   });
 
   it("does not treat a missing execution step index as the first step", () => {
@@ -586,7 +586,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes.map((note) => note.headline)).toEqual(["Implement did not pass"]);
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review the run");
     expect(fixture.footer.attentionCard).toBe(true);
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual([]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.checks).toEqual([]);
   });
 
@@ -604,15 +604,14 @@ describe("splitRunFixtureForWorkOrder", () => {
       status: "passed",
       canvasKey: null,
     });
-    expect(backlog?.stream.map((line) => line.componentName)).toEqual([
-      "Leonardo DiCaprio created this work order manually.",
-    ]);
+    expect(backlog?.stream.map((line) => line.componentName)).toEqual(["Leonardo DiCaprio created this task."]);
     expect(backlog?.artifacts[0]?.data).toMatchObject({
       name: "description.md",
       body: DRAFT_WORK_ORDER.description,
     });
     expect(backlog?.stream[0]?.artifact?.data).toMatchObject({ name: "description.md" });
-    expect(fixture.footer.note?.text).toContain("Leonardo DiCaprio created this work order manually.");
+    expect(fixture.footer.note?.headline).toBe("This task is ready to start");
+    expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
   });
 
   it("logs GitHub ingest as the backlog source", () => {
@@ -666,15 +665,15 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.footerTone).toBe("draft");
     expect(backlog?.canvasKey).toBeNull();
-    expect(backlog?.stream.map((line) => line.componentName)).toEqual(["Created this work order manually."]);
+    expect(backlog?.stream.map((line) => line.componentName)).toEqual(["A person created this task."]);
     expect(backlog?.artifacts[0]?.data).toMatchObject({
       name: "description.md",
       body: OPEN_WORK_ORDER.description,
     });
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.note?.headline).toBe("Start this work order");
-    expect(fixture.footer.note?.text).toContain("A person created this work order manually.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Start"]);
+    expect(fixture.footer.note?.headline).toBe("This task is ready to start");
+    expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
@@ -711,6 +710,10 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "plan"))).toEqual(["plan.md"]);
     expect(outputNames(fixture.phases.find((phase) => phase.id === "implement-0"))).toEqual(["feature/rf-106", "#506"]);
     expect(fixture.footerTone).toBe("failed");
+    expect(fixture.footer.note).toEqual({
+      headline: "This task is closed as failed",
+      text: "Reopen this task to start the line again.",
+    });
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
   });
 

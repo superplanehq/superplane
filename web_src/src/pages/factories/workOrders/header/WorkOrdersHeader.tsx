@@ -72,7 +72,7 @@ export function WorkOrdersHeader({
           <DisplayMenu state={state} />
           <PermissionTooltip
             allowed={canCreate || permissionsLoading}
-            message="You don't have permission to create work orders."
+            message="You do not have permission to create tasks."
           >
             <Button
               type="button"
@@ -82,7 +82,7 @@ export function WorkOrdersHeader({
               data-testid="work-order-list-create-button"
             >
               <Plus className="size-3.5" aria-hidden />
-              New work order
+              New task
             </Button>
           </PermissionTooltip>
         </>

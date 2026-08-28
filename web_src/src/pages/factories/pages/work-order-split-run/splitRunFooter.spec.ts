@@ -33,13 +33,20 @@ const DRAFT_NOTE = {
   text: "From GitHub issue PAY-842. Confidence 5/5.",
 };
 
+const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
+const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
+const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
+const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+
 describe("buildSplitRunFooter", () => {
-  it("keeps a draft note above the state bar with Start", () => {
+  it("keeps a draft note with Reject and Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
       sentence: "This work order is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
-      actions: [{ id: "start", kind: "start", label: "Start", emphasis: "primary" }],
+      attentionCard: true,
+      actions: [REJECT, START],
     });
   });
 
@@ -75,10 +82,10 @@ describe("buildSplitRunFooter", () => {
     ]);
   });
 
-  it("keeps a waiting note off the bar without header close actions", () => {
+  it("keeps a waiting note on the decision strip with Reject and Approve", () => {
     const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
 
-    expect(footer.attentionCard).toBeUndefined();
+    expect(footer.attentionCard).toBe(true);
     expect(footer.note).toEqual({
       headline: "Review the pull request",
       text: "Merge #6812 to continue Verify.",
@@ -86,53 +93,88 @@ describe("buildSplitRunFooter", () => {
       cta: PR_NOTE.cta,
     });
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([]);
+    expect(footer.actions).toEqual([REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
 
-  it("flags a visible waiting note as an attention card", () => {
-    const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE, attentionCard: true });
-
-    expect(footer.attentionCard).toBe(true);
-    expect(footer.note?.cta).toEqual(PR_NOTE.cta);
-    expect(footer.actions).toEqual([]);
+  it("uses the default waiting note when a waiting order has no run note", () => {
+    expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
+      kind: "waiting",
+      sentence: "This work order needs attention.",
+      note: {
+        headline: "This task waits on a person",
+        text: "No automation is running. Click Approve if the result is good. Click Reject to close this task as rejected.",
+      },
+      attentionCard: true,
+      actions: [REJECT, APPROVE],
+    });
   });
 
-  it("still has no header close actions when a waiting order has no run note", () => {
-    expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
+  it("hides the decision strip while a waiting order is still running a follow-up", () => {
+    expect(buildSplitRunFooter({ kind: "waiting", decision: false })).toEqual({
       kind: "waiting",
       sentence: "This work order needs attention.",
       actions: [],
     });
   });
 
-  it("treats a failed open implement as a run note without header close actions", () => {
-    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, attentionCard: true });
+  it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Review the run");
     expect(footer.sentence).toBe("This work order needs attention.");
-    expect(footer.actions).toEqual([]);
+    expect(footer.actions).toEqual([REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
 
-  it("shows a done summary with Reopen", () => {
+  it("shows a done summary with Reopen on the decision strip", () => {
     expect(doneFooterForStatus("completed")).toEqual({
       kind: "done",
       sentence: "Work order completed successfully.",
-      actions: [{ id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" }],
+      note: {
+        headline: "This task is completed",
+        text: "Reopen this task if more work is needed.",
+      },
+      attentionCard: true,
+      actions: [REOPEN],
       status: "completed",
     });
-    expect(doneFooterForStatus("rejected").sentence).toBe("A person rejected this work order.");
-    expect(doneFooterForStatus("cancelled").sentence).toBe("This work order was canceled.");
-    expect(doneFooterForStatus("failed").sentence).toBe("Closed as failed. Line execution did not pass.");
+    expect(doneFooterForStatus("rejected")).toMatchObject({
+      sentence: "A person rejected this work order.",
+      note: {
+        headline: "This task is rejected",
+        text: "Reopen this task if the work should continue.",
+      },
+      attentionCard: true,
+      actions: [REOPEN],
+    });
+    expect(doneFooterForStatus("cancelled")).toMatchObject({
+      sentence: "This work order was canceled.",
+      note: {
+        headline: "This task is canceled",
+        text: "Reopen this task if the work should continue.",
+      },
+    });
+    expect(doneFooterForStatus("failed")).toMatchObject({
+      sentence: "Closed as failed. Line execution did not pass.",
+      note: {
+        headline: "This task is closed as failed",
+        text: "Reopen this task to start the line again.",
+      },
+    });
   });
 
-  it("offers Reopen on a closed failed footer instead of Stop", () => {
-    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, attentionCard: true, status: "failed" });
+  it("offers Reopen on a closed failed footer instead of Reject and Approve", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, status: "failed" });
 
-    expect(footer.actions).toEqual([{ id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" }]);
+    expect(footer.actions).toEqual([REOPEN]);
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note).toEqual({
+      headline: "This task is closed as failed",
+      text: "Reopen this task to start the line again.",
+    });
   });
 });
 

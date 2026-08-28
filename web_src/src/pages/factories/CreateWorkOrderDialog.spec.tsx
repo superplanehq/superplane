@@ -76,10 +76,10 @@ describe("CreateWorkOrderDialog", () => {
     meUser.current = null;
   });
 
-  it("names the dialog New work order instead of the fallback Dialog title", () => {
+  it("names the dialog New task instead of the fallback Dialog title", () => {
     renderDialog();
 
-    expect(screen.getByRole("dialog", { name: "New work order" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "New task" })).toBeInTheDocument();
     expect(screen.queryByText("Dialog")).not.toBeInTheDocument();
   });
 

@@ -73,8 +73,8 @@ function CreateWorkOrderDialogSession({
           isExpanded={isExpanded}
           onToggleExpanded={() => setIsExpanded((current) => !current)}
         >
-          <DialogTitle className="text-[13px] font-medium text-foreground">New work order</DialogTitle>
-          <DialogDescription className="sr-only">Create a work order for this workspace.</DialogDescription>
+          <DialogTitle className="text-[13px] font-medium text-foreground">New task</DialogTitle>
+          <DialogDescription className="sr-only">Create a task for this workspace.</DialogDescription>
         </CreateWorkOrderDialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
@@ -86,7 +86,7 @@ function CreateWorkOrderDialogSession({
             data-testid="work-order-title-input"
             value={composer.title}
             onChange={(event) => composer.updateTitle(event.target.value)}
-            placeholder="Work order title"
+            placeholder="Task title"
             maxLength={composer.maxTitleLength}
             autoFocus
             className="h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none placeholder:font-semibold placeholder:text-muted-foreground/70 focus-visible:ring-0"
@@ -253,8 +253,8 @@ function StartWorkOrderButton({
   const hasLines = Boolean(firstFactoryLineName({ lines }));
   const isDisabled = !canDispatch || !canSaveDraft || !hasLines;
   const tooltipMessage = !canDispatch
-    ? "You don't have permission to start work orders."
-    : "This workspace has no line to start this work order on.";
+    ? "You do not have permission to start tasks."
+    : "This workspace has no line to start this task on.";
 
   return (
     <PermissionTooltip allowed={canDispatch && hasLines} message={tooltipMessage}>
