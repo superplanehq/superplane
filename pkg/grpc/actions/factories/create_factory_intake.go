@@ -92,7 +92,7 @@ func CreateFactoryIntake(
 	if name == "" {
 		name = intakeDefaultName(source)
 	}
-	name, err = models.AvailableCanvasName(db, orgID, name)
+	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory intake")
 	}

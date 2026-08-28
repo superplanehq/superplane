@@ -88,7 +88,7 @@ export function BacklogColumn({
         count={orders.length}
         tone="neutral"
         surfaceClassName={surfaceClassName}
-        emptyDescription="No work orders in the backlog."
+        emptyDescription="No tasks in the backlog."
         emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
         keepChildrenWhenEmpty
         className={surfaceClassName ? undefined : "bg-muted"}
