@@ -18,7 +18,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "github-issues",
     name: "GitHub issues",
-    description: "Open issues from connected repositories.",
+    description: "Creates tasks from GitHub issues.",
     iconSrc: githubIcon,
   },
   {

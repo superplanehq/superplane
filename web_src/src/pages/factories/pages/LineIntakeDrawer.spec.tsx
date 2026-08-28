@@ -12,11 +12,7 @@ import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { LineIntakeDrawer } from "./LineIntakeDrawer";
-import {
-  GITHUB_ISSUES_ANALYZING_TICKETS,
-  lineIntakeSourceById,
-  type ConfiguredLineIntakeSource,
-} from "./lineIntakeModel";
+import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS } from "./intakeSourceSettingsModel";
 import type { LineIntakeDrawerProps } from "./lineIntakeDrawerTypes";
 
@@ -120,12 +116,7 @@ function drawerElement(props: Partial<LineIntakeDrawerProps>) {
 }
 
 function renderDrawer(props: Partial<LineIntakeDrawerProps> = {}) {
-  const view = render(drawerElement(props));
-  return {
-    ...view,
-    showSources: (configuredSources: ConfiguredLineIntakeSource[]) =>
-      view.rerender(drawerElement({ ...props, configuredSources })),
-  };
+  return render(drawerElement(props));
 }
 
 function intakeRuns(runs: unknown[]) {
@@ -251,173 +242,15 @@ describe("LineIntakeDrawer", () => {
     expect(screen.queryByTestId("add-intake-picker")).not.toBeInTheDocument();
   });
 
-  it("lets each intake expand and collapse on its own", async () => {
-    const user = userEvent.setup();
-    renderDrawer({ analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "Expand Sentry exceptions" })).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(screen.getByRole("button", { name: "Expand GitHub issues" }));
-
-    const github = screen.getByTestId("line-intake-source-intake-github");
-    const analyzing = within(github).getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getAllByTestId("line-intake-analyzing-spinner")).toHaveLength(5);
-    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(github).getByText("5 Creating")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
-  });
-
-  it("collapses an intake on a second header click", async () => {
-    const user = userEvent.setup();
-    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    expect(screen.getByTestId("line-intake-analyzing")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
-
-    expect(screen.queryByTestId("line-intake-analyzing")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  // Setup can open the drawer without an intake in the URL. A workspace with
-  // one intake must still show what that intake found.
-  it("expands the only intake when the URL names none", () => {
+  it("lists each intake without an expand control or empty run list", () => {
     renderDrawer({ configuredSources: [GITHUB_INTAKE] });
 
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("expands the only intake when it loads after the drawer opens", async () => {
-    const { showSources } = renderDrawer({ configuredSources: [] });
-    showSources([GITHUB_INTAKE]);
-
-    expect(await screen.findByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-  });
-
-  it("keeps the only intake collapsed after the reader collapses it", async () => {
-    const user = userEvent.setup();
-    const { showSources } = renderDrawer({ configuredSources: [GITHUB_INTAKE] });
-
-    await user.click(screen.getByRole("button", { name: "Collapse GitHub issues" }));
-    showSources([GITHUB_INTAKE]);
-
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("expands the intake named in the URL", () => {
-    renderDrawer({ initialIntakeId: "intake-sentry" });
-
-    expect(
-      within(screen.getByTestId("line-intake-source-intake-sentry")).getByTestId("line-intake-empty"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse Sentry exceptions" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Expand GitHub issues" })).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("lists the runs the intake is still analyzing", () => {
-    intakeRuns([
-      { id: "run-1", title: "Handle duplicate refunds on retry", placement: "PLACEMENT_ANALYZING" },
-      { id: "run-2", title: "Already in Backlog", placement: "PLACEMENT_BACKLOG" },
-    ]);
-    renderDrawer({
-      configuredSources: [GITHUB_INTAKE],
-      initialIntakeId: "intake-github",
-      organizationId: "org-1",
-      factoryId: "factory-1",
-    });
-
-    const analyzing = screen.getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
-  });
-
-  it("keeps live tickets below the minimum confidence in the Intake list", () => {
-    intakeRuns([
-      { id: "run-1", title: "Handle duplicate refunds on retry", placement: "PLACEMENT_ANALYZING" },
-      { id: "run-2", title: "Already in Backlog", placement: "PLACEMENT_BACKLOG" },
-      {
-        id: "run-3",
-        title: "Document the refund webhook contract",
-        placement: "PLACEMENT_BELOW_THRESHOLD",
-        confidencePct: 52,
-      },
-    ]);
-    renderDrawer({
-      configuredSources: [GITHUB_INTAKE],
-      initialIntakeId: "intake-github",
-      organizationId: "org-1",
-      factoryId: "factory-1",
-    });
-
-    const analyzing = screen.getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
-    expect(within(analyzing).getByTestId("line-intake-below-threshold-icon")).toBeInTheDocument();
-    expect(within(analyzing).getByTestId("line-intake-ticket-score-run-3")).toHaveAttribute("aria-valuenow", "3");
-    expect(
-      within(screen.getByTestId("line-intake-source-intake-github")).getByText("1 Not accepted"),
-    ).toBeInTheDocument();
-  });
-
-  // A ticket that scores under the minimum confidence never reaches Backlog.
-  // It stays under the analyzing tickets so a reader can see what was left out.
-  it("keeps tickets below the minimum confidence at the bottom with their score", () => {
-    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    const analyzing = screen.getByTestId("line-intake-analyzing");
-    expect(within(analyzing).getAllByTestId("line-intake-below-threshold-icon")).toHaveLength(6);
-    expect(
-      within(analyzing)
-        .getAllByRole("button")
-        .map((ticket) => ticket.getAttribute("aria-label"))
-        .slice(-6),
-    ).toEqual([
-      "Open Document the refund webhook contract",
-      "Open Make the billing dashboard faster",
-      "Open Redesign the invoice settings page",
-      "Open Investigate flaky payouts in staging",
-      "Open Move the ledger to a new database",
-      "Open Payments break for some customers",
-    ]);
-    expect(within(analyzing).getByTestId("line-intake-ticket-score-gh-issue-6")).toHaveAttribute("aria-valuenow", "3");
-    expect(within(analyzing).getByTestId("line-intake-ticket-score-gh-issue-11")).toHaveAttribute("aria-valuenow", "1");
-    expect(
-      within(screen.getByTestId("line-intake-source-intake-github")).getByText("6 Not accepted"),
-    ).toBeInTheDocument();
-  });
-
-  it("opens the analysis of a ticket below the minimum confidence", async () => {
-    const user = userEvent.setup();
-    renderDrawer({ initialIntakeId: "intake-github", analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS });
-
-    await user.click(screen.getByRole("button", { name: "Open Payments break for some customers" }));
-
-    const dialog = screen.getByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Payments break for some customers" })).toBeInTheDocument();
-  });
-
-  it("opens the analysis popup from an analyzing ticket", async () => {
-    const onOpenTicket = vi.fn();
-    const user = userEvent.setup();
-    renderDrawer({
-      initialIntakeId: "intake-github",
-      analyzingTickets: GITHUB_ISSUES_ANALYZING_TICKETS,
-      onOpenTicket,
-    });
-
-    await user.click(screen.getByRole("button", { name: "Open Handle duplicate refunds on retry" }));
-
-    expect(onOpenTicket).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "gh-issue-1", title: "Handle duplicate refunds on retry" }),
-    );
-    const dialog = screen.getByTestId("work-order-split-run");
-    expect(within(dialog).getByRole("heading", { name: "Handle duplicate refunds on retry" })).toBeInTheDocument();
-    expect(within(dialog).getByTestId("split-run-phase-analyze")).toBeInTheDocument();
+    const github = screen.getByTestId("line-intake-source-intake-github");
+    expect(within(github).getByRole("heading", { name: "GitHub issues" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand GitHub issues" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collapse GitHub issues" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("line-intake-empty")).not.toBeInTheDocument();
+    expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
   });
 
   it("opens intake settings from the gear", async () => {

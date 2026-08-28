@@ -310,7 +310,7 @@ describe("LinesPage board", () => {
     );
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collapse GitHub issues" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: "Collapse GitHub issues" })).not.toBeInTheDocument();
     expect(screen.queryByTestId(`line-intake-source-${SENTRY_INTAKE_ID}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
@@ -334,13 +334,14 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("loads analyzing tickets from the configured GitHub intake", () => {
+  it("does not list intake runs under the GitHub issues card", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
     );
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
   });
 

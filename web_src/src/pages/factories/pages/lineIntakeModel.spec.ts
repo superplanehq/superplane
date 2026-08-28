@@ -3,14 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   ADD_INTAKE_TEMPLATES,
   filterAddIntakeTemplates,
-  GITHUB_ISSUES_ANALYZING_TICKETS,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
   intakeTicketConfidenceScore,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
-  sortIntakeTicketsByOutcome,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
@@ -179,22 +177,6 @@ describe("lineIntakeModel", () => {
     expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket", confidencePct: 12 })).toBe(1);
     expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket", confidenceScore: 5, confidencePct: 12 })).toBe(5);
     expect(intakeTicketConfidenceScore({ id: "gh-1", title: "Ticket" })).toBeUndefined();
-  });
-
-  it("keeps analyzing tickets over the tickets below the minimum confidence", () => {
-    expect(
-      sortIntakeTicketsByOutcome([
-        { id: "gh-1", title: "Below", outcome: "below-threshold", confidencePct: 20 },
-        { id: "gh-2", title: "Analyzing" },
-      ]).map((ticket) => ticket.id),
-    ).toEqual(["gh-2", "gh-1"]);
-
-    expect(GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold")).toHaveLength(6);
-    expect(
-      GITHUB_ISSUES_ANALYZING_TICKETS.filter((ticket) => ticket.outcome === "below-threshold").every(
-        (ticket) => (ticket.confidencePct ?? 100) < 60,
-      ),
-    ).toBe(true);
   });
 
   // The analysis of a ticket under the minimum confidence is over. The popup
