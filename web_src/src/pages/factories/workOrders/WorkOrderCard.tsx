@@ -119,7 +119,7 @@ export function WorkOrderCard({
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
             <span
-              className="truncate text-[11px] leading-none text-muted-foreground"
+              className="truncate text-[11px] leading-4 text-muted-foreground"
               title={startedAt?.toLocaleString()}
             >
               {startedLabel}
