@@ -282,3 +282,32 @@ func Test__DispatchWorkOrder__RerunStepKeepsEarlierExecutions(t *testing.T) {
 	require.Len(t, resp.Order.LineDispatches, 1)
 	require.GreaterOrEqual(t, len(resp.Order.LineDispatches[0].StepExecutions), 2)
 }
+
+func Test__DispatchWorkOrder__ReturnsOwnerNameAfterStart(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", nil, nil, nil)
+	require.NoError(t, err)
+
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "step-one", "start-one")
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+
+	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Order.Assignees, 1)
+	assert.Equal(t, r.User.String(), resp.Order.Assignees[0].Id)
+	assert.Equal(t, r.UserModel.Name, resp.Order.Assignees[0].Name)
+	assert.NotEqual(t, r.User.String(), resp.Order.Assignees[0].Name)
+}

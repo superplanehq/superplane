@@ -48,11 +48,7 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	assigneeIDs, err := parseAssigneeIDs(db, orgID, req.GetAssigneeIds())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-
+	assigneeIDs := []uuid.UUID{createdByID}
 	order, err := factory.CreateWorkOrder(db, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")

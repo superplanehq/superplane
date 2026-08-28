@@ -1,8 +1,6 @@
 import { useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useEffect, useMemo, useState } from "react";
 
-import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -236,7 +234,6 @@ export function WorkOrderSplitRunPopup({
   });
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
-  const ownerOrganizationId = popupOwnerOrganizationId(organizationId, edits.canEdit);
   const [fullPage, setFullPage] = useState(false);
   const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"));
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
@@ -252,14 +249,7 @@ export function WorkOrderSplitRunPopup({
         expanded={fullPage}
         onToggleExpanded={() => setFullPage((current) => !current)}
       >
-        <OwnerTimeCostRow
-          fixture={{ ...fixture, owner: edits.owner }}
-          organizationId={ownerOrganizationId}
-          canEditOwner={edits.canEdit}
-          assigneeIds={edits.assigneeIds}
-          ownerBusy={edits.ownerBusy}
-          onOwnerSave={edits.saveOwner}
-        />
+        <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
       </PopupHeader>
       <SplitRunPopupTabs
         fixture={fixture}
@@ -327,13 +317,6 @@ function returnToBacklogAction(
 
 function hasLiveWorkOrder(organizationId?: string, factoryId?: string, orderId?: string) {
   return Boolean(organizationId && factoryId && orderId);
-}
-
-function popupOwnerOrganizationId(organizationId: string | undefined, canEdit: boolean) {
-  if (organizationId) {
-    return organizationId;
-  }
-  return canEdit ? FACTORIES_ORGANIZATION_ID : undefined;
 }
 
 function SplitRunPopupTabs({

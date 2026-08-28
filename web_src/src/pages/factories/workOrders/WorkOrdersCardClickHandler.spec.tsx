@@ -265,19 +265,12 @@ describe.each(views)("$name click handling", ({ Component }) => {
 });
 
 describe.each(viewsWithAssignee)("$name assignee control", ({ Component }) => {
-  it("keeps the assignee control clickable", () => {
+  it("shows the owner without a change control", () => {
     const { row } = renderView(Component);
 
-    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("auto");
-  });
-
-  it("does not navigate when the assignee control is clicked", async () => {
-    const user = userEvent.setup();
-    const { router, row } = renderView(Component);
-
-    await user.click(within(row).getByTestId(`work-order-row-assignees-${entry.id}`));
-
-    expect(router.state.location.pathname).toBe("/");
+    expect(within(row).getByTestId(`work-order-row-assignees-${entry.id}`)).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
+    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("none");
   });
 });
 

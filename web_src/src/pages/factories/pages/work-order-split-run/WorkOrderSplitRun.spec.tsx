@@ -103,6 +103,7 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("does not show elapsed time or a spend icon on the owner row", () => {
     renderSplitRun();
+    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
     const row = screen.getByTestId("popup-owner-time-cost");
     expect(within(row).queryByText(/so far/)).not.toBeInTheDocument();
     expect(row.querySelector(".lucide-clock")).toBeNull();
