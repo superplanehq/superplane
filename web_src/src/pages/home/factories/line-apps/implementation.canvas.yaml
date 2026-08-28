@@ -259,6 +259,7 @@ spec:
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
+        model: sonnet
         steps:
           - name: Inject Plan
             type: bash

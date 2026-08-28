@@ -34,6 +34,17 @@ export function pickHostedModel(provider: string, modelIds: string[]): string | 
   return ids[0];
 }
 
+/**
+ * Find the first allowlisted id that contains the hint. Returns undefined when
+ * none does, so a caller can keep the model it already resolved rather than
+ * fall back to an unrelated one.
+ */
+export function pickModelMatching(modelIds: string[], hint: string): string | undefined {
+  const needle = hint.trim().toLowerCase();
+  if (needle === "") return undefined;
+  return uniqueSortedModelIds(modelIds).find((id) => id.toLowerCase().includes(needle));
+}
+
 /** Prefer a Sonnet id from the Anthropic hosted allowlist; otherwise use the first id. */
 export function pickHostedAnthropicModel(modelIds: string[]): string | undefined {
   return pickHostedModel("anthropic", modelIds);
