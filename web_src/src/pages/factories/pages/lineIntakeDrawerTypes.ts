@@ -26,6 +26,8 @@ export interface LineIntakeDrawerProps {
   onSettingsSaved?: () => void;
   /** Show Add intake in Storybook. Hidden on the board until the flow is ready. */
   showAddIntakeControl?: boolean;
+  /** Bump to highlight the window and expand a collapsed intake. */
+  focusNonce?: number;
 }
 
 export interface LineIntakeDrawerPopupsProps {

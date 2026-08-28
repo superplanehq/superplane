@@ -324,7 +324,7 @@ function createWorkOrderFromRequest(request: RequestBody, orderCount: number): F
   return {
     id: `storybook-work-order-${orderCount + 1}`,
     number: String(200 + orderCount + 1),
-    title: stringOrEmpty(request.title) || "New work order",
+    title: stringOrEmpty(request.title) || "New task",
     description: stringOrEmpty(request.description),
     state: "STATE_OPEN",
     result: "RESULT_UNSPECIFIED",
