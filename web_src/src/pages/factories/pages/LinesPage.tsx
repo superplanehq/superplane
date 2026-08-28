@@ -72,6 +72,7 @@ import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   editFactoryLinePath,
   factoryAppConfigurePath,
@@ -526,6 +527,7 @@ function LineBoardSplitRunPopup({
   });
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
+  const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -542,6 +544,8 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        stoppedBy: closer.actor,
+        closer,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}

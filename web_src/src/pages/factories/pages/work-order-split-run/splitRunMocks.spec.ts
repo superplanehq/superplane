@@ -1152,6 +1152,17 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#510"]);
   });
 
+  it("names the person who marked a completed task successful", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A", avatarUrl: "https://example.com/alex.png" };
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { closer: { actor } });
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "marked this task as successful",
+      text: "The work is done. The result met the goal.",
+      actor,
+    });
+  });
+
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([
