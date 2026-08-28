@@ -114,6 +114,7 @@ export function WorkOrderSplitRunBody({
             ? visual.stream
             : resolveSplitRunVisual(entry, yamlOnly, { demoArtifacts }).stream,
           artifactIndex,
+          entry.runId,
         ),
       ]),
     );

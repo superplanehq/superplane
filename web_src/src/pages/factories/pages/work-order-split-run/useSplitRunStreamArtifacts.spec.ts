@@ -32,6 +32,7 @@ describe("useSplitRunStreamArtifacts", () => {
                 event: {
                   automation: { nodeId: "add-pr" },
                   artifact: { id: "art-branch-1", type: "branch", data: { name: "feature/retry" } },
+                  run: { id: "run-1" },
                 },
               },
             ],
@@ -47,9 +48,12 @@ describe("useSplitRunStreamArtifacts", () => {
     const { result } = renderHook(() => useSplitRunStreamArtifacts("org-1", "factory-1", "order-1"));
 
     expect(result.current.byNodeId.get("add-pr")).toEqual({
-      id: "art-branch-1",
-      type: "TYPE_BRANCH",
-      data: { name: "feature/retry-v2" },
+      value: {
+        id: "art-branch-1",
+        type: "TYPE_BRANCH",
+        data: { name: "feature/retry-v2" },
+      },
+      runId: "run-1",
     });
   });
 

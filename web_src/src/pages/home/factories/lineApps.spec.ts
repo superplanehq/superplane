@@ -301,6 +301,7 @@ describe("setup factory event apps", () => {
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
     expect(canvasYaml).toContain("component: findPullRequest");
     expect(canvasYaml).toContain("component: addPullRequestActivity");
+    expect(canvasYaml).toMatch(/description: .*was.*merged.*closed/);
     expect(canvasYaml).toContain("component: updatePullRequest");
     expect(canvasYaml).toContain("mergedAt: '{{ root().data.pull_request.merged_at }}'");
     expect(canvasYaml).toContain("closedAt: '{{ root().data.pull_request.closed_at }}'");
