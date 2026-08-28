@@ -91,7 +91,7 @@ func createBacklogCanvas(
 	factoryModel *models.Factory,
 ) (uuid.UUID, error) {
 	db := database.DB(ctx)
-	name, err := models.AvailableCanvasName(db, factoryModel.OrganizationID, backlogDefaultName)
+	name, err := models.AvailableCanvasName(db, factoryModel.OrganizationID, &factoryModel.ID, backlogDefaultName)
 	if err != nil {
 		return uuid.Nil, factoryErrorToStatus(err, "failed to create Backlog automation")
 	}
