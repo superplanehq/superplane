@@ -120,7 +120,7 @@ describe("LinesPage backlog create", () => {
     const items = within(list).getAllByRole("listitem");
     expect(items.at(-1)).toHaveAttribute("data-testid", "lines-backlog-create-ghost-item");
     expect(within(items.at(-1)!).getByRole("button", { name: "Create task" })).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-backlog-create-ghost"));
     expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe("LinesPage backlog create", () => {
     renderLinesBoard();
 
     expect(screen.getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 
   it("hides the create ghost card when the backlog is at capacity", async () => {
@@ -210,6 +210,6 @@ describe("LinesPage backlog create", () => {
 
     expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
-    expect(screen.queryByText("No work orders in the backlog.")).not.toBeInTheDocument();
+    expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 });
