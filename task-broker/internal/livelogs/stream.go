@@ -114,14 +114,7 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 		lastToken = token
 
 		for _, ev := range out.Events {
-			msg := awsToString(ev.Message)
-			if rec, ok := parseRunnerControlRecord(msg); ok {
-				if err := nw.writeRecord(rec); err != nil {
-					return err
-				}
-				continue
-			}
-			if err := nw.writeRecord(map[string]any{"type": "line", "text": msg}); err != nil {
+			if err := nw.writeRecord(RecordFromLogMessage(awsToString(ev.Message))); err != nil {
 				return err
 			}
 		}
@@ -140,6 +133,14 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 		case <-time.After(pollActive):
 		}
 	}
+}
+
+// RecordFromLogMessage maps one runner log message to an NDJSON live-log record.
+func RecordFromLogMessage(message string) map[string]any {
+	if rec, ok := parseRunnerControlRecord(message); ok {
+		return rec
+	}
+	return map[string]any{"type": "line", "text": message}
 }
 
 func parseRunnerControlRecord(message string) (map[string]any, bool) {

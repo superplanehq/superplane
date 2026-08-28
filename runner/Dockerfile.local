@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+# Context: repository root — docker build -f runner/Dockerfile.local .
+#
+# Local-dev image with host-mode interpreters (bash, python3, node) plus Docker CLI.
+# Mount the daemon socket for execution_mode=docker:
+#   -v /var/run/docker.sock:/var/run/docker.sock
+
+FROM golang:1.25-alpine AS build
+RUN apk add --no-cache git
+WORKDIR /workspace
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./runner/cmd/runner
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/mint-runner-registration ./scripts/mint-runner-registration
+
+FROM alpine:3.20
+RUN apk add --no-cache bash ca-certificates docker-cli python3 nodejs git
+COPY --from=build /out/runner /usr/local/bin/runner
+COPY --from=build /out/mint-runner-registration /usr/local/bin/mint-runner-registration
+COPY runner/local-entrypoint.sh /usr/local/bin/local-entrypoint.sh
+RUN chmod +x /usr/local/bin/local-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/local-entrypoint.sh"]

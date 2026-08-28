@@ -18,6 +18,7 @@ import (
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
 	"github.com/superplane/runner/task-broker/internal/dispatch"
+	"github.com/superplane/runner/task-broker/internal/livelogs"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
@@ -42,6 +43,8 @@ type Server struct {
 	TaskCloudWatchLogGroup        string
 	TaskCloudWatchLogStreamPrefix string
 	TaskCloudWatchRegion          string
+
+	LiveLogs *livelogs.Hub
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
@@ -782,6 +785,7 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not complete task")
 		return
 	}
+	s.closeLiveLogs(id)
 	if s.RunnerDrain != nil {
 		s.RunnerDrain.CompleteTask(runnerID, id)
 	}
@@ -806,6 +810,7 @@ func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
 		return
 	case taskstore.CancelOutcomeCanceledQueued:
 		s.recordTaskCompleted(r.Context(), task)
+		s.closeLiveLogs(id)
 		go s.DeliverWebhook(task)
 	case taskstore.CancelOutcomeCancelRequested:
 		rid := strings.TrimSpace(task.RunnerID)

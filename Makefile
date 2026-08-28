@@ -18,12 +18,15 @@ LOCAL_STACK_AUTH_TOKEN ?= dev-local-token
 LOCAL_FLEET_ID ?= local
 LOCAL_RUNNER_TRANSPORT ?= http
 LOCAL_RUNNER_SHELL_USE_PIPE ?= 1
+TASK_BROKER_HOST_PORT ?= 8091
+AUTH_TOKEN ?= $(LOCAL_STACK_AUTH_TOKEN)
+export TASK_BROKER_HOST_PORT AUTH_TOKEN
 
 # Number of runner processes for `make runner` (default 1).
 N ?= 1
 
 .PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-linux-arm64 runner-linux-all runner-publish-s3 runner-publish-s3-all
-.PHONY: fleet-manager task-broker runner register-local-fleet local-dev-help
+.PHONY: dev dev.down fleet-manager task-broker runner register-local-fleet register-superplane-fleets local-dev-help
 
 build:
 	go build -o bin/fleet-manager ./fleet-manager/cmd/fleet-manager
@@ -34,11 +37,33 @@ test:
 	go test ./...
 
 local-dev-help:
-	@echo "Local dev (separate terminals):"
+	@echo "Local dev:"
+	@echo "  make dev"
+	@echo "  make dev.down"
+	@echo "Manual (separate terminals):"
 	@echo "  make task-broker"
 	@echo "  make register-local-fleet"
+	@echo "  make register-superplane-fleets"
 	@echo "  make runner N=3"
 	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
+
+# One-command local stack: Postgres, task-broker, SuperPlane fleets, one worker.
+# Broker is on host port 8091 (8081 is SuperPlane pgweb). SuperPlane app in Docker
+# should use TASK_BROKER_BASE_URL=http://host.docker.internal:8091
+dev:
+	docker compose up -d --wait --build
+	@echo "Local runner stack is up."
+	@echo "  broker: http://127.0.0.1:$(TASK_BROKER_HOST_PORT)"
+	@echo "  AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN)"
+	@echo "  fleet_id=$(LOCAL_FLEET_ID)"
+	@echo "SuperPlane (.env or compose override):"
+	@echo "  TASK_BROKER_BASE_URL=http://host.docker.internal:$(TASK_BROKER_HOST_PORT)"
+	@echo "  TASK_BROKER_PUBLIC_URL=http://localhost:$(TASK_BROKER_HOST_PORT)"
+	@echo "  TASK_BROKER_AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN)"
+	@echo "  TASK_BROKER_FLEET_ID=$(LOCAL_FLEET_ID)"
+
+dev.down:
+	docker compose down
 
 # Long-running: run in its own terminal. Requires a JSON config; set FM_CONFIG_FILE.
 # Example:
@@ -59,6 +84,18 @@ register-local-fleet:
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
 		-d '{"id":"$(LOCAL_FLEET_ID)","provisioner":"local","arch":"amd64","size":"local"}'
+
+# Registers SuperPlane machine types plus LOCAL_FLEET_ID so canvas nodes can queue locally.
+SUPERPLANE_FLEET_IDS ?= local e1-large-amd64 e1-large-arm64 e1-tiny-amd64 e1-tiny-arm64
+register-superplane-fleets:
+	@set -e; \
+	for id in $(SUPERPLANE_FLEET_IDS); do \
+	  curl -fsS -X POST "$(LOCAL_BROKER_URL)/v1/fleets" \
+	    -H "Content-Type: application/json" \
+	    -H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
+	    -d "{\"id\":\"$$id\",\"provisioner\":\"local\",\"arch\":\"amd64\",\"size\":\"local\"}"; \
+	  echo; \
+	done
 
 # Blocks until all N runner processes exit. N=1 is one foreground-equivalent worker.
 runner: build

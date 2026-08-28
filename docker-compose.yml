@@ -18,11 +18,59 @@ services:
       context: .
       dockerfile: task-broker/Dockerfile
     ports:
-      - "8081:8081"
+      - "${TASK_BROKER_HOST_PORT:-8091}:8081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgres://broker:broker@db:5432/broker?sslmode=disable
-      AUTH_TOKEN: dev-token
+      AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
       LISTEN_ADDR: :8081
+      TASK_BROKER_LIVE_LOGS_CORS_ORIGINS: ${TASK_BROKER_LIVE_LOGS_CORS_ORIGINS:-http://localhost:8000,http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
+
+  task-broker-init:
+    image: curlimages/curl:8.11.1
+    depends_on:
+      - task-broker
+    restart: "no"
+    environment:
+      AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        i=0
+        while [ "$$i" -lt 60 ]; do
+          if curl -fsS http://task-broker:8081/healthz >/dev/null; then
+            break
+          fi
+          i=$$((i + 1))
+          sleep 1
+        done
+        curl -fsS http://task-broker:8081/healthz >/dev/null
+        for id in local e1-large-amd64 e1-large-arm64 e1-tiny-amd64 e1-tiny-arm64; do
+          curl -fsS -X POST http://task-broker:8081/v1/fleets \
+            -H "Authorization: Bearer $$AUTH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"id\":\"$$id\",\"provisioner\":\"local\",\"arch\":\"amd64\",\"size\":\"local\"}" >/dev/null
+        done
+
+  runner:
+    build:
+      context: .
+      dockerfile: runner/Dockerfile.local
+    environment:
+      TASK_BROKER_URL: http://task-broker:8081
+      RUNNER_FLEET_ID: local
+      RUNNER_TRANSPORT: http
+      RUNNER_SHELL_USE_PIPE: "1"
+      RUNNER_ID: local-1
+      BROKER_AUTH_TOKEN: ${AUTH_TOKEN:-dev-local-token}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      task-broker-init:
+        condition: service_completed_successfully
+    restart: on-failure

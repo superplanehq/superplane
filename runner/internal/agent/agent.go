@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/superplane/runner/runner/internal/brokerlive"
 	"github.com/superplane/runner/runner/internal/cloudwatchlog"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/cwstream"
@@ -404,11 +405,10 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 		}()
 	}
 
-	// Optional live-stream of stdout/stderr to CloudWatch Logs while the
-	// task runs. Task logs are read from CloudWatch (task_log on webhooks);
-	// completion payloads do not include inline output.
+	// Optional live-stream of stdout/stderr. CloudWatch when configured;
+	// otherwise POST chunks to task-broker for GET /v1/tasks/{id}/live-logs.
 	var live io.Writer
-	var cwClose func()
+	var liveClose func()
 	if g := strings.TrimSpace(a.Config.CloudWatchLogGroup); g != "" {
 		stream := cwstream.TaskLogStream(strings.TrimSpace(a.Config.CloudWatchLogStreamPrefix), task.ID)
 		sw, err := cloudwatchlog.NewStreamWriter(execCtx, cloudwatchlog.StreamConfig{
@@ -422,11 +422,15 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 			}
 		} else {
 			live = sw
-			cwClose = func() { _ = sw.Close() }
+			liveClose = func() { _ = sw.Close() }
 		}
+	} else if strings.TrimSpace(a.Config.BaseURL) != "" && strings.TrimSpace(a.Config.Token) != "" {
+		bw := brokerlive.NewWriter(a.HTTP, a.Config.BaseURL, a.Config.Token, task.ID)
+		live = bw
+		liveClose = func() { _ = bw.Close() }
 	}
-	if cwClose != nil {
-		defer cwClose()
+	if liveClose != nil {
+		defer liveClose()
 	}
 
 	exit, _, runErr := ex.Execute(execCtx, task, live, resultPath)
