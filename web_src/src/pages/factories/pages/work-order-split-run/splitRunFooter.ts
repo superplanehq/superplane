@@ -6,7 +6,7 @@ export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "d
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "reopen";
+export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "rerun" | "reopen";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -134,14 +134,61 @@ export interface SplitRunFooter {
   sentence: string;
   actions: SplitRunFooterAction[];
   note?: SplitRunFooterNote;
-  /** When true, the waiting or failed note renders as a sticky strip. */
+  /** When true, the decision note renders as a sticky strip. */
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
 }
 
+const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
+const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN: SplitRunFooterAction = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+
+export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
+  headline: "This task waits on a person",
+  text: "No automation is running. Click Approve if the result is good. Click Reject to close this task as rejected.",
+};
+
+export const SPLIT_RUN_FAILED_NOTE_TEXT =
+  "This automation failed. Open the run to review the error. Fix the automation, then click Rerun. Or close this task.";
+
+export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
+  headline: "This task is ready to start",
+  text: "Review the details. Change anything you need. Then click Start to send it to the line.",
+};
+
+export type SplitRunDecisionTone = "draft" | "waiting" | "failed" | "done" | "rejected";
+
+export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
+  if (footer.kind === "draft") {
+    return "draft";
+  }
+  if (footer.kind === "waiting") {
+    return "waiting";
+  }
+  if (footer.kind === "failed" || footer.status === "failed") {
+    return "failed";
+  }
+  if (footer.status === "rejected" || footer.status === "cancelled") {
+    return "rejected";
+  }
+  return "done";
+}
+
+function closedDecisionNote(status?: WorkOrderDisplayStatus): SplitRunFooterNote {
+  if (status === "rejected") {
+    return { headline: "This task is rejected", text: "Reopen this task if the work should continue." };
+  }
+  if (status === "cancelled") {
+    return { headline: "This task is canceled", text: "Reopen this task if the work should continue." };
+  }
+  if (status === "failed") {
+    return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
+  }
+  return { headline: "This task is completed", text: "Reopen this task if more work is needed." };
+}
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
   return {
@@ -155,68 +202,90 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 }
 
 /**
- * Header actions for the work-order popup. Draft keeps Start.
- * Open orders have no close actions in the header. Closed orders keep Reopen.
- * A visible waiting note sits under the log as an attention card.
+ * Decision strip for the work-order popup. Running has no strip. Other
+ * states keep Reject, Approve, Rerun, Start, or Reopen on the note, not in the
+ * header.
  */
-export function buildSplitRunFooter(input: {
+type FooterInput = {
   kind: SplitRunFooterKind;
   note?: WorkOrderStatusNotePresentation;
   doneSummary?: string;
-  attentionCard?: boolean;
+  /** When false, hide the decision strip. Used while a follow-up run is active. */
+  decision?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
-}): SplitRunFooter {
-  const note = input.note ? toFooterNote(input.note) : undefined;
-  const attentionCard = input.attentionCard || undefined;
-  const withStatus = (footer: SplitRunFooter): SplitRunFooter =>
-    input.status ? { ...footer, status: input.status } : footer;
-  if (input.kind === "draft") {
-    return withStatus({ kind: "draft", sentence: "This work order is a draft.", note, actions: [START] });
-  }
-  if (isClosedWorkOrderDisplayStatus(input.status) || input.kind === "done") {
-    if (input.kind === "failed") {
-      return withStatus({
-        kind: "failed",
-        sentence: "This work order needs attention.",
-        note,
-        attentionCard,
-        run: input.run,
-        actions: [REOPEN],
-      });
-    }
-    return withStatus({
-      kind: "done",
-      sentence: input.doneSummary ?? getWorkOrderDisplayStatusMeta(input.status ?? "completed").summary,
-      note,
+};
+
+function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
+  const next = input.status ? { ...footer, status: input.status } : footer;
+  return input.run ? { ...next, run: input.run } : next;
+}
+
+function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  return withFooterMeta(input, {
+    kind: input.kind,
+    sentence: input.kind === "running" ? "This work order is running." : "This work order needs attention.",
+    note,
+    actions: [],
+  });
+}
+
+function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  return withFooterMeta(input, {
+    kind: "draft",
+    sentence: "This work order is a draft.",
+    note,
+    attentionCard: true,
+    actions: [REJECT, START],
+  });
+}
+
+function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  const closedNote = note ?? closedDecisionNote(input.status);
+  if (input.kind === "failed") {
+    return withFooterMeta(input, {
+      kind: "failed",
+      sentence: "This work order needs attention.",
+      note: closedNote,
+      attentionCard: true,
       actions: [REOPEN],
     });
   }
-  if (input.kind === "running") {
-    return withStatus({
-      kind: "running",
-      sentence: "This work order is running.",
-      note,
-      run: input.run,
-      actions: [],
-    });
-  }
-  if (input.kind === "waiting" || input.kind === "failed") {
-    return withStatus({
-      kind: input.kind,
-      sentence: "This work order needs attention.",
-      note,
-      attentionCard,
-      run: input.run,
-      actions: [],
-    });
-  }
-  return withStatus({
+  return withFooterMeta(input, {
     kind: "done",
-    sentence: input.doneSummary ?? getWorkOrderDisplayStatusMeta("completed").summary,
-    note,
+    sentence: input.doneSummary ?? getWorkOrderDisplayStatusMeta(input.status ?? "completed").summary,
+    note: closedNote,
+    attentionCard: true,
     actions: [REOPEN],
   });
+}
+
+function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  const actions = input.kind === "failed" ? [REJECT, RERUN] : [REJECT, APPROVE];
+  return withFooterMeta(input, {
+    kind: input.kind,
+    sentence: "This work order needs attention.",
+    note: note ?? (input.kind === "waiting" ? { ...SPLIT_RUN_WAITING_NOTE } : undefined),
+    attentionCard: true,
+    actions,
+  });
+}
+
+export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {
+  const note = input.note ? toFooterNote(input.note) : undefined;
+  if (input.kind === "running" || input.decision === false) {
+    return hiddenDecisionFooter(input, note);
+  }
+  if (input.kind === "draft") {
+    return draftDecisionFooter(input, note);
+  }
+  if (isClosedWorkOrderDisplayStatus(input.status) || input.kind === "done") {
+    return closedDecisionFooter(input, note);
+  }
+  if (input.kind === "waiting" || input.kind === "failed") {
+    return openDecisionFooter(input, note);
+  }
+  return closedDecisionFooter({ ...input, kind: "done" }, note);
 }
 
 export function doneFooterForStatus(status: WorkOrderDisplayStatus): SplitRunFooter {

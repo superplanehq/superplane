@@ -12,7 +12,12 @@ import {
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckDialog } from "../../WorkOrderCheckDialog";
 import { SplitRunAttentionNote } from "./SplitRunAttentionNote";
-import type { SplitRunFooter } from "./splitRunFooter";
+import {
+  splitRunDecisionTone,
+  type SplitRunFooter,
+  type SplitRunFooterAction,
+  type SplitRunStopChoice,
+} from "./splitRunFooter";
 
 const PILL_TONE: Record<WorkOrderCheckLevel, string> = {
   positive: "border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
@@ -41,7 +46,7 @@ function reviewRunHref(
 }
 
 /**
- * Attention note under Description and Automations. Actions live in the header.
+ * Decision note under Description and Automations. Header stays Close only.
  */
 export function SplitRunReview({
   footer,
@@ -49,24 +54,65 @@ export function SplitRunReview({
   organizationId,
   factoryKey,
   orderNumber,
+  canAct = true,
+  onStart,
+  onReject,
+  onStop,
+  startBusy = false,
+  actionBusy = false,
+  startDisabled = false,
 }: {
   footer: SplitRunFooter;
   className?: string;
   organizationId?: string;
   factoryKey?: string;
   orderNumber?: string;
+  canAct?: boolean;
+  onStart?: () => void | Promise<void>;
+  onReject?: () => void | Promise<void>;
+  onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+  startBusy?: boolean;
+  actionBusy?: boolean;
+  startDisabled?: boolean;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
   }
   const runHref = reviewRunHref(organizationId, factoryKey, footer.run, orderNumber);
+  const actions = canAct ? footer.actions : [];
+  const onAction = (action: SplitRunFooterAction) => {
+    if (action.kind === "start") {
+      void onStart?.();
+      return;
+    }
+    if (action.kind === "reject") {
+      void onReject?.();
+      return;
+    }
+    if (action.kind === "approve") {
+      void onStop?.("completed");
+      return;
+    }
+    if (action.kind === "rerun") {
+      void onStop?.("rerun-step");
+      return;
+    }
+    if (action.kind === "reopen") {
+      void onStop?.("reopen");
+    }
+  };
 
   return (
     <div className={cn("shrink-0", className)} data-testid="split-run-review">
       <SplitRunAttentionNote
         note={footer.note}
-        tone={footer.kind === "failed" ? "failed" : "waiting"}
+        tone={splitRunDecisionTone(footer)}
+        actions={actions}
         runHref={runHref}
+        actionBusy={actionBusy}
+        startBusy={startBusy}
+        startDisabled={startDisabled}
+        onAction={onAction}
       />
     </div>
   );
