@@ -283,7 +283,7 @@ export function LinesPage() {
 
   const closePeek = () => {
     setPeekHint(null);
-    navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id));
+    navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id), { replace: true });
   };
 
   return (

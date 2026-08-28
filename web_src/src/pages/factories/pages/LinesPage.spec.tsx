@@ -305,6 +305,26 @@ describe("LinesPage board", () => {
     );
   });
 
+  it("does not reopen the popup when Back is pressed after Close", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+    expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+
+    await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
+    await waitFor(() => {
+      expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByTestId("lines-test-back"));
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+    );
+  });
+
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     renderLinesBoard();
