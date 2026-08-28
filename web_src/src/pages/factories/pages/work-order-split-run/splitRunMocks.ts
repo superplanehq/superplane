@@ -1015,17 +1015,21 @@ function missingEarlierStepIndexes(present: Set<number>): number[] {
 }
 
 function pickCurrentExecution(executions: FactoriesWorkOrderExecution[]): FactoriesWorkOrderExecution | undefined {
-  const active = executions.filter(
+  const inFlight = executions.filter(
     (execution) =>
       execution.state === "STATE_STARTED" ||
       execution.state === "STATE_PENDING" ||
-      execution.state === "STATE_CANCELLING" ||
-      execution.result === "RESULT_FAILED",
+      execution.state === "STATE_CANCELLING",
   );
-  const pool = active.length > 0 ? active : executions;
+  const pool = inFlight.length > 0 ? inFlight : executions;
   return pool.reduce<FactoriesWorkOrderExecution | undefined>((best, candidate) => {
     if (!best) {
       return candidate;
+    }
+    const bestAt = Date.parse(best.updatedAt ?? best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.updatedAt ?? candidate.createdAt ?? "") || 0;
+    if (candidateAt !== bestAt) {
+      return candidateAt > bestAt ? candidate : best;
     }
     return (candidate.stepIndex ?? -1) >= (best.stepIndex ?? -1) ? candidate : best;
   }, undefined);

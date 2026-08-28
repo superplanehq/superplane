@@ -569,6 +569,48 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Pending");
   });
 
+  it("does not treat an earlier failed step as the current footer when a later step passed", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Chore: Add health check endpoint",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          dispatch("STATE_FINISHED", [
+            {
+              id: "e-impl-5",
+              step: "Implement",
+              stepIndex: 5,
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              updatedAt: "2026-08-28T10:00:00.000Z",
+            },
+            {
+              id: "e-impl-6",
+              step: "Implement",
+              stepIndex: 6,
+              state: "STATE_FINISHED",
+              result: "RESULT_CANCELLED",
+              updatedAt: "2026-08-28T10:10:00.000Z",
+            },
+            {
+              id: "e-impl-7",
+              step: "Implement",
+              stepIndex: 7,
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              updatedAt: "2026-08-28T11:00:00.000Z",
+            },
+          ]),
+        ],
+      }),
+    );
+
+    expect(fixture.footerTone).toBe("waiting");
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.note?.headline).toBe("This task needs a decision");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Approve"]);
+  });
+
   it("marks a failed implement step as failed", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
