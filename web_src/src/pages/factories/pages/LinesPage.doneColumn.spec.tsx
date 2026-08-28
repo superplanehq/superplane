@@ -125,8 +125,8 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-column-title-phase-1")).toBeInTheDocument();
     expect(screen.getByTestId("lines-column-title-verify")).toHaveTextContent("Verify");
     expect(screen.getByTestId("lines-column-title-done")).toHaveTextContent("Done");
-    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No work orders in Done.");
-    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No work orders in Verify.");
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
@@ -168,7 +168,7 @@ describe("LinesPage Done column", () => {
     const done = screen.getByTestId("lines-done-column");
     expect(within(done).getByRole("button", { name: "Open Publish refund SLA dashboard" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
-    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No work orders in Verify.");
+    expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
   });
 
   it("keeps the bookend Done column when the line has its own Done automation", () => {
