@@ -471,13 +471,16 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 }
 
 func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
-	if err := tx.Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
+	if err := tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
 		return err
 	}
 	if len(o.Assignees) == 1 && o.Assignees[0].UserID == actor {
 		return nil
 	}
-	return o.UpdateAssignees(tx, []uuid.UUID{actor}, actor)
+	if err := o.UpdateAssignees(tx, []uuid.UUID{actor}, actor); err != nil {
+		return err
+	}
+	return tx.Preload("User").Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error
 }
 
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {

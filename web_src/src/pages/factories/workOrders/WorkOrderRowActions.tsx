@@ -3,7 +3,6 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { cn } from "@/lib/utils";
 import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";

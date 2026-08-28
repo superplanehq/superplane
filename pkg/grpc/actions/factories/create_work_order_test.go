@@ -29,5 +29,6 @@ func Test__CreateWorkOrder__AssignsTheCreator(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.Order.Assignees, 1)
 	assert.Equal(t, r.User.String(), resp.Order.Assignees[0].Id)
+	assert.Equal(t, r.UserModel.Name, resp.Order.Assignees[0].Name)
 	assert.Equal(t, r.User.String(), resp.Order.GetCreatedBy().GetUser().GetId())
 }
