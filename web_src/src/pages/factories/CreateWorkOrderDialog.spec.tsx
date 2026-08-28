@@ -9,7 +9,6 @@ import {
   REFUND_FACTORY,
 } from "./__fixtures__/factoryPageResponses";
 import { CreateWorkOrderDialog } from "./CreateWorkOrderDialog";
-import type * as CreateWorkOrderPropertyPillsModule from "./CreateWorkOrderPropertyPills";
 import { FactoriesLayoutContext } from "./layout/factoriesLayoutContext";
 
 const { canAct, permissions, createMutate, dispatchMutate, meUser } = vi.hoisted(() => ({
@@ -39,16 +38,6 @@ vi.mock("@/contexts/usePermissions", () => ({
 vi.mock("./WorkOrderDescriptionEditor", () => ({
   WorkOrderDescriptionEditor: () => <div data-testid="work-order-description-input" />,
 }));
-
-vi.mock("./CreateWorkOrderPropertyPills", async () => {
-  const actual = await vi.importActual<typeof CreateWorkOrderPropertyPillsModule>("./CreateWorkOrderPropertyPills");
-  return {
-    ...actual,
-    CreateWorkOrderPropertyPills: (props: { assigneeIds: string[] }) => (
-      <div data-testid="mock-owner-pill">{props.assigneeIds.join(",") || "no owner"}</div>
-    ),
-  };
-});
 
 function renderDialog(factory = REFUND_FACTORY) {
   return render(
@@ -100,17 +89,12 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.queryByTestId("work-order-line-picker-panel")).not.toBeInTheDocument();
   });
 
-  it("defaults Owner to the current user without any click", () => {
+  it("does not show an owner picker", () => {
     meUser.current = { id: "user-me", name: "Me" };
     renderDialog();
 
-    expect(screen.getByTestId("mock-owner-pill")).toHaveTextContent("user-me");
-  });
-
-  it("leaves Owner empty when there is no current user", () => {
-    renderDialog();
-
-    expect(screen.getByTestId("mock-owner-pill")).toHaveTextContent("no owner");
+    expect(screen.queryByTestId("work-order-assignees-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mock-owner-pill")).not.toBeInTheDocument();
   });
 
   it("disables Start when the user cannot dispatch work orders", () => {

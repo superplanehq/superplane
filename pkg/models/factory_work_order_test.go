@@ -308,6 +308,60 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org, creatorID, factoryModel := setupFactoryWithUser(t, "assign-on-start")
+	starter := createOrgUser(t, org.ID, "starter")
+
+	t.Run("assigns the person who opens an unassigned draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Intake draft", "", nil, nil, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &starter.ID,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("replaces the creator when someone else starts the draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Manual draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &starter.ID,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("leaves assignees unchanged when no person opens the draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, creatorID, loaded.Assignees[0].UserID)
+	})
+}
+
 func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -984,6 +1038,21 @@ func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userI
 	require.NoError(t, err)
 
 	return organization, user.ID, factoryModel
+}
+
+func createOrgUser(t *testing.T, orgID uuid.UUID, prefix string) *User {
+	t.Helper()
+
+	nonce := time.Now().UnixNano()
+	account, err := CreateAccount(
+		fmt.Sprintf("%s %d", prefix, nonce),
+		fmt.Sprintf("%s-%d@example.com", prefix, nonce),
+	)
+	require.NoError(t, err)
+
+	user, err := CreateUser(orgID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	return user
 }
 
 func eventTypes(events []FactoryWorkOrderEvent) []string {

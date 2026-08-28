@@ -11,7 +11,6 @@ import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, Play, XIcon
 import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
-import { CreateWorkOrderPropertyPills } from "./CreateWorkOrderPropertyPills";
 import { firstFactoryLineName } from "./lib/factoryPagePaths";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
@@ -107,15 +106,11 @@ function CreateWorkOrderDialogSession({
         </div>
 
         <CreateWorkOrderDialogFooter
-          organizationId={organizationId}
-          assigneeIds={composer.assigneeIds}
           lines={lines}
-          isSaving={composer.isSaving}
           canDispatch={canDispatch}
           canSaveDraft={composer.canSaveDraft}
           isSavingDraft={composer.isSavingDraft}
           isSendingToLine={composer.isSendingToLine}
-          onAssigneeChange={composer.setAssigneeIds}
           onSaveDraft={() => void composer.handleSaveDraft()}
           onStart={() => {
             const lineName = firstFactoryLineName({ lines });
@@ -178,39 +173,24 @@ function CreateWorkOrderDialogHeader({
 }
 
 function CreateWorkOrderDialogFooter({
-  organizationId,
-  assigneeIds,
   lines,
-  isSaving,
   canDispatch,
   canSaveDraft,
   isSavingDraft,
   isSendingToLine,
-  onAssigneeChange,
   onSaveDraft,
   onStart,
 }: {
-  organizationId: string;
-  assigneeIds: string[];
   lines: FactoriesFactoryLine[];
-  isSaving: boolean;
   canDispatch: boolean;
   canSaveDraft: boolean;
   isSavingDraft: boolean;
   isSendingToLine: boolean;
-  onAssigneeChange: (ids: string[]) => void;
   onSaveDraft: () => void;
   onStart: () => void;
 }) {
   return (
-    <div className="relative z-10 flex items-center justify-between gap-3 border-t border-border px-4 py-3">
-      <CreateWorkOrderPropertyPills
-        organizationId={organizationId}
-        assigneeIds={assigneeIds}
-        isSaving={isSaving}
-        onAssigneeChange={onAssigneeChange}
-      />
-
+    <div className="relative z-10 flex items-center justify-end gap-3 border-t border-border px-4 py-3">
       <div className="flex shrink-0 items-center gap-2">
         <LoadingButton
           type="button"
