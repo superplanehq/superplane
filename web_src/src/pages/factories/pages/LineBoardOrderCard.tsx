@@ -25,7 +25,7 @@ export function LineBoardOrderCard({
       isAnalyzing={isAnalyzing}
       onOpen={() => {
         if (order.id) {
-          onOpenWorkOrder(order.id);
+          onOpenWorkOrder(order.id, order);
         }
       }}
     />
