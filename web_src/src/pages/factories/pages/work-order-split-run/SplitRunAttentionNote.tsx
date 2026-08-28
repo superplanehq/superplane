@@ -41,8 +41,8 @@ const TONE = {
 } as const;
 
 /**
- * Sticky decision note. CTA and close actions sit under the copy, aligned
- * to the right. No Update manually, no source time.
+ * Sticky decision note. Actions sit beside the copy. No Update manually,
+ * no source time.
  */
 export function SplitRunAttentionNote({
   note,
@@ -68,7 +68,7 @@ export function SplitRunAttentionNote({
 
   return (
     <div className={cn("border-t px-4 py-3", visual.strip)} data-testid="split-run-attention-note">
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <span
           className={cn("flex size-8 shrink-0 items-center justify-center rounded-full", visual.iconWrap)}
           aria-hidden
@@ -83,16 +83,16 @@ export function SplitRunAttentionNote({
               <MarkdownContent content={note.text} variant="workspace" />
             </div>
           ) : null}
-          <NoteActionRow
-            note={note}
-            actions={actions}
-            runHref={runHref}
-            actionBusy={actionBusy}
-            startBusy={startBusy}
-            startDisabled={startDisabled}
-            onAction={onAction}
-          />
         </div>
+        <NoteActionRow
+          note={note}
+          actions={actions}
+          runHref={runHref}
+          actionBusy={actionBusy}
+          startBusy={startBusy}
+          startDisabled={startDisabled}
+          onAction={onAction}
+        />
       </div>
     </div>
   );
@@ -122,7 +122,7 @@ function NoteActionRow({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
       {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} /> : null}
       {actions.map((action) => (
         <NoteAction

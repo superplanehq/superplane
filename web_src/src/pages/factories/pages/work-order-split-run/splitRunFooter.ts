@@ -179,7 +179,10 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
 
 function closedDecisionNote(status?: WorkOrderDisplayStatus): SplitRunFooterNote {
   if (status === "rejected") {
-    return { headline: "This task is rejected", text: "Reopen this task if the work should continue." };
+    return {
+      headline: "This task is rejected",
+      text: "A person closed this task. The line automations did not finish the work.",
+    };
   }
   if (status === "cancelled") {
     return { headline: "This task is canceled", text: "Reopen this task if the work should continue." };
@@ -187,7 +190,17 @@ function closedDecisionNote(status?: WorkOrderDisplayStatus): SplitRunFooterNote
   if (status === "failed") {
     return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
   }
-  return { headline: "This task is completed", text: "Reopen this task if more work is needed." };
+  return {
+    headline: "This task finished successfully",
+    text: "The line automations completed every step.",
+  };
+}
+
+function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
+  if (status === "completed" || status === "rejected") {
+    return [];
+  }
+  return [REOPEN];
 }
 
 export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFooterNote {
@@ -202,9 +215,9 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 }
 
 /**
- * Decision strip for the work-order popup. Running has no strip. Other
- * states keep Reject, Approve, Rerun, Start, or Reopen on the note, not in the
- * header.
+ * Decision strip for the work-order popup. Running has no strip. Open
+ * states keep Reject, Approve, Rerun, or Start on the note. Closed failed
+ * keeps Reopen. Completed and rejected explain the result only.
  */
 type FooterInput = {
   kind: SplitRunFooterKind;
@@ -251,7 +264,7 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
       sentence: "This work order needs attention.",
       note: closedNote,
       attentionCard: true,
-      actions: [REOPEN],
+      actions: closedDecisionActions(input.status ?? "failed"),
     });
   }
   return withFooterMeta(input, {
@@ -259,7 +272,7 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
     sentence: input.doneSummary ?? getWorkOrderDisplayStatusMeta(input.status ?? "completed").summary,
     note: closedNote,
     attentionCard: true,
-    actions: [REOPEN],
+    actions: closedDecisionActions(input.status ?? "completed"),
   });
 }
 

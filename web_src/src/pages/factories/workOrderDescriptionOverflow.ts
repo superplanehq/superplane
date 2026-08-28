@@ -1,4 +1,5 @@
 export const FALLBACK_COLLAPSED_MAX_HEIGHT_PX = 220;
+export const MIN_COLLAPSED_DESCRIPTION_HEIGHT_PX = 100;
 export const DESCRIPTION_TOGGLE_RESERVE_PX = 32;
 const HEIGHT_SLACK_PX = 4;
 
@@ -30,7 +31,7 @@ export function descriptionNeedsCollapse(contentHeight: number, paneCapacity: nu
 }
 
 export function collapsedDescriptionMaxHeight(paneCapacity: number): number {
-  return Math.max(0, paneCapacity - DESCRIPTION_TOGGLE_RESERVE_PX);
+  return Math.max(MIN_COLLAPSED_DESCRIPTION_HEIGHT_PX, paneCapacity - DESCRIPTION_TOGGLE_RESERVE_PX);
 }
 
 export function nearestScrollParent(element: HTMLElement): HTMLElement | null {

@@ -94,6 +94,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(within(note).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
   });

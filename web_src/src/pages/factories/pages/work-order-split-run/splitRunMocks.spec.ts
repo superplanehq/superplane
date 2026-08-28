@@ -308,7 +308,11 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.waitingNotes).toEqual([]);
     expect(done.footerTone).toBe("done");
     expect(done.footer.sentence).toBe("Work order completed successfully.");
-    expect(done.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(done.footer.actions).toEqual([]);
+    expect(done.footer.note).toEqual({
+      headline: "This task finished successfully",
+      text: "The line automations completed every step.",
+    });
   });
 
   it("keeps a completed order on the done footer when a leftover step failed", () => {
@@ -326,7 +330,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
 
     expect(fixture.footerTone).toBe("done");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(fixture.footer.actions).toEqual([]);
     expect(fixture.footer.status).toBe("completed");
   });
 
@@ -953,6 +957,11 @@ describe("line board work-order examples", () => {
     expect(fixture.phases.find((phase) => phase.id === "done-2")?.stream[0]?.pullRequest).toMatchObject({
       state: "STATE_CLOSED",
     });
+    expect(fixture.footer.note).toEqual({
+      headline: "This task is rejected",
+      text: "A person closed this task. The line automations did not finish the work.",
+    });
+    expect(fixture.footer.actions).toEqual([]);
   });
 
   it("keeps ingest analysis and a cancel note on the canceled done card", () => {
@@ -985,7 +994,7 @@ describe("line board work-order examples", () => {
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.appId).toBe("app-refund-implementer");
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.runId).toBe(LINE_RUN_IMPLEMENT_NOTIFY_ID);
     expect(fixture.footer.sentence).toBe("Work order completed successfully.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reopen"]);
+    expect(fixture.footer.actions).toEqual([]);
     expect(
       fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
     ).toEqual([
