@@ -4,10 +4,13 @@ import {
   canvasesInvokeNodeTriggerHook,
   canvasesListCanvases,
   canvasesPutCanvasStaging,
+  factoriesListFactoryApps,
   type CanvasesCanvasSummary,
+  type FactoryApp,
 } from "@/api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import { canvasKeys } from "@/hooks/useCanvasData";
+import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -101,14 +104,34 @@ export async function materializeAndCommitFactoryTemplate(args: {
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
 }
 
-async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient) {
+function presentNames(items: { name?: string }[]): string[] {
+  return items.map((item) => item.name).filter((name): name is string => Boolean(name));
+}
+
+/**
+ * Lists the names already taken in the scope the new canvas competes with:
+ * the workspace when the canvas belongs to one, the organization otherwise.
+ */
+async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient, workspaceFactoryId?: string) {
+  if (workspaceFactoryId) {
+    const cachedApps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, workspaceFactoryId));
+    if (cachedApps) {
+      return presentNames(cachedApps);
+    }
+
+    const appsResponse = await factoriesListFactoryApps(
+      withOrganizationHeader({ organizationId, path: { factoryId: workspaceFactoryId } }),
+    );
+    return presentNames(appsResponse.data?.apps ?? []);
+  }
+
   const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
   if (cached) {
-    return cached.map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
+    return presentNames(cached);
   }
 
   const response = await canvasesListCanvases(withOrganizationHeader({ organizationId }));
-  return (response.data?.canvases ?? []).map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
+  return presentNames(response.data?.canvases ?? []);
 }
 
 async function createCanvasWithUniqueName(args: {
@@ -182,7 +205,9 @@ export async function ensureFactoryCanvas(args: {
 
   if (args.pending) return args.pending;
 
-  const existingNames = new Set(await listExistingCanvasNames(args.organizationId, args.queryClient));
+  const existingNames = new Set(
+    await listExistingCanvasNames(args.organizationId, args.queryClient, args.workspaceFactoryId),
+  );
   const created = await createCanvasWithUniqueName({
     title: args.definition.title,
     description: args.definition.description,
