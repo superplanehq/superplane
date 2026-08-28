@@ -84,20 +84,21 @@ type LLMUsageEventInput struct {
 }
 
 // RecordUsage inserts one factory-linked usage row and copies ledger totals
-// into the step cache so in-progress work orders show spend. Non-factory
-// runs are skipped. Each billed call gets its own row, including retries
-// of the same node execution.
+// into the line-step cache when the run belongs to a line execution.
+// Factory canvases without a line step (Backlog analysis, PR feedback)
+// still persist. Org canvases are skipped. Each billed call gets its own
+// row, including retries of the same node execution.
 func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	if in.Provider == "" || in.Model == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
 		return fmt.Errorf("llm usage event requires provider, model, node execution, and canvas run")
 	}
 
-	execution, err := FindWorkOrderExecutionForRun(tx, in.CanvasRunID)
+	scope, err := resolveUsageScope(tx, in.CanvasRunID)
 	if err != nil {
-		if errors.Is(err, ErrFactoryWorkOrderExecutionNotFound) {
-			return nil
-		}
 		return err
+	}
+	if scope == nil {
+		return nil
 	}
 
 	total := in.TotalTokens
@@ -132,7 +133,7 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 
 	billedMicros := providerCostMicros
 	if fundingSource == UsageFundingSourceHosted {
-		markupBPS, markupErr := ResolveOrganizationMarkupBPS(tx, execution.OrganizationID)
+		markupBPS, markupErr := ResolveOrganizationMarkupBPS(tx, scope.OrganizationID)
 		if markupErr != nil {
 			return markupErr
 		}
@@ -142,12 +143,12 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	now := time.Now()
 	event := LLMUsageEvent{
 		ID:                   uuid.New(),
-		OrganizationID:       execution.OrganizationID,
-		FactoryID:            &execution.FactoryID,
-		WorkOrderID:          &execution.WorkOrderID,
-		LineID:               &execution.LineID,
-		LineDispatchID:       &execution.LineDispatchID,
-		WorkOrderExecutionID: &execution.ID,
+		OrganizationID:       scope.OrganizationID,
+		FactoryID:            &scope.FactoryID,
+		WorkOrderID:          scope.WorkOrderID,
+		LineID:               scope.LineID,
+		LineDispatchID:       scope.LineDispatchID,
+		WorkOrderExecutionID: scope.WorkOrderExecutionID,
 		CanvasRunID:          in.CanvasRunID,
 		NodeExecutionID:      in.NodeExecutionID,
 		NodeID:               in.NodeID,
@@ -178,8 +179,10 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		return err
 	}
 
-	if err := execution.RollupUsage(tx); err != nil {
-		return err
+	if scope.execution != nil {
+		if err := scope.execution.RollupUsage(tx); err != nil {
+			return err
+		}
 	}
 	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
 }
@@ -224,6 +227,104 @@ func (t UsageTotals) CostCents() int64 {
 
 func (r UsageByModel) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
+}
+
+type usageSumRow struct {
+	ID          uuid.UUID
+	TotalTokens int64
+	CostMicros  int64
+}
+
+func scanUsageSums(rows []usageSumRow) map[uuid.UUID]UsageTotals {
+	result := make(map[uuid.UUID]UsageTotals, len(rows))
+	for _, row := range rows {
+		result[row.ID] = UsageTotals{TotalTokens: row.TotalTokens, CostMicros: row.CostMicros}
+	}
+	return result
+}
+
+// SumUsageForWorkOrders returns ledger totals keyed by work order. Missing
+// IDs are absent from the map (zero value).
+func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]UsageTotals, error) {
+	if len(workOrderIDs) == 0 {
+		return map[uuid.UUID]UsageTotals{}, nil
+	}
+
+	var rows []usageSumRow
+	err := tx.Model(&LLMUsageEvent{}).
+		Select("work_order_id AS id, COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+		Where("work_order_id IN ?", workOrderIDs).
+		Group("work_order_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return scanUsageSums(rows), nil
+}
+
+// SumUsageForRunTrees returns ledger totals for each root run, including
+// spend recorded on descendant runs.
+func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageTotals, error) {
+	result := make(map[uuid.UUID]UsageTotals, len(rootIDs))
+	if len(rootIDs) == 0 {
+		return result, nil
+	}
+
+	rootOf := make(map[uuid.UUID]uuid.UUID, len(rootIDs))
+	treeIDs := make([]uuid.UUID, 0, len(rootIDs))
+	for _, id := range rootIDs {
+		rootOf[id] = id
+		treeIDs = append(treeIDs, id)
+	}
+
+	frontier := append([]uuid.UUID{}, rootIDs...)
+	for len(frontier) > 0 {
+		var children []CanvasRun
+		err := tx.Select("id", "parent_run_id").Where("parent_run_id IN ?", frontier).Find(&children).Error
+		if err != nil {
+			return nil, err
+		}
+
+		frontier = frontier[:0]
+		for i := range children {
+			child := children[i]
+			if child.ParentRunID == nil {
+				continue
+			}
+			parentRoot, ok := rootOf[*child.ParentRunID]
+			if !ok {
+				continue
+			}
+			if _, seen := rootOf[child.ID]; seen {
+				continue
+			}
+			rootOf[child.ID] = parentRoot
+			treeIDs = append(treeIDs, child.ID)
+			frontier = append(frontier, child.ID)
+		}
+	}
+
+	var rows []usageSumRow
+	err := tx.Model(&LLMUsageEvent{}).
+		Select("canvas_run_id AS id, COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+		Where("canvas_run_id IN ?", treeIDs).
+		Group("canvas_run_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		rootID, ok := rootOf[row.ID]
+		if !ok {
+			continue
+		}
+		totals := result[rootID]
+		totals.TotalTokens += row.TotalTokens
+		totals.CostMicros += row.CostMicros
+		result[rootID] = totals
+	}
+	return result, nil
 }
 
 func usageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {

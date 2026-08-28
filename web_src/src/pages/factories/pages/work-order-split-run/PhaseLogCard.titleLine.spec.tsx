@@ -47,6 +47,19 @@ describe("PhaseLogCard title line", () => {
     expect(within(row).getByRole("button", { name: "Plan" }).querySelector(".lucide-chevron-right")).toBeNull();
   });
 
+  it("shows cost and tokens next to duration when the phase has spend", () => {
+    render(<PhaseLogCard phase={{ ...PHASE, costCents: "45", totalTokens: "1200" }} expanded={false} />);
+
+    const row = screen.getByTestId("split-run-phase-plan");
+    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("$0.45 · 1.2k · 01:00");
+  });
+
+  it("shows tokens alone when the phase has no dollar spend", () => {
+    render(<PhaseLogCard phase={{ ...PHASE, totalTokens: "1200" }} expanded={false} />);
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1.2k · 01:00");
+  });
+
   it("uses one mono face and size on the name and artifact", () => {
     render(
       <PhaseLogCard
