@@ -604,7 +604,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "A person stopped this automation" })).toBeInTheDocument();
-    expect(within(note).getByText("This automation did not finish. This task still needs a decision.")).toBeInTheDocument();
+    expect(
+      within(note).getByText("This automation did not finish. This task still needs a decision."),
+    ).toBeInTheDocument();
     const toBacklog = within(note).getByRole("button", { name: "To Backlog" });
     expect(toBacklog).toBeInTheDocument();
     expect(toBacklog.querySelector("svg.lucide-undo-2")).toBeTruthy();

@@ -162,11 +162,9 @@ export const SPLIT_RUN_WAITING_NOTE: SplitRunFooterNote = {
   text: "Every automation finished. This task is ready to complete.",
 };
 
-export const SPLIT_RUN_FAILED_NOTE_TEXT =
-  "This automation did not finish. Fix the error, then run this step again.";
+export const SPLIT_RUN_FAILED_NOTE_TEXT = "This automation did not finish. Fix the error, then run this step again.";
 
-export const SPLIT_RUN_STOPPED_NOTE_TEXT =
-  "This automation did not finish. This task still needs a decision.";
+export const SPLIT_RUN_STOPPED_NOTE_TEXT = "This automation did not finish. This task still needs a decision.";
 
 export const SPLIT_RUN_STOPPED_HEADLINE = "stopped this automation";
 export const SPLIT_RUN_STOPPED_HEADLINE_UNKNOWN = "A person stopped this automation";
@@ -301,17 +299,27 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
   });
 }
 
+function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooterNote {
+  if (input.status === "failed" || input.kind === "failed") {
+    return closedDecisionNote(input.status ?? "failed");
+  }
+  if (input.status === "completed" || input.status === "rejected") {
+    return closedDecisionNote(input.status, {
+      actor: input.actor,
+      automationName: input.automationName,
+    });
+  }
+  return (
+    note ??
+    closedDecisionNote(input.status, {
+      actor: input.actor,
+      automationName: input.automationName,
+    })
+  );
+}
+
 function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
-  const outcome = closedDecisionNote(input.status, {
-    actor: input.actor,
-    automationName: input.automationName,
-  });
-  const closedNote =
-    input.status === "failed" || input.kind === "failed"
-      ? closedDecisionNote(input.status ?? "failed")
-      : input.status === "completed" || input.status === "rejected"
-        ? outcome
-        : (note ?? outcome);
+  const closedNote = closedFooterNote(input, note);
   if (input.kind === "failed") {
     return withFooterMeta(input, {
       kind: "failed",

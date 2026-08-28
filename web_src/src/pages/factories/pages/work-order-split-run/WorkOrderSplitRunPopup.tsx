@@ -317,7 +317,10 @@ function returnToBacklogAction(
     return undefined;
   }
   return async () => {
-    await onBackToDraft();
+    const returned = await onBackToDraft();
+    if (returned === false) {
+      return;
+    }
     openDescription();
   };
 }

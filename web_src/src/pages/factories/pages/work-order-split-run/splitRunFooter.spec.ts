@@ -23,7 +23,7 @@ const FAILED_NOTE = {
   key: "implement-failed",
   headline: "Implement did not pass",
   text: "Backend tests failed on the reconciliation worker.",
-  cta: { label: "Debug", icon: "bug" },
+  cta: { label: "Debug", icon: "bug" as const },
   source: { name: "Implementation" },
 };
 
@@ -130,9 +130,7 @@ describe("buildSplitRunFooter", () => {
 
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("A person stopped this automation");
-    expect(footer.note?.text).toBe(
-      "This automation did not finish. This task still needs a decision.",
-    );
+    expect(footer.note?.text).toBe("This automation did not finish. This task still needs a decision.");
     expect(footer.note?.cta).toBeUndefined();
     expect(footer.note?.actor).toBeUndefined();
     expect(footer.actions.map((action) => action.label)).toEqual(["To Backlog", "Reject", "Rerun"]);

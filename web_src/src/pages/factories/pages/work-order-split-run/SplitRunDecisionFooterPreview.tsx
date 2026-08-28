@@ -25,7 +25,7 @@ type DecisionCopy = {
   text: string;
   tone: "draft" | "waiting" | "failed" | "done" | "rejected";
   actions: DecisionAction[];
-  cta?: { label: string; href: string };
+  cta?: { label: string; href: string; icon?: "bug" };
 };
 
 const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
