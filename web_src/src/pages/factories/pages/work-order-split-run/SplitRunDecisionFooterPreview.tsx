@@ -65,7 +65,7 @@ const COPY: Record<Exclude<DecisionFooterKind, "running">, DecisionCopy> = {
     headline: "Implement did not pass",
     text: "This automation failed. Open the run to review the error. Fix the automation, then click Rerun. Or close this task.",
     tone: "failed",
-    cta: { label: "Review the run", href: "/run/implement" },
+    cta: { label: "Debug", href: "/run/implement", icon: "bug" },
     actions: [
       { id: "reject", label: "Reject", emphasis: "quiet" },
       { id: "rerun", label: "Rerun", emphasis: "primary" },

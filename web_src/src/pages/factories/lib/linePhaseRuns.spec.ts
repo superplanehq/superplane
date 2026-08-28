@@ -396,7 +396,7 @@ describe("linePhaseRunHref", () => {
 });
 
 describe("collectLineBacklogOrders", () => {
-  it("returns only draft orders that are not on a line", () => {
+  it("returns draft orders, including those with a finished line history", () => {
     const onLine = order("wo-on-line", "On line", [
       {
         id: "e-on",
@@ -440,9 +440,49 @@ describe("collectLineBacklogOrders", () => {
       lineDispatches: [],
     };
 
-    const backlog = collectLineBacklogOrders([onLine, otherLine, draft, open, closed]);
+    const returned: FactoriesWorkOrder = {
+      ...order("wo-returned", "Returned", [
+        {
+          id: "e-cancelled",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_CANCELLED",
+          createdAt: "2026-08-11T15:00:00.000Z",
+          updatedAt: "2026-08-11T15:00:00.000Z",
+        },
+      ]),
+      state: "STATE_DRAFT",
+      updatedAt: "2026-08-11T15:30:00.000Z",
+    };
 
-    expect(backlog.map((entry) => entry.id)).toEqual(["wo-draft"]);
+    const backlog = collectLineBacklogOrders([onLine, otherLine, draft, returned, open, closed]);
+
+    expect(backlog.map((entry) => entry.id)).toEqual(["wo-returned", "wo-draft"]);
+  });
+
+  it("keeps a returned draft off the Plan column", () => {
+    const returned: FactoriesWorkOrder = {
+      ...order("wo-returned", "Returned", [
+        {
+          id: "e-cancelled",
+          line: { id: "line-1", name: "poc" },
+          step: "plan",
+          stepIndex: 0,
+          state: "STATE_FINISHED",
+          result: "RESULT_CANCELLED",
+          createdAt: "2026-08-11T15:00:00.000Z",
+          updatedAt: "2026-08-11T15:00:00.000Z",
+        },
+      ]),
+      state: "STATE_DRAFT",
+    };
+
+    const board = buildLinePhaseBoard(LINE, [returned], APPS);
+
+    expect(workOrderIds(board)).toEqual([]);
+    expect(collectLineBacklogOrders([returned]).map((entry) => entry.id)).toEqual(["wo-returned"]);
   });
 });
 

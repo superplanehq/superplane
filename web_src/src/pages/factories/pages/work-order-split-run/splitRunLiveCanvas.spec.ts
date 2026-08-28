@@ -12,6 +12,7 @@ import {
   resolveSplitRunVisual,
   splitRunCanvasFromLive,
   streamFromLiveRun,
+  streamStatusFromNode,
 } from "./splitRunLiveCanvas";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
@@ -26,6 +27,13 @@ describe("nodeStatusFromExecution", () => {
     expect(nodeStatusFromExecution({ state: "STATE_STARTED" }, false)).toBe("running");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_PASSED" }, true)).toBe("triggered");
     expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_FAILED" }, false)).toBe("failed");
+    expect(nodeStatusFromExecution({ state: "STATE_FINISHED", result: "RESULT_CANCELLED" }, false)).toBe("cancelled");
+  });
+});
+
+describe("streamStatusFromNode", () => {
+  it("keeps a cancelled node as canceled, not pending", () => {
+    expect(streamStatusFromNode("cancelled")).toBe("cancelled");
   });
 });
 

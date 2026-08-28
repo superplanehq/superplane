@@ -1,9 +1,10 @@
-import { CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, Loader2, RotateCcw } from "lucide-react";
+import { Bug, CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, Loader2, RotateCcw, Undo2 } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
+import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
 
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 
@@ -44,6 +45,18 @@ const TONE = {
  * Sticky decision note. Actions sit beside the copy. No Update manually,
  * no source time.
  */
+function StoppedHeadline({ note }: { note: SplitRunFooterNote }) {
+  if (!note.actor) {
+    return note.headline;
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1">
+      <WorkOrderPersonMention person={note.actor} />
+      <span>{note.headline}</span>
+    </span>
+  );
+}
+
 export function SplitRunAttentionNote({
   note,
   tone = "waiting",
@@ -77,7 +90,9 @@ export function SplitRunAttentionNote({
         </span>
 
         <div className="min-w-0 flex-1">
-          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{note.headline}</h3>
+          <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">
+            <StoppedHeadline note={note} />
+          </h3>
           {note.text ? (
             <div className="mt-1 text-[13px] text-foreground/80">
               <MarkdownContent content={note.text} variant="workspace" />
@@ -123,7 +138,7 @@ function NoteActionRow({
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-      {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} /> : null}
+      {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} icon={note.cta.icon} /> : null}
       {actions.map((action) => (
         <NoteAction
           key={action.id}
@@ -138,20 +153,32 @@ function NoteActionRow({
   );
 }
 
-function NoteCta({ label, href }: { label: string; href: string }) {
+function NoteCta({ label, href, icon }: { label: string; href: string; icon?: "bug" }) {
   const external = href.startsWith("http");
+  const mark = icon === "bug" ? <Bug className="size-3.5" aria-hidden /> : null;
   return (
     <Button asChild size="sm" variant="outline">
       {external ? (
         <a href={href} target="_blank" rel="noreferrer">
+          {mark}
           {label}
           <ExternalLink className="size-3.5" aria-hidden />
         </a>
       ) : (
-        <Link href={href}>{label}</Link>
+        <Link href={href}>
+          {mark}
+          {label}
+        </Link>
       )}
     </Button>
   );
+}
+
+function ActionIcon({ icon }: { icon?: SplitRunFooterAction["icon"] }) {
+  if (icon === "undo-2") {
+    return <Undo2 className="size-3.5" aria-hidden />;
+  }
+  return null;
 }
 
 function NoteAction({
@@ -180,7 +207,7 @@ function NoteAction({
       onClick={onClick}
       data-testid={primary ? "split-run-review-cta" : `split-run-footer-${action.id}`}
     >
-      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
       {action.label}
     </Button>
   );
