@@ -525,6 +525,8 @@ func serializeWorkOrderExecutionResult(executionResult, runResult string) pb.Wor
 
 func serializeWorkOrderState(state string) pb.WorkOrder_State {
 	switch state {
+	case models.FactoryWorkOrderStateIntake:
+		return pb.WorkOrder_STATE_INTAKE
 	case models.FactoryWorkOrderStateDraft:
 		return pb.WorkOrder_STATE_DRAFT
 	case models.FactoryWorkOrderStateOpen:

@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	FactoryWorkOrderStateIntake = "intake"
 	FactoryWorkOrderStateDraft  = "draft"
 	FactoryWorkOrderStateOpen   = "open"
 	FactoryWorkOrderStateClosed = "closed"
@@ -32,6 +33,7 @@ var (
 
 var (
 	factoryWorkOrderStates = []string{
+		FactoryWorkOrderStateIntake,
 		FactoryWorkOrderStateDraft,
 		FactoryWorkOrderStateOpen,
 		FactoryWorkOrderStateClosed,
@@ -53,6 +55,7 @@ var (
 	// open` is reopen; `draft → closed` is "abandon before dispatch"
 	// (rejected only). See TransitionOnDispatch for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
+		FactoryWorkOrderStateIntake: {FactoryWorkOrderStateDraft},
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
 		FactoryWorkOrderStateOpen:   {FactoryWorkOrderStateClosed, FactoryWorkOrderStateDraft},
 		FactoryWorkOrderStateClosed: {FactoryWorkOrderStateOpen},
@@ -82,6 +85,16 @@ type FactoryWorkOrder struct {
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
 }
 
+type FactoryWorkOrderCreateOptions struct {
+	Title        string
+	Description  string
+	CreatedBy    *uuid.UUID
+	Assignees    []uuid.UUID
+	SourceRunID  *uuid.UUID
+	Origin       *WorkOrderOrigin
+	InitialState string
+}
+
 func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
 }
@@ -101,8 +114,9 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 	return o.State == FactoryWorkOrderStateClosed
 }
 
-// IsDispatchable reports whether the work order can be dispatched;
-// the first dispatch from `draft` also promotes it to `open`.
+// IsDispatchable reports whether the work order can be dispatched. Intake
+// orders stay private to the intake automation until it promotes them to draft.
+// The first dispatch from draft also promotes the order to open.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
 }
@@ -446,7 +460,7 @@ func (o *FactoryWorkOrder) Close(db *gorm.DB, result string, closedBy *uuid.UUID
 }
 
 // TransitionOnDispatch promotes a draft order to open; open is a no-op.
-// Any other state rejects the dispatch.
+// Intake and closed orders reject the dispatch.
 func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) error {
 	if o.State == FactoryWorkOrderStateOpen {
 		return nil

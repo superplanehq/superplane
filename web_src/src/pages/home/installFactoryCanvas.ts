@@ -2,12 +2,8 @@ import {
   canvasesCommitCanvasStaging,
   canvasesDescribeCanvas,
   canvasesInvokeNodeTriggerHook,
-  canvasesListCanvases,
   canvasesPutCanvasStaging,
-  type CanvasesCanvasSummary,
 } from "@/api-client";
-import type { QueryClient } from "@tanstack/react-query";
-import { canvasKeys } from "@/hooks/useCanvasData";
 import { encodeRepositoryFileContent } from "@/pages/app/files/lib/repository-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/pages/app/lib/workflow-spec-paths";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -24,9 +20,6 @@ import {
 } from "./factories";
 import type { IntegrationSelections } from "./homeIntegrationStatus";
 import type { CanvasFolderData } from "./types";
-import { isCanvasNameAlreadyExistsError, uniqueCanvasName } from "./uniqueCanvasName";
-
-const MAX_NAME_RETRY_ATTEMPTS = 20;
 
 export type FactoryCanvasHandle = {
   canvasId: string;
@@ -37,6 +30,7 @@ export type CreateFactoryCanvasFn = (input: {
   name: string;
   description?: string;
   factoryId?: string;
+  uniqueName: boolean;
   method: "ui";
 }) => Promise<{
   data?: { canvas?: { metadata?: { id?: string; name?: string } } };
@@ -101,51 +95,32 @@ export async function materializeAndCommitFactoryTemplate(args: {
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
 }
 
-async function listExistingCanvasNames(organizationId: string, queryClient: QueryClient) {
-  const cached = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
-  if (cached) {
-    return cached.map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-  }
-
-  const response = await canvasesListCanvases(withOrganizationHeader({ organizationId }));
-  return (response.data?.canvases ?? []).map((canvas) => canvas.name).filter((name): name is string => Boolean(name));
-}
-
-async function createCanvasWithUniqueName(args: {
+// The server suffixes the title when the organization already holds it. The
+// client cannot pick the name itself: canvas names are unique per organization,
+// but the canvas list hides the factory-owned canvases that apps install into.
+async function createFactoryCanvas(args: {
   title: string;
   description?: string;
   workspaceFactoryId?: string;
-  existingNames: Set<string>;
   createCanvas: CreateFactoryCanvasFn;
 }): Promise<FactoryCanvasHandle> {
-  let canvasName = uniqueCanvasName(args.title, args.existingNames);
+  const result = await args.createCanvas({
+    name: args.title,
+    description: args.description,
+    factoryId: args.workspaceFactoryId,
+    uniqueName: true,
+    method: "ui",
+  });
 
-  for (let attempt = 0; attempt < MAX_NAME_RETRY_ATTEMPTS; attempt++) {
-    try {
-      const result = await args.createCanvas({
-        name: canvasName,
-        description: args.description,
-        factoryId: args.workspaceFactoryId,
-        method: "ui",
-      });
-      const canvasId = result?.data?.canvas?.metadata?.id;
-      if (!canvasId) {
-        throw new Error("Failed to create factory canvas");
-      }
-      return {
-        canvasId,
-        canvasName: result?.data?.canvas?.metadata?.name?.trim() || canvasName,
-      };
-    } catch (error) {
-      if (!isCanvasNameAlreadyExistsError(error)) {
-        throw error;
-      }
-      args.existingNames.add(canvasName);
-      canvasName = uniqueCanvasName(args.title, args.existingNames);
-    }
+  const canvasId = result?.data?.canvas?.metadata?.id;
+  if (!canvasId) {
+    throw new Error("Failed to create factory canvas");
   }
 
-  throw new Error("Failed to create factory canvas");
+  return {
+    canvasId,
+    canvasName: result?.data?.canvas?.metadata?.name?.trim() || args.title,
+  };
 }
 
 async function resolveExistingFactoryCanvas(canvasId: string, fallbackName: string): Promise<FactoryCanvasHandle> {
@@ -164,8 +139,6 @@ async function resolveExistingFactoryCanvas(canvasId: string, fallbackName: stri
 
 export async function ensureFactoryCanvas(args: {
   pending: FactoryCanvasHandle | null;
-  organizationId: string;
-  queryClient: QueryClient;
   definition: FactoryDefinition;
   folder?: CanvasFolderData;
   workspaceFactoryId?: string;
@@ -182,12 +155,10 @@ export async function ensureFactoryCanvas(args: {
 
   if (args.pending) return args.pending;
 
-  const existingNames = new Set(await listExistingCanvasNames(args.organizationId, args.queryClient));
-  const created = await createCanvasWithUniqueName({
+  const created = await createFactoryCanvas({
     title: args.definition.title,
     description: args.definition.description,
     workspaceFactoryId: args.workspaceFactoryId,
-    existingNames,
     createCanvas: args.createCanvas,
   });
 

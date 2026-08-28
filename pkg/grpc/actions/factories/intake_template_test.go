@@ -35,11 +35,26 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, []yaml.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
-			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-			{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
-			{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+			{Channel: "default", SourceID: intakeReportConfidenceNodeID, TargetID: intakeThresholdNodeID},
+			{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakePromotionNodeID},
 		}, canvas.Spec.Edges)
+	})
+
+	t.Run("creates an intake order before analysis and promotes it to draft", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues, ConfidencePct: DefaultIntakeConfidencePct})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, "intake", create.Configuration["state"])
+
+		promotion := findSpecNode(t, canvas, intakePromotionNodeID)
+		assert.Equal(t, intakePromotionNodeName, promotion.Name)
+		assert.Equal(t, intakePromotionComponent, promotion.Component)
+		assert.Equal(t, "draft", promotion.Configuration["status"])
+		assert.Equal(t, intakeWorkOrderIDExpression(), promotion.Configuration["orderId"])
 	})
 
 	t.Run("the created work order receives the intake confidence score", func(t *testing.T) {

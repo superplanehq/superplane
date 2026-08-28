@@ -207,6 +207,7 @@ export interface LineIntakeAnalyzingTicket {
   title: string;
   appId?: string;
   runId?: string;
+  workOrderId?: string;
   outcome?: LineIntakeTicketOutcome;
   detailsMarkdown?: string;
   issueKey?: string;

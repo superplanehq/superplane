@@ -74,12 +74,35 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, false, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, nil)
+	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Duplicate Canvas", "", nil, false, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
+
+func TestCreateCanvasWithUniqueNameSuffixesTakenName(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	baseURL := "https://example.com"
+
+	factory, err := models.CreateFactory(database.DB(ctx), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	first, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "PR Closure", "", &factory.ID, true, nil)
+	require.NoError(t, err)
+	require.Equal(t, "PR Closure", first.Canvas.Metadata.Name)
+
+	second, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "PR Closure", "", &factory.ID, true, nil)
+	require.NoError(t, err)
+	require.Equal(t, "PR Closure (2)", second.Canvas.Metadata.Name)
+
+	// Factory-owned names are hidden from ListCanvases, so the organization
+	// level create has to see them too.
+	third, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "PR Closure", "", nil, true, nil)
+	require.NoError(t, err)
+	require.Equal(t, "PR Closure (3)", third.Canvas.Metadata.Name)
 }
 
 func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
@@ -87,7 +110,7 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "   ", "", nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "   ", "", nil, false, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	require.Equal(t, "canvas name is required", func() string {
@@ -104,7 +127,7 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Health Check Monitor", "Quick start canvas on a fresh organization", nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Health Check Monitor", "Quick start canvas on a fresh organization", nil, false, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -144,7 +167,7 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Limited Canvas", "", nil, service)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Limited Canvas", "", nil, false, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
 	assert.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())

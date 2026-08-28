@@ -96,19 +96,13 @@ func (c *FactoryContext) createFactoryWorkOrder(
 	params core.WorkOrderParams,
 	sourceRunID uuid.UUID,
 ) (*models.FactoryWorkOrder, error) {
-	if origin := c.originFromSourceRun(sourceRunID); origin != nil {
-		return factoryModel.CreateWorkOrderWithOrigin(
-			c.tx,
-			params.Title,
-			params.Description,
-			nil,
-			[]uuid.UUID{},
-			&sourceRunID,
-			*origin,
-		)
-	}
-
-	return factoryModel.CreateWorkOrder(c.tx, params.Title, params.Description, nil, []uuid.UUID{}, &sourceRunID)
+	return factoryModel.CreateWorkOrderWithOptions(c.tx, models.FactoryWorkOrderCreateOptions{
+		Title:        params.Title,
+		Description:  params.Description,
+		SourceRunID:  &sourceRunID,
+		Origin:       c.originFromSourceRun(sourceRunID),
+		InitialState: params.InitialState,
+	})
 }
 
 func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.WorkOrderOrigin {

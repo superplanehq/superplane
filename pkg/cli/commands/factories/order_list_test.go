@@ -194,8 +194,8 @@ func TestOrderListCommand_UnknownAssigneeEmail(t *testing.T) {
 }
 
 func TestNormalizeFilterValues(t *testing.T) {
-	got := normalizeFilterValues([]string{"open", "STATE_CLOSED", "Draft"}, shortOrderStateTokens)
-	assert.Equal(t, []string{"STATE_OPEN", "STATE_CLOSED", "STATE_DRAFT"}, got)
+	got := normalizeFilterValues([]string{"intake", "open", "STATE_CLOSED", "Draft"}, shortOrderStateTokens)
+	assert.Equal(t, []string{"STATE_INTAKE", "STATE_OPEN", "STATE_CLOSED", "STATE_DRAFT"}, got)
 
 	got = normalizeFilterValues([]string{"completed", "RESULT_FAILED", "unknown-token"}, shortOrderResultTokens)
 	assert.Equal(t, []string{"RESULT_COMPLETED", "RESULT_FAILED", "unknown-token"}, got)

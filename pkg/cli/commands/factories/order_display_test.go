@@ -14,6 +14,7 @@ func TestFormatOrderState(t *testing.T) {
 		state openapi_client.FactoriesWorkOrderState
 		want  string
 	}{
+		{openapi_client.FACTORIESWORKORDERSTATE_STATE_INTAKE, "Intake"},
 		{openapi_client.FACTORIESWORKORDERSTATE_STATE_DRAFT, "Draft"},
 		{openapi_client.FACTORIESWORKORDERSTATE_STATE_OPEN, "Open"},
 		{openapi_client.FACTORIESWORKORDERSTATE_STATE_CLOSED, "Closed"},

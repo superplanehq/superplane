@@ -110,6 +110,23 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, "acme/payments#12", persisted.Origin().Label)
 	})
 
+	t.Run("creates an intake work order when requested", func(t *testing.T) {
+		intakeCanvas, intakeExecution, _ := setupFactoryAppExecution(t, r, factory.ID)
+		db := database.DB(t.Context())
+		ctx := NewFactoryContext(db, intakeCanvas, intakeExecution)
+
+		created, err := ctx.CreateWorkOrder(core.WorkOrderParams{
+			Title:        "Analyze candidate",
+			InitialState: models.FactoryWorkOrderStateIntake,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateIntake, created.State)
+
+		persisted, err := factory.FindWorkOrder(db, uuid.MustParse(created.ID))
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryWorkOrderStateIntake, persisted.State)
+	})
+
 	t.Run("rejects blank title", func(t *testing.T) {
 		ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
 

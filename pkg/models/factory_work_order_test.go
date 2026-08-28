@@ -37,6 +37,46 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
 }
 
+func TestFactoryWorkOrder_CreateStartsInRequestedState(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "create-intake")
+	db := database.DB(t.Context())
+
+	order, err := factoryModel.CreateWorkOrderWithOptions(db, FactoryWorkOrderCreateOptions{
+		Title:        "Analyze reported issue",
+		CreatedBy:    &userID,
+		InitialState: FactoryWorkOrderStateIntake,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, FactoryWorkOrderStateIntake, order.State)
+	assert.False(t, order.IsDispatchable())
+	require.ErrorIs(t, order.TransitionOnDispatch(db, &userID), ErrFactoryWorkOrderInvalidState)
+	assert.Equal(t, FactoryWorkOrderStateIntake, order.State)
+
+	events, err := order.ListEvents(db, 10, nil)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+
+	var payload factory.WorkOrderStatusUpdated
+	require.NoError(t, json.Unmarshal(events[0].Data, &payload))
+	assert.Equal(t, "", payload.FromState)
+	assert.Equal(t, FactoryWorkOrderStateIntake, payload.ToState)
+}
+
+func TestFactoryWorkOrder_CreateRejectsInvalidInitialState(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "create-invalid-state")
+
+	_, err := factoryModel.CreateWorkOrderWithOptions(database.DB(t.Context()), FactoryWorkOrderCreateOptions{
+		Title:        "Invalid initial state",
+		CreatedBy:    &userID,
+		InitialState: FactoryWorkOrderStateOpen,
+	})
+	require.ErrorIs(t, err, ErrFactoryWorkOrderInvalidState)
+}
+
 func TestFactoryWorkOrder_CreateWithOriginPersistsTicket(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -185,6 +225,24 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 
 	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Lifecycle", "", &userID, nil, nil)
 	require.NoError(t, err)
+
+	t.Run("intake to draft promotes a candidate", func(t *testing.T) {
+		db := database.DB(t.Context())
+		candidate, err := factoryModel.CreateWorkOrderWithOptions(db, FactoryWorkOrderCreateOptions{
+			Title:        "Candidate",
+			CreatedBy:    &userID,
+			InitialState: FactoryWorkOrderStateIntake,
+		})
+		require.NoError(t, err)
+
+		changed, err := candidate.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateDraft,
+			Actor:   &userID,
+		})
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, FactoryWorkOrderStateDraft, candidate.State)
+	})
 
 	t.Run("draft to open emits status.updated", func(t *testing.T) {
 		changed, err := order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{

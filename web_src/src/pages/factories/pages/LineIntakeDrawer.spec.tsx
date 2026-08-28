@@ -330,6 +330,31 @@ describe("LineIntakeDrawer", () => {
     expect(within(analyzing).queryByText("Already in Backlog")).not.toBeInTheDocument();
   });
 
+  it("reports the work order when an intake ticket created one", async () => {
+    intakeRuns([
+      {
+        id: "run-1",
+        title: "Handle duplicate refunds on retry",
+        placement: "PLACEMENT_ANALYZING",
+        workOrderId: "work-order-1",
+      },
+    ]);
+    const onOpenTicket = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer({
+      configuredSources: [GITHUB_INTAKE],
+      initialIntakeId: "intake-github",
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      onOpenTicket,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open Handle duplicate refunds on retry" }));
+
+    expect(onOpenTicket).toHaveBeenCalledWith(expect.objectContaining({ workOrderId: "work-order-1" }));
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
+  });
+
   it("keeps live tickets below the minimum confidence in the Intake list", () => {
     intakeRuns([
       { id: "run-1", title: "Handle duplicate refunds on retry", placement: "PLACEMENT_ANALYZING" },
@@ -497,6 +522,7 @@ describe("LineIntakeDrawer", () => {
         title: "Handle duplicate refunds on retry",
         confidencePct: 94,
         placement: "PLACEMENT_PROGRESSED",
+        workOrderId: "work-order-1",
         stage: "implement",
       },
     ]);
@@ -524,10 +550,12 @@ describe("LineIntakeDrawer", () => {
         id: "run-1",
         appId: "app-github-issues-intake",
         runId: "run-1",
+        workOrderId: "work-order-1",
         title: "Handle duplicate refunds on retry",
       }),
     );
     expect(screen.getByTestId("intake-source-settings")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
   });
 
   it("saves the name and filters through the intake API", async () => {

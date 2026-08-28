@@ -422,6 +422,9 @@ message CreateCanvasRequest {
   string name = 1;
   string description = 2;
   optional string factory_id = 3;
+  // When set, the name is a base name: the server adds a " (n)" suffix if the
+  // organization already holds the name, instead of rejecting the request.
+  bool unique_name = 4;
 }
 
 message CreateCanvasResponse {

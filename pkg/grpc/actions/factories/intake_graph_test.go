@@ -17,6 +17,7 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 		assert.Equal(t, intakeAnalysisNodeID, graph.AnalysisNodeID)
 		assert.Equal(t, intakeThresholdNodeID, graph.ThresholdNodeID)
 		assert.Equal(t, intakeCreateNodeID, graph.CreateNodeID)
+		assert.Equal(t, intakePromotionNodeID, graph.PromotionNodeID)
 		assert.Equal(t, 80, graph.ConfidencePct)
 		assert.True(t, graph.Healthy(spec.Edges))
 	})
@@ -28,11 +29,13 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 				componentNode("score-it", "runnerCodex"),
 				componentNode("gate", intakeThresholdComponent),
 				componentNode("file-it", intakeCreateComponent),
+				componentNode("promote-it", intakePromotionComponent),
 			},
 			Edges: []models.Edge{
-				{SourceID: "listen-here", TargetID: "score-it"},
+				{SourceID: "listen-here", TargetID: "file-it"},
+				{SourceID: "file-it", TargetID: "score-it"},
 				{SourceID: "score-it", TargetID: "gate"},
-				{SourceID: "gate", TargetID: "file-it"},
+				{SourceID: "gate", TargetID: "promote-it"},
 			},
 		}
 
@@ -40,6 +43,7 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 		assert.Equal(t, "listen-here", graph.TriggerNodeID)
 		assert.Equal(t, "score-it", graph.AnalysisNodeID)
 		assert.Equal(t, "file-it", graph.CreateNodeID)
+		assert.Equal(t, "promote-it", graph.PromotionNodeID)
 		assert.True(t, graph.Healthy(spec.Edges))
 	})
 
@@ -69,10 +73,11 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 		spec := intakeSpecFromTemplate(t, models.FactoryIntakeSourceGitHubIssues, DefaultIntakeConfidencePct)
 		spec.Nodes = append(spec.Nodes, componentNode("label-filter", "filter"))
 		spec.Edges = []models.Edge{
-			{SourceID: intakeTriggerNodeID, TargetID: "label-filter"},
+			{SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+			{SourceID: intakeCreateNodeID, TargetID: "label-filter"},
 			{SourceID: "label-filter", TargetID: intakeAnalysisNodeID},
 			{SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-			{SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
+			{SourceID: intakeThresholdNodeID, TargetID: intakePromotionNodeID},
 		}
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)

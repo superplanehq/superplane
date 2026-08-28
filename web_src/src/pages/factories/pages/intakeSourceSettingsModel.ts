@@ -16,6 +16,7 @@ export interface IntakeAutomationRun {
   id: string;
   appId?: string;
   runId?: string;
+  workOrderId?: string;
   title: string;
   confidencePct: number;
   ranMinutesAgo: number;
@@ -273,11 +274,13 @@ export function intakeRunsFromApi(
     }
 
     const stage = run.stage ? STAGE_BY_NAME[run.stage.trim().toLowerCase()] : undefined;
+    const workOrderId = workOrderIdFromApi(run);
     return [
       {
         id,
         runId: id,
         ...(appId ? { appId } : {}),
+        ...(workOrderId ? { workOrderId } : {}),
         title,
         confidencePct: run.confidencePct ?? 0,
         ranMinutesAgo: minutesAgo(run.createdAt, now),
@@ -294,6 +297,7 @@ interface IntakeListTicket {
   title: string;
   appId?: string;
   runId?: string;
+  workOrderId?: string;
   outcome?: "analyzing" | "below-threshold";
   confidencePct?: number;
 }
@@ -319,7 +323,14 @@ function intakeListTicketFromRun(
     return undefined;
   }
 
-  const ticket: IntakeListTicket = { id, title, runId: id, ...(appId ? { appId } : {}) };
+  const workOrderId = workOrderIdFromApi(run);
+  const ticket: IntakeListTicket = {
+    id,
+    title,
+    runId: id,
+    ...(appId ? { appId } : {}),
+    ...(workOrderId ? { workOrderId } : {}),
+  };
   if (run.placement === "PLACEMENT_ANALYZING") {
     return ticket;
   }
@@ -332,6 +343,10 @@ function intakeListTicketFromRun(
     outcome: "below-threshold",
     ...(run.confidencePct != null ? { confidencePct: run.confidencePct } : {}),
   };
+}
+
+function workOrderIdFromApi(run: FactoriesFactoryIntakeRun): string | undefined {
+  return run.workOrderId?.trim() || undefined;
 }
 
 function minutesAgo(timestamp: string | undefined, now: Date): number {

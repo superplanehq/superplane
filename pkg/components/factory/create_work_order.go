@@ -6,6 +6,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -20,6 +21,7 @@ type CreateWorkOrder struct{}
 type CreateWorkOrderConfiguration struct {
 	Title       string `json:"title" mapstructure:"title"`
 	Description string `json:"description" mapstructure:"description"`
+	State       string `json:"state" mapstructure:"state"`
 }
 
 func (c *CreateWorkOrder) Name() string {
@@ -80,6 +82,22 @@ func (c *CreateWorkOrder) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 		},
+		{
+			Name:        "state",
+			Label:       "Initial State",
+			Description: "The lifecycle state assigned when the work order is created",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     models.FactoryWorkOrderStateDraft,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Intake", Value: models.FactoryWorkOrderStateIntake},
+						{Label: "Draft", Value: models.FactoryWorkOrderStateDraft},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -89,9 +107,15 @@ func (c *CreateWorkOrder) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	initialState := config.State
+	if initialState == "" {
+		initialState = models.FactoryWorkOrderStateDraft
+	}
+
 	workOrder, err := ctx.Factory.CreateWorkOrder(core.WorkOrderParams{
-		Title:       config.Title,
-		Description: config.Description,
+		Title:        config.Title,
+		Description:  config.Description,
+		InitialState: initialState,
 	})
 
 	if err != nil {

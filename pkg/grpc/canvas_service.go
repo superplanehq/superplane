@@ -87,6 +87,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		req.GetName(),
 		req.GetDescription(),
 		factoryID,
+		req.GetUniqueName(),
 		s.usageService,
 	)
 }

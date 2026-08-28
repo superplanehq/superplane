@@ -28,6 +28,14 @@ func mustSerializeWorkOrder(
 	return serialized
 }
 
+func TestSerializeWorkOrderState_Intake(t *testing.T) {
+	assert.Equal(t, pb.WorkOrder_STATE_INTAKE, serializeWorkOrderState(models.FactoryWorkOrderStateIntake))
+
+	state, ok := workOrderStateFromProto(pb.WorkOrder_STATE_INTAKE)
+	assert.True(t, ok)
+	assert.Equal(t, models.FactoryWorkOrderStateIntake, state)
+}
+
 func TestSerializeWorkOrderCreator_UserBranch(t *testing.T) {
 	userID := uuid.New()
 	order := &models.FactoryWorkOrder{

@@ -414,6 +414,9 @@ func statusChangeDescription(message messages.FactoryWorkOrderNotificationMessag
 		}
 		return "opened"
 	case models.FactoryWorkOrderStateDraft:
+		if message.FromState == models.FactoryWorkOrderStateIntake {
+			return "promoted to draft"
+		}
 		return "moved back to draft"
 	case models.FactoryWorkOrderStateClosed:
 		if message.Result != "" {

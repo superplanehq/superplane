@@ -103,6 +103,7 @@ func countStepExecutions(dispatches []openapi_client.FactoriesWorkOrderLineDispa
 // full proto enum token expected by the API, so --state is pleasant to
 // type interactively (e.g. "open" instead of "STATE_OPEN").
 var shortOrderStateTokens = map[string]string{
+	"intake": "STATE_INTAKE",
 	"draft":  "STATE_DRAFT",
 	"open":   "STATE_OPEN",
 	"closed": "STATE_CLOSED",

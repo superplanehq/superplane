@@ -608,8 +608,9 @@ message FactoryIntake {
   string description = 5;
   Source source = 6;
   Settings settings = 7;
-  // False when the canvas can no longer receive an item, score it, and create
-  // a work order. The intake stays listed so the user can repair it.
+  // False when the canvas can no longer receive an item, create its intake
+  // work order, score it, and promote it to draft. The intake stays listed so
+  // the user can repair it.
   bool healthy = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
@@ -619,11 +620,13 @@ message FactoryIntakeRun {
   // Where the item ended up after the intake scored it.
   enum Placement {
     PLACEMENT_UNSPECIFIED = 0;
-    // The analysis is still running.
+    // The run has not promoted the intake work order yet.
     PLACEMENT_ANALYZING = 1;
-    // The score was below the threshold, so no work order was created.
+    // The score was below the threshold. The work order remains in intake.
     PLACEMENT_BELOW_THRESHOLD = 2;
+    // The work order was promoted to draft and has not started on a line.
     PLACEMENT_BACKLOG = 3;
+    // The run failed before it could promote the work order.
     PLACEMENT_REJECTED = 4;
     // The work order started on a line.
     PLACEMENT_PROGRESSED = 5;
@@ -634,6 +637,7 @@ message FactoryIntakeRun {
   // Unset while the analysis runs, or when the analysis returned no score.
   optional int32 confidence_pct = 3;
   Placement placement = 4;
+  // Available after the create step, including while analysis is active.
   string work_order_id = 5;
   // Line step the work order reached. Set only when progressed.
   string stage = 6;
@@ -759,9 +763,14 @@ message CloseWorkOrderResponse {
 message WorkOrder {
   enum State {
     STATE_UNSPECIFIED = 0;
+    // A backlog item that can be dispatched to a factory line.
     STATE_DRAFT = 1;
+    // A work order that has started on a factory line.
     STATE_OPEN = 2;
+    // A terminal work order.
     STATE_CLOSED = 3;
+    // A candidate created by an intake automation. It cannot be dispatched.
+    STATE_INTAKE = 4;
   }
 
   enum Result {

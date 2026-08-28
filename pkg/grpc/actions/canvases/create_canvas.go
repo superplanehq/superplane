@@ -21,11 +21,22 @@ import (
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
+// Attempts to survive another canvas taking the free name between the lookup
+// and the insert. Only concurrent creates in the same organization collide, so
+// a couple of retries are enough.
+const uniqueNameAttempts = 3
+
+// uniqueName treats name as a base name and suffixes it until it is free,
+// instead of rejecting a name the organization already holds. Callers that
+// install several canvases at once need this: canvas names are unique per
+// organization, but ListCanvases hides factory-owned canvases, so a client
+// cannot tell which names are taken.
 func CreateCanvas(
 	ctx context.Context,
 	registry *registry.Registry,
@@ -37,6 +48,7 @@ func CreateCanvas(
 	name string,
 	description string,
 	factoryID *uuid.UUID,
+	uniqueName bool,
 	usageService usage.Service,
 ) (*pb.CreateCanvasResponse, error) {
 	name = strings.TrimSpace(name)
@@ -44,22 +56,49 @@ func CreateCanvas(
 		return nil, grpcerrors.InvalidArgument(nil, "canvas name is required")
 	}
 
-	return CreateCanvasWithSeedFiles(
-		ctx,
-		registry,
-		encryptor,
-		authService,
-		gitProvider,
-		webhookBaseURL,
-		organizationID,
-		name,
-		description,
-		factoryID,
-		[]models.Node{},
-		[]models.Edge{},
-		usageService,
-		nil,
-	)
+	create := func(canvasName string) (*pb.CreateCanvasResponse, error) {
+		return CreateCanvasWithSeedFiles(
+			ctx,
+			registry,
+			encryptor,
+			authService,
+			gitProvider,
+			webhookBaseURL,
+			organizationID,
+			canvasName,
+			description,
+			factoryID,
+			[]models.Node{},
+			[]models.Edge{},
+			usageService,
+			nil,
+		)
+	}
+
+	if !uniqueName {
+		return create(name)
+	}
+
+	var err error
+	for attempt := 0; attempt < uniqueNameAttempts; attempt++ {
+		var available string
+		available, err = models.AvailableCanvasName(database.DB(ctx), organizationID, name)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to pick a free canvas name")
+		}
+
+		var response *pb.CreateCanvasResponse
+		response, err = create(available)
+		if err == nil {
+			return response, nil
+		}
+
+		if grpcerrors.Code(err) != codes.AlreadyExists {
+			return nil, err
+		}
+	}
+
+	return nil, err
 }
 
 // CreateCanvasWithSeedFiles is the variant called by the app install flow. It

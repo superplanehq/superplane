@@ -23,6 +23,8 @@ const (
 
 func formatOrderState(state openapi_client.FactoriesWorkOrderState) string {
 	switch state {
+	case openapi_client.FACTORIESWORKORDERSTATE_STATE_INTAKE:
+		return "Intake"
 	case openapi_client.FACTORIESWORKORDERSTATE_STATE_DRAFT:
 		return "Draft"
 	case openapi_client.FACTORIESWORKORDERSTATE_STATE_OPEN:
@@ -381,6 +383,8 @@ func describeStatusTransition(fromState, toState, toResult string) string {
 	switch {
 	case fromState == "":
 		return "Work order created"
+	case fromState == "intake" && toState == "draft":
+		return "Work order promoted to Draft"
 	case toState == "closed":
 		if toResult != "" {
 			return fmt.Sprintf("Work order closed as %s", titleCase(toResult))

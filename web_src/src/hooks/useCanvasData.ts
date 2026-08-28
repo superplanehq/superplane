@@ -461,6 +461,7 @@ export const useCreateCanvas = (organizationId: string) => {
         name: string;
         description?: string;
         factoryId?: string;
+        uniqueName?: boolean;
         method?: "ui" | "cli" | "yaml_import" | "template";
         templateId?: string;
       } & CanvasGraphData,
@@ -471,6 +472,7 @@ export const useCreateCanvas = (organizationId: string) => {
             name: data.name,
             description: data.description || "",
             factoryId: data.factoryId,
+            uniqueName: data.uniqueName,
           },
         }),
       );

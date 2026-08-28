@@ -14,18 +14,20 @@ type intakeGraph struct {
 	AnalysisNodeID  string
 	ThresholdNodeID string
 	CreateNodeID    string
+	PromotionNodeID string
 	ConfidencePct   int
 }
 
 // Healthy reports whether the graph can still do the intake's job: receive an
-// item, score it, and reach the node that creates the work order.
+// item, create its intake order, score it, and reach the promotion node.
 func (g intakeGraph) Healthy(edges []models.Edge) bool {
-	if g.TriggerNodeID == "" || g.AnalysisNodeID == "" || g.CreateNodeID == "" {
+	if g.TriggerNodeID == "" || g.CreateNodeID == "" || g.AnalysisNodeID == "" || g.PromotionNodeID == "" {
 		return false
 	}
 
-	return hasCanvasPath(edges, g.TriggerNodeID, g.AnalysisNodeID) &&
-		hasCanvasPath(edges, g.AnalysisNodeID, g.CreateNodeID)
+	return hasCanvasPath(edges, g.TriggerNodeID, g.CreateNodeID) &&
+		hasCanvasPath(edges, g.CreateNodeID, g.AnalysisNodeID) &&
+		hasCanvasPath(edges, g.AnalysisNodeID, g.PromotionNodeID)
 }
 
 // resolveIntakeGraph matches the generated node identifiers first, then falls
@@ -49,6 +51,9 @@ func resolveIntakeGraph(source string, spec models.LiveCanvasSpec) intakeGraph {
 	})
 	graph.CreateNodeID = resolveIntakeNode(nodes, intakeCreateNodeID, func(node *models.Node) bool {
 		return node.ComponentName() == intakeCreateComponent
+	})
+	graph.PromotionNodeID = resolveIntakeNode(nodes, intakePromotionNodeID, func(node *models.Node) bool {
+		return node.ComponentName() == intakePromotionComponent
 	})
 
 	if threshold := findIntakeNode(nodes, graph.ThresholdNodeID); threshold != nil {

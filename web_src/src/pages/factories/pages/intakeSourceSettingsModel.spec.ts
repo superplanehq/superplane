@@ -8,6 +8,7 @@ import {
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
+  intakeRunsFromApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -83,5 +84,25 @@ describe("intakeSourceSettingsModel", () => {
         confidencePct: 52,
       },
     ]);
+  });
+
+  it("maps the created work order into intake runs and tickets", () => {
+    const apiRun = {
+      id: "run-1",
+      title: "Handle duplicate refunds on retry",
+      placement: "PLACEMENT_BACKLOG" as const,
+      workOrderId: "work-order-1",
+    };
+
+    expect(intakeRunsFromApi([apiRun], "app-github-issues-intake")[0]).toMatchObject({
+      id: "run-1",
+      workOrderId: "work-order-1",
+    });
+    expect(
+      analyzingTicketsFromApi([{ ...apiRun, placement: "PLACEMENT_ANALYZING" }], "app-github-issues-intake")[0],
+    ).toMatchObject({
+      id: "run-1",
+      workOrderId: "work-order-1",
+    });
   });
 });

@@ -135,8 +135,6 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
       try {
         const { canvasId, canvasName } = await ensureFactoryCanvas({
           pending: pendingCanvasRef.current,
-          organizationId,
-          queryClient,
           definition,
           folder,
           workspaceFactoryId: input.workspaceFactoryId,

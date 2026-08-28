@@ -50,6 +50,7 @@ import {
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import { buildAssigneeFilterOptions } from "../lib/workOrderFilterOptions";
+import { isIntakeWorkOrder } from "../lib/workOrderVisibility";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills } from "../workOrders/header/ScopePills";
@@ -146,6 +147,8 @@ export function LinesPage() {
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const [openWorkOrderId, setOpenWorkOrderId] = useState<string | null>(null);
+  const openWorkOrder = workOrders.find((workOrder) => workOrder.id === openWorkOrderId);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
@@ -195,6 +198,10 @@ export function LinesPage() {
           <LineIntakeDrawer
             configuredSources={configuredIntakes}
             onOpenTicket={(ticket) => {
+              if (ticket.workOrderId) {
+                setOpenWorkOrderId(ticket.workOrderId);
+                return;
+              }
               if (!ticket.appId || !ticket.runId) {
                 return;
               }
@@ -271,9 +278,26 @@ export function LinesPage() {
                 canAssign: canUpdateWorkOrders,
                 ...cardActions,
               }}
+              onOpenWorkOrder={setOpenWorkOrderId}
             />
           </div>
         </div>
+        {openWorkOrderId && openWorkOrder ? (
+          <LineBoardSplitRunPopup
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={factoryKey}
+            lineId={selectedLine.id}
+            lineName={selectedLine.name}
+            peekOrderId={openWorkOrderId}
+            peekOrder={openWorkOrder}
+            canDispatch={canUpdateWorkOrders && !isIntakeWorkOrder(openWorkOrder)}
+            canUpdate={canUpdateWorkOrders}
+            isDispatching={cardActions.dispatchingOrderIds.has(openWorkOrderId)}
+            onDispatch={cardActions.onDispatch}
+            onClose={() => setOpenWorkOrderId(null)}
+          />
+        ) : null}
       </div>
     );
   }
@@ -423,6 +447,7 @@ function LineDetail({
   canUpdate,
   onCreateWorkOrder,
   workOrderCardContext,
+  onOpenWorkOrder,
 }: {
   organizationId: string;
   factoryId: string;
@@ -434,6 +459,7 @@ function LineDetail({
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
+  onOpenWorkOrder: (workOrderId: string) => void;
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
@@ -443,17 +469,6 @@ function LineDetail({
     () => collectLineDoneOrders(workOrders ?? [], line, fullBoard),
     [workOrders, line, fullBoard],
   );
-  const [peekOrderId, setPeekOrderId] = useState<string | null>(null);
-  const [peekOrderHint, setPeekOrderHint] = useState<FactoriesWorkOrder | undefined>();
-  const peekOrder =
-    workOrders.find((order) => order.id === peekOrderId) ??
-    (peekOrderHint?.id === peekOrderId ? peekOrderHint : undefined);
-
-  const openWorkOrder = (orderId: string, order?: FactoriesWorkOrder) => {
-    setPeekOrderHint(order);
-    setPeekOrderId(orderId);
-  };
-
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
       {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
@@ -471,28 +486,9 @@ function LineDetail({
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
           workOrderCardContext={workOrderCardContext}
-          onOpenWorkOrder={openWorkOrder}
+          onOpenWorkOrder={onOpenWorkOrder}
         />
       )}
-      {peekOrderId && peekOrder ? (
-        <LineBoardSplitRunPopup
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          lineId={line.id}
-          lineName={line.name}
-          peekOrderId={peekOrderId}
-          peekOrder={peekOrder}
-          canDispatch={workOrderCardContext.canDispatch}
-          canUpdate={workOrderCardContext.canAssign}
-          isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
-          onDispatch={workOrderCardContext.onDispatch}
-          onClose={() => {
-            setPeekOrderHint(undefined);
-            setPeekOrderId(null);
-          }}
-        />
-      ) : null}
     </div>
   );
 }

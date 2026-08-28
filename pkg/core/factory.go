@@ -43,6 +43,9 @@ type FactoryContext interface {
 type WorkOrderParams struct {
 	Title       string
 	Description string
+	// InitialState defaults to draft. Intake automations use intake so the
+	// candidate exists before analysis but cannot be dispatched.
+	InitialState string
 }
 
 // FindWorkOrderParams configures FactoryContext.FindWorkOrder. By selects

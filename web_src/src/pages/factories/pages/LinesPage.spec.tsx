@@ -2,7 +2,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeRun,
+  FactoriesWorkOrder,
+  FactoryApp,
+} from "@/api-client";
 import { editFactoryLinePath, factoryAppConfigurePath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
@@ -46,6 +52,12 @@ const updateFactoryLineMutateAsync = vi.fn();
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
+const useFactoryIntakeRuns = vi.fn(() => ({
+  data: [] as FactoriesFactoryIntakeRun[],
+  isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
+}));
 const createFactoryIntakeMutateAsync = vi.fn();
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
@@ -92,7 +104,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakes: () => useFactoryIntakes(),
-  useFactoryIntakeRuns: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useFactoryIntakeRuns: () => useFactoryIntakeRuns(),
   useCreateFactoryIntake: () => ({ mutateAsync: createFactoryIntakeMutateAsync, isPending: false }),
   useUpdateFactoryIntake: () => ({ mutateAsync: vi.fn(), isPending: false, error: null }),
   useSearchFactoryIntakeItems: () => searchFactoryIntakeItems(),
@@ -188,6 +200,7 @@ describe("LinesPage board", () => {
     useFactoryWorkOrders.mockReturnValue({ data: [] });
     useFactoryApps.mockReturnValue({ data: [] });
     useFactoryIntakes.mockReturnValue({ data: [] });
+    useFactoryIntakeRuns.mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() });
     createFactoryIntakeMutateAsync.mockReset();
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
@@ -357,6 +370,56 @@ describe("LinesPage board", () => {
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
+  });
+
+  it("opens an intake work order without adding it to the line board", async () => {
+    const intakeWorkOrder: FactoriesWorkOrder = {
+      id: "work-order-intake",
+      number: "42",
+      title: "Handle duplicate refunds on retry",
+      description: "Keep refund retries idempotent.",
+      state: "STATE_INTAKE",
+      lineDispatches: [
+        {
+          id: "dispatch-intake",
+          line: { id: REFUND_LINE_PLAN_ID },
+          stepExecutions: [
+            {
+              id: "execution-intake",
+              stepIndex: 0,
+              state: "STATE_STARTED",
+              run: { id: "automation-run-1", appId: "app-plan" },
+            },
+          ],
+        },
+      ],
+    };
+    useFactoryWorkOrders.mockReturnValue({ data: [intakeWorkOrder] });
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    useFactoryIntakeRuns.mockReturnValue({
+      data: [
+        {
+          id: "intake-run-1",
+          title: intakeWorkOrder.title,
+          placement: "PLACEMENT_ANALYZING",
+          workOrderId: intakeWorkOrder.id,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const user = userEvent.setup();
+    const linePath = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`;
+
+    renderLinesBoard(`${linePath}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+
+    expect(screen.queryByTestId("work-order-card-work-order-intake")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open Handle duplicate refunds on retry" }));
+
+    const dialog = screen.getByTestId("work-order-split-run");
+    expect(within(dialog).getByRole("heading", { name: "Handle duplicate refunds on retry" })).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(linePath);
   });
 
   it("renames the board title on Enter", async () => {

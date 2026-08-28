@@ -88,7 +88,11 @@ function useLineIntakeDrawerState({
   }
 
   function openIntakeRun(run: IntakeAutomationRun) {
-    const ticket = { id: run.id, title: run.title, appId: run.appId, runId: run.runId };
+    const ticket: LineIntakeAnalyzingTicket = run;
+    if (hasExternalTicketTarget(ticket)) {
+      onOpenTicket?.(ticket);
+      return;
+    }
     setOpenTicket(ticket);
     onOpenTicket?.(ticket);
   }
@@ -102,12 +106,16 @@ function useLineIntakeDrawerState({
   function openAnalyzingTicket(ticket: LineIntakeAnalyzingTicket) {
     setPreviewIntakeId(null);
     setSettingsIntakeId(null);
-    if (ticket.appId && ticket.runId && onOpenTicket) {
-      onOpenTicket(ticket);
+    if (hasExternalTicketTarget(ticket)) {
+      onOpenTicket?.(ticket);
       return;
     }
     setOpenTicket(ticket);
     onOpenTicket?.(ticket);
+  }
+
+  function hasExternalTicketTarget(ticket: LineIntakeAnalyzingTicket): boolean {
+    return Boolean(onOpenTicket && (ticket.workOrderId || (ticket.appId && ticket.runId)));
   }
 
   function selectIntakeTemplate(template: AddIntakeTemplate) {

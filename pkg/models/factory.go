@@ -479,7 +479,13 @@ func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) erro
 }
 
 func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
+	return f.CreateWorkOrderWithOptions(tx, FactoryWorkOrderCreateOptions{
+		Title:       title,
+		Description: description,
+		CreatedBy:   createdBy,
+		Assignees:   assignees,
+		SourceRunID: sourceRunID,
+	})
 }
 
 func (f *Factory) CreateWorkOrderWithOrigin(
@@ -490,20 +496,31 @@ func (f *Factory) CreateWorkOrderWithOrigin(
 	sourceRunID *uuid.UUID,
 	origin WorkOrderOrigin,
 ) (*FactoryWorkOrder, error) {
-	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin)
+	return f.CreateWorkOrderWithOptions(tx, FactoryWorkOrderCreateOptions{
+		Title:       title,
+		Description: description,
+		CreatedBy:   createdBy,
+		Assignees:   assignees,
+		SourceRunID: sourceRunID,
+		Origin:      &origin,
+	})
 }
 
-func (f *Factory) createWorkOrder(
+func (f *Factory) CreateWorkOrderWithOptions(
 	tx *gorm.DB,
-	title, description string,
-	createdBy *uuid.UUID,
-	assignees []uuid.UUID,
-	sourceRunID *uuid.UUID,
-	origin *WorkOrderOrigin,
+	options FactoryWorkOrderCreateOptions,
 ) (*FactoryWorkOrder, error) {
-	title = strings.TrimSpace(title)
+	title := strings.TrimSpace(options.Title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
+	}
+
+	initialState := options.InitialState
+	if initialState == "" {
+		initialState = FactoryWorkOrderStateDraft
+	}
+	if initialState != FactoryWorkOrderStateIntake && initialState != FactoryWorkOrderStateDraft {
+		return nil, fmt.Errorf("%w: cannot create work order in %q", ErrFactoryWorkOrderInvalidState, initialState)
 	}
 
 	// Allocate the sequence number atomically: the UPDATE ... RETURNING
@@ -523,36 +540,37 @@ func (f *Factory) createWorkOrder(
 		FactoryID:      f.ID,
 		Number:         nextNumber,
 		Title:          title,
-		Description:    description,
-		State:          FactoryWorkOrderStateDraft,
+		Description:    options.Description,
+		State:          initialState,
 		Result:         "",
-		CreatedByID:    createdBy,
-		SourceRunID:    sourceRunID,
+		CreatedByID:    options.CreatedBy,
+		SourceRunID:    options.SourceRunID,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
-	applyWorkOrderOrigin(order, origin)
+	applyWorkOrderOrigin(order, options.Origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
 		return nil, err
 	}
 
-	if len(assignees) > 0 {
-		if err := order.ReplaceAssignees(tx, assignees); err != nil {
+	if len(options.Assignees) > 0 {
+		if err := order.ReplaceAssignees(tx, options.Assignees); err != nil {
 			return nil, err
 		}
 	}
 
-	// Creation is a status transition into `draft` (fromState == "").
+	// Creation is a status transition into the requested initial state
+	// (fromState == "").
 	// For orders spawned by a canvas run we snapshot the originating
 	// run + app here so the very first timeline entry links back to
 	// the run that created the order — matching the enrichment
 	// UpdateStatus performs on the draft → open promotion.
 	initialStatus := statusUpdatedRecord{
-		Actor:   createdBy,
-		ToState: FactoryWorkOrderStateDraft,
+		Actor:   options.CreatedBy,
+		ToState: initialState,
 	}
-	if sourceRunID != nil {
+	if options.SourceRunID != nil {
 		sourceRun, sourceApp, err := order.loadSourceRunRefs(tx)
 		if err != nil {
 			return nil, err

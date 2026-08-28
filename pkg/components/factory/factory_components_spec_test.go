@@ -16,6 +16,10 @@ import (
 // without spinning up a database. Only UpdateWorkOrderStatus and
 // FindWorkOrder are wired up; the rest of the interface returns zero values.
 type fakeFactoryContext struct {
+	createParams core.WorkOrderParams
+	createOrder  *core.WorkOrder
+	createErr    error
+
 	statusCalls int
 	nextChanged bool
 	nextErr     error
@@ -44,8 +48,9 @@ type fakeFactoryContext struct {
 	setStatusNoteErr    error
 }
 
-func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
-	return nil, nil
+func (f *fakeFactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
+	f.createParams = params
+	return f.createOrder, f.createErr
 }
 
 func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
@@ -84,6 +89,62 @@ func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStat
 	f.setStatusNoteCalls++
 	f.setStatusNoteParams = params
 	return f.setStatusNoteResult, f.setStatusNoteErr
+}
+
+func TestCreateWorkOrder_Execute(t *testing.T) {
+	component := &CreateWorkOrder{}
+
+	t.Run("defaults the initial state to draft", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createOrder: &core.WorkOrder{ID: "wo-1", State: "draft"}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"title":       "Handle duplicate refunds",
+				"description": "Issue body",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "draft", factoryCtx.createParams.InitialState)
+	})
+
+	t.Run("passes the intake initial state", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{createOrder: &core.WorkOrder{ID: "wo-2", State: "intake"}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"title": "Analyze issue",
+				"state": "intake",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "intake", factoryCtx.createParams.InitialState)
+	})
+}
+
+func TestCreateWorkOrder_ConfigurationAllowsOnlyInitialStates(t *testing.T) {
+	fields := (&CreateWorkOrder{}).Configuration()
+
+	require.NoError(t, configuration.ValidateConfiguration(fields, map[string]any{
+		"title": "Default to draft",
+	}))
+
+	for _, state := range []string{"intake", "draft"} {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"title": "Analyze issue",
+			"state": state,
+		})
+		require.NoError(t, err)
+	}
+
+	err := configuration.ValidateConfiguration(fields, map[string]any{
+		"title": "Analyze issue",
+		"state": "open",
+	})
+	require.Error(t, err)
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {

@@ -90,7 +90,6 @@ type intakeRunContext struct {
 	graph      intakeGraph
 	rootEvents map[uuid.UUID]models.CanvasEvent
 	analyses   map[uuid.UUID]models.CanvasNodeExecution
-	creations  map[uuid.UUID]models.CanvasNodeExecution
 	scores     map[uuid.UUID]int
 	orders     map[uuid.UUID]models.FactoryWorkOrder
 	stages     map[uuid.UUID]string
@@ -152,7 +151,6 @@ func loadIntakeRunContext(
 	context := intakeRunContext{
 		rootEvents: map[uuid.UUID]models.CanvasEvent{},
 		analyses:   map[uuid.UUID]models.CanvasNodeExecution{},
-		creations:  map[uuid.UUID]models.CanvasNodeExecution{},
 		scores:     map[uuid.UUID]int{},
 		orders:     map[uuid.UUID]models.FactoryWorkOrder{},
 		stages:     map[uuid.UUID]string{},
@@ -181,12 +179,9 @@ func loadIntakeRunContext(
 
 	analysisIDs := make([]uuid.UUID, 0, len(runs))
 	for _, execution := range executions {
-		switch execution.NodeID {
-		case context.graph.AnalysisNodeID:
+		if execution.NodeID == context.graph.AnalysisNodeID {
 			context.analyses[execution.RunID] = execution
 			analysisIDs = append(analysisIDs, execution.ID)
-		case context.graph.CreateNodeID:
-			context.creations[execution.RunID] = execution
 		}
 	}
 
@@ -284,27 +279,22 @@ func latestDispatchStage(record models.FactoryWorkOrderLineDispatchRecord) strin
 }
 
 func intakeRunPlacement(run models.CanvasRun, context intakeRunContext) pb.FactoryIntakeRun_Placement {
-	analysis, ok := context.analyses[run.ID]
-	if !ok || analysis.State != models.CanvasNodeExecutionStateFinished {
-		return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
-	}
-
-	// A failed analysis is reported as a rejection: the intake looked at the
-	// item and did not put it in the backlog.
-	if analysis.Result == models.CanvasNodeExecutionResultFailed {
+	if run.State == models.CanvasRunStateFinished && run.Result == models.CanvasRunResultFailed {
 		return pb.FactoryIntakeRun_PLACEMENT_REJECTED
 	}
 
-	creation, ok := context.creations[run.ID]
-	if !ok || creation.Result != models.CanvasNodeExecutionResultPassed {
-		return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
+	if order, ok := context.orders[run.ID]; ok && order.State != models.FactoryWorkOrderStateIntake {
+		if context.stages[run.ID] != "" {
+			return pb.FactoryIntakeRun_PLACEMENT_PROGRESSED
+		}
+		return pb.FactoryIntakeRun_PLACEMENT_BACKLOG
 	}
 
-	if context.stages[run.ID] != "" {
-		return pb.FactoryIntakeRun_PLACEMENT_PROGRESSED
+	if run.State != models.CanvasRunStateFinished {
+		return pb.FactoryIntakeRun_PLACEMENT_ANALYZING
 	}
 
-	return pb.FactoryIntakeRun_PLACEMENT_BACKLOG
+	return pb.FactoryIntakeRun_PLACEMENT_BELOW_THRESHOLD
 }
 
 // intakeRunTitle reads the item's title out of the trigger payload. Each source

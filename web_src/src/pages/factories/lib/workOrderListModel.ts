@@ -16,6 +16,7 @@ import {
   type WorkOrderBoardLaneId,
   type WorkOrderDisplayStatus,
 } from "./workOrderProgress";
+import { visibleWorkOrdersForCollections } from "./workOrderVisibility";
 
 /**
  * Presentation model built on top of a `FactoriesWorkOrder`. It centralizes
@@ -218,7 +219,7 @@ export function buildWorkOrderListEntries(
   orders: FactoriesWorkOrder[],
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry[] {
-  return orders.map((order) => buildWorkOrderListEntry(order, factory));
+  return visibleWorkOrdersForCollections(orders).map((order) => buildWorkOrderListEntry(order, factory));
 }
 
 /**

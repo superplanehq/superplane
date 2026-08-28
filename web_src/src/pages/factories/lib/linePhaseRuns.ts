@@ -12,6 +12,7 @@ import {
   isQueuedStepRow,
   type WorkOrderStepRow,
 } from "./workOrderExecutions";
+import { visibleWorkOrdersForCollections } from "./workOrderVisibility";
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
 
 /** Phase status expressed with a distinct glyph shape, not colour alone. */
@@ -91,7 +92,7 @@ export function buildLinePhaseBoard(
     tick: null,
   }));
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, visibleWorkOrdersForCollections(workOrders));
   for (const column of columns) {
     column.runs = runsByStep.get(column.stepIndex) ?? [];
     column.tick = resolvePhaseTick(column.runs);
@@ -115,7 +116,7 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
  * come first.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+  return visibleWorkOrdersForCollections(workOrders).filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
 }
 
 /**
@@ -129,7 +130,7 @@ export function collectLineDoneOrders(
 ): FactoriesWorkOrder[] {
   const doneById = new Map<string, FactoriesWorkOrder>();
 
-  for (const order of workOrders) {
+  for (const order of visibleWorkOrdersForCollections(workOrders)) {
     if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
       continue;
     }

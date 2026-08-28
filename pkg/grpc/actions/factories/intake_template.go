@@ -19,15 +19,18 @@ const (
 	intakeThresholdNodeID        = "threshold"
 	intakeCreateNodeID           = "create-work-order"
 	intakeReportConfidenceNodeID = "report-confidence"
+	intakePromotionNodeID        = "promote-work-order"
 
 	// The threshold expression reads the analysis result by node name, so the
 	// name is part of the generated graph's contract.
-	intakeAnalysisNodeName = "Analyze intake"
-	intakeCreateNodeName   = "Create Work Order"
+	intakeAnalysisNodeName  = "Analyze intake"
+	intakeCreateNodeName    = "Create Work Order"
+	intakePromotionNodeName = "Promote Work Order"
 
 	intakeThresholdComponent        = "if"
 	intakeCreateComponent           = "createWorkOrder"
 	intakeReportConfidenceComponent = "reportWorkOrderCheck"
+	intakePromotionComponent        = "updateWorkOrderStatus"
 
 	intakeConfidenceCheckKey  = "confidence"
 	intakeConfidenceCheckName = "Confidence score"
@@ -136,8 +139,9 @@ func intakeDefaultDescription(source string) string {
 }
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
-// source, score the item with an agent, and create a work order when the score
-// clears the threshold. The binding tells the trigger which installation and
+// source, create a non-dispatchable intake order, score it with an agent, and
+// promote it to draft when the score clears the threshold. The binding tells
+// the trigger which installation and
 // resource to listen on, and the agent tells the analysis node which runner to
 // score with; without them the user completes those nodes by hand.
 func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
@@ -160,10 +164,11 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 		},
 		Spec: &yaml.CanvasSpec{
 			Edges: []yaml.Edge{
-				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
-				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeThresholdNodeID},
-				{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakeCreateNodeID},
-				{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeReportConfidenceNodeID},
+				{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
+				{Channel: "default", SourceID: intakeCreateNodeID, TargetID: intakeAnalysisNodeID},
+				{Channel: "passed", SourceID: intakeAnalysisNodeID, TargetID: intakeReportConfidenceNodeID},
+				{Channel: "default", SourceID: intakeReportConfidenceNodeID, TargetID: intakeThresholdNodeID},
+				{Channel: "true", SourceID: intakeThresholdNodeID, TargetID: intakePromotionNodeID},
 			},
 			Nodes: []yaml.Node{
 				{
@@ -176,26 +181,6 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 					Position:      yaml.Position{X: 160, Y: 80},
 				},
 				{
-					ID:            intakeAnalysisNodeID,
-					Name:          intakeAnalysisNodeName,
-					Type:          yaml.NodeTypeAction,
-					Component:     request.Agent.component(),
-					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
-					Concurrency:   intakeConcurrency(),
-					Position:      yaml.Position{X: 160, Y: 260},
-				},
-				{
-					ID:        intakeThresholdNodeID,
-					Name:      "Meets confidence threshold?",
-					Type:      yaml.NodeTypeAction,
-					Component: intakeThresholdComponent,
-					Configuration: map[string]any{
-						"expression": intakeThresholdExpression(request.ConfidencePct),
-					},
-					Concurrency: intakeConcurrency(),
-					Position:    yaml.Position{X: 160, Y: 440},
-				},
-				{
 					ID:        intakeCreateNodeID,
 					Name:      intakeCreateNodeName,
 					Type:      yaml.NodeTypeAction,
@@ -203,9 +188,19 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 					Configuration: map[string]any{
 						"title":       spec.createTitle,
 						"description": spec.createDescription,
+						"state":       models.FactoryWorkOrderStateIntake,
 					},
 					Concurrency: intakeConcurrency(),
-					Position:    yaml.Position{X: 160, Y: 620},
+					Position:    yaml.Position{X: 160, Y: 260},
+				},
+				{
+					ID:            intakeAnalysisNodeID,
+					Name:          intakeAnalysisNodeName,
+					Type:          yaml.NodeTypeAction,
+					Component:     request.Agent.component(),
+					Configuration: intakeAnalysisConfiguration(spec, request.Agent),
+					Concurrency:   intakeConcurrency(),
+					Position:      yaml.Position{X: 160, Y: 440},
 				},
 				{
 					ID:        intakeReportConfidenceNodeID,
@@ -226,7 +221,30 @@ func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 						"analysis":   intakeConfidenceWriteupExpression(spec.analysisSubject),
 					},
 					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 620},
+				},
+				{
+					ID:        intakeThresholdNodeID,
+					Name:      "Meets confidence threshold?",
+					Type:      yaml.NodeTypeAction,
+					Component: intakeThresholdComponent,
+					Configuration: map[string]any{
+						"expression": intakeThresholdExpression(request.ConfidencePct),
+					},
+					Concurrency: intakeConcurrency(),
 					Position:    yaml.Position{X: 160, Y: 800},
+				},
+				{
+					ID:        intakePromotionNodeID,
+					Name:      intakePromotionNodeName,
+					Type:      yaml.NodeTypeAction,
+					Component: intakePromotionComponent,
+					Configuration: map[string]any{
+						"orderId": intakeWorkOrderIDExpression(),
+						"status":  models.FactoryWorkOrderStateDraft,
+					},
+					Concurrency: intakeConcurrency(),
+					Position:    yaml.Position{X: 160, Y: 980},
 				},
 			},
 		},
