@@ -618,8 +618,8 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const name = description
     ? description
     : entry.pullRequestNumber
-      ? `Address feedback on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
-      : "Address PR feedback";
+      ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
+      : "Activity on PR";
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
     {

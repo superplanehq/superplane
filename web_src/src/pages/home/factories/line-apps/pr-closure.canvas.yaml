@@ -58,6 +58,7 @@ spec:
       component: addPullRequestActivity
       configuration:
         pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        description: '{{ "PR #" + string(root().data.pull_request.number) + " was " + (root().data.pull_request.merged == true ? "merged" : "closed") }}'
       position:
         x: 1272
         'y': 612
