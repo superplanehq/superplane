@@ -1,17 +1,13 @@
-import type { FactoriesFactoryLine } from "@/api-client";
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, Play, XIcon } from "lucide-react";
+import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
-import { firstFactoryLineName } from "./lib/factoryPagePaths";
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
 
@@ -37,11 +33,8 @@ function CreateWorkOrderDialogSession({
   onCreated: (orderNumber: string) => void;
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
-  const { canAct } = usePermissions();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
-  const lines = factory?.lines ?? [];
   const [isExpanded, setIsExpanded] = useState(false);
-  const canDispatch = canAct("work_orders", "update");
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -50,7 +43,7 @@ function CreateWorkOrderDialogSession({
   };
 
   const handleClose = () => {
-    if (composer.isSaving) {
+    if (composer.isCreating) {
       return;
     }
     onClose();
@@ -99,25 +92,16 @@ function CreateWorkOrderDialogSession({
             <WorkOrderDescriptionEditor
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
-              disabled={composer.isSaving}
+              disabled={composer.isCreating}
               onChange={composer.updateDescription}
             />
           </div>
         </div>
 
         <CreateWorkOrderDialogFooter
-          lines={lines}
-          canDispatch={canDispatch}
-          canSaveDraft={composer.canSaveDraft}
-          isSavingDraft={composer.isSavingDraft}
-          isSendingToLine={composer.isSendingToLine}
-          onSaveDraft={() => void composer.handleSaveDraft()}
-          onStart={() => {
-            const lineName = firstFactoryLineName({ lines });
-            if (lineName) {
-              void composer.handleSendToLine(lineName);
-            }
-          }}
+          canCreate={composer.canCreate}
+          isCreating={composer.isCreating}
+          onCreate={() => void composer.handleCreate()}
         />
       </DialogContent>
     </Dialog>
@@ -173,83 +157,27 @@ function CreateWorkOrderDialogHeader({
 }
 
 function CreateWorkOrderDialogFooter({
-  lines,
-  canDispatch,
-  canSaveDraft,
-  isSavingDraft,
-  isSendingToLine,
-  onSaveDraft,
-  onStart,
+  canCreate,
+  isCreating,
+  onCreate,
 }: {
-  lines: FactoriesFactoryLine[];
-  canDispatch: boolean;
-  canSaveDraft: boolean;
-  isSavingDraft: boolean;
-  isSendingToLine: boolean;
-  onSaveDraft: () => void;
-  onStart: () => void;
+  canCreate: boolean;
+  isCreating: boolean;
+  onCreate: () => void;
 }) {
   return (
     <div className="relative z-10 flex items-center justify-end gap-3 border-t border-border px-4 py-3">
-      <div className="flex shrink-0 items-center gap-2">
-        <LoadingButton
-          type="button"
-          variant="outline"
-          disabled={!canSaveDraft}
-          loading={isSavingDraft}
-          loadingText="Saving..."
-          onClick={onSaveDraft}
-          className="h-8 rounded-full px-4"
-          data-testid="work-order-create-draft-button"
-        >
-          Save as draft
-        </LoadingButton>
-
-        <StartWorkOrderButton
-          lines={lines}
-          canDispatch={canDispatch}
-          canSaveDraft={canSaveDraft}
-          isSendingToLine={isSendingToLine}
-          onStart={onStart}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StartWorkOrderButton({
-  lines,
-  canDispatch,
-  canSaveDraft,
-  isSendingToLine,
-  onStart,
-}: {
-  lines: FactoriesFactoryLine[];
-  canDispatch: boolean;
-  canSaveDraft: boolean;
-  isSendingToLine: boolean;
-  onStart: () => void;
-}) {
-  const hasLines = Boolean(firstFactoryLineName({ lines }));
-  const isDisabled = !canDispatch || !canSaveDraft || !hasLines;
-  const tooltipMessage = !canDispatch
-    ? "You do not have permission to start tasks."
-    : "This workspace has no line to start this task on.";
-
-  return (
-    <PermissionTooltip allowed={canDispatch && hasLines} message={tooltipMessage}>
       <LoadingButton
         type="button"
-        disabled={isDisabled}
-        loading={isSendingToLine}
-        loadingText="Starting..."
-        onClick={onStart}
-        className="h-8 shrink-0 rounded-full px-4"
-        data-testid="work-order-create-start"
+        disabled={!canCreate}
+        loading={isCreating}
+        loadingText="Creating..."
+        onClick={onCreate}
+        className="h-8 rounded-full px-4"
+        data-testid="work-order-create-button"
       >
-        <Play className="size-3.5" aria-hidden />
-        Start
+        Create
       </LoadingButton>
-    </PermissionTooltip>
+    </div>
   );
 }
