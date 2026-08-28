@@ -1,4 +1,5 @@
 import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
@@ -55,7 +56,9 @@ function useSplitRunWorkOrderExtras(
   );
   const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(order ? pullRequests : [], handlers);
-  return { orderChecks, prFeedbackRuns };
+  const { runsByWorkOrder } = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const analysisRuns = orderId ? (runsByWorkOrder.get(orderId) ?? []) : [];
+  return { orderChecks, prFeedbackRuns, analysisRuns };
 }
 
 export function useFactoryAppSplitRunPage() {
@@ -64,10 +67,10 @@ export function useFactoryAppSplitRunPage() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
-  const { orderChecks, prFeedbackRuns } = useSplitRunWorkOrderExtras(organizationId, factoryId, order);
+  const { orderChecks, prFeedbackRuns, analysisRuns } = useSplitRunWorkOrderExtras(organizationId, factoryId, order);
   const fixture = useMemo(
-    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns),
-    [order, orderChecks, prFeedbackRuns, query.lineId],
+    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns, analysisRuns),
+    [order, orderChecks, prFeedbackRuns, analysisRuns, query.lineId],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(

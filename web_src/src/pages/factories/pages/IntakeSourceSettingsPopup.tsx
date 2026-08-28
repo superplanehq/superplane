@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { CanvasPage } from "@/ui/CanvasPage";
@@ -158,32 +157,6 @@ export function IntakeSourceSettingsPopup({
                   />
                 </div>
               </fieldset>
-
-              <section>
-                <div className="flex items-baseline justify-between gap-3">
-                  <Label htmlFor="intake-confidence-slider">{INTAKE_SETTINGS_COPY.confidenceLabel}</Label>
-                  <span
-                    className="text-[13px] font-medium tabular-nums text-foreground"
-                    data-testid="intake-confidence-value"
-                  >
-                    {draft.confidencePct}%
-                  </span>
-                </div>
-                <p className="workspace-body-text mt-1 text-muted-foreground">
-                  {INTAKE_SETTINGS_COPY.confidenceHelper}
-                </p>
-                <Slider
-                  id="intake-confidence-slider"
-                  className="mt-4 max-w-xs"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={[draft.confidencePct]}
-                  onValueChange={(values) => update("confidencePct", values[0] ?? draft.confidencePct)}
-                  aria-label={INTAKE_SETTINGS_COPY.confidenceLabel}
-                  data-testid="intake-confidence-slider"
-                />
-              </section>
 
               <GitHubIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={setDraft} />
             </div>

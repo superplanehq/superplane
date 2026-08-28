@@ -62,8 +62,8 @@ export interface LineIntakeSource {
 }
 
 /**
- * Intake is an automation that listens to an external source, decides which
- * events to take in, and creates backlog work orders with that context.
+ * Intake is an automation that listens to an external source and creates
+ * backlog work orders. SuperPlane scores those work orders in Backlog.
  */
 export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
@@ -77,8 +77,8 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On GitHub issue",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the issue and decides whether to create a work order.",
+      label: "Create a work order",
+      rule: "A matching GitHub issue becomes a work order in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -96,8 +96,8 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On Sentry exception",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the exception and decides whether to create a work order.",
+      label: "Create a work order",
+      rule: "A matching Sentry exception becomes a work order in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -115,8 +115,8 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On PagerDuty incident",
     },
     evaluate: {
-      label: "Classify with a runner",
-      rule: "A runner classifies the incident and decides whether to create a work order.",
+      label: "Create a work order",
+      rule: "A matching PagerDuty incident becomes a work order in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
@@ -242,10 +242,10 @@ export function intakeTicketConfidenceScore(ticket: LineIntakeAnalyzingTicket): 
 }
 
 export const LINE_INTAKE_COPY = {
-  analyzingTitle: "Analyzing",
+  analyzingTitle: "Creating",
   analyzingHelper: "Tickets from this intake.",
-  analyzingStatus: "Analyzing",
-  analyzingEmpty: "No tickets in analysis.",
+  analyzingStatus: "Creating",
+  analyzingEmpty: "No intake runs in progress.",
   belowThresholdStatus: "Not accepted",
   belowThresholdHelper: "Not accepted. The score is below the minimum confidence.",
   needsRepair: "Needs repair",

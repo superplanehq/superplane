@@ -33,6 +33,7 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
@@ -289,6 +290,8 @@ export type SplitRunFixtureOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   /** Person who stopped the current automation, when known. */
   stoppedBy?: OrgUserDisplay;
+  /** Backlog analysis runs for this work order, shown as extra Log phases. */
+  analysisRuns?: BacklogAnalysisRun[];
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -308,9 +311,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const demoArtifacts = options?.demoArtifacts !== false;
   const phases = [
     ...phasesForOrder(order, executions, options?.checks, demoArtifacts),
+    ...phasesForAnalysisRuns(options?.analysisRuns ?? [], options?.checks),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
-  const activeFeedbackPhaseId = activePRFeedbackPhaseId(phases);
+  const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
     title: order.title ?? "Work order",
     descriptionText: order.description ?? "",
@@ -323,9 +327,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
-    currentPhaseId:
-      activeFeedbackPhaseId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
-    openPhaseId: activeFeedbackPhaseId,
+    currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
+    openPhaseId: activeAutomationId,
     phases,
     source: splitRunSourceForOrder(order),
     ...reviewSurfaces(order, displayStatus, {
@@ -333,7 +336,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
-      addressingFeedback: Boolean(activeFeedbackPhaseId),
+      addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
       stoppedBy: options?.stoppedBy,
     }),
   };
@@ -518,6 +521,67 @@ function phasesForOrder(
   ];
 }
 
+const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
+
+/**
+ * Backlog analysis runs of this work order, oldest first. Each phase keeps
+ * its run, so the log panel streams the analysis while the automation
+ * still works. The newest phase carries the reported score.
+ */
+function phasesForAnalysisRuns(runs: BacklogAnalysisRun[], apiChecks?: FactoriesWorkOrderCheck[]): SplitRunPhase[] {
+  const ordered = [...runs]
+    .filter((entry) => Boolean(entry.canvasId && entry.run.id))
+    .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? ""));
+
+  return ordered.map((entry, index) =>
+    analysisRunToPhase(entry, index === ordered.length - 1 ? confidenceChecks(apiChecks) : undefined),
+  );
+}
+
+function analysisRunToPhase(entry: BacklogAnalysisRun, checks?: WorkOrderCheckPresentation[]): SplitRunPhase {
+  const status = statusForCanvasRun(entry.run);
+  const componentName = CONFIDENCE_CHECK_NAME;
+  const duration = durationForExecution(
+    {
+      createdAt: entry.run.createdAt,
+      updatedAt: entry.run.finishedAt ?? entry.run.updatedAt ?? entry.run.createdAt,
+    },
+    status,
+  );
+  const line: SplitRunStreamLine = {
+    id: entry.run.id ?? componentName,
+    at: clockLabel(entry.run.createdAt),
+    componentName,
+    status,
+    duration,
+    kind: "action",
+    componentType: componentName,
+    action: status === "passed" ? "passed" : status === "failed" ? "failed" : status === "running" ? "running" : "—",
+    iconSlug: "box",
+  };
+  return {
+    id: `${ANALYSIS_PHASE_ID_PREFIX}${entry.run.id}`,
+    name: "Backlog",
+    status,
+    duration,
+    componentName,
+    artifacts: [],
+    checks,
+    stream: [line],
+    canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
+    appId: entry.canvasId,
+    runId: entry.run.id,
+  };
+}
+
+function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
+  const reported = (apiChecks ?? []).filter((check) => (check.name ?? "") === CONFIDENCE_CHECK_NAME);
+  if (reported.length === 0) {
+    return undefined;
+  }
+  return presentWorkOrderChecks(reported);
+}
+
 function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[]): SplitRunPhase[] {
   return [...runs]
     .filter((entry) => Boolean(entry.canvasId && entry.run.id))
@@ -526,8 +590,21 @@ function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[]): SplitRunPhase[] {
 }
 
 function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | undefined {
+  return activePhaseIdWithPrefix(phases, "pr-feedback-");
+}
+
+/**
+ * Factory-level automation that works on this order right now: a PR-feedback
+ * run or a Backlog analysis run. The popup opens its log so the progress is
+ * visible without another click.
+ */
+function activeAutomationPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | undefined {
+  return activePRFeedbackPhaseId(phases) ?? activePhaseIdWithPrefix(phases, ANALYSIS_PHASE_ID_PREFIX);
+}
+
+function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): SplitRunPhaseId | undefined {
   return phases.find(
-    (phase) => phase.id.startsWith("pr-feedback-") && (phase.status === "running" || phase.status === "pending"),
+    (phase) => phase.id.startsWith(prefix) && (phase.status === "running" || phase.status === "pending"),
   )?.id;
 }
 
