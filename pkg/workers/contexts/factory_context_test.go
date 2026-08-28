@@ -44,6 +44,7 @@ func TestFactoryContext_CreateWorkOrder(t *testing.T) {
 		assert.Equal(t, run.ID, *persisted.SourceRunID)
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, persisted.State,
 			"work orders now start as draft and are promoted to open on first dispatch")
+		assert.Empty(t, persisted.Assignees)
 
 		// Creation emits a single `order.status.updated` ("" → draft).
 		events, err := persisted.ListEvents(database.Conn(), 0, nil)

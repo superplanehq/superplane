@@ -298,7 +298,8 @@ func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID,
 // `order.status.updated` event enriched with the caller's attribution
 // (actor / automation / run + app). On the initial `draft → open` we also
 // snapshot the originating run/app from `o.SourceRunID`, so the timeline
-// can always trace an order back to the run that created it.
+// can always trace an order back to the run that created it. When a
+// person opens the draft, they become the owner.
 //
 // The bool return reports whether a transition was actually recorded:
 // `true` on a real state change, `false` when SkipSame swallowed a no-op
@@ -372,6 +373,12 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// queue; a queued dispatch has no run to finish it later.
 		if toState == FactoryWorkOrderStateClosed {
 			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
+		}
+
+		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
+			if err := o.assignPersonWhoOpened(tx, *update.Actor); err != nil {
 				return err
 			}
 		}
@@ -461,6 +468,16 @@ func (o *FactoryWorkOrder) TransitionOnDispatch(tx *gorm.DB, actor *uuid.UUID) e
 		Actor:   actor,
 	})
 	return err
+}
+
+func (o *FactoryWorkOrder) assignPersonWhoOpened(tx *gorm.DB, actor uuid.UUID) error {
+	if err := tx.Where("work_order_id = ?", o.ID).Find(&o.Assignees).Error; err != nil {
+		return err
+	}
+	if len(o.Assignees) == 1 && o.Assignees[0].UserID == actor {
+		return nil
+	}
+	return o.UpdateAssignees(tx, []uuid.UUID{actor}, actor)
 }
 
 func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID) error {
