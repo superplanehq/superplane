@@ -9,7 +9,12 @@ import { cn } from "@/lib/utils";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { createWorkOrderPath, factoryHomePath, factoryVelocityPath, workOrdersPath } from "../../lib/factoryPagePaths";
+import {
+  createWorkOrderPath,
+  factoryVelocityPath,
+  workOrderOpenPath,
+  workOrdersPath,
+} from "../../lib/factoryPagePaths";
 import {
   WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
   WORK_ORDER_ATTENTION_ICON,
@@ -159,9 +164,14 @@ const MAX_OVERVIEW_ROWS = 3;
  */
 const MAX_SHIPPED_ROWS = 5;
 
-/** Detail route from a workspace-scoped key like "SP-61" (mock-only parsing). */
-function workOrderHref(organizationId: string, factoryKey: string, _workOrderKey: string) {
-  return factoryHomePath(organizationId, factoryKey);
+function workOrderNumberFromKey(workOrderKey: string): string | undefined {
+  const digits = workOrderKey.match(/(\d+)$/)?.[1];
+  return digits;
+}
+
+/** Detail route from a workspace-scoped key like "SP-61". */
+function workOrderHref(organizationId: string, factoryKey: string, workOrderKey: string) {
+  return workOrderOpenPath(organizationId, factoryKey, workOrderNumberFromKey(workOrderKey));
 }
 
 /**

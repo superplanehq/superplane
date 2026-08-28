@@ -2,7 +2,7 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Link } from "react-router";
-import { factoryHomePath } from "../lib/factoryPagePaths";
+import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatCompactTokens, formatUsdCents } from "../lib/workOrderUsage";
@@ -82,7 +82,7 @@ function TableRow({
   onAssigneesSave,
 }: WorkOrdersTableViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href = factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
+  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article
