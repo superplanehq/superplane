@@ -13,7 +13,7 @@ type CanvasNode = {
   name?: string;
   component?: string;
   concurrency?: { max?: number };
-  configuration?: { model?: string; message?: string; steps?: AgentStep[] };
+  configuration?: { model?: string; message?: string; steps?: AgentStep[]; script?: string };
 };
 
 function canvasNodes(canvasYaml: string): CanvasNode[] {
@@ -282,6 +282,18 @@ describe("setup factory line apps", () => {
     expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
     expect(steps["Implementation"]?.workingDirectory).toBe("repo");
     expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
+  });
+
+  it("pushes the created branch without an empty initialize commit", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const script = canvasNodes(implementation).find((node) => node.id === "create-branch")?.configuration?.script ?? "";
+
+    // The implementation agent adds the first real commit downstream, so
+    // Create Branch only checks out and pushes the branch at the base SHA.
+    expect(script).toContain('git checkout -b "$BRANCH"');
+    expect(script).toContain('git push -u origin "$BRANCH"');
+    expect(script).not.toContain("--allow-empty");
+    expect(script).not.toContain("chore: initialize");
   });
 });
 
