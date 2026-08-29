@@ -200,18 +200,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("Run Bash"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-line-create-branch")).not.toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
-    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText(">")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).not.toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
+    expect(
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText(">"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-node-indent")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("├──"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("├──"),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("└──"),
     ).not.toBeInTheDocument();
     const implementStream = screen.getByTestId("split-run-stream-implement");
     const note = within(implementStream).getByText("Provide Plan");
@@ -291,10 +293,10 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-stream-line-create-branch")).getByRole("button"));
+    await user.click(within(screen.getByTestId("split-run-stream-line-onrun-implement")).getByRole("button"));
 
-    expect(screen.getByTestId("split-run-stream-line-create-branch")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.queryByTestId("split-run-canvas-node-create-branch")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.queryByTestId("split-run-canvas-node-onrun-implement")).not.toBeInTheDocument();
   });
 
   it("puts risk score and code quality on the verify step", () => {
