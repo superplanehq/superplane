@@ -64,7 +64,9 @@ func (a *ArgoCD) Configuration() []configuration.Field {
 }
 
 func (a *ArgoCD) Actions() []core.Action {
-	return nil
+	return []core.Action{
+		&GetApplication{},
+	}
 }
 
 func (a *ArgoCD) Triggers() []core.Trigger {

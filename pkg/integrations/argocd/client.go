@@ -89,7 +89,7 @@ func readServerURL(integration core.IntegrationContext) (string, error) {
 }
 
 func (c *Client) Verify() error {
-	response, err := c.do(http.MethodGet, versionPath)
+	response, err := c.do(http.MethodGet, versionPath, nil)
 	if err != nil {
 		return err
 	}
@@ -102,8 +102,37 @@ func (c *Client) Verify() error {
 	return nil
 }
 
-func (c *Client) do(method, path string) (*http.Response, error) {
-	request, err := http.NewRequest(method, c.serverURL+path, nil)
+func (c *Client) GetApplication(project, name, appNamespace string) (Application, error) {
+	query := url.Values{"project": []string{project}}
+	if appNamespace != "" {
+		query.Set("appNamespace", appNamespace)
+	}
+
+	response, err := c.do(http.MethodGet, "/api/v1/applications/"+url.PathEscape(name), query)
+	if err != nil {
+		return Application{}, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return Application{}, parseAPIError(response)
+	}
+
+	application := Application{}
+	if err := json.NewDecoder(response.Body).Decode(&application); err != nil {
+		return Application{}, fmt.Errorf("decode Argo CD application response: %w", err)
+	}
+
+	return application, nil
+}
+
+func (c *Client) do(method, path string, query url.Values) (*http.Response, error) {
+	target := c.serverURL + path
+	if len(query) > 0 {
+		target += "?" + query.Encode()
+	}
+
+	request, err := http.NewRequest(method, target, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build Argo CD request: %w", err)
 	}
