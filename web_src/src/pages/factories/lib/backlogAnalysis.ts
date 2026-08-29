@@ -87,3 +87,67 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   }
   return value as Record<string, unknown>;
 }
+
+/**
+ * Optimistic "an analysis is expected" store, keyed by work order id.
+ *
+ * A freshly created draft has no Backlog run yet — the run is created
+ * asynchronously after the create RPC returns — so the board cannot learn
+ * "analyzing" from real run data alone. This tiny external store lets the
+ * create mutation say "show analyzing now" the moment it succeeds, while
+ * `useBacklogAnalysisRuns` keeps polling until the real run (or its result)
+ * shows up. Entries self-clean via a TTL backstop so a card can never get
+ * stuck in "Analyzing" if a run never appears.
+ */
+const PENDING_ANALYSIS_TTL_MS = 60_000;
+
+const pendingAnalysis = new Map<string, number>();
+const pendingAnalysisListeners = new Set<() => void>();
+let pendingAnalysisSnapshot: ReadonlySet<string> = new Set();
+
+function notifyPendingAnalysisListeners(): void {
+  pendingAnalysisSnapshot = new Set(pendingAnalysis.keys());
+  for (const listener of pendingAnalysisListeners) {
+    listener();
+  }
+}
+
+/** Mark a work order as expecting a Backlog analysis run. */
+export function markBacklogAnalysisPending(workOrderId: string | undefined | null): void {
+  if (!workOrderId) {
+    return;
+  }
+  pendingAnalysis.set(workOrderId, Date.now() + PENDING_ANALYSIS_TTL_MS);
+  notifyPendingAnalysisListeners();
+}
+
+/** Clear a work order once its real run (or result) is known. */
+export function clearBacklogAnalysisPending(workOrderId: string | undefined | null): void {
+  if (!workOrderId || !pendingAnalysis.delete(workOrderId)) {
+    return;
+  }
+  notifyPendingAnalysisListeners();
+}
+
+/** Live pending ids, pruning anything past its TTL. */
+export function pendingBacklogAnalysisIds(now = Date.now()): ReadonlySet<string> {
+  let pruned = false;
+  for (const [workOrderId, expiresAt] of pendingAnalysis) {
+    if (expiresAt <= now) {
+      pendingAnalysis.delete(workOrderId);
+      pruned = true;
+    }
+  }
+  if (pruned) {
+    notifyPendingAnalysisListeners();
+  }
+  return pendingAnalysisSnapshot;
+}
+
+/** Subscribe to pending-set changes; returns an unsubscribe function. */
+export function subscribeBacklogAnalysisPending(listener: () => void): () => void {
+  pendingAnalysisListeners.add(listener);
+  return () => {
+    pendingAnalysisListeners.delete(listener);
+  };
+}
