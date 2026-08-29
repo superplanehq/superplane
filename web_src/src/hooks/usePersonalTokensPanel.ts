@@ -1,18 +1,27 @@
 import { useState } from "react";
+import type { MeUserApiToken } from "@/api-client/types.gen";
 import { useUserTokens, useCreateUserToken, useRevokeUserToken } from "@/hooks/useUserTokens";
 import { getApiErrorMessage } from "@/lib/errors";
+import { showSuccessToast } from "@/lib/toast";
 
 export interface RevealedPersonalToken {
   id: string;
+  name: string;
   plaintext: string;
 }
 
+export interface PersonalTokenTarget {
+  id: string;
+  name: string;
+}
+
+export type PersonalTokensPanel = ReturnType<typeof usePersonalTokensPanel>;
+
 /**
- * Encapsulates the state and actions behind the personal API tokens panel
- * shown on Profile and the factory General settings page: the create form,
- * the create-once secret reveal, and per-row revoke. Both pages render their
- * own markup around this shared state so each can match its surrounding
- * design language.
+ * State behind the personal API tokens panel on Profile and on the factory
+ * General settings page. Each step of the flow owns a dialog: name the
+ * token, copy the secret one time, then confirm a revoke. Both pages render
+ * their own table chrome around this state and share the dialogs.
  */
 export function usePersonalTokensPanel(organizationId: string | null | undefined) {
   const orgId = organizationId || "";
@@ -20,58 +29,96 @@ export function usePersonalTokensPanel(organizationId: string | null | undefined
   const createMutation = useCreateUserToken(orgId);
   const revokeMutation = useRevokeUserToken(orgId);
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newTokenName, setNewTokenName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
   const [revealedToken, setRevealedToken] = useState<RevealedPersonalToken | null>(null);
-  const [tokenVisible, setTokenVisible] = useState(false);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<PersonalTokenTarget | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  const openCreateDialog = () => {
+    setNewTokenName("");
+    setCreateError(null);
+    setIsCreateOpen(true);
+  };
+
+  const closeCreateDialog = () => {
+    if (createMutation.isPending) return;
+    setIsCreateOpen(false);
+    setCreateError(null);
+  };
 
   const createToken = async () => {
     const name = newTokenName.trim();
     if (!name) return;
 
     try {
-      setActionError(null);
+      setCreateError(null);
       const response = await createMutation.mutateAsync({ name });
-      if (response?.token && response.plaintext) {
-        setRevealedToken({ id: response.token.id || "", plaintext: response.plaintext });
-        setTokenVisible(false);
+      if (!response?.plaintext) {
+        setCreateError("SuperPlane did not return a token. Try again.");
+        return;
       }
+
+      setRevealedToken({
+        id: response.token?.id || "",
+        name: response.token?.name || name,
+        plaintext: response.plaintext,
+      });
       setNewTokenName("");
+      setIsCreateOpen(false);
     } catch (err) {
-      setActionError(`Failed to create token: ${getApiErrorMessage(err)}`);
+      setCreateError(`Failed to create the token: ${getApiErrorMessage(err)}`);
     }
   };
 
-  const revokeToken = async (id: string, name: string) => {
-    if (!confirm(`Revoke token "${name || "Unnamed"}"? Anything using it stops working immediately.`)) return;
+  const dismissRevealedToken = () => setRevealedToken(null);
+
+  const requestRevoke = (token: MeUserApiToken) => {
+    setRevokeError(null);
+    setRevokeTarget({ id: token.id || "", name: token.name || "Unnamed" });
+  };
+
+  const cancelRevoke = () => {
+    if (revokeMutation.isPending) return;
+    setRevokeTarget(null);
+    setRevokeError(null);
+  };
+
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return;
 
     try {
-      setActionError(null);
-      setRevokingId(id);
-      await revokeMutation.mutateAsync(id);
-      if (revealedToken?.id === id) {
+      setRevokeError(null);
+      await revokeMutation.mutateAsync(revokeTarget.id);
+      if (revealedToken?.id === revokeTarget.id) {
         setRevealedToken(null);
       }
+      setRevokeTarget(null);
+      showSuccessToast("Token revoked.");
     } catch (err) {
-      setActionError(`Failed to revoke token: ${getApiErrorMessage(err)}`);
-    } finally {
-      setRevokingId(null);
+      setRevokeError(`Failed to revoke the token: ${getApiErrorMessage(err)}`);
     }
   };
 
   return {
     tokens,
     tokensLoading,
+    isCreateOpen,
+    openCreateDialog,
+    closeCreateDialog,
     newTokenName,
     setNewTokenName,
-    revealedToken,
-    tokenVisible,
-    setTokenVisible,
-    revokingId,
-    actionError,
-    isCreating: createMutation.isPending,
     createToken,
-    revokeToken,
+    isCreating: createMutation.isPending,
+    createError,
+    revealedToken,
+    dismissRevealedToken,
+    revokeTarget,
+    requestRevoke,
+    cancelRevoke,
+    confirmRevoke,
+    isRevoking: revokeMutation.isPending,
+    revokeError,
   };
 }

@@ -1,22 +1,15 @@
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Icon } from "@/components/Icon";
-import { Input } from "@/components/Input/input";
+import { PersonalApiTokenDialogs, PersonalApiTokensTable } from "@/components/PersonalApiTokens";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useMe } from "@/hooks/useMe";
 import { usePersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
-import { showErrorToast } from "@/lib/toast";
-import { CopyButton } from "@/ui/CopyButton";
+import type { PersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
 import { ChangePasswordDialog } from "@/pages/organization/settings/components/ChangePasswordDialog";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
-
-function formatTokenDate(value?: string) {
-  if (!value) return "Never";
-  return new Date(value).toLocaleString();
-}
 
 export function FactorySettingsProfilePage() {
   const { organizationId } = useFactorySettingsLayout();
@@ -41,6 +34,7 @@ export function FactorySettingsProfilePage() {
           onChangePassword={() => setPasswordModalOpen(true)}
         />
       </FactorySettingsPageFrame>
+      <PersonalApiTokenDialogs panel={tokensPanel} />
       {canChangePassword ? <ChangePasswordDialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen} /> : null}
     </>
   );
@@ -67,7 +61,7 @@ function ProfileBody({
   user: ProfileUser | null | undefined;
   avatarUrl?: string | null;
   canChangePassword: boolean;
-  tokensPanel: ReturnType<typeof usePersonalTokensPanel>;
+  tokensPanel: PersonalTokensPanel;
   onChangePassword: () => void;
 }) {
   if (isLoading) {
@@ -156,133 +150,29 @@ function ProfileInformationCard({
   );
 }
 
-function ApiTokensCard({ panel }: { panel: ReturnType<typeof usePersonalTokensPanel> }) {
+function ApiTokensCard({ panel }: { panel: PersonalTokensPanel }) {
   return (
-    <FactorySettingsCard title="API tokens">
+    <FactorySettingsCard
+      title="API tokens"
+      action={
+        <Button size="sm" onClick={panel.openCreateDialog} data-testid="user-token-create-btn">
+          <Icon name="plus" />
+          Create token
+        </Button>
+      }
+    >
       <p className="text-[12px] text-muted-foreground">
         Use a personal API token to authenticate API requests to SuperPlane. Keep your tokens secure and do not share
         them.
       </p>
-
-      {panel.actionError ? <p className="mt-2 text-[12px] text-destructive">{panel.actionError}</p> : null}
-
-      <form
-        className="mt-4 flex flex-wrap items-end gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void panel.createToken();
-        }}
-      >
-        <div className="w-full max-w-xs">
-          <label htmlFor="factory-new-token-name" className="mb-1 block text-[12px] font-medium text-foreground">
-            Token name
-          </label>
-          <Input
-            id="factory-new-token-name"
-            type="text"
-            value={panel.newTokenName}
-            onChange={(e) => panel.setNewTokenName(e.target.value)}
-            placeholder="e.g., CI token"
-            data-testid="user-token-create-name"
-          />
-        </div>
-        <LoadingButton
-          type="submit"
-          disabled={!panel.newTokenName.trim()}
-          loading={panel.isCreating}
-          loadingText="Creating..."
-          className="flex items-center gap-2"
-          data-testid="user-token-create-submit"
-        >
-          <Icon name="plus" />
-          Create token
-        </LoadingButton>
-      </form>
-
-      {panel.revealedToken ? (
-        <NewTokenReveal
-          token={panel.revealedToken.plaintext}
-          tokenVisible={panel.tokenVisible}
-          onToggleTokenVisible={() => panel.setTokenVisible(!panel.tokenVisible)}
-        />
-      ) : null}
-
-      {!panel.tokensLoading && panel.tokens.length === 0 ? (
-        <div className="mt-4 flex items-center gap-2">
-          <Icon name="key-round" className="text-muted-foreground" />
-          <p className="text-[13px] text-muted-foreground">No API tokens yet</p>
-        </div>
-      ) : null}
-
-      {panel.tokens.length > 0 ? (
-        <div className="mt-4 divide-y divide-border" data-testid="user-token-list">
-          {panel.tokens.map((tokenItem) => (
-            <div
-              key={tokenItem.id}
-              className="flex items-center justify-between gap-4 py-3"
-              data-testid="user-token-row"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-[13px] font-medium text-foreground">{tokenItem.name || "Unnamed"}</p>
-                <p className="text-[12px] text-muted-foreground">
-                  Created {formatTokenDate(tokenItem.createdAt)} · Last used {formatTokenDate(tokenItem.lastUsedAt)}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => panel.revokeToken(tokenItem.id || "", tokenItem.name || "")}
-                disabled={panel.revokingId === tokenItem.id}
-                className="shrink-0 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                data-testid="user-token-revoke-btn"
-              >
-                <Icon name="trash-2" size="sm" />
-                Revoke
-              </Button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      <PersonalApiTokensTable
+        className="mt-4"
+        tokens={panel.tokens}
+        isLoading={panel.tokensLoading}
+        onCreate={panel.openCreateDialog}
+        onRevoke={panel.requestRevoke}
+      />
     </FactorySettingsCard>
-  );
-}
-
-function NewTokenReveal({
-  token,
-  tokenVisible,
-  onToggleTokenVisible,
-}: {
-  token: string;
-  tokenVisible: boolean;
-  onToggleTokenVisible: () => void;
-}) {
-  return (
-    <div className="mt-4 space-y-3">
-      <p className="text-[13px] font-medium text-foreground">New API token</p>
-      <div className="flex items-center gap-2 ph-no-capture">
-        <Input
-          type={tokenVisible ? "text" : "password"}
-          value={token}
-          readOnly
-          className="flex-1 font-mono text-sm"
-          data-testid="user-token-reveal-value"
-        />
-        <Button variant="outline" onClick={onToggleTokenVisible} aria-label="Toggle token visibility">
-          <Icon name={tokenVisible ? "eye-closed" : "eye"} />
-        </Button>
-        <CopyButton
-          variant="button"
-          text={token}
-          onCopyError={() => showErrorToast("Failed to copy API token.")}
-          data-testid="user-token-reveal-copy"
-        >
-          Copy
-        </CopyButton>
-      </div>
-      <p className="rounded-md border border-border bg-muted/40 p-3 text-[12px] text-muted-foreground">
-        This token is shown once. Copy and store it now. If you lose it, revoke it and create a new one.
-      </p>
-    </div>
   );
 }
 
