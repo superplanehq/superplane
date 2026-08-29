@@ -21,9 +21,11 @@ func TestPersonalAPITokens(t *testing.T) {
 		steps.visitProfilePage()
 		steps.createToken("CI token")
 		steps.assertTokenRevealed()
-		steps.assertTokenListed("CI token")
 
 		plaintext := steps.revealedTokenValue()
+		steps.dismissRevealedToken()
+
+		steps.assertTokenListed("CI token")
 		steps.assertBearerTokenAuthenticatesAsSessionUser(plaintext)
 	})
 
@@ -34,9 +36,11 @@ func TestPersonalAPITokens(t *testing.T) {
 
 		steps.createToken("Token A")
 		tokenA := steps.revealedTokenValue()
+		steps.dismissRevealedToken()
 
 		steps.createToken("Token B")
 		tokenB := steps.revealedTokenValue()
+		steps.dismissRevealedToken()
 
 		steps.assertTokenListed("Token A")
 		steps.assertTokenListed("Token B")
@@ -69,7 +73,11 @@ func (s *personalTokenSteps) visitProfilePage() {
 func (s *personalTokenSteps) createToken(name string) {
 	page := s.session.Page()
 
-	err := page.GetByTestId("user-token-create-name").Fill(name)
+	err := page.GetByTestId("user-token-create-btn").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+
+	err = page.GetByTestId("user-token-create-name").Fill(name)
 	require.NoError(s.t, err)
 	s.session.Sleep(200)
 
@@ -87,10 +95,20 @@ func (s *personalTokenSteps) assertTokenRevealed() {
 
 func (s *personalTokenSteps) revealedTokenValue() string {
 	page := s.session.Page()
-	value, err := page.GetByTestId("user-token-reveal-value").InputValue()
+	value, err := page.GetByTestId("user-token-reveal-value").TextContent()
 	require.NoError(s.t, err)
 	require.NotEmpty(s.t, value, "token secret should not be empty")
 	return value
+}
+
+// dismissRevealedToken closes the one-time secret dialog so that the token
+// list and the create action are reachable again.
+func (s *personalTokenSteps) dismissRevealedToken() {
+	page := s.session.Page()
+
+	err := page.GetByTestId("user-token-reveal-done").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
 }
 
 func (s *personalTokenSteps) assertTokenListed(name string) {
@@ -108,10 +126,22 @@ func (s *personalTokenSteps) assertTokenNotListed(name string) {
 	require.Zero(s.t, count, "token %q should not be listed after revoke", name)
 }
 
+// revokeToken opens the row menu of a token, picks Revoke, and confirms the
+// dialog. The menu and the dialog render in portals, so both are located on
+// the page instead of inside the row.
 func (s *personalTokenSteps) revokeToken(name string) {
 	page := s.session.Page()
+
 	row := page.GetByTestId("user-token-row").Filter(pw.LocatorFilterOptions{HasText: name})
-	err := row.GetByTestId("user-token-revoke-btn").Click()
+	err := row.GetByTestId("user-token-row-menu").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+
+	err = page.GetByTestId("user-token-revoke-btn").Click()
+	require.NoError(s.t, err)
+	s.session.Sleep(300)
+
+	err = page.GetByTestId("user-token-revoke-confirm").Click()
 	require.NoError(s.t, err)
 	s.session.Sleep(1000)
 }
