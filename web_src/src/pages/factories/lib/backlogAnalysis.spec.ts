@@ -1,12 +1,16 @@
 import type { CanvasesCanvasRun } from "@/api-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   analyzingWorkOrderIds,
   backlogAnalysisRuns,
   backlogAnalysisRunsByWorkOrder,
+  clearBacklogAnalysisPending,
   findBacklogAnalyzerCanvasId,
   hasActiveBacklogAnalysisRun,
+  markBacklogAnalysisPending,
+  pendingBacklogAnalysisIds,
+  subscribeBacklogAnalysisPending,
 } from "./backlogAnalysis";
 
 function analysisRun(overrides: {
@@ -90,5 +94,54 @@ describe("backlogAnalysisRunsByWorkOrder", () => {
 
     expect(grouped.get("wo-1")?.map((entry) => entry.run.id)).toEqual(["run-1", "run-2"]);
     expect(grouped.get("wo-2")?.map((entry) => entry.run.id)).toEqual(["run-3"]);
+  });
+});
+
+describe("pending backlog analysis store", () => {
+  it("adds an id when marked pending", () => {
+    markBacklogAnalysisPending("wo-pending-1");
+
+    expect(pendingBacklogAnalysisIds().has("wo-pending-1")).toBe(true);
+
+    clearBacklogAnalysisPending("wo-pending-1");
+  });
+
+  it("ignores empty ids", () => {
+    markBacklogAnalysisPending("");
+    markBacklogAnalysisPending(undefined);
+    markBacklogAnalysisPending(null);
+
+    expect(pendingBacklogAnalysisIds().size).toBe(0);
+  });
+
+  it("removes an id when cleared", () => {
+    markBacklogAnalysisPending("wo-pending-2");
+    clearBacklogAnalysisPending("wo-pending-2");
+
+    expect(pendingBacklogAnalysisIds().has("wo-pending-2")).toBe(false);
+  });
+
+  it("drops an id once its TTL expires", () => {
+    const markedAt = Date.now();
+    markBacklogAnalysisPending("wo-pending-3");
+
+    expect(pendingBacklogAnalysisIds(markedAt).has("wo-pending-3")).toBe(true);
+    expect(pendingBacklogAnalysisIds(markedAt + 61_000).has("wo-pending-3")).toBe(false);
+  });
+
+  it("notifies listeners on mark and clear", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeBacklogAnalysisPending(listener);
+
+    markBacklogAnalysisPending("wo-pending-4");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    clearBacklogAnalysisPending("wo-pending-4");
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+    markBacklogAnalysisPending("wo-pending-5");
+    expect(listener).toHaveBeenCalledTimes(2);
+    clearBacklogAnalysisPending("wo-pending-5");
   });
 });

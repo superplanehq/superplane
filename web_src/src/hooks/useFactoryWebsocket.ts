@@ -83,6 +83,12 @@ export function invalidateFactoryWorkOrderQueries(
   void queryClient.invalidateQueries({
     queryKey: ["factories", organizationId, factoryId, "pull-requests"],
   });
+  // Covers orders created through the API: there is no client mutation to
+  // mark them "analyzing" optimistically, so the runs query must refetch
+  // here to pick up the Backlog run once the factory creates it.
+  void queryClient.invalidateQueries({
+    queryKey: ["backlog-analysis-runs", organizationId],
+  });
 
   for (const run of canvasRunsForWorkOrders(
     cachedWorkOrdersForInvalidation(queryClient, organizationId, factoryId, orderId),
