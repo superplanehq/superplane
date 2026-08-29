@@ -43,6 +43,7 @@ async function installOnboardingApp(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<{ canvasId: string; canvasName: string }> {
@@ -53,6 +54,7 @@ async function installOnboardingApp(args: {
     installParams: {
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
     },
     startingTaskPrompt: "",
     navigateOnComplete: false,
@@ -71,6 +73,7 @@ async function provisionLineApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
@@ -82,6 +85,7 @@ async function provisionLineApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -101,6 +105,7 @@ export async function provisionEventApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<void> {
@@ -111,6 +116,7 @@ export async function provisionEventApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -167,6 +173,7 @@ export async function provisionLine(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
@@ -182,6 +189,7 @@ export async function provisionLine(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch: args.defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
