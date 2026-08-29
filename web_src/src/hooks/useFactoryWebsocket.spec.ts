@@ -92,6 +92,9 @@ describe("useFactoryWebsocket", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["factories", "org-1", "factory-1", "pull-requests"],
     });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ["backlog-analysis-runs", "org-1"],
+    });
   });
 
   it("invalidates described canvas runs for the updated task", () => {

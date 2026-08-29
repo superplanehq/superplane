@@ -32,6 +32,7 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
@@ -335,6 +336,11 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
     },
     onSuccess: (order) => {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      // The Backlog run for this order is created asynchronously after this
+      // RPC returns, so show "Analyzing" optimistically and start polling
+      // for the real run right away instead of waiting for a page reload.
+      markBacklogAnalysisPending(order.id);
+      void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({
           queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
