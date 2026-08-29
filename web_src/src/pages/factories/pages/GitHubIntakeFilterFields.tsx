@@ -96,6 +96,20 @@ export function GitHubIntakeFilterFields({
           ))}
         </div>
       </fieldset>
+      <fieldset className="min-w-0">
+        <legend className="text-sm font-medium text-gray-800 dark:text-gray-100">
+          {INTAKE_SETTINGS_COPY.authorsLabel}
+        </legend>
+        <p className="workspace-body-text mt-1 text-muted-foreground">{INTAKE_SETTINGS_COPY.authorsHelper}</p>
+        <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-sm text-gray-800 dark:text-gray-100">
+          <Checkbox
+            checked={settings.authorsWithAccess}
+            onChange={() => update("authorsWithAccess", !settings.authorsWithAccess)}
+            aria-label={INTAKE_SETTINGS_COPY.authorsWithAccess}
+          />
+          {INTAKE_SETTINGS_COPY.authorsWithAccess}
+        </label>
+      </fieldset>
     </section>
   );
 }
