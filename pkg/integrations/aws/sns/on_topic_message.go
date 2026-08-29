@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -297,9 +298,6 @@ func (t *OnTopicMessage) verifyMessageSignature(ctx core.WebhookRequestContext, 
 		return fmt.Errorf("failed to build string to sign: %w", err)
 	}
 
-	//
-	// TODO: it would be good to not fetch the certificate every time.
-	//
 	cert, err := t.fetchSigningCertificate(ctx, message.SigningCertURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch signing certificate: %w", err)
@@ -380,6 +378,41 @@ func (t *OnTopicMessage) getSignableFields(message SubscriptionMessage) ([]Signa
 	}
 }
 
+var signingCertCache sync.Map
+
+const signingCertificateCacheTTL = 24 * time.Hour
+
+type signingCertCacheEntry struct {
+	cert      *x509.Certificate
+	expiresAt time.Time
+}
+
+func getCachedSigningCertificate(cacheKey string) (*x509.Certificate, bool) {
+	value, ok := signingCertCache.Load(cacheKey)
+	if !ok {
+		return nil, false
+	}
+
+	entry := value.(signingCertCacheEntry)
+
+	now := time.Now()
+	if now.After(entry.expiresAt) || now.Before(entry.cert.NotBefore) || now.After(entry.cert.NotAfter) {
+		signingCertCache.Delete(cacheKey)
+		return nil, false
+	}
+
+	return entry.cert, true
+}
+
+func cacheSigningCertificate(cacheKey string, cert *x509.Certificate) {
+	expiresAt := time.Now().Add(signingCertificateCacheTTL)
+	if cert.NotAfter.Before(expiresAt) {
+		expiresAt = cert.NotAfter
+	}
+
+	signingCertCache.Store(cacheKey, signingCertCacheEntry{cert: cert, expiresAt: expiresAt})
+}
+
 func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext, signingCertURL string) (*x509.Certificate, error) {
 	parsedURL, err := url.Parse(signingCertURL)
 	if err != nil {
@@ -403,7 +436,12 @@ func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext,
 		return nil, fmt.Errorf("SigningCertURL host must be an AWS SNS domain")
 	}
 
-	req, err := http.NewRequest(http.MethodGet, parsedURL.String(), nil)
+	cacheKey := parsedURL.String()
+	if cert, ok := getCachedSigningCertificate(cacheKey); ok {
+		return cert, nil
+	}
+
+	req, err := http.NewRequest(http.MethodGet, cacheKey, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate request: %w", err)
 	}
@@ -453,6 +491,8 @@ func (t *OnTopicMessage) fetchSigningCertificate(ctx core.WebhookRequestContext,
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
 		return nil, fmt.Errorf("signing certificate is not currently valid")
 	}
+
+	cacheSigningCertificate(cacheKey, cert)
 
 	return cert, nil
 }
