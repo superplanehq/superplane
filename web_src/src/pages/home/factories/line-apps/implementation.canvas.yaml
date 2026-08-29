@@ -56,7 +56,7 @@ spec:
             value: '{{ order().title }}'
             valueSource: literal
           - name: BASE
-            value: main
+            value: '{{ install_params.defaultBranch }}'
             valueSource: literal
           - name: COAUTHORS
             value: '{{ join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
@@ -241,7 +241,7 @@ spec:
 
               Task title: {{ order().title }}
 
-              1/ Compare the current branch with main and review the commits you made.
+              1/ Compare the current branch with {{ install_params.defaultBranch }} and review the commits you made.
               2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
               3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
               4/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
@@ -274,7 +274,7 @@ spec:
       concurrency:
         max: 100
       configuration:
-        base: main
+        base: '{{ install_params.defaultBranch }}'
         body: |-
           [Task]({{ order().url }}).
 
