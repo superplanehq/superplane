@@ -21,12 +21,12 @@ import {
 import { lineMetricsFactoriesFixture } from "./lineMetricsFactoriesFixture";
 import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "./setupStoryFixtures";
 
-describe("FactoriesHarness work orders", () => {
+describe("FactoriesHarness tasks", () => {
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("shows the Work Orders board when Work Orders opens from the factory sidebar", async () => {
+  it("shows the Tasks board when Tasks opens from the factory sidebar", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}

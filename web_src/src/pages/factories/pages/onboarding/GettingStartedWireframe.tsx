@@ -57,15 +57,13 @@ export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void 
             2
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              Create your first work order
-            </div>
+            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Create your first task</div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              A work order is one task for the coding agent. Create one manually and watch the agent open a pull
+              A task is one unit of work for the coding agent. Create one manually and watch the agent open a pull
               request.
             </p>
             <Button type="button" size="sm" className="mt-3" onClick={() => handleCreateWorkOrder()}>
-              Create work order
+              Create task
             </Button>
           </div>
         </div>
@@ -79,7 +77,7 @@ export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void 
               See the agent pipeline on a line
             </div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Each work order runs through a line: intake, build, verify, and related phases you can configure later.
+              Each task runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
               to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))}

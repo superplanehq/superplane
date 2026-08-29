@@ -107,7 +107,7 @@ export interface SplitRunPhase {
   canvasSteps: RunOverlayStep[];
   appId?: string;
   runId?: string;
-  /** Line automation canvas. `null` means a person created the work order. */
+  /** Line automation canvas. `null` means a person created the task. */
   canvasKey?: SplitRunCanvasKey | null;
   /** Trigger node that ran when the canvas has more than one start. */
   triggerName?: string;
@@ -290,13 +290,13 @@ export type SplitRunFixtureOptions = {
   lineId?: string | null;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
-  /** PR-feedback canvas runs for this work order, shown as extra Log phases. */
+  /** PR-feedback canvas runs for this task, shown as extra Log phases. */
   prFeedbackRuns?: PRFeedbackLogRun[];
   /** Person who stopped the current automation, when known. */
   stoppedBy?: OrgUserDisplay;
-  /** Person or automation that closed the work order, when known. */
+  /** Person or automation that closed the task, when known. */
   closer?: { actor?: OrgUserDisplay; automationName?: string };
-  /** Backlog analysis runs for this work order, shown as extra Log phases. */
+  /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
 };
 
@@ -318,7 +318,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const phases = phasesForOrder(order, executions, options, demoArtifacts);
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
-    title: order.title ?? "Work order",
+    title: order.title ?? "Task",
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
@@ -536,7 +536,7 @@ function phasesForOrder(
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
 
 /**
- * Backlog analysis runs of this work order, oldest first. Each phase keeps
+ * Backlog analysis runs of this task, oldest first. Each phase keeps
  * its run, so the log panel streams the analysis while the automation
  * still works. The newest phase carries the reported score.
  */
@@ -705,7 +705,7 @@ function analysisTicketForOrder(order: FactoriesWorkOrder): LineIntakeAnalyzingT
   const confidenceScore = exampleConfidenceScore(order);
   return {
     id: order.id ?? "work-order",
-    title: order.title ?? "Work order",
+    title: order.title ?? "Task",
     detailsMarkdown: order.description,
     issueKey: order.key,
     planMarkdown: fallbackPlanMarkdown(order),
@@ -743,11 +743,11 @@ function fallbackPlanMarkdown(order: FactoriesWorkOrder): string {
     goal,
     files: ["See the work-order description for the files to change."],
     steps: [
-      "Read the work order and the current implementation.",
-      "Apply the change described in the work order.",
+      "Read the task and the current implementation.",
+      "Apply the change described in the task.",
       "Add or update tests for the new behavior.",
     ],
-    verify: ["The existing suite passes.", "The notes in the work order hold."],
+    verify: ["The existing suite passes.", "The notes in the task hold."],
   });
 }
 
@@ -1001,7 +1001,7 @@ function canceledNotesArtifact(order: FactoriesWorkOrder): FactoriesWorkOrderArt
     data: {
       name: "notes.md",
       title: "notes.md",
-      body: "The work order was canceled.",
+      body: "The task was canceled.",
     },
   };
 }

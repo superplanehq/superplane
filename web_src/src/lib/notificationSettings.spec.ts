@@ -62,13 +62,13 @@ describe("NOTIFICATION_TYPE_OPTIONS", () => {
     const labelsByKey = Object.fromEntries(NOTIFICATION_TYPE_OPTIONS.map((option) => [option.key, option.label]));
 
     expect(labelsByKey).toEqual({
-      TYPE_WORK_ORDER_ASSIGNED: "Added as a work order owner",
-      TYPE_WORK_ORDER_COMMENT_OWNED: "Comments on work orders you own",
-      TYPE_WORK_ORDER_COMMENT_CREATED: "Comments on work orders you created",
-      TYPE_WORK_ORDER_STATUS_OWNED: "Status changes on work orders you own or created",
-      TYPE_WORK_ORDER_ARTIFACT_OWNED: "New artifacts on work orders you own",
-      TYPE_WORK_ORDER_MENTIONED: "Mentions in work order comments",
-      TYPE_WORK_ORDER_STATUS_NOTE_OWNED: "Review requests on work orders you own or created",
+      TYPE_WORK_ORDER_ASSIGNED: "Added as a task owner",
+      TYPE_WORK_ORDER_COMMENT_OWNED: "Comments on tasks you own",
+      TYPE_WORK_ORDER_COMMENT_CREATED: "Comments on tasks you created",
+      TYPE_WORK_ORDER_STATUS_OWNED: "Status changes on tasks you own or created",
+      TYPE_WORK_ORDER_ARTIFACT_OWNED: "New artifacts on tasks you own",
+      TYPE_WORK_ORDER_MENTIONED: "Mentions in task comments",
+      TYPE_WORK_ORDER_STATUS_NOTE_OWNED: "Review requests on tasks you own or created",
     });
   });
 
@@ -76,7 +76,7 @@ describe("NOTIFICATION_TYPE_OPTIONS", () => {
     const owned = NOTIFICATION_TYPE_OPTIONS.find((option) => option.key === "TYPE_WORK_ORDER_COMMENT_OWNED");
     const created = NOTIFICATION_TYPE_OPTIONS.find((option) => option.key === "TYPE_WORK_ORDER_COMMENT_CREATED");
 
-    expect(owned?.label.startsWith("Comments on work orders you ")).toBe(true);
-    expect(created?.label.startsWith("Comments on work orders you ")).toBe(true);
+    expect(owned?.label.startsWith("Comments on tasks you ")).toBe(true);
+    expect(created?.label.startsWith("Comments on tasks you ")).toBe(true);
   });
 });

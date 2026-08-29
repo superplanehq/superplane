@@ -34,7 +34,7 @@ export const BOARD_IMPLEMENT_NOTIFY_ORDER: FactoriesWorkOrder = {
   key: "RF-114",
   title: "Notify on status change after a reopen",
   description: [
-    "A user does not get a status-change notification when a work order is reopened.",
+    "A user does not get a status-change notification when a task is reopened.",
     "",
     "Send the same notification that a status change already sends, so the assignee sees the reopen.",
   ].join("\n"),
@@ -220,7 +220,7 @@ export const BOARD_DONE_CANCELED_ORDER: FactoriesWorkOrder = boardDoneOrder({
   number: "113",
   key: "RF-113",
   title: "Migrate refunds to the v2 provider API",
-  description: "The v2 migration stopped when the provider delayed the cutover. The work order was canceled.",
+  description: "The v2 migration stopped when the provider delayed the cutover. The task was canceled.",
   result: "RESULT_UNSPECIFIED",
   dispatchResult: "RESULT_CANCELLED",
   doneResult: "RESULT_CANCELLED",

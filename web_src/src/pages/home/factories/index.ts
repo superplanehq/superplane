@@ -41,7 +41,7 @@ function buildSoftwareFactory(): FactoryDefinition {
 
 // Onboarding provisions a factory line as separate, focused apps — one per
 // phase — mirroring the production setup. Each app exposes a single onRun
-// entrypoint that the line calls in order, passing the work order through.
+// entrypoint that the line calls in order, passing the task through.
 const LINE_APP_COMPONENT_INTEGRATIONS: Record<string, string> = {
   "github.createIssueComment": "github",
   "github.createPullRequest": "github",
@@ -142,7 +142,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "line-planning": buildLineApp({
     id: "line-planning",
     title: "Plan",
-    description: "Read the work order and write an implementation plan.",
+    description: "Read the task and write an implementation plan.",
     canvasYaml: planningCanvasYaml,
     entrypointNodeId: "onrun-create-plan",
   }),
@@ -156,7 +156,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "pr-closure": buildEventApp({
     id: "pr-closure",
     title: "PR Closure",
-    description: "Close the work order when the attached pull request merges or is closed without a merge.",
+    description: "Close the task when the attached pull request merges or is closed without a merge.",
     canvasYaml: prClosureCanvasYaml,
     triggerNodeId: "on-pr-closed",
   }),

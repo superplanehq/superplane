@@ -22,7 +22,7 @@ describe("lineIntakeModel", () => {
     const github = lineIntakeSourceById("github-issues");
     expect(github?.listen.kind).toBe("webhook");
     expect(github?.accept.destination).toBe("backlog");
-    expect(github?.evaluate.label).toBe("Create a work order");
+    expect(github?.evaluate.label).toBe("Create a task");
     expect(github?.evaluate.rule).toContain("scores it there");
   });
 

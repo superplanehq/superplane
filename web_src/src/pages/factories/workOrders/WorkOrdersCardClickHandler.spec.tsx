@@ -107,7 +107,7 @@ function renderView(
         />
       ),
     },
-    { path: permalinkHref, element: <div>Work order</div> },
+    { path: permalinkHref, element: <div>Task</div> },
   ]);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -254,7 +254,7 @@ describe.each(views)("$name click handling", ({ Component }) => {
     expect(effectivePointerEvents(status)).toBe("none");
   });
 
-  it("navigates to the work order permalink when the overlay link is activated", async () => {
+  it("navigates to the task permalink when the overlay link is activated", async () => {
     const user = userEvent.setup();
     const { router, row } = renderView(Component);
 
@@ -410,7 +410,7 @@ describe("WorkOrderCard attention", () => {
     onOpen: vi.fn(),
   };
 
-  it("shows Waiting for user review when the work order has a status note", () => {
+  it("shows Waiting for user review when the task has a status note", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>

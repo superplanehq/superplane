@@ -120,7 +120,7 @@ describe("firstFactoryLineName", () => {
 });
 
 describe("workOrderDetailPath", () => {
-  it("builds the canonical permalink from the workspace key and work order number", () => {
+  it("builds the canonical permalink from the workspace key and task number", () => {
     expect(workOrderDetailPath("org-1", "SP", 42)).toBe("/org-1/workspaces/SP/work-order/42");
   });
 

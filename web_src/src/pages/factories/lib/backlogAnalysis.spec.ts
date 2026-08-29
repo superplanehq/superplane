@@ -41,7 +41,7 @@ describe("findBacklogAnalyzerCanvasId", () => {
 });
 
 describe("backlogAnalysisRuns", () => {
-  it("reads the work order out of the trigger payload, oldest run first", () => {
+  it("reads the task out of the trigger payload, oldest run first", () => {
     const runs = backlogAnalysisRuns("app-analyzer", [
       analysisRun({ id: "run-2", workOrderId: "wo-2", createdAt: "2026-08-28T11:00:00Z" }),
       analysisRun({ id: "run-1", workOrderId: "wo-1", createdAt: "2026-08-28T10:00:00Z" }),
@@ -52,13 +52,13 @@ describe("backlogAnalysisRuns", () => {
     expect(runs[0].canvasId).toBe("app-analyzer");
   });
 
-  it("drops runs without a work order", () => {
+  it("drops runs without a task", () => {
     expect(backlogAnalysisRuns("app-analyzer", [analysisRun({ id: "run-1" })])).toEqual([]);
   });
 });
 
 describe("analyzingWorkOrderIds", () => {
-  it("reports only work orders with a run in flight", () => {
+  it("reports only tasks with a run in flight", () => {
     const runs = backlogAnalysisRuns("app-analyzer", [
       analysisRun({ id: "run-1", workOrderId: "wo-1", state: "STATE_STARTED" }),
       analysisRun({ id: "run-2", workOrderId: "wo-2", state: "STATE_FINISHED" }),
@@ -79,7 +79,7 @@ describe("analyzingWorkOrderIds", () => {
 });
 
 describe("backlogAnalysisRunsByWorkOrder", () => {
-  it("groups every run of the same work order", () => {
+  it("groups every run of the same task", () => {
     const runs = backlogAnalysisRuns("app-analyzer", [
       analysisRun({ id: "run-1", workOrderId: "wo-1", createdAt: "2026-08-28T10:00:00Z" }),
       analysisRun({ id: "run-2", workOrderId: "wo-1", createdAt: "2026-08-28T11:00:00Z" }),

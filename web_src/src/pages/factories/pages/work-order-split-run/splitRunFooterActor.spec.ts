@@ -47,7 +47,7 @@ function stepFinishedEvent(at: string, payload: { userId?: string; runResult?: s
 }
 
 describe("footerCloserFromEvents", () => {
-  it("names the person who completed the work order, including avatar", () => {
+  it("names the person who completed the task, including avatar", () => {
     expect(
       footerCloserFromEvents(
         [statusEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id, toResult: "completed" })],
@@ -57,7 +57,7 @@ describe("footerCloserFromEvents", () => {
     ).toEqual({ actor: ALEX });
   });
 
-  it("names the person who rejected the work order", () => {
+  it("names the person who rejected the task", () => {
     expect(
       footerCloserFromEvents(
         [statusEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id, toResult: "rejected" })],
@@ -67,7 +67,7 @@ describe("footerCloserFromEvents", () => {
     ).toEqual({ actor: ALEX });
   });
 
-  it("names the automation that closed the work order when no person is set", () => {
+  it("names the automation that closed the task when no person is set", () => {
     expect(
       footerCloserFromEvents(
         [statusEvent("2026-08-04T12:00:00.000Z", { automationName: "PR Closure", toResult: "completed" })],

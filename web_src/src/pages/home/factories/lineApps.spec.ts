@@ -215,15 +215,13 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(
       /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
     );
-    expect(implementation).toMatch(
-      /component: github\.createPullRequest[\s\S]*\[Work Order\]\(\{\{ order\(\)\.url \}\}\)/,
-    );
+    expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*\[Task\]\(\{\{ order\(\)\.url \}\}\)/);
     // Reviewers get a pull request they can review and merge right away.
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*draft: false/);
     expect(implementation).toContain("Created via [SuperPlane](https://superplane.com)");
   });
 
-  it("announces the PR-merge wait after the work order attaches the pull request", () => {
+  it("announces the PR-merge wait after the task attaches the pull request", () => {
     const implementation = materializeOnboardingApp("line-implementation");
 
     expect(implementation).toMatch(/sourceId: attach-pr-artifact[\s\S]*targetId: set-pr-closure-note/);
@@ -296,7 +294,7 @@ describe("setup factory event apps", () => {
     expect(ONBOARDING_LINE_APPS.map((app) => app.factoryId)).not.toContain("line-pr");
   });
 
-  it("closes the work order when a factory pull request is closed", () => {
+  it("closes the task when a factory pull request is closed", () => {
     const canvasYaml = materializeOnboardingApp("pr-closure");
 
     expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*actions:[\s\S]*- closed/);

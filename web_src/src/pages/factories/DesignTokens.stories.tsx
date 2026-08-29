@@ -59,7 +59,7 @@ const TYPOGRAPHY_STEPS: { name: string; sample: string; className: string }[] = 
     className: "workspace-section-title font-medium",
   },
   { name: "Section heading (15 / 600)", sample: "Workspace details", className: "workspace-section-title" },
-  { name: "Card heading (13 / 500)", sample: "Work Orders", className: "text-[13px] font-medium tracking-[-0.01em]" },
+  { name: "Card heading (13 / 500)", sample: "Tasks", className: "text-[13px] font-medium tracking-[-0.01em]" },
   { name: "Body (13 / 400)", sample: "The quick brown fox jumps over the lazy dog.", className: "text-[13px]" },
   {
     name: "Subtitle (13 / 400 muted)",

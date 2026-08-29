@@ -48,7 +48,7 @@ function renderBoard(dispatchingOrderIds: ReadonlySet<string>) {
 }
 
 describe("Start button on draft cards", () => {
-  it("shows the busy state only on the work order that dispatches", () => {
+  it("shows the busy state only on the task that dispatches", () => {
     renderBoard(new Set(["wo-1"]));
 
     const starting = screen.getByTestId("work-order-card-start-wo-1");

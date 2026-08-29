@@ -215,7 +215,7 @@ export function LinesPage() {
     if (routeOrderNumber && permalink.status === "loading") {
       return (
         <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
-          <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading work order…</p>
+          <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
     }
@@ -1010,7 +1010,7 @@ function ColumnConfigureMenu({ title, href, testId }: { title: string; href: str
   );
 }
 
-/** Phase lanes borrow the Work Orders lane tints: blue in flight, grey once closed. */
+/** Phase lanes borrow the Tasks lane tints: blue in flight, grey once closed. */
 const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
   running: "running",
   waiting: "running",

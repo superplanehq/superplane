@@ -55,7 +55,7 @@ export const CONFIDENCE_ANALYZING_LABEL = "Analyzing";
 
 /**
  * Placeholder for the meter while the Backlog automation still analyzes the
- * work order. It takes the same slot as the meter, so the card does not
+ * task. It takes the same slot as the meter, so the card does not
  * move when the score arrives.
  */
 export function ConfidenceAnalyzingIndicator({ className, testId }: { className?: string; testId?: string }) {

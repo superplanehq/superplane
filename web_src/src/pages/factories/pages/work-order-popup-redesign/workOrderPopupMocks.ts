@@ -89,7 +89,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
     {
       id: "backlog",
       actor: "Backlog",
-      title: "Create work order",
+      title: "Create task",
       duration: "2s",
       state: "passed",
       artifactId: "art-description",
@@ -143,7 +143,7 @@ export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
     {
       id: "backlog",
       actor: "Backlog",
-      title: "Create work order",
+      title: "Create task",
       duration: "2s",
       state: "passed",
       artifactId: "art-description",
@@ -240,7 +240,7 @@ function backlogLogEntry(order: FactoriesWorkOrder): PopupLogEntry {
   return {
     id: "backlog",
     actor: "Backlog",
-    title: ingested ? "Create work order from GitHub issue" : "Create work order",
+    title: ingested ? "Create task from GitHub issue" : "Create task",
     duration: "2s",
     state: "passed",
     artifactId: "art-description",
@@ -309,9 +309,9 @@ function isPrClosureRun(execution: FactoriesWorkOrderExecution): boolean {
 function doneLogTitle(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): string {
   const fromPullRequest = isPrClosureRun(execution);
   if (order.result === "RESULT_REJECTED") {
-    return fromPullRequest ? "Reject work order from closed pull request" : "Reject work order";
+    return fromPullRequest ? "Reject task from closed pull request" : "Reject task";
   }
-  return fromPullRequest ? "Complete work order from merged pull request" : "Complete work order";
+  return fromPullRequest ? "Complete task from merged pull request" : "Complete task";
 }
 
 function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWorkOrderExecution): PopupLogEntry {

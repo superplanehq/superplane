@@ -17,7 +17,7 @@ export type LaneListener = {
 };
 
 /**
- * Listeners sit at the head of a lane, above the work orders they open. Flat
+ * Listeners sit at the head of a lane, above the tasks they open. Flat
  * rows, not cards: a listener is a source, not an item on the board.
  */
 export function LaneListenerList({

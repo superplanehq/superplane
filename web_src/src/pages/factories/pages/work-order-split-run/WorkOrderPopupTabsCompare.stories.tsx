@@ -5,7 +5,7 @@ import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { WorkOrderPopupTabsCompare } from "./WorkOrderPopupTabsCompare";
 
 const meta = {
-  title: "Factories/Pages/Work Order Split Run/Tab layouts",
+  title: "Factories/Pages/Task Split Run/Tab layouts",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },
@@ -25,6 +25,6 @@ export default meta;
 type Story = StoryObj;
 
 export const TwoColumn: Story = {
-  name: "Work order — two columns",
+  name: "Task — two columns",
   render: () => <WorkOrderPopupTabsCompare />,
 };

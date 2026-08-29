@@ -66,7 +66,7 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
     expect(screen.getByTestId("notifications-scope-all")).toHaveTextContent("All workspaces");
     expect(screen.getByTestId("notifications-scope-filtered")).toHaveTextContent("Choose workspaces");
     expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Off");
-    expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Do not send any work order emails.");
+    expect(screen.getByTestId("notifications-scope-none")).toHaveTextContent("Do not send any task emails.");
   });
 
   it("shows an explicit 'no emails' message instead of an empty area when Off is selected", async () => {
@@ -79,7 +79,7 @@ describe("FactorySettingsNotificationsPage — workspace scope control", () => {
     await user.click(screen.getByTestId("notifications-scope-none"));
 
     expect(screen.getByTestId("notifications-scope-off-message")).toHaveTextContent(
-      "You will not receive any work order emails.",
+      "You will not receive any task emails.",
     );
     expect(screen.getByTestId("notifications-scope-none")).toHaveAttribute("aria-checked", "true");
   });

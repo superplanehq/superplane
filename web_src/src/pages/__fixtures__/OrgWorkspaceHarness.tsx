@@ -95,7 +95,7 @@ export interface OrgWorkspacePageOverrides {
   overview?: ComponentType;
   /** When set, mounts `/setup` and gates other factory pages while pending. */
   onboarding?: ComponentType;
-  /** Storybook-only Work Orders page. Live app ignores this. */
+  /** Storybook-only Tasks page. Live app ignores this. */
   workOrders?: ComponentType;
   /** Storybook-only Velocity page (e.g. work-order flow prototype). */
   velocity?: ComponentType;

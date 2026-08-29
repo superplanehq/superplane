@@ -203,7 +203,7 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
   };
 }
 
-// The step is at its max parallelism: the work order waits in the step
+// The step is at its max parallelism: the task waits in the step
 // queue until a run completes and frees a slot.
 function appendStepQueuedEvent(
   events: WorkOrderTimelineEvent[],
@@ -288,20 +288,20 @@ function deriveStatusEventKind(fromState: string, toState: string): WorkOrderTim
 
 function describeStatusTransition(fromState: string, toState: string, toResult: string): string {
   if (!fromState) {
-    return "created this work order";
+    return "created this task";
   }
   if (toState === "closed") {
     const result = formatWorkOrderResult(CLOSED_RESULT_TO_PROTO[toResult] ?? undefined);
-    return result ? `closed as ${result.toLowerCase()}` : "closed this work order";
+    return result ? `closed as ${result.toLowerCase()}` : "closed this task";
   }
   if (fromState === "draft" && toState === "open") {
-    return "opened this work order";
+    return "opened this task";
   }
   if (fromState === "open" && toState === "draft") {
-    return "moved this work order back to Draft";
+    return "moved this task back to Draft";
   }
   if (fromState === "closed" && toState === "open") {
-    return "reopened this work order";
+    return "reopened this task";
   }
   return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
 }

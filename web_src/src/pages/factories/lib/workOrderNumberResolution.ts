@@ -27,7 +27,7 @@ function parsePositiveInteger(value: string): number | null {
 
 /**
  * Resolves the `:orderNumber` route segment to a `FactoriesWorkOrder` using
- * the already-fetched work orders list (same query the sidebar's "recent
+ * the already-fetched tasks list (same query the sidebar's "recent
  * orders" section uses — no extra network round trip on a warm workspace).
  * Matches the factory-scoped `number` first (tolerating leading zeros, e.g.
  * `007` -> `7`), then falls back to `id` so old permalinks keep working.
@@ -78,7 +78,7 @@ export function workOrderRouteNeedsCanonicalRedirect(resolution: WorkOrderResolu
   return String(Number(resolution.order.number)) !== routeNumber;
 }
 
-/** Find the work order whose line dispatch ran this canvas run. */
+/** Find the task whose line dispatch ran this canvas run. */
 export function findWorkOrderByRunId(
   orders: FactoriesWorkOrder[],
   runId: string | null | undefined,
@@ -106,7 +106,7 @@ export function latestDispatchForLine(
   });
 }
 
-/** Canonical route identifier for a resolved work order, or `null`. */
+/** Canonical route identifier for a resolved task, or `null`. */
 export function canonicalWorkOrderNumber(order: FactoriesWorkOrder | null): string | null {
   if (!order || order.number === undefined || order.number === null || order.number === "") {
     return null;
@@ -116,7 +116,7 @@ export function canonicalWorkOrderNumber(order: FactoriesWorkOrder | null): stri
 }
 
 /**
- * Order stashed on `navigate(..., { state })` so a just-imported work order
+ * Order stashed on `navigate(..., { state })` so a just-imported task
  * can open before the list query includes it (and so remount after permalink
  * navigation does not drop the peek).
  */

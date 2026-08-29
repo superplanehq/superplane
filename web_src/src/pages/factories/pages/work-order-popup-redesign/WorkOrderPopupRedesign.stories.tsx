@@ -17,7 +17,7 @@ import { AGENT_WORK_POPUP_RUNNING } from "./workOrderPopupMocks";
  * second popup.
  */
 const meta = {
-  title: "Factories/Pages/Work Order Popup Redesign",
+  title: "Factories/Pages/Task Popup Redesign",
   parameters: { layout: "fullscreen" },
   decorators: [
     withFactoriesTheme,

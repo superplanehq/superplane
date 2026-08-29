@@ -52,7 +52,7 @@ describe("useCreateWorkOrderDialogState", () => {
     expect(result.current.pathname).toBe(factoryHomePath(ORGANIZATION_ID, FACTORY_KEY, "line-plan-and-implement"));
   });
 
-  it("does not open from New Work Order when create is not allowed", () => {
+  it("does not open from New Task when create is not allowed", () => {
     const { result } = renderHook(() => useDialogState(false), {
       wrapper: wrapper(workOrdersPath(ORGANIZATION_ID, FACTORY_KEY)),
     });

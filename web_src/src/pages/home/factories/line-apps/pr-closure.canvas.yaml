@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: PR Closure
-  description: Close the work order when the attached pull request merges or is closed without a merge.
+  description: Close the task when the attached pull request merges or is closed without a merge.
 spec:
   edges:
     - channel: default
@@ -100,7 +100,7 @@ spec:
         'y': 972
       isCollapsed: true
     - id: complete-work-order
-      name: Complete Work Order
+      name: Complete Task
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:
@@ -112,7 +112,7 @@ spec:
         'y': 1332
       isCollapsed: true
     - id: reject-work-order
-      name: Reject Work Order
+      name: Reject Task
       type: TYPE_ACTION
       component: updateWorkOrderStatus
       configuration:

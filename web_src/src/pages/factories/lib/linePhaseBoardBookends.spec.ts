@@ -51,7 +51,7 @@ function closedOrder(id: string, updatedAt: string, lineId?: string): FactoriesW
 }
 
 describe("collectLineDoneOrders", () => {
-  it("returns closed work orders for this line, newest first", () => {
+  it("returns closed tasks for this line, newest first", () => {
     const closedOld = closedOrder("wo-closed-old", "2026-08-11T10:00:00.000Z", "line-1");
     const closedNew = closedOrder("wo-closed-new", "2026-08-11T14:00:00.000Z", "line-1");
     const closedOtherLine = closedOrder("wo-other-line", "2026-08-11T16:00:00.000Z", "line-other");

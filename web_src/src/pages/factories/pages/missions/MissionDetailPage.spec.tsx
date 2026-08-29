@@ -18,7 +18,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
 }));
 
 describe("MissionDetailPage", () => {
-  it("shows a recoverable error when work orders fail to load", () => {
+  it("shows a recoverable error when tasks fail to load", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={[`/missions/${CHECKOUT_RELIABILITY_MISSION.id}`]}>
@@ -41,6 +41,6 @@ describe("MissionDetailPage", () => {
     );
 
     expect(screen.getByTestId("work-orders-error-state")).toBeInTheDocument();
-    expect(screen.queryByText("This mission has no work orders.")).not.toBeInTheDocument();
+    expect(screen.queryByText("This mission has no tasks.")).not.toBeInTheDocument();
   });
 });

@@ -94,7 +94,7 @@ export function VelocityPrototypePage() {
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         title="Velocity"
-        subtitle="Merged pull requests, waste, cost, and work order time."
+        subtitle="Merged pull requests, waste, cost, and task time."
         actions={
           <SegmentedNav
             ariaLabel="Velocity period in days"

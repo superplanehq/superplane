@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canEditSplitRunContent, canEditSplitRunDescription } from "./useSplitRunWorkOrderEdits";
 
 describe("canEditSplitRunContent", () => {
-  it("allows title edits until the work order is done", () => {
+  it("allows title edits until the task is done", () => {
     expect(canEditSplitRunContent("draft")).toBe(true);
     expect(canEditSplitRunContent("running")).toBe(true);
     expect(canEditSplitRunContent("waiting")).toBe(true);
