@@ -738,6 +738,10 @@ message FactoryIntake {
     repeated string labels = 2;
     LabelFilterMode label_filter_mode = 3;
     Assignment assignment = 4;
+    // When true, only create a work order for issues opened by someone with
+    // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
+    // GitHub issue intakes only. Off by default.
+    bool authors_with_access = 5;
   }
 
   string id = 1;
