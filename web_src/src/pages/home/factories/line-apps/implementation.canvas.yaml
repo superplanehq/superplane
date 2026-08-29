@@ -95,13 +95,11 @@ spec:
           HOOK
           chmod +x .git/hooks/prepare-commit-msg
 
-          # Create an empty branch off the base: a single empty commit so a pull request can be
-          # opened, with no files added.
+          # Create the branch off the base and push it; the agent adds the first real commit.
           git checkout -b "$BRANCH"
-          git commit -s --allow-empty -m "chore: initialize ${BRANCH}"
           git push -u origin "$BRANCH"
 
-          echo "Pushed empty branch ${BRANCH}"
+          echo "Pushed branch ${BRANCH}"
 
           # Respond with branch and session id
           printf '{"branch":"%s", "session":"%s"}\n' "$BRANCH" "$SESSION_ID" > "$SUPERPLANE_RESULT_FILE"
