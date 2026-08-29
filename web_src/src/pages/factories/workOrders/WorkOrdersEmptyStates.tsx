@@ -10,7 +10,7 @@ export function WorkOrdersLoadingState() {
   return (
     <div className={CARD_CLASSES} data-testid="work-orders-loading-state">
       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
-      <p className="text-[13px] text-muted-foreground">Loading work orders…</p>
+      <p className="text-[13px] text-muted-foreground">Loading tasks…</p>
     </div>
   );
 }
@@ -20,7 +20,7 @@ export function WorkOrdersErrorState({ onRetry }: { onRetry: () => void }) {
     <div className={CARD_CLASSES} data-testid="work-orders-error-state">
       <AlertCircle className="size-5 text-destructive" aria-hidden />
       <div className="space-y-1">
-        <p className="text-[13px] font-medium text-foreground">We could not load work orders.</p>
+        <p className="text-[13px] font-medium text-foreground">We could not load tasks.</p>
         <p className="text-[12px] text-muted-foreground">Check your network and try again.</p>
       </div>
       <Button type="button" variant="outline" size="sm" onClick={onRetry} data-testid="work-orders-error-retry">
@@ -45,9 +45,9 @@ export function WorkOrdersTrueEmptyState({
     <div className={CARD_CLASSES} data-testid="work-orders-empty-state">
       <ClipboardList className="size-6 text-muted-foreground" aria-hidden />
       <div className="space-y-1">
-        <p className="text-[14px] font-medium text-foreground">No work orders yet</p>
+        <p className="text-[14px] font-medium text-foreground">No tasks yet</p>
         <p className="text-[12px] text-muted-foreground">
-          Create your first work order to plan and dispatch work across factory lines.
+          Create your first task to plan and dispatch work across factory lines.
         </p>
       </div>
       <PermissionTooltip
@@ -74,10 +74,10 @@ export function WorkOrdersScopedEmptyState({ scopeLabel, onResetScope }: WorkOrd
       <ClipboardList className="size-5 text-muted-foreground" aria-hidden />
       <div className="space-y-1">
         <p className="text-[14px] font-medium text-foreground">Nothing in {scopeLabel}</p>
-        <p className="text-[12px] text-muted-foreground">Switch scope to see other work orders in this workspace.</p>
+        <p className="text-[12px] text-muted-foreground">Switch scope to see other tasks in this workspace.</p>
       </div>
       <Button type="button" variant="outline" size="sm" onClick={onResetScope}>
-        Show all work orders
+        Show all tasks
       </Button>
     </div>
   );
@@ -92,7 +92,7 @@ export function WorkOrdersFilteredEmptyState({ onClearFilters }: WorkOrdersFilte
     <div className={CARD_CLASSES} data-testid="work-orders-filtered-empty-state">
       <ClipboardList className="size-5 text-muted-foreground" aria-hidden />
       <div className="space-y-1">
-        <p className="text-[14px] font-medium text-foreground">No work orders match these filters</p>
+        <p className="text-[14px] font-medium text-foreground">No tasks match these filters</p>
         <p className="text-[12px] text-muted-foreground">
           Try a different search, remove a filter, or widen the scope.
         </p>

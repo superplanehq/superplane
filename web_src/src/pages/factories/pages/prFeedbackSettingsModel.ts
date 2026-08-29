@@ -66,6 +66,11 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
   };
 }
 
+/** Row title on the Verify lane. It says what the handler listens to. */
+export function prFeedbackListenTitle(): string {
+  return "Listening to PR comments";
+}
+
 export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeedbackDraftSettings {
   return {
     name: draft.name.trim(),
@@ -91,7 +96,7 @@ export function activePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullR
     if (!workOrderId) {
       continue;
     }
-    if ((pullRequest.runs ?? []).some(isActiveCanvasRun)) {
+    if ((pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))) {
       ids.add(workOrderId);
     }
   }
@@ -102,6 +107,9 @@ export type PRFeedbackLogRun = {
   canvasId: string;
   handlerName?: string;
   pullRequestNumber?: string;
+  description?: string;
+  costCents?: string;
+  totalTokens?: string;
   run: CanvasesCanvasRunRef;
 };
 

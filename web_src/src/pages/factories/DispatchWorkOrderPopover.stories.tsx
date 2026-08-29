@@ -7,7 +7,7 @@ import { REFUND_FACTORY_LINES } from "./__fixtures__/factoryPageResponses";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 
 /**
- * Popover for dispatching a work order to a specific factory line. Wraps
+ * Popover for dispatching a task to a specific factory line. Wraps
  * any trigger element via `children`; opens a line picker + Dispatch button.
  */
 const meta = {

@@ -13,7 +13,7 @@ spec:
           > [!SECTION:setup] Factory line step
           >
           > This app is one step of a factory line. The line runs it through its
-          > `onRun` entrypoint and passes the current work order.
+          > `onRun` entrypoint and passes the current task.
           >
           > Work moves between steps through work-order artifacts (plan, branch,
           > pull request). Open the factory line to see the full sequence.

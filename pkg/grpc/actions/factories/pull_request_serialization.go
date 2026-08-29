@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
-	canvasespb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -42,12 +41,24 @@ func serializeFactoryPullRequests(
 		return nil, err
 	}
 
+	runIDs := make([]uuid.UUID, 0)
+	for _, runs := range runsByPullRequest {
+		for _, linked := range runs {
+			runIDs = append(runIDs, linked.Run.ID)
+		}
+	}
+	usageByRun, err := models.SumUsageForRunTrees(tx, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
 	for i := range pullRequests {
 		serialized = append(serialized, serializeFactoryPullRequest(
 			&pullRequests[i],
 			numbers[pullRequests[i].WorkOrderID],
 			runsByPullRequest[pullRequests[i].ID],
+			usageByRun,
 		))
 	}
 	return serialized, nil
@@ -57,6 +68,7 @@ func serializeFactoryPullRequest(
 	pullRequest *models.FactoryPullRequest,
 	workOrderNumber int64,
 	runs []models.FactoryPullRequestLinkedRun,
+	usageByRun map[uuid.UUID]models.UsageTotals,
 ) *pb.FactoryPullRequest {
 	serialized := &pb.FactoryPullRequest{
 		Id:              pullRequest.ID.String(),
@@ -71,7 +83,7 @@ func serializeFactoryPullRequest(
 		State:           pullRequestStateToProto(pullRequest.State),
 		CreatedAt:       timestamppb.New(pullRequest.CreatedAt),
 		UpdatedAt:       timestamppb.New(pullRequest.UpdatedAt),
-		Runs:            serializePullRequestRuns(runs),
+		Runs:            serializePullRequestRuns(runs, usageByRun),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID
@@ -85,14 +97,21 @@ func serializeFactoryPullRequest(
 	return serialized
 }
 
-func serializePullRequestRuns(runs []models.FactoryPullRequestLinkedRun) []*canvasespb.CanvasRunRef {
-	refs := make([]*canvasespb.CanvasRunRef, 0, len(runs))
+func serializePullRequestRuns(
+	runs []models.FactoryPullRequestLinkedRun,
+	usageByRun map[uuid.UUID]models.UsageTotals,
+) []*pb.FactoryPullRequestRun {
+	result := make([]*pb.FactoryPullRequestRun, 0, len(runs))
 	for _, linked := range runs {
-		ref := canvases.SerializeCanvasRunRef(linked.Run)
-		ref.Description = linked.Description
-		refs = append(refs, ref)
+		usage := usageByRun[linked.Run.ID]
+		result = append(result, &pb.FactoryPullRequestRun{
+			Description: linked.Description,
+			TotalTokens: usage.TotalTokens,
+			CostCents:   usage.CostCents(),
+			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+		})
 	}
-	return refs
+	return result
 }
 
 func workOrderNumbersByID(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]int64, error) {

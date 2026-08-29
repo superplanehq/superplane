@@ -703,6 +703,7 @@ type ListFactoryWorkOrdersFilters struct {
 	States      []string
 	Results     []string
 	Unassigned  *bool
+	Mine        *uuid.UUID
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
@@ -737,6 +738,16 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 				AND factory_work_order_assignees.user_id IN ?
 			)`, filters.AssigneeIDs)
+	}
+
+	if filters.Mine != nil {
+		query = query.Where(`
+			EXISTS (
+				SELECT 1 FROM factory_work_order_assignees
+				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				AND factory_work_order_assignees.user_id = ?
+			)
+			OR factory_work_orders.created_by_id = ?`, *filters.Mine, *filters.Mine)
 	}
 
 	var orders []FactoryWorkOrder

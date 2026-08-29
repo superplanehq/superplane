@@ -286,16 +286,9 @@ func serializeWorkOrder(
 	order *models.FactoryWorkOrder,
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
+	usage models.UsageTotals,
 ) (*pb.WorkOrder, error) {
 	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
-
-	var totalTokens, totalCostCents int64
-	for _, d := range dispatches {
-		for _, e := range d.Executions {
-			totalTokens += e.TotalTokens
-			totalCostCents += e.CostCents
-		}
-	}
 
 	displayKey := ""
 	if f != nil {
@@ -320,8 +313,8 @@ func serializeWorkOrder(
 		Assignees:      serializeWorkOrderAssignees(order.Assignees),
 		LineDispatches: serializedDispatches,
 		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
-		TotalTokens:    totalTokens,
-		TotalCostCents: totalCostCents,
+		TotalTokens:    usage.TotalTokens,
+		TotalCostCents: usage.CostCents(),
 		StatusNotes:    statusNotes,
 		Origin:         serializeWorkOrderOrigin(order),
 	}, nil

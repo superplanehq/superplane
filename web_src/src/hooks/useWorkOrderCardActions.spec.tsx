@@ -33,7 +33,7 @@ function mockMutations() {
 }
 
 describe("useWorkOrderCardActions", () => {
-  it("reports only the work order that dispatches as in flight", async () => {
+  it("reports only the task that dispatches as in flight", async () => {
     const { finishDispatch } = mockMutations();
     const { result } = renderHook(() => useWorkOrderCardActions("org-1", "factory-1"));
 
@@ -53,7 +53,7 @@ describe("useWorkOrderCardActions", () => {
     expect(result.current.dispatchingOrderIds.has("wo-1")).toBe(false);
   });
 
-  it("clears the in-flight work order when the dispatch fails", async () => {
+  it("clears the in-flight task when the dispatch fails", async () => {
     mockMutations();
     vi.mocked(useDispatchWorkOrder).mockReturnValue({
       mutateAsync: vi.fn().mockRejectedValue(new Error("nope")),

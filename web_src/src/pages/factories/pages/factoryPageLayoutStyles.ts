@@ -17,7 +17,7 @@ export const factoryContentHeaderClassName = cn(
 const sectionPaneGutter = "px-3";
 
 /**
- * Compact section header (Overview, Work Orders, Lines, Automations, Wiki, Velocity).
+ * Compact section header (Overview, Tasks, Lines, Automations, Wiki, Velocity).
  * Title size matches the sidebar workspace name. Top inset matches the
  * workspace switcher (`pt-3`). Full pane width — not the centered column.
  */
@@ -33,7 +33,7 @@ export const factorySectionHeaderClassName = cn(
 /** Section list/body: same gutter as the header, no extra left inset. */
 export const factorySectionBodyClassName = cn("mx-0 max-w-none pt-0 pb-6 text-foreground", sectionPaneGutter);
 
-/** Work Orders / Lines kanban body: same gutter, fills leftover height. */
+/** Tasks / Lines kanban body: same gutter, fills leftover height. */
 export const factoryWorkOrdersBodyClassName = cn(
   factorySectionBodyClassName,
   "max-w-full pb-3",

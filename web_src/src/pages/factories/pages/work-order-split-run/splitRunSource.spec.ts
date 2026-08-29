@@ -111,7 +111,7 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("uses the person and Created manually when a person opened the work order", () => {
+  it("uses the person and Created manually when a person opened the task", () => {
     expect(splitRunSourceForOrder(DRAFT_WORK_ORDER)).toEqual(
       expect.objectContaining({
         kind: "manual",
@@ -121,7 +121,7 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("fills Source for every work order on the populated line board", () => {
+  it("fills Source for every task on the populated line board", () => {
     const orders = lineMetricsFactoriesFixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID] ?? [];
     expect(orders.length).toBeGreaterThan(0);
     for (const order of orders) {

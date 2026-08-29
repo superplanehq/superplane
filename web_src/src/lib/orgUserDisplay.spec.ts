@@ -14,6 +14,14 @@ describe("orgUserDisplay", () => {
     expect(getUserInitials("Alex Reviewer")).toBe("AR");
   });
 
+  it("drops emoji-only words instead of showing a broken glyph", () => {
+    expect(getUserInitials("SuperPlane Prod 🚀")).toBe("SP");
+  });
+
+  it("returns an empty string for an empty name, so callers can fall back", () => {
+    expect(getUserInitials("")).toBe("");
+  });
+
   it("maps list users response fields to display data", () => {
     const user: SuperplaneUsersUser = {
       metadata: { id: "user-1", email: "alex@example.com" },

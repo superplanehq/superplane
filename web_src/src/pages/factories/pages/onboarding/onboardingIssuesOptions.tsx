@@ -51,7 +51,7 @@ export function IssuesSourceOptions({
       <ConnectOptionRow
         icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
         title="Skip for now"
-        detail="Do not import a backlog. Create work orders yourself for selected tasks."
+        detail="Do not import a backlog. Create tasks yourself instead."
         selected={setup.issuesChoice === "skip"}
         onSelect={() => setup.setIssuesChoice("skip")}
       />

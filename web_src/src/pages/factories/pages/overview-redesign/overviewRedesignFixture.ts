@@ -15,9 +15,9 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 
 /**
- * Backing work orders for every row the Overview redesign mock shows, so
- * clicking a row opens a real work order detail page instead of bouncing
- * back to the Work Orders list (the detail route redirects when it cannot
+ * Backing tasks for every row the Overview redesign mock shows, so
+ * clicking a row opens a real task detail page instead of bouncing
+ * back to the Tasks list (the detail route redirects when it cannot
  * resolve the order number). Each order carries a description and an
  * activity timeline that match its overview state, so click-throughs land
  * on a believable detail page.

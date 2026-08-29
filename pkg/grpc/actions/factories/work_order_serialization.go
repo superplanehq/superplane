@@ -26,11 +26,17 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
+	usageByOrder, err := models.SumUsageForWorkOrders(db, []uuid.UUID{order.ID})
+	if err != nil {
+		return nil, err
+	}
+
 	return serializeWorkOrder(
 		factory,
 		order,
 		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
+		usageByOrder[order.ID],
 	)
 }
 
@@ -61,6 +67,11 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return nil, err
 	}
 
+	usageByOrder, err := models.SumUsageForWorkOrders(db, workOrderIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
 		serialized, err := serializeWorkOrder(
@@ -68,6 +79,7 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 			&orders[i],
 			dispatchesByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],
+			usageByOrder[orders[i].ID],
 		)
 		if err != nil {
 			return nil, err

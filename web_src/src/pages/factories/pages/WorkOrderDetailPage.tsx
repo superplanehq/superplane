@@ -2,6 +2,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import {
   useFactory,
   useFactoryPullRequests,
+  useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
   useWorkOrderEvents,
@@ -10,25 +11,38 @@ import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
+import { canonicalWorkOrderNumber, resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
 import { presentWorkOrderStatusNotes } from "../lib/workOrderStatusNote";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { LinesPage } from "./LinesPage";
 
+/** Canonical `/work-order/:orderNumber` opens the line board with the popup. */
 export function WorkOrderDetailPage() {
-  const { organizationId, factoryKey, factory } = useFactoriesLayout();
-  return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
+  return <LinesPage />;
 }
 
-/** Legacy `/work-orders/:orderId` bookmarks go to the workspace line board. */
+/** Legacy `/work-orders/:orderId` bookmarks go to the canonical permalink. */
 export function LegacyWorkOrderDetailRedirect() {
-  const { organizationId, factoryKey, factory } = useFactoriesLayout();
+  const { orderId } = useParams<{ orderId: string }>();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
+  const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
+  const number = canonicalWorkOrderNumber(resolution.order);
+
+  if (resolution.status === "loading") {
+    return null;
+  }
+  if (number) {
+    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, number)} replace />;
+  }
   return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
 }
 
@@ -105,7 +119,7 @@ function workOrderDetailTitle(
   order: ReturnType<typeof useWorkOrder>["data"],
   factory: ReturnType<typeof useFactory>["data"],
 ) {
-  return [order?.title ?? "Work Order", factory?.name ?? "Workspace"];
+  return [order?.title ?? "Task", factory?.name ?? "Workspace"];
 }
 
 function isWorkOrderDetailReady(
@@ -122,14 +136,14 @@ function isWorkOrderDetailReady(
 function WorkOrderDetailLoading({ chrome }: { chrome: "page" | "dialog" }) {
   return (
     <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
-      <p className="text-[13px] text-muted-foreground">Loading work order…</p>
+      <p className="text-[13px] text-muted-foreground">Loading task…</p>
     </div>
   );
 }
 
 function WorkOrderDetailUnavailable({ chrome, boardHref }: { chrome: "page" | "dialog"; boardHref: string }) {
   if (chrome === "dialog") {
-    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This work order cannot be opened.</p>;
+    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This task cannot be opened.</p>;
   }
   return <Navigate to={boardHref} replace />;
 }

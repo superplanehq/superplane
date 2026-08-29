@@ -442,7 +442,7 @@ function UserActionEventDescription({
         </span>
       </p>
       {event.kind === "created" && actorDisplay ? (
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create work order form</p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create task form</p>
       ) : null}
     </div>
   );

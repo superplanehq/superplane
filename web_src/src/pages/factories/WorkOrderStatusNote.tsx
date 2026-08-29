@@ -125,7 +125,7 @@ function ManualUpdateMenu({
 }) {
   return (
     <DropdownMenu>
-      <PermissionTooltip allowed={canClose || canManage} message="You don't have permission to manage this work order.">
+      <PermissionTooltip allowed={canClose || canManage} message="You don't have permission to manage this task.">
         <DropdownMenuTrigger asChild>
           <Button
             type="button"

@@ -210,7 +210,7 @@ describe("VelocityPage shell", () => {
     expect(split).not.toHaveTextContent("SuperPlane authored");
   });
 
-  it("explains when work order time could not be loaded", () => {
+  it("explains when task time could not be loaded", () => {
     resetState();
     velocityHookState.data = {
       yesterday: { superplaneMerged: 3, waste: 1 },
@@ -229,7 +229,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     const flow = screen.getByTestId("velocity-work-order-flow");
-    expect(flow).toHaveTextContent("We could not load work order time.");
-    expect(flow).not.toHaveTextContent("No work orders closed in this period.");
+    expect(flow).toHaveTextContent("We could not load task time.");
+    expect(flow).not.toHaveTextContent("No tasks closed in this period.");
   });
 });

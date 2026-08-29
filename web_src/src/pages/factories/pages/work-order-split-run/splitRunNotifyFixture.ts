@@ -292,7 +292,7 @@ function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStream
       id: "component-node-f069ua",
       at: "19:52:39",
       componentType: "Add Pull Request",
-      componentName: "Attach PR to Work Order",
+      componentName: "Attach PR to Task",
       action: "passed",
       iconSlug: "factory",
       duration: "1s",

@@ -1,17 +1,10 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
-import { ArrowRightFromLine, Kanban, MessageSquare, Settings } from "lucide-react";
+import { Gauge, Kanban, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import {
-  factoryHomePath,
-  factoryIntakePath,
-  factoryPRFeedbackPath,
-  factorySettingsPath,
-  isIntakeSearchOpen,
-  isPRFeedbackSearchOpen,
-} from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isSettingsPath } from "./factoriesRail";
+import { factoryHomePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
@@ -19,6 +12,8 @@ interface FactoriesSidebarNavProps {
   lineId?: string;
   canOpenSettings: boolean;
   permissionsLoading: boolean;
+  /** Shows the Velocity rail link when the org has the `factory_velocity` experimental feature. */
+  showVelocity: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -53,8 +48,11 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: intake drawer, PR feedback,
- * the line board, then settings.
+ * Icon rail under the workspace switcher: the line board, an optional
+ * Velocity link, then settings. Velocity only shows when the organization
+ * has the `factory_velocity` experimental feature enabled. Intakes and PR
+ * feedback open from their listener rows on the board, so they do not need a
+ * rail icon.
  */
 export function FactoriesSidebarNav({
   organizationId,
@@ -62,36 +60,28 @@ export function FactoriesSidebarNav({
   lineId,
   canOpenSettings,
   permissionsLoading,
+  showVelocity,
 }: FactoriesSidebarNavProps) {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
-  const intakeOpen = isIntakeSearchOpen(search);
-  const prFeedbackOpen = isPRFeedbackSearchOpen(search);
-  const intakeHref = intakeOpen ? boardHref : factoryIntakePath(organizationId, factoryKey, lineId);
-  const prFeedbackHref = prFeedbackOpen ? boardHref : factoryPRFeedbackPath(organizationId, factoryKey, lineId);
+  const velocityHref = factoryVelocityPath(organizationId, factoryKey);
   const settingsHref = factorySettingsPath(organizationId, factoryKey);
-  const intakeCurrent = intakeOpen;
-  const prFeedbackCurrent = prFeedbackOpen;
-  const boardCurrent = isBoardPath(pathname) && !intakeOpen && !prFeedbackOpen;
+  const boardCurrent = isBoardPath(pathname);
+  const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
 
   return (
     <nav className="flex flex-col items-center gap-1 px-1.5" aria-label="Workspace" data-testid="factories-sidebar-nav">
-      <RailNavLink
-        to={intakeHref}
-        label="Intake"
-        Icon={ArrowRightFromLine}
-        testId="factories-nav-intake"
-        isCurrent={intakeCurrent}
-      />
-      <RailNavLink
-        to={prFeedbackHref}
-        label="PR feedback"
-        Icon={MessageSquare}
-        testId="factories-nav-pr-feedback"
-        isCurrent={prFeedbackCurrent}
-      />
       <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
+      {showVelocity ? (
+        <RailNavLink
+          to={velocityHref}
+          label="Velocity"
+          Icon={Gauge}
+          testId="factories-nav-velocity"
+          isCurrent={velocityCurrent}
+        />
+      ) : null}
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."

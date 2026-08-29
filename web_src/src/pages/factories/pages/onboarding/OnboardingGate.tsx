@@ -2,12 +2,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import {
-  factoryIntakePath,
-  factoryOverviewPath,
-  factorySetupPath,
-  firstFactoryLineId,
-} from "../../lib/factoryPagePaths";
+import { factoryHomePath, factoryOverviewPath, factorySetupPath, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { isFactoryOnboardingComplete } from "./onboardingStatus";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
@@ -16,17 +11,16 @@ function isWorkspaceSetupRoute(pathname: string) {
 }
 
 /**
- * Where a finished workspace goes when it leaves setup: the line board with
- * the Intake drawer open, the same place the Finish action opens. Finish and
- * this redirect run in the same tick, so a different target here would drop
- * the drawer whenever this redirect lands last.
+ * Where a finished workspace goes when it leaves setup: the line board, the
+ * same place the Finish action opens. Finish and this redirect run in the same
+ * tick, so a different target here would win whenever this redirect lands last.
  */
 function pathAfterSetup(organizationId: string, factoryKey: string, factory: FactoriesFactory | null) {
   const lineId = firstFactoryLineId(factory);
   if (!lineId) {
     return factoryOverviewPath(organizationId, factoryKey);
   }
-  return factoryIntakePath(organizationId, factoryKey, lineId);
+  return factoryHomePath(organizationId, factoryKey, lineId);
 }
 
 /**

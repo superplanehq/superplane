@@ -181,7 +181,7 @@ describe("resolveSplitRunVisual", () => {
     });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
     expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
   });
 
@@ -228,17 +228,17 @@ describe("resolveSplitRunVisual", () => {
       canvas: { ...yaml, title: "Implementation (live)" },
       stream: [
         {
-          id: "live-create-branch",
-          nodeId: "create-branch",
+          id: "live-implementation-agent",
+          nodeId: "implementation-agent-no-issue",
           at: "00:00:01",
-          componentName: "Create Branch",
+          componentName: "Agent - Implement from order description",
           status: "passed",
         },
       ],
     });
 
     expect(visual.canvas.title).toBe("Implementation (live)");
-    expect(visual.stream?.some((line) => line.id === "live-create-branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.id === "live-implementation-agent")).toBe(true);
   });
 
   it("replaces the canned implement branch and adds the order pull request", () => {
@@ -286,7 +286,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
   });
 
   it("shows the line automation while the live canvas loads", () => {
@@ -294,7 +294,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: true, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Create Branch")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
   });
 
   it("does not keep YAML logs when the live canvas fails", () => {

@@ -86,7 +86,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       canvasSteps: [
         {
           id: "create-work-order",
-          title: "Create work order",
+          title: "Create task",
           componentName: "Create Work Order",
           provider: "superplane",
           status: "passed",
@@ -108,7 +108,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "plan-read",
           at: "12:24:05",
-          componentName: "Read Work Order",
+          componentName: "Read Task",
           status: "passed",
           duration: "4s",
           detail: "description.md",
@@ -125,8 +125,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
       canvasSteps: [
         {
           id: "read-order",
-          title: "Read work order",
-          componentName: "Read Work Order",
+          title: "Read task",
+          componentName: "Read Task",
           provider: "superplane",
           status: "passed",
           detail: "description.md",

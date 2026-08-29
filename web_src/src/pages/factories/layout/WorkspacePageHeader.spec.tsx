@@ -19,7 +19,7 @@ describe("WorkspacePageHeader (section variant)", () => {
 
   it("renders leading content next to the title", () => {
     renderHeader(
-      <WorkspacePageHeader title="Work Orders" leading={<span data-testid="scope-pills">All | Active | My</span>} />,
+      <WorkspacePageHeader title="Tasks" leading={<span data-testid="scope-pills">All | Active | My</span>} />,
     );
     expect(screen.getByTestId("scope-pills")).toBeInTheDocument();
   });
@@ -27,7 +27,7 @@ describe("WorkspacePageHeader (section variant)", () => {
   it("renders trailing actions and belowRow content", () => {
     renderHeader(
       <WorkspacePageHeader
-        title="Work Orders"
+        title="Tasks"
         actions={<button data-testid="new-button">New</button>}
         belowRow={<div data-testid="filter-chips">chips</div>}
       />,
@@ -40,7 +40,7 @@ describe("WorkspacePageHeader (section variant)", () => {
   it("keeps actions in the title row when actionsAlign is start", () => {
     renderHeader(
       <WorkspacePageHeader
-        title="Work Orders"
+        title="Tasks"
         actionsAlign="start"
         actions={<button data-testid="new-button">New</button>}
       />,
@@ -50,7 +50,7 @@ describe("WorkspacePageHeader (section variant)", () => {
   });
 
   it("does not add a below-row slot when belowRow is omitted", () => {
-    renderHeader(<WorkspacePageHeader title="Work Orders" />);
+    renderHeader(<WorkspacePageHeader title="Tasks" />);
     expect(screen.getByTestId("workspace-page-header").children).toHaveLength(1);
   });
 });
@@ -64,12 +64,12 @@ describe("WorkspacePageHeader (entity variant)", () => {
         kicker="SP-42"
         subtitle="Ledger cleanup"
         backHref="/org-1/workspaces/SP/work-orders"
-        backLabel="Work Orders"
+        backLabel="Tasks"
       />,
     );
     const back = screen.getByTestId("workspace-page-header-back");
     expect(back).toHaveAttribute("href", "/org-1/workspaces/SP/work-orders");
-    expect(back).toHaveTextContent("Work Orders");
+    expect(back).toHaveTextContent("Tasks");
     expect(screen.getByTestId("workspace-page-header-kicker")).toHaveTextContent("SP-42");
     expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Reconcile duplicate refunds");
     expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("Ledger cleanup");

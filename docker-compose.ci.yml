@@ -16,3 +16,11 @@ services:
     volumes:
       - ./tmp/go:/go/pkg/mod
       - ./tmp/go-build:/go/go-build-cache
+    # CI has no sibling runner `make dev`. Empty defaults override the local
+    # broker URL and token from docker-compose.dev.yml. Set these in CI env
+    # only when a job talks to a real task-broker.
+    environment:
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
+      TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}

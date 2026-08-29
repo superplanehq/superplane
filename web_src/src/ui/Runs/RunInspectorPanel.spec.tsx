@@ -588,11 +588,11 @@ describe("RunInspectorPanel run errors", () => {
     renderInspector({
       factoryContext: true,
       selectedNodeId: "action-2",
-      run: { ...run, errors: ["work order check failed"] },
+      run: { ...run, errors: ["task check failed"] },
     });
 
     expect(screen.getByTestId("factory-run-node-detail")).toBeInTheDocument();
     expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has an error");
-    expect(screen.getByText("work order check failed")).toBeInTheDocument();
+    expect(screen.getByText("task check failed")).toBeInTheDocument();
   });
 });

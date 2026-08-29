@@ -61,7 +61,7 @@ describe("useSplitRunFooterActions", () => {
 
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
     expect(cancelRunMock).not.toHaveBeenCalled();
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task closed as rejected.");
   });
 
   it("closes as completed for Stop and Complete", async () => {
@@ -70,7 +70,7 @@ describe("useSplitRunFooterActions", () => {
     await result.current.handleStop("completed", { kind: "failed" });
 
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_COMPLETED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as completed.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task closed as completed.");
   });
 
   it("reruns the current step", async () => {
@@ -88,7 +88,7 @@ describe("useSplitRunFooterActions", () => {
       startStepIndex: 1,
       replaceActive: true,
     });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order step started again.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task step started again.");
   });
 
   it("reruns from the first step", async () => {
@@ -106,19 +106,19 @@ describe("useSplitRunFooterActions", () => {
       startStepIndex: 0,
       replaceActive: true,
     });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order started from the first step.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task started from the first step.");
   });
 
-  it("reopens a closed work order", async () => {
+  it("reopens a closed task", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     await result.current.handleStop("reopen", { kind: "failed", status: "failed" });
 
     expect(updateMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", state: "STATE_OPEN" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order reopened.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task reopened.");
   });
 
-  it("stops a running automation without closing the work order", async () => {
+  it("stops a running automation without closing the task", async () => {
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 
     await result.current.handleStopAutomation({ appId: "app-implement", runId: "run-9" });
@@ -145,7 +145,7 @@ describe("useSplitRunFooterActions", () => {
     expect(cancelRunMock).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes the work order after stopping an automation", async () => {
+  it("refreshes the task after stopping an automation", async () => {
     const queryClient = new QueryClient();
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), {
@@ -197,7 +197,7 @@ describe("useSplitRunFooterActions", () => {
 
     expect(deleted).toBe(true);
     expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: "wo-1", result: "RESULT_REJECTED" });
-    expect(showSuccessToast).toHaveBeenCalledWith("Work order closed as rejected.");
+    expect(showSuccessToast).toHaveBeenCalledWith("Task closed as rejected.");
   });
 
   it("does not mutate when the popup has no live order", async () => {
@@ -212,7 +212,7 @@ describe("useSplitRunFooterActions", () => {
     expect(cancelRunMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the work order open when cancel fails", async () => {
+  it("keeps the task open when cancel fails", async () => {
     cancelRunMock.mockRejectedValue(new Error("run still busy"));
     const { result } = renderHook(() => useSplitRunFooterActions("org-1", "factory-1", "wo-1"), { wrapper });
 

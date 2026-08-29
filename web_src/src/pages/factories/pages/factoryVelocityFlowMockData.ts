@@ -2,9 +2,9 @@ import type { FactoryVelocityPeriodDays } from "./factoryVelocityMockData";
 
 export type FactoryVelocityFlowTrendPoint = {
   day: string;
-  /** Median hours in Running for work orders that closed that day. */
+  /** Median hours in Running for tasks that closed that day. */
   runningHours: number;
-  /** Median hours in Waiting for work orders that closed that day. */
+  /** Median hours in Waiting for tasks that closed that day. */
   waitingHours: number;
 };
 

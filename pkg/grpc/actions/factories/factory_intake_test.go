@@ -272,6 +272,66 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Contains(t, expression, "size(root().data.issue.assignees) == 0")
 	})
 
+	t.Run("the authors filter reaches the filter expression when on", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				AuthorsWithAccess: true,
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.True(t, settings.GetAuthorsWithAccess())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		expression := ""
+		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeFilterNodeID {
+				expression, _ = node.Configuration["expression"].(string)
+			}
+		}
+		assert.Contains(t, expression, `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`)
+	})
+
+	t.Run("the authors filter stays off by default", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		response, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		require.NoError(t, err)
+
+		settings := response.GetIntake().GetSettings()
+		assert.False(t, settings.GetAuthorsWithAccess())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		expression := ""
+		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeFilterNodeID {
+				expression, _ = node.Configuration["expression"].(string)
+			}
+		}
+		assert.NotContains(t, expression, "author_association")
+	})
+
 	t.Run("a source without a filter ignores label settings", func(t *testing.T) {
 		factory := newFactory(t)
 		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_SENTRY_EXCEPTIONS})

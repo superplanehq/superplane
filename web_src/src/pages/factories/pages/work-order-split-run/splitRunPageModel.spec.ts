@@ -34,7 +34,7 @@ describe("readSplitRunQuery", () => {
 });
 
 describe("resolveSplitRunOrder", () => {
-  it("matches a work order by number", () => {
+  it("matches a task by number", () => {
     expect(resolveSplitRunOrder([OPEN_WORK_ORDER], String(OPEN_WORK_ORDER.number), null, false)?.id).toBe(
       OPEN_WORK_ORDER.id,
     );
@@ -42,11 +42,11 @@ describe("resolveSplitRunOrder", () => {
 });
 
 describe("fixtureForSplitRunPage", () => {
-  it("returns null when no work order is selected", () => {
+  it("returns null when no task is selected", () => {
     expect(fixtureForSplitRunPage(null, [], null)).toBeNull();
   });
 
-  it("maps a loaded work order", () => {
+  it("maps a loaded task", () => {
     expect(fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null)?.title).toBe(RUNNING_WORK_ORDER.title);
   });
 

@@ -25,7 +25,7 @@ interface WorkOrdersHeaderProps {
 }
 
 /**
- * Compact title bar for the Work Orders page. Title, scope, and Filter
+ * Compact title bar for the Tasks page. Title, scope, and Filter
  * stay on the left. Search, Display, and New sit on the right.
  *
  * The Filter menu and the chip row read from one shared set of options, so
@@ -47,7 +47,7 @@ export function WorkOrdersHeader({
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       data-testid="work-orders-header"
-      title="Work Orders"
+      title="Tasks"
       leading={
         <>
           <ScopePills

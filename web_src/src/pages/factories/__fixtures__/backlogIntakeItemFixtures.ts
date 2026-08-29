@@ -27,7 +27,7 @@ export const PAGERDUTY_INCIDENTS_INTAKE: FactoriesFactoryIntake = {
   id: PAGERDUTY_INCIDENTS_INTAKE_ID,
   canvasId: "app-pagerduty-intake",
   name: "PagerDuty incidents",
-  description: "Firing incidents that need a work order.",
+  description: "Firing incidents that need a task.",
   source: "SOURCE_PAGERDUTY_INCIDENTS",
   healthy: true,
 };
@@ -153,6 +153,16 @@ export const severalIntakeFactoriesFixture: FactoriesFixture = {
     ],
   },
   intakeItemCatalog: severalIntakeItemCatalog,
+};
+
+/** Two listeners at the head of Backlog: GitHub issues and Sentry exceptions. */
+export const githubAndSentryIntakeFactoriesFixture: FactoriesFixture = {
+  ...lineMetricsFactoriesFixture,
+  intakesByFactoryId: {
+    ...lineMetricsFactoriesFixture.intakesByFactoryId,
+    [PRIMARY_FACTORY_ID]: [GITHUB_ISSUES_INTAKE, SENTRY_EXCEPTIONS_INTAKE],
+  },
+  intakeItemCatalog: { items: [...githubItems, ...sentryItems] },
 };
 
 export const noIntakeFactoriesFixture: FactoriesFixture = {

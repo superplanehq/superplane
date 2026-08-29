@@ -9,7 +9,7 @@ import type {
 import { factoryAppRunPath } from "./factoryPagePaths";
 
 /**
- * One row in a work order's step activity: either a real execution or a
+ * One row in a task's step activity: either a real execution or a
  * queue item projected into the same shape. `queuePosition` is set only
  * for queued rows (1 is next to be admitted).
  */
