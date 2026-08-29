@@ -1048,6 +1048,8 @@ message ListWorkOrdersRequest {
   repeated WorkOrder.State states = 3;
   repeated WorkOrder.Result results = 4;
   optional bool unassigned = 5;
+  // User ID. Returns orders where this user is an assignee or the creator.
+  optional string mine = 6;
 }
 
 message ListWorkOrdersResponse {
