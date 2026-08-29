@@ -81,6 +81,7 @@ async function provisionWorkspace(args: {
   takenNames: string[];
   appRepository: string;
   backlogRepository: string;
+  resolveDefaultBranch: (repository: string) => Promise<string>;
   github: { id: string };
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
@@ -101,6 +102,10 @@ async function provisionWorkspace(args: {
     issuesSource: apiIssuesSource(args.setup.issuesChoice),
     agentHarness: args.agentPlan.harness,
   });
+  // Onboarding installs the Implement app with the real default branch (main,
+  // master, staging, ...) instead of hardcoding "main", so Create Branch and
+  // Create Pull Request target the branch GitHub actually treats as default.
+  const defaultBranch = (await args.resolveDefaultBranch(args.appRepository)) || "main";
   const { lineId, primaryAppId } = await provisionLine({
     factory: args.factory,
     savedLineId: args.factory?.onboarding?.provisionedLineId,
@@ -108,6 +113,7 @@ async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
     createLine: args.createLine,
@@ -118,10 +124,11 @@ async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
-  // The intake needs the line: it opens work orders that the line runs.
+  // The intake needs the line: it opens tasks that the line runs.
   await provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
@@ -155,6 +162,7 @@ export function useFinishOnboarding(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;

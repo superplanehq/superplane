@@ -7,6 +7,8 @@ import {
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
+  intakeSettingsFromApi,
+  intakeSettingsToApi,
   normalizeIntakeSourceSettings,
   toggleIntakeLabel,
 } from "./intakeSourceSettingsModel";
@@ -48,5 +50,20 @@ describe("intakeSourceSettingsModel", () => {
     expect(isIntakeSettingsTab("runs")).toBe(true);
     expect(isIntakeSettingsTab("general")).toBe(true);
     expect(isIntakeSettingsTab("listen")).toBe(false);
+  });
+
+  it("defaults the authors filter to off", () => {
+    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(false);
+    expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(false);
+  });
+
+  it("round-trips the authors filter through the API shape", () => {
+    const on = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: true });
+    expect(on.authorsWithAccess).toBe(true);
+    expect(intakeSettingsToApi(on).authorsWithAccess).toBe(true);
+
+    const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
+    expect(off.authorsWithAccess).toBe(false);
+    expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
   });
 });

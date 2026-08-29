@@ -23,7 +23,7 @@ const LEVEL_METER_CLASSNAME: Record<WorkOrderCheckLevel, string> = {
 };
 
 /**
- * Scores reported by automations that reviewed the work order (risk review,
+ * Scores reported by automations that reviewed the task (risk review,
  * coverage, confidence, …). Each renders as a scorecard; clicking one opens
  * the full analysis in a dialog.
  */
@@ -54,7 +54,7 @@ export function WorkOrderChecksSection({
     <section className={className} data-testid="work-order-checks">
       <h2 className="workspace-section-title">Checks</h2>
       <p className="workspace-body-text mt-1 text-muted-foreground">
-        Scores reported by automations that reviewed this work order.
+        Scores reported by automations that reviewed this task.
       </p>
       {error ? (
         <p className="mt-4 text-[13px] text-destructive">Failed to load checks.</p>

@@ -355,7 +355,7 @@ const CLOSURE_NOTES: FactoriesWorkOrderArtifact = {
   data: {
     name: "closure.md",
     title: "closure.md",
-    body: "The pull request merged. SuperPlane closed the work order.",
+    body: "The pull request merged. SuperPlane closed the task.",
   },
 };
 
@@ -576,7 +576,7 @@ function agentNotes(nodeId: string): string[] {
   if (nodeId === "assess-pr-risk") {
     return ["Reading the pull request diff.", "Scoring retry-policy risk.", "Writing the risk review."];
   }
-  return ["Reading the work order.", "Writing the change.", "Running the local checks."];
+  return ["Reading the task.", "Writing the change.", "Running the local checks."];
 }
 
 function checkName(nodeId: string, fallback: string): string {

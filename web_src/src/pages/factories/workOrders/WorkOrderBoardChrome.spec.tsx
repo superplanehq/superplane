@@ -37,11 +37,11 @@ describe("WorkOrderKanbanBoard", () => {
         keepChildrenWhenEmpty
         testId="lane-ghost"
       >
-        <p data-testid="lane-children">Create work order</p>
+        <p data-testid="lane-children">Create task</p>
       </WorkOrderBoardLane>,
     );
 
-    expect(screen.getByTestId("lane-children")).toHaveTextContent("Create work order");
+    expect(screen.getByTestId("lane-children")).toHaveTextContent("Create task");
     expect(screen.queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
   });
 

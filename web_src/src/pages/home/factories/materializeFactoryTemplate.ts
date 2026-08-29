@@ -13,6 +13,10 @@ export const FACTORY_CANVAS_ID_PLACEHOLDER = "__FACTORY_CANVAS_ID__";
  */
 export function normalizeFactoryInstallParams(params: Record<string, string>): Record<string, string> {
   const next = { ...params };
+  if (!next.defaultBranch?.trim()) {
+    next.defaultBranch = "main";
+  }
+
   const legacyRepository = next.repository?.trim();
   if (!legacyRepository) return next;
 

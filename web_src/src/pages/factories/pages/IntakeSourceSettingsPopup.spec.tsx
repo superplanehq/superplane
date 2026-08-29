@@ -183,6 +183,7 @@ describe("IntakeSourceSettingsPopup", () => {
     await user.click(screen.getByRole("radio", { name: "Exclude these labels" }));
     await user.click(screen.getByRole("checkbox", { name: "bug" }));
     await user.click(screen.getByRole("radio", { name: "Unassigned" }));
+    await user.click(screen.getByRole("checkbox", { name: "Only issues from people with repository access" }));
     await user.click(screen.getByTestId("intake-source-settings-save"));
 
     await waitFor(() =>
@@ -193,6 +194,7 @@ describe("IntakeSourceSettingsPopup", () => {
         labelFilterMode: "exclude",
         labels: ["bug"],
         assignment: "unassigned",
+        authorsWithAccess: true,
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);

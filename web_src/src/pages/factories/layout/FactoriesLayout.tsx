@@ -2,10 +2,12 @@ import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { FEATURE_FACTORY_VELOCITY } from "@/lib/experimentalFeatures";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
@@ -131,7 +133,7 @@ function FactoriesLayoutContent({
   // `pages/factories/pages/`). React fires a newly-mounted child's effects
   // before its parent's, so if this effect stayed enabled it would run right
   // after the leaf's and clobber it back down to just the factory name on
-  // every first render (e.g. a hard reload straight to a work order
+  // every first render (e.g. a hard reload straight to a task
   // permalink). Disable it as soon as there's a leaf to hand off to; keep it
   // enabled only for the loading/error baseline rendered before that.
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);
@@ -246,6 +248,8 @@ function FactoriesSidebar({
   onOpenCreateFactory,
 }: FactoriesSidebarProps) {
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const showVelocity = hasExperimentalFeature(FEATURE_FACTORY_VELOCITY);
   return (
     <aside
       className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
@@ -265,6 +269,7 @@ function FactoriesSidebar({
         lineId={routeLineId ?? firstFactoryLineId(factory)}
         canOpenSettings={canOpenSettings}
         permissionsLoading={permissionsLoading}
+        showVelocity={showVelocity}
       />
       <div className="flex-1" />
       <SidebarUserMenu

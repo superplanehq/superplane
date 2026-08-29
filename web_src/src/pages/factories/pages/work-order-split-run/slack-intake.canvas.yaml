@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Slack
-  description: Create a work order when someone mentions the SuperPlane agent in Slack.
+  description: Create a task when someone mentions the SuperPlane agent in Slack.
 spec:
   edges:
     - channel: default

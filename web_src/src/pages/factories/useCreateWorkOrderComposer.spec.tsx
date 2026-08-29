@@ -31,7 +31,7 @@ describe("useCreateWorkOrderComposer", () => {
     meResult.current = { data: null };
   });
 
-  it("marks Create as loading while the work order is created", async () => {
+  it("marks Create as loading while the task is created", async () => {
     let resolveCreate: (order: { id: string }) => void = () => {};
     createMutate.mockImplementation(
       () =>
@@ -133,7 +133,7 @@ describe("useCreateWorkOrderComposer", () => {
     expect(result.current.assigneeIds).toEqual([]);
   });
 
-  it("opens the new work order without closing to the list first", async () => {
+  it("opens the new task without closing to the list first", async () => {
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
 
     const { result } = renderHook(() =>

@@ -43,7 +43,7 @@ describe("BacklogIntakeSources", () => {
     const intake = screen.getByTestId("line-intake-source-intake-github");
     expect(intake).toHaveTextContent("Listening to GitHub issues");
     expect(intake).not.toHaveTextContent("Creates tasks from GitHub issues.");
-    expect(screen.queryByText("Automations that listen, evaluate, and create backlog work orders.")).toBeNull();
+    expect(screen.queryByText("Automations that listen, evaluate, and create backlog tasks.")).toBeNull();
   });
 
   it("lists two intakes on the same source as separate rows", () => {
@@ -71,7 +71,7 @@ describe("BacklogIntakeSources", () => {
     expect(screen.queryByTestId("line-intake-source-intake-sentry")).not.toBeInTheDocument();
   });
 
-  it("marks an intake whose automation can no longer create work orders", () => {
+  it("marks an intake whose automation can no longer create tasks", () => {
     renderSources({ intakes: [configuredIntake({ healthy: false })] });
 
     const intake = screen.getByTestId("line-intake-source-intake-github");

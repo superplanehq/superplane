@@ -19,7 +19,7 @@ export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "pass
 export type LinePhaseRunCard = {
   executionId: string;
   workOrderId: string;
-  /** Raw work order, so the board can build the shared work order card model. */
+  /** Raw task, so the board can build the shared task card model. */
   order: FactoriesWorkOrder;
   execution: WorkOrderStepRow;
 };
@@ -40,7 +40,7 @@ export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
  * Destination for a phase-board card: the split-run page for this phase.
- * Never the work order page — that destination stays on the Work Orders list.
+ * Never the task page — that destination stays on the Tasks list.
  */
 export function linePhaseRunHref(
   organizationId: string,
@@ -68,7 +68,7 @@ export function linePhaseRunHref(
 }
 
 /**
- * Builds the Lines detail board: one column per line step. Each work order
+ * Builds the Lines detail board: one column per line step. Each task
  * appears once, in the column for its current (furthest active, else furthest
  * finished) step on this line — newest cards first within a column. Work
  * orders that reached a terminal outcome move to the Done column instead.
@@ -104,7 +104,7 @@ export function buildLinePhaseBoard(
 
 /**
  * True when the last step is the line's own Done automation. Such a line keeps
- * finished work orders on that step; every other line hands them to the board
+ * finished tasks on that step; every other line hands them to the board
  * Done column, which no app backs.
  */
 export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
@@ -113,7 +113,7 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft work orders. A draft that already ran on a line still belongs
+ * Draft tasks. A draft that already ran on a line still belongs
  * here after To Backlog. Newest updated drafts come first.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
@@ -243,7 +243,7 @@ function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
   return Boolean(order.id) && order.state === "STATE_DRAFT";
 }
 
-// A finished work order belongs on this board when it ran on this line, or
+// A finished task belongs on this board when it ran on this line, or
 // when it closed before any line picked it up — the same rule the shared
 // backlog follows.
 function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {

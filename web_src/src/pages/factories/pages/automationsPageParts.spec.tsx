@@ -209,7 +209,7 @@ describe("AutomationDetail tabs", () => {
     expect(screen.getByTestId("automations-detail-body").className).toMatch(/\bmax-w-none\b/);
   });
 
-  it("renders the work order card when the run belongs to a work order", () => {
+  it("renders the task card when the run belongs to a task", () => {
     renderDetail([matchingOrder]);
 
     const card = screen.getByTestId("work-order-card-wo-1");

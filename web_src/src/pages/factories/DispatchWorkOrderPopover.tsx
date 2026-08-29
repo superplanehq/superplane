@@ -53,7 +53,7 @@ export function DispatchWorkOrderPopover({
       await onDispatch({ lineName });
       setOpen(false);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to dispatch work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to dispatch task"));
     }
   };
 
@@ -65,8 +65,8 @@ export function DispatchWorkOrderPopover({
           {lines.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {submitLabel === "Start"
-                ? "Configure at least one line before you start a work order."
-                : "Configure at least one line before dispatching work orders."}
+                ? "Configure at least one line before you start a task."
+                : "Configure at least one line before dispatching tasks."}
             </p>
           ) : (
             <div className="space-y-1.5">
@@ -88,7 +88,7 @@ export function DispatchWorkOrderPopover({
             </div>
           )}
 
-          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
             <LoadingButton
               onClick={() => void handleDispatch()}
               disabled={!canDispatch || lines.length === 0 || !lineName}

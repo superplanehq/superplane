@@ -89,7 +89,7 @@ describe("isActiveCanvasRun", () => {
 });
 
 describe("activePRFeedbackWorkOrderIds", () => {
-  it("returns work orders that have an active pull request run", () => {
+  it("returns tasks that have an active pull request run", () => {
     expect(
       activePRFeedbackWorkOrderIds([
         { workOrderId: "wo-1", runs: [{ run: { id: "r1", state: "STATE_PENDING" } }] },

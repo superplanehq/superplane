@@ -30,7 +30,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "pagerduty-incidents",
     name: "PagerDuty incidents",
-    description: "Firing incidents that need a work order.",
+    description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
   },
   {
@@ -46,7 +46,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "flaky-tests",
     name: "Flaky tests",
-    description: "Catch unstable tests and create fix work orders.",
+    description: "Catch unstable tests and create fix tasks.",
   },
 ];
 

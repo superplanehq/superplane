@@ -46,7 +46,7 @@ export function extractArtifactUrl(data: ArtifactData): string | undefined {
 }
 
 /**
- * Browse URL for a branch artifact that carries no `url`. The Add Work Order
+ * Browse URL for a branch artifact that carries no `url`. The Add Task
  * Artifact component writes a tree URL at attach time, so this only covers
  * branches attached before that: they hold `repository` (`owner/repo` or a
  * repository http(s) URL) plus the branch `name`.

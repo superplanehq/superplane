@@ -69,7 +69,7 @@ export function useCreateWorkOrderComposer({
       });
       goToOrder(order);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to create work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to create task"));
     } finally {
       setIsCreating(false);
     }

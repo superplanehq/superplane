@@ -146,7 +146,7 @@ describe("applySplitRunStop", () => {
     expect(onClose).toHaveBeenCalledWith("RESULT_REJECTED");
   });
 
-  it("cancels a running automation without closing the work order", async () => {
+  it("cancels a running automation without closing the task", async () => {
     const cancelRun = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
 

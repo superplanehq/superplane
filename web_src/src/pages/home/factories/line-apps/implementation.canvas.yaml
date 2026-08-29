@@ -7,15 +7,12 @@ spec:
   edges:
     - channel: default
       sourceId: onrun-implement
-      targetId: create-branch
-    - channel: passed
-      sourceId: create-branch
-      targetId: add-branch-artifact
-    - channel: default
-      sourceId: add-branch-artifact
       targetId: implementation-agent-no-issue
     - channel: passed
       sourceId: implementation-agent-no-issue
+      targetId: add-branch-artifact
+    - channel: default
+      sourceId: add-branch-artifact
       targetId: create-pr
     - channel: default
       sourceId: create-pr
@@ -36,94 +33,6 @@ spec:
         x: 1542
         'y': 144
       isCollapsed: true
-    - id: create-branch
-      name: Create Branch
-      type: TYPE_ACTION
-      component: runnerBash
-      concurrency:
-        max: 5
-      configuration:
-        enable_setup_commands: false
-        environmentFrom:
-          - source: integration
-            integration:
-              name: github
-        environment:
-          - name: REPO
-            value: '{{ install_params.appRepository }}'
-            valueSource: literal
-          - name: WORK_ORDER_TITLE
-            value: '{{ order().title }}'
-            valueSource: literal
-          - name: BASE
-            value: main
-            valueSource: literal
-          - name: COAUTHORS
-            value: '{{ join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
-            valueSource: literal
-        execution_mode: host
-        execution_timeout_seconds: 3600
-        machine_type: e1-large-amd64
-        script: |-
-          #!/usr/bin/env bash
-          set -euo pipefail
-
-          BASE="${BASE:-main}"
-          SESSION_ID=$(date +%s)
-
-          # Build a unique branch name: fix/{slug-of-issue-title}-{unix-timestamp}-{random}
-          SLUG="$(printf '%s' "${WORK_ORDER_TITLE:-}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50 | sed -E 's/-+$//')"
-          [ -z "$SLUG" ] && SLUG="issue"
-          RAND="$(openssl rand -hex 4 2>/dev/null || head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-          BRANCH="fix/${SLUG}-${SESSION_ID}-${RAND}"
-
-          GITURL="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git"
-          WORKDIR="repo"
-          rm -rf "$WORKDIR"
-
-          git config --global user.email "superplaneagent@superplane.com"
-          git config --global user.name "SuperPlane Agent"
-
-          git clone --depth 1 "$GITURL" "$WORKDIR"
-          cd "$WORKDIR"
-
-          cat > .git/hooks/prepare-commit-msg <<'HOOK'
-          printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
-          if [ -n "${COAUTHORS:-}" ]; then
-            printf '\n%s\n' "$COAUTHORS" >> "$1"
-          fi
-          HOOK
-          chmod +x .git/hooks/prepare-commit-msg
-
-          # Create an empty branch off the base: a single empty commit so a pull request can be
-          # opened, with no files added.
-          git checkout -b "$BRANCH"
-          git commit -s --allow-empty -m "chore: initialize ${BRANCH}"
-          git push -u origin "$BRANCH"
-
-          echo "Pushed empty branch ${BRANCH}"
-
-          # Respond with branch and session id
-          printf '{"branch":"%s", "session":"%s"}\n' "$BRANCH" "$SESSION_ID" > "$SUPERPLANE_RESULT_FILE"
-      position:
-        x: 1542
-        'y': 312
-      isCollapsed: false
-    - id: add-branch-artifact
-      name: Add Branch Artifact
-      type: TYPE_ACTION
-      component: addWorkOrderArtifact
-      concurrency:
-        max: 100
-      configuration:
-        artifactType: branch
-        name: '{{ $["Create Branch"].data.result.branch }}'
-        orderId: '{{ order().id }}'
-        repository: '{{ install_params.appRepository }}'
-      position:
-        x: 1495
-        'y': 480
-      isCollapsed: true
     - id: implementation-agent-no-issue
       name: Agent - Implement from order description
       type: TYPE_ACTION
@@ -143,8 +52,11 @@ spec:
           - name: REPO
             value: '{{ install_params.appRepository }}'
             valueSource: literal
-          - name: BRANCH
-            value: '{{ $["Create Branch"].data.result.branch }}'
+          - name: BASE
+            value: '{{ install_params.defaultBranch }}'
+            valueSource: literal
+          - name: WORK_ORDER_TITLE
+            value: '{{ order().title }}'
             valueSource: literal
           - name: ORDER_DESCRIPTION
             value: '{{ toBase64(order().description) }}'
@@ -175,22 +87,38 @@ spec:
             command: |-
               echo $PLAN | base64 -d > /tmp/PLAN.md
               cat /tmp/PLAN.md
-          - name: Checkout Branch
+          - name: Create Branch
             type: bash
             command: |-
               set -euo pipefail
+
+              # Unique branch name: fix/{slug-of-task-title}-{unix-timestamp}-{random}
+              SLUG="$(printf '%s' "${WORK_ORDER_TITLE:-}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50 | sed -E 's/-+$//')"
+              [ -z "$SLUG" ] && SLUG="issue"
+              RAND="$(openssl rand -hex 4 2>/dev/null || head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+              BRANCH="fix/${SLUG}-$(date +%s)-${RAND}"
+              echo "$BRANCH" > /tmp/BRANCH
+
               rm -rf repo
-              git clone --depth 1 --branch "$BRANCH" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+              git clone --depth 1 --branch "${BASE:-main}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
+              git checkout -b "$BRANCH"
+              echo "Working on $BRANCH"
           - name: Set Up DCO Signing
             type: bash
             workingDirectory: repo
             command: |-
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
-              printf '\n%s\n' "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" >> "$1"
-              if [ -n "${COAUTHORS:-}" ]; then
-                printf '\n%s\n' "$COAUTHORS" >> "$1"
-              fi
+              git interpret-trailers --in-place --if-exists doNothing \
+                --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"
+
+              printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do
+                if [ -n "$trailer" ]; then
+                  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"
+                fi
+              done
+
+              exit 0
               HOOK
 
               chmod +x .git/hooks/prepare-commit-msg
@@ -198,14 +126,14 @@ spec:
             type: prompt
             workingDirectory: repo
             prompt: |-
-              You are implementing a fix for a SuperPlane work order. The repository is already checked out in your current working directory, on the branch to work on.
+              You are implementing a fix for a SuperPlane task. The repository is already checked out in your current working directory, on the branch to work on.
 
               Repository: {{ install_params.appRepository }}
-              Work order title: {{ order().title }}
+              Task title: {{ order().title }}
 
-              1/ The original work order description is at /tmp/ORDER.md. Read it before implementing.
+              1/ The original task description is at /tmp/ORDER.md. Read it before implementing.
               2/ The preliminary plan is at /tmp/PLAN.md. Read it before writing any implementation.
-              3/ Implement. Make the code changes required to resolve the work order description and plan.
+              3/ Implement. Make the code changes required to resolve the task description and plan.
               4/ Keep the change focused and commit your work to the current branch with clear commit messages.
 
               Guidelines:
@@ -218,20 +146,19 @@ spec:
             workingDirectory: repo
             command: |-
               set -euo pipefail
+              BRANCH="$(cat /tmp/BRANCH)"
               echo "cwd=$(pwd -P)"
               git status
               git log --oneline -5
               git add -A
               if ! git diff --cached --quiet; then
-                git commit -s -m "fix: implement work order via SuperPlane"
+                git commit -s -m "fix: implement task via SuperPlane"
               fi
-              if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
-                if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
-                  echo "No file changes and no unpushed commits on ${BRANCH}" >&2
-                  exit 1
-                fi
+              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+                echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                exit 1
               fi
-              git push origin "$BRANCH"
+              git push -u origin "$BRANCH"
               echo "Pushed implementation to $BRANCH"
           - name: Generate PR title and description
             type: prompt
@@ -239,9 +166,9 @@ spec:
             prompt: |-
               Write the pull request title and description for the change you pushed.
 
-              Work order title: {{ order().title }}
+              Task title: {{ order().title }}
 
-              1/ Compare the current branch with main and review the commits you made.
+              1/ Compare the current branch with {{ install_params.defaultBranch }} and review the commits you made.
               2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
               3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
               4/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
@@ -253,9 +180,10 @@ spec:
               if [ -s /tmp/TITLE ] && [ -s /tmp/DESCRIPTION.md ]; then
                 echo "Title and description found. Using as output"
                 jq -n \
+                  --arg branch "$(cat /tmp/BRANCH)" \
                   --rawfile title /tmp/TITLE \
                   --rawfile description /tmp/DESCRIPTION.md \
-                  '{title: ($title | @base64), description: ($description | @base64)}' \
+                  '{branch: $branch, title: ($title | @base64), description: ($description | @base64)}' \
                   > "$SUPERPLANE_RESULT_FILE"
               else
                 jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
@@ -265,8 +193,23 @@ spec:
               fi
       position:
         x: 1475
-        'y': 648
+        'y': 312
       isCollapsed: false
+    - id: add-branch-artifact
+      name: Add Branch Artifact
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      concurrency:
+        max: 100
+      configuration:
+        artifactType: branch
+        name: '{{ $["Agent - Implement from order description"].data.result.branch }}'
+        orderId: '{{ order().id }}'
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 1495
+        'y': 648
+      isCollapsed: true
     - id: create-pr
       name: Create Pull Request
       type: TYPE_ACTION
@@ -274,25 +217,25 @@ spec:
       concurrency:
         max: 100
       configuration:
-        base: main
+        base: '{{ install_params.defaultBranch }}'
         body: |-
-          [Work Order]({{ order().url }}).
+          [Task]({{ order().url }}).
 
-          {{ fromBase64(previous().data.result.description) }}
+          {{ fromBase64($["Agent - Implement from order description"].data.result.description) }}
 
           <hr>
 
           Created via [SuperPlane](https://superplane.com).
         draft: false
-        head: '{{ $["Create Branch"].data.result.branch }}'
+        head: '{{ $["Agent - Implement from order description"].data.result.branch }}'
         repository: '{{ install_params.appRepository }}'
-        title: '{{ fromBase64(previous().data.result.title) }}'
+        title: '{{ fromBase64($["Agent - Implement from order description"].data.result.title) }}'
       position:
         x: 1442
-        'y': 984
+        'y': 816
       isCollapsed: true
     - id: attach-pr-artifact
-      name: Attach PR to Work Order
+      name: Attach PR to Task
       type: TYPE_ACTION
       component: addPullRequest
       concurrency:
@@ -308,7 +251,7 @@ spec:
         externalId: '{{ $["Create Pull Request"].data.id }}'
       position:
         x: 1442
-        'y': 1152
+        'y': 984
       isCollapsed: true
     - id: set-pr-closure-note
       name: Set PR closure note
@@ -324,7 +267,7 @@ spec:
         showOnlyWhenWaiting: true
       position:
         x: 1442
-        'y': 1320
+        'y': 1152
       isCollapsed: true
     - id: add-run-error
       name: Record Implementation Failure
@@ -334,5 +277,5 @@ spec:
         message: The implementation agent failed. Open the agent logs to find the cause.
       position:
         x: 1770
-        'y': 984
+        'y': 648
       isCollapsed: true

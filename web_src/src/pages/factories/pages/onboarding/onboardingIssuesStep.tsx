@@ -68,7 +68,7 @@ export function IssuesStep({
                     : `Found ${setup.issueCount} open issues on ${vcsLabel(host)}`}
                 </div>
                 <p className="mt-1 text-[12px] text-muted-foreground">
-                  Select the repository that SuperPlane will use for work orders.
+                  Select the repository that SuperPlane will use for tasks.
                 </p>
               </div>
               <button

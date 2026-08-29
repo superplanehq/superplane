@@ -25,7 +25,7 @@ import { MissionDetailHeader } from "./MissionDetailHeader";
 import { MissionStatusValue } from "./MissionStatusValue";
 import { MissionWorkOrderList } from "./MissionWorkOrderList";
 
-/** Storybook-only mission detail. Open one mission and see its work orders. */
+/** Storybook-only mission detail. Open one mission and see its tasks. */
 export function MissionDetailPage() {
   const { missionId } = useParams<{ missionId: string }>();
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
@@ -50,7 +50,7 @@ export function MissionDetailPage() {
         <p className="text-[14px] font-medium text-foreground">Mission not found</p>
         <p className="mt-1 text-[13px] text-muted-foreground">This mission is not in the Storybook seed data.</p>
         <Link to={listHref} className="mt-3 inline-flex text-[13px] font-medium text-foreground underline">
-          Back to work orders
+          Back to tasks
         </Link>
       </div>
     );
@@ -124,10 +124,10 @@ function MissionDetailLoadedView({
         <div className="min-w-0">
           {mission.description ? <WorkOrderDescription description={mission.description} /> : null}
 
-          <section className={mission.description ? "mt-10" : "mt-8"} aria-label="Work orders in this mission">
-            <h2 className="workspace-section-label mb-1">Work orders</h2>
+          <section className={mission.description ? "mt-10" : "mt-8"} aria-label="Tasks in this mission">
+            <h2 className="workspace-section-label mb-1">Tasks</h2>
             {entries.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted-foreground">This mission has no work orders.</p>
+              <p className="py-2 text-[13px] text-muted-foreground">This mission has no tasks.</p>
             ) : (
               <MissionWorkOrderList entries={entries} organizationId={organizationId} factoryKey={factoryKey} />
             )}

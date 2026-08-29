@@ -210,8 +210,8 @@ function WorkspaceDetailsSection({
           autoComplete="off"
         />
         <p className="text-[11px] text-muted-foreground">
-          Changing the key updates every work order identifier for this workspace. IDs already shared elsewhere will no
-          longer resolve.
+          Changing the key updates every task identifier for this workspace. IDs already shared elsewhere will no longer
+          resolve.
         </p>
         {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
       </div>
@@ -263,7 +263,7 @@ function DangerZoneSection({ canDelete, permissionsLoading, onOpenDelete }: Dang
       data-testid="factory-settings-danger-zone"
     >
       <p className="text-[13px] text-muted-foreground">
-        Deleting a workspace permanently removes its work orders, lines, and apps.
+        Deleting a workspace permanently removes its tasks, lines, and apps.
       </p>
       <div className="mt-4">
         <PermissionTooltip

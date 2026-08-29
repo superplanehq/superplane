@@ -15,7 +15,7 @@ interface WorkOrderLineStepProps {
 }
 
 /**
- * Line and step caption under the work order title. Board, List, and Table
+ * Line and step caption under the task title. Board, List, and Table
  * share it so the three layouts always agree on the wording and on when the
  * running indicator spins.
  */

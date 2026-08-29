@@ -92,7 +92,7 @@ export function FactoryLineStepEditor({
             placeholder="10"
           />
           <p className="text-xs text-muted-foreground">
-            Maximum number of work orders to be processed in parallel at this step.
+            Maximum number of tasks to be processed in parallel at this step.
           </p>
         </div>
       </div>

@@ -68,7 +68,7 @@ const nodes: Node<StepNodeData>[] = [
         agent: "github-worker",
         attempt: "1 / 1",
         output: "Opened draft PR #148 against main.",
-        logs: ["Authenticated GitHub app", "Created draft pull request", "Linked work order"],
+        logs: ["Authenticated GitHub app", "Created draft pull request", "Linked task"],
         inputs: ["head: feat/invite-poc", "base: main", "draft: true"],
       },
     },

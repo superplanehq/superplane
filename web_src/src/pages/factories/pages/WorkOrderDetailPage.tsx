@@ -119,7 +119,7 @@ function workOrderDetailTitle(
   order: ReturnType<typeof useWorkOrder>["data"],
   factory: ReturnType<typeof useFactory>["data"],
 ) {
-  return [order?.title ?? "Work Order", factory?.name ?? "Workspace"];
+  return [order?.title ?? "Task", factory?.name ?? "Workspace"];
 }
 
 function isWorkOrderDetailReady(
@@ -136,14 +136,14 @@ function isWorkOrderDetailReady(
 function WorkOrderDetailLoading({ chrome }: { chrome: "page" | "dialog" }) {
   return (
     <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
-      <p className="text-[13px] text-muted-foreground">Loading work order…</p>
+      <p className="text-[13px] text-muted-foreground">Loading task…</p>
     </div>
   );
 }
 
 function WorkOrderDetailUnavailable({ chrome, boardHref }: { chrome: "page" | "dialog"; boardHref: string }) {
   if (chrome === "dialog") {
-    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This work order cannot be opened.</p>;
+    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This task cannot be opened.</p>;
   }
   return <Navigate to={boardHref} replace />;
 }

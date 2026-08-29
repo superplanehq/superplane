@@ -12,11 +12,11 @@ import {
 import { WorkOrderDetailPage } from "./WorkOrderDetailPage";
 
 /**
- * Work Order Detail — full detail view inside the FactoriesLayout.
+ * Task Detail — full detail view inside the FactoriesLayout.
  * Storybook Overview includes a Mission picker. The live page does not.
  */
 const meta = {
-  title: "Factories/Pages/Work Order Detail",
+  title: "Factories/Pages/Task Detail",
   component: WorkOrderDetailPage,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof WorkOrderDetailPage>;

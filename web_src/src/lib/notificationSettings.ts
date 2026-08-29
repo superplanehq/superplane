@@ -29,38 +29,38 @@ export interface NotificationTypeOption {
 export const NOTIFICATION_TYPE_OPTIONS: NotificationTypeOption[] = [
   {
     key: "TYPE_WORK_ORDER_ASSIGNED",
-    label: "Added as a work order owner",
-    description: "You become an owner of a work order.",
+    label: "Added as a task owner",
+    description: "You become an owner of a task.",
   },
   {
     key: "TYPE_WORK_ORDER_COMMENT_OWNED",
-    label: "Comments on work orders you own",
-    description: "Someone comments on a work order you own.",
+    label: "Comments on tasks you own",
+    description: "Someone comments on a task you own.",
   },
   {
     key: "TYPE_WORK_ORDER_COMMENT_CREATED",
-    label: "Comments on work orders you created",
-    description: "Someone comments on a work order you created.",
+    label: "Comments on tasks you created",
+    description: "Someone comments on a task you created.",
   },
   {
     key: "TYPE_WORK_ORDER_STATUS_OWNED",
-    label: "Status changes on work orders you own or created",
-    description: "A work order you own or created opens, closes, or moves back to draft.",
+    label: "Status changes on tasks you own or created",
+    description: "A task you own or created opens, closes, or moves back to draft.",
   },
   {
     key: "TYPE_WORK_ORDER_ARTIFACT_OWNED",
-    label: "New artifacts on work orders you own",
-    description: "An artifact is added to a work order you own.",
+    label: "New artifacts on tasks you own",
+    description: "An artifact is added to a task you own.",
   },
   {
     key: "TYPE_WORK_ORDER_MENTIONED",
-    label: "Mentions in work order comments",
-    description: "Someone mentions you in a work order comment.",
+    label: "Mentions in task comments",
+    description: "Someone mentions you in a task comment.",
   },
   {
     key: "TYPE_WORK_ORDER_STATUS_NOTE_OWNED",
-    label: "Review requests on work orders you own or created",
-    description: "An automation flags a work order you own or created as waiting on your review.",
+    label: "Review requests on tasks you own or created",
+    description: "An automation flags a task you own or created as waiting on your review.",
   },
 ];
 

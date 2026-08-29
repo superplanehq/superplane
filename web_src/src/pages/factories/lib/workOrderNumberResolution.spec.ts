@@ -103,7 +103,7 @@ describe("findWorkOrderByRunId", () => {
 });
 
 describe("peekOrderFromNavigationState", () => {
-  it("reads a work order from navigate state", () => {
+  it("reads a task from navigate state", () => {
     expect(peekOrderFromNavigationState({ peekOrder: ORDERS[0] })).toBe(ORDERS[0]);
   });
 
