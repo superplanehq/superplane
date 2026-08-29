@@ -9,7 +9,7 @@ import {
   WORK_ORDER_ATTENTION_LABEL,
   type WorkOrderAttentionReason,
 } from "../lib/workOrderAttention";
-import { factoryHomePath } from "../lib/factoryPagePaths";
+import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
@@ -23,21 +23,21 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   factoryId?: string;
   factoryKey: string;
   factoryLines: FactoriesFactoryLine[];
-  /** When set, Start on a draft sends the work order to this line. */
+  /** When set, Start on a draft sends the task to this line. */
   preferredLineName?: string;
   canDispatch: boolean;
   canAssign: boolean;
-  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
-  /** Work orders with a queued or running PR-feedback run. */
+  /** Tasks with a queued or running PR-feedback run. */
   addressingFeedbackOrderIds?: ReadonlySet<string>;
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
   entry: WorkOrderListEntry;
   /**
-   * Overlay destination. Defaults to the work order. The Lines board
+   * Overlay destination. Defaults to the task. The Lines board
    * passes onOpen to show the card dialog instead of navigating.
    */
   href?: string;
@@ -46,18 +46,18 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   /** Confidence score from ListWorkOrderChecks, 0 to 5. Shown left of Start. */
   confidenceScore?: number;
   /**
-   * True while the Backlog automation analyzes this work order. The card
+   * True while the Backlog automation analyzes this task. The card
    * shows a spinner in the meter slot until the score arrives.
    */
   isAnalyzing?: boolean;
 }
 
 /**
- * The canonical work order card.
+ * The canonical task card.
  *
  * Every board uses this complete component. Status is a colored dot next
  * to the title. The footer shows the owner (except on drafts), the age of
- * the work order, and a Start button on drafts. Reviewed drafts also
+ * the task, and a Start button on drafts. Reviewed drafts also
  * show a score to the left of Start. Waiting cards show an attention
  * label such as Waiting for user review. The owner is display-only on
  * the card.
@@ -78,7 +78,7 @@ export function WorkOrderCard({
   isAnalyzing = false,
 }: WorkOrderCardProps) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const destination = href ?? factoryHomePath(organizationId, factoryKey, factoryLines[0]?.id);
+  const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
   const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";
@@ -118,10 +118,7 @@ export function WorkOrderCard({
         <div className="mt-2 flex items-center justify-between gap-2">
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-            <span
-              className="truncate text-[11px] leading-none text-muted-foreground"
-              title={startedAt?.toLocaleString()}
-            >
+            <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
               {startedLabel}
             </span>
           </div>
@@ -149,7 +146,7 @@ export function WorkOrderCard({
 
 /**
  * Score meter, or a spinner while the Backlog automation still analyzes the
- * work order. Both take the same slot, so the card does not move when the
+ * task. Both take the same slot, so the card does not move when the
  * score arrives.
  */
 function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; score?: number; isAnalyzing: boolean }) {

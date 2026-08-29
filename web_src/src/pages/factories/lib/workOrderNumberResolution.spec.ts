@@ -4,6 +4,8 @@ import {
   canonicalWorkOrderNumber,
   findWorkOrderByRunId,
   latestDispatchForLine,
+  peekOrderFromNavigationState,
+  resolvePeekWorkOrder,
   resolveWorkOrderByNumber,
   workOrderRouteNeedsCanonicalRedirect,
 } from "./workOrderNumberResolution";
@@ -97,6 +99,41 @@ describe("findWorkOrderByRunId", () => {
     expect(findWorkOrderByRunId([ORDERS[0], withRun], "run-new")?.id).toBe("order-run");
     expect(findWorkOrderByRunId([withRun], "missing")).toBeUndefined();
     expect(findWorkOrderByRunId([withRun], "  ")).toBeUndefined();
+  });
+});
+
+describe("peekOrderFromNavigationState", () => {
+  it("reads a task from navigate state", () => {
+    expect(peekOrderFromNavigationState({ peekOrder: ORDERS[0] })).toBe(ORDERS[0]);
+  });
+
+  it("rejects empty or malformed state", () => {
+    expect(peekOrderFromNavigationState(undefined)).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { title: "no id" } })).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { id: "" } })).toBeUndefined();
+  });
+});
+
+describe("resolvePeekWorkOrder", () => {
+  const notFound = resolveWorkOrderByNumber([], "12", false);
+  const found = resolveWorkOrderByNumber(ORDERS, "42", false);
+  const imported: FactoriesWorkOrder = { id: "wo-imported-12", title: "Handle duplicate refunds" };
+  const numberedImport: FactoriesWorkOrder = { id: "wo-imported-12", number: "12", title: "Handle duplicate refunds" };
+
+  it("prefers the list match over a navigation hint", () => {
+    expect(resolvePeekWorkOrder(found, "42", numberedImport, imported)).toBe(ORDERS[0]);
+  });
+
+  it("uses the navigation hint when the list has not caught up", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", numberedImport, null)).toBe(numberedImport);
+  });
+
+  it("uses the local hint when there is no permalink yet", () => {
+    expect(resolvePeekWorkOrder(notFound, undefined, undefined, imported)).toBe(imported);
+  });
+
+  it("ignores a local hint once a permalink is in the URL", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", undefined, imported)).toBeUndefined();
   });
 });
 

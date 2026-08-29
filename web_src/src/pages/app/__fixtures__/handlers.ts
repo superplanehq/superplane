@@ -464,7 +464,7 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
             },
           ],
         },

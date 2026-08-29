@@ -222,7 +222,7 @@ export const WithTwoStatusNotes: Story = {
         key: "deploy-window",
         kind: "info",
         headline: "Waiting on the deploy window",
-        body: "The change is ready. SuperPlane will complete this work order after the next deploy window.",
+        body: "The change is ready. SuperPlane will complete this task after the next deploy window.",
         updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
       },
     ]),

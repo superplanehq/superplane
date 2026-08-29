@@ -94,6 +94,8 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.currentPhaseId).toMatch(/^implement-/);
     const implement = fixture.phases.find((phase) => phase.name === "Implement");
     expect(implement?.status).toBe("running");
+    expect(implement?.costCents).toBe("28");
+    expect(implement?.totalTokens).toBe("900");
     expect(implement?.componentName).toBe("Implementation");
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id);
@@ -247,7 +249,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.sentence).toBe("This work order needs attention.");
+    expect(fixture.footer.sentence).toBe("This task needs attention.");
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -307,7 +309,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.checks).toEqual([]);
     expect(done.waitingNotes).toEqual([]);
     expect(done.footerTone).toBe("done");
-    expect(done.footer.sentence).toBe("Work order completed successfully.");
+    expect(done.footer.sentence).toBe("Task completed successfully.");
     expect(done.footer.actions).toEqual([]);
     expect(done.footer.note).toEqual({
       headline: "This task succeeded",
@@ -890,7 +892,7 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
   });
 
-  // Scoring runs on the work order before a line plans it. The log must read
+  // Scoring runs on the task before a line plans it. The log must read
   // in that order: the intake that created the order, the score, then the plan.
   it("puts the Backlog analysis before the line steps", () => {
     const fixture = splitRunFixtureForWorkOrder(
@@ -1034,6 +1036,9 @@ describe("line board work-order examples", () => {
           canvasId: "canvas-fb",
           handlerName: "Address PR feedback",
           pullRequestNumber: "6812",
+          description: "Please add tests for the retry path.",
+          costCents: "45",
+          totalTokens: "1200",
           run: {
             id: "run-comment",
             canvasId: "canvas-fb",
@@ -1041,13 +1046,14 @@ describe("line board work-order examples", () => {
             result: "RESULT_PASSED",
             createdAt: "2026-08-26T11:00:00Z",
             finishedAt: "2026-08-26T11:05:00Z",
-            description: "Please add tests for the retry path.",
           },
         },
       ],
     });
     expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-comment")).toMatchObject({
       name: "Please add tests for the retry path.",
+      costCents: "45",
+      totalTokens: "1200",
     });
   });
 
@@ -1152,6 +1158,17 @@ describe("line board work-order examples", () => {
     expect(outputNames(fixture.phases.find((phase) => phase.id === "done-2"))).toEqual(["#510"]);
   });
 
+  it("names the person who marked a completed task successful", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A", avatarUrl: "https://example.com/alex.png" };
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { closer: { actor } });
+
+    expect(fixture.footer.note).toMatchObject({
+      headline: "marked this task as successful",
+      text: "The work is done. The result met the goal.",
+      actor,
+    });
+  });
+
   it("keeps ingest analysis and a rejected pull request on the rejected done card", () => {
     const fixture = splitRunFixtureForWorkOrder(BOARD_DONE_REJECTED_ORDER);
     expect(fixture.phases.map((phase) => phase.id)).toEqual([
@@ -1206,7 +1223,7 @@ describe("line board work-order examples", () => {
     });
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.appId).toBe("app-refund-implementer");
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.runId).toBe(LINE_RUN_IMPLEMENT_NOTIFY_ID);
-    expect(fixture.footer.sentence).toBe("Work order completed successfully.");
+    expect(fixture.footer.sentence).toBe("Task completed successfully.");
     expect(fixture.footer.actions).toEqual([]);
     expect(
       fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
@@ -1237,10 +1254,10 @@ describe("line board work-order examples", () => {
       ["19:51:17", "Run Claude Code", "Generate PR title and description", "passed"],
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
-      ["19:52:39", "Add Pull Request", "Attach PR to Work Order", "passed"],
+      ["19:52:39", "Add Pull Request", "Attach PR to Task", "passed"],
       ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
     ]);
-    expect(prStream.find((line) => line.componentName === "Attach PR to Work Order")?.pullRequest).toMatchObject({
+    expect(prStream.find((line) => line.componentName === "Attach PR to Task")?.pullRequest).toMatchObject({
       number: "6837",
       state: "STATE_MERGED",
       url: "https://github.com/superplanehq/superplane/pull/6837",

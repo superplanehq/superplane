@@ -3,7 +3,7 @@
  *
  * The redesign targets the near-future product: the workspace both executes
  * work (attention queue, in flight, shipped) and proposes work (suggested
- * work orders, improvement proposals). Entities that do not exist in the
+ * tasks, improvement proposals). Entities that do not exist in the
  * backend yet are modeled here as plain types so the mockup stays
  * self-contained.
  */
@@ -25,9 +25,9 @@ export interface AttentionItem {
   stepName: string;
   /** Precomputed wait duration label, e.g. "4h". */
   waitingFor: string;
-  /** Work order owner. Absent means anyone on the team can grab it. */
+  /** Task owner. Absent means anyone on the team can grab it. */
   owner?: WorkOrderOwner;
-  /** True when the work order is assigned to the viewer ("My" scope). */
+  /** True when the task is assigned to the viewer ("My" scope). */
   mine?: boolean;
 }
 
@@ -42,7 +42,7 @@ export interface InFlightItem {
   stepCount: number;
   /** Precomputed elapsed label, e.g. "32m". */
   elapsed: string;
-  /** True when the work order is assigned to the viewer ("My" scope). */
+  /** True when the task is assigned to the viewer ("My" scope). */
   mine?: boolean;
 }
 
@@ -57,7 +57,7 @@ export interface ShippedItem {
   detail: string;
   /** Precomputed relative time label, e.g. "2h ago". */
   when: string;
-  /** True when the work order is assigned to the viewer ("My" scope). */
+  /** True when the task is assigned to the viewer ("My" scope). */
   mine?: boolean;
 }
 
@@ -90,7 +90,7 @@ export interface ImprovementProposal {
   description: string;
   /** Estimated effect on the readiness score, e.g. "+7 readiness". */
   impactLabel: string;
-  /** Action the proposal offers, e.g. "Update line" or "Create work order". */
+  /** Action the proposal offers, e.g. "Update line" or "Create task". */
   actionLabel: string;
 }
 
@@ -306,7 +306,7 @@ export const POPULATED_OVERVIEW: OverviewRedesignData = {
       title: "Describe the release process in AGENTS.md",
       description: "Agents lack release context and ask more questions than needed.",
       impactLabel: "+5 readiness",
-      actionLabel: "Create work order",
+      actionLabel: "Create task",
     },
   ],
   readiness: {

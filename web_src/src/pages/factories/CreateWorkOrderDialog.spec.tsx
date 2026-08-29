@@ -86,7 +86,7 @@ describe("CreateWorkOrderDialog", () => {
     expect(screen.queryByTestId("mock-owner-pill")).not.toBeInTheDocument();
   });
 
-  it("creates the work order without sending it to a line", async () => {
+  it("creates the task without sending it to a line", async () => {
     const user = userEvent.setup();
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
     renderDialog();

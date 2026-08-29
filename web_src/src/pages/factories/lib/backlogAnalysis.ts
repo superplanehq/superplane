@@ -3,7 +3,7 @@ import type { CanvasesCanvasRun } from "@/api-client";
 import { isActiveCanvasRun } from "./workOrderPullRequest";
 
 /**
- * One run of the factory Backlog automation and the work order it analyzes.
+ * One run of the factory Backlog automation and the task it analyzes.
  * The `factory.onWorkOrder` trigger payload is the only place the work
  * order id exists, so the run carries it in its root event.
  */
@@ -30,7 +30,7 @@ function isBacklogAnalyzerName(name?: string): boolean {
   return (name ?? "").trim().toLowerCase().startsWith("backlog");
 }
 
-/** Analysis runs of one canvas, oldest first, keyed to their work order. */
+/** Analysis runs of one canvas, oldest first, keyed to their task. */
 export function backlogAnalysisRuns(canvasId: string, runs: CanvasesCanvasRun[]): BacklogAnalysisRun[] {
   return runs
     .flatMap((run) => {
@@ -56,7 +56,7 @@ export function backlogAnalysisRunsByWorkOrder(runs: BacklogAnalysisRun[]): Map<
   return byWorkOrder;
 }
 
-/** Work orders whose score is still on the way. */
+/** Tasks whose score is still on the way. */
 export function analyzingWorkOrderIds(runs: BacklogAnalysisRun[]): ReadonlySet<string> {
   const ids = new Set<string>();
   for (const entry of runs) {
@@ -86,4 +86,68 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     return undefined;
   }
   return value as Record<string, unknown>;
+}
+
+/**
+ * Optimistic "an analysis is expected" store, keyed by work order id.
+ *
+ * A freshly created draft has no Backlog run yet — the run is created
+ * asynchronously after the create RPC returns — so the board cannot learn
+ * "analyzing" from real run data alone. This tiny external store lets the
+ * create mutation say "show analyzing now" the moment it succeeds, while
+ * `useBacklogAnalysisRuns` keeps polling until the real run (or its result)
+ * shows up. Entries self-clean via a TTL backstop so a card can never get
+ * stuck in "Analyzing" if a run never appears.
+ */
+const PENDING_ANALYSIS_TTL_MS = 60_000;
+
+const pendingAnalysis = new Map<string, number>();
+const pendingAnalysisListeners = new Set<() => void>();
+let pendingAnalysisSnapshot: ReadonlySet<string> = new Set();
+
+function notifyPendingAnalysisListeners(): void {
+  pendingAnalysisSnapshot = new Set(pendingAnalysis.keys());
+  for (const listener of pendingAnalysisListeners) {
+    listener();
+  }
+}
+
+/** Mark a work order as expecting a Backlog analysis run. */
+export function markBacklogAnalysisPending(workOrderId: string | undefined | null): void {
+  if (!workOrderId) {
+    return;
+  }
+  pendingAnalysis.set(workOrderId, Date.now() + PENDING_ANALYSIS_TTL_MS);
+  notifyPendingAnalysisListeners();
+}
+
+/** Clear a work order once its real run (or result) is known. */
+export function clearBacklogAnalysisPending(workOrderId: string | undefined | null): void {
+  if (!workOrderId || !pendingAnalysis.delete(workOrderId)) {
+    return;
+  }
+  notifyPendingAnalysisListeners();
+}
+
+/** Live pending ids, pruning anything past its TTL. */
+export function pendingBacklogAnalysisIds(now = Date.now()): ReadonlySet<string> {
+  let pruned = false;
+  for (const [workOrderId, expiresAt] of pendingAnalysis) {
+    if (expiresAt <= now) {
+      pendingAnalysis.delete(workOrderId);
+      pruned = true;
+    }
+  }
+  if (pruned) {
+    notifyPendingAnalysisListeners();
+  }
+  return pendingAnalysisSnapshot;
+}
+
+/** Subscribe to pending-set changes; returns an unsubscribe function. */
+export function subscribeBacklogAnalysisPending(listener: () => void): () => void {
+  pendingAnalysisListeners.add(listener);
+  return () => {
+    pendingAnalysisListeners.delete(listener);
+  };
 }

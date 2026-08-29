@@ -17,6 +17,7 @@ import {
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  RUNNING_WORK_ORDER,
 } from "../../__fixtures__/factoryPageResponses";
 import {
   BOARD_DONE_REJECTED_ORDER,
@@ -112,14 +113,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(row).toHaveTextContent("2.7k tokens");
   });
 
-  it("does not put an Open work order link next to close", () => {
+  it("shows tokens and cost on a line-step phase", () => {
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
+
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
+  });
+
+  it("does not put an Open task link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
     });
 
     expect(screen.queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
 
-    expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open task" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
@@ -193,18 +200,20 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Create Branch").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("Run Bash"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("split-run-stream-line-create-branch")).not.toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
-    expect(within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText(">")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).not.toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
+    expect(
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText(">"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-node-indent")).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("├──"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("├──"),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("split-run-stream-line-create-branch")).queryByText("└──"),
+      within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("└──"),
     ).not.toBeInTheDocument();
     const implementStream = screen.getByTestId("split-run-stream-implement");
     const note = within(implementStream).getByText("Provide Plan");
@@ -284,10 +293,10 @@ describe("WorkOrderSplitRunPopup", () => {
     const user = userEvent.setup();
     renderSplitRun();
 
-    await user.click(within(screen.getByTestId("split-run-stream-line-create-branch")).getByRole("button"));
+    await user.click(within(screen.getByTestId("split-run-stream-line-onrun-implement")).getByRole("button"));
 
-    expect(screen.getByTestId("split-run-stream-line-create-branch")).toHaveAttribute("data-highlighted", "true");
-    expect(screen.queryByTestId("split-run-canvas-node-create-branch")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-onrun-implement")).toHaveAttribute("data-highlighted", "true");
+    expect(screen.queryByTestId("split-run-canvas-node-onrun-implement")).not.toBeInTheDocument();
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -424,7 +433,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
+    expect(screen.queryByText("This task needs attention from test test.")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task needs a decision" })).toBeInTheDocument();
     expect(within(note).getByText("Every automation finished. This task is ready to complete.")).toBeInTheDocument();
@@ -433,7 +442,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
-  it("keeps the running log visible when the work order has no note or checks", () => {
+  it("keeps the running log visible when the task has no note or checks", () => {
     renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
@@ -463,7 +472,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
-  it("hides work-order close actions when the user cannot update the work order", () => {
+  it("hides work-order close actions when the user cannot update the task", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
       canUpdate: false,
@@ -474,7 +483,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
-  it("offers automation Stop on a live running work order", () => {
+  it("offers automation Stop on a live running task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -485,7 +494,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
-  it("hides automation Stop when the user cannot update the work order", () => {
+  it("hides automation Stop when the user cannot update the task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -546,7 +555,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         id: "wo-2",
-        title: "Test work order 2",
+        title: "Test task 2",
         state: "STATE_OPEN",
         lineDispatches: [
           {
@@ -648,6 +657,24 @@ describe("WorkOrderSplitRunPopup", () => {
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByTestId("work-order-mention")).toHaveTextContent("Alex");
     expect(within(note).getByRole("heading", { name: /stopped this automation/ })).toBeInTheDocument();
+  });
+
+  it("names the person who marked the task successful, with avatar", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, {
+        closer: {
+          actor: { id: "user-1", name: "Alex", initials: "A", avatarUrl: "https://example.com/alex.png" },
+        },
+      }),
+    });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByTestId("work-order-mention")).toHaveTextContent("Alex");
+    expect(within(note).getByTestId("work-order-mention").querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.com/alex.png",
+    );
+    expect(within(note).getByRole("heading", { name: /marked this task as successful/ })).toBeInTheDocument();
   });
 
   it("keeps Reject and Approve off the header on a running order", () => {
@@ -767,7 +794,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(coverage).toHaveAttribute("open");
   });
 
-  it("keeps description checks collapsed when the work order is not a draft", async () => {
+  it("keeps description checks collapsed when the task is not a draft", async () => {
     const user = userEvent.setup();
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(
@@ -847,7 +874,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
   });
 
-  it("hides invented files and ledger pull requests on a live work order", async () => {
+  it("hides invented files and ledger pull requests on a live task", async () => {
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -881,7 +908,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fixture = splitRunFixtureForWorkOrder(
       {
         id: "wo-2",
-        title: "Test work order 2",
+        title: "Test task 2",
         state: "STATE_OPEN",
         lineDispatches: [
           {
@@ -987,7 +1014,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(backlog).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
-  it("opens a mapped implement-running work order on the implement log", () => {
+  it("opens a mapped implement-running task on the implement log", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
@@ -1070,7 +1097,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("popup-work-order-title")).toHaveTextContent("Renamed draft");
   });
 
-  it("does not let you edit a completed work order", () => {
+  it("does not let you edit a completed task", () => {
     renderPopup({
       fixture: {
         ...SPLIT_RUN_RUNNING,

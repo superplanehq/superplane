@@ -15,9 +15,9 @@ spec:
           > This app is not a factory line step. It listens for closed pull
           > requests on the app repository.
           >
-          > When a pull request is attached to a work order:
-          > - A merge closes the work order as completed.
-          > - A close without a merge closes the work order as rejected.
+          > When a pull request is attached to a task:
+          > - A merge closes the task as completed.
+          > - A close without a merge closes the task as rejected.
   layout:
     - i: about
       x: 0

@@ -130,7 +130,11 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return models.ClearTokenHashesForAccountInTransaction(tx, account.ID)
+		if err := models.ClearTokenHashesForAccountInTransaction(tx, account.ID); err != nil {
+			return err
+		}
+
+		return models.DeleteUserAPITokensForAccount(tx, account.ID)
 	})
 
 	if err != nil {

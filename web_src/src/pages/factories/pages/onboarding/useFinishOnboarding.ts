@@ -5,7 +5,7 @@ import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useNavigate } from "react-router";
 
-import { factoryIntakePath } from "../../lib/factoryPagePaths";
+import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import {
@@ -49,13 +49,9 @@ export function finishOnboardingError(args: {
   return null;
 }
 
-export function afterOnboardingPath(args: {
-  organizationId: string;
-  factoryKey: string;
-  lineId: string;
-  githubIntakeId?: string;
-}) {
-  return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, args.githubIntakeId);
+/** The line board, where the new GitHub intake sits at the foot of Backlog. */
+export function afterOnboardingPath(args: { organizationId: string; factoryKey: string; lineId: string }) {
+  return factoryHomePath(args.organizationId, args.factoryKey, args.lineId);
 }
 
 function navigateAfterFinish(
@@ -63,9 +59,8 @@ function navigateAfterFinish(
   organizationId: string,
   factoryKey: string,
   lineId: string,
-  githubIntakeId?: string,
 ) {
-  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId, githubIntakeId }), { replace: true });
+  navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
 }
 
 async function provisionWorkspace(args: {
@@ -86,11 +81,12 @@ async function provisionWorkspace(args: {
   takenNames: string[];
   appRepository: string;
   backlogRepository: string;
+  resolveDefaultBranch: (repository: string) => Promise<string>;
   github: { id: string };
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
-}): Promise<{ lineId: string; githubIntakeId?: string }> {
+}): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
@@ -106,6 +102,10 @@ async function provisionWorkspace(args: {
     issuesSource: apiIssuesSource(args.setup.issuesChoice),
     agentHarness: args.agentPlan.harness,
   });
+  // Onboarding installs the Implement app with the real default branch (main,
+  // master, staging, ...) instead of hardcoding "main", so Create Branch and
+  // Create Pull Request target the branch GitHub actually treats as default.
+  const defaultBranch = (await args.resolveDefaultBranch(args.appRepository)) || "main";
   const { lineId, primaryAppId } = await provisionLine({
     factory: args.factory,
     savedLineId: args.factory?.onboarding?.provisionedLineId,
@@ -113,6 +113,7 @@ async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
     createLine: args.createLine,
@@ -123,11 +124,12 @@ async function provisionWorkspace(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
-  // The intake needs the line: it opens work orders that the line runs.
-  const githubIntake = await provisionGithubIntake({
+  // The intake needs the line: it opens tasks that the line runs.
+  await provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
   });
@@ -141,7 +143,7 @@ async function provisionWorkspace(args: {
     provisionedLineId: lineId,
     complete: true,
   });
-  return { lineId, githubIntakeId: githubIntake.id ?? undefined };
+  return { lineId };
 }
 
 export function useFinishOnboarding(args: {
@@ -160,6 +162,7 @@ export function useFinishOnboarding(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
@@ -202,13 +205,7 @@ export function useFinishOnboarding(args: {
           args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(
-        navigate,
-        args.organizationId,
-        args.factoryKey,
-        provisioned.lineId,
-        provisioned.githubIntakeId,
-      );
+      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

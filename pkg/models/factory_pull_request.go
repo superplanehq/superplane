@@ -449,6 +449,33 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 	return runsByPullRequest, nil
 }
 
+// FindWorkOrderIDsByLinkedRunIDs returns the work order each canvas run is
+// linked to through factory_pull_request_runs.
+func FindWorkOrderIDsByLinkedRunIDs(tx *gorm.DB, runIDs []uuid.UUID) (map[uuid.UUID]uuid.UUID, error) {
+	result := map[uuid.UUID]uuid.UUID{}
+	if len(runIDs) == 0 {
+		return result, nil
+	}
+
+	type row struct {
+		RunID       uuid.UUID
+		WorkOrderID uuid.UUID
+	}
+	var rows []row
+	err := tx.Table("factory_pull_request_runs").
+		Select("factory_pull_request_runs.run_id, factory_pull_requests.work_order_id").
+		Joins("JOIN factory_pull_requests ON factory_pull_requests.id = factory_pull_request_runs.pull_request_id").
+		Where("factory_pull_request_runs.run_id IN ?", runIDs).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.RunID] = row.WorkOrderID
+	}
+	return result, nil
+}
+
 func ListPullRequestsByWorkOrderIDs(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID][]FactoryPullRequest, error) {
 	result := map[uuid.UUID][]FactoryPullRequest{}
 	if len(workOrderIDs) == 0 {

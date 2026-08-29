@@ -27,6 +27,9 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 	case "branch":
 		return g.listBranchResources(ctx)
 
+	case "default_branch":
+		return g.listDefaultBranchResource(ctx)
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -48,6 +51,47 @@ func toIntegrationResources(repositories []*github.Repository) []core.Integratio
 		})
 	}
 	return resources
+}
+
+// listDefaultBranchResource resolves the default branch of a single
+// repository, identified by ctx.Parameters["repository"]. It is used by
+// onboarding to write the real default branch (main, master, staging, ...)
+// into generated automations instead of hardcoding "main".
+func (g *GitHub) listDefaultBranchResource(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := ctx.Parameters["repository"]
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	repo, err := client.FindRepository(repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repository: %w", err)
+	}
+
+	return toDefaultBranchResources(repo), nil
+}
+
+// toDefaultBranchResources returns the resolved default branch as a single
+// IntegrationResource, falling back to "main" when GitHub reports no default
+// branch (this can happen for empty repositories).
+func toDefaultBranchResources(repo *github.Repository) []core.IntegrationResource {
+	branch := repo.GetDefaultBranch()
+	if branch == "" {
+		branch = "main"
+	}
+
+	return []core.IntegrationResource{
+		{
+			Type: "default_branch",
+			Name: branch,
+			ID:   branch,
+		},
+	}
 }
 
 func (g *GitHub) listBranchResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

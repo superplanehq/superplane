@@ -33,7 +33,7 @@ const composerFooter = (
 );
 
 /**
- * Vertical timeline of the work order lifecycle: `created` marker, dispatch
+ * Vertical timeline of the task lifecycle: `created` marker, dispatch
  * batches per line, and (when closed) a "Closed as …" footer.
  */
 const meta = {

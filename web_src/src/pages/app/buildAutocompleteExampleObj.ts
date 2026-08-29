@@ -84,7 +84,7 @@ const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
 const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
 const EXAMPLE_ORDER_NUMBER = 12;
 
-// Work order permalinks are workspace-scoped
+// Task permalinks are workspace-scoped
 // (`/{org}/workspaces/{workspaceKey}/work-order/{number}`), so the example is
 // only meaningful on a workspace app page, where order() also resolves.
 function exampleOrderUrl(): string {

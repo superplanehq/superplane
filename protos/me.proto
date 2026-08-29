@@ -55,6 +55,43 @@ service Me {
     };
   }
 
+  // Self-scoped personal API token management for the calling user.
+  // A user can hold several named tokens; each authenticates as that
+  // user. The plaintext secret is only ever returned once, at creation.
+  rpc ListTokens(ListTokensRequest) returns (ListTokensResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/tokens"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List personal API tokens";
+      description: "Returns the calling user's personal API tokens, without their secrets";
+      tags: "Me";
+    };
+  }
+
+  rpc CreateToken(CreateTokenRequest) returns (CreateTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/tokens"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a personal API token";
+      description: "Creates a new named personal API token and returns its plaintext secret once";
+      tags: "Me";
+    };
+  }
+
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/me/tokens/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a personal API token";
+      description: "Revokes a personal API token without affecting the caller's other tokens";
+      tags: "Me";
+    };
+  }
+
   // Self-scoped work order notification settings for the calling user.
   rpc DescribeNotificationSettings(DescribeNotificationSettingsRequest) returns (DescribeNotificationSettingsResponse) {
     option (google.api.http) = {
@@ -103,6 +140,34 @@ message User {
 message RegenerateTokenResponse {
   string token = 1;
 }
+
+message UserAPIToken {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message ListTokensRequest {}
+
+message ListTokensResponse {
+  repeated UserAPIToken tokens = 1;
+}
+
+message CreateTokenRequest {
+  string name = 1;
+}
+
+message CreateTokenResponse {
+  UserAPIToken token = 1;
+  string plaintext = 2;
+}
+
+message RevokeTokenRequest {
+  string id = 1;
+}
+
+message RevokeTokenResponse {}
 
 // NotificationSettings is a user's organization-wide configuration for
 // work order notification emails. A missing row defaults to all

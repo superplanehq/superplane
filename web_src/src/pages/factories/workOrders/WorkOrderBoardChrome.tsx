@@ -4,11 +4,11 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { shouldRedirectWheelToHorizontalScroll } from "./kanbanBoardWheel";
 
 /**
- * Lane chrome for every board in the workspace. The Work Orders board and
+ * Lane chrome for every board in the workspace. The Tasks board and
  * the Lines phase board both render through it.
  */
 
-/** Lane tint. Only in-flight and closed work get colour, as on the Work Orders board. */
+/** Lane tint. Only in-flight and closed work get colour, as on the Tasks board. */
 export type BoardLaneTone = "neutral" | "running" | "done";
 
 const LANE_TONE_CLASSNAME: Record<BoardLaneTone, string> = {
@@ -77,6 +77,8 @@ interface WorkOrderBoardLaneProps {
   surfaceClassName?: string;
   /** Sits at the end of the header, for example a menu button. */
   actions?: ReactNode;
+  /** Pinned between the header and the card list, and kept while the lane is empty. */
+  banner?: ReactNode;
   /** When set, a click on the title opens an inline rename field. */
   onRename?: (name: string) => void;
   canRename?: boolean;
@@ -123,6 +125,7 @@ export function WorkOrderBoardLane({
   tone = "neutral",
   surfaceClassName,
   actions,
+  banner,
   onRename,
   canRename = false,
   titleTestId,
@@ -159,6 +162,8 @@ export function WorkOrderBoardLane({
         </h2>
         {actions}
       </header>
+
+      {banner}
 
       <LaneBody
         count={count}

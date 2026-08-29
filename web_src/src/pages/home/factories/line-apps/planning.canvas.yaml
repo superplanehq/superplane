@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Plan
-  description: Read the work order and write an implementation plan.
+  description: Read the task and write an implementation plan.
 spec:
   edges:
     - channel: default
@@ -59,10 +59,10 @@ spec:
             type: prompt
             workingDirectory: repo
             prompt: |-
-              You are writing an implementation plan for a SuperPlane Work Order. The repository is cloned out in your current working directory.
+              You are writing an implementation plan for a SuperPlane Task. The repository is cloned out in your current working directory.
 
               Repository: {{ install_params.appRepository }}
-              Work Order Title: {{ root().data.work_order.title }}
+              Task Title: {{ root().data.work_order.title }}
 
               1/ The description is in the /tmp/ORDER.md
               2/ Write the plan to the file /tmp/plan.md. Do NOT create any files inside the repository, and do NOT commit anything.

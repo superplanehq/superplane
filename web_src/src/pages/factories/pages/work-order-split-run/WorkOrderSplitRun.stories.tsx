@@ -14,7 +14,7 @@ import { lineMetricsFactoriesFixture } from "../../__fixtures__/lineMetricsFacto
  * collapsed and the current step expands into a log.
  */
 const meta = {
-  title: "Factories/Pages/Work Order Split Run",
+  title: "Factories/Pages/Task Split Run",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },

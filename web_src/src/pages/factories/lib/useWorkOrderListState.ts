@@ -16,7 +16,7 @@ import { WORK_ORDER_DISPLAY_STATUSES, type WorkOrderDisplayStatus } from "./work
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
 
 /**
- * Title-bar and view state for the Work Orders page.
+ * Title-bar and view state for the Tasks page.
  *
  * Layout and ordering are pure display preferences that don't reference
  * factory-specific data, so they're persisted in `localStorage` under a
@@ -153,7 +153,7 @@ function writePersistedFilters(key: string, filters: WorkOrderFilters) {
 /**
  * Owns `scope` and `filters`, namespacing their storage per `factoryId` and
  * resetting `search`/`searchOpen`/`filterMenuOpen` whenever `factoryId`
- * changes (the Work Orders route can be revisited across factories without
+ * changes (the Tasks route can be revisited across factories without
  * necessarily remounting its page component).
  *
  * Reset-on-factory-change and persist-on-value-change are both driven by

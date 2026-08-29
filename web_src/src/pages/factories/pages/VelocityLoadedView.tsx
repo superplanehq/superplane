@@ -234,7 +234,7 @@ interface WorkOrderFlowCardProps {
 
 function WorkOrderFlowCard({ periodLabel, periodDays, config }: WorkOrderFlowCardProps) {
   const flow = config.flow;
-  const emptyLabel = config.emptyLabel ?? "No work orders closed in this period.";
+  const emptyLabel = config.emptyLabel ?? "No tasks closed in this period.";
 
   return (
     <section
@@ -243,10 +243,10 @@ function WorkOrderFlowCard({ periodLabel, periodDays, config }: WorkOrderFlowCar
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">Work order time</h2>
+          <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">Task time</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Median times for work orders that closed in this period. Cycle time is time running plus time in Waiting
-            after the work order leaves Draft.
+            Median times for tasks that closed in this period. Cycle time is time running plus time in Waiting after the
+            task leaves Draft.
           </p>
         </div>
         <p className="text-[12px] text-muted-foreground">{periodLabel}</p>
@@ -290,7 +290,7 @@ function WorkOrderFlowBody({ flow, periodDays }: { flow: FactoryVelocityFlow; pe
       <div className="mt-6 border-t border-border pt-5">
         <h3 className="text-[13px] font-medium text-foreground">Time running and Time in Waiting by day</h3>
         <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
-          Median for work orders that closed on that day. The stacked area is the two parts of cycle time.
+          Median for tasks that closed on that day. The stacked area is the two parts of cycle time.
         </p>
         <TimeTrendChart trend={flow.timeTrend} days={periodDays} />
       </div>

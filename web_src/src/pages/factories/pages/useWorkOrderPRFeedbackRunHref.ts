@@ -27,14 +27,24 @@ export function prFeedbackLogRunsFromPullRequests(
 
   return pullRequests.flatMap((pullRequest) =>
     [...(pullRequest.runs ?? [])]
-      .filter((run) => Boolean(run.id && run.canvasId))
-      .sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))
-      .map((run) => ({
-        canvasId: run.canvasId ?? "",
-        handlerName: handlerNameByCanvasId.get(run.canvasId ?? ""),
-        pullRequestNumber: pullRequest.number,
-        run,
-      })),
+      .flatMap((linked) => {
+        const run = linked.run;
+        if (!run?.id || !run.canvasId) {
+          return [];
+        }
+        return [
+          {
+            canvasId: run.canvasId,
+            handlerName: handlerNameByCanvasId.get(run.canvasId),
+            pullRequestNumber: pullRequest.number,
+            description: linked.description,
+            costCents: linked.costCents,
+            totalTokens: linked.totalTokens,
+            run,
+          },
+        ];
+      })
+      .sort((left, right) => Date.parse(left.run.createdAt ?? "") - Date.parse(right.run.createdAt ?? "")),
   );
 }
 

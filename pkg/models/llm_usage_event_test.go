@@ -143,13 +143,18 @@ func Test__RecordUsage__ChildRunUsesParentFactoryExecution(t *testing.T) {
 	assertInProgressExecutionUsage(t, db, execution.ID, 120, 0)
 }
 
-func Test__RecordUsage__SkipsRunsWithoutWorkOrderExecution(t *testing.T) {
+func Test__RecordUsage__SkipsRunsWithoutFactoryCanvas(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	err := models.RecordUsage(db, models.LLMUsageEventInput{
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, nil)
+	event := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, event)
+	require.NoError(t, err)
+
+	err = models.RecordUsage(db, models.LLMUsageEventInput{
 		OrganizationID:  r.Organization.ID,
-		CanvasRunID:     uuid.New(),
+		CanvasRunID:     run.ID,
 		NodeExecutionID: uuid.New(),
 		NodeID:          "prompt",
 		Provider:        models.UsageProviderOpenAI,
@@ -166,6 +171,145 @@ func Test__RecordUsage__SkipsRunsWithoutWorkOrderExecution(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), totals.TotalTokens)
 	assert.Empty(t, byModel)
+}
+
+func Test__RecordUsage__FactoryCanvasWithoutLineStepPersists(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	run := startFactoryCanvasRun(t, r, factory.ID, nil)
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	event := requireUsageEventForRun(t, db, run.ID)
+	assert.Equal(t, factory.ID, *event.FactoryID)
+	assert.Nil(t, event.WorkOrderID)
+	assert.Nil(t, event.WorkOrderExecutionID)
+	assert.Equal(t, int64(1_000_000), event.TotalTokens)
+}
+
+func Test__RecordUsage__AttachesWorkOrderFromPullRequestLink(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, nil)
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/app/pull/99",
+	})
+	require.NoError(t, err)
+	require.NoError(t, pullRequest.LinkRun(db, run.ID, "Please add tests."))
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	event := requireUsageEventForRun(t, db, run.ID)
+	require.NotNil(t, event.WorkOrderID)
+	assert.Equal(t, order.ID, *event.WorkOrderID)
+	assert.Nil(t, event.WorkOrderExecutionID)
+}
+
+func Test__RecordUsage__ChildRunInheritsPullRequestWorkOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	parent := startFactoryCanvasRun(t, r, factory.ID, nil)
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/app/pull/100",
+	})
+	require.NoError(t, err)
+	require.NoError(t, pullRequest.LinkRun(db, parent.ID, "Address review."))
+
+	now := parent.CreatedAt
+	if now == nil {
+		created := time.Now()
+		now = &created
+	}
+	child := models.CanvasRun{
+		ID:               uuid.New(),
+		WorkflowID:       parent.WorkflowID,
+		NodeID:           parent.NodeID,
+		VersionID:        parent.VersionID,
+		ParentRunID:      &parent.ID,
+		ParentWorkflowID: &parent.WorkflowID,
+		State:            models.CanvasRunStateStarted,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	require.NoError(t, db.Create(&child).Error)
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, child.ID)))
+
+	event := requireUsageEventForRun(t, db, child.ID)
+	require.NotNil(t, event.WorkOrderID)
+	assert.Equal(t, order.ID, *event.WorkOrderID)
+}
+
+func Test__RecordUsage__AttachesWorkOrderFromOnWorkOrderEvent(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	event := requireUsageEventForRun(t, db, run.ID)
+	require.NotNil(t, event.WorkOrderID)
+	assert.Equal(t, order.ID, *event.WorkOrderID)
+	assert.Nil(t, event.WorkOrderExecutionID)
+}
+
+func Test__SumUsageForRunTrees__IncludesDescendantSpend(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	parent := startFactoryCanvasRun(t, r, factory.ID, nil)
+	now := parent.CreatedAt
+	if now == nil {
+		created := time.Now()
+		now = &created
+	}
+	child := models.CanvasRun{
+		ID:               uuid.New(),
+		WorkflowID:       parent.WorkflowID,
+		NodeID:           parent.NodeID,
+		VersionID:        parent.VersionID,
+		ParentRunID:      &parent.ID,
+		ParentWorkflowID: &parent.WorkflowID,
+		State:            models.CanvasRunStateStarted,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	require.NoError(t, db.Create(&child).Error)
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, child.ID)))
+
+	sums, err := models.SumUsageForRunTrees(db, []uuid.UUID{parent.ID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_000_000), sums[parent.ID].TotalTokens)
+	assert.Equal(t, int64(300), sums[parent.ID].CostCents())
+}
+
+func Test__SumUsageForWorkOrders__SumsLedgerByWorkOrder(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+
+	sums, err := models.SumUsageForWorkOrders(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1_000_000), sums[order.ID].TotalTokens)
+	assert.Equal(t, int64(300), sums[order.ID].CostCents())
 }
 
 func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
@@ -259,4 +403,48 @@ func dispatchWorkOrderExecution(t *testing.T, r *support.ResourceRegistry) *mode
 	}))
 	require.NotNil(t, execution)
 	return execution
+}
+
+func createFactoryOrder(t *testing.T, r *support.ResourceRegistry) (*models.Factory, *models.FactoryWorkOrder) {
+	t.Helper()
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	return factory, order
+}
+
+func startFactoryCanvasRun(t *testing.T, r *support.ResourceRegistry, factoryID uuid.UUID, data map[string]any) *models.CanvasRun {
+	t.Helper()
+	db := database.DB(t.Context())
+	canvas, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryID, "score", "start")
+	if data == nil {
+		data = map[string]any{"key": "value"}
+	}
+	event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, entry, "default", nil, data)
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, event)
+	require.NoError(t, err)
+	return run
+}
+
+func sonnetUsage(t *testing.T, r *support.ResourceRegistry, runID uuid.UUID) models.LLMUsageEventInput {
+	t.Helper()
+	return models.LLMUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+	}
+}
+
+func requireUsageEventForRun(t *testing.T, db *gorm.DB, runID uuid.UUID) models.LLMUsageEvent {
+	t.Helper()
+	var event models.LLMUsageEvent
+	require.NoError(t, db.Where("canvas_run_id = ?", runID).First(&event).Error)
+	return event
 }

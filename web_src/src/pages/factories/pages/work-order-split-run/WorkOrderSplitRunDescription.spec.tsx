@@ -42,7 +42,7 @@ function stubClientRects(target: object) {
 }
 
 describe("WorkOrderSplitRunDescription", () => {
-  it("keeps a read-only description when the work order is not a draft", () => {
+  it("keeps a read-only description when the task is not a draft", () => {
     render(<WorkOrderSplitRunDescription description="Retry webhooks after a timeout." />);
 
     expect(screen.getByTestId("work-order-description-markdown")).toHaveTextContent("Retry webhooks after a timeout.");

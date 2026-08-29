@@ -924,6 +924,20 @@ CREATE TABLE public.secrets (
 
 
 --
+-- Name: user_api_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_api_tokens (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    name text NOT NULL,
+    token_hash text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp without time zone
+);
+
+
+--
 -- Name: user_canvas_preferences; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1787,6 +1801,14 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
+-- Name: user_api_tokens user_api_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_api_tokens
+    ADD CONSTRAINT user_api_tokens_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: user_canvas_preferences user_canvas_preferences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2472,6 +2494,20 @@ CREATE INDEX idx_repository_seed_files_repository_id ON public.repository_seed_f
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_user_api_tokens_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_user_api_tokens_token_hash ON public.user_api_tokens USING btree (token_hash);
+
+
+--
+-- Name: idx_user_api_tokens_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_api_tokens_user_id ON public.user_api_tokens USING btree (user_id);
 
 
 --
@@ -3298,6 +3334,14 @@ ALTER TABLE ONLY public.repository_seed_files
 
 
 --
+-- Name: user_api_tokens user_api_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_api_tokens
+    ADD CONSTRAINT user_api_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user_canvas_preferences user_canvas_preferences_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3665,7 +3709,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260828094719	f
+20260829133423	f
 \.
 
 

@@ -62,6 +62,7 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/web",
       backlogRepository: "acme/web",
+      defaultBranch: "main",
     });
     expect(
       normalizeFactoryInstallParams({
@@ -73,7 +74,24 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "main",
     });
+  });
+
+  it("substitutes the default branch placeholder", () => {
+    expect(
+      substituteInstallParams("base: {{ install_params.defaultBranch }}", {
+        defaultBranch: "staging",
+      }),
+    ).toBe("base: staging");
+  });
+
+  it("defaults defaultBranch to main when absent or blank", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
+      "staging",
+    );
   });
 
   it("wires integration refs onto matching components", () => {

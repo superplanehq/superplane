@@ -22,7 +22,7 @@ export function firstFactoryLineId(
   return factory?.lines?.find((line) => Boolean(line.id))?.id;
 }
 
-/** First line name on a factory, used to Start a new work order. */
+/** First line name on a factory, used to Start a new task. */
 export function firstFactoryLineName(
   factory: { lines?: Array<{ name?: string }> | null } | null | undefined,
 ): string | undefined {
@@ -116,17 +116,51 @@ export function createWorkOrderPath(organizationId: string, factoryKey: string) 
 }
 
 /**
- * Canonical work order permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
+ * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
  * (singular segment, sibling of `work-orders`). `orderNumber` is the
  * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
  * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
  */
-export function workOrderDetailPath(organizationId: string, factoryKey: string, orderNumber: string | number) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
+export function workOrderDetailPath(
+  organizationId: string,
+  factoryKey: string,
+  orderNumber: string | number,
+  lineId?: string | null,
+) {
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
+  const boardLineId = lineId?.trim();
+  if (!boardLineId) {
+    return path;
+  }
+  return `${path}?${WORK_ORDER_LINE_SEARCH_PARAM}=${encodeURIComponent(boardLineId)}`;
+}
+
+/** Line id carried on a work-order permalink when the popup opened from a board. */
+export const WORK_ORDER_LINE_SEARCH_PARAM = "lineId";
+
+export function workOrderBoardLineIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(WORK_ORDER_LINE_SEARCH_PARAM);
 }
 
 /**
- * Old id-based work order URL shape, kept around only so the legacy
+ * Opens a task at its canonical permalink. Falls back to the line
+ * board when the order has no number yet.
+ */
+export function workOrderOpenPath(
+  organizationId: string,
+  factoryKey: string,
+  orderNumber: string | number | null | undefined,
+  fallbackLineId?: string | null,
+) {
+  if (orderNumber === undefined || orderNumber === null || String(orderNumber).trim() === "") {
+    return factoryHomePath(organizationId, factoryKey, fallbackLineId);
+  }
+  return workOrderDetailPath(organizationId, factoryKey, orderNumber);
+}
+
+/**
+ * Old id-based task URL shape, kept around only so the legacy
  * redirect route can compare against it / build test fixtures. New code
  * should always call `workOrderDetailPath`.
  */
@@ -170,7 +204,7 @@ export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom 
 export type FactoryAppNavOptions = {
   from?: FactoryAppNavFrom;
   lineId?: string;
-  /** Work order `number` (route identifier), not the database id. */
+  /** Task `number` (route identifier), not the database id. */
   orderNumber?: string;
   runId?: string;
   /**
