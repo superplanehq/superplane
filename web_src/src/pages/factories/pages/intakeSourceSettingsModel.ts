@@ -32,6 +32,7 @@ export interface IntakeSourceSettings {
   labelFilterMode: IntakeLabelFilterMode;
   labels: string[];
   assignment: IntakeAssignmentFilter;
+  authorsWithAccess: boolean;
 }
 
 export const GITHUB_INTAKE_LABEL_OPTIONS = ["bug", "enhancement", "documentation", "good first issue"] as const;
@@ -43,6 +44,7 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   labelFilterMode: "include",
   labels: [],
   assignment: "any",
+  authorsWithAccess: false,
 };
 
 export const INTAKE_SETTINGS_COPY = {
@@ -90,6 +92,9 @@ export const INTAKE_SETTINGS_COPY = {
   assignmentAny: "Any assignment",
   assignmentAssigned: "Assigned",
   assignmentUnassigned: "Unassigned",
+  authorsLabel: "Authors",
+  authorsWithAccess: "Only issues from people with repository access",
+  authorsHelper: "Skip issues opened by outside contributors.",
   save: "Save",
   saving: "Saving",
   saveError: "SuperPlane could not save the intake settings. Try again.",
@@ -211,6 +216,7 @@ export function intakeSettingsFromApi(
     labelFilterMode: settings?.labelFilterMode === "LABEL_FILTER_MODE_EXCLUDE" ? "exclude" : "include",
     labels: settings?.labels ?? [],
     assignment: assignmentFromApi(settings?.assignment),
+    authorsWithAccess: settings?.authorsWithAccess ?? DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess,
   };
 }
 
@@ -225,6 +231,7 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
         : settings.assignment === "unassigned"
           ? "ASSIGNMENT_UNASSIGNED"
           : "ASSIGNMENT_ANY",
+    authorsWithAccess: settings.authorsWithAccess,
   };
 }
 
