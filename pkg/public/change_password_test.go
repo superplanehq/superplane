@@ -218,6 +218,10 @@ func TestChangePassword_Success(t *testing.T) {
 	originalTokenHash := crypto.HashToken("some-existing-api-token")
 	require.NoError(t, r.UserModel.UpdateTokenHash(originalTokenHash))
 
+	// Seed a named personal API token so we can verify it gets revoked too.
+	personalToken := models.NewUserAPIToken(r.User, "CI token", crypto.HashToken("some-personal-token"))
+	require.NoError(t, models.CreateUserAPIToken(database.Conn(), personalToken))
+
 	// Drop a stale impersonation cookie on the request to verify it is cleared.
 	staleImpersonation := &http.Cookie{Name: impersonation.CookieName, Value: "stale-token-value"}
 
@@ -251,6 +255,11 @@ func TestChangePassword_Success(t *testing.T) {
 	for _, u := range users {
 		assert.Empty(t, u.TokenHash, "token_hash should have been cleared for user %s", u.ID)
 	}
+
+	// Every named personal API token was revoked.
+	tokens, err := models.ListUserAPITokens(database.Conn(), r.User)
+	require.NoError(t, err)
+	assert.Empty(t, tokens, "personal API tokens should have been revoked on password change")
 
 	// Cookies were set: a refreshed account_token AND a cleared impersonation_token.
 	cookies := res.Result().Cookies()
