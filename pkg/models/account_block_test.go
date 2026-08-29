@@ -24,6 +24,9 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, human.UpdateTokenHash("human-token-hash"))
 
+	personalToken := NewUserAPIToken(human.ID, "CI token", "personal-token-hash")
+	require.NoError(t, CreateUserAPIToken(database.Conn(), personalToken))
+
 	description := "org key"
 	apiKey, err := CreateAPIKey(database.Conn(), org.ID, "org-key", &description, human.ID, nil, nil)
 	require.NoError(t, err)
@@ -47,6 +50,10 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	refreshedKey, err := FindActiveUserByID(org.ID.String(), apiKey.ID.String())
 	require.NoError(t, err)
 	assert.Empty(t, refreshedKey.TokenHash)
+
+	remainingTokens, err := ListUserAPITokens(database.Conn(), human.ID)
+	require.NoError(t, err)
+	assert.Empty(t, remainingTokens, "personal API tokens should be revoked when the account is blocked")
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		return blocked.Unblock(tx)
