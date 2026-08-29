@@ -31,6 +31,7 @@ describe("provisionLine", () => {
       selections: {},
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "main",
       installFactory,
       createLine,
       updateOnboarding,
@@ -54,6 +55,7 @@ describe("provisionLine", () => {
       selections: {},
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "master",
       installFactory,
       createLine,
       updateOnboarding,
@@ -62,6 +64,10 @@ describe("provisionLine", () => {
     expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
       "line-planning",
       "line-implementation",
+    ]);
+    expect(installFactory.mock.calls.map(([input]) => input.installParams)).toEqual([
+      { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
+      { appRepository: "acme/app", backlogRepository: "acme/backlog", defaultBranch: "master" },
     ]);
     expect(createLine).toHaveBeenCalledWith({
       name: DEFAULT_LINE_NAME,
@@ -96,6 +102,7 @@ describe("provisionEventApps", () => {
       selections: {},
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "staging",
       installFactory,
     });
 
@@ -107,6 +114,7 @@ describe("provisionEventApps", () => {
         installParams: {
           appRepository: "acme/app",
           backlogRepository: "acme/backlog",
+          defaultBranch: "staging",
         },
       }),
     );
