@@ -64,9 +64,8 @@ describe("OrganizationSettingsLayout", () => {
 
     const table = await screen.findByTestId("organization-settings-workspaces-table");
     expect(table).toHaveTextContent("Semaphore");
-    expect(table).toHaveTextContent("RF");
     expect(table).toHaveTextContent("SuperPlane");
-    expect(table).toHaveTextContent("PF");
+    expect(table).not.toHaveTextContent("RF");
     expect(within(sidebar).getByTestId("organization-settings-nav-workspaces")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
