@@ -198,14 +198,14 @@ spec:
             type: prompt
             workingDirectory: repo
             prompt: |-
-              You are implementing a fix for a SuperPlane work order. The repository is already checked out in your current working directory, on the branch to work on.
+              You are implementing a fix for a SuperPlane task. The repository is already checked out in your current working directory, on the branch to work on.
 
               Repository: {{ install_params.appRepository }}
-              Work order title: {{ order().title }}
+              Task title: {{ order().title }}
 
-              1/ The original work order description is at /tmp/ORDER.md. Read it before implementing.
+              1/ The original task description is at /tmp/ORDER.md. Read it before implementing.
               2/ The preliminary plan is at /tmp/PLAN.md. Read it before writing any implementation.
-              3/ Implement. Make the code changes required to resolve the work order description and plan.
+              3/ Implement. Make the code changes required to resolve the task description and plan.
               4/ Keep the change focused and commit your work to the current branch with clear commit messages.
 
               Guidelines:
@@ -223,7 +223,7 @@ spec:
               git log --oneline -5
               git add -A
               if ! git diff --cached --quiet; then
-                git commit -s -m "fix: implement work order via SuperPlane"
+                git commit -s -m "fix: implement task via SuperPlane"
               fi
               if git rev-parse --verify "origin/${BRANCH}" >/dev/null 2>&1; then
                 if [ "$(git rev-list --count "origin/${BRANCH}..HEAD")" -eq 0 ]; then
@@ -239,7 +239,7 @@ spec:
             prompt: |-
               Write the pull request title and description for the change you pushed.
 
-              Work order title: {{ order().title }}
+              Task title: {{ order().title }}
 
               1/ Compare the current branch with main and review the commits you made.
               2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
@@ -276,7 +276,7 @@ spec:
       configuration:
         base: main
         body: |-
-          [Work Order]({{ order().url }}).
+          [Task]({{ order().url }}).
 
           {{ fromBase64(previous().data.result.description) }}
 
@@ -292,7 +292,7 @@ spec:
         'y': 984
       isCollapsed: true
     - id: attach-pr-artifact
-      name: Attach PR to Work Order
+      name: Attach PR to Task
       type: TYPE_ACTION
       component: addPullRequest
       concurrency:

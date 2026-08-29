@@ -41,12 +41,12 @@ import type {
  *
  * Layout: briefing header, a horizontal row of health scorecards, then the
  * work stream — Needs attention and In flight full width, Recently shipped
- * and Suggested work orders paired in one row, and Workspace improvements
+ * and Suggested tasks paired in one row, and Workspace improvements
  * as a wide card at the bottom. Every table caps at three rows; totals stay
  * visible in the header counts. Future-capability cards carry a "Preview"
  * badge.
  *
- * The All/My toggle in the header scopes the three work order tables to
+ * The All/My toggle in the header scopes the three task tables to
  * the viewer's assignments. Health metrics and the proposal cards always
  * stay workspace-wide.
  */
@@ -130,7 +130,7 @@ function BriefingLine({
       <span>Nothing needs attention</span>
     ) : (
       <span className="font-medium text-foreground">
-        {counts.attention} {counts.attention === 1 ? "work order needs" : "work orders need"} attention
+        {counts.attention} {counts.attention === 1 ? "task needs" : "tasks need"} attention
       </span>
     );
 
@@ -175,9 +175,9 @@ function workOrderHref(organizationId: string, factoryKey: string, workOrderKey:
 }
 
 /**
- * Stretched link that makes the whole row open the work order detail.
+ * Stretched link that makes the whole row open the task detail.
  * Row content sits above it with `pointer-events-none`; inline buttons
- * re-enable pointer events. Same pattern as the Work Orders list rows.
+ * re-enable pointer events. Same pattern as the Tasks list rows.
  */
 function RowLink({ href, label }: { href: string; label: string }) {
   return <Link to={href} className="absolute inset-0 z-0" aria-label={label} />;
@@ -221,9 +221,9 @@ const ATTENTION_META: Record<
 };
 
 /**
- * Owner of the work order: avatar + name (name hides on narrow screens).
+ * Owner of the task: avatar + name (name hides on narrow screens).
  * No owner renders a dashed "Unassigned" chip — in a team-wide queue that
- * marks work anyone can pick up, matching the work orders list pattern.
+ * marks work anyone can pick up, matching the tasks list pattern.
  */
 function OwnerReference({ owner, className }: { owner?: WorkOrderOwner; className?: string }) {
   if (!owner) {
@@ -264,7 +264,7 @@ function NeedsAttentionCard({
   return (
     <OverviewCard
       title="Needs attention"
-      subtitle="Work orders that wait for a human decision."
+      subtitle="Tasks that wait for a human decision."
       count={items.length}
       headerAction={<CardViewAllLink href={viewAllHref} label="View all" />}
       testId="overview-attention-card"
@@ -273,7 +273,7 @@ function NeedsAttentionCard({
         <CardEmptyState
           icon={<CircleCheck className="size-5 text-emerald-600 dark:text-emerald-400" aria-hidden />}
           title="Nothing waits on the team"
-          hint="Work orders that need a decision appear here."
+          hint="Tasks that need a decision appear here."
         />
       ) : (
         <ul>
@@ -364,20 +364,20 @@ function InFlightCard({
   return (
     <OverviewCard
       title="In flight"
-      subtitle="Work orders that run on lines now."
+      subtitle="Tasks that run on lines now."
       count={items.length}
       headerAction={<CardViewAllLink href={viewAllHref} label="View all" />}
       testId="overview-in-flight-card"
     >
       {items.length === 0 ? (
         <CardEmptyState
-          title="No work orders run now"
-          hint="Create a work order to send work through the workspace."
+          title="No tasks run now"
+          hint="Create a task to send work through the workspace."
           action={
             <Button asChild size="xs" variant="outline">
               <Link to={newWorkOrderHref}>
                 <Plus aria-hidden />
-                New work order
+                New task
               </Link>
             </Button>
           }
@@ -447,7 +447,7 @@ function RecentlyShippedCard({
       testId="overview-shipped-card"
     >
       {items.length === 0 ? (
-        <CardEmptyState title="No completed work in the last 7 days" hint="Finished work orders appear here." />
+        <CardEmptyState title="No completed work in the last 7 days" hint="Finished tasks appear here." />
       ) : (
         <ul>
           {items.slice(0, MAX_SHIPPED_ROWS).map((item) => {

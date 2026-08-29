@@ -79,7 +79,7 @@ export function PopupHeader({
   titleBusy = false,
   onTitleSave,
   titleTestId = "popup-work-order-title",
-  titleAriaLabel = "Work order title",
+  titleAriaLabel = "Task title",
 }: {
   title: string;
   children?: ReactNode;

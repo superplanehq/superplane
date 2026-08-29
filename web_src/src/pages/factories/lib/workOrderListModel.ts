@@ -19,7 +19,7 @@ import {
 
 /**
  * Presentation model built on top of a `FactoriesWorkOrder`. It centralizes
- * every derived value the Work Orders layouts need — identifiers, status,
+ * every derived value the Tasks layouts need — identifiers, status,
  * latest line and step, usage, assignee summary, and search text — so
  * board/list/table stay display-only and can share the same reducers.
  *
@@ -72,7 +72,7 @@ export function buildWorkOrderListEntry(
 
   const createdAtMs = parseTimestamp(order.createdAt);
   const displayKey = getWorkOrderDisplayKey(order, factory?.key ?? null);
-  const title = trimOrNull(order.title) ?? "Untitled work order";
+  const title = trimOrNull(order.title) ?? "Untitled task";
   const latestLineName = trimOrNull(latestPair?.line?.name);
   const latestStepName = trimOrNull(latestPair?.execution.step);
 
@@ -263,12 +263,12 @@ function formatUsageTooltip(totalTokens: number, totalCostCents: number): string
 export type WorkOrderScope = "all" | "active" | "my";
 
 export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; tooltip: string }> = [
-  { id: "all", label: "All", tooltip: "Every work order in this workspace." },
-  { id: "active", label: "Needs attention", tooltip: "Work orders that need your attention." },
+  { id: "all", label: "All", tooltip: "Every task in this workspace." },
+  { id: "active", label: "Needs attention", tooltip: "Tasks that need your attention." },
   {
     id: "my",
     label: "My",
-    tooltip: "Work orders you created or started. SuperPlane assigns those to you.",
+    tooltip: "Tasks you created or started. SuperPlane assigns those to you.",
   },
 ];
 
@@ -294,7 +294,7 @@ export const WORK_ORDER_LAYOUTS: Array<{ id: WorkOrderLayoutId; label: string }>
   { id: "table", label: "Table" },
 ];
 
-/** Sentinel assignee filter value that matches work orders with no assignee. */
+/** Sentinel assignee filter value that matches tasks with no assignee. */
 export const UNASSIGNED_FILTER_VALUE = "unassigned";
 
 /**
@@ -386,7 +386,7 @@ export function applyWorkOrderOrdering(
 
 /**
  * Buckets entries into the shared board lanes, keeping the incoming order
- * inside each lane. Board and List both group this way so a work order
+ * inside each lane. Board and List both group this way so a task
  * never lands in different sections depending on the layout.
  */
 export function groupWorkOrderEntriesByLane(

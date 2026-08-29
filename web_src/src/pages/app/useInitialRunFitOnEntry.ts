@@ -3,7 +3,7 @@ import { shouldRequestInitialRunFit } from "./workflowPageHelpers";
 
 /**
  * Requests a "fit to participants" once, on mount, when run-inspection mode
- * is already active from the URL (e.g. a Lines/Automations/Work Order deep
+ * is already active from the URL (e.g. a Lines/Automations/Task deep
  * link landing directly on `?run=<id>`). Mirrors what `handleSelectRun`
  * already does for in-app run selection, closing the gap where a fresh
  * mount into run-inspection mode never requests a fit at all.

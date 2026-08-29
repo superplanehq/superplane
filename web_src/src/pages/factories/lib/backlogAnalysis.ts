@@ -3,7 +3,7 @@ import type { CanvasesCanvasRun } from "@/api-client";
 import { isActiveCanvasRun } from "./workOrderPullRequest";
 
 /**
- * One run of the factory Backlog automation and the work order it analyzes.
+ * One run of the factory Backlog automation and the task it analyzes.
  * The `factory.onWorkOrder` trigger payload is the only place the work
  * order id exists, so the run carries it in its root event.
  */
@@ -30,7 +30,7 @@ function isBacklogAnalyzerName(name?: string): boolean {
   return (name ?? "").trim().toLowerCase().startsWith("backlog");
 }
 
-/** Analysis runs of one canvas, oldest first, keyed to their work order. */
+/** Analysis runs of one canvas, oldest first, keyed to their task. */
 export function backlogAnalysisRuns(canvasId: string, runs: CanvasesCanvasRun[]): BacklogAnalysisRun[] {
   return runs
     .flatMap((run) => {
@@ -56,7 +56,7 @@ export function backlogAnalysisRunsByWorkOrder(runs: BacklogAnalysisRun[]): Map<
   return byWorkOrder;
 }
 
-/** Work orders whose score is still on the way. */
+/** Tasks whose score is still on the way. */
 export function analyzingWorkOrderIds(runs: BacklogAnalysisRun[]): ReadonlySet<string> {
   const ids = new Set<string>();
   for (const entry of runs) {

@@ -78,7 +78,7 @@ export const INTAKE_SETTINGS_COPY = {
   nameHelper: "Shown in the Intake list.",
   listenLabel: "When to create",
   listenOption: "Listen for new issues",
-  listenHelper: "Create a work order when a GitHub issue is opened.",
+  listenHelper: "Create a task when a GitHub issue is opened.",
   scheduleOption: "Run on a schedule",
   scheduleHelper: "Scheduled intake is not available.",
   filtersLabel: "Filters",

@@ -83,7 +83,7 @@ function CopyLinkButton() {
       size="icon-xs"
       onClick={() => void handleCopy()}
       className="text-muted-foreground hover:bg-accent hover:text-foreground"
-      aria-label="Copy link to work order"
+      aria-label="Copy link to task"
       data-testid="work-order-copy-link-button"
     >
       {copied ? <Check className="size-3.5" aria-hidden /> : <Link2 className="size-3.5" aria-hidden />}
@@ -111,7 +111,7 @@ function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
     <DropdownMenu>
       <PermissionTooltip
         allowed={props.canClose || props.canManage}
-        message="You don't have permission to manage this work order."
+        message="You don't have permission to manage this task."
       >
         <DropdownMenuTrigger asChild>
           <Button

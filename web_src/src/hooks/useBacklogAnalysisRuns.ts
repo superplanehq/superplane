@@ -20,9 +20,9 @@ const BACKLOG_ANALYSIS_RUNS_LIMIT = 50;
 const BACKLOG_ANALYSIS_POLL_MS = 4000;
 
 /**
- * Runs of the factory Backlog automation, keyed to the work order each one
+ * Runs of the factory Backlog automation, keyed to the task each one
  * analyzes. The board reads it to show that a score is on the way, and the
- * work order popup reads it to open the live log of the analysis.
+ * task popup reads it to open the live log of the analysis.
  */
 export function useBacklogAnalysisRuns(organizationId: string, canvasId: string | undefined) {
   return useQuery({
@@ -47,8 +47,8 @@ export function useBacklogAnalysisRuns(organizationId: string, canvasId: string 
 }
 
 /**
- * Backlog analysis of one factory: which work orders wait for a score, and
- * the runs of each work order. Intake automations can share the Backlog
+ * Backlog analysis of one factory: which tasks wait for a score, and
+ * the runs of each task. Intake automations can share the Backlog
  * name, so their canvases are excluded.
  */
 export function useFactoryBacklogAnalysis(organizationId: string, factoryId: string) {

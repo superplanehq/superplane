@@ -6,7 +6,7 @@ import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
 import { SplitRunDecisionFooterPreview, type DecisionFooterKind } from "./SplitRunDecisionFooterPreview";
 
 const meta = {
-  title: "Factories/Pages/Work Order Split Run/Decision footer",
+  title: "Factories/Pages/Task Split Run/Decision footer",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },

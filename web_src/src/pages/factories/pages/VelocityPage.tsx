@@ -58,7 +58,7 @@ export function VelocityPage() {
           ? undefined
           : {
               flow: model.workOrderFlow.flow,
-              emptyLabel: model.workOrderFlow.error ? "We could not load work order time." : undefined,
+              emptyLabel: model.workOrderFlow.error ? "We could not load task time." : undefined,
             }
       }
     />,
@@ -84,7 +84,7 @@ function VelocityHeader({ model }: { model: VelocityPageModel }) {
     <WorkspacePageHeader
       className={factorySectionHeaderClassName}
       title="Velocity"
-      subtitle="Merged pull requests and work order time."
+      subtitle="Merged pull requests and task time."
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {model.githubIntegrations.length > 1 ? (
@@ -177,7 +177,7 @@ function RepositoryPicker({
         <SelectValue placeholder={repositoryPlaceholder(hasIntegrations, loading)} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NO_REPO_SENTINEL}>All work orders (no repo)</SelectItem>
+        <SelectItem value={NO_REPO_SENTINEL}>All tasks (no repo)</SelectItem>
         {options.map((repo) => (
           <SelectItem key={repo} value={repo}>
             {repo}

@@ -58,7 +58,7 @@ describe("Confidence score on a backlog card", () => {
     expect(screen.getByTestId("work-order-card-score-wo-1")).toHaveAttribute("aria-valuenow", "4");
   });
 
-  it("stays quiet when no automation analyzes the work order", () => {
+  it("stays quiet when no automation analyzes the task", () => {
     renderCard({});
 
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();

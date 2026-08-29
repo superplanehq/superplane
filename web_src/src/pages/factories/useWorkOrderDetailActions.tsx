@@ -35,16 +35,16 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const handleClose = async (result: FactoriesWorkOrderResult) => {
     try {
       await closeWorkOrder.mutateAsync({ orderId, result });
-      showSuccessToast(`Work order closed as ${formatWorkOrderResult(result).toLowerCase()}.`);
+      showSuccessToast(`Task closed as ${formatWorkOrderResult(result).toLowerCase()}.`);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to close task"));
     }
   };
 
   const handleStatusChange = async (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => {
     try {
       await updateStatus.mutateAsync({ orderId, state, result });
-      showSuccessToast(`Work order moved to ${formatWorkOrderState(state).toLowerCase()}.`);
+      showSuccessToast(`Task moved to ${formatWorkOrderState(state).toLowerCase()}.`);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to update status"));
       throw error;

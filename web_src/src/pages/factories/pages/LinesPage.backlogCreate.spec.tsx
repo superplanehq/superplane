@@ -169,21 +169,21 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
   });
 
-  it("creates work orders from the backlog header plus", async () => {
+  it("creates tasks from the backlog header plus", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
     expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
-  it("imports an intake item and opens the work order popup", async () => {
+  it("imports an intake item and opens the task popup", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     searchFactoryIntakeItems.mockReturnValue(REFUND_INTAKE_SEARCH);

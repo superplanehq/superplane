@@ -94,7 +94,7 @@ describe("useFactoryWebsocket", () => {
     });
   });
 
-  it("invalidates described canvas runs for the updated work order", () => {
+  it("invalidates described canvas runs for the updated task", () => {
     const { queryClient, invalidateSpy } = renderFactoryWebsocket();
     queryClient.setQueryData(factoryQueryKeys.workOrders("org-1", "factory-1"), [
       {

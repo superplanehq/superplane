@@ -192,7 +192,7 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Work order not found");
+        throw new Error("Task not found");
       }
       return response.data.order;
     },
@@ -329,7 +329,7 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to create work order");
+        throw new Error("Failed to create task");
       }
       return response.data.order;
     },
@@ -360,7 +360,7 @@ export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to update work order");
+        throw new Error("Failed to update task");
       }
       return response.data.order;
     },
@@ -394,7 +394,7 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to update work order assignees");
+        throw new Error("Failed to update task assignees");
       }
       return response.data.order;
     },
@@ -432,7 +432,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to dispatch work order");
+        throw new Error("Failed to dispatch task");
       }
       return response.data.order;
     },
@@ -468,7 +468,7 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to update work order status");
+        throw new Error("Failed to update task status");
       }
       return response.data.order;
     },
@@ -543,7 +543,7 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to close work order");
+        throw new Error("Failed to close task");
       }
       return response.data.order;
     },

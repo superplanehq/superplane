@@ -31,7 +31,7 @@ interface FactoriesHarnessProps {
    * Storybook-only: replace selected factory page elements.
    * Wiki defaults to the wireframe so sidebar navigation shows it; pass
    * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
-   * Work Orders defaults to the missions page so the sidebar keeps missions.
+   * Tasks defaults to the missions page so the sidebar keeps missions.
    * Setup + Get started overview are enabled by default.
    */
   pageOverrides?: OrgWorkspacePageOverrides;

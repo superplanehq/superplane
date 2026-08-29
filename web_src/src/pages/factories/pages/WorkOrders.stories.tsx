@@ -7,11 +7,11 @@ import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/mis
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
 /**
- * Work Orders page. Storybook uses the FactoriesHarness work-orders route.
- * New Work Order opens the create dialog.
+ * Tasks page. Storybook uses the FactoriesHarness work-orders route.
+ * New Task opens the create dialog.
  */
 const meta = {
-  title: "Factories/Pages/Work Orders",
+  title: "Factories/Pages/Tasks",
   component: WorkOrdersPage,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof WorkOrdersPage>;

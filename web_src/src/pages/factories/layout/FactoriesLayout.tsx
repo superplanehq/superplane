@@ -131,7 +131,7 @@ function FactoriesLayoutContent({
   // `pages/factories/pages/`). React fires a newly-mounted child's effects
   // before its parent's, so if this effect stayed enabled it would run right
   // after the leaf's and clobber it back down to just the factory name on
-  // every first render (e.g. a hard reload straight to a work order
+  // every first render (e.g. a hard reload straight to a task
   // permalink). Disable it as soon as there's a leaf to hand off to; keep it
   // enabled only for the loading/error baseline rendered before that.
   const pageTitle = useMemo(() => (factory?.name ? [factory.name] : ["Workspaces"]), [factory?.name]);

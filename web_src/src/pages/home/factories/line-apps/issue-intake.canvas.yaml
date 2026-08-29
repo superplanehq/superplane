@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Canvas
 metadata:
   name: Ingest
-  description: Create a work order when an issue gets the factory label or is assigned to the SuperPlane agent.
+  description: Create a task when an issue gets the factory label or is assigned to the SuperPlane agent.
 spec:
   edges:
     - channel: default

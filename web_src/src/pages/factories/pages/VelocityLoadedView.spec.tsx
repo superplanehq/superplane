@@ -104,7 +104,7 @@ describe("VelocityLoadedView", () => {
     );
 
     const flow = screen.getByTestId("velocity-work-order-flow");
-    expect(flow).toHaveTextContent("Work order time");
+    expect(flow).toHaveTextContent("Task time");
     expect(flow).toHaveTextContent("Cycle time");
     expect(flow).toHaveTextContent("Time running");
     expect(flow).toHaveTextContent("Time in Waiting");
@@ -139,7 +139,7 @@ describe("VelocityLoadedView", () => {
     );
 
     const flow = screen.getByTestId("velocity-work-order-flow");
-    expect(flow).toHaveTextContent("No work orders closed in this period.");
+    expect(flow).toHaveTextContent("No tasks closed in this period.");
     // Metric cells (`Cycle time` label, `%` share hints) must not render.
     expect(flow).not.toHaveTextContent("From start to close");
     expect(flow).not.toHaveTextContent("% of cycle time");

@@ -50,7 +50,7 @@ describe("buildSplitRunFooter", () => {
   it("keeps a draft note with Reject and Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
-      sentence: "This work order is a draft.",
+      sentence: "This task is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       attentionCard: true,
       actions: [REJECT, START],
@@ -63,7 +63,7 @@ describe("buildSplitRunFooter", () => {
       note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
     });
 
-    expect(footer.sentence).toBe("This work order is running.");
+    expect(footer.sentence).toBe("This task is running.");
     expect(footer.note?.headline).toBe("Implement is running");
     expect(footer.run).toBeUndefined();
     expect(footer.actions).toEqual([]);
@@ -99,7 +99,7 @@ describe("buildSplitRunFooter", () => {
       sourceName: "PR Closure",
       cta: PR_NOTE.cta,
     });
-    expect(footer.sentence).toBe("This work order needs attention.");
+    expect(footer.sentence).toBe("This task needs attention.");
     expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, APPROVE]);
     expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
   });
@@ -107,7 +107,7 @@ describe("buildSplitRunFooter", () => {
   it("uses the default waiting note when a waiting order has no run note", () => {
     expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
       kind: "waiting",
-      sentence: "This work order needs attention.",
+      sentence: "This task needs attention.",
       note: {
         headline: "This task needs a decision",
         text: "Every automation finished. This task is ready to complete.",
@@ -120,7 +120,7 @@ describe("buildSplitRunFooter", () => {
   it("hides the decision strip while a waiting order is still running a follow-up", () => {
     expect(buildSplitRunFooter({ kind: "waiting", decision: false })).toEqual({
       kind: "waiting",
-      sentence: "This work order needs attention.",
+      sentence: "This task needs attention.",
       actions: [],
     });
   });
@@ -153,7 +153,7 @@ describe("buildSplitRunFooter", () => {
     expect(footer.attentionCard).toBe(true);
     expect(footer.note?.headline).toBe("Implement did not pass");
     expect(footer.note?.cta?.label).toBe("Debug");
-    expect(footer.sentence).toBe("This work order needs attention.");
+    expect(footer.sentence).toBe("This task needs attention.");
     expect(footer.actions).toEqual([BACK_TO_DRAFT, REJECT, RERUN]);
     expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
   });
@@ -161,7 +161,7 @@ describe("buildSplitRunFooter", () => {
   it("explains a completed or rejected result without Reopen", () => {
     expect(doneFooterForStatus("completed")).toEqual({
       kind: "done",
-      sentence: "Work order completed successfully.",
+      sentence: "Task completed successfully.",
       note: {
         headline: "This task succeeded",
         text: "The work is done. The result met the goal.",
@@ -171,7 +171,7 @@ describe("buildSplitRunFooter", () => {
       status: "completed",
     });
     expect(doneFooterForStatus("rejected")).toMatchObject({
-      sentence: "A person rejected this work order.",
+      sentence: "A person rejected this task.",
       note: {
         headline: "This task did not succeed",
         text: "The work is done. The result did not meet the goal.",
@@ -180,7 +180,7 @@ describe("buildSplitRunFooter", () => {
       actions: [],
     });
     expect(doneFooterForStatus("cancelled")).toMatchObject({
-      sentence: "This work order was canceled.",
+      sentence: "This task was canceled.",
       note: {
         headline: "This task is canceled",
         text: "Reopen this task if the work should continue.",
@@ -223,7 +223,7 @@ describe("buildSplitRunFooter", () => {
 });
 
 describe("availableSplitRunStopChoices", () => {
-  it("keeps every Stop outcome while the work order is still open", () => {
+  it("keeps every Stop outcome while the task is still open", () => {
     expect(availableSplitRunStopChoices("running").map((choice) => choice.id)).toEqual([
       "canceled",
       "completed",
@@ -241,11 +241,11 @@ describe("availableSplitRunStopChoices", () => {
     expect(defaultSplitRunStopChoice("waiting", "failed")).toBe("rerun-step");
   });
 
-  it("drops the outcome that already matches the work order", () => {
+  it("drops the outcome that already matches the task", () => {
     expect(availableSplitRunStopChoices("draft").map((choice) => choice.id)).toEqual(["canceled", "completed"]);
   });
 
-  it("offers Reopen when the work order is already closed", () => {
+  it("offers Reopen when the task is already closed", () => {
     expect(availableSplitRunStopChoices("completed").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("cancelled").map((choice) => choice.id)).toEqual(["reopen"]);
     expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);

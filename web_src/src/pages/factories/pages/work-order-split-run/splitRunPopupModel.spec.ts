@@ -127,14 +127,14 @@ describe("splitRunPopupModel", () => {
   it("prefers the saved work-order description on a live order", () => {
     expect(
       splitRunSourceDescription({
-        workOrderDescription: "Saved on the work order",
+        workOrderDescription: "Saved on the task",
         artifactDescription: "Stale artifact body",
         preferWorkOrder: true,
       }),
-    ).toBe("Saved on the work order");
+    ).toBe("Saved on the task");
     expect(
       splitRunSourceDescription({
-        workOrderDescription: "Saved on the work order",
+        workOrderDescription: "Saved on the task",
         artifactDescription: "Storybook artifact body",
       }),
     ).toBe("Storybook artifact body");
@@ -154,7 +154,7 @@ describe("splitRunPopupModel", () => {
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
   });
 
-  it("uses live artifacts for a real work order and fixture artifacts in Storybook", () => {
+  it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {
     const fixtureArtifacts = collectSplitRunArtifacts(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
     const liveArtifacts = [
       {
