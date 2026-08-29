@@ -34,13 +34,18 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		return nil, err
 	}
 
+	tokenCount, err := models.CountUserAPITokens(database.DB(ctx), user.ID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to count personal tokens")
+	}
+
 	userProto := &pb.User{
 		Id:             user.ID.String(),
 		Name:           user.Name,
 		Email:          user.GetEmail(),
 		OrganizationId: orgID,
 		CreatedAt:      timestamppb.New(user.CreatedAt),
-		HasToken:       user.TokenHash != "",
+		HasToken:       tokenCount > 0,
 		Permissions:    []*pbAuth.Permission{},
 		Roles:          []string{},
 		Groups:         []string{},
