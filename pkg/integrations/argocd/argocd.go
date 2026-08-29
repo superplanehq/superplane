@@ -66,6 +66,7 @@ func (a *ArgoCD) Configuration() []configuration.Field {
 func (a *ArgoCD) Actions() []core.Action {
 	return []core.Action{
 		&GetApplication{},
+		&SyncApplication{},
 	}
 }
 

@@ -1,6 +1,7 @@
 package argocd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -89,7 +90,7 @@ func readServerURL(integration core.IntegrationContext) (string, error) {
 }
 
 func (c *Client) Verify() error {
-	response, err := c.do(http.MethodGet, versionPath, nil)
+	response, err := c.do(http.MethodGet, versionPath, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func (c *Client) GetApplication(project, name, appNamespace string) (Application
 		query.Set("appNamespace", appNamespace)
 	}
 
-	response, err := c.do(http.MethodGet, "/api/v1/applications/"+url.PathEscape(name), query)
+	response, err := c.do(http.MethodGet, "/api/v1/applications/"+url.PathEscape(name), query, nil)
 	if err != nil {
 		return Application{}, err
 	}
@@ -126,19 +127,46 @@ func (c *Client) GetApplication(project, name, appNamespace string) (Application
 	return application, nil
 }
 
-func (c *Client) do(method, path string, query url.Values) (*http.Response, error) {
+func (c *Client) SyncApplication(request SyncApplicationRequest) (Application, error) {
+	body, err := json.Marshal(request)
+	if err != nil {
+		return Application{}, fmt.Errorf("encode Argo CD sync request: %w", err)
+	}
+
+	response, err := c.do(http.MethodPost, "/api/v1/applications/"+url.PathEscape(request.Name)+"/sync", nil, bytes.NewReader(body))
+	if err != nil {
+		return Application{}, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return Application{}, parseAPIError(response)
+	}
+
+	application := Application{}
+	if err := json.NewDecoder(response.Body).Decode(&application); err != nil {
+		return Application{}, fmt.Errorf("decode Argo CD sync response: %w", err)
+	}
+
+	return application, nil
+}
+
+func (c *Client) do(method, path string, query url.Values, body io.Reader) (*http.Response, error) {
 	target := c.serverURL + path
 	if len(query) > 0 {
 		target += "?" + query.Encode()
 	}
 
-	request, err := http.NewRequest(method, target, nil)
+	request, err := http.NewRequest(method, target, body)
 	if err != nil {
 		return nil, fmt.Errorf("build Argo CD request: %w", err)
 	}
 
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Authorization", "Bearer "+c.authToken)
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
 
 	response, err := c.http.Do(request)
 	if err != nil {
