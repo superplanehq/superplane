@@ -19,17 +19,17 @@ interface WorkspacePageHeaderBaseProps {
 
 interface WorkspaceSectionHeaderProps extends WorkspacePageHeaderBaseProps {
   variant?: "section";
-  /** Section title, e.g. "Work Orders", "Lines". */
+  /** Section title, e.g. "Tasks", "Lines". */
   title: ReactNode;
   /** Optional description below the title. */
   subtitle?: ReactNode;
-  /** Optional inline element rendered next to the title (e.g. Work Orders scope pills). */
+  /** Optional inline element rendered next to the title (e.g. Tasks scope pills). */
   leading?: ReactNode;
 }
 
 interface WorkspaceEntityHeaderProps extends WorkspacePageHeaderBaseProps {
   variant: "entity";
-  /** Entity title, e.g. work order title, line name, automation name. */
+  /** Entity title, e.g. task title, line name, automation name. */
   title: ReactNode;
   /** Optional short identifier shown above the title (e.g. "SP-42"). */
   kicker?: ReactNode;
@@ -37,7 +37,7 @@ interface WorkspaceEntityHeaderProps extends WorkspacePageHeaderBaseProps {
   subtitle?: ReactNode;
   /** Back link target. Omit on landing surfaces that have no parent list. */
   backHref?: string;
-  /** Label for the back link, e.g. "Work Orders", "Lines", "Automations". */
+  /** Label for the back link, e.g. "Tasks", "Lines", "Automations". */
   backLabel?: string;
   /** Optional test id on the back link. */
   backTestId?: string;
@@ -50,10 +50,10 @@ export type WorkspacePageHeaderProps = WorkspaceSectionHeaderProps | WorkspaceEn
  * route. Two variants:
  *
  * - `section` (default): title + optional subtitle + trailing actions. Used
- *   for Overview, Work Orders list, Lines list, Automations list, Wiki,
+ *   for Overview, Tasks list, Lines list, Automations list, Wiki,
  *   Velocity, and other section pages.
  * - `entity`: back link + optional identifier kicker + entity title +
- *   trailing actions. Used for work order, line, and automation detail.
+ *   trailing actions. Used for task, line, and automation detail.
  *
  * The header always uses the same gutter, max width, and vertical rhythm
  * so pages match. Callers put body content in `factoryContentBodyClassName`

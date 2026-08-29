@@ -54,7 +54,7 @@ export function WorkOrderSidebarFactoryLines({
         )}
 
         {isDispatchable ? (
-          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
             <DispatchWorkOrderPopover
               lines={factoryLines}
               isSaving={isDispatching}

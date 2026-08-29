@@ -57,7 +57,7 @@ export const SectionWithPrimaryAction: Story = {
     ...sectionHeader,
     title: "Lines",
     subtitle:
-      "Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs work orders.",
+      "Factory lines specialize how work moves through the workspace. Each phase is backed by a canvas that runs tasks.",
     actions: (
       <Button type="button" size="sm">
         <Plus className="size-3.5" aria-hidden />
@@ -90,7 +90,7 @@ export const SectionWithPeriodPills: Story = {
 export const SectionWithToolbarAndChips: Story = {
   args: {
     ...sectionHeader,
-    title: "Work Orders",
+    title: "Tasks",
     leading: (
       <>
         <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label="Scope">
@@ -112,7 +112,7 @@ export const SectionWithToolbarAndChips: Story = {
     ),
     actions: (
       <>
-        <Button type="button" variant="ghost" size="icon-xs" aria-label="Search work orders">
+        <Button type="button" variant="ghost" size="icon-xs" aria-label="Search tasks">
           <Search className="size-3.5" aria-hidden />
         </Button>
         <Button type="button" variant="ghost" size="sm" className="text-muted-foreground">
@@ -121,7 +121,7 @@ export const SectionWithToolbarAndChips: Story = {
         </Button>
         <Button type="button" size="sm">
           <Plus className="size-3.5" aria-hidden />
-          New work order
+          New task
         </Button>
       </>
     ),
@@ -154,7 +154,7 @@ export const SectionWithSecondaryAction: Story = {
 
 /**
  * Settings and some entity pages still use the large centered title.
- * Section pages (Overview, Work Orders, Lines, Automations, Wiki, Velocity)
+ * Section pages (Overview, Tasks, Lines, Automations, Wiki, Velocity)
  * use the compact class instead.
  */
 export const SettingsLargeTitle: Story = {
@@ -185,7 +185,7 @@ export const EntityWorkOrder: Story = {
   args: {
     variant: "entity",
     backHref: "#",
-    backLabel: "Work Orders",
+    backLabel: "Tasks",
     kicker: "SP-42",
     title: "Reconcile duplicate refunds in ledger",
     actions: (

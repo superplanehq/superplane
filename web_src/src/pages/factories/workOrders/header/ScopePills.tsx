@@ -15,7 +15,7 @@ interface ScopePillsProps<T extends string> {
   testIdPrefix: string;
 }
 
-/** Pill-style scope selector shared by the Work Orders header and the Overview scope toggle. */
+/** Pill-style scope selector shared by the Tasks header and the Overview scope toggle. */
 export function ScopePills<T extends string>({ value, onChange, options, testIdPrefix }: ScopePillsProps<T>) {
   return (
     <div className="flex items-center rounded-md border border-border p-0.5" role="group" aria-label="Scope">

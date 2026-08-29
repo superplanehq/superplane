@@ -119,14 +119,14 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
   });
 
-  it("does not put an Open work order link next to close", () => {
+  it("does not put an Open task link next to close", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
     });
 
     expect(screen.queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
 
-    expect(screen.queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open task" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
@@ -431,7 +431,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
-    expect(screen.queryByText("This work order needs attention from test test.")).not.toBeInTheDocument();
+    expect(screen.queryByText("This task needs attention from test test.")).not.toBeInTheDocument();
     const note = screen.getByTestId("split-run-attention-note");
     expect(within(note).getByRole("heading", { name: "This task needs a decision" })).toBeInTheDocument();
     expect(within(note).getByText("Every automation finished. This task is ready to complete.")).toBeInTheDocument();
@@ -440,7 +440,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
-  it("keeps the running log visible when the work order has no note or checks", () => {
+  it("keeps the running log visible when the task has no note or checks", () => {
     renderPopup({ fixture: { ...SPLIT_RUN_RUNNING, waitingNotes: [], checks: [] } });
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
@@ -470,7 +470,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Stop and Close" })).not.toBeInTheDocument();
   });
 
-  it("hides work-order close actions when the user cannot update the work order", () => {
+  it("hides work-order close actions when the user cannot update the task", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
       canUpdate: false,
@@ -481,7 +481,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
   });
 
-  it("offers automation Stop on a live running work order", () => {
+  it("offers automation Stop on a live running task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -492,7 +492,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
   });
 
-  it("hides automation Stop when the user cannot update the work order", () => {
+  it("hides automation Stop when the user cannot update the task", () => {
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
       factoryId: PRIMARY_FACTORY_ID,
@@ -553,7 +553,7 @@ describe("WorkOrderSplitRunPopup", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         id: "wo-2",
-        title: "Test work order 2",
+        title: "Test task 2",
         state: "STATE_OPEN",
         lineDispatches: [
           {
@@ -792,7 +792,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(coverage).toHaveAttribute("open");
   });
 
-  it("keeps description checks collapsed when the work order is not a draft", async () => {
+  it("keeps description checks collapsed when the task is not a draft", async () => {
     const user = userEvent.setup();
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(
@@ -872,7 +872,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
   });
 
-  it("hides invented files and ledger pull requests on a live work order", async () => {
+  it("hides invented files and ledger pull requests on a live task", async () => {
     const user = userEvent.setup();
     renderPopup({
       organizationId: FACTORIES_ORGANIZATION_ID,
@@ -906,7 +906,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const fixture = splitRunFixtureForWorkOrder(
       {
         id: "wo-2",
-        title: "Test work order 2",
+        title: "Test task 2",
         state: "STATE_OPEN",
         lineDispatches: [
           {
@@ -1012,7 +1012,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(backlog).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
   });
 
-  it("opens a mapped implement-running work order on the implement log", () => {
+  it("opens a mapped implement-running task on the implement log", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...OPEN_WORK_ORDER,
@@ -1095,7 +1095,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("popup-work-order-title")).toHaveTextContent("Renamed draft");
   });
 
-  it("does not let you edit a completed work order", () => {
+  it("does not let you edit a completed task", () => {
     renderPopup({
       fixture: {
         ...SPLIT_RUN_RUNNING,

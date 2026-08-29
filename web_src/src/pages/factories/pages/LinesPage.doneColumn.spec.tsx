@@ -131,7 +131,7 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
-  it("puts a closed work order in Done instead of the last stage", () => {
+  it("puts a closed task in Done instead of the last stage", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [BOARD_DONE_REJECTED_ORDER],
     });
@@ -151,7 +151,7 @@ describe("LinesPage Done column", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("collects finished work orders in the Done column", () => {
+  it("collects finished tasks in the Done column", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {

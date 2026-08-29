@@ -172,7 +172,7 @@ describe("aggregateFactoryVelocityFlow", () => {
   });
 
   it("includes a closed order whose last run finished before the period", () => {
-    // Last run finished 10 days ago; the work order closed yesterday.
+    // Last run finished 10 days ago; the task closed yesterday.
     // Windowing must use the close instant, not the last run finish.
     const order = closedOrder({
       id: "closed-later",

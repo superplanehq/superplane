@@ -13,7 +13,7 @@ const CONCEPTS: { id: PopupConcept; label: string; pattern: string }[] = [
 ];
 
 /**
- * Storybook playground: line board under a popup that treats the work order
+ * Storybook playground: line board under a popup that treats the task
  * as agent work. Production peek is unchanged.
  */
 export function WorkOrderPopupRedesignPlayground({

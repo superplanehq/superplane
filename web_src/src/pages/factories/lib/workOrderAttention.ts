@@ -5,7 +5,7 @@ import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-clie
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
-/** Why a waiting work order needs a person, or why it is addressing feedback. */
+/** Why a waiting task needs a person, or why it is addressing feedback. */
 export type WorkOrderAttentionReason = "approval" | "feedback" | "question" | "failed" | "stopped" | "stalled";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
@@ -36,7 +36,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
 };
 
 /**
- * Maps a work order to an attention reason. Closed failed orders and
+ * Maps a task to an attention reason. Closed failed orders and
  * waiting orders with a failed latest step are Run failed. A cancelled
  * latest step is Stopped. An active PR-feedback run is Addressing user
  * feedback. A visible status note is Waiting for user review. Waiting

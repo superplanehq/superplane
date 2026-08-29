@@ -4,11 +4,11 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { shouldRedirectWheelToHorizontalScroll } from "./kanbanBoardWheel";
 
 /**
- * Lane chrome for every board in the workspace. The Work Orders board and
+ * Lane chrome for every board in the workspace. The Tasks board and
  * the Lines phase board both render through it.
  */
 
-/** Lane tint. Only in-flight and closed work get colour, as on the Work Orders board. */
+/** Lane tint. Only in-flight and closed work get colour, as on the Tasks board. */
 export type BoardLaneTone = "neutral" | "running" | "done";
 
 const LANE_TONE_CLASSNAME: Record<BoardLaneTone, string> = {

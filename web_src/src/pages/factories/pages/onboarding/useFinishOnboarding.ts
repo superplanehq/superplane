@@ -121,7 +121,7 @@ async function provisionWorkspace(args: {
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });
-  // The intake needs the line: it opens work orders that the line runs.
+  // The intake needs the line: it opens tasks that the line runs.
   await provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,

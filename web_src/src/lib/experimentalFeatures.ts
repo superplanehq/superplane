@@ -1,4 +1,4 @@
-/** Organization experimental feature: real factories (work orders, lines, factory apps). */
+/** Organization experimental feature: real factories (tasks, lines, factory apps). */
 export const FEATURE_FACTORIES = "factories";
 
 /** Organization experimental feature: Claude managed agents on the canvas. */

@@ -31,7 +31,7 @@ export function buildLineFilterOptions(lines: FactoriesFactoryLine[]): WorkOrder
     .map((line) => ({ value: line.id, label: line.name?.trim() || "Untitled line" }));
 }
 
-/** People on at least one work order, sorted by name, with No Owner first. */
+/** People on at least one task, sorted by name, with No Owner first. */
 export function buildAssigneeFilterOptions(entries: WorkOrderListEntry[]): WorkOrderFilterOption[] {
   const byId = new Map<string, string>();
   for (const entry of entries) {

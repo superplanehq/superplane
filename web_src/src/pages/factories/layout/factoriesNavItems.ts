@@ -27,7 +27,7 @@ export const FACTORIES_NAV_ITEMS: FactoriesNavItem[] = [
   },
   {
     id: "work-orders",
-    label: "Work Orders",
+    label: "Tasks",
     Icon: ClipboardList,
     buildHref: workOrdersPath,
   },

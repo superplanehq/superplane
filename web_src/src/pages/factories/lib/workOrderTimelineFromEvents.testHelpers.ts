@@ -1,7 +1,7 @@
 import type { FactoriesWorkOrderEvent } from "@/api-client";
 
 /**
- * Builds a `step.execution.*` work order event for timeline tests.
+ * Builds a `step.execution.*` task event for timeline tests.
  *
  * Shared across the `workOrderTimelineFromEvents` spec files so the fixture
  * stays consistent while each spec focuses on a single behaviour area.

@@ -9,7 +9,7 @@ import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 type ResolveUserFn = ReturnType<typeof useOrgUserLookup>["resolveUser"];
 
-// Resolves a work order's `createdBy` union into a display suitable for
+// Resolves a task's `createdBy` union into a display suitable for
 // avatar/name rendering. When the creator is an automation, callers that
 // want a richer rendering (e.g. a link to the app) should check
 // `createdBy.automation` themselves; this helper guarantees at least a
@@ -42,7 +42,7 @@ function buildAutomationCreatorDisplay(automation: FactoriesAutomationRef): OrgU
   };
 }
 
-/** Storybook/fixture owner chip for a work order. Prefers automation, then user. */
+/** Storybook/fixture owner chip for a task. Prefers automation, then user. */
 export function workOrderOwnerDisplay(order: Pick<FactoriesWorkOrder, "createdBy">, fallback: OrgUserDisplay) {
   const automation = order.createdBy?.automation;
   if (automation) {

@@ -40,7 +40,7 @@ interface WorkOrdersLoadedViewProps {
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
-  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
@@ -48,7 +48,7 @@ interface WorkOrdersLoadedViewProps {
 }
 
 /**
- * Data-agnostic Work Orders view. Receives raw work orders + the shared
+ * Data-agnostic Tasks view. Receives raw tasks + the shared
  * `WorkOrderListState` and renders the toolbar + selected layout. Kept
  * separate from `WorkOrdersPage` so stories can drive it with fixtures
  * and the shell page only handles fetching + mutations.

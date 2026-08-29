@@ -51,7 +51,7 @@ export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
   remainingCreditWarning: false,
 };
 
-/** Totals match spend on the populated Refunds Factory work orders. */
+/** Totals match spend on the populated Refunds Factory tasks. */
 export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   totalTokens: "25600",
   totalCostCents: "876",

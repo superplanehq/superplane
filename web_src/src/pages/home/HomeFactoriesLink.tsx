@@ -27,7 +27,7 @@ export function HomeFactoriesLink({ organizationId }: HomeFactoriesLinkProps) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-900 dark:text-gray-100">Navigate to Workspaces</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Manage work orders, automations, and apps.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Manage tasks, automations, and apps.</p>
         </div>
         <ArrowRight className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
       </Link>

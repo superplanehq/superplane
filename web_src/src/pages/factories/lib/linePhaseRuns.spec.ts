@@ -136,7 +136,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-b", "wo-c", "wo-a", "wo-d"]);
   });
 
-  it("keeps closed work orders off the stage columns", () => {
+  it("keeps closed tasks off the stage columns", () => {
     const closed = {
       ...order("wo-closed", "Closed", [
         {
@@ -158,7 +158,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual([]);
   });
 
-  it("places a multi-step work order only in its furthest active step", () => {
+  it("places a multi-step task only in its furthest active step", () => {
     const orders = [
       order("wo-progress", "Progressing", [
         {
@@ -203,7 +203,7 @@ describe("buildLinePhaseBoard", () => {
     expect(workOrderIds(board)).toEqual(["wo-progress"]);
   });
 
-  it("places a failed mid-line work order only on the failed step", () => {
+  it("places a failed mid-line task only on the failed step", () => {
     const orders = [
       order("wo-fail", "Failing", [
         {

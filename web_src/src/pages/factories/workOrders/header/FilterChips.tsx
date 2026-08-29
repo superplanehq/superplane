@@ -4,7 +4,7 @@ import { buildWorkOrderFilterChips, type WorkOrderFilterOption } from "../../lib
 
 interface FilterChipsProps {
   state: WorkOrderListState;
-  /** Omit on a line board so leftover Work Orders line filters stay hidden. */
+  /** Omit on a line board so leftover Tasks line filters stay hidden. */
   lineOptions?: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
 }

@@ -18,7 +18,7 @@ import { FactoryAppCanvasPage } from "./FactoryAppCanvasPage";
 
 /**
  * Factory-embedded canvas Configure (edit). Run viewing moved to
- * Factories/Pages/Work Order Split Run.
+ * Factories/Pages/Task Split Run.
  */
 const meta = {
   title: "Factories/Pages/Factory App Canvas",
