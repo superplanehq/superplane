@@ -166,16 +166,16 @@ describe("setup factory line apps", () => {
     );
     expect(implementationNodeIds).toEqual([
       "onrun-implement",
-      "create-branch",
-      "add-branch-artifact",
       "implementation-agent-no-issue",
+      "add-branch-artifact",
       "create-pr",
       "attach-pr-artifact",
       "set-pr-closure-note",
       "add-run-error",
     ]);
-    expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: implementation-agent-no-issue/);
-    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: create-pr/);
+    expect(implementation).toMatch(/sourceId: onrun-implement\n\s+targetId: implementation-agent-no-issue/);
+    expect(implementation).toMatch(/sourceId: implementation-agent-no-issue\n\s+targetId: add-branch-artifact/);
+    expect(implementation).toMatch(/sourceId: add-branch-artifact\n\s+targetId: create-pr/);
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
     expect(implementation).toMatch(/sourceId: create-pr\n\s+targetId: attach-pr-artifact/);
     expect(implementation).toMatch(/sourceId: attach-pr-artifact\n\s+targetId: set-pr-closure-note/);
@@ -186,9 +186,8 @@ describe("setup factory line apps", () => {
     expect(implementation).toMatch(/id: attach-pr-artifact[\s\S]*state: open/);
     expect(Object.fromEntries(canvasNodes(implementation).map((node) => [node.id, node.concurrency?.max]))).toEqual({
       "onrun-implement": undefined,
-      "create-branch": 5,
-      "add-branch-artifact": 100,
       "implementation-agent-no-issue": 5,
+      "add-branch-artifact": 100,
       "create-pr": 100,
       "attach-pr-artifact": 100,
       "set-pr-closure-note": undefined,
@@ -212,8 +211,10 @@ describe("setup factory line apps", () => {
     ]);
     expect(steps["Generate PR title and description"]?.workingDirectory).toBe("repo");
     expect(implementation).toContain("Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md");
+    // The branch artifact sits between the agent and the pull request, so the
+    // pull request names the agent node instead of reading previous().
     expect(implementation).toMatch(
-      /component: github\.createPullRequest[\s\S]*fromBase64\(previous\(\)\.data\.result\.title\)/,
+      /component: github\.createPullRequest[\s\S]*fromBase64\(\$\["Agent - Implement from order description"\]\.data\.result\.title\)/,
     );
     expect(implementation).toMatch(/component: github\.createPullRequest[\s\S]*\[Task\]\(\{\{ order\(\)\.url \}\}\)/);
     // Reviewers get a pull request they can review and merge right away.
@@ -263,10 +264,10 @@ describe("setup factory line apps", () => {
     const nodes = canvasNodes(implementation);
 
     const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
-    const checkout = steps["Checkout Branch"]?.command ?? "";
+    const createBranch = steps["Create Branch"]?.command ?? "";
     const commit = steps["Commit and Push"]?.command ?? "";
 
-    expect(checkout).toContain("set -euo pipefail");
+    expect(createBranch).toContain("set -euo pipefail");
     expect(commit).toContain("No file changes and no unpushed commits");
     expect(commit).toContain("exit 1");
     expect(commit).not.toContain("already up to date on origin");
@@ -282,6 +283,37 @@ describe("setup factory line apps", () => {
     expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
     expect(steps["Implementation"]?.workingDirectory).toBe("repo");
     expect(steps["Commit and Push"]?.workingDirectory).toBe("repo");
+  });
+
+  it("creates the branch inside the agent run instead of a separate bash node", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const nodes = canvasNodes(implementation);
+    const steps = nodeStepsByName(nodes, "implementation-agent-no-issue");
+    const createBranch = steps["Create Branch"]?.command ?? "";
+
+    // The run clones the repository once and pushes the branch with the first
+    // real commit, so a failed run leaves no empty branch on GitHub.
+    expect(nodes.some((node) => node.component === "runnerBash")).toBe(false);
+    expect(createBranch).toContain('git checkout -b "$BRANCH"');
+    expect(createBranch).toContain("/tmp/BRANCH");
+    expect(createBranch).not.toContain("git push");
+    expect(steps["Commit and Push"]?.command).toContain('git push -u origin "$BRANCH"');
+    expect(implementation).not.toContain("--allow-empty");
+    expect(implementation).not.toContain("chore: initialize");
+  });
+
+  it("adds the sign-off and co-author trailers once, in one trailer block", () => {
+    const implementation = materializeOnboardingApp("line-implementation");
+    const steps = nodeStepsByName(canvasNodes(implementation), "implementation-agent-no-issue");
+    const hook = steps["Set Up DCO Signing"]?.command ?? "";
+
+    // Appending the trailers duplicated them, because "git commit -s" already
+    // signs off and the agent amends commits. It also split the sign-off from
+    // the co-author block, which GitHub reads as the last paragraph.
+    expect(hook).toContain("git interpret-trailers");
+    expect(hook).toContain("--if-exists doNothing");
+    expect(hook).toContain("--if-exists addIfDifferent");
+    expect(hook).not.toContain('>> "$1"');
   });
 });
 
