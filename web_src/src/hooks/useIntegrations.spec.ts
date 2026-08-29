@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SdkGen from "@/api-client/sdk.gen";
 
 const { organizationsListIntegrationResources } = vi.hoisted(() => ({
@@ -16,6 +16,10 @@ vi.mock("@/api-client/sdk.gen", async (importOriginal) => {
 import { resolveGithubDefaultBranch } from "./useIntegrations";
 
 describe("resolveGithubDefaultBranch", () => {
+  beforeEach(() => {
+    organizationsListIntegrationResources.mockReset();
+  });
+
   it("returns the branch reported by the integration", async () => {
     organizationsListIntegrationResources.mockResolvedValue({
       data: { resources: [{ type: "default_branch", name: "staging", id: "staging" }] },
