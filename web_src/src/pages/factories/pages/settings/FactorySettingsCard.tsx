@@ -30,22 +30,29 @@ export function FactorySettingsPageFrame({
 export function FactorySettingsCard({
   title,
   titleClassName,
+  action,
   children,
   className,
   "data-testid": testId,
 }: {
   title?: string;
   titleClassName?: string;
+  action?: ReactNode;
   children: ReactNode;
   className?: string;
   "data-testid"?: string;
 }) {
   return (
     <section className={cn("rounded-lg border border-border p-4", className)} data-testid={testId}>
-      {title ? (
-        <h2 className={cn("mb-3 text-[13px] font-medium tracking-[-0.01em] text-foreground", titleClassName)}>
-          {title}
-        </h2>
+      {title || action ? (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          {title ? (
+            <h2 className={cn("text-[13px] font-medium tracking-[-0.01em] text-foreground", titleClassName)}>
+              {title}
+            </h2>
+          ) : null}
+          {action}
+        </div>
       ) : null}
       {children}
     </section>
