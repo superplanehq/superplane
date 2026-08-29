@@ -79,12 +79,12 @@ describe("splitRunCanvasForPhase", () => {
 
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Create Branch");
     expect(canvas.nodes.map((node) => node.name)).toContain("Agent - Implement from order description");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Add Branch Artifact");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Task");
-    expect(canvas.statuses["create-branch"]).toBe("passed");
     expect(canvas.statuses["implementation-agent-no-issue"]).toBe("running");
+    expect(canvas.statuses["add-branch-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["create-pr"]).toBe("did_not_run");
     expect(canvas.statuses["attach-pr-artifact"]).toBe("did_not_run");
     expect(canvas.statuses["set-pr-closure-note"]).toBe("did_not_run");
