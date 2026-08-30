@@ -442,6 +442,7 @@ The On PR Comment trigger starts a workflow execution when comments are added on
 - **Repository**: Select the GitHub repository to monitor
 - **Content Filter**: Optional filter on comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
 - **Ignore Bots**: Skip comments written by GitHub Apps and bots
+- **Allowed Bots**: React to comments from these GitHub Apps or bots even when the comment does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ### Event Data
 
@@ -756,6 +757,7 @@ A review with several comments therefore produces one run, not one run per comme
 - **Repository**: Select the GitHub repository to monitor
 - **Content Filter**: Optional filter on the review summary and inline comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
 - **Ignore Bots**: Skip reviews written by GitHub Apps and bots
+- **Allowed Bots**: React to reviews from these GitHub Apps or bots even when the review does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ### Event Data
 
@@ -844,6 +846,7 @@ The On PR Review Comment trigger starts a workflow execution when review comment
 - **Include Review Submissions**: Also start a run when a pull request review is submitted
 - **Comment Scope**: All comments, or replies only
 - **Ignore Bots**: Skip comments and reviews written by GitHub Apps and bots
+- **Allowed Bots**: React to comments and reviews from these GitHub Apps or bots even when they do not match the content filter. Enter the bot login, for example coderabbitai.
 
 ### Event Data
 
