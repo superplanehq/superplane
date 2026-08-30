@@ -21,16 +21,19 @@ const (
 
 	intakeAssignedCondition   = "size(root().data.issue.assignees) > 0"
 	intakeUnassignedCondition = "size(root().data.issue.assignees) == 0"
+
+	intakeAuthorAccessCondition = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
 )
 
 // intakeSettings is what a user can change about an intake without editing the
 // canvas by hand. Filter fields are stored in, and read back from, the filter
 // expression: the graph is what the workers run, so nothing is kept twice.
 type intakeSettings struct {
-	ConfidencePct   int
-	Labels          []string
-	LabelFilterMode string
-	Assignment      string
+	ConfidencePct     int
+	Labels            []string
+	LabelFilterMode   string
+	Assignment        string
+	AuthorsWithAccess bool
 }
 
 func defaultIntakeSettings() intakeSettings {
@@ -39,6 +42,7 @@ func defaultIntakeSettings() intakeSettings {
 		Labels:          []string{},
 		LabelFilterMode: intakeLabelFilterInclude,
 		Assignment:      intakeAssignmentAny,
+		// AuthorsWithAccess is off by default: false.
 	}
 }
 
@@ -91,6 +95,10 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		conditions = append(conditions, intakeUnassignedCondition)
 	}
 
+	if settings.AuthorsWithAccess {
+		conditions = append(conditions, intakeAuthorAccessCondition)
+	}
+
 	if len(conditions) == 0 {
 		return "true"
 	}
@@ -103,6 +111,9 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 		return true
 	}
 	if current.Assignment != updated.Assignment {
+		return true
+	}
+	if current.AuthorsWithAccess != updated.AuthorsWithAccess {
 		return true
 	}
 	if len(current.Labels) != len(updated.Labels) {
@@ -152,15 +163,18 @@ func intakeSettingsFromGraph(graph intakeGraph, spec models.LiveCanvasSpec) inta
 		settings.Assignment = intakeAssignmentAssigned
 	}
 
+	settings.AuthorsWithAccess = strings.Contains(expression, intakeAuthorAccessCondition)
+
 	return settings.normalized()
 }
 
 func serializeIntakeSettings(settings intakeSettings) *pb.FactoryIntake_Settings {
 	return &pb.FactoryIntake_Settings{
-		ConfidencePct:   int32(settings.ConfidencePct),
-		Labels:          settings.Labels,
-		LabelFilterMode: serializeIntakeLabelFilterMode(settings.LabelFilterMode),
-		Assignment:      serializeIntakeAssignment(settings.Assignment),
+		ConfidencePct:     int32(settings.ConfidencePct),
+		Labels:            settings.Labels,
+		LabelFilterMode:   serializeIntakeLabelFilterMode(settings.LabelFilterMode),
+		Assignment:        serializeIntakeAssignment(settings.Assignment),
+		AuthorsWithAccess: settings.AuthorsWithAccess,
 	}
 }
 
@@ -181,6 +195,7 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 	if assignment := requested.GetAssignment(); assignment != pb.FactoryIntake_Settings_ASSIGNMENT_UNSPECIFIED {
 		updated.Assignment = parseIntakeAssignment(assignment)
 	}
+	updated.AuthorsWithAccess = requested.GetAuthorsWithAccess()
 
 	return updated.normalized()
 }

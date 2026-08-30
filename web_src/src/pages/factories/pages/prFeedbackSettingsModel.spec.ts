@@ -25,25 +25,24 @@ describe("prFeedbackLogRunsFromPullRequests", () => {
         workOrderId: "wo-1",
         number: "42",
         runs: [
-          run({
-            id: "later",
-            canvasId: "c-1",
-            state: "STATE_STARTED",
-            createdAt: "2026-08-26T12:00:00Z",
-          }),
-          run({
-            canvasId: "c-2",
-            state: "STATE_FINISHED",
-            result: "RESULT_PASSED",
-            createdAt: "2026-08-26T08:00:00Z",
-          }),
-          run({
-            id: "older",
-            canvasId: "c-2",
-            state: "STATE_FINISHED",
-            result: "RESULT_PASSED",
-            createdAt: "2026-08-26T11:00:00Z",
-          }),
+          { run: run({ id: "later", canvasId: "c-1", state: "STATE_STARTED", createdAt: "2026-08-26T12:00:00Z" }) },
+          {
+            run: run({
+              canvasId: "c-2",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T08:00:00Z",
+            }),
+          },
+          {
+            run: run({
+              id: "older",
+              canvasId: "c-2",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+            }),
+          },
         ],
       },
     ];
@@ -94,13 +93,13 @@ describe("isActiveCanvasRun", () => {
 });
 
 describe("activePRFeedbackWorkOrderIds", () => {
-  it("returns work orders that have an active pull request run", () => {
+  it("returns tasks that have an active pull request run", () => {
     expect(
       activePRFeedbackWorkOrderIds([
-        { workOrderId: "wo-1", runs: [{ id: "r1", state: "STATE_PENDING" }] },
-        { workOrderId: "wo-2", runs: [{ id: "r2", state: "STATE_FINISHED", result: "RESULT_PASSED" }] },
-        { workOrderId: "wo-3", runs: [{ id: "r3", state: "STATE_STARTED" }] },
-        { runs: [{ id: "r4", state: "STATE_PENDING" }] },
+        { workOrderId: "wo-1", runs: [{ run: { id: "r1", state: "STATE_PENDING" } }] },
+        { workOrderId: "wo-2", runs: [{ run: { id: "r2", state: "STATE_FINISHED", result: "RESULT_PASSED" } }] },
+        { workOrderId: "wo-3", runs: [{ run: { id: "r3", state: "STATE_STARTED" } }] },
+        { runs: [{ run: { id: "r4", state: "STATE_PENDING" } }] },
       ]),
     ).toEqual(new Set(["wo-1", "wo-3"]));
   });

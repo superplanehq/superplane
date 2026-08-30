@@ -15,10 +15,10 @@ describe("resolveFactoryAppBackNav", () => {
       resolveFactoryAppBackNav("org", "fac", {
         from: "automations",
         appId: "app-1",
-        appName: "Label to work order",
+        appName: "Label to task",
       }),
     ).toEqual({
-      label: "Label to work order",
+      label: "Label to task",
       href: "/org/workspaces/fac/automations/app-1",
     });
   });
@@ -37,11 +37,11 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns the line board when from=work-order", () => {
+  it("returns the work-order permalink when from=work-order has a number", () => {
     expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42", lineId: "line-1" })).toEqual(
       {
         label: "Back",
-        href: "/org/workspaces/fac/lines/line-1",
+        href: "/org/workspaces/fac/work-order/42",
       },
     );
   });

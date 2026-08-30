@@ -41,7 +41,7 @@ export function planLineExecution(
 
 /**
  * Builds a single line dispatch (traversal) around a set of step
- * executions. Fixtures give every work order at most one dispatch of the
+ * executions. Fixtures give every task at most one dispatch of the
  * plan-and-implement line.
  */
 export function planLineDispatch(

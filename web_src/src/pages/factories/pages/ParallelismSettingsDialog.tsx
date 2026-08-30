@@ -81,7 +81,7 @@ export function ParallelismSettingsDialog({ open, value, onSave, onClose }: Para
       <DialogContent className="sm:max-w-md" data-testid="lines-parallelism-settings">
         <DialogHeader>
           <DialogTitle>Set parallelism</DialogTitle>
-          <DialogDescription>Maximum number of work orders to be processed in parallel at this step.</DialogDescription>
+          <DialogDescription>Maximum number of tasks to be processed in parallel at this step.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

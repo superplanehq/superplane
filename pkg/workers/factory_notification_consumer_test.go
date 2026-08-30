@@ -283,7 +283,8 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 			assert.Contains(t, email.Subject, "Review the pull request")
 			assert.Contains(t, email.Data.Summary, "waiting on you")
 			assert.Contains(t, email.Data.Detail, "Merging the PR completes this work order automatically.")
-			assert.Contains(t, email.Data.Detail, "https://github.com/example/repo/pull/42")
+			assert.Equal(t, "Review PR #42", email.Data.DetailCtaLabel)
+			assert.Equal(t, "https://github.com/example/repo/pull/42", email.Data.DetailCtaURL)
 		}
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})

@@ -138,6 +138,13 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "order().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, `${COAUTHORS:-}`)
+
+		// "git commit -s" signs off and the agent amends commits, so appending
+		// the trailers wrote them twice. It also put a blank line before the
+		// sign-off, which left it outside the trailer block GitHub reads.
+		assert.Contains(t, dco, "--if-exists doNothing")
+		assert.Contains(t, dco, "--if-exists addIfDifferent")
+		assert.NotContains(t, dco, `>> "$1"`)
 	})
 
 	t.Run("the runner names the model it runs", func(t *testing.T) {

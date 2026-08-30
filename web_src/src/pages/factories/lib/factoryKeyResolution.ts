@@ -66,7 +66,7 @@ export function factoryRouteNeedsCanonicalRedirect(resolution: FactoryResolution
 /**
  * Swaps a stale `:factoryKey` route segment (a legacy id or a non-canonical
  * spelling of the key) for the canonical key, leaving the rest of the path
- * untouched so deep links under the workspace (work orders, lines, apps...)
+ * untouched so deep links under the workspace (tasks, lines, apps...)
  * keep working after the redirect.
  */
 export function replaceFactoryKeySegment(

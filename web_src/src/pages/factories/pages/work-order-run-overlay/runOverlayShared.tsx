@@ -29,7 +29,7 @@ export function RunOverlayBoardBackdrop() {
           <p className="mb-3 text-[13px] font-medium text-muted-foreground">{lane}</p>
           <div className="space-y-2">
             <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-foreground">
-              {lane === "Implement" ? "Ship idempotent refund retries" : "Queued work order"}
+              {lane === "Implement" ? "Ship idempotent refund retries" : "Queued task"}
             </div>
             <div className="rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-muted-foreground">
               {lane === "Verify" ? "Draft retry telemetry" : "Follow-up work"}

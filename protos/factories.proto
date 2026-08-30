@@ -738,6 +738,10 @@ message FactoryIntake {
     repeated string labels = 2;
     LabelFilterMode label_filter_mode = 3;
     Assignment assignment = 4;
+    // When true, only create a work order for issues opened by someone with
+    // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
+    // GitHub issue intakes only. Off by default.
+    bool authors_with_access = 5;
   }
 
   string id = 1;
@@ -920,6 +924,13 @@ message DeleteFactoryPRFeedbackHandlerRequest {
 
 message DeleteFactoryPRFeedbackHandlerResponse {}
 
+message FactoryPullRequestRun {
+  string description = 1;
+  int64 total_tokens = 2;
+  int64 cost_cents = 3;
+  Superplane.Canvases.CanvasRunRef run = 4;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -950,7 +961,7 @@ message FactoryPullRequest {
   google.protobuf.Timestamp closed_at = 13;
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
-  repeated Superplane.Canvases.CanvasRunRef runs = 16;
+  repeated FactoryPullRequestRun runs = 16;
 }
 
 message ListFactoryPullRequestsRequest {
@@ -1043,6 +1054,8 @@ message ListWorkOrdersRequest {
   repeated WorkOrder.State states = 3;
   repeated WorkOrder.Result results = 4;
   optional bool unassigned = 5;
+  // User ID. Returns orders where this user is an assignee or the creator.
+  optional string mine = 6;
 }
 
 message ListWorkOrdersResponse {

@@ -178,7 +178,7 @@ describe("findWorkOrderForAutomationRun", () => {
     order("wo-match", "Matched", [{ id: "e1", run: { id: "run-1", appId: "app-1" } }]),
   ];
 
-  it("returns the work order whose execution run matches this canvas run", () => {
+  it("returns the task whose execution run matches this canvas run", () => {
     expect(findWorkOrderForAutomationRun(orders, "run-1")?.id).toBe("wo-match");
   });
 

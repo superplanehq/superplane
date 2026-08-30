@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath, factorySettingsPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
-function renderNav(path: string) {
+function renderNav(path: string, showVelocity = false) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <TooltipProvider>
@@ -17,6 +17,7 @@ function renderNav(path: string) {
           lineId={REFUND_LINE_PLAN_ID}
           canOpenSettings
           permissionsLoading={false}
+          showVelocity={showVelocity}
         />
       </TooltipProvider>
     </MemoryRouter>,
@@ -63,5 +64,21 @@ describe("FactoriesSidebarNav", () => {
 
     renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1`);
     expect(screen.getAllByTestId("factories-nav-board")[1]).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows the Velocity link when showVelocity is true", () => {
+    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`, true);
+
+    const nav = screen.getByTestId("factories-sidebar-nav");
+    const velocityLink = screen.getByTestId("factories-nav-velocity");
+
+    expect(nav.contains(velocityLink)).toBe(true);
+    expect(velocityLink).toHaveAttribute("href", factoryVelocityPath(org, key));
+  });
+
+  it("marks the Velocity icon current on the velocity page", () => {
+    renderNav(`/${org}/workspaces/${key}/velocity`, true);
+
+    expect(screen.getByTestId("factories-nav-velocity")).toHaveAttribute("aria-current", "page");
   });
 });

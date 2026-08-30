@@ -4,8 +4,8 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 
 describe("usePageTitle", () => {
   it("joins parts with middots and appends SuperPlane", () => {
-    renderHook(() => usePageTitle(["Work Order #12", "Acme"]));
-    expect(document.title).toBe("Work Order #12 · Acme · SuperPlane");
+    renderHook(() => usePageTitle(["Task #12", "Acme"]));
+    expect(document.title).toBe("Task #12 · Acme · SuperPlane");
   });
 
   it("drops empty/undefined/null parts", () => {
@@ -20,9 +20,9 @@ describe("usePageTitle", () => {
 
   it("re-fires when the derived title string changes across renders", () => {
     const { rerender } = renderHook(({ parts }: { parts: Array<string | undefined> }) => usePageTitle(parts), {
-      initialProps: { parts: ["Work Orders", "Acme"] },
+      initialProps: { parts: ["Tasks", "Acme"] },
     });
-    expect(document.title).toBe("Work Orders · Acme · SuperPlane");
+    expect(document.title).toBe("Tasks · Acme · SuperPlane");
 
     rerender({ parts: ["Lines", "Acme"] });
     expect(document.title).toBe("Lines · Acme · SuperPlane");

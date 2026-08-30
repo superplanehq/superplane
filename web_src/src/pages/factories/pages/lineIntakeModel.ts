@@ -49,7 +49,7 @@ export interface LineIntakeSource {
     kind: LineIntakeListenKind;
     label: string;
   };
-  /** Runner that classifies whether the event becomes a work order. */
+  /** Runner that classifies whether the event becomes a task. */
   evaluate: {
     label: string;
     rule: string;
@@ -63,7 +63,7 @@ export interface LineIntakeSource {
 
 /**
  * Intake is an automation that listens to an external source and creates
- * backlog work orders. SuperPlane scores those work orders in Backlog.
+ * backlog tasks. SuperPlane scores those tasks in Backlog.
  */
 export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
   {
@@ -77,12 +77,12 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On GitHub issue",
     },
     evaluate: {
-      label: "Create a work order",
-      rule: "A matching GitHub issue becomes a work order in Backlog. SuperPlane scores it there.",
+      label: "Create a task",
+      rule: "A matching GitHub issue becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
     },
   },
   {
@@ -96,18 +96,18 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On Sentry exception",
     },
     evaluate: {
-      label: "Create a work order",
-      rule: "A matching Sentry exception becomes a work order in Backlog. SuperPlane scores it there.",
+      label: "Create a task",
+      rule: "A matching Sentry exception becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
     },
   },
   {
     id: "pagerduty-incidents",
     name: "PagerDuty incidents",
-    description: "Firing incidents that need a work order.",
+    description: "Firing incidents that need a task.",
     iconSrc: pagerdutyIcon,
     iconAlt: "PagerDuty",
     listen: {
@@ -115,12 +115,12 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "On PagerDuty incident",
     },
     evaluate: {
-      label: "Create a work order",
-      rule: "A matching PagerDuty incident becomes a work order in Backlog. SuperPlane scores it there.",
+      label: "Create a task",
+      rule: "A matching PagerDuty incident becomes a task in Backlog. SuperPlane scores it there.",
     },
     accept: {
       destination: "backlog",
-      label: "Create a work order in Backlog",
+      label: "Create a task in Backlog",
     },
   },
 ];
@@ -240,7 +240,7 @@ export function lineIntakeListenTitle(source: LineIntakeSource): string {
 
 export const LINE_INTAKE_COPY = {
   needsRepair: "Needs repair",
-  needsRepairHelper: "The automation can no longer create work orders. Open it to repair the steps.",
+  needsRepairHelper: "The automation can no longer create tasks. Open it to repair the steps.",
   analysisHeadline: "SuperPlane is analyzing this ticket",
   analysisHelper: "SuperPlane reads the ticket and the repository. It does not start work yet.",
   analysisCompleteHeadline: "Ticket analysis finished",
@@ -549,7 +549,7 @@ function ticketAnalysisCanvas(complete: boolean): SplitRunCanvasModel {
 }
 
 /**
- * Builds the same popup shape as a line-board work order: log on the left,
+ * Builds the same popup shape as a line-board task: log on the left,
  * automation canvas on the right. Phases are listen → evaluate → backlog.
  */
 export function intakeAutomationCanvas(source: LineIntakeSource): SplitRunCanvasModel {
@@ -562,7 +562,7 @@ export function intakeAutomationFixture(source: LineIntakeSource, appId?: string
     {
       key: `${source.id}-backlog`,
       headline: "Accepted events go to Backlog",
-      text: `${source.evaluate.rule} Accepted items become work orders in Backlog with the source context.`,
+      text: `${source.evaluate.rule} Accepted items become tasks in Backlog with the source context.`,
     },
   ];
 

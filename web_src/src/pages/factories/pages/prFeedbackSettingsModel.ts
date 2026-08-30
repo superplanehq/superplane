@@ -120,7 +120,7 @@ export function activePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullR
     if (!workOrderId) {
       continue;
     }
-    if ((pullRequest.runs ?? []).some(isActiveCanvasRun)) {
+    if ((pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))) {
       ids.add(workOrderId);
     }
   }
@@ -131,6 +131,9 @@ export type PRFeedbackLogRun = {
   canvasId: string;
   handlerName?: string;
   pullRequestNumber?: string;
+  description?: string;
+  costCents?: string;
+  totalTokens?: string;
   run: CanvasesCanvasRunRef;
 };
 

@@ -60,7 +60,7 @@ export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[nu
 export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
   id: GITHUB_ISSUES_INTAKE_APP_ID,
   name: "GitHub issue intake",
-  description: "Listens for GitHub issues and creates backlog work orders.",
+  description: "Listens for GitHub issues and creates backlog tasks.",
   createdAt: LAST_WEEK,
   updatedAt: YESTERDAY,
 };
@@ -71,7 +71,7 @@ export const GITHUB_ISSUES_INTAKE: FactoriesFactoryIntake = {
   id: GITHUB_ISSUES_INTAKE_ID,
   canvasId: GITHUB_ISSUES_INTAKE_APP_ID,
   name: "GitHub issues",
-  description: "Listens for GitHub issues and creates backlog work orders.",
+  description: "Listens for GitHub issues and creates backlog tasks.",
   source: "SOURCE_GITHUB_ISSUES",
   settings: {
     confidencePct: 65,
@@ -163,7 +163,7 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
   {
     id: "app-pr-closure",
     name: "PR Closure",
-    description: "Closes the work order when the pull request merges or is closed.",
+    description: "Closes the task when the pull request merges or is closed.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
@@ -204,7 +204,7 @@ export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
   name: "SuperPlane",
   key: "PF",
-  description: "New factory. No lines or work orders configured yet.",
+  description: "New factory. No lines or tasks configured yet.",
   lines: [],
 };
 
@@ -215,7 +215,7 @@ export const ACME_ONBOARDING_APPS: FactoryApp[] = [
   {
     id: ACME_ONBOARDING_BACKLOG_APP_ID,
     name: "Backlog",
-    description: "Scopes work orders before they enter a line.",
+    description: "Scopes tasks before they enter a line.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
@@ -229,7 +229,7 @@ export const ACME_ONBOARDING_APPS: FactoryApp[] = [
   {
     id: ACME_ONBOARDING_DONE_APP_ID,
     name: "Done",
-    description: "Completes the work order.",
+    description: "Completes the task.",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },

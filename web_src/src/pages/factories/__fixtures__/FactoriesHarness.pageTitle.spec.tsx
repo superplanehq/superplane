@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -18,7 +18,7 @@ describe("client-side navigation updates document.title", () => {
     client.setConfig({ baseUrl: "http://localhost" });
   });
 
-  it("sends a work-order permalink to the line board", async () => {
+  it("opens a work-order permalink on the line board", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-order/101`}
@@ -28,7 +28,26 @@ describe("client-side navigation updates document.title", () => {
     );
 
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    const permalinkPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
+    expect(
+      within(permalinkPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+    ).toBeInTheDocument();
     expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
+  }, 15000);
+
+  it("canonicalizes a legacy work-order id URL onto the permalink", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders/wo-open-refunds`}
+        factoriesFixture={defaultFactoriesFixture}
+        pageOverrides={pageOverrides}
+      />,
+    );
+
+    const legacyPopup = await screen.findByTestId("work-order-split-run", {}, { timeout: 8000 });
+    expect(
+      within(legacyPopup).getByRole("heading", { name: "Reconcile duplicate refunds in ledger" }),
+    ).toBeInTheDocument();
   }, 15000);
 
   it("updates the tab title on the line board home", async () => {

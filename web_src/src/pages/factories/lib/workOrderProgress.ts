@@ -14,7 +14,7 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 }
 
 /**
- * Display vocabulary for the Work Orders workspace: Draft, Running, Needs
+ * Display vocabulary for the Tasks workspace: Draft, Running, Needs
  * attention, Completed, Failed, Rejected, Canceled. The idle-open key stays
  * `waiting` so stored filters keep working. Persisted state + result
  * columns in the database stay unchanged; this file is the single mapping
@@ -60,7 +60,7 @@ const DISPLAY_STATUS_META: Record<
   completed: {
     label: "Completed",
     filterLabel: "Completed",
-    summary: "Work order completed successfully.",
+    summary: "Task completed successfully.",
     className:
       "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]",
     dotClassName: "bg-[color:var(--status-completed-dot)]",
@@ -76,7 +76,7 @@ const DISPLAY_STATUS_META: Record<
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
-    summary: "A person rejected this work order.",
+    summary: "A person rejected this task.",
     className:
       "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
     dotClassName: "bg-[color:var(--status-failed-dot)]",
@@ -84,7 +84,7 @@ const DISPLAY_STATUS_META: Record<
   cancelled: {
     label: "Canceled",
     filterLabel: "Canceled",
-    summary: "This work order was canceled.",
+    summary: "This task was canceled.",
     className:
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
@@ -127,7 +127,7 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "review",
     title: "Needs attention",
-    description: "Work orders that wait for a human decision.",
+    description: "Tasks that wait for a human decision.",
     statuses: ["waiting"],
   },
   {

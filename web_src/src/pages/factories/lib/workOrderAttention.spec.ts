@@ -17,11 +17,11 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
 }
 
 describe("getWorkOrderAttentionReason", () => {
-  it("returns null when the work order is not waiting or failed", () => {
+  it("returns null when the task is not waiting or failed", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_DRAFT" }))).toBeNull();
   });
 
-  it("labels a closed failed work order as Run failed", () => {
+  it("labels a closed failed task as Run failed", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_CLOSED", result: "RESULT_FAILED" }))).toBe("failed");
   });
 

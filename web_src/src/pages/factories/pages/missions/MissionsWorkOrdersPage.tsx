@@ -10,7 +10,7 @@ import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../f
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
 
-/** Storybook-only Work Orders page with a Missions rail. */
+/** Storybook-only Tasks page with a Missions rail. */
 export function MissionsWorkOrdersPage() {
   const { organizationId, factoryId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -35,7 +35,7 @@ export function MissionsWorkOrdersPage() {
   if (workOrdersError) {
     return (
       <>
-        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersErrorState onRetry={() => void refetch()} />
         </div>
@@ -46,7 +46,7 @@ export function MissionsWorkOrdersPage() {
   if (isOrdersLoading || !factory) {
     return (
       <>
-        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Work Orders" />
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
         <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
           <WorkOrdersLoadingState />
         </div>

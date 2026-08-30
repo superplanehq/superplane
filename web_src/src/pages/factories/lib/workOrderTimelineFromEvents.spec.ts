@@ -72,7 +72,7 @@ describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
       kind: "statusChanged",
       sourceRunId: "run-1",
       sourceAppId: "app-1",
-      title: "opened this work order",
+      title: "opened this task",
       statusChange: { fromState: "draft", toState: "open" },
     });
     expect(view.events[0]?.actorUserId).toBeUndefined();
@@ -152,7 +152,7 @@ describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
     expect(view.events[0]).toMatchObject({
       kind: "created",
       actorUserId: "user-1",
-      title: "created this work order",
+      title: "created this task",
     });
   });
 
@@ -173,7 +173,7 @@ describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
       kind: "statusChanged",
       actorUserId: "user-1",
       statusChange: { fromState: "open", toState: "draft" },
-      title: "moved this work order back to Draft",
+      title: "moved this task back to Draft",
     });
   });
 
@@ -195,7 +195,7 @@ describe("buildWorkOrderTimelineViewFromEvents: steps and lifecycle", () => {
       kind: "statusChanged",
       actorUserId: "user-1",
       statusChange: { fromState: "closed", toState: "open", fromResult: "completed" },
-      title: "reopened this work order",
+      title: "reopened this task",
     });
   });
 });

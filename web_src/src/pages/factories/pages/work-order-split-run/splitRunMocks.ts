@@ -107,7 +107,7 @@ export interface SplitRunPhase {
   canvasSteps: RunOverlayStep[];
   appId?: string;
   runId?: string;
-  /** Line automation canvas. `null` means a person created the work order. */
+  /** Line automation canvas. `null` means a person created the task. */
   canvasKey?: SplitRunCanvasKey | null;
   /** Trigger node that ran when the canvas has more than one start. */
   triggerName?: string;
@@ -115,6 +115,10 @@ export interface SplitRunPhase {
   canvas?: SplitRunCanvasModel;
   /** Line step index used to rerun this automation. */
   stepIndex?: number;
+  /** Ledger cost for this phase, in USD cents. Hidden when zero. */
+  costCents?: string;
+  /** Ledger token count for this phase. Hidden when zero. */
+  totalTokens?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -286,11 +290,13 @@ export type SplitRunFixtureOptions = {
   lineId?: string | null;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
-  /** PR-feedback canvas runs for this work order, shown as extra Log phases. */
+  /** PR-feedback canvas runs for this task, shown as extra Log phases. */
   prFeedbackRuns?: PRFeedbackLogRun[];
   /** Person who stopped the current automation, when known. */
   stoppedBy?: OrgUserDisplay;
-  /** Backlog analysis runs for this work order, shown as extra Log phases. */
+  /** Person or automation that closed the task, when known. */
+  closer?: { actor?: OrgUserDisplay; automationName?: string };
+  /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
 };
 
@@ -312,7 +318,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const phases = phasesForOrder(order, executions, options, demoArtifacts);
   const activeAutomationId = activeAutomationPhaseId(phases);
   const fixture: SplitRunFixture = {
-    title: order.title ?? "Work order",
+    title: order.title ?? "Task",
     descriptionText: order.description ?? "",
     owner: splitRunOwnerDisplay(order),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
@@ -333,7 +339,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       apiChecks: options?.checks,
       demoArtifacts,
       addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
-      stoppedBy: options?.stoppedBy,
+      stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
+      closer: options?.closer,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -352,6 +359,7 @@ function reviewSurfaces(
     demoArtifacts?: boolean;
     addressingFeedback?: boolean;
     stoppedBy?: OrgUserDisplay;
+    closer?: { actor?: OrgUserDisplay; automationName?: string };
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -368,7 +376,7 @@ function reviewSurfaces(
     );
   }
   if (displayStatus === "completed" || displayStatus === "rejected" || displayStatus === "cancelled") {
-    return surfaces(doneFooterForStatus(displayStatus), [], checks);
+    return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
     return failedReviewSurface(current, displayStatus, checks);
@@ -391,7 +399,7 @@ function reviewSurfaces(
       checks,
     );
   }
-  return surfaces(doneFooterForStatus(displayStatus), [], checks);
+  return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
 }
 
 function stoppedReviewSurface(
@@ -528,7 +536,7 @@ function phasesForOrder(
 const ANALYSIS_PHASE_ID_PREFIX = "backlog-analysis-";
 
 /**
- * Backlog analysis runs of this work order, oldest first. Each phase keeps
+ * Backlog analysis runs of this task, oldest first. Each phase keeps
  * its run, so the log panel streams the analysis while the automation
  * still works. The newest phase carries the reported score.
  */
@@ -614,7 +622,7 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const status = statusForCanvasRun(entry.run);
-  const description = entry.run.description?.trim();
+  const description = entry.description?.trim();
   const name = description
     ? description
     : entry.pullRequestNumber
@@ -650,6 +658,8 @@ function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
     canvasSteps: [streamLineToCanvasStep(line, providerForName(componentName))],
     appId: entry.canvasId,
     runId: entry.run.id,
+    costCents: entry.costCents,
+    totalTokens: entry.totalTokens,
   };
 }
 
@@ -695,7 +705,7 @@ function analysisTicketForOrder(order: FactoriesWorkOrder): LineIntakeAnalyzingT
   const confidenceScore = exampleConfidenceScore(order);
   return {
     id: order.id ?? "work-order",
-    title: order.title ?? "Work order",
+    title: order.title ?? "Task",
     detailsMarkdown: order.description,
     issueKey: order.key,
     planMarkdown: fallbackPlanMarkdown(order),
@@ -733,11 +743,11 @@ function fallbackPlanMarkdown(order: FactoriesWorkOrder): string {
     goal,
     files: ["See the work-order description for the files to change."],
     steps: [
-      "Read the work order and the current implementation.",
-      "Apply the change described in the work order.",
+      "Read the task and the current implementation.",
+      "Apply the change described in the task.",
       "Add or update tests for the new behavior.",
     ],
-    verify: ["The existing suite passes.", "The notes in the work order hold."],
+    verify: ["The existing suite passes.", "The notes in the task hold."],
   });
 }
 
@@ -889,6 +899,8 @@ function executionToPhase(
     appId: execution.run?.appId,
     runId: execution.run?.id,
     stepIndex: execution.stepIndex,
+    costCents: execution.costCents,
+    totalTokens: execution.totalTokens,
   };
 }
 
@@ -989,7 +1001,7 @@ function canceledNotesArtifact(order: FactoriesWorkOrder): FactoriesWorkOrderArt
     data: {
       name: "notes.md",
       title: "notes.md",
-      body: "The work order was canceled.",
+      body: "The task was canceled.",
     },
   };
 }

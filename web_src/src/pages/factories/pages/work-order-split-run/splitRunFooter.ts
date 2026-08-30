@@ -57,7 +57,7 @@ export const SPLIT_RUN_REOPEN_CHOICE: SplitRunStopChoiceItem = {
   id: "reopen",
   label: "Reopen",
   actionLabel: "Reopen",
-  description: "Opens this work order again",
+  description: "Opens this task again",
   status: "draft",
 };
 
@@ -283,7 +283,7 @@ function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFoo
 function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: input.kind === "running" ? "This work order is running." : "This work order needs attention.",
+    sentence: input.kind === "running" ? "This task is running." : "This task needs attention.",
     note,
     actions: [],
   });
@@ -292,7 +292,7 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: "draft",
-    sentence: "This work order is a draft.",
+    sentence: "This task is a draft.",
     note,
     attentionCard: true,
     actions: [REJECT, START],
@@ -323,7 +323,7 @@ function closedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
   if (input.kind === "failed") {
     return withFooterMeta(input, {
       kind: "failed",
-      sentence: "This work order needs attention.",
+      sentence: "This task needs attention.",
       note: closedNote,
       attentionCard: true,
       actions: closedDecisionActions(input.status ?? "failed"),
@@ -349,7 +349,7 @@ function stoppedNote(note: SplitRunFooterNote | undefined, actor?: OrgUserDispla
 function stoppedDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
   return withFooterMeta(input, {
     kind: "stopped",
-    sentence: "This work order needs attention.",
+    sentence: "This task needs attention.",
     note: stoppedNote(note, input.actor),
     attentionCard: true,
     actions: [BACK_TO_DRAFT, REJECT, RERUN],
@@ -360,7 +360,7 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
   const actions = input.kind === "failed" ? [BACK_TO_DRAFT, REJECT, RERUN] : [BACK_TO_DRAFT, REJECT, APPROVE];
   return withFooterMeta(input, {
     kind: input.kind,
-    sentence: "This work order needs attention.",
+    sentence: "This task needs attention.",
     note: note ?? (input.kind === "waiting" ? { ...SPLIT_RUN_WAITING_NOTE } : undefined),
     attentionCard: true,
     actions,

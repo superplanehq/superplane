@@ -5,10 +5,10 @@ import { defaultFactoriesFixture, EMPTY_FACTORY_KEY, PRIMARY_FACTORY_KEY } from 
 
 /**
  * Linear-style create dialog. `/work-orders/new` opens it over the list.
- * Click New Work Order on Work Orders stories to open the same dialog.
+ * Click New Task on Tasks stories to open the same dialog.
  */
 const meta = {
-  title: "Factories/Pages/Create Work Order",
+  title: "Factories/Pages/Create Task",
   parameters: { layout: "fullscreen" },
 } satisfies Meta;
 

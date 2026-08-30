@@ -13,7 +13,7 @@ import {
 } from "./reviewCandidates";
 
 describe("reviewCandidates", () => {
-  it("maps a work order id to a review candidate", () => {
+  it("maps a task id to a review candidate", () => {
     const candidate = reviewCandidateForWorkOrderId("wo-review-pay-842");
     expect(candidate?.ticketKey).toBe("PAY-842");
     expect(candidate?.ticketBody).toContain("Webhook delivery");
@@ -73,7 +73,7 @@ Move both images to Node 20.
     ]);
   });
 
-  it("builds draft backlog work orders for each candidate", () => {
+  it("builds draft backlog tasks for each candidate", () => {
     expect(REVIEW_CANDIDATE_WORK_ORDERS).toHaveLength(REVIEW_CANDIDATES.length);
     expect(REVIEW_CANDIDATE_WORK_ORDERS[0]?.state).toBe("STATE_DRAFT");
     expect(REVIEW_CANDIDATE_WORK_ORDERS[0]?.key).toBe("PAY-842");

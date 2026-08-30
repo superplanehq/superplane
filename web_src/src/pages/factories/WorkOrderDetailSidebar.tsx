@@ -36,7 +36,7 @@ interface WorkOrderDetailSidebarProps {
   onDispatch: (input: { lineName: string }) => Promise<void>;
 }
 
-/** Work order overview, factory lines, and artifacts. */
+/** Task overview, factory lines, and artifacts. */
 export function WorkOrderDetailSidebar({
   organizationId,
   factoryKey,

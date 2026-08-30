@@ -35,6 +35,26 @@ const searchFactoryIntakeItems = vi.fn(() => ({
 }));
 const importFactoryIntakeItem = vi.fn();
 
+const REFUND_INTAKE_SEARCH = {
+  data: [
+    {
+      id: "12",
+      key: "#12",
+      title: "Handle duplicate refunds",
+      body: "Retrying a refund posts twice.",
+      url: "https://github.com/acme/payments/issues/12",
+    },
+  ],
+  isLoading: false,
+  isError: false,
+};
+
+async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("lines-backlog-create"));
+  await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
+  await user.click(screen.getByTestId("lines-backlog-create-item-12"));
+}
+
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryApps: () => useFactoryApps(),
@@ -149,36 +169,24 @@ describe("LinesPage backlog create", () => {
     expect(screen.getByTestId("lines-backlog-create")).toBeDisabled();
   });
 
-  it("creates work orders from the backlog header plus", async () => {
+  it("creates tasks from the backlog header plus", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     const openCreateWorkOrder = vi.fn();
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, openCreateWorkOrder);
 
     const backlog = screen.getByTestId("lines-backlog-column");
-    expect(within(backlog).queryByRole("button", { name: "Add work order" })).not.toBeInTheDocument();
+    expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
     expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
   });
 
-  it("imports an intake item and opens the work order popup", async () => {
+  it("imports an intake item and opens the task popup", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
-    searchFactoryIntakeItems.mockReturnValue({
-      data: [
-        {
-          id: "12",
-          key: "#12",
-          title: "Handle duplicate refunds",
-          body: "Retrying a refund posts twice.",
-          url: "https://github.com/acme/payments/issues/12",
-        },
-      ],
-      isLoading: false,
-      isError: false,
-    });
+    searchFactoryIntakeItems.mockReturnValue(REFUND_INTAKE_SEARCH);
     importFactoryIntakeItem.mockResolvedValue({
       id: "wo-imported-12",
       title: "Handle duplicate refunds",
@@ -187,9 +195,7 @@ describe("LinesPage backlog create", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-backlog-create"));
-    await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
-    await user.click(screen.getByTestId("lines-backlog-create-item-12"));
+    await importRefundIssue(user);
 
     expect(importFactoryIntakeItem).toHaveBeenCalledWith({
       intakeId: GITHUB_ISSUES_INTAKE_ID,
@@ -199,6 +205,26 @@ describe("LinesPage backlog create", () => {
       expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
     });
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("opens the popup from a just-imported order that already has a number", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    searchFactoryIntakeItems.mockReturnValue(REFUND_INTAKE_SEARCH);
+    importFactoryIntakeItem.mockResolvedValue({
+      id: "wo-imported-12",
+      number: "12",
+      title: "Handle duplicate refunds",
+      state: "STATE_DRAFT",
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await importRefundIssue(user);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("work-order-split-run")).toBeInTheDocument();
+    });
   });
 
   it("shows a backlog onboarding card on Acme when the backlog is empty", () => {

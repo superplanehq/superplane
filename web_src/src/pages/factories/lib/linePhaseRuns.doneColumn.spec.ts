@@ -64,7 +64,7 @@ function closedOrder(args: {
 }
 
 describe("buildLinePhaseBoard with a board Done column", () => {
-  it("takes a completed work order off the phase columns", () => {
+  it("takes a completed task off the phase columns", () => {
     const done = closedOrder({ id: "wo-done", result: "RESULT_COMPLETED", lineId: "line-1" });
 
     const board = buildLinePhaseBoard(LINE, [done], APPS);
@@ -73,7 +73,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
     expect(board.flatMap((column) => column.runs)).toEqual([]);
   });
 
-  it("takes a failed work order off the phase columns", () => {
+  it("takes a failed task off the phase columns", () => {
     const failed = closedOrder({
       id: "wo-failed",
       result: "RESULT_FAILED",
