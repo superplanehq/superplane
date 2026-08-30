@@ -8,9 +8,10 @@ import (
 )
 
 type prFeedbackSettings struct {
-	Repository string
-	Mention    string
-	IgnoreBots bool
+	Repository  string
+	Mention     string
+	IgnoreBots  bool
+	AllowedBots []string
 }
 
 func defaultPRFeedbackSettings() prFeedbackSettings {
@@ -26,7 +27,38 @@ func (s prFeedbackSettings) normalized() prFeedbackSettings {
 	if s.Mention == "" {
 		s.Mention = prFeedbackDefaultMention
 	}
+	s.AllowedBots = normalizedAllowedBots(s.AllowedBots)
 	return s
+}
+
+// normalizedAllowedBots trims entries, strips a leading @, drops empties, and
+// removes duplicates while preserving order.
+func normalizedAllowedBots(bots []string) []string {
+	seen := make(map[string]struct{}, len(bots))
+	normalized := make([]string, 0, len(bots))
+	for _, bot := range bots {
+		bot = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(bot), "@"))
+		if bot == "" {
+			continue
+		}
+		key := strings.ToLower(bot)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, bot)
+	}
+	return normalized
+}
+
+// allowedBotsNodeValue converts a string slice into the []any shape that
+// node configuration validation expects for list fields.
+func allowedBotsNodeValue(bots []string) []any {
+	values := make([]any, 0, len(bots))
+	for _, bot := range bots {
+		values = append(values, bot)
+	}
+	return values
 }
 
 func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSpec) prFeedbackSettings {
@@ -43,6 +75,7 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 			settings.Mention = mention
 		}
 		settings.IgnoreBots = prFeedbackNodeBool(node, "ignoreBots", settings.IgnoreBots)
+		settings.AllowedBots = prFeedbackNodeStringSlice(node, "allowedBots")
 		break
 	}
 	return settings.normalized()
@@ -55,8 +88,9 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			Repository: settings.Repository,
 		},
 		Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-			Mention:    settings.Mention,
-			IgnoreBots: settings.IgnoreBots,
+			Mention:     settings.Mention,
+			IgnoreBots:  settings.IgnoreBots,
+			AllowedBots: settings.AllowedBots,
 		},
 	}
 }
@@ -73,6 +107,7 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 	if requested.GetDiscussion() != nil {
 		updated.Mention = strings.TrimSpace(requested.GetDiscussion().GetMention())
 		updated.IgnoreBots = requested.GetDiscussion().GetIgnoreBots()
+		updated.AllowedBots = requested.GetDiscussion().GetAllowedBots()
 	}
 	return updated.normalized()
 }

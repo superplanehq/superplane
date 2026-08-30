@@ -134,6 +134,7 @@ func applyPRFeedbackSettings(
 				configuration["repository"] = updated.Repository
 				configuration["contentFilter"] = updated.Mention
 				configuration["ignoreBots"] = updated.IgnoreBots
+				configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
 				nodes[i].Configuration = configuration
 				continue
 			}

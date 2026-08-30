@@ -160,7 +160,7 @@ function PRFeedbackSettingsLoaded({
             name: next.name,
             settings: {
               subject: { repository: next.repository },
-              discussion: { mention: next.mention, ignoreBots: next.ignoreBots },
+              discussion: { mention: next.mention, ignoreBots: next.ignoreBots, allowedBots: next.allowedBots },
             },
           });
         } catch (error) {

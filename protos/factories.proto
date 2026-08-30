@@ -858,6 +858,8 @@ message FactoryPRFeedbackHandler {
   message DiscussionSettings {
     string mention = 1;
     bool ignore_bots = 2;
+    // GitHub usernames of bots to react to even without the mention.
+    repeated string allowed_bots = 3;
   }
 
   // Settings stored in the canvas graph. This block is a read/write facade

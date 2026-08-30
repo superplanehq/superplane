@@ -96,3 +96,25 @@ func prFeedbackNodeBool(node *models.Node, key string, fallback bool) bool {
 	}
 	return value
 }
+
+func prFeedbackNodeStringSlice(node *models.Node, key string) []string {
+	if node == nil {
+		return nil
+	}
+
+	items, ok := node.Configuration[key].([]any)
+	if !ok {
+		if values, ok := node.Configuration[key].([]string); ok {
+			return values
+		}
+		return nil
+	}
+
+	values := make([]string, 0, len(items))
+	for _, item := range items {
+		if value, ok := item.(string); ok {
+			values = append(values, value)
+		}
+	}
+	return values
+}

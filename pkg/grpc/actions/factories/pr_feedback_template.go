@@ -35,12 +35,13 @@ var prFeedbackTriggerNodeIDs = []string{
 }
 
 type prFeedbackBuildRequest struct {
-	Name       string
-	Repository string
-	Mention    string
-	IgnoreBots bool
-	Binding    *intakeBinding
-	Agent      *intakeAgent
+	Name        string
+	Repository  string
+	Mention     string
+	IgnoreBots  bool
+	AllowedBots []string
+	Binding     *intakeBinding
+	Agent       *intakeAgent
 }
 
 func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
@@ -75,7 +76,7 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Name:          "On PR Comment",
 					Type:          yaml.NodeTypeTrigger,
 					Component:     "github.onPRComment",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots),
+					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
 					Integration:   request.Binding.integrationRef(),
 					Position:      yaml.Position{X: 80, Y: 80},
 				},
@@ -84,7 +85,7 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Name:          "On PR Review",
 					Type:          yaml.NodeTypeTrigger,
 					Component:     "github.onPRReview",
-					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots),
+					Configuration: prFeedbackTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots),
 					Integration:   request.Binding.integrationRef(),
 					Position:      yaml.Position{X: 80, Y: 260},
 				},
@@ -93,7 +94,7 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Name:          "On PR Review Reply",
 					Type:          yaml.NodeTypeTrigger,
 					Component:     "github.onPRReviewComment",
-					Configuration: prFeedbackReplyTriggerConfiguration(request.Repository, mention, request.IgnoreBots, includeReviewSubmissions),
+					Configuration: prFeedbackReplyTriggerConfiguration(request.Repository, mention, request.IgnoreBots, request.AllowedBots, includeReviewSubmissions),
 					Integration:   request.Binding.integrationRef(),
 					Position:      yaml.Position{X: 80, Y: 440},
 				},
@@ -135,20 +136,23 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 	}
 }
 
-func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots, includeReviewSubmissions bool) map[string]any {
-	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots)
+func prFeedbackReplyTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string, includeReviewSubmissions bool) map[string]any {
+	configuration := prFeedbackTriggerConfiguration(repository, mention, ignoreBots, allowedBots)
 	configuration["includeReviewSubmissions"] = includeReviewSubmissions
 	configuration["commentScope"] = prFeedbackCommentScopeReplies
 	return configuration
 }
 
-func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool) map[string]any {
+func prFeedbackTriggerConfiguration(repository, mention string, ignoreBots bool, allowedBots []string) map[string]any {
 	configuration := map[string]any{
 		"contentFilter": mention,
 		"ignoreBots":    ignoreBots,
 	}
 	if strings.TrimSpace(repository) != "" {
 		configuration["repository"] = repository
+	}
+	if len(allowedBots) > 0 {
+		configuration["allowedBots"] = allowedBotsNodeValue(allowedBots)
 	}
 	return configuration
 }
@@ -321,7 +325,8 @@ func prFeedbackPrompt() string {
 		"Use the GitHub token in GITHUB_TOKEN.",
 		"Read unresolved review threads.",
 		"Read pull request conversation comments that mention @superplaneagent.",
-		"Ignore comments from bots.",
+		"Also read comments from bots that the automation allows, even without a mention.",
+		"Ignore comments from all other bots.",
 		"Ignore replies that SuperPlane Agent already wrote.",
 		"",
 		"For each request:",
