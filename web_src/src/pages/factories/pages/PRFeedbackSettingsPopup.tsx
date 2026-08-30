@@ -184,7 +184,7 @@ function PRFeedbackGeneralTab({
               onChange={(event) => onUpdate("ignoreBots", event.currentTarget.checked)}
               data-testid="pr-feedback-ignore-bots"
             />
-            <Label htmlFor="pr-feedback-ignore-bots">
+            <Label htmlFor="pr-feedback-ignore-bots" className="flex-col items-start">
               <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
                 {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
               </span>
