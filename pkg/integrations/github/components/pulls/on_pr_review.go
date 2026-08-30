@@ -43,6 +43,7 @@ A review with several comments therefore produces one run, not one run per comme
 - **Repository**: Select the GitHub repository to monitor
 - **Content Filter**: Optional filter on the review summary and inline comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
 - **Ignore Bots**: Skip reviews written by GitHub Apps and bots
+- **Allowed Bots**: React to reviews from these GitHub Apps or bots even when the review does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ## Event Data
 
@@ -120,7 +121,8 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return http.StatusOK, nil, nil
 	}
 
-	if config.IgnoreBots && isBotAuthor(eventType, data) {
+	allowed := isAllowedBot(eventType, data, config.AllowedBots)
+	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
 		ctx.Logger.Info("Ignoring event - author is a bot")
 		return http.StatusOK, nil, nil
 	}
@@ -131,11 +133,16 @@ func (p *OnPRReview) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.W
 		return code, nil, err
 	}
 
-	bodies := reviewFilterBodies(data, comments)
-	matched, code, err := applyContentFilter(config.ContentFilter, bodies...)
-	if err != nil {
-		ctx.Logger.Errorf("Failed to apply PR review content filter: %v", err)
-		return code, nil, fmt.Errorf("failed to apply PR review content filter: %w", err)
+	matched := allowed
+	if !allowed {
+		bodies := reviewFilterBodies(data, comments)
+		matched, code, err = applyContentFilter(config.ContentFilter, bodies...)
+		if err != nil {
+			ctx.Logger.Errorf("Failed to apply PR review content filter: %v", err)
+			return code, nil, fmt.Errorf("failed to apply PR review content filter: %w", err)
+		}
+	} else {
+		ctx.Logger.Info("Author is an allowed bot - bypassing content filter")
 	}
 
 	if !matched {

@@ -39,6 +39,7 @@ func (p *OnPRReviewComment) Documentation() string {
 - **Include Review Submissions**: Also start a run when a pull request review is submitted
 - **Comment Scope**: All comments, or replies only
 - **Ignore Bots**: Skip comments and reviews written by GitHub Apps and bots
+- **Allowed Bots**: React to comments and reviews from these GitHub Apps or bots even when they do not match the content filter. Enter the bot login, for example coderabbitai.
 
 ## Event Data
 
@@ -158,15 +159,21 @@ func (p *OnPRReviewComment) HandleWebhook(ctx core.WebhookRequestContext) (int, 
 		return http.StatusOK, nil, nil
 	}
 
-	if config.IgnoreBots && isBotAuthor(eventType, data) {
+	allowed := isAllowedBot(eventType, data, config.AllowedBots)
+	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
 		ctx.Logger.Info("Ignoring event - author is a bot")
 		return http.StatusOK, nil, nil
 	}
 
-	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
-	if err != nil {
-		ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
-		return code, nil, fmt.Errorf("failed to apply PR comment content filter: %w", err)
+	matched := allowed
+	if !allowed {
+		matched, code, err = applyPRCommentContentFilter(config.ContentFilter, eventType, data)
+		if err != nil {
+			ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
+			return code, nil, fmt.Errorf("failed to apply PR comment content filter: %w", err)
+		}
+	} else {
+		ctx.Logger.Info("Author is an allowed bot - bypassing content filter")
 	}
 
 	if !matched {
