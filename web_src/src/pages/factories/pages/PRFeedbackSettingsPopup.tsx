@@ -179,12 +179,12 @@ function PRFeedbackGeneralTab({
           <div className="flex items-start gap-3">
             <Checkbox
               id="pr-feedback-ignore-bots"
-              className="mt-0.5"
+              className="mt-0.5 cursor-pointer"
               checked={draft.ignoreBots}
               onChange={(event) => onUpdate("ignoreBots", event.currentTarget.checked)}
               data-testid="pr-feedback-ignore-bots"
             />
-            <Label htmlFor="pr-feedback-ignore-bots" className="flex-col items-start">
+            <Label htmlFor="pr-feedback-ignore-bots" className="flex-col items-start cursor-pointer">
               <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
                 {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
               </span>
