@@ -98,12 +98,13 @@ func createPRFeedbackCanvas(
 	db := database.DB(ctx)
 	binding := resolvePRFeedbackBinding(db, factory, repository)
 	canvasDoc := buildPRFeedbackCanvas(prFeedbackBuildRequest{
-		Name:       name,
-		Repository: repository,
-		Mention:    prFeedbackDefaultMention,
-		IgnoreBots: true,
-		Binding:    binding,
-		Agent:      resolveIntakeAgent(db, factory),
+		Name:        name,
+		Repository:  repository,
+		Mention:     prFeedbackDefaultMention,
+		IgnoreBots:  true,
+		AllowedBots: nil,
+		Binding:     binding,
+		Agent:       resolveIntakeAgent(db, factory),
 	})
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factory.OrganizationID.String())

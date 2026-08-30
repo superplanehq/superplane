@@ -136,8 +136,9 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 					Repository: "acme/other",
 				},
 				Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
-					Mention:    "@superplaneagent",
-					IgnoreBots: true,
+					Mention:     "@superplaneagent",
+					IgnoreBots:  true,
+					AllowedBots: []string{"coderabbitai", "bugbot"},
 				},
 			},
 		})
@@ -145,6 +146,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		assert.Equal(t, "Address review comments", response.GetHandler().GetName())
 		assert.Equal(t, "acme/other", response.GetHandler().GetSettings().GetSubject().GetRepository())
 		assert.True(t, response.GetHandler().GetHealthy())
+		assert.Equal(t, []string{"coderabbitai", "bugbot"}, response.GetHandler().GetSettings().GetDiscussion().GetAllowedBots())
 
 		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
 		require.NoError(t, err)
@@ -159,6 +161,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			}
 			assert.Equal(t, "acme/other", node.Configuration["repository"])
 			assert.Equal(t, "@superplaneagent", node.Configuration["contentFilter"])
+			assert.Equal(t, []any{"coderabbitai", "bugbot"}, node.Configuration["allowedBots"])
 		}
 	})
 
