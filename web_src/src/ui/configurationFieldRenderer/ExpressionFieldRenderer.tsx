@@ -11,7 +11,8 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
 }) => {
-  const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
+  const rawValue = value ?? field.defaultValue;
+  const currentValue = rawValue == null ? "" : String(rawValue);
 
   if (!allowExpressions) {
     return (

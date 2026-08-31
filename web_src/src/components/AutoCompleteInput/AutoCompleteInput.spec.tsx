@@ -181,6 +181,65 @@ describe("AutoCompleteInput suggestions", () => {
   });
 });
 
+describe("AutoCompleteInput non-string value handling", () => {
+  // Regression test for Sentry issue 7695184502: "TypeError: S.substring is not a
+  // function". Callers (e.g. StringFieldRenderer fed by node configuration data)
+  // could pass a non-string `value` despite the `value?: string` prop type, which
+  // crashed the internal cursor-position measurement.
+  it.each([
+    ["number", 123, "123"],
+    ["boolean", true, "true"],
+    ["object", { foo: "bar" }, "[object Object]"],
+  ] as const)("renders without crashing when value is a %s", (_label, value, expectedText) => {
+    render(
+      <AutoCompleteInput
+        aria-label="Coerced value"
+        exampleObj={null}
+        value={value as unknown as string}
+        onChange={vi.fn()}
+        placeholder="Type here"
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Coerced value" })).toHaveValue(expectedText);
+  });
+
+  it("renders an empty string when value is null or undefined", () => {
+    render(
+      <AutoCompleteInput
+        aria-label="Nullish value"
+        exampleObj={null}
+        value={null as unknown as string}
+        onChange={vi.fn()}
+        placeholder="Type here"
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "Nullish value" })).toHaveValue("");
+  });
+
+  it("still renders a normal string value and reports edits via onChange", () => {
+    const handleChange = vi.fn();
+
+    render(
+      <AutoCompleteInput
+        aria-label="String value"
+        exampleObj={null}
+        value="hello"
+        onChange={handleChange}
+        placeholder="Type here"
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "String value" });
+    expect(input).toHaveValue("hello");
+
+    fireEvent.change(input, { target: { value: "hello world", selectionStart: 11 } });
+
+    expect(handleChange).toHaveBeenCalledWith("hello world");
+  });
+});
+
 describe("AutoCompleteInput fullHeight mode", () => {
   it("lets the textarea fill its parent instead of auto-resizing", () => {
     render(
