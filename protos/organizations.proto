@@ -33,7 +33,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization details";
-      description: "Returns the details of a specific organization (can be referenced by ID or name)";
+      description: "Returns the details of a specific organization (can be referenced by ID or slug)";
       tags: "Organization";
     };
   }
@@ -45,7 +45,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update an organization";
-      description: "Updates the specified organization (can be referenced by ID or name)";
+      description: "Updates the specified organization (can be referenced by ID or slug). Set metadata.slug to change the organization's URL slug.";
       tags: "Organization";
     };
   }
@@ -345,6 +345,9 @@ message Organization {
     string description = 3;
     google.protobuf.Timestamp created_at = 4;
     google.protobuf.Timestamp updated_at = 5;
+    // URL-friendly, unique identifier used to route to this organization in
+    // the frontend. Editable in organization settings.
+    string slug = 6;
   }
 
   message Spec {
