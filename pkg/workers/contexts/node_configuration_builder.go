@@ -1203,12 +1203,10 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 		return "", "", fmt.Errorf("order() could not resolve the workspace: %w", err)
 	}
 	config := factory.OnboardingConfigValue()
-	if repository == "" {
-		repository = config.AppRepository
-	}
-	if defaultBranch == "" {
-		defaultBranch = config.DefaultBranch
-	}
+	// Repository and branch are one snapshot. Do not combine a saved value
+	// with current workspace settings when a legacy row contains only one.
+	repository = config.AppRepository
+	defaultBranch = config.DefaultBranch
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}

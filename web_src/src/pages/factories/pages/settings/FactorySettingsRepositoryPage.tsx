@@ -25,6 +25,7 @@ export function FactorySettingsRepositoryPage() {
     [resources.data],
   );
   const [repository, setRepository] = useState(factory.onboarding?.appRepository ?? "");
+  const [isResolvingDefaultBranch, setIsResolvingDefaultBranch] = useState(false);
   const updateRepository = useFactoryRepository(organizationId, factoryId);
   const canUpdate = canAct("factories", "update");
 
@@ -35,14 +36,18 @@ export function FactorySettingsRepositoryPage() {
   }, [factory.onboarding?.appRepository]);
 
   const isDirty = repository !== (factory.onboarding?.appRepository ?? "");
+  const isSaving = isResolvingDefaultBranch || updateRepository.isPending;
   const save = async () => {
-    if (!repository || !integrationId) return;
+    if (!repository || !integrationId || isSaving) return;
+    setIsResolvingDefaultBranch(true);
     try {
       const defaultBranch = await resolveGithubDefaultBranch(organizationId, integrationId, repository);
       await updateRepository.mutateAsync({ repository, defaultBranch });
       showSuccessToast("Workspace repository updated.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to update workspace repository"));
+    } finally {
+      setIsResolvingDefaultBranch(false);
     }
   };
 
@@ -81,9 +86,9 @@ export function FactorySettingsRepositoryPage() {
           >
             <LoadingButton
               type="button"
-              loading={updateRepository.isPending}
+              loading={isSaving}
               loadingText="Saving..."
-              disabled={!repository || !isDirty || !canUpdate || permissionsLoading}
+              disabled={!repository || !isDirty || !canUpdate || permissionsLoading || isSaving}
               onClick={save}
               data-testid="factory-settings-repository-save"
             >

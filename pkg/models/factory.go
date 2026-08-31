@@ -505,17 +505,17 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil)
 }
 
-// SnapshotActiveWorkOrderRepository records the current repository on active
-// work orders before a workspace switches repositories. A nil snapshot is a
-// legacy row, so preserve an existing value from an earlier switch.
-func (f *Factory) SnapshotActiveWorkOrderRepository(tx *gorm.DB, repository, defaultBranch string) error {
+// SnapshotWorkOrderRepository records the current repository before a
+// workspace switches repositories. A nil snapshot is a legacy row, so
+// preserve an existing value from an earlier switch.
+func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBranch string) error {
 	updates := map[string]any{
 		"repository":     gorm.Expr("COALESCE(repository, ?)", repository),
 		"default_branch": gorm.Expr("COALESCE(default_branch, ?)", defaultBranch),
 	}
 
 	return tx.Model(&FactoryWorkOrder{}).
-		Where("factory_id = ? AND state IN ?", f.ID, []string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen}).
+		Where("factory_id = ?", f.ID).
 		Updates(updates).
 		Error
 }
@@ -570,10 +570,8 @@ func (f *Factory) createWorkOrder(
 		UpdatedAt:      now,
 	}
 	config := f.OnboardingConfigValue()
-	if config.AppRepository != "" {
+	if config.AppRepository != "" && config.DefaultBranch != "" {
 		order.Repository = &config.AppRepository
-	}
-	if config.DefaultBranch != "" {
 		order.DefaultBranch = &config.DefaultBranch
 	}
 	applyWorkOrderOrigin(order, origin)

@@ -89,7 +89,7 @@ func UpdateFactoryRepository(
 		if err != nil {
 			return err
 		}
-		if err := factory.SnapshotActiveWorkOrderRepository(tx, previous.AppRepository, previousBranch); err != nil {
+		if err := factory.SnapshotWorkOrderRepository(tx, previous.AppRepository, previousBranch); err != nil {
 			return err
 		}
 

@@ -373,6 +373,26 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, defaultBranch, payload["default_branch"])
 	})
 
+	t.Run("uses workspace values for partial work order snapshots", func(t *testing.T) {
+		currentRepository := "acme/current-service"
+		currentDefaultBranch := "develop"
+		require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			AppRepository: &currentRepository,
+			DefaultBranch: &currentDefaultBranch,
+		}))
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     "acme/previous-service",
+			"default_branch": nil,
+		}).Error)
+
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, currentRepository, payload["repository"])
+		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
+	})
+
 	t.Run("field access and templates", func(t *testing.T) {
 		id, err := builder.ResolveExpression(`order().id`)
 		require.NoError(t, err)
