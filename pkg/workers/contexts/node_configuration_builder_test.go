@@ -245,7 +245,6 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	defaultBranch := "main"
 	require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
 		AppRepository: &repository,
-		DefaultBranch: &defaultBranch,
 	}))
 
 	sourceCanvas, _ := support.CreateCanvas(
@@ -358,6 +357,20 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, float64(42), issue["number"])
 		assert.Equal(t, "Fix login", issue["title"])
+	})
+
+	t.Run("uses workspace values for legacy work orders", func(t *testing.T) {
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     nil,
+			"default_branch": nil,
+		}).Error)
+
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, defaultBranch, payload["default_branch"])
 	})
 
 	t.Run("field access and templates", func(t *testing.T) {

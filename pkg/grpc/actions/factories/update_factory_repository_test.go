@@ -7,24 +7,26 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func TestReplaceConfigurationStrings(t *testing.T) {
+func TestReplaceConfigurationValues(t *testing.T) {
 	configuration := map[string]any{
 		"repository": "acme/old",
 		"environment": []any{
 			map[string]any{"name": "REPO", "value": "acme/old"},
 			map[string]any{"name": "BASE", "value": "main"},
 		},
+		"command": "git clone --branch ${BASE:-main} https://github.com/acme/main-service.git",
 	}
 
-	replaced, changed := replaceConfigurationStrings(configuration, map[string]string{
-		"acme/old": "{{ order().repository }}",
-		"main":     "{{ order().default_branch }}",
+	replaced, changed := replaceConfigurationValues(configuration, []configurationReplacement{
+		{from: "acme/old", to: "{{ order().repository }}"},
+		{from: "main", to: "{{ order().default_branch }}"},
 	})
 
 	assert.True(t, changed)
 	assert.Equal(t, "acme/old", configuration["repository"])
 	assert.Equal(t, "{{ order().repository }}", replaced.(map[string]any)["repository"])
 	assert.Equal(t, "{{ order().default_branch }}", replaced.(map[string]any)["environment"].([]any)[1].(map[string]any)["value"])
+	assert.Equal(t, configuration["command"], replaced.(map[string]any)["command"])
 }
 
 func TestReplaceTriggerRepository(t *testing.T) {
