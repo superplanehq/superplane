@@ -106,6 +106,7 @@ async function provisionWorkspace(args: {
   // master, staging, ...) instead of hardcoding "main", so Create Branch and
   // Create Pull Request target the branch GitHub actually treats as default.
   const defaultBranch = (await args.resolveDefaultBranch(args.appRepository)) || "main";
+  await args.updateOnboarding({ defaultBranch });
   const { lineId, primaryAppId } = await provisionLine({
     factory: args.factory,
     savedLineId: args.factory?.onboarding?.provisionedLineId,

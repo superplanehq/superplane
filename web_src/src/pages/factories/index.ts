@@ -13,6 +13,7 @@ export {
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
   FactorySettingsSoonPage,
+  FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   FACTORY_SETTINGS_NAV_GROUPS,
