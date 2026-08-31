@@ -69,6 +69,7 @@ export function useFactoryAppCanvasPageModel() {
   }, []);
   const editActions = useFactoryAppCanvasEditActions({
     organizationId: route.organizationId,
+    factoryId: route.factoryId,
     factoryKey: route.factoryKey,
     appId: route.appId,
     from: route.from,

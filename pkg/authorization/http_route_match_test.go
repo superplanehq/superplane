@@ -41,6 +41,23 @@ func TestMatchHTTPRoute(t *testing.T) {
 			wantOK: false,
 		},
 		{
+			method: http.MethodPost,
+			path:   "/api/v1/factories/factory-123/apps/app-456:defaults",
+			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodPost,
+			path:   "/api/v1/factories/factory-123/app-templates/line-planning:materialize",
+			want:   HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"},
+			wantOK: true,
+		},
+		{
+			method: http.MethodPost,
+			path:   "/api/v1/factories/factory-123/apps/app-456:unknown",
+			wantOK: false,
+		},
+		{
 			method: http.MethodGet,
 			path:   "/api/v1/me/notification-settings",
 			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me/notification-settings"},

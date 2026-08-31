@@ -1,4 +1,4 @@
-import type { CanvasesCanvas } from "@/api-client";
+import { factoriesMaterializeFactoryAppDefaults, type CanvasesCanvas } from "@/api-client";
 import {
   requestCanvasAgentSidebarClose,
   requestCanvasAgentSidebarOpen,
@@ -6,20 +6,22 @@ import {
 } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { showErrorToast } from "@/lib/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { parseCanvasYamlForImport } from "@/pages/app/lib/workflow-spec-files";
-import { materializeFactoryCanvas } from "@/pages/home/factories";
 import {
   requestBuildingBlocksSidebar,
   subscribeBuildingBlocksSidebarChanged,
 } from "@/ui/CanvasPage/buildingBlocksSidebarRequest";
-import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react";
-import { deriveFactoryAppResetWiring, resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
+import { useCallback, useEffect, useState, type MutableRefObject } from "react";
+import { hasFactoryAppDefaults } from "../lib/factoryAppTemplate";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { setSearchParamFlag } from "../lib/factoryAppSearchParamFlag";
 
 type FactoryAppCanvasEditActionsInput = {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   appId: string;
   from: string | null;
@@ -38,6 +40,7 @@ type FactoryAppCanvasEditActionsInput = {
 
 export function useFactoryAppCanvasEditActions({
   organizationId,
+  factoryId,
   factoryKey,
   appId,
   from,
@@ -111,8 +114,7 @@ export function useFactoryAppCanvasEditActions({
     handleAgentPromptOpenChange(true);
   }, [handleAgentPromptOpenChange]);
 
-  const resetTemplate = useMemo(() => resolveFactoryAppTemplate(canvas), [canvas]);
-  const resetAvailable = isConfigure && canUpdateCanvas && Boolean(resetTemplate);
+  const resetAvailable = isConfigure && canUpdateCanvas && hasFactoryAppDefaults(canvas);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const handleOpenResetConfirm = useCallback(() => {
@@ -124,31 +126,30 @@ export function useFactoryAppCanvasEditActions({
     setResetConfirmOpen(open);
   }, []);
 
-  // Rematerializes the app's bundled template with its own real repo/agent
-  // wiring and loads it as an unsaved configure draft. The user still needs
-  // to click Save — this never persists or calls a gRPC action.
-  const handleResetToFactoryDefaults = useCallback(() => {
+  // The backend owns template generation and preserves the app's live wiring.
+  // This only loads the result as a draft. The user still needs to click Save.
+  const handleResetToFactoryDefaults = useCallback(async () => {
     setResetConfirmOpen(false);
-    if (!resetAvailable || !resetTemplate || !canvas) return;
+    if (!resetAvailable) return;
 
-    const wiring = deriveFactoryAppResetWiring(canvas);
-    const yamlText = materializeFactoryCanvas({
-      definition: resetTemplate,
-      canvasName: canvas.metadata?.name || resetTemplate.title,
-      canvasId: appId,
-      installParams: wiring.installParams,
-      integrations: wiring.integrations,
-      agentRewrite: wiring.agentRewrite,
-    });
-
-    const parsed = parseCanvasYamlForImport(yamlText);
-    if (!parsed.ok) {
-      showErrorToast(parsed.error);
-      return;
+    try {
+      const response = await factoriesMaterializeFactoryAppDefaults(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, appId },
+          body: {},
+        }),
+      );
+      const parsed = parseCanvasYamlForImport(response.data?.canvasYaml ?? "");
+      if (!parsed.ok) {
+        showErrorToast(parsed.error);
+        return;
+      }
+      configureActionsRef.current?.applyDraftSpec(parsed.spec);
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Failed to reset app"));
     }
-
-    configureActionsRef.current?.applyDraftSpec(parsed.spec);
-  }, [appId, canvas, configureActionsRef, resetAvailable, resetTemplate]);
+  }, [appId, configureActionsRef, factoryId, organizationId, resetAvailable]);
 
   const handleAgentOpenChange = useCallback(
     (open: boolean) => {

@@ -1,10 +1,50 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CanvasesCanvas } from "@/api-client";
 import type { FactoryConfigureActions } from "@/pages/app";
 
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
+
+const { materializeDefaults } = vi.hoisted(() => ({ materializeDefaults: vi.fn() }));
+
+vi.mock("@/api-client", () => ({
+  factoriesMaterializeFactoryAppDefaults: materializeDefaults,
+}));
+
+const DEFAULTS_YAML = `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+spec:
+  edges: []
+  nodes:
+    - id: onrun-implement
+      name: Start
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+    - id: implementation-agent-no-issue
+      name: Agent
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        model: sonnet
+        credentials:
+          source: integration
+          integration:
+            name: claude-prod
+    - id: create-pr
+      name: Create Pull Request
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      integration:
+        id: gh-1
+        name: github-prod
+      configuration:
+        repository: acme/web
+        base: main
+`;
 
 function implementCanvas(): CanvasesCanvas {
   return {
@@ -43,6 +83,7 @@ function implementCanvas(): CanvasesCanvas {
 function baseOptions(overrides: Partial<Parameters<typeof useFactoryAppCanvasEditActions>[0]> = {}) {
   return {
     organizationId: "org-1",
+    factoryId: "factory-1",
     factoryKey: "SP",
     appId: "app-1",
     from: null,
@@ -62,6 +103,11 @@ function baseOptions(overrides: Partial<Parameters<typeof useFactoryAppCanvasEdi
 }
 
 describe("useFactoryAppCanvasEditActions reset to factory defaults", () => {
+  beforeEach(() => {
+    materializeDefaults.mockReset();
+    materializeDefaults.mockResolvedValue({ data: { canvasYaml: DEFAULTS_YAML } });
+  });
+
   it("is unavailable when no bundled template matches the canvas", () => {
     const { result } = renderHook(() =>
       useFactoryAppCanvasEditActions(
@@ -107,20 +153,26 @@ describe("useFactoryAppCanvasEditActions reset to factory defaults", () => {
     expect(result.current.resetConfirmOpen).toBe(false);
   });
 
-  it("materializes the app's own wiring and applies it as an unsaved draft", () => {
+  it("loads backend defaults and applies them as an unsaved draft", async () => {
     const applyDraftSpec = vi.fn();
     const configureActionsRef = { current: { applyDraftSpec } as unknown as FactoryConfigureActions };
     const { result } = renderHook(() => useFactoryAppCanvasEditActions(baseOptions({ configureActionsRef })));
 
-    act(() => {
+    await act(async () => {
       result.current.handleOpenResetConfirm();
-      result.current.handleResetToFactoryDefaults();
+      await result.current.handleResetToFactoryDefaults();
     });
 
     // Closes the confirm dialog and never calls save — the caller still has
     // to click Save to persist the draft.
     expect(result.current.resetConfirmOpen).toBe(false);
     expect(applyDraftSpec).toHaveBeenCalledTimes(1);
+    expect(materializeDefaults).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: { factoryId: "factory-1", appId: "app-1" },
+        body: {},
+      }),
+    );
 
     type MaterializedNode = {
       id: string;
