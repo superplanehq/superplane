@@ -1,6 +1,5 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Blocks } from "lucide-react";
 import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
@@ -40,7 +39,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
-  FactorySettingsSoonPage,
+  FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   OrganizationSettingsOverviewPage,
@@ -306,9 +305,7 @@ const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-repository"
     path="workspace/repository"
-    element={
-      <FactorySettingsSoonPage title="Repository" description="Repository settings for this workspace." Icon={Blocks} />
-    }
+    element={<FactorySettingsRepositoryPage />}
   />,
   <Route
     key="factory-settings-workspace-automations"

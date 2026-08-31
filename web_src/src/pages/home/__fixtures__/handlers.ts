@@ -442,6 +442,9 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
+    if (url.searchParams.get("type") === "default_branch") {
+      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }
 
