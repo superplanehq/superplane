@@ -134,6 +134,28 @@ export function resolveAgentModels(
   return { codingModel, planningModel };
 }
 
+export function countReadyAgentIntegrations(
+  integrations: Array<{ metadata?: { integrationName?: string }; status?: { state?: string } }>,
+  name: string,
+) {
+  return integrations.filter(
+    (integration) => integration.metadata?.integrationName === name && integration.status?.state === "ready",
+  ).length;
+}
+
+export function agentProviderToApi(
+  provider: AgentProvider,
+): "AGENT_PROVIDER_ANTHROPIC" | "AGENT_PROVIDER_OPENAI" | "AGENT_PROVIDER_OPENROUTER" {
+  switch (provider) {
+    case "anthropic":
+      return "AGENT_PROVIDER_ANTHROPIC";
+    case "openai":
+      return "AGENT_PROVIDER_OPENAI";
+    case "openrouter":
+      return "AGENT_PROVIDER_OPENROUTER";
+  }
+}
+
 function credentialSourceFor(integrationId: string | undefined): CredentialSource {
   return integrationId ? "integration" : "hosted";
 }
