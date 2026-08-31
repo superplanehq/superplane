@@ -20,11 +20,16 @@ const (
 	FactoryOnboardingAgentHarnessClaudeCode = "claude-code"
 	FactoryOnboardingAgentHarnessCursor     = "cursor"
 	FactoryOnboardingAgentHarnessCodex      = "codex"
+
+	FactoryOnboardingAgentProviderAnthropic  = "anthropic"
+	FactoryOnboardingAgentProviderOpenAI     = "openai"
+	FactoryOnboardingAgentProviderOpenRouter = "openrouter"
 )
 
 var (
 	ErrFactoryOnboardingInvalidIssuesSource      = errors.New("invalid issues source")
 	ErrFactoryOnboardingInvalidAgentHarness      = errors.New("invalid agent harness")
+	ErrFactoryOnboardingInvalidAgentProvider     = errors.New("invalid agent provider")
 	ErrFactoryOnboardingInvalidIntegrationID     = errors.New("invalid integration id")
 	ErrFactoryOnboardingInvalidAppID             = errors.New("invalid provisioned app id")
 	ErrFactoryOnboardingInvalidLineID            = errors.New("invalid provisioned line id")
@@ -52,6 +57,9 @@ type FactoryOnboardingConfig struct {
 	DefaultBranch      string `json:"default_branch,omitempty"`
 	IssuesSource       string `json:"issues_source,omitempty"`
 	AgentHarness       string `json:"agent_harness,omitempty"`
+	AgentProvider      string `json:"agent_provider,omitempty"`
+	AgentModel         string `json:"agent_model,omitempty"`
+	AgentPlanningModel string `json:"agent_planning_model,omitempty"`
 	ProvisionedAppID   string `json:"provisioned_app_id,omitempty"`
 	ProvisionedLineID  string `json:"provisioned_line_id,omitempty"`
 }
@@ -68,6 +76,9 @@ type FactoryOnboardingPatch struct {
 	DefaultBranch      *string
 	IssuesSource       *string
 	AgentHarness       *string
+	AgentProvider      *string
+	AgentModel         *string
+	AgentPlanningModel *string
 	ProvisionedAppID   *string
 	ProvisionedLineID  *string
 }
@@ -94,6 +105,18 @@ func ValidateFactoryOnboardingAgentHarness(harness string) error {
 		return nil
 	default:
 		return ErrFactoryOnboardingInvalidAgentHarness
+	}
+}
+
+func ValidateFactoryOnboardingAgentProvider(provider string) error {
+	switch provider {
+	case "",
+		FactoryOnboardingAgentProviderAnthropic,
+		FactoryOnboardingAgentProviderOpenAI,
+		FactoryOnboardingAgentProviderOpenRouter:
+		return nil
+	default:
+		return ErrFactoryOnboardingInvalidAgentProvider
 	}
 }
 
@@ -214,6 +237,19 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 			return FactoryOnboardingConfig{}, err
 		}
 		next.AgentHarness = value
+	}
+	if patch.AgentProvider != nil {
+		value := strings.TrimSpace(*patch.AgentProvider)
+		if err := ValidateFactoryOnboardingAgentProvider(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.AgentProvider = value
+	}
+	if patch.AgentModel != nil {
+		next.AgentModel = strings.TrimSpace(*patch.AgentModel)
+	}
+	if patch.AgentPlanningModel != nil {
+		next.AgentPlanningModel = strings.TrimSpace(*patch.AgentPlanningModel)
 	}
 	if patch.ProvisionedAppID != nil {
 		value := strings.TrimSpace(*patch.ProvisionedAppID)
