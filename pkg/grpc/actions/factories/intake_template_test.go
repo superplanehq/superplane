@@ -15,6 +15,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 			models.FactoryIntakeSourceGitHubIssues:       "github.onIssue",
 			models.FactoryIntakeSourceSentryExceptions:   "sentry.onIssue",
 			models.FactoryIntakeSourcePagerDutyIncidents: "pagerduty.onIncident",
+			models.FactoryIntakeSourceProductiveTasks:    "productive.onTask",
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
@@ -41,10 +42,11 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, "true", filter.Configuration["expression"])
 	})
 
-	t.Run("Sentry and PagerDuty create a work order without a filter", func(t *testing.T) {
+	t.Run("Sentry, PagerDuty, and Productive.io create a work order without a filter", func(t *testing.T) {
 		for _, source := range []string{
 			models.FactoryIntakeSourceSentryExceptions,
 			models.FactoryIntakeSourcePagerDutyIncidents,
+			models.FactoryIntakeSourceProductiveTasks,
 		} {
 			canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
 			require.NoError(t, err)
