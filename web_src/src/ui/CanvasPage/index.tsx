@@ -106,7 +106,7 @@ import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
-import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { shouldRefitOnInit, shouldRunFitAllRequest, stampFittedContentKey } from "./fitView";
 import { useFactoryConfigureFitView } from "./useFactoryConfigureFitView";
 import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
@@ -2904,13 +2904,30 @@ function CanvasContent({
     }
     const last = lastFitAllRequestRef.current;
     if (last?.nonce === fitAllRequest && last.runMode === isRunInspectionMode) return;
-    if (!hasFitToViewRef.current) return;
-    // Consume the nonce so re-enabling auto-focus later does not retroactively
-    // replay this run's participant fit. The viewport stays where the user is.
-    lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
-    if (!isAutoFocusEnabled) return;
     let timeoutId: number | null = null;
+    let accepted = false;
     const runFit = (attempt: number) => {
+      if (!accepted) {
+        const decision = shouldRunFitAllRequest({
+          hasFitted: hasFitToViewRef.current,
+          reactFlowReady: hasReactFlowInitialized,
+          isAutoFocusEnabled,
+          isFirstFitAllOnMount: lastFitAllRequestRef.current == null,
+        });
+        if (decision === "wait") {
+          if (attempt < 20) {
+            timeoutId = window.setTimeout(() => runFit(attempt + 1), 50);
+          }
+          return;
+        }
+        // Consume the nonce so re-enabling auto-focus later does not retroactively
+        // replay this run's participant fit. The viewport stays where the user is.
+        lastFitAllRequestRef.current = { nonce: fitAllRequest, runMode: isRunInspectionMode };
+        if (decision === "skip") {
+          return;
+        }
+        accepted = true;
+      }
       const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
       const nodesById = new Map(stateRef.current.nodes.map((node) => [node.id, node]));
       getNodes().forEach((node) => nodesById.set(node.id, node));

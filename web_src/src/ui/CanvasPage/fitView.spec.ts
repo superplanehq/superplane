@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveFitViewVersionId, shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { resolveFitViewVersionId, shouldRefitOnInit, shouldRunFitAllRequest, stampFittedContentKey } from "./fitView";
 
 describe("resolveFitViewVersionId", () => {
   const liveParams = {
@@ -76,5 +76,46 @@ describe("stampFittedContentKey", () => {
 
   it("is a no-op without a ref", () => {
     expect(() => stampFittedContentKey(undefined, "c1:v1")).not.toThrow();
+  });
+});
+
+describe("shouldRunFitAllRequest", () => {
+  const ready = {
+    hasFitted: true,
+    reactFlowReady: true,
+    isAutoFocusEnabled: true,
+    isFirstFitAllOnMount: false,
+  };
+
+  it("waits until React Flow has fitted once", () => {
+    expect(shouldRunFitAllRequest({ ...ready, hasFitted: false })).toBe("wait");
+  });
+
+  it("waits until React Flow reports initialized", () => {
+    expect(shouldRunFitAllRequest({ ...ready, reactFlowReady: false })).toBe("wait");
+  });
+
+  it("runs when auto-focus is on", () => {
+    expect(shouldRunFitAllRequest(ready)).toBe("run");
+  });
+
+  it("still runs the first fitAll on a mount when auto-focus is off", () => {
+    expect(
+      shouldRunFitAllRequest({
+        ...ready,
+        isAutoFocusEnabled: false,
+        isFirstFitAllOnMount: true,
+      }),
+    ).toBe("run");
+  });
+
+  it("skips later fitAll requests when auto-focus is off", () => {
+    expect(
+      shouldRunFitAllRequest({
+        ...ready,
+        isAutoFocusEnabled: false,
+        isFirstFitAllOnMount: false,
+      }),
+    ).toBe("skip");
   });
 });
