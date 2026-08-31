@@ -55,7 +55,7 @@ import {
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
-import { OrganizationSettingsLLMSpendPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsLLMSpendPage";
+import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
 import {
   OrganizationIntegrationDetailsPage,
   OrganizationIntegrationSetupPage,
@@ -340,7 +340,7 @@ const factorySettingsStorybookRoutes = [
     path="organization/spending"
     element={
       <RequirePermission resource="org" action="read">
-        <OrganizationSettingsLLMSpendPage />
+        <OrganizationSettingsWorkspaceUsagePage />
       </RequirePermission>
     }
   />,
