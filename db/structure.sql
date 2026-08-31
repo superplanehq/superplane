@@ -407,6 +407,52 @@ CREATE TABLE public.factory_llm_model_allowlists (
 
 
 --
+-- Name: factory_planning_session_surveys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_surveys (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    canvas_run_id uuid NOT NULL,
+    status text NOT NULL,
+    questions jsonb DEFAULT '[]'::jsonb NOT NULL,
+    answers jsonb DEFAULT '[]'::jsonb NOT NULL,
+    timeout_seconds integer NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    answered_at timestamp with time zone,
+    answered_by_user_id uuid
+);
+
+
+--
+-- Name: factory_planning_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    created_by_user_id uuid NOT NULL,
+    repository text NOT NULL,
+    state text NOT NULL,
+    canvas_id uuid,
+    canvas_run_id uuid,
+    messages jsonb DEFAULT '[]'::jsonb NOT NULL,
+    pending_draft jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_work_order_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    wait_state text DEFAULT ''::text NOT NULL,
+    wait_result jsonb DEFAULT '{}'::jsonb NOT NULL,
+    heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
+    ended_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_pr_feedback_handlers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1542,6 +1588,22 @@ ALTER TABLE ONLY public.factory_llm_model_allowlists
 
 
 --
+-- Name: factory_planning_session_surveys factory_planning_session_surveys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_surveys
+    ADD CONSTRAINT factory_planning_session_surveys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_pr_feedback_handlers factory_pr_feedback_handlers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2304,6 +2366,34 @@ CREATE INDEX idx_factory_intakes_factory_id ON public.factory_intakes USING btre
 --
 
 CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (factory_id);
+
+
+--
+-- Name: idx_factory_planning_session_surveys_one_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_planning_session_surveys_one_pending ON public.factory_planning_session_surveys USING btree (session_id) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: idx_factory_planning_session_surveys_session_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_surveys_session_created ON public.factory_planning_session_surveys USING btree (session_id, created_at DESC);
+
+
+--
+-- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_canvas_run ON public.factory_planning_sessions USING btree (canvas_run_id) WHERE (canvas_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_factory_planning_sessions_factory_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_factory_created ON public.factory_planning_sessions USING btree (factory_id, created_at DESC);
 
 
 --
@@ -3129,6 +3219,46 @@ ALTER TABLE ONLY public.factory_intakes
 
 ALTER TABLE ONLY public.factory_lines
     ADD CONSTRAINT factory_lines_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_session_surveys factory_planning_session_surveys_answered_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_surveys
+    ADD CONSTRAINT factory_planning_session_surveys_answered_by_user_id_fkey FOREIGN KEY (answered_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_session_surveys factory_planning_session_surveys_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_surveys
+    ADD CONSTRAINT factory_planning_session_surveys_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_session_surveys factory_planning_session_surveys_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_surveys
+    ADD CONSTRAINT factory_planning_session_surveys_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
 
 
 --

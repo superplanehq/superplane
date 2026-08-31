@@ -17,11 +17,13 @@ export function WorkOrderSurveyCard({
   survey,
   canSubmit = true,
   busy = false,
+  help = WORK_ORDER_SURVEY_HELP,
   onSubmit,
 }: {
   survey: WorkOrderSurveyView;
   canSubmit?: boolean;
   busy?: boolean;
+  help?: string;
   onSubmit?: (answers: WorkOrderSurveyAnswerInput[]) => void | Promise<void>;
 }) {
   const questions = survey.questions;
@@ -89,7 +91,7 @@ export function WorkOrderSurveyCard({
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10" aria-hidden>
           <MessageCircleQuestion className="size-4 text-blue-700 dark:text-blue-400" />
         </span>
-        <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">{WORK_ORDER_SURVEY_HELP}</p>
+        <p className="min-w-0 flex-1 text-xs leading-snug text-muted-foreground">{help}</p>
         <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
           {currentIndex + 1} of {questions.length}
         </span>

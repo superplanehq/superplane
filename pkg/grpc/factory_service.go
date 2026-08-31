@@ -277,3 +277,48 @@ func (s *FactoryService) AnswerWorkOrderSurvey(ctx context.Context, req *pb.Answ
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.AnswerWorkOrderSurvey(ctx, organizationID, req)
 }
+
+func (s *FactoryService) StartPlanningSession(ctx context.Context, req *pb.StartPlanningSessionRequest) (*pb.StartPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DescribePlanningSession(ctx context.Context, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribePlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) HeartbeatPlanningSession(ctx context.Context, req *pb.HeartbeatPlanningSessionRequest) (*pb.HeartbeatPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.HeartbeatPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) EndPlanningSession(ctx context.Context, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.EndPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SendPlanningSessionMessage(ctx context.Context, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendPlanningSessionMessage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdatePlanningSessionDraft(ctx context.Context, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdatePlanningSessionDraft(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreatePlanningSessionWorkOrder(ctx context.Context, req *pb.CreatePlanningSessionWorkOrderRequest) (*pb.CreatePlanningSessionWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreatePlanningSessionWorkOrder(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SkipPlanningSessionDraft(ctx context.Context, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SkipPlanningSessionDraft(ctx, organizationID, req)
+}
+
+func (s *FactoryService) AnswerPlanningSessionSurvey(ctx context.Context, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.AnswerPlanningSessionSurvey(ctx, organizationID, req)
+}

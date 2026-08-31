@@ -60,8 +60,34 @@ describe("BacklogCreatePopover", () => {
     expect(screen.getByTestId("lines-backlog-create-icon-intake-github")).toHaveAttribute("src", "/github.svg");
     expect(screen.queryByTestId("lines-backlog-create-item-gh-1")).not.toBeInTheDocument();
 
+    expect(screen.queryByTestId("lines-backlog-create-with-agent")).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));
     expect(onCreateManually).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts an agent session from the create menu", async () => {
+    const onCreateWithAgent = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <BacklogCreatePopover
+        canAdd
+        sources={sources}
+        items={[]}
+        query=""
+        focusedIntakeId={null}
+        onQueryChange={vi.fn()}
+        onFocusedIntakeChange={vi.fn()}
+        onCreateManually={vi.fn()}
+        onCreateWithAgent={onCreateWithAgent}
+        onImportItem={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createWithAgent }));
+    expect(onCreateWithAgent).toHaveBeenCalledTimes(1);
   });
 
   it("expands a few issues when an intake search is selected", async () => {
@@ -237,8 +263,9 @@ describe("BacklogCreatePopover", () => {
     );
   });
 
-  it("opens the create dialog when no intakes are configured", async () => {
+  it("opens the create menu when no intakes are configured", async () => {
     const onCreateManually = vi.fn();
+    const onCreateWithAgent = vi.fn();
     const user = userEvent.setup();
     render(
       <BacklogCreatePopover
@@ -250,12 +277,14 @@ describe("BacklogCreatePopover", () => {
         onQueryChange={vi.fn()}
         onFocusedIntakeChange={vi.fn()}
         onCreateManually={onCreateManually}
+        onCreateWithAgent={onCreateWithAgent}
         onImportItem={vi.fn()}
       />,
     );
 
     await user.click(screen.getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: BACKLOG_CREATE_COPY.createManually }));
     expect(onCreateManually).toHaveBeenCalledTimes(1);
   });
 

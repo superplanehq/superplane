@@ -135,7 +135,116 @@ async function askWorkOrder(input) {
   return waitForSurvey(created.id);
 }
 
-const TOOLS = [
+function isPlanningSession() {
+  return Boolean(String(process.env.SUPERPLANE_PLANNING_SESSION_ID || "").trim());
+}
+
+async function waitForUser() {
+  const deadline = Date.now() + MAX_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    const result = await requestJSON(
+      "GET",
+      `/api/v1/runner/planning-sessions/wait?hold_seconds=${HOLD_SECONDS}`,
+    );
+    if (result.status && result.status !== "pending") {
+      return result;
+    }
+  }
+  return { status: "no_answer" };
+}
+
+async function askPlanningSession(input) {
+  const created = await requestJSON("POST", "/api/v1/runner/planning-sessions/ask", {
+    timeout_seconds: normalizeTimeout(input.timeout_seconds),
+    questions: normalizeQuestions(input.questions),
+  });
+  if (created.status && created.status !== "pending") {
+    return created;
+  }
+  const deadline = Date.now() + MAX_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    const result = await requestJSON(
+      "GET",
+      `/api/v1/runner/planning-sessions/surveys/${encodeURIComponent(created.id)}/wait?hold_seconds=${HOLD_SECONDS}`,
+    );
+    if (result.status && result.status !== "pending") {
+      return result;
+    }
+  }
+  return { status: "no_answer", answers: [] };
+}
+
+async function proposeDraft(input) {
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/drafts", {
+    title: String((input && input.title) || "").trim(),
+    description: String((input && input.description) || "").trim(),
+  });
+}
+
+async function say(input) {
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/messages", {
+    text: String((input && input.text) || "").trim(),
+  });
+}
+
+const PLANNING_TOOLS = [
+  {
+    name: "wait_for_user",
+    description: "Wait until the user sends a message, creates a draft, skips a draft, or ends the session.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "ask",
+    description: "Ask the user a structured survey and wait for the answer. Do not print a survey in markdown.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        timeout_seconds: { type: "number" },
+        questions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 10,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              prompt: { type: "string" },
+              options: { type: "array", items: { type: "string" } },
+              allow_free_text: { type: "boolean" },
+            },
+            required: ["id", "prompt"],
+          },
+        },
+      },
+      required: ["questions"],
+    },
+  },
+  {
+    name: "propose_draft",
+    description: "Show a draft work order on the right. The user confirms or skips. Do not create the work order.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "say",
+    description: "Post a chat message to the user.",
+    inputSchema: {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    },
+  },
+];
+
+const TOOLS = isPlanningSession()
+  ? PLANNING_TOOLS
+  : [
   {
     name: TOOL_NAME,
     description:
@@ -213,12 +322,27 @@ async function handleRequest(message) {
   if (method === "tools/call") {
     const name = params && params.name;
     const args = (params && params.arguments) || {};
-    if (name !== TOOL_NAME) {
-      sendError(id, -32601, `Unknown tool: ${name}`);
-      return;
-    }
     try {
-      const result = await askWorkOrder(args);
+      let result;
+      if (isPlanningSession()) {
+        if (name === "wait_for_user") {
+          result = await waitForUser();
+        } else if (name === "ask") {
+          result = await askPlanningSession(args);
+        } else if (name === "propose_draft") {
+          result = await proposeDraft(args);
+        } else if (name === "say") {
+          result = await say(args);
+        } else {
+          sendError(id, -32601, `Unknown tool: ${name}`);
+          return;
+        }
+      } else if (name === TOOL_NAME) {
+        result = await askWorkOrder(args);
+      } else {
+        sendError(id, -32601, `Unknown tool: ${name}`);
+        return;
+      }
       sendResult(id, {
         content: [{ type: "text", text: JSON.stringify(result) }],
         structuredContent: result,

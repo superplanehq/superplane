@@ -429,6 +429,8 @@ func (w *NodeExecutor) executeActionNode(
 	if workOrderExecution, err := models.FindWorkOrderExecutionForRun(tx, execution.RunID); err == nil {
 		ctx.FactoryID = workOrderExecution.FactoryID
 		ctx.WorkOrderID = workOrderExecution.WorkOrderID
+	} else if workflow.FactoryID != nil {
+		ctx.FactoryID = *workflow.FactoryID
 	}
 
 	if node.AppInstallationID != nil {

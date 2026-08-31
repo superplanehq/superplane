@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { Loader2, Plus, SquarePen } from "lucide-react";
+import { Loader2, Plus, Sparkles, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -253,6 +253,7 @@ type BacklogCreatePopoverProps = {
   onQueryChange: (query: string) => void;
   onFocusedIntakeChange: (intakeId: string | null) => void;
   onCreateManually: () => void;
+  onCreateWithAgent?: () => void;
   onImportItem: (item: BacklogIntakeItem) => void;
   isLoading?: boolean;
   isLoadingMore?: boolean;
@@ -272,6 +273,7 @@ export function BacklogCreatePopover({
   onQueryChange,
   onFocusedIntakeChange,
   onCreateManually,
+  onCreateWithAgent,
   onImportItem,
   isLoading = false,
   isLoadingMore = false,
@@ -298,10 +300,6 @@ export function BacklogCreatePopover({
   };
 
   const Trigger = variant === "ghost" ? CreateGhostCard : CreateTriggerButton;
-
-  if (!isLoading && sources.length === 0) {
-    return <Trigger canAdd={canAdd} atCapacity={atCapacity} onClick={canAdd ? onCreateManually : undefined} />;
-  }
 
   return (
     <Popover
@@ -341,6 +339,20 @@ export function BacklogCreatePopover({
           <SquarePen className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
           {BACKLOG_CREATE_COPY.createManually}
         </button>
+        {onCreateWithAgent ? (
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-accent"
+            data-testid="lines-backlog-create-with-agent"
+            onClick={() => {
+              close();
+              onCreateWithAgent();
+            }}
+          >
+            <Sparkles className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            {BACKLOG_CREATE_COPY.createWithAgent}
+          </button>
+        ) : null}
         <CreateMenuSources
           sources={sources}
           query={query}

@@ -275,7 +275,7 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 }
 
 func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
-	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID)
+	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID).Where("name <> ?", PlanningCanvasLegacyName)
 
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
@@ -305,7 +305,7 @@ func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, i
 func ListCanvases(orgID string) ([]Canvas, error) {
 	var canvases []Canvas
 	err := database.Conn().
-		Where("organization_id = ?", orgID).
+		Where("organization_id = ? AND name <> ?", orgID, PlanningCanvasLegacyName).
 		Order("name ASC").
 		Find(&canvases).
 		Error

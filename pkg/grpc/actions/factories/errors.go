@@ -112,6 +112,14 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "work order already has a pending survey")
 	case errors.Is(err, models.ErrFactoryWorkOrderSurveyNotPending):
 		return grpcerrors.FailedPrecondition(err, "work order survey is not pending")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
+		return grpcerrors.NotFound(err, "planning session not found")
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
+		return grpcerrors.FailedPrecondition(err, "planning session has ended")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):

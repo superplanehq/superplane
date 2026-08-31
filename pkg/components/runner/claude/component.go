@@ -162,10 +162,11 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachWorkOrderSurveyEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
 
 	// command_list tasks only accept commands (+ optional files).
 	task := buildClaudeCodeBrokerTask(spec)
-	if runner.HasWorkOrderSurveyToken(environment) {
+	if runner.HasPlanningSessionToken(environment) || runner.HasWorkOrderSurveyToken(environment) {
 		task.Files = append(task.Files, claudeSurveyMCPFiles()...)
 	}
 	params := runner.CreateTaskParams{

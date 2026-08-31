@@ -58,9 +58,30 @@ test("lists ask_work_order over Content-Length JSON-RPC", async () => {
   assert.equal(replies[1].result.tools[0].name, "ask_work_order");
 });
 
-async function exchangeMCP(format, messages) {
+test("lists planning tools when a planning session id is set", async () => {
+  const replies = await exchangeMCP(
+    "ndjson",
+    [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+      },
+      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    ],
+    { SUPERPLANE_PLANNING_SESSION_ID: "session-1" },
+  );
+  assert.deepEqual(
+    replies[1].result.tools.map((tool) => tool.name),
+    ["wait_for_user", "ask", "propose_draft", "say"],
+  );
+});
+
+async function exchangeMCP(format, messages, env = {}) {
   const child = spawn(process.execPath, [path.join(__dirname, "ask_work_order_mcp.js")], {
     stdio: ["pipe", "pipe", "pipe"],
+    env: { ...process.env, ...env },
   });
   const replies = [];
   let buf = Buffer.alloc(0);

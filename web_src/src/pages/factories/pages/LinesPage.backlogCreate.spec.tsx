@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
@@ -69,6 +69,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useAnswerWorkOrderSurvey: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -129,6 +130,10 @@ describe("LinesPage backlog create", () => {
     importFactoryIntakeItem.mockReset();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("keeps a create ghost card at the bottom of the backlog", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
@@ -179,8 +184,52 @@ describe("LinesPage backlog create", () => {
     expect(within(backlog).queryByRole("button", { name: "Add task" })).not.toBeInTheDocument();
 
     await user.click(within(backlog).getByTestId("lines-backlog-create"));
-    expect(screen.queryByTestId("lines-backlog-create-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-create-menu")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Create task manually" }));
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the agent session from the backlog plus menu", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    await user.click(screen.getByRole("button", { name: "Create with an Agent" }));
+    expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
+  });
+
+  it("starts the session with the workspace repository, not the demo repo", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: {
+          id: "session-1",
+          repository: "semaphore/web",
+          canvasRunId: "run-1",
+          messages: [],
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+      ...REFUND_FACTORY,
+      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "semaphore/web" },
+    });
+
+    await user.click(screen.getByTestId("lines-backlog-create"));
+    await user.click(screen.getByRole("button", { name: "Create with an Agent" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalled();
+    });
+    const startCall = fetchMock.mock.calls.find(([url, init]) => {
+      return String(url).includes("/planning-sessions") && init?.method === "POST" && !String(url).includes("/end");
+    });
+    expect(startCall).toBeDefined();
+    expect(JSON.parse(String(startCall?.[1]?.body))).toEqual({ repository: "semaphore/web" });
   });
 
   it("imports an intake item and opens the task popup", async () => {
