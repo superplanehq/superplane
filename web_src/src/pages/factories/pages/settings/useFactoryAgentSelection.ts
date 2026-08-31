@@ -52,6 +52,7 @@ type AgentOnboarding = {
   agentIntegrationId?: string;
   agentProvider?: string;
   agentHarness?: string;
+  agentModel?: string;
 };
 
 export function useFactoryAgentSelection(onboarding: AgentOnboarding | undefined, integrations: AgentIntegration[]) {
@@ -109,7 +110,9 @@ export function providerFor(onboarding: AgentOnboarding | undefined): AgentProvi
     case "AGENT_PROVIDER_OPENROUTER":
       return "openrouter";
     default:
-      return onboarding?.agentHarness === "AGENT_HARNESS_CODEX" ? "openai" : "anthropic";
+      if (onboarding?.agentHarness === "AGENT_HARNESS_CODEX") return "openai";
+      if (onboarding?.agentModel?.startsWith("anthropic/")) return "openrouter";
+      return "anthropic";
   }
 }
 
