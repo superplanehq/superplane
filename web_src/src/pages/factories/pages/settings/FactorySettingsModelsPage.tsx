@@ -2,7 +2,6 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useFactoryLLMModels, useUpdateFactoryLLMModels } from "@/hooks/useLLMModelAllowlists";
@@ -13,22 +12,27 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { ModelAllowlistEditor } from "@/pages/organization/settings/ModelAllowlistEditor";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { Switch } from "@/ui/switch";
-import { Check, CircleDollarSign, Cpu, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "react-router";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import {
+  AgentCredentialSelection,
+  AgentResolutionPreview,
+  AgentSummary,
+  HostedOption,
+  ProviderCard,
+} from "./FactorySettingsAgentCards";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useFactoryAgent } from "./useFactoryAgent";
 import {
+  agentProviderToApi,
+  countReadyAgentIntegrations,
   factoryAgentProviders,
-  providerFor,
   resolveAgentModels,
   type AgentProvider,
   type CredentialSource,
-  type ProviderOption,
   useFactoryAgentSelection,
 } from "./useFactoryAgentSelection";
 
@@ -92,7 +96,7 @@ export function FactorySettingsModelsPage() {
               key={option.provider}
               active={source === "integration" && provider === option.provider}
               option={option}
-              readyCount={countReadyIntegrations(integrations, option.integrationName)}
+              readyCount={countReadyAgentIntegrations(integrations, option.integrationName)}
               onSelect={() => {
                 setSource("integration");
                 setProvider(option.provider);
@@ -146,6 +150,7 @@ export function FactorySettingsModelsPage() {
           onboarding default.
         </Text>
         <FactoryProviderModelSection
+          key={`${provider}-${source}`}
           organizationId={organizationId}
           factoryId={factoryId}
           provider={provider}
@@ -176,7 +181,7 @@ function useSaveFactoryAgent({
     if (source === "integration" && !integrationId) return;
     try {
       await updateAgent.mutateAsync({
-        provider: providerToApi(provider),
+        provider: agentProviderToApi(provider),
         credentialSource:
           source === "hosted" ? "AGENT_CREDENTIAL_SOURCE_HOSTED" : "AGENT_CREDENTIAL_SOURCE_INTEGRATION",
         ...(source === "integration" ? { integrationId } : {}),
@@ -187,207 +192,6 @@ function useSaveFactoryAgent({
     }
   };
   return { saveAgent, isPending: updateAgent.isPending };
-}
-
-function AgentSummary({
-  onboarding,
-}: {
-  onboarding: { agentProvider?: string; agentModel?: string; agentPlanningModel?: string } | undefined;
-}) {
-  const provider = providerFor(onboarding);
-  const model = onboarding?.agentModel || "onboarding default";
-  const planningModel = onboarding?.agentPlanningModel || model;
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-4">
-      <Cpu className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div>
-        <p className="text-[13px] font-medium">
-          {hostedProviderLabel(provider)} · {model} coding · {planningModel} planning
-        </p>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          Planning uses the review model. Implementation and Backlog use the coding model.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function AgentResolutionPreview({
-  source,
-  provider,
-  resolution,
-}: {
-  source: CredentialSource;
-  provider: ProviderOption;
-  resolution: { codingModel: string; planningModel: string };
-}) {
-  return (
-    <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
-      <p className="text-[13px] font-medium">Will use {provider.runner}</p>
-      <p className="mt-1 text-[12px] text-muted-foreground">
-        {source === "hosted" ? "SuperPlane-hosted credit" : `${hostedProviderLabel(provider.provider)} key`} · coding{" "}
-        {resolution.codingModel} · planning {resolution.planningModel}
-      </p>
-    </div>
-  );
-}
-
-function AgentCredentialSelection({
-  source,
-  provider,
-  integrationId,
-  readyIntegrations,
-  onProviderChange,
-  onIntegrationChange,
-}: {
-  source: CredentialSource;
-  provider: AgentProvider;
-  integrationId: string;
-  readyIntegrations: Array<{ metadata?: { id?: string; name?: string } }>;
-  onProviderChange: (provider: AgentProvider) => void;
-  onIntegrationChange: (integrationId: string) => void;
-}) {
-  if (source === "integration") {
-    return (
-      <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
-        <Label htmlFor="factory-agent-integration" className="text-[13px] font-medium">
-          {hostedProviderLabel(provider)} key
-        </Label>
-        {readyIntegrations.length > 0 ? (
-          <Select value={integrationId} onValueChange={onIntegrationChange}>
-            <SelectTrigger id="factory-agent-integration" className="mt-2 h-9">
-              <SelectValue placeholder={`Select a ${hostedProviderLabel(provider)} key`} />
-            </SelectTrigger>
-            <SelectContent>
-              {readyIntegrations.map((integration) => (
-                <SelectItem key={integration.metadata?.id} value={integration.metadata?.id ?? ""}>
-                  {integration.metadata?.name || integration.metadata?.id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          <Text className="mt-2 text-[13px] text-muted-foreground">
-            Connect a {hostedProviderLabel(provider)} key to use this provider.
-          </Text>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 rounded-lg border border-border bg-muted/20 p-4">
-      <Label htmlFor="factory-agent-hosted-provider" className="text-[13px] font-medium">
-        Hosted provider
-      </Label>
-      <Select value={provider} onValueChange={(value) => onProviderChange(value as AgentProvider)}>
-        <SelectTrigger id="factory-agent-hosted-provider" className="mt-2 h-9">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {factoryAgentProviders.map((option) => (
-            <SelectItem key={option.provider} value={option.provider}>
-              {hostedProviderLabel(option.provider)} · {option.runner}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function HostedOption({
-  active,
-  provider,
-  onSelect,
-}: {
-  active: boolean;
-  provider: AgentProvider;
-  onSelect: () => void;
-}) {
-  return (
-    <button type="button" onClick={onSelect} className={optionClassName(active)} aria-pressed={active}>
-      <CircleDollarSign className="mt-0.5 size-5 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1 text-left">
-        <span className="block text-[13px] font-medium">SuperPlane-hosted credit</span>
-        <span className="mt-0.5 block text-[12px] text-muted-foreground">
-          Use hosted {hostedProviderLabel(provider)} models for this workspace.
-        </span>
-      </span>
-      {active ? <Check className="size-4 shrink-0" aria-hidden /> : null}
-    </button>
-  );
-}
-
-function ProviderCard({
-  active,
-  option,
-  readyCount,
-  onSelect,
-  onConnect,
-}: {
-  active: boolean;
-  option: ProviderOption;
-  readyCount: number;
-  onSelect: () => void;
-  onConnect: () => void;
-}) {
-  return (
-    <div className={optionClassName(active)}>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex min-w-0 flex-1 items-start gap-3 text-left"
-        aria-pressed={active}
-      >
-        <IntegrationIcon integrationName={option.integrationName} className="mt-0.5 size-5 shrink-0" size={20} />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-medium">{hostedProviderLabel(option.provider)}</span>
-          <span className="mt-0.5 block text-[12px] text-muted-foreground">
-            Use a {hostedProviderLabel(option.provider)} key with {option.runner}.
-          </span>
-        </span>
-      </button>
-      {readyCount > 0 ? (
-        <span className="flex shrink-0 items-center gap-1.5 text-[12px] text-emerald-700 dark:text-emerald-300">
-          {active ? <Check className="size-3.5" aria-hidden /> : <KeyRound className="size-3.5" aria-hidden />}
-          {readyCount === 1 ? "Connected" : `${readyCount} connected`}
-        </span>
-      ) : (
-        <Button type="button" variant="outline" size="sm" onClick={onConnect}>
-          Connect
-        </Button>
-      )}
-    </div>
-  );
-}
-
-function optionClassName(active: boolean): string {
-  return `flex items-start gap-3 rounded-lg border p-4 transition-colors ${
-    active ? "border-foreground bg-accent/40" : "border-border bg-background hover:bg-accent/20"
-  }`;
-}
-
-function providerToApi(
-  provider: AgentProvider,
-): "AGENT_PROVIDER_ANTHROPIC" | "AGENT_PROVIDER_OPENAI" | "AGENT_PROVIDER_OPENROUTER" {
-  switch (provider) {
-    case "anthropic":
-      return "AGENT_PROVIDER_ANTHROPIC";
-    case "openai":
-      return "AGENT_PROVIDER_OPENAI";
-    case "openrouter":
-      return "AGENT_PROVIDER_OPENROUTER";
-  }
-}
-
-function countReadyIntegrations(
-  integrations: Array<{ metadata?: { integrationName?: string }; status?: { state?: string } }>,
-  name: string,
-) {
-  return integrations.filter(
-    (integration) => integration.metadata?.integrationName === name && integration.status?.state === "ready",
-  ).length;
 }
 
 function FactoryProviderModelSection({
