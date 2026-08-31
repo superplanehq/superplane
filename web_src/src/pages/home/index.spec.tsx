@@ -254,7 +254,7 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the factory-first landing as the canvas creation entrypoint", async () => {
+  it("uses a generated name when the optional app name is blank", async () => {
     const user = userEvent.setup();
     mutationMocks.createCanvasAsync.mockResolvedValue({
       data: { canvas: { metadata: { id: "canvas-new" } } },
@@ -266,6 +266,14 @@ describe("HomePage canvas folders", () => {
 
     await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
 
+    expect(screen.getByRole("dialog", { name: "Create app" })).toBeInTheDocument();
+    expect(screen.getByLabelText("App name (optional)")).toHaveValue("");
+    expect(screen.getByText("Leave this blank to use a generated name.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create app" })).toBeEnabled();
+    expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Create app" }));
+
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -273,6 +281,28 @@ describe("HomePage canvas folders", () => {
           method: "ui",
         }),
       );
+    });
+  });
+
+  it("uses the app name entered by the user", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
+    useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
+    useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
+
+    renderHome();
+
+    await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await user.type(screen.getByLabelText("App name (optional)"), "Sentry Analysis");
+    await user.click(screen.getByRole("button", { name: "Create app" }));
+
+    await waitFor(() => {
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
+        name: "Sentry Analysis",
+        method: "ui",
+      });
     });
   });
 
@@ -496,10 +526,12 @@ describe("HomePage canvas folders", () => {
     expect(await screen.findByRole("heading", { name: "Create New App in Deployments Folder" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create a blank app/i }));
+    await user.type(screen.getByLabelText("App name (optional)"), "Deployment Analysis");
+    await user.click(screen.getByRole("button", { name: "Create app" }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
-        name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+        name: "Deployment Analysis",
         method: "ui",
       });
       expect(mutationMocks.updateCanvasFolderMembership).toHaveBeenCalledWith({
@@ -528,6 +560,8 @@ describe("HomePage canvas folders", () => {
     const deploymentsSection = screen.getByText("Deployments").closest("section")!;
     await user.click(within(deploymentsSection).getByLabelText("Create app in folder Deployments"));
     await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await user.type(screen.getByLabelText("App name (optional)"), "Deployment Analysis");
+    await user.click(screen.getByRole("button", { name: "Create app" }));
 
     expect(await screen.findByText("Canvas editor")).toBeInTheDocument();
     expect(showErrorToast).toHaveBeenCalledWith("App created, but failed to add it to folder");
@@ -586,6 +620,8 @@ describe("HomePage canvas folders", () => {
 
     renderHome(["/org-123/apps/new?folderId=folder-1"]);
     await user.click(await screen.findByRole("button", { name: /create a blank app/i }));
+    await user.type(screen.getByLabelText("App name (optional)"), "Deployment Analysis");
+    await user.click(screen.getByRole("button", { name: "Create app" }));
 
     expect(mutationMocks.createCanvasAsync).not.toHaveBeenCalled();
     expect(showErrorToast).toHaveBeenCalledWith("You don't have permission to update canvases.");

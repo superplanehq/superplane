@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
@@ -8,6 +7,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { LeadIcon, type AppEntry } from "./AppDetailModal";
 import { APP_CATALOG } from "./appCatalog";
+import { CreateAppModal } from "./CreateAppModal";
 import { FactorySetupPanel } from "./FactorySetupPanel";
 import { getFactoryDefinition } from "./factories";
 import { homeListCardClassName, homePageSubtitleClassName, homePageTitleClassName } from "./homePageStyles";
@@ -36,7 +36,11 @@ export function FreshOrgLanding({
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const showLegacyFactoryOnboarding = !hasExperimentalFeature(FEATURE_FACTORIES);
   const factory = getFactoryDefinition();
-  const { createApp, isSaving } = useCreateApp({ folder });
+  const [isCreateAppModalOpen, setIsCreateAppModalOpen] = useState(false);
+  const { createApp, isSaving } = useCreateApp({
+    folder,
+    onCreated: () => setIsCreateAppModalOpen(false),
+  });
   const { installFactory, isInstalling } = useInstallFactory({ folder });
   const [showFactorySetup, setShowFactorySetup] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
@@ -117,7 +121,7 @@ export function FreshOrgLanding({
             showCatalog={showCatalog}
             onCreateBlank={() => {
               if (busy) return;
-              void createApp(generateCanvasName());
+              setIsCreateAppModalOpen(true);
             }}
             onToggleCatalog={() => setShowCatalog((open) => !open)}
           />
@@ -137,6 +141,13 @@ export function FreshOrgLanding({
           }}
         />
       )}
+
+      <CreateAppModal
+        open={isCreateAppModalOpen}
+        isSaving={isSaving}
+        onClose={() => setIsCreateAppModalOpen(false)}
+        onCreate={createApp}
+      />
     </div>
   );
 }
