@@ -49,6 +49,10 @@ vi.mock("@/pages/app/utils", () => ({
   buildExecutionInfo: (execution: unknown) => execution,
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+}));
+
 beforeEach(() => {
   mockedExecutions = executions;
   mockedRunVersion = undefined;

@@ -1,6 +1,7 @@
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
@@ -110,7 +111,7 @@ export function RunInspectorNodeAccordion({
           </span>
         </NodeHeaderButton>
         <RunInspectorNodeActions section={section} actions={actions} currentUser={currentUser} />
-        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} />
+        <NodeMetadata section={section} onRerun={onRerun} rerunPending={rerunPending} canRerun={actions.canRerun} />
       </AccordionPrimitive.Header>
       {section.isQueued ? null : (
         <AccordionContent className="bg-slate-50 px-3 pb-3 pt-3 dark:bg-gray-950">
@@ -296,26 +297,30 @@ function NodeMetadata({
   section,
   onRerun,
   rerunPending,
+  canRerun,
 }: {
   section: RunInspectorNodeSection;
   onRerun: () => void;
   rerunPending: boolean;
+  canRerun: boolean;
 }) {
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
       {section.isTrigger ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="xs"
-          disabled={rerunPending}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRerun();
-          }}
-        >
-          {rerunPending ? "Rerun..." : "Rerun"}
-        </Button>
+        <PermissionTooltip allowed={canRerun} message="You do not have permission to restart this run.">
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={rerunPending || !canRerun}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRerun();
+            }}
+          >
+            {rerunPending ? "Rerun..." : "Rerun"}
+          </Button>
+        </PermissionTooltip>
       ) : null}
       {(section.isTrigger || section.isQueued) && section.createdAt ? (
         <span>{formatEventTimestamp(section.createdAt)}</span>
