@@ -33,6 +33,17 @@ export const factorySectionHeaderClassName = cn(
 /** Section list/body: same gutter as the header, no extra left inset. */
 export const factorySectionBodyClassName = cn("mx-0 max-w-none pt-0 pb-6 text-foreground", sectionPaneGutter);
 
+/**
+ * Centered variants for report pages such as Velocity. The section title style
+ * stays the same as the other workspace pages, but the header and the body
+ * share one centered column so charts keep a readable width on wide screens.
+ * The header uses a larger top inset than the full-width page header, because a
+ * centered column has no sidebar next to it to set the vertical rhythm.
+ */
+export const factoryCenteredSectionHeaderClassName = cn(factorySectionHeaderClassName, contentColumn, "pt-14");
+
+export const factoryCenteredSectionBodyClassName = cn(factorySectionBodyClassName, contentColumn);
+
 /** Tasks / Lines kanban body: same gutter, fills leftover height. */
 export const factoryWorkOrdersBodyClassName = cn(
   factorySectionBodyClassName,
