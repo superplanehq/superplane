@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -25,12 +25,17 @@ describe("FactorySettingsRepositoryPage", () => {
     );
 
     const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
-    expect(within(settings).getByRole("option", { name: /acme\/api/i })).toHaveAttribute("aria-selected", "true");
+    expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     fireEvent.click(within(settings).getByRole("option", { name: /acme\/web/i }));
-    fireEvent.click(within(settings).getByTestId("factory-settings-repository-save"));
+    const saveButton = within(settings).getByTestId("factory-settings-repository-save");
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    fireEvent.click(saveButton);
 
-    expect(await screen.findByText("Workspace repository updated.")).toBeInTheDocument();
+    await waitFor(() => expect(saveButton).toBeDisabled());
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toHaveAttribute("aria-selected", "true");
   }, 10000);
 });

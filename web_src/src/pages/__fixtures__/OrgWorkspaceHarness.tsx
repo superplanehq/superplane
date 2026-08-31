@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Blocks } from "lucide-react";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
@@ -31,7 +30,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,
-  FactorySettingsSoonPage,
+  FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   LegacyWorkOrderDetailRedirect,
@@ -249,9 +248,7 @@ const factorySettingsStorybookRoutes = [
   <Route
     key="factory-settings-workspace-repository"
     path="workspace/repository"
-    element={
-      <FactorySettingsSoonPage title="Repository" description="Repository settings for this workspace." Icon={Blocks} />
-    }
+    element={<FactorySettingsRepositoryPage />}
   />,
   <Route
     key="factory-settings-workspace-automations"
