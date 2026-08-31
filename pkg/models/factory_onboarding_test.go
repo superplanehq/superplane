@@ -47,10 +47,16 @@ func Test__FactoryOnboarding(t *testing.T) {
 		backlogRepo := "acme/backlog"
 		defaultBranch := "main"
 		issuesSource := models.FactoryOnboardingIssuesSourceVCS
+		agentProvider := models.FactoryOnboardingAgentProviderAnthropic
+		agentModel := "claude-sonnet-4-6"
+		planningModel := "claude-opus-4-6"
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-			BacklogRepository: &backlogRepo,
-			DefaultBranch:     &defaultBranch,
-			IssuesSource:      &issuesSource,
+			BacklogRepository:  &backlogRepo,
+			DefaultBranch:      &defaultBranch,
+			IssuesSource:       &issuesSource,
+			AgentProvider:      &agentProvider,
+			AgentModel:         &agentModel,
+			AgentPlanningModel: &planningModel,
 		}))
 
 		config := factory.OnboardingConfigValue()
@@ -59,6 +65,9 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, "acme/backlog", config.BacklogRepository)
 		assert.Equal(t, "main", config.DefaultBranch)
 		assert.Equal(t, models.FactoryOnboardingIssuesSourceVCS, config.IssuesSource)
+		assert.Equal(t, agentProvider, config.AgentProvider)
+		assert.Equal(t, agentModel, config.AgentModel)
+		assert.Equal(t, planningModel, config.AgentPlanningModel)
 	})
 
 	t.Run("rejects invalid enum and uuid values", func(t *testing.T) {
@@ -72,6 +81,10 @@ func Test__FactoryOnboarding(t *testing.T) {
 		badHarness := "windsurf"
 		err = factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentHarness: &badHarness})
 		assert.ErrorIs(t, err, models.ErrFactoryOnboardingInvalidAgentHarness)
+
+		badProvider := "gemini"
+		err = factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AgentProvider: &badProvider})
+		assert.ErrorIs(t, err, models.ErrFactoryOnboardingInvalidAgentProvider)
 
 		badID := "not-a-uuid"
 		err = factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSIntegrationID: &badID})
