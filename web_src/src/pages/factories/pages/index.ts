@@ -22,9 +22,10 @@ export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPag
 export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
 export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";
+export { FactorySettingsRepositoryPage } from "./settings/FactorySettingsRepositoryPage";
 export { FactorySettingsUsagePage } from "./settings/FactorySettingsUsagePage";
 export { FactorySettingsModelsPage } from "./settings/FactorySettingsModelsPage";
-export { FACTORY_SETTINGS_NAV_ITEMS, isFactorySettingsComingSoon } from "./settings/settingsNavItems";
+export { FACTORY_SETTINGS_NAV_GROUPS, FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";
 export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
 export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";
 export { OrganizationSettingsWorkspacesPage } from "./organizationSettings/OrganizationSettingsWorkspacesPage";

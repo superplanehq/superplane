@@ -638,6 +638,8 @@ CREATE TABLE public.factory_work_orders (
     status_note jsonb,
     origin_url text,
     origin_label text,
+    repository text,
+    default_branch text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
