@@ -180,11 +180,9 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	}
 
 	if scope.execution != nil {
-		if err := scope.execution.RollupUsage(tx); err != nil {
-			return err
-		}
+		return scope.execution.RollupUsage(tx)
 	}
-	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
+	return nil
 }
 
 func fundingSourceIsHosted(source string) bool {

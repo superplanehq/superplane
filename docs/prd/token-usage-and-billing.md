@@ -145,8 +145,8 @@ cap. Zero means hosted runs cannot start in that factory. Remaining factory
 budget is cap minus hosted billed spend for that factory. Effective remaining
 is the minimum of factory remaining and org remaining. Soft warning uses the
 installation threshold. Hard stop in `PrepareHostedRun` when effective
-remaining is 0. BYOK ignores the cap. Org-level one-in-flight hosted hold
-stays. Do not invent a second wallet.
+remaining is 0. BYOK ignores the cap. Concurrent hosted runs can overshoot
+remaining credit until a planned budget exists. Do not invent a second wallet.
 
 ## Assumptions
 
