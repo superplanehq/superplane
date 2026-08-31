@@ -15,6 +15,8 @@ import {
   isPRFeedbackSearchOpen,
   prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
+  factorySettingsSectionPath,
+  factorySettingsWorkspaceGeneralPath,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
@@ -165,11 +167,22 @@ describe("factoryAppPath", () => {
 
 describe("factorySettingsGeneralPathAfterKeyChange", () => {
   it("returns the General settings URL when the key changes", () => {
-    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe("/org-1/workspaces/AB/settings/general");
+    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe(
+      "/org-1/workspaces/AB/settings/workspace/general",
+    );
   });
 
   it("returns null when the key does not change", () => {
     expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "RF")).toBeNull();
+  });
+});
+
+describe("factorySettingsSectionPath", () => {
+  it("builds a scoped settings URL", () => {
+    expect(factorySettingsWorkspaceGeneralPath("org-1", "RF")).toBe("/org-1/workspaces/RF/settings/workspace/general");
+    expect(factorySettingsSectionPath("org-1", "RF", "organization", "api-keys")).toBe(
+      "/org-1/workspaces/RF/settings/organization/api-keys",
+    );
   });
 });
 

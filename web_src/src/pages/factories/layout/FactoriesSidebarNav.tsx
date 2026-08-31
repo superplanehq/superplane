@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Gauge, Kanban, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
@@ -65,7 +65,7 @@ export function FactoriesSidebarNav({
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
-  const settingsHref = factorySettingsPath(organizationId, factoryKey);
+  const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, factoryKey);
   const boardCurrent = isBoardPath(pathname);
   const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
