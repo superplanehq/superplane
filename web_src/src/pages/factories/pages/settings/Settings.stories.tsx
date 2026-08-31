@@ -8,6 +8,11 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
+import {
+  CONNECTED_SETUP_INTEGRATIONS,
+  SETUP_ANSWERS,
+  factoriesFixtureWithSetupAnswers,
+} from "../../__fixtures__/setupStoryFixtures";
 
 /** Factory settings with Account, Workspace, and Organization navigation. */
 const meta = {
@@ -87,7 +92,8 @@ export const Repository: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
-      factoriesFixture={defaultFactoriesFixture}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
     />
   ),
 };
