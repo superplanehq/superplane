@@ -105,6 +105,8 @@ export function useFactoryAgentSelection(onboarding: AgentOnboarding | undefined
 
 export function providerFor(onboarding: AgentOnboarding | undefined): AgentProvider {
   switch (onboarding?.agentProvider) {
+    case "AGENT_PROVIDER_ANTHROPIC":
+      return "anthropic";
     case "AGENT_PROVIDER_OPENAI":
       return "openai";
     case "AGENT_PROVIDER_OPENROUTER":
