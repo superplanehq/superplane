@@ -67,13 +67,13 @@ export const FIRST_RUN_COPY = {
     approve: "Approve",
     approved: "Approved",
     helper: "Work starts only on tickets you approve.",
-    empty: "No tickets scored above 65%. Connect more of your backlog or create a work order yourself.",
+    empty: "No tickets scored above 65%. Connect more of your backlog or create a task yourself.",
     rescan: "Rescan backlog",
   },
   board: {
     backlogHintTitle: "Tickets land here first.",
     backlogHintBody:
-      "New issues become work orders here. SuperPlane scores them for how well an agent can complete the work.",
+      "New issues become tasks here. SuperPlane scores them for how well an agent can complete the work.",
   },
 } as const;
 

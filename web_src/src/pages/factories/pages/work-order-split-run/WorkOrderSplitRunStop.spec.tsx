@@ -50,7 +50,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     handleBackToDraftMock.mockReset().mockResolvedValue(true);
   });
 
-  it("keeps Reject and Approve off a running work order", () => {
+  it("keeps Reject and Approve off a running task", () => {
     renderPopup(SPLIT_RUN_RUNNING);
 
     expect(screen.queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
@@ -59,7 +59,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.queryByTestId("split-run-review")).not.toBeInTheDocument();
   });
 
-  it("rejects and approves a waiting work order from the note", async () => {
+  it("rejects and approves a waiting task from the note", async () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
 
@@ -171,7 +171,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
   });
 
-  it("reruns a failed open work order from the note", async () => {
+  it("reruns a failed open task from the note", async () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(FAILED_WORK_ORDER));
 
@@ -181,7 +181,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     expect(handleStopMock).toHaveBeenCalledWith("rerun-step", expect.objectContaining({ kind: "failed" }));
   });
 
-  it("reopens a closed work order from the note", async () => {
+  it("reopens a closed task from the note", async () => {
     const user = userEvent.setup();
     renderPopup(splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_FAILED_ORDER));
 

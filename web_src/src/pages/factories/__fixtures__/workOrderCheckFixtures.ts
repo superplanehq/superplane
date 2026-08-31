@@ -19,7 +19,7 @@ import {
 
 /**
  * Mock checks for Storybook — scores that dedicated automations attach to a
- * work order (risk review, coverage, confidence). Shaped like the
+ * task (risk review, coverage, confidence). Shaped like the
  * `ListWorkOrderChecks` API response entries. Timestamps are relative to
  * now so the cards always read as recent.
  */
@@ -53,7 +53,7 @@ const CODE_COVERAGE_ANALYSIS = `### Coverage by package
 
 The drop in \`pkg/providers\` comes from the new \`RetryPolicy\` type: its failure branches are not exercised. Two focused tests on the backoff cap and the give-up path would recover the loss.`;
 
-const TEST_COVERAGE_ANALYSIS = `### New code in this work order
+const TEST_COVERAGE_ANALYSIS = `### New code in this task
 
 - \`RefundDispatcher.dispatch\` — covered by 6 new cases, including both terminal failure paths.
 - \`RetryPolicy.next\` — only the happy path is covered. The jitter bounds and the max-attempts cutoff have no direct tests.

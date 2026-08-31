@@ -249,7 +249,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.footerTone).toBe("waiting");
     expect(fixture.waitingNotes).toEqual([]);
-    expect(fixture.footer.sentence).toBe("This work order needs attention.");
+    expect(fixture.footer.sentence).toBe("This task needs attention.");
   });
 
   it("puts risk score and code quality on the verify step", () => {
@@ -309,7 +309,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(done.checks).toEqual([]);
     expect(done.waitingNotes).toEqual([]);
     expect(done.footerTone).toBe("done");
-    expect(done.footer.sentence).toBe("Work order completed successfully.");
+    expect(done.footer.sentence).toBe("Task completed successfully.");
     expect(done.footer.actions).toEqual([]);
     expect(done.footer.note).toEqual({
       headline: "This task succeeded",
@@ -892,7 +892,7 @@ describe("line board work-order examples", () => {
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
   });
 
-  // Scoring runs on the work order before a line plans it. The log must read
+  // Scoring runs on the task before a line plans it. The log must read
   // in that order: the intake that created the order, the score, then the plan.
   it("puts the Backlog analysis before the line steps", () => {
     const fixture = splitRunFixtureForWorkOrder(
@@ -1223,7 +1223,7 @@ describe("line board work-order examples", () => {
     });
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.appId).toBe("app-refund-implementer");
     expect(fixture.phases.find((phase) => phase.id === "implementation-1")?.runId).toBe(LINE_RUN_IMPLEMENT_NOTIFY_ID);
-    expect(fixture.footer.sentence).toBe("Work order completed successfully.");
+    expect(fixture.footer.sentence).toBe("Task completed successfully.");
     expect(fixture.footer.actions).toEqual([]);
     expect(
       fixture.phases.map((phase) => [phase.id, phase.name, phase.componentName, phase.status, phase.duration]),
@@ -1254,10 +1254,10 @@ describe("line board work-order examples", () => {
       ["19:51:17", "Run Claude Code", "Generate PR title and description", "passed"],
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
-      ["19:52:39", "Add Pull Request", "Attach PR to Work Order", "passed"],
+      ["19:52:39", "Add Pull Request", "Attach PR to Task", "passed"],
       ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
     ]);
-    expect(prStream.find((line) => line.componentName === "Attach PR to Work Order")?.pullRequest).toMatchObject({
+    expect(prStream.find((line) => line.componentName === "Attach PR to Task")?.pullRequest).toMatchObject({
       number: "6837",
       state: "STATE_MERGED",
       url: "https://github.com/superplanehq/superplane/pull/6837",

@@ -135,6 +135,30 @@ service Factories {
     };
   }
 
+  rpc MaterializeFactoryAppTemplate(MaterializeFactoryAppTemplateRequest) returns (MaterializeFactoryAppTemplateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize a factory app template";
+      description: "Builds a bundled factory app template with its installation settings";
+      tags: "Factory";
+    };
+  }
+
+  rpc MaterializeFactoryAppDefaults(MaterializeFactoryAppDefaultsRequest) returns (MaterializeFactoryAppDefaultsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize factory app defaults";
+      description: "Builds the bundled defaults for an installed factory app and preserves its connections";
+      tags: "Factory";
+    };
+  }
+
   // Factory intake APIs
 
   rpc ListFactoryIntakes(ListFactoryIntakesRequest) returns (ListFactoryIntakesResponse) {
@@ -703,6 +727,46 @@ message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
 }
 
+message FactoryAppTemplateIntegration {
+  string type = 1;
+  string id = 2;
+  string name = 3;
+}
+
+message FactoryAppTemplateAgent {
+  string component = 1;
+  string model = 2;
+  string planning_model = 3;
+  string credential_source = 4;
+  string credential_integration_name = 5;
+}
+
+message MaterializeFactoryAppTemplateRequest {
+  string factory_id = 1;
+  string template_id = 2;
+  string app_id = 3;
+  map<string, string> install_params = 4;
+  repeated FactoryAppTemplateIntegration integrations = 5;
+  FactoryAppTemplateAgent agent = 6;
+}
+
+message MaterializeFactoryAppTemplateResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
+}
+
+message MaterializeFactoryAppDefaultsRequest {
+  string factory_id = 1;
+  string app_id = 2;
+}
+
+message MaterializeFactoryAppDefaultsResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
+}
+
 // Factory intakes
 
 message FactoryIntake {
@@ -738,6 +802,10 @@ message FactoryIntake {
     repeated string labels = 2;
     LabelFilterMode label_filter_mode = 3;
     Assignment assignment = 4;
+    // When true, only create a work order for issues opened by someone with
+    // repository access (author_association OWNER, MEMBER, or COLLABORATOR).
+    // GitHub issue intakes only. Off by default.
+    bool authors_with_access = 5;
   }
 
   string id = 1;
@@ -854,6 +922,8 @@ message FactoryPRFeedbackHandler {
   message DiscussionSettings {
     string mention = 1;
     bool ignore_bots = 2;
+    // GitHub usernames of bots to react to even without the mention.
+    repeated string allowed_bots = 3;
   }
 
   // Settings stored in the canvas graph. This block is a read/write facade
@@ -1048,6 +1118,8 @@ message ListWorkOrdersRequest {
   repeated WorkOrder.State states = 3;
   repeated WorkOrder.Result results = 4;
   optional bool unassigned = 5;
+  // User ID. Returns orders where this user is an assignee or the creator.
+  optional string mine = 6;
 }
 
 message ListWorkOrdersResponse {

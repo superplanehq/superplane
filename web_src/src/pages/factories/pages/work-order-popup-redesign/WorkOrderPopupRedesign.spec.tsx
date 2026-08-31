@@ -205,8 +205,8 @@ describe("Line board job popup", () => {
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getByRole("heading", { name: "Add refund reconciliation test" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-open-work-order")).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("link", { name: "Open work order" })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Open work order" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: "Open task" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Open task" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-ingest")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-analyze")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
@@ -241,7 +241,7 @@ describe("Line board job popup", () => {
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
     expect(within(dialog).getByTestId("split-run-description")).toHaveTextContent(
-      "Let a user add emoji reactions on a work order itself (not only on comments).",
+      "Let a user add emoji reactions on a task itself (not only on comments).",
     );
   }, 15000);
 
@@ -326,7 +326,7 @@ describe("Line board job popup", () => {
     expect(within(dialog).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
   }, 20000);
 
-  it("dispatches a draft work order to the open line", async () => {
+  it("dispatches a draft task to the open line", async () => {
     const user = userEvent.setup();
     const line = REFUND_FACTORY_LINES[0];
 

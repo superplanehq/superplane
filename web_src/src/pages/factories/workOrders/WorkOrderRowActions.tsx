@@ -106,7 +106,7 @@ interface StartDraftButtonProps {
 }
 
 /**
- * Persistent Start control on a draft card. One click sends the work order
+ * Persistent Start control on a draft card. One click sends the task
  * to the preferred line, or opens the line picker when more than one line
  * exists.
  */
@@ -141,7 +141,7 @@ export function StartDraftButton({
 
   return (
     <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this work order.">
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this task.">
         {lineName ? (
           startButton
         ) : (
@@ -166,7 +166,7 @@ interface DispatchButtonProps {
   canDispatch: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
-  /** Only draft/open work orders show the button. */
+  /** Only draft/open tasks show the button. */
   visible: boolean;
   variant?: "ghost" | "outline";
 }
@@ -185,7 +185,7 @@ export function InlineDispatchButton({
   }
   return (
     <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
         <DispatchWorkOrderPopover
           lines={lines}
           isSaving={isDispatching}

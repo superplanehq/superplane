@@ -121,7 +121,7 @@ export const WIZARD_STEPS = [
     id: "issues" as const,
     label: "Issues",
     purpose:
-      "Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create work orders yourself.",
+      "Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create tasks yourself.",
   },
   {
     id: "agent" as const,

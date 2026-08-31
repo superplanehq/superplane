@@ -220,6 +220,7 @@ describe("IntakeSettingsHost", () => {
         labels: [],
         labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
         assignment: "ASSIGNMENT_ANY",
+        authorsWithAccess: false,
       },
     });
   });

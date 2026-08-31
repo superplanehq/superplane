@@ -95,6 +95,12 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 		filters.AssigneeIDs = append(filters.AssigneeIDs, userID)
 	}
 
+	if req.Mine != nil {
+		if userID, err := uuid.Parse(*req.Mine); err == nil {
+			filters.Mine = &userID
+		}
+	}
+
 	return filters
 }
 

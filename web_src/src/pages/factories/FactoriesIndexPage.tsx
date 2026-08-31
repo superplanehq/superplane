@@ -77,7 +77,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           Create your first workspace
         </Heading>
         <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Workspaces group work orders, automations, and apps.
+          Workspaces group tasks, automations, and apps.
         </Text>
         <PermissionTooltip
           allowed={canCreate || permissionsLoading}

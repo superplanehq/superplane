@@ -488,7 +488,7 @@ export const PR_CLOSURE_COMPLETED_WORK_ORDER_EVENTS: FactoriesWorkOrderEvent[] =
   automationClosedEvent(PR_CLOSURE_COMPLETED_WORK_ORDER, YESTERDAY, "completed", {
     appId: "app-refund-done",
     appName: "PR Closure",
-    nodeName: "Complete Work Order",
+    nodeName: "Complete Task",
   }),
 ];
 

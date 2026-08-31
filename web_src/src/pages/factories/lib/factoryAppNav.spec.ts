@@ -15,10 +15,10 @@ describe("resolveFactoryAppBackNav", () => {
       resolveFactoryAppBackNav("org", "fac", {
         from: "automations",
         appId: "app-1",
-        appName: "Label to work order",
+        appName: "Label to task",
       }),
     ).toEqual({
-      label: "Label to work order",
+      label: "Label to task",
       href: "/org/workspaces/fac/automations/app-1",
     });
   });

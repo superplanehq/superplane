@@ -31,10 +31,12 @@ export type BacklogColumnProps = {
   onCreateWorkOrder: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
-  /** Work orders the Backlog automation analyzes right now. */
+  /** Tasks the Backlog automation analyzes right now. */
   analyzingOrderIds?: ReadonlySet<string>;
-  /** Intakes that open work orders in this backlog, listed at its head. */
+  /** Intakes that open tasks in this backlog, listed at its head. */
   intakePanel?: BacklogIntakePanel;
+  /** Configure link for the factory Backlog automation, when one exists. */
+  automationHref?: string | null;
 };
 
 export type BacklogIntakePanel = {
@@ -66,6 +68,7 @@ export function BacklogColumn({
   onOpenWorkOrder,
   analyzingOrderIds,
   intakePanel,
+  automationHref,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -110,6 +113,7 @@ export function BacklogColumn({
             <ColumnLaneMenu
               title={title}
               testId="lines-backlog-menu"
+              automationHref={automationHref}
               onEdit={onOpenSettings}
               colorId={colorId}
               onColorChange={onColorChange}

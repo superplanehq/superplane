@@ -16,7 +16,7 @@ interface WorkOrdersTableViewProps {
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
-  /** Work orders with a dispatch in flight. Only their controls show a busy state. */
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;

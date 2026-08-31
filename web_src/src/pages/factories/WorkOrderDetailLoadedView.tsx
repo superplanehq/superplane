@@ -81,7 +81,7 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
   return (
     <>
       <WorkOrderDetailHeader
-        orderTitle={props.order.title ?? "Work Order"}
+        orderTitle={props.order.title ?? "Task"}
         orderIdentifier={identifier === "—" ? undefined : identifier}
         backHref={isDialog ? undefined : workOrderBoardBackHref(props)}
         backLabel="Workspace"
@@ -192,7 +192,7 @@ function WorkOrderDetailMainColumn({
       <section className={order.description || hasChecksSection || showStatusNotes ? "mt-10" : undefined}>
         <h2 className="workspace-section-title">Activity</h2>
         <p className="workspace-body-text mt-1 text-muted-foreground">
-          Actions and comments on the work order, plus factory line runs.
+          Actions and comments on the task, plus factory line runs.
         </p>
         <div className="mt-4">
           <WorkOrderActivityTimeline

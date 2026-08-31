@@ -54,7 +54,7 @@ describe("WORK_ORDER_BOARD_LANES", () => {
   it("names the waiting lane Needs attention", () => {
     const review = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "review");
     expect(review?.title).toBe("Needs attention");
-    expect(review?.description).toBe("Work orders that wait for a human decision.");
+    expect(review?.description).toBe("Tasks that wait for a human decision.");
   });
 });
 

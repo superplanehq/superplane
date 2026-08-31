@@ -87,6 +87,16 @@ func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactor
 	return actions.ListFactoryApps(ctx, organizationID, req)
 }
 
+func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req *pb.MaterializeFactoryAppTemplateRequest) (*pb.MaterializeFactoryAppTemplateResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MaterializeFactoryAppTemplate(ctx, organizationID, req)
+}
+
+func (s *FactoryService) MaterializeFactoryAppDefaults(ctx context.Context, req *pb.MaterializeFactoryAppDefaultsRequest) (*pb.MaterializeFactoryAppDefaultsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MaterializeFactoryAppDefaults(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFactoryIntakesRequest) (*pb.ListFactoryIntakesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryIntakes(ctx, organizationID, req)

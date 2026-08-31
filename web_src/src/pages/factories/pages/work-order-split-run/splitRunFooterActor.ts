@@ -24,7 +24,7 @@ const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> 
 };
 
 /**
- * Person or automation that closed or stopped this work order. Close
+ * Person or automation that closed or stopped this task. Close
  * attribution comes from `order.status.updated`. Stop attribution comes
  * from a cancelled `step.execution.finished` (cancelling a run leaves the
  * order open and does not write a status event). Empty when that event

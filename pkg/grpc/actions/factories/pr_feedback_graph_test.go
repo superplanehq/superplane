@@ -93,6 +93,34 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Equal(t, prFeedbackActivityDescriptionExpression(), activity.Configuration["description"])
 	})
 
+	t.Run("the allowed bots list is applied to every trigger", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:  "acme/app",
+			Mention:     prFeedbackDefaultMention,
+			IgnoreBots:  true,
+			AllowedBots: []string{"coderabbitai", "bugbot"},
+		})
+
+		for _, nodeID := range []string{prFeedbackCommentTriggerNodeID, prFeedbackReviewTriggerNodeID, prFeedbackReplyTriggerNodeID} {
+			node := findSpecNode(t, canvas, nodeID)
+			assert.Equal(t, []any{"coderabbitai", "bugbot"}, node.Configuration["allowedBots"])
+		}
+	})
+
+	t.Run("an empty allowed bots list is omitted from trigger configuration", func(t *testing.T) {
+		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository: "acme/app",
+			Mention:    prFeedbackDefaultMention,
+			IgnoreBots: true,
+		})
+
+		for _, nodeID := range []string{prFeedbackCommentTriggerNodeID, prFeedbackReviewTriggerNodeID, prFeedbackReplyTriggerNodeID} {
+			node := findSpecNode(t, canvas, nodeID)
+			_, exists := node.Configuration["allowedBots"]
+			assert.False(t, exists)
+		}
+	})
+
 	t.Run("the runner checks out the pull request head branch", func(t *testing.T) {
 		canvas := buildPRFeedbackCanvas(prFeedbackBuildRequest{
 			Repository: "acme/app",
@@ -110,6 +138,13 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "order().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, `${COAUTHORS:-}`)
+
+		// "git commit -s" signs off and the agent amends commits, so appending
+		// the trailers wrote them twice. It also put a blank line before the
+		// sign-off, which left it outside the trailer block GitHub reads.
+		assert.Contains(t, dco, "--if-exists doNothing")
+		assert.Contains(t, dco, "--if-exists addIfDifferent")
+		assert.NotContains(t, dco, `>> "$1"`)
 	})
 
 	t.Run("the runner names the model it runs", func(t *testing.T) {

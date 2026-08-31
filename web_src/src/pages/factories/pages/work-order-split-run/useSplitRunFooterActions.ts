@@ -22,21 +22,21 @@ type StopFooter = Pick<SplitRunFooter, "kind" | "run" | "status"> & {
 
 function closeToast(choice: SplitRunStopChoice): string {
   if (choice === "completed") {
-    return "Work order closed as completed.";
+    return "Task closed as completed.";
   }
   if (choice === "canceled") {
-    return "Work order closed as rejected.";
+    return "Task closed as rejected.";
   }
   if (choice === "reopen") {
-    return "Work order reopened.";
+    return "Task reopened.";
   }
   if (choice === "rerun-start") {
-    return "Work order started from the first step.";
+    return "Task started from the first step.";
   }
   if (choice === "rerun-step") {
-    return "Work order step started again.";
+    return "Task step started again.";
   }
-  return "Work order closed as failed.";
+  return "Task closed as failed.";
 }
 
 function rejectToast(): string {
@@ -45,15 +45,15 @@ function rejectToast(): string {
 
 function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): string {
   if (choice === "reopen") {
-    return "Failed to reopen work order";
+    return "Failed to reopen task";
   }
   if (isSplitRunRerunChoice(choice)) {
-    return "Failed to start the work order";
+    return "Failed to start the task";
   }
   if (footer.kind === "running" && footer.run) {
     return "Failed to stop the run";
   }
-  return "Failed to close work order";
+  return "Failed to close task";
 }
 
 export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
@@ -110,7 +110,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       showSuccessToast(rejectToast());
       return true;
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to close task"));
       return false;
     }
   }, [busy, closeWorkOrder, live, orderId]);
@@ -137,7 +137,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
           onRerun: async (rerunChoice) => {
             const lineName = footer.lineName?.trim();
             if (!lineName) {
-              throw new Error("A factory line is required to rerun this work order");
+              throw new Error("A factory line is required to rerun this task");
             }
             await dispatchWorkOrder.mutateAsync({
               orderId,

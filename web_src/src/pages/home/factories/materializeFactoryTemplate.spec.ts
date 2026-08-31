@@ -62,6 +62,7 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/web",
       backlogRepository: "acme/web",
+      defaultBranch: "main",
     });
     expect(
       normalizeFactoryInstallParams({
@@ -73,7 +74,24 @@ describe("materializeFactoryTemplate", () => {
       repository: "acme/web",
       appRepository: "acme/app",
       backlogRepository: "acme/backlog",
+      defaultBranch: "main",
     });
+  });
+
+  it("substitutes the default branch placeholder", () => {
+    expect(
+      substituteInstallParams("base: {{ install_params.defaultBranch }}", {
+        defaultBranch: "staging",
+      }),
+    ).toBe("base: staging");
+  });
+
+  it("defaults defaultBranch to main when absent or blank", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
+      "staging",
+    );
   });
 
   it("wires integration refs onto matching components", () => {
@@ -216,93 +234,5 @@ spec:
   it("exposes separate app and backlog install params on the bundled definition", () => {
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
-  });
-
-  // A hosted run rejects a model that is not on the allowlist, so the planner
-  // takes the Opus id the caller resolved, not the "opus" alias.
-  it("gives the planning agent the resolved Opus id on hosted credentials", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-planning"),
-      canvasName: "Plan",
-      canvasId: "canvas-hosted-plan",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerClaudeCode",
-        model: "claude-sonnet-4-6",
-        planningModel: "claude-opus-4-6",
-        credentials: { source: "hosted" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/id: planner-agent-no-issue[\s\S]*model: claude-opus-4-6/);
-    expect(canvasYaml).not.toContain("model: claude-sonnet-4-6");
-    expect(canvasYaml).not.toMatch(/model: opus$/m);
-  });
-
-  it("rewrites Claude Code credentials to hosted when Claude is not connected", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-implementation"),
-      canvasName: "Implementation",
-      canvasId: "canvas-hosted",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerClaudeCode",
-        model: "claude-sonnet-4-6",
-        credentials: { source: "hosted" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerClaudeCode[\s\S]*credentials:[\s\S]*source: hosted/);
-    expect(canvasYaml).toContain("model: claude-sonnet-4-6");
-    expect(canvasYaml).not.toMatch(/credentials:[\s\S]*source: integration[\s\S]*name: claude/);
-    expect(canvasYaml).not.toContain("model: sonnet");
-  });
-
-  it("rewrites Claude Code nodes to hosted OpenRouter with an allowlisted model", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-planning"),
-      canvasName: "Planning",
-      canvasId: "canvas-openrouter",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerOpenRouter",
-        model: "openai/gpt-4.1",
-        credentials: { source: "hosted" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*source: hosted/);
-    expect(canvasYaml).toContain("model: openai/gpt-4.1");
-    expect(canvasYaml).not.toContain("runnerClaudeCode");
-  });
-
-  it("rewrites Claude Code nodes to an OpenRouter integration", () => {
-    const canvasYaml = materializeFactoryCanvas({
-      definition: getFactoryDefinition("line-implementation"),
-      canvasName: "Implement",
-      canvasId: "canvas-or-byok",
-      installParams: { appRepository: "acme/app", backlogRepository: "acme/backlog" },
-      integrations: {
-        github: { id: "int-1", name: "acme-github", ready: true },
-        openrouter: { id: "int-3", name: "acme-openrouter", ready: true },
-      },
-      agentRewrite: {
-        component: "runnerOpenRouter",
-        model: "anthropic/claude-sonnet-4-6",
-        credentials: { source: "integration", name: "acme-openrouter" },
-      },
-    });
-
-    expect(canvasYaml).toMatch(/component: runnerOpenRouter[\s\S]*credentials:[\s\S]*name: acme-openrouter/);
-    expect(canvasYaml).not.toContain("runnerClaudeCode");
   });
 });

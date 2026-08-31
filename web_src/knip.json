@@ -1,11 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "project": [
-    "src/**/*.{ts,tsx}",
-    ".storybook/**/*.{ts,tsx}",
-    "scripts/**/*.mjs"
-  ],
+  "project": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.mjs"],
   "ignoreDependencies": ["monaco-editor", "tippy.js"],
+  "paths": {
+    "@factory-templates/*": ["../pkg/grpc/actions/factories/templates/*"]
+  },
   "ignore": [],
   "rules": {
     "nsTypes": "off"

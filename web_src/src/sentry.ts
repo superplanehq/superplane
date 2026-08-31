@@ -21,6 +21,23 @@ export function isIgnoredConsoleMessage(message: unknown): boolean {
   return typeof message === "string" && IGNORED_CONSOLE_MESSAGES.some((pattern) => pattern.test(message));
 }
 
+// True when the event is the known-benign monaco-editor "Canceled"
+// unhandled rejection. monaco-editor (CDN-loaded) rejects a DeferredPromise
+// with no .catch() when a WebKit clipboard-write is superseded by a new copy
+// action. This is upstream noise, not a bug in our code.
+export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
+  const exception = event.exception?.values?.[0];
+  if (exception?.value !== "Canceled") {
+    return false;
+  }
+
+  const frames = exception.stacktrace?.frames ?? [];
+  return (
+    frames.length > 0 &&
+    frames.every((frame) => frame.filename?.includes("monaco-editor") || frame.filename?.includes("@sentry"))
+  );
+}
+
 let dsn: string | undefined;
 let environment: string | undefined;
 
@@ -39,6 +56,10 @@ if (dsn) {
       const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
       const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
       if (allDash0) {
+        return null;
+      }
+
+      if (isMonacoCanceledEvent(event)) {
         return null;
       }
 

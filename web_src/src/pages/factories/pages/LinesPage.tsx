@@ -215,7 +215,7 @@ export function LinesPage() {
     if (routeOrderNumber && permalink.status === "loading") {
       return (
         <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
-          <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading work order…</p>
+          <p className="px-6 py-8 text-[13px] text-muted-foreground">Loading task…</p>
         </div>
       );
     }
@@ -510,6 +510,7 @@ function LineDetail({
           factoryId={factoryId}
           factoryKey={factoryKey}
           line={line}
+          apps={apps}
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
@@ -718,6 +719,7 @@ function PhaseBoard({
   factoryId,
   factoryKey,
   line,
+  apps,
   backlogOrders,
   verifyOrders,
   doneOrders,
@@ -735,6 +737,7 @@ function PhaseBoard({
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
+  apps: Array<{ id?: string; name?: string }>;
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
@@ -755,6 +758,14 @@ function PhaseBoard({
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
+  const backlogAutomationApp = findBacklogAutomationApp(apps);
+  const backlogAutomationHref =
+    backlogAutomationApp && lineId
+      ? factoryAppConfigurePath(organizationId, factoryKey, backlogAutomationApp.id, {
+          from: "lines",
+          lineId,
+        })
+      : undefined;
 
   const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
     setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
@@ -815,6 +826,7 @@ function PhaseBoard({
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
+          automationHref={backlogAutomationHref}
         />
       </div>
       {columns.map((column, index) => {
@@ -1010,7 +1022,7 @@ function ColumnConfigureMenu({ title, href, testId }: { title: string; href: str
   );
 }
 
-/** Phase lanes borrow the Work Orders lane tints: blue in flight, grey once closed. */
+/** Phase lanes borrow the Tasks lane tints: blue in flight, grey once closed. */
 const PHASE_LANE_TONE: Record<PhaseGlyphKind, BoardLaneTone> = {
   running: "running",
   waiting: "running",

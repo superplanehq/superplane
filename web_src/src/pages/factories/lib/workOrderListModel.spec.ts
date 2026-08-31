@@ -272,9 +272,9 @@ describe("scope + filter + search + ordering", () => {
   it("labels the attention scope and describes My as work you started", () => {
     const attention = WORK_ORDER_SCOPES.find((scope) => scope.id === "active");
     expect(attention?.label).toBe("Needs attention");
-    expect(attention?.tooltip).toBe("Work orders that need your attention.");
+    expect(attention?.tooltip).toBe("Tasks that need your attention.");
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
-      "Work orders you created or started. SuperPlane assigns those to you.",
+      "Tasks you created or started. SuperPlane assigns those to you.",
     );
   });
 

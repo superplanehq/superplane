@@ -218,6 +218,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		// Self-scoped: members read their own notification settings.
+		// Note: /api/v1/me, /api/v1/me/token, and /api/v1/me/tokens* have
+		// no entry here on purpose. They only ever act on the calling
+		// user's own record, so GatewayAuthorizer.AuthorizeHTTP's
+		// no-rule-found path (allow without an org permission check) is
+		// the correct behavior; the authenticated gRPC handler already
+		// requires a valid session or personal token before reaching them.
 		{Method: "GET", Pattern: "/api/v1/me/notification-settings"}: {
 			Resource:                     "notifications",
 			Action:                       "read",
@@ -631,6 +637,18 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "POST", Pattern: "/api/v1/factories"}: {
 			Resource:                     "factories",
 			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"}: {
+			Resource:                     "factories",
+			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},

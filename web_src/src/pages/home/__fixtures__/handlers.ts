@@ -173,7 +173,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
             },
           ],
         },

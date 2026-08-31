@@ -1,7 +1,7 @@
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import { LINE_INTAKE_COPY, lineIntakeListenTitle, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 
-/** Intakes at the head of Backlog: each one opens the work orders below it. */
+/** Intakes at the head of Backlog: each one opens the tasks below it. */
 export function BacklogIntakeSources({
   intakes,
   showAddIntake = false,

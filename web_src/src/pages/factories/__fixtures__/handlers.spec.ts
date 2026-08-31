@@ -29,7 +29,7 @@ describe("matchFactoryPageFixture", () => {
     expect(plan?.metrics?.successRatePct).toBe(82);
   });
 
-  it("serves work orders and includes both open and closed entries", async () => {
+  it("serves tasks and includes both open and closed entries", async () => {
     const orders = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders`);
     const body = (await orders.json()) as { orders: Array<{ id?: string; state?: string }> };
     const ids = body.orders.map((entry) => entry.id);
@@ -129,7 +129,7 @@ describe("matchFactoryPageFixture", () => {
     expect(body.factory?.key).toBe("NEWWA");
   });
 
-  it("updates a work order title and description", async () => {
+  it("updates a task title and description", async () => {
     const fixture = structuredClone(defaultFactoriesFixture);
     const response = await fetchFactoryPageFixture(
       `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${OPEN_WORK_ORDER.id}`,

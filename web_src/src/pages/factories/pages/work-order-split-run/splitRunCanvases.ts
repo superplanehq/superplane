@@ -12,10 +12,10 @@ import {
   OPEN_WORK_ORDER_PULL_REQUESTS,
 } from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
-import issueIntakeYaml from "@/pages/home/factories/line-apps/issue-intake.canvas.yaml?raw";
-import planningYaml from "@/pages/home/factories/line-apps/planning.canvas.yaml?raw";
-import implementationYaml from "@/pages/home/factories/line-apps/implementation.canvas.yaml?raw";
-import prClosureYaml from "@/pages/home/factories/line-apps/pr-closure.canvas.yaml?raw";
+import issueIntakeYaml from "@factory-templates/issue-intake.canvas.yaml?raw";
+import planningYaml from "@factory-templates/line-planning.canvas.yaml?raw";
+import implementationYaml from "@factory-templates/line-implementation.canvas.yaml?raw";
+import prClosureYaml from "@factory-templates/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
@@ -355,7 +355,7 @@ const CLOSURE_NOTES: FactoriesWorkOrderArtifact = {
   data: {
     name: "closure.md",
     title: "closure.md",
-    body: "The pull request merged. SuperPlane closed the work order.",
+    body: "The pull request merged. SuperPlane closed the task.",
   },
 };
 
@@ -576,7 +576,7 @@ function agentNotes(nodeId: string): string[] {
   if (nodeId === "assess-pr-risk") {
     return ["Reading the pull request diff.", "Scoring retry-policy risk.", "Writing the risk review."];
   }
-  return ["Reading the work order.", "Writing the change.", "Running the local checks."];
+  return ["Reading the task.", "Writing the change.", "Running the local checks."];
 }
 
 function checkName(nodeId: string, fallback: string): string {

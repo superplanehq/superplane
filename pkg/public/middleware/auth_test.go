@@ -237,6 +237,119 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	})
 }
 
+func TestOrganizationAuthMiddleware_PersonalAPIToken(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		user, ok := GetUserFromContext(req.Context())
+		require.True(t, ok)
+		assert.Equal(t, r.User, user.ID)
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	t.Run("valid personal token authenticates as the owning user", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		token := models.NewUserAPIToken(r.User, "CI token", crypto.HashToken(rawToken))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+
+		found, err := models.FindUserAPITokenByHash(database.Conn(), crypto.HashToken(rawToken))
+		require.NoError(t, err)
+		assert.NotNil(t, found.LastUsedAt, "last_used_at should advance on successful auth")
+	})
+
+	t.Run("revoked personal token is rejected", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		token := models.NewUserAPIToken(r.User, "Revoked token", crypto.HashToken(rawToken))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
+		require.NoError(t, token.HardDelete(database.Conn()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
+	t.Run("revoking one personal token does not invalidate the others", func(t *testing.T) {
+		rawA, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		tokenA := models.NewUserAPIToken(r.User, "Token A", crypto.HashToken(rawA))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), tokenA))
+
+		rawB, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		tokenB := models.NewUserAPIToken(r.User, "Token B", crypto.HashToken(rawB))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), tokenB))
+
+		require.NoError(t, tokenA.HardDelete(database.Conn()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawB)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("blocking the account revokes the personal token", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		token := models.NewUserAPIToken(r.User, "Blocked account token", crypto.HashToken(rawToken))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
+
+		// Account.Block hard-deletes every personal token for the account,
+		// so the token stops authenticating immediately.
+		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
+	t.Run("personal token is rejected as a defense-in-depth check for a blocked account", func(t *testing.T) {
+		// Simulate a row that somehow survived a block (defense in depth):
+		// block the account directly, without going through Account.Block,
+		// so the token row is not deleted, then confirm auth still rejects it.
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		token := models.NewUserAPIToken(r.User, "Surviving token", crypto.HashToken(rawToken))
+		require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
+
+		now := time.Now()
+		require.NoError(t, database.Conn().Model(&models.Account{}).
+			Where("id = ?", r.Account.ID).
+			Update("blocked_at", now).Error)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusForbidden, res.Code)
+		assert.Contains(t, res.Body.String(), models.AccountBlockedMessage)
+	})
+}
+
 func TestOrganizationAuthMiddleware_APIKeyWithDeletedCreator(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")

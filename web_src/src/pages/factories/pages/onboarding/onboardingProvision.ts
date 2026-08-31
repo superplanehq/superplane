@@ -43,6 +43,7 @@ async function installOnboardingApp(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<{ canvasId: string; canvasName: string }> {
@@ -53,6 +54,7 @@ async function installOnboardingApp(args: {
     installParams: {
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
     },
     startingTaskPrompt: "",
     navigateOnComplete: false,
@@ -71,6 +73,7 @@ async function provisionLineApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
@@ -82,6 +85,7 @@ async function provisionLineApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -101,6 +105,7 @@ export async function provisionEventApps(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
 }): Promise<void> {
@@ -111,6 +116,7 @@ export async function provisionEventApps(args: {
       selections: args.selections,
       appRepository: args.appRepository,
       backlogRepository: args.backlogRepository,
+      defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
       installFactory: args.installFactory,
     });
@@ -121,8 +127,8 @@ export type ListFactoryIntakes = () => Promise<FactoriesFactoryIntake[]>;
 
 export type CreateFactoryIntake = (input: { source: FactoriesFactoryIntakeSource }) => Promise<FactoriesFactoryIntake>;
 
-// The GitHub intake opens a work order for each matching issue. The Backlog
-// canvas scores those work orders. The backend reads the connection and the
+// The GitHub intake opens a task for each matching issue. The Backlog
+// canvas scores those tasks. The backend reads the connection and the
 // backlog repository from the saved onboarding config, so this runs after the
 // wizard choices are stored. A retried finish must not add a second copy.
 export async function provisionGithubIntake(args: {
@@ -167,6 +173,7 @@ export async function provisionLine(args: {
   selections: IntegrationSelections;
   appRepository: string;
   backlogRepository: string;
+  defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
@@ -182,6 +189,7 @@ export async function provisionLine(args: {
     selections: args.selections,
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
+    defaultBranch: args.defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
   });

@@ -13,6 +13,10 @@ export const FACTORY_CANVAS_ID_PLACEHOLDER = "__FACTORY_CANVAS_ID__";
  */
 export function normalizeFactoryInstallParams(params: Record<string, string>): Record<string, string> {
   const next = { ...params };
+  if (!next.defaultBranch?.trim()) {
+    next.defaultBranch = "main";
+  }
+
   const legacyRepository = next.repository?.trim();
   if (!legacyRepository) return next;
 
@@ -155,6 +159,9 @@ export function materializeFactoryCanvas(args: {
   integrations: IntegrationSelections;
   agentRewrite?: FactoryAgentRewrite;
 }): string {
+  if (!args.definition.canvasYaml) {
+    throw new Error(`Factory template ${args.definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(args.definition.canvasYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: args.canvasId,
   });
@@ -185,6 +192,9 @@ export function materializeFactoryCanvas(args: {
 }
 
 export function materializeFactoryConsole(definition: FactoryDefinition, canvasName: string, canvasId: string): string {
+  if (!definition.consoleYaml) {
+    throw new Error(`Factory template ${definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(definition.consoleYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: canvasId,
   });

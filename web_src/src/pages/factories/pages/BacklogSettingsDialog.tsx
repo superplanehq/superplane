@@ -83,7 +83,7 @@ export function BacklogSettingsDialog({ open, name, size, onSave, onClose }: Bac
       <DialogContent className="sm:max-w-md" data-testid="lines-backlog-settings">
         <DialogHeader>
           <DialogTitle>Edit backlog</DialogTitle>
-          <DialogDescription>Set the column name and the maximum number of work orders.</DialogDescription>
+          <DialogDescription>Set the column name and the maximum number of tasks.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -116,7 +116,7 @@ export function BacklogSettingsDialog({ open, name, size, onSave, onClose }: Bac
                 }
               }}
             />
-            <p className="text-xs text-muted-foreground">Maximum number of work orders. Leave empty for no limit.</p>
+            <p className="text-xs text-muted-foreground">Maximum number of tasks. Leave empty for no limit.</p>
             {sizeError ? <p className="text-xs text-red-600">{sizeError}</p> : null}
           </div>
         </div>

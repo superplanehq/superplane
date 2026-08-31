@@ -365,7 +365,7 @@ function SplitRunPopupTabs({
       className="flex min-h-0 min-w-0 flex-1 flex-col"
     >
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-2">
-        <TabsList aria-label="Work order views">
+        <TabsList aria-label="Task views">
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="log">
             <WorkOrderStatusDot

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -20,11 +21,12 @@ const (
 )
 
 type prCommentTriggerConfiguration struct {
-	Repository               string `json:"repository" mapstructure:"repository"`
-	ContentFilter            string `json:"contentFilter" mapstructure:"contentFilter"`
-	IgnoreBots               bool   `json:"ignoreBots" mapstructure:"ignoreBots"`
-	IncludeReviewSubmissions *bool  `json:"includeReviewSubmissions" mapstructure:"includeReviewSubmissions"`
-	CommentScope             string `json:"commentScope" mapstructure:"commentScope"`
+	Repository               string   `json:"repository" mapstructure:"repository"`
+	ContentFilter            string   `json:"contentFilter" mapstructure:"contentFilter"`
+	IgnoreBots               bool     `json:"ignoreBots" mapstructure:"ignoreBots"`
+	AllowedBots              []string `json:"allowedBots" mapstructure:"allowedBots"`
+	IncludeReviewSubmissions *bool    `json:"includeReviewSubmissions" mapstructure:"includeReviewSubmissions"`
+	CommentScope             string   `json:"commentScope" mapstructure:"commentScope"`
 }
 
 func (c prCommentTriggerConfiguration) includeReviewSubmissions() bool {
@@ -44,7 +46,7 @@ func (c prCommentTriggerConfiguration) commentScope() string {
 }
 
 func prCommentConfigurationFields() []configuration.Field {
-	return append(prCommentBaseConfigurationFields(), ignoreBotsConfigurationField())
+	return append(prCommentBaseConfigurationFields(), ignoreBotsConfigurationField(), allowedBotsConfigurationField())
 }
 
 func prReviewCommentConfigurationFields() []configuration.Field {
@@ -74,6 +76,7 @@ func prReviewCommentConfigurationFields() []configuration.Field {
 			},
 		},
 		ignoreBotsConfigurationField(),
+		allowedBotsConfigurationField(),
 	)
 }
 
@@ -110,6 +113,24 @@ func ignoreBotsConfigurationField() configuration.Field {
 		Required:    false,
 		Default:     false,
 		Description: "Skip comments and reviews written by GitHub Apps and bots.",
+	}
+}
+
+func allowedBotsConfigurationField() configuration.Field {
+	return configuration.Field{
+		Name:        "allowedBots",
+		Label:       "Allowed Bots",
+		Type:        configuration.FieldTypeList,
+		Required:    false,
+		Description: "React to comments from these GitHub Apps or bots even when the comment does not match the content filter. Enter the bot login, for example coderabbitai.",
+		TypeOptions: &configuration.TypeOptions{
+			List: &configuration.ListTypeOptions{
+				ItemLabel: "Bot username",
+				ItemDefinition: &configuration.ListItemDefinition{
+					Type: configuration.FieldTypeString,
+				},
+			},
+		},
 	}
 }
 
@@ -270,6 +291,42 @@ func isBotAuthor(eventType string, data map[string]any) bool {
 
 	userType, _ := user["type"].(string)
 	return strings.EqualFold(userType, "Bot")
+}
+
+func authorLogin(eventType string, data map[string]any) string {
+	user := authorUser(eventType, data)
+	if user == nil {
+		return ""
+	}
+
+	login, _ := user["login"].(string)
+	return login
+}
+
+func isAllowedBot(eventType string, data map[string]any, allowed []string) bool {
+	if len(allowed) == 0 {
+		return false
+	}
+
+	if !isBotAuthor(eventType, data) {
+		return false
+	}
+
+	login := normalizeBotName(authorLogin(eventType, data))
+	if login == "" {
+		return false
+	}
+
+	return slices.ContainsFunc(allowed, func(candidate string) bool {
+		return normalizeBotName(candidate) == login
+	})
+}
+
+func normalizeBotName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.TrimPrefix(name, "@")
+	name = strings.TrimSuffix(name, "[bot]")
+	return name
 }
 
 func authorUser(eventType string, data map[string]any) map[string]any {

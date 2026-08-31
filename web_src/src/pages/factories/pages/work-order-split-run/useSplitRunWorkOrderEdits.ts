@@ -84,7 +84,7 @@ export function useSplitRunWorkOrderEdits(args: {
       }
       try {
         await updateWorkOrder.mutateAsync({ orderId: args.orderId, title: next });
-        showSuccessToast("Work order title updated.");
+        showSuccessToast("Task title updated.");
       } catch (error) {
         setTitle(previous);
         showErrorToast(getApiErrorMessage(error, "Failed to update the title"));
@@ -103,7 +103,7 @@ export function useSplitRunWorkOrderEdits(args: {
       }
       try {
         await updateWorkOrder.mutateAsync({ orderId: args.orderId, description: next });
-        showSuccessToast("Work order description updated.");
+        showSuccessToast("Task description updated.");
       } catch (error) {
         descriptionSaved.current = false;
         setDescription(previous);

@@ -4,12 +4,12 @@ import { useCallback, useState } from "react";
 
 const NO_ORDERS: ReadonlySet<string> = new Set();
 
-/** Shared mutation state and callbacks for every surface that renders work order cards. */
+/** Shared mutation state and callbacks for every surface that renders task cards. */
 export function useWorkOrderCardActions(organizationId: string, factoryId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   // The mutation is shared by every card on the page, so its pending flag
-  // cannot say which card the user clicked. Track the work orders in flight
+  // cannot say which card the user clicked. Track the tasks in flight
   // instead, so only their controls show a busy state.
   const [dispatchingOrderIds, setDispatchingOrderIds] = useState<ReadonlySet<string>>(NO_ORDERS);
 
@@ -20,7 +20,7 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
         await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName });
         showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {
-        showErrorToast("Failed to dispatch work order.");
+        showErrorToast("Failed to dispatch task.");
       } finally {
         setDispatchingOrderIds((current) => withoutOrderId(current, orderId));
       }

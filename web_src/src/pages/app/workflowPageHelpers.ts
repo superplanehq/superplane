@@ -451,7 +451,7 @@ export function shouldClearRunDetailNode({
 /**
  * True when run-inspection mode was entered with a run already selected (e.g.
  * a fresh page load / navigation landing on `?run=<id>`, such as Lines,
- * Automations, or Work Order deep links) and no specific node is already
+ * Automations, or Task deep links) and no specific node is already
  * about to be focused via the sidebar (`?sidebar=1&node=<id>`). Used to
  * request a one-time "fit all participants" on entry, mirroring what
  * `handleSelectRun` already does for in-app run selection.
