@@ -105,6 +105,8 @@ function buildOrderExample(): Record<string, unknown> {
     factory_id: EXAMPLE_FACTORY_ID,
     state: "open",
     result: "",
+    repository: "acme/service",
+    default_branch: "main",
     url: exampleOrderUrl(),
     source: {
       issue: { number: 42, title: "Fix login" },
@@ -124,6 +126,17 @@ function buildOrderExample(): Record<string, unknown> {
         created_at: "2024-01-01T00:00:00Z",
       },
     ],
+  };
+}
+
+function buildWorkspaceExample(): Record<string, unknown> {
+  return {
+    id: EXAMPLE_FACTORY_ID,
+    key: "SP",
+    name: "Example workspace",
+    repository: "acme/service",
+    backlog_repository: "acme/service",
+    default_branch: "main",
   };
 }
 
@@ -300,6 +313,7 @@ type BuildNamedExampleObjInput = {
   appExample: Record<string, unknown>;
   runExample: Record<string, unknown>;
   orderExample: Record<string, unknown>;
+  workspaceExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -314,6 +328,7 @@ function buildNamedExampleObj({
   appExample,
   runExample,
   orderExample,
+  workspaceExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -364,6 +379,7 @@ function buildNamedExampleObj({
   namedExampleObj.__app = appExample;
   namedExampleObj.__run = runExample;
   namedExampleObj.__order = orderExample;
+  namedExampleObj.__workspace = workspaceExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -417,6 +433,7 @@ export function buildAutocompleteExampleObj(
     appExample: buildAppExample(context.app),
     runExample: buildRunExample(),
     orderExample: buildOrderExample(),
+    workspaceExample: buildWorkspaceExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });
