@@ -6,7 +6,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { RepositoryPicker } from "../onboarding/onboardingSteps";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
@@ -46,26 +46,28 @@ export function FactorySettingsRepositoryPage() {
     }
   };
 
+  let repositoryContent: ReactNode;
+  if (!integrationId) {
+    repositoryContent = (
+      <p className="text-[13px] text-muted-foreground">
+        Connect GitHub during workspace setup before you select a repository.
+      </p>
+    );
+  } else if (resources.isLoading) {
+    repositoryContent = <p className="text-[13px] text-muted-foreground">Loading repositories...</p>;
+  } else {
+    repositoryContent = (
+      <RepositoryPicker host="github" repos={repositories} selectedRepo={repository || null} onSelect={setRepository} />
+    );
+  }
+
   return (
     <FactorySettingsPageFrame
       title="Repository"
       subtitle="Select the GitHub repository for workspace work and issue intake."
     >
       <FactorySettingsCard title="GitHub repository" data-testid="factory-settings-repository">
-        {!integrationId ? (
-          <p className="text-[13px] text-muted-foreground">
-            Connect GitHub during workspace setup before you select a repository.
-          </p>
-        ) : resources.isLoading ? (
-          <p className="text-[13px] text-muted-foreground">Loading repositories...</p>
-        ) : (
-          <RepositoryPicker
-            host="github"
-            repos={repositories}
-            selectedRepo={repository || null}
-            onSelect={setRepository}
-          />
-        )}
+        {repositoryContent}
         {resources.isError ? (
           <p className="mt-3 text-[13px] text-destructive">We could not load repositories. Try again.</p>
         ) : null}

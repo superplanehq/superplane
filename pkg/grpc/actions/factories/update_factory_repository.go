@@ -18,8 +18,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const defaultFactoryRepositoryBranch = "main"
-
 const (
 	legacyAppRepositoryExpression = "{{ install_params.appRepository }}"
 	legacyDefaultBranchExpression = "{{ install_params.defaultBranch }}"
@@ -87,9 +85,9 @@ func UpdateFactoryRepository(
 			return invalidArgument("repository settings currently require a GitHub integration")
 		}
 
-		previousBranch := previous.DefaultBranch
-		if previousBranch == "" {
-			previousBranch = defaultFactoryRepositoryBranch
+		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
+		if err != nil {
+			return err
 		}
 		if err := factory.SnapshotActiveWorkOrderRepository(tx, previous.AppRepository, previousBranch); err != nil {
 			return err
@@ -132,6 +130,44 @@ func UpdateFactoryRepository(
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
 	return &pb.UpdateFactoryRepositoryResponse{Factory: serialized}, nil
+}
+
+// currentFactoryDefaultBranch resolves the branch used before a repository
+// switch. Older factories did not persist this setting, so read it from the
+// generated implementation canvas instead of assuming a default.
+func currentFactoryDefaultBranch(tx *gorm.DB, factory *models.Factory, configuredBranch string) (string, error) {
+	if configuredBranch = strings.TrimSpace(configuredBranch); configuredBranch != "" {
+		return configuredBranch, nil
+	}
+
+	canvasesForFactory, err := factory.ListCanvases(tx)
+	if err != nil {
+		return "", err
+	}
+	for i := range canvasesForFactory {
+		canvas := &canvasesForFactory[i]
+		version, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
+		if err != nil {
+			return "", err
+		}
+		template, ok := resolveFactoryTemplate(version.Nodes)
+		if !ok || template.id != "line-implementation" {
+			continue
+		}
+		if defaultBranch := factoryDefaultBranchFromNodes(version.Nodes); defaultBranch != "" {
+			return defaultBranch, nil
+		}
+	}
+
+	return "", invalidArgument("could not determine the current workspace default branch")
+}
+
+func factoryDefaultBranchFromNodes(nodes []models.Node) string {
+	defaultBranch := strings.TrimSpace(deriveFactoryInstallParams(nodes)["defaultBranch"])
+	if strings.HasPrefix(defaultBranch, "{{") {
+		return ""
+	}
+	return defaultBranch
 }
 
 func reconcileFactoryRepository(

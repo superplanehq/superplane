@@ -41,3 +41,25 @@ func TestReplaceTriggerRepository(t *testing.T) {
 	assert.Equal(t, "acme/new", nodes[0].Configuration["repository"])
 	assert.Equal(t, "acme/custom", nodes[1].Configuration["repository"])
 }
+
+func TestFactoryDefaultBranchFromNodes(t *testing.T) {
+	nodes := []models.Node{
+		{
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "BASE", "value": "develop"},
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, "develop", factoryDefaultBranchFromNodes(nodes))
+}
+
+func TestFactoryDefaultBranchFromNodesIgnoresExpressions(t *testing.T) {
+	nodes := []models.Node{
+		{Configuration: map[string]any{"base": orderDefaultBranchExpression}},
+	}
+
+	assert.Empty(t, factoryDefaultBranchFromNodes(nodes))
+}
