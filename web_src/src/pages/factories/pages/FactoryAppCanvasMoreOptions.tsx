@@ -1,14 +1,26 @@
 import { MoreHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 
 type FactoryAppCanvasMoreOptionsProps = {
   onViewYaml: () => void;
   onEditWithLocalAgent: () => void;
+  /** Omitted (or undefined) hides the item — no bundled template matches this app. */
+  onResetToFactoryDefaults?: () => void;
 };
 
-export function FactoryAppCanvasMoreOptions({ onViewYaml, onEditWithLocalAgent }: FactoryAppCanvasMoreOptionsProps) {
+export function FactoryAppCanvasMoreOptions({
+  onViewYaml,
+  onEditWithLocalAgent,
+  onResetToFactoryDefaults,
+}: FactoryAppCanvasMoreOptionsProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -31,6 +43,14 @@ export function FactoryAppCanvasMoreOptions({ onViewYaml, onEditWithLocalAgent }
         <DropdownMenuItem onSelect={onEditWithLocalAgent} data-testid="factory-app-edit-local-agent">
           Edit with a local agent
         </DropdownMenuItem>
+        {onResetToFactoryDefaults ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onResetToFactoryDefaults} data-testid="factory-app-reset-defaults">
+              Reset to factory defaults
+            </DropdownMenuItem>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );
