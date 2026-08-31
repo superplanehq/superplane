@@ -1,50 +1,77 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture } from "../../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
-import { OrganizationSettingsLayout } from "./OrganizationSettingsLayout";
+import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
-  title: "Factories/Pages/OrganizationSettings",
-  component: OrganizationSettingsLayout,
+  title: "Factories/Pages/Settings/Organization",
+  component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof OrganizationSettingsLayout>;
+} satisfies Meta<typeof FactorySettingsLayout>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const organizationSettingsPath = (page: string) => `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${page}`;
+
 export const General: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/general" factoriesFixture={defaultFactoriesFixture} />,
-};
-
-export const Workspaces: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/workspaces" factoriesFixture={defaultFactoriesFixture} />,
-};
-
-export const WorkspaceUsage: Story = {
-  name: "Workspace usage",
   render: () => (
-    <FactoriesHarness pathSuffix="organization/workspace-usage" factoriesFixture={defaultFactoriesFixture} />
+    <FactoriesHarness pathSuffix={organizationSettingsPath("general")} factoriesFixture={defaultFactoriesFixture} />
   ),
 };
 
-export const WorkspaceUsageEmpty: Story = {
-  name: "Workspace usage (empty)",
+export const Members: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("members")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Integrations: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/workspace-usage"
+      pathSuffix={organizationSettingsPath("integrations")}
+      factoriesFixture={defaultFactoriesFixture}
+    />
+  ),
+};
+
+export const ApiKeys: Story = {
+  name: "API keys",
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("api-keys")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Secrets: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("secrets")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Spending: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("spending")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const SpendingEmpty: Story = {
+  name: "Spending (empty)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{ ...defaultFactoriesFixture, organizationWorkspaceUsage: EMPTY_USAGE_REPORT }}
     />
   ),
 };
 
-export const WorkspaceUsageBilling: Story = {
-  name: "Workspace usage (add hosted credit)",
+export const SpendingBilling: Story = {
+  name: "Spending (add hosted credit)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/workspace-usage"
+      pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationWorkspaceUsage: {
@@ -66,11 +93,11 @@ export const WorkspaceUsageBilling: Story = {
   ),
 };
 
-export const WorkspaceUsageBillingInvoices: Story = {
-  name: "Workspace usage (manage invoices)",
+export const SpendingBillingInvoices: Story = {
+  name: "Spending (manage invoices)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/workspace-usage"
+      pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationWorkspaceUsage: {
@@ -103,11 +130,11 @@ export const WorkspaceUsageBillingInvoices: Story = {
   ),
 };
 
-export const WorkspaceUsageCreditAdded: Story = {
-  name: "Workspace usage (credit added)",
+export const SpendingCreditAdded: Story = {
+  name: "Spending (credit added)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/workspace-usage?credit=added"
+      pathSuffix={`${organizationSettingsPath("spending")}?credit=added`}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         organizationWorkspaceUsage: {
@@ -123,8 +150,4 @@ export const WorkspaceUsageCreditAdded: Story = {
       }}
     />
   ),
-};
-
-export const Integrations: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/integrations" factoriesFixture={defaultFactoriesFixture} />,
 };

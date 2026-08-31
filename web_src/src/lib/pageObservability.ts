@@ -193,7 +193,7 @@ function resolveOrganizationSettingsPageObservability(
     return { pageKey: "organizationSettingsWorkspaces", attributes: organizationAttributes };
   }
 
-  if (section === "workspace-usage" || section === "llm-spend") {
+  if (section === "workspace-usage" || section === "llm-spend" || section === "spending") {
     return { pageKey: "organizationSettingsWorkspaceUsage", attributes: organizationAttributes };
   }
 

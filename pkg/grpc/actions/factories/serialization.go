@@ -55,6 +55,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		AgentIntegrationId: config.AgentIntegrationID,
 		AppRepository:      config.AppRepository,
 		BacklogRepository:  config.BacklogRepository,
+		DefaultBranch:      config.DefaultBranch,
 		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
 		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
 		ProvisionedAppId:   config.ProvisionedAppID,

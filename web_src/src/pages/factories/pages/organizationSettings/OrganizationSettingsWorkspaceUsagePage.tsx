@@ -24,14 +24,14 @@ import {
 
 export function OrganizationSettingsWorkspaceUsagePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
-  usePageTitle(["Workspace usage"]);
+  usePageTitle(["Spending"]);
   const { data, isLoading, error, refetch } = useOrganizationWorkspaceUsage(organizationId || "");
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
 
   return (
     <FactorySettingsPageFrame
-      title="Workspace usage"
+      title="Spending"
       subtitle="Review factory token usage, VM time, and estimated spend for this organization."
     >
       <WorkspaceUsageBody

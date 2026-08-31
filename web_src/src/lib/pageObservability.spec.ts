@@ -81,6 +81,10 @@ describe("resolvePageObservability", () => {
       pageKey: "organizationSettingsWorkspaceUsage",
       attributes: { organization_id: "org-1" },
     });
+    expect(resolvePageObservability("/org-1/organization/spending")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
     expect(resolvePageObservability("/org-1/organization/integrations")).toEqual({
       pageKey: "organizationSettingsIntegrations",
       attributes: { organization_id: "org-1" },

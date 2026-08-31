@@ -42,7 +42,7 @@ Do not reinvent these pieces:
 - `protos/usage.proto` and org settings **Usage** (`GET /organizations/{id}/usage`)
   are **SaaS plan limits** (canvases, events, canvas-agent tokens, runner
   minutes). Keep that service. Do not use it as the factory spend ledger.
-  Factory settings **Usage** and org **Workspace usage** read
+  Factory and organization settings **Spending** read
   `workspace_usage_events`.
 - The factory PRD defines tracked cost as model tokens plus execution compute.
   It excludes third-party charges and human labor. Compute in this ledger is
@@ -114,8 +114,8 @@ in this phase. Markup and `PrepareHostedRun` stay LLM-only.
 
 Ledger, price book, `RecordUsage`, execution rollups, org and workspace reports.
 Do not overload the plan-limits Usage page (`GET /organizations/{id}/usage`,
-org settings nav **Usage**). Factory settings **Usage** and org **Workspace
-usage** (`GET /organizations/{id}/workspace-usage`) are the ledger.
+org settings nav **Usage**). Factory and organization settings **Spending**
+(`GET /organizations/{id}/workspace-usage`) are the ledger.
 
 ### Phase 2 — Provider clients (shipped)
 
@@ -215,7 +215,7 @@ Decide these while Phase 1 is in progress or before Phase 3:
 7. **Ledger retention.** How long do we keep usage events? This is separate
    from `usage_retention_window_days` on the plan-limits service.
 8. **Rename `/settings/billing`.** That page is plan limits. Workspace usage
-   and hosted credit live on **Workspace usage**. Keep the nav label **Usage**
+   and hosted credit live on **Spending**. Keep the nav label **Usage**
    for plan limits. Do not use the path `/usage` for the ledger.
 9. **Compute in the same reports.** Closed. SuperPlane runner-fleet seconds
    and machine type share `workspace_usage_events` (`usage_kind=compute`).
@@ -239,7 +239,7 @@ Decide these while Phase 1 is in progress or before Phase 3:
 2. Phases 1–6 are shipped for model usage, hosted credit, BYOK, Polar, and
    workspace budgets.
 3. Runner-fleet compute is on the same `workspace_usage_events` ledger.
-   Org **Workspace usage** and factory **Usage** show tokens and VM seconds.
+   Organization and workspace **Spending** show tokens and VM seconds.
 4. Defer Polar meters until prepaid checkout works. If meters are added later,
    ingest billed cents, not tokens. Markup-on-VM, wallet debit for compute,
    and a runner hard-stop when credit is empty stay out of the tracking

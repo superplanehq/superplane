@@ -639,6 +639,8 @@ CREATE TABLE public.factory_work_orders (
     status_note jsonb,
     origin_url text,
     origin_label text,
+    repository text,
+    default_branch text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -3800,7 +3802,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260831140629	f
+20260831160100	f
 \.
 
 

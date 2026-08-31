@@ -1,4 +1,4 @@
-import { Route } from "react-router";
+import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { FactorySettingsSoonPage } from "../settings/FactorySettingsSoonPage";
@@ -12,7 +12,6 @@ import {
   PreserveStateNavigate,
 } from "./organizationSettingsRoutePages";
 import { isOrganizationSettingsComingSoon, ORGANIZATION_SETTINGS_NAV_ITEMS } from "./organizationSettingsNavItems";
-import { LegacyLLMSpendRedirect } from "../../lib/organizationSettingsRedirects";
 
 export const organizationSettingsSectionRoutes = [
   <Route
@@ -32,7 +31,11 @@ export const organizationSettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
-  <Route key="organization-settings-llm-spend-redirect" path="llm-spend" element={<LegacyLLMSpendRedirect />} />,
+  <Route
+    key="organization-settings-llm-spend-redirect"
+    path="llm-spend"
+    element={<Navigate to="workspace-usage" replace />}
+  />,
   <Route
     key="organization-settings-integrations"
     path="integrations"

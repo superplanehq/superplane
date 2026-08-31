@@ -25,7 +25,7 @@ export function FactorySettingsUsagePage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { data, isLoading, error } = useFactoryUsage(organizationId, factoryId);
 
-  usePageTitle(["Usage", "Settings", factory.name ?? "Workspace"]);
+  usePageTitle(["Spending", "Settings", factory.name ?? "Workspace"]);
 
   const totalTokens = parseWorkOrderMetric(data?.totalTokens);
   const totalCostCents = parseWorkOrderMetric(data?.totalCostCents);
@@ -36,7 +36,7 @@ export function FactorySettingsUsagePage() {
 
   return (
     <>
-      <WorkspacePageHeader title="Usage" subtitle="LLM tokens, VM seconds, and estimated spend for this workspace." />
+      <WorkspacePageHeader title="Spending" subtitle="LLM tokens, VM seconds, and estimated spend for this workspace." />
       <div className={factoryContentBodyClassName}>
         {isLoading ? (
           <p className="text-[13px] text-muted-foreground">Loading usage...</p>
