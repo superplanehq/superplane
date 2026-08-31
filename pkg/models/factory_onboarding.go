@@ -49,6 +49,7 @@ type FactoryOnboardingConfig struct {
 	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
 	AppRepository      string `json:"app_repository,omitempty"`
 	BacklogRepository  string `json:"backlog_repository,omitempty"`
+	DefaultBranch      string `json:"default_branch,omitempty"`
 	IssuesSource       string `json:"issues_source,omitempty"`
 	AgentHarness       string `json:"agent_harness,omitempty"`
 	ProvisionedAppID   string `json:"provisioned_app_id,omitempty"`
@@ -64,6 +65,7 @@ type FactoryOnboardingPatch struct {
 	AgentIntegrationID *string
 	AppRepository      *string
 	BacklogRepository  *string
+	DefaultBranch      *string
 	IssuesSource       *string
 	AgentHarness       *string
 	ProvisionedAppID   *string
@@ -195,6 +197,9 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 			return FactoryOnboardingConfig{}, err
 		}
 		next.BacklogRepository = value
+	}
+	if patch.DefaultBranch != nil {
+		next.DefaultBranch = strings.TrimSpace(*patch.DefaultBranch)
 	}
 	if patch.IssuesSource != nil {
 		value := strings.TrimSpace(*patch.IssuesSource)

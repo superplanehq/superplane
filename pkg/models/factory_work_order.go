@@ -72,6 +72,8 @@ type FactoryWorkOrder struct {
 	SourceRunID    *uuid.UUID
 	OriginURL      *string
 	OriginLabel    *string
+	Repository     *string
+	DefaultBranch  *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
