@@ -148,6 +148,10 @@ func checkTopLevelCall(name string, args []ast.Node) error {
 		if len(args) != 0 {
 			return fmt.Errorf("order() takes no arguments, got %d", len(args))
 		}
+	case "workspace":
+		if len(args) != 0 {
+			return fmt.Errorf("workspace() takes no arguments, got %d", len(args))
+		}
 	}
 	return nil
 }
@@ -188,6 +192,7 @@ func compileWithStubEnv(body string, knownNodeNames map[string]struct{}, extraEn
 		expr.Function("run", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("app", func(params ...any) (any, error) { return nil, nil }),
 		expr.Function("order", func(params ...any) (any, error) { return nil, nil }),
+		expr.Function("workspace", func(params ...any) (any, error) { return nil, nil }),
 	}
 
 	if _, err := expr.Compile(body, opts...); err != nil {
