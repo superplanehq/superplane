@@ -81,7 +81,7 @@ func UpdateFactoryPRFeedbackHandler(
 	}
 
 	return &pb.UpdateFactoryPRFeedbackHandlerResponse{
-		Handler: serializeFactoryPRFeedbackHandler(handler, specs[handler.CanvasID]),
+		Handler: serializeFactoryPRFeedbackHandler(db, orgID, handler, specs[handler.CanvasID]),
 	}, nil
 }
 
@@ -109,10 +109,19 @@ func applyPRFeedbackSettings(
 		if strings.TrimSpace(settings.GetSubject().GetRepository()) == "" {
 			return invalidArgument("repository cannot be empty")
 		}
-		if strings.TrimSpace(settings.GetDiscussion().GetMention()) == "" {
-			return invalidArgument("mention cannot be empty")
-		}
 		updated := parsePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec), settings)
+		if handler.MaximumAttempts != nil {
+			updated.MaximumAttempts = *handler.MaximumAttempts
+			if settings.GetChecks() != nil && settings.GetChecks().MaximumAttempts != nil {
+				updated.MaximumAttempts = int(settings.GetChecks().GetMaximumAttempts())
+			}
+		}
+		if err := validatePRFeedbackSettingsForSource(tx, canvas.OrganizationID, handler.Source, updated, settings); err != nil {
+			return err
+		}
+		if err := resolveRunnerIntegrationNames(tx, canvas.OrganizationID, &updated); err != nil {
+			return err
+		}
 
 		triggerIDs := map[string]bool{}
 		for _, nodeID := range graph.triggerNodeIDs() {
@@ -132,9 +141,50 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				configuration["contentFilter"] = updated.Mention
-				configuration["ignoreBots"] = updated.IgnoreBots
-				configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
+				if !graph.isChecks() {
+					configuration["contentFilter"] = updated.Mention
+					configuration["ignoreBots"] = updated.IgnoreBots
+					configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
+				}
+				nodes[i].Configuration = configuration
+				continue
+			}
+			if nodes[i].ID == graph.WaitChecksNodeID {
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["repository"] = updated.Repository
+				if len(updated.CheckNames) > 0 {
+					configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
+				} else {
+					delete(configuration, "checkNames")
+				}
+				nodes[i].Configuration = configuration
+				continue
+			}
+			if nodes[i].ID == graph.RunnerNodeID {
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
+				if err != nil {
+					return err
+				}
+				configuration["environmentFrom"] = prFeedbackEnvironmentFrom(
+					resolvePRFeedbackBinding(tx, factory, updated.Repository),
+					updated.RunnerIntegrationNames,
+				)
+				nodes[i].Configuration = configuration
+				continue
+			}
+			if nodes[i].ID == graph.PauseFixesNodeID {
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["description"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
 				nodes[i].Configuration = configuration
 				continue
 			}
@@ -145,8 +195,16 @@ func applyPRFeedbackSettings(
 			if configuration == nil {
 				configuration = map[string]any{}
 			}
-			configuration["description"] = prFeedbackActivityDescriptionExpression()
+			if !graph.isChecks() {
+				configuration["description"] = prFeedbackActivityDescriptionExpression()
+			}
 			nodes[i].Configuration = configuration
+		}
+
+		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+			if err := handler.SetMaximumAttempts(tx, updated.MaximumAttempts); err != nil {
+				return err
+			}
 		}
 
 		if err := canvases.PublishGeneratedCanvasNodes(

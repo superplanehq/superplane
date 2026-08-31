@@ -14,6 +14,7 @@ import (
 const (
 	FactoryPRFeedbackHandlerSubjectGitHubPullRequest    = "github-pull-request"
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion = "pull-request-discussion"
+	FactoryPRFeedbackHandlerSourcePullRequestChecks     = "pull-request-checks"
 
 	factoryPRFeedbackHandlerCanvasUniqueConstraint = "idx_factory_pr_feedback_handlers_canvas_id"
 )
@@ -32,6 +33,7 @@ var factoryPRFeedbackHandlerSubjects = []string{
 
 var factoryPRFeedbackHandlerSources = []string{
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+	FactoryPRFeedbackHandlerSourcePullRequestChecks,
 }
 
 // FactoryPRFeedbackHandler declares that a factory canvas addresses pull
@@ -41,10 +43,11 @@ type FactoryPRFeedbackHandler struct {
 	OrganizationID uuid.UUID
 	FactoryID      uuid.UUID
 	CanvasID       uuid.UUID
-	Subject        string
-	Source         string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	Subject          string
+	Source           string
+	MaximumAttempts  *int
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 
 	Canvas *Canvas `gorm:"foreignKey:CanvasID"`
 }
@@ -154,6 +157,43 @@ func (h *FactoryPRFeedbackHandler) Touch(tx *gorm.DB) error {
 	}
 	h.UpdatedAt = now
 	return nil
+}
+
+func (h *FactoryPRFeedbackHandler) SetMaximumAttempts(tx *gorm.DB, attempts int) error {
+	if attempts < 1 {
+		return errors.New("maximum attempts must be positive")
+	}
+	now := time.Now()
+	h.MaximumAttempts = &attempts
+	h.UpdatedAt = now
+	return tx.Model(h).Updates(map[string]any{
+		"maximum_attempts": attempts,
+		"updated_at":       now,
+	}).Error
+}
+
+func FindPRFeedbackHandlerByCanvasID(tx *gorm.DB, canvasID uuid.UUID) (*FactoryPRFeedbackHandler, error) {
+	var handler FactoryPRFeedbackHandler
+	err := tx.Where("canvas_id = ?", canvasID).First(&handler).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &handler, nil
+}
+
+func FindPRFeedbackHandlerByID(tx *gorm.DB, handlerID uuid.UUID) (*FactoryPRFeedbackHandler, error) {
+	var handler FactoryPRFeedbackHandler
+	err := tx.Where("id = ?", handlerID).First(&handler).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryPRFeedbackHandlerNotFound
+		}
+		return nil, err
+	}
+	return &handler, nil
 }
 
 // DeleteFactoryPRFeedbackHandlersByCanvas removes the handlers a canvas

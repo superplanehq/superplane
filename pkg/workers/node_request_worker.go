@@ -99,12 +99,26 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		newEvents = append(newEvents, events...)
 	}
 
+	type pendingFactoryWorkOrderUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	pendingFactoryWorkOrderUpdates := []pendingFactoryWorkOrderUpdate{}
+	onFactoryWorkOrderUpdated := func(factoryID, orderID, reason string) {
+		pendingFactoryWorkOrderUpdates = append(pendingFactoryWorkOrderUpdates, pendingFactoryWorkOrderUpdate{
+			factoryID: factoryID,
+			orderID:   orderID,
+			reason:    reason,
+		})
+	}
+
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err == nil {
-			return w.processRequest(logger, tx, r, onNewEvents, runCancellations)
+			return w.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated)
 		}
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -125,26 +139,46 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
 
+	for _, update := range pendingFactoryWorkOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(update.factoryID, update.orderID, update.reason); err != nil {
+			logger.Errorf("failed to publish factory work order updated RabbitMQ message: %v", err)
+		}
+	}
+
 	runCancellations.Publish()
 
 	return nil
 }
 
-func (w *NodeRequestWorker) processRequest(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) processRequest(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations)
+		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) invokeHook(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+) error {
 	if request.ExecutionID == nil {
 		return w.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations)
+	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated)
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
@@ -300,7 +334,14 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) invokeComponentHook(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
 	}
@@ -315,7 +356,7 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return request.Complete(tx)
 	}
 
-	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations)
+	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated)
 }
 
 func (w *NodeRequestWorker) invokeExecutionComponentHook(
@@ -325,6 +366,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -371,7 +413,9 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
-		Usage:          contexts.NewUsageContext(workflow.OrganizationID, execution),
+		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated),
+		Usage: contexts.NewUsageContext(workflow.OrganizationID, execution),
 	}
 
 	if node.AppInstallationID != nil {

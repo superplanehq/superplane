@@ -5,6 +5,16 @@ export function parseWorkOrderMetric(value: string | number | undefined): number
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/** First metric that is greater than zero. Gateway emit-unpopulated sends `"0"`. */
+export function firstPositiveWorkOrderMetric(...values: Array<string | number | undefined>): string | undefined {
+  for (const value of values) {
+    if (parseWorkOrderMetric(value) > 0) {
+      return typeof value === "number" ? String(value) : value;
+    }
+  }
+  return undefined;
+}
+
 export function formatCompactTokens(tokens: number): string {
   return formatCompactTokenLabel(tokens);
 }

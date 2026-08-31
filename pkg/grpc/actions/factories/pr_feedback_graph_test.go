@@ -59,6 +59,17 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		graph := resolvePRFeedbackGraph(spec)
 		assert.False(t, graph.Healthy(spec))
 	})
+
+	t.Run("resolves a generated checks graph", func(t *testing.T) {
+		spec := prFeedbackChecksSpecFromTemplate(t, "acme/app")
+
+		graph := resolvePRFeedbackGraph(spec)
+		assert.Equal(t, prFeedbackPullRequestTriggerNodeID, graph.PullRequestTriggerNodeID)
+		assert.Equal(t, prFeedbackWaitChecksNodeID, graph.WaitChecksNodeID)
+		assert.Equal(t, prFeedbackStartRepairNodeID, graph.StartRepairNodeID)
+		assert.True(t, graph.isChecks())
+		assert.True(t, graph.Healthy(spec))
+	})
 }
 
 func Test__BuildPRFeedbackCanvas(t *testing.T) {
@@ -161,6 +172,53 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 	})
 }
 
+func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
+	t.Run("opened, reopened, and synchronize start one wait then one repair", func(t *testing.T) {
+		canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:      "acme/app",
+			MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+			CheckNames:      []string{"lint", "unit"},
+		})
+
+		assert.Equal(t, []string{
+			"default:" + prFeedbackPullRequestTriggerNodeID + "->" + prFeedbackFindNodeID,
+			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
+			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackWaitChecksNodeID,
+			"passed:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackMarkPassedNodeID,
+			"failed:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackStartRepairNodeID,
+			"timedOut:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackStopWaitingNodeID,
+			"default:" + prFeedbackStartRepairNodeID + "->" + prFeedbackRunnerNodeID,
+			"limitReached:" + prFeedbackStartRepairNodeID + "->" + prFeedbackPauseFixesNodeID,
+			"default:" + prFeedbackStopWaitingNodeID + "->" + prFeedbackRecordTimeoutNodeID,
+		}, yamlEdgeChannels(canvas))
+
+		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
+		assert.Equal(t, "concurrent", activity.Configuration["access"])
+		assert.Equal(t, prFeedbackPRHeadSHAExpression(), activity.Configuration["revision"])
+
+		wait := findSpecNode(t, canvas, prFeedbackWaitChecksNodeID)
+		assert.Equal(t, []any{"lint", "unit"}, wait.Configuration["checkNames"])
+
+		pause := findSpecNode(t, canvas, prFeedbackPauseFixesNodeID)
+		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["description"])
+	})
+
+	t.Run("the runner verifies the remote head before it pushes", func(t *testing.T) {
+		canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+			Repository:      "acme/app",
+			MaximumAttempts: prFeedbackDefaultMaximumAttempts,
+		})
+		runner := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+		assert.Contains(t, runnerEnv(t, runner, "FAILED_CHECKS"), "Wait For Pull Request Checks")
+		assert.Contains(t, runnerEnv(t, runner, "PR_REVISION"), "pull_request.head.sha")
+
+		push := runnerStepCommand(t, runner, "Commit and Push")
+		assert.Contains(t, push, "REMOTE_HEAD")
+		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
+		assert.Contains(t, push, `git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`)
+	})
+}
+
 func yamlEdgeChannels(canvas *yaml.Canvas) []string {
 	result := make([]string, 0, len(canvas.Spec.Edges))
 	for _, edge := range canvas.Spec.Edges {
@@ -211,6 +269,16 @@ func prFeedbackSpecFromTemplate(t *testing.T, repository string) models.LiveCanv
 		Repository: repository,
 		Mention:    prFeedbackDefaultMention,
 		IgnoreBots: true,
+	})
+	return models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
+}
+
+func prFeedbackChecksSpecFromTemplate(t *testing.T, repository string) models.LiveCanvasSpec {
+	t.Helper()
+
+	canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:      repository,
+		MaximumAttempts: prFeedbackDefaultMaximumAttempts,
 	})
 	return models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
 }

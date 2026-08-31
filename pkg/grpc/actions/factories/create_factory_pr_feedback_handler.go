@@ -54,16 +54,29 @@ func CreateFactoryPRFeedbackHandler(
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
+	settings := parsePRFeedbackSettings(defaultPRFeedbackSettings(), req.GetSettings())
+	settings.Repository = repository
+	if err := validatePRFeedbackSettingsForSource(db, orgID, source, settings, req.GetSettings()); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+	if err := resolveRunnerIntegrationNames(db, orgID, &settings); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
-		name = prFeedbackDefaultName
+		if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+			name = prFeedbackChecksDefaultName
+		} else {
+			name = prFeedbackDefaultName
+		}
 	}
 	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
 
-	canvasID, err := createPRFeedbackCanvas(ctx, deps, factory, name, repository)
+	canvasID, err := createPRFeedbackCanvas(ctx, deps, factory, source, name, settings)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +85,12 @@ func CreateFactoryPRFeedbackHandler(
 	if err != nil {
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+	}
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		if err := handler.SetMaximumAttempts(db, settings.MaximumAttempts); err != nil {
+			discardIntakeCanvas(db, orgID, canvasID)
+			return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
+		}
 	}
 
 	handler, err = factory.FindPRFeedbackHandler(db, handler.ID)
@@ -85,7 +104,7 @@ func CreateFactoryPRFeedbackHandler(
 	}
 
 	return &pb.CreateFactoryPRFeedbackHandlerResponse{
-		Handler: serializeFactoryPRFeedbackHandler(handler, specs[canvasID]),
+		Handler: serializeFactoryPRFeedbackHandler(db, orgID, handler, specs[canvasID]),
 	}, nil
 }
 
@@ -93,19 +112,29 @@ func createPRFeedbackCanvas(
 	ctx context.Context,
 	deps PRFeedbackDependencies,
 	factory *models.Factory,
-	name, repository string,
+	source, name string,
+	settings prFeedbackSettings,
 ) (uuid.UUID, error) {
 	db := database.DB(ctx)
-	binding := resolvePRFeedbackBinding(db, factory, repository)
-	canvasDoc := buildPRFeedbackCanvas(prFeedbackBuildRequest{
-		Name:        name,
-		Repository:  repository,
-		Mention:     prFeedbackDefaultMention,
-		IgnoreBots:  true,
-		AllowedBots: nil,
-		Binding:     binding,
-		Agent:       resolveIntakeAgent(db, factory),
-	})
+	binding := resolvePRFeedbackBinding(db, factory, settings.Repository)
+	request := prFeedbackBuildRequest{
+		Name:                   name,
+		Repository:             settings.Repository,
+		Mention:                settings.Mention,
+		IgnoreBots:             settings.IgnoreBots,
+		AllowedBots:            settings.AllowedBots,
+		CheckNames:             settings.CheckNames,
+		MaximumAttempts:        settings.MaximumAttempts,
+		RunnerIntegrationNames: settings.RunnerIntegrationNames,
+		Binding:                binding,
+		Agent:                  resolveIntakeAgent(db, factory),
+	}
+	var canvasDoc *yaml.Canvas
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		canvasDoc = buildChecksPRFeedbackCanvas(request)
+	} else {
+		canvasDoc = buildDiscussionPRFeedbackCanvas(request)
+	}
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factory.OrganizationID.String())
 	if err != nil {

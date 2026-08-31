@@ -3,6 +3,7 @@ package factory
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,8 +40,12 @@ type fakeFactoryContext struct {
 	setStatusNoteErr    error
 
 	lastActivityParams core.AddPullRequestActivityParams
-	activityMatch      *core.PullRequestMatch
+	activityResult     *core.PullRequestActivityResult
 	activityErr        error
+
+	lastUpdateParams core.UpdatePullRequestActivityParams
+	updateResult     *core.PullRequestActivityResult
+	updateErr        error
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -91,17 +96,39 @@ func (f *fakeFactoryContext) FindPullRequest(_ core.FindPullRequestParams) (*cor
 	return nil, nil
 }
 
-func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestMatch, error) {
+func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
 	f.lastActivityParams = params
 	if f.activityErr != nil {
 		return nil, f.activityErr
 	}
-	if f.activityMatch != nil {
-		return f.activityMatch, nil
+	if f.activityResult != nil {
+		return f.activityResult, nil
 	}
-	return &core.PullRequestMatch{
+	return &core.PullRequestActivityResult{
 		PullRequest: &core.PullRequest{ID: params.PullRequestID, Number: 42},
 		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
+		Activity:    &core.PullRequestActivity{Description: params.Description, Access: core.PullRequestActivityAccessConcurrent, State: "active"},
+		Outcome:     core.PullRequestActivityOutcomeReady,
+	}, nil
+}
+
+func (f *fakeFactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	f.lastUpdateParams = params
+	if f.updateErr != nil {
+		return nil, f.updateErr
+	}
+	if f.updateResult != nil {
+		return f.updateResult, nil
+	}
+	description := ""
+	if params.Description != nil {
+		description = *params.Description
+	}
+	return &core.PullRequestActivityResult{
+		PullRequest: &core.PullRequest{ID: "pr-1", Number: 42},
+		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
+		Activity:    &core.PullRequestActivity{Description: description, Access: params.Access, State: "active"},
+		Outcome:     core.PullRequestActivityOutcomeReady,
 	}, nil
 }
 
@@ -711,6 +738,88 @@ func TestAddPullRequestActivity_Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "Please add tests for the retry path.", data["description"])
 	})
+
+	t.Run("passes without output when another activity owns the revision", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{activityErr: core.ErrPullRequestActivityAlreadyActive}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"pullRequestId": "pr-1", "revision": "abc", "access": "concurrent"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Empty(t, stateCtx.Channel)
+		assert.Empty(t, stateCtx.Payloads)
+	})
+
+	t.Run("waits when exclusive access is not available", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{activityResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Outcome:     core.PullRequestActivityOutcomeWaiting,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+		requestCtx := &contexts.RequestContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"pullRequestId": "pr-1", "access": "exclusive"},
+			ExecutionState: stateCtx,
+			Requests:       requestCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.False(t, stateCtx.Finished)
+		assert.Equal(t, acquireAccessHookName, requestCtx.Action)
+		assert.GreaterOrEqual(t, requestCtx.Duration, 10*time.Second)
+	})
+}
+
+func TestUpdatePullRequestActivity_Execute(t *testing.T) {
+	component := &UpdatePullRequestActivity{}
+
+	t.Run("updates the description", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"description": "Checks passed on d1209da"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, factoryCtx.lastUpdateParams.Description)
+		assert.Equal(t, "Checks passed on d1209da", *factoryCtx.lastUpdateParams.Description)
+		assert.Equal(t, "pullRequest.activityUpdated", stateCtx.Type)
+	})
+
+	t.Run("emits limitReached when the handler is at the attempt limit", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Outcome:     core.PullRequestActivityOutcomeLimitReached,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"access": "exclusive"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, core.PullRequestActivityOutcomeLimitReached, stateCtx.Channel)
+	})
+}
+
+func TestPullRequestActivity_OutputChannels(t *testing.T) {
+	channels := pullRequestActivityChannels()
+	names := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		names = append(names, channel.Name)
+	}
+	assert.Equal(t, []string{core.DefaultOutputChannel.Name, core.PullRequestActivityOutcomeLimitReached}, names)
 }
 
 func TestAddPullRequestActivity_ValidatesConfiguration(t *testing.T) {

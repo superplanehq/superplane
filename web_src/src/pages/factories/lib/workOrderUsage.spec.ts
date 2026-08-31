@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatWorkOrderExecutionUsage } from "./workOrderUsage";
+import { firstPositiveWorkOrderMetric, formatWorkOrderExecutionUsage } from "./workOrderUsage";
+
+describe("firstPositiveWorkOrderMetric", () => {
+  it("skips zero and empty values", () => {
+    expect(firstPositiveWorkOrderMetric("0", undefined, "45")).toBe("45");
+    expect(firstPositiveWorkOrderMetric(0, "1200")).toBe("1200");
+    expect(firstPositiveWorkOrderMetric("0", "0")).toBeUndefined();
+  });
+});
 
 describe("formatWorkOrderExecutionUsage", () => {
   it("sums usage from every execution in the dispatch", () => {

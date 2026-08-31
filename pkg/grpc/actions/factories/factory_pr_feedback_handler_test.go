@@ -165,6 +165,125 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		}
 	})
 
+	t.Run("creating a checks handler waits for pull request checks", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+
+		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			Source: pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+		})
+
+		assert.Equal(t, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS, handler.GetSource())
+		assert.Equal(t, prFeedbackChecksDefaultName, handler.GetName())
+		assert.True(t, handler.GetHealthy())
+		assert.Equal(t, "acme/app", handler.GetSettings().GetSubject().GetRepository())
+		assert.Empty(t, handler.GetSettings().GetChecks().GetNames())
+		assert.Equal(t, int32(prFeedbackDefaultMaximumAttempts), handler.GetSettings().GetChecks().GetMaximumAttempts())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		assert.Len(t, liveVersion.Nodes, 10)
+		var foundWait bool
+		for _, node := range liveVersion.Nodes {
+			if node.ID == prFeedbackWaitChecksNodeID {
+				foundWait = true
+				assert.Equal(t, prFeedbackWaitChecksComponent, node.ComponentName())
+			}
+		}
+		assert.True(t, foundWait)
+	})
+
+	t.Run("checks creation rejects an invalid attempt limit", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		zero := int32(0)
+		_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{MaximumAttempts: &zero},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("discussion creation rejects runner integrations", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		_, err := CreateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					RunnerIntegrationIds: []string{uuid.NewString()},
+				},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+	})
+
+	t.Run("checks settings updates reach the wait and pause nodes", func(t *testing.T) {
+		factory := newFactory(t)
+		appRepo := "acme/app"
+		require.NoError(t, factory.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			AppRepository: &appRepo,
+		}))
+		handler := create(t, factory, &pb.CreateFactoryPRFeedbackHandlerRequest{
+			Source: pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS,
+		})
+
+		name := "Fix selected checks"
+		maximumAttempts := int32(5)
+		response, err := UpdateFactoryPRFeedbackHandler(ctx, deps, orgID, &pb.UpdateFactoryPRFeedbackHandlerRequest{
+			FactoryId: factory.ID.String(),
+			HandlerId: handler.GetId(),
+			Name:      &name,
+			Settings: &pb.FactoryPRFeedbackHandler_Settings{
+				Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+					Repository: "acme/other",
+				},
+				Checks: &pb.FactoryPRFeedbackHandler_CheckSettings{
+					Names:           []string{"lint", "unit"},
+					MaximumAttempts: &maximumAttempts,
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Fix selected checks", response.GetHandler().GetName())
+		assert.Equal(t, []string{"lint", "unit"}, response.GetHandler().GetSettings().GetChecks().GetNames())
+		assert.Equal(t, int32(5), response.GetHandler().GetSettings().GetChecks().GetMaximumAttempts())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(handler.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		for _, node := range liveVersion.Nodes {
+			if node.ID == prFeedbackPullRequestTriggerNodeID || node.ID == prFeedbackWaitChecksNodeID {
+				assert.Equal(t, "acme/other", node.Configuration["repository"])
+			}
+			if node.ID == prFeedbackWaitChecksNodeID {
+				assert.Equal(t, []any{"lint", "unit"}, node.Configuration["checkNames"])
+			}
+			if node.ID == prFeedbackPauseFixesNodeID {
+				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["description"])
+			}
+		}
+	})
+
 	t.Run("deleting a handler retires its canvas", func(t *testing.T) {
 		factory := newFactory(t)
 		appRepo := "acme/app"

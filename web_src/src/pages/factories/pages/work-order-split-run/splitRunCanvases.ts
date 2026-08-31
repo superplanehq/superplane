@@ -303,6 +303,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   updatePullRequest: { title: "Update Pull Request", iconSlug: "factory" },
   findPullRequest: { title: "Find Pull Request", iconSlug: "factory" },
   addPullRequestActivity: { title: "Add Pull Request Activity", iconSlug: "factory" },
+  updatePullRequestActivity: { title: "Update Pull Request Activity", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
   setWorkOrderStatusNote: { title: "Set Work Order Status Note", iconSlug: "factory" },
   reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },

@@ -32,7 +32,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -338,7 +338,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
-      addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
+      hideWaitingDecision: hasActivePRFeedbackRun(options?.prFeedbackRuns),
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
     }),
@@ -357,7 +357,7 @@ function reviewSurfaces(
     phases: SplitRunPhase[];
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
-    addressingFeedback?: boolean;
+    hideWaitingDecision?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
   },
@@ -385,7 +385,7 @@ function reviewSurfaces(
     return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.addressingFeedback);
+    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -442,9 +442,9 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
-  addressingFeedback?: boolean,
+  hideWaitingDecision?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  if (addressingFeedback) {
+  if (hideWaitingDecision) {
     return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
   }
   const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
@@ -605,6 +605,10 @@ function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | und
   return activePhaseIdWithPrefix(phases, "pr-feedback-");
 }
 
+function hasActivePRFeedbackRun(runs?: PRFeedbackLogRun[]): boolean {
+  return (runs ?? []).some((entry) => isActiveCanvasRun(entry.run));
+}
+
 /**
  * Factory-level automation that works on this order right now: a PR-feedback
  * run or a Backlog analysis run. The popup opens its log so the progress is
@@ -623,11 +627,12 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const status = statusForCanvasRun(entry.run);
   const description = entry.description?.trim();
-  const name = description
+  const baseName = description
     ? description
     : entry.pullRequestNumber
       ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
       : "Activity on PR";
+  const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
     {

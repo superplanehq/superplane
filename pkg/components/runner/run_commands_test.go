@@ -694,6 +694,43 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[0].URL.Path)
 }
 
+func TestCancelBrokerLLMTaskRecordsUsageFromFetchedTask(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"id":"broker-42",
+					"status":"claimed",
+					"result":{"usage":{"input_tokens":900,"output_tokens":40},"model":"claude-sonnet-4-6"}
+				}`)),
+			},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"broker-42","status":"canceled"}`))},
+		},
+	}
+
+	recorder := &recordingUsage{}
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "broker-42"}}
+	err := CancelBrokerLLMTask(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: state,
+		Usage:          recorder,
+		Configuration:  map[string]any{"credentials": map[string]any{"source": "hosted"}},
+	}, "runnerClaudeCode.finished")
+	require.NoError(t, err)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, int64(940), recorder.records[0].TotalTokens)
+	require.Len(t, httpContext.Requests, 2)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Equal(t, "/v1/tasks/broker-42", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, http.MethodPost, httpContext.Requests[1].Method)
+	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[1].URL.Path)
+}
+
 func TestBrokerListActiveTasks(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
