@@ -1,57 +1,197 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/ui/switch";
-import { Text } from "@/components/Text/text";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useFactoryLLMModels, useUpdateFactoryLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { BYOK_PROVIDERS, useFactoryLLMModels, useUpdateFactoryLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedProviderLabel } from "@/lib/hostedCredit";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
+import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { ModelAllowlistEditor } from "@/pages/organization/settings/ModelAllowlistEditor";
+import { Switch } from "@/ui/switch";
 import { useState } from "react";
-import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { useLocation } from "react-router";
 
-const PROVIDERS = [...BYOK_PROVIDERS];
+import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import {
+  AgentCredentialSelection,
+  AgentResolutionPreview,
+  AgentSummary,
+  HostedOption,
+  ProviderCard,
+} from "./FactorySettingsAgentCards";
+import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { useFactoryAgent } from "./useFactoryAgent";
+import {
+  agentProviderToApi,
+  countReadyAgentIntegrations,
+  factoryAgentProviders,
+  resolveAgentModels,
+  type AgentProvider,
+  type CredentialSource,
+  useFactoryAgentSelection,
+} from "./useFactoryAgentSelection";
 
 export function FactorySettingsModelsPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const location = useLocation();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const canUpdate = canAct("factories", "update");
+  const canUpdate = canAct("factories", "update") && !permissionsLoading;
+  const onboarding = factory.onboarding;
+  const [selections, setSelections] = useState<IntegrationSelections>({});
+  const { data: integrations = [] } = useConnectedIntegrations(organizationId, { enabled: Boolean(organizationId) });
+  const selection = useFactoryAgentSelection(onboarding, integrations);
+  const {
+    source,
+    setSource,
+    provider,
+    setProvider,
+    integrationId,
+    setIntegrationId,
+    selectedProvider,
+    readyIntegrations,
+    dirty,
+  } = selection;
+  const connect = useIntegrationConnectDialog({
+    organizationId,
+    returnTo: location.pathname,
+    integrationNames: factoryAgentProviders.map((option) => option.integrationName),
+    selections,
+    onSelectionsChange: setSelections,
+  });
+  const { saveAgent, isPending: agentSavePending } = useSaveFactoryAgent({
+    organizationId,
+    factoryId,
+    provider,
+    source,
+    integrationId,
+  });
+  const agentModels = useFactoryLLMModels(
+    organizationId,
+    factoryId,
+    provider,
+    source === "hosted" ? "hosted" : "byok",
+    Boolean(organizationId && factoryId),
+  );
 
   usePageTitle(["Models", "Settings", factory.name ?? "Workspace"]);
+
+  const resolvedAgent = resolveAgentModels(selectedProvider, source, agentModels.data?.selected ?? []);
 
   return (
     <FactorySettingsPageFrame
       title="Models"
-      subtitle="Limit SuperPlane-hosted and your-key models for this workspace. An empty list uses the organization list."
+      subtitle="Choose the agent provider and credentials for generated workspace automations."
     >
-      {PROVIDERS.map((provider) => (
-        <FactorySettingsCard key={provider} title={hostedProviderLabel(provider)}>
-          <FactoryProviderModelSection
-            organizationId={organizationId}
-            factoryId={factoryId}
-            provider={provider}
-            fundingSource="hosted"
-            title="SuperPlane-hosted models"
-            canUpdate={canUpdate && !permissionsLoading}
-          />
-          <div className="mt-6 border-t border-border pt-4">
-            <FactoryProviderModelSection
-              organizationId={organizationId}
-              factoryId={factoryId}
-              provider={provider}
-              fundingSource="byok"
-              title="Use your keys"
-              canUpdate={canUpdate && !permissionsLoading}
+      <FactorySettingsCard title="Workspace agent" data-testid="factory-settings-agent">
+        <AgentSummary onboarding={onboarding} />
+        <div className="mt-5 grid gap-3">
+          <HostedOption active={source === "hosted"} provider={provider} onSelect={() => setSource("hosted")} />
+          {factoryAgentProviders.map((option) => (
+            <ProviderCard
+              key={option.provider}
+              active={source === "integration" && provider === option.provider}
+              option={option}
+              readyCount={countReadyAgentIntegrations(integrations, option.integrationName)}
+              onSelect={() => {
+                setSource("integration");
+                setProvider(option.provider);
+                const next = integrations.find(
+                  (integration) =>
+                    integration.metadata?.integrationName === option.integrationName &&
+                    integration.status?.state === "ready",
+                );
+                setIntegrationId(next?.metadata?.id ?? "");
+              }}
+              onConnect={() => connect.createNew(option.integrationName)}
             />
-          </div>
-        </FactorySettingsCard>
-      ))}
+          ))}
+        </div>
+
+        <AgentCredentialSelection
+          source={source}
+          provider={provider}
+          integrationId={integrationId}
+          readyIntegrations={readyIntegrations}
+          onProviderChange={setProvider}
+          onIntegrationChange={setIntegrationId}
+        />
+
+        <AgentResolutionPreview source={source} provider={selectedProvider} resolution={resolvedAgent} />
+
+        <div className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
+          <Text className="max-w-xl text-[12px] text-muted-foreground">
+            Saving updates generated Planning, Implementation, and Backlog runners. Current runs keep their existing
+            version.
+          </Text>
+          <PermissionTooltip
+            allowed={canUpdate || permissionsLoading}
+            message="You do not have permission to update this workspace."
+          >
+            <Button
+              type="button"
+              disabled={!dirty || !canUpdate || agentSavePending || (source === "integration" && !integrationId)}
+              onClick={() => void saveAgent()}
+              data-testid="factory-settings-agent-save"
+            >
+              {agentSavePending ? "Saving..." : "Save agent"}
+            </Button>
+          </PermissionTooltip>
+        </div>
+      </FactorySettingsCard>
+
+      <FactorySettingsCard title="Available models">
+        <Text className="text-[13px] text-muted-foreground">
+          Choose which {hostedProviderLabel(provider)} models this workspace can use. The workspace agent uses the
+          onboarding default.
+        </Text>
+        <FactoryProviderModelSection
+          key={`${provider}-${source}`}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          provider={provider}
+          fundingSource={source === "hosted" ? "hosted" : "byok"}
+          canUpdate={canUpdate}
+        />
+      </FactorySettingsCard>
+      {connect.dialogs}
     </FactorySettingsPageFrame>
   );
+}
+
+function useSaveFactoryAgent({
+  organizationId,
+  factoryId,
+  provider,
+  source,
+  integrationId,
+}: {
+  organizationId: string;
+  factoryId: string;
+  provider: AgentProvider;
+  source: CredentialSource;
+  integrationId: string;
+}) {
+  const updateAgent = useFactoryAgent(organizationId, factoryId);
+  const saveAgent = async () => {
+    if (source === "integration" && !integrationId) return;
+    try {
+      await updateAgent.mutateAsync({
+        provider: agentProviderToApi(provider),
+        credentialSource:
+          source === "hosted" ? "AGENT_CREDENTIAL_SOURCE_HOSTED" : "AGENT_CREDENTIAL_SOURCE_INTEGRATION",
+        ...(source === "integration" ? { integrationId } : {}),
+      });
+      showSuccessToast("Workspace agent updated.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Unable to update the workspace agent."));
+    }
+  };
+  return { saveAgent, isPending: updateAgent.isPending };
 }
 
 function FactoryProviderModelSection({
@@ -59,14 +199,12 @@ function FactoryProviderModelSection({
   factoryId,
   provider,
   fundingSource,
-  title,
   canUpdate,
 }: {
   organizationId: string;
   factoryId: string;
   provider: string;
   fundingSource: "hosted" | "byok";
-  title: string;
   canUpdate: boolean;
 }) {
   const factoryModels = useFactoryLLMModels(organizationId, factoryId, provider, fundingSource, true);
@@ -74,7 +212,6 @@ function FactoryProviderModelSection({
   const [query, setQuery] = useState("");
   const [inherit, setInherit] = useState<boolean | null>(null);
   const [draft, setDraft] = useState<string[] | null>(null);
-
   const parent = (factoryModels.data?.parent ?? []).map((model) => model.id ?? "").filter(Boolean);
   const inheritParent = inherit ?? factoryModels.data?.inheritParent !== false;
   const selected =
@@ -85,11 +222,7 @@ function FactoryProviderModelSection({
 
   const save = async () => {
     try {
-      await update.mutateAsync({
-        provider,
-        fundingSource,
-        allowedModels: inheritParent ? [] : selected,
-      });
+      await update.mutateAsync({ provider, fundingSource, allowedModels: inheritParent ? [] : selected });
       setDraft(null);
       setInherit(null);
       showSuccessToast("Workspace models saved.");
@@ -104,29 +237,23 @@ function FactoryProviderModelSection({
       : "No organization models are selected for this provider.";
 
   return (
-    <div>
-      <p className="text-[13px] font-medium">{title}</p>
-      <FactoryModelSectionBody
-        canUpdate={canUpdate}
-        emptyMessage={emptyMessage}
-        inheritParent={inheritParent}
-        isLoading={factoryModels.isLoading}
-        isPending={update.isPending}
-        parent={parent}
-        query={query}
-        selected={selected}
-        title={title}
-        onInheritChange={(checked) => {
-          setInherit(checked);
-          if (!checked) {
-            setDraft(selected.length > 0 ? selected : parent);
-          }
-        }}
-        onQueryChange={setQuery}
-        onSave={() => void save()}
-        onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
-      />
-    </div>
+    <FactoryModelSectionBody
+      canUpdate={canUpdate}
+      emptyMessage={emptyMessage}
+      inheritParent={inheritParent}
+      isLoading={factoryModels.isLoading}
+      isPending={update.isPending}
+      parent={parent}
+      query={query}
+      selected={selected}
+      onInheritChange={(checked) => {
+        setInherit(checked);
+        if (!checked) setDraft(selected.length > 0 ? selected : parent);
+      }}
+      onQueryChange={setQuery}
+      onSave={() => void save()}
+      onToggle={(model, checked) => setDraft(checked ? [...selected, model] : selected.filter((id) => id !== model))}
+    />
   );
 }
 
@@ -139,7 +266,6 @@ function FactoryModelSectionBody({
   parent,
   query,
   selected,
-  title,
   onInheritChange,
   onQueryChange,
   onSave,
@@ -153,21 +279,16 @@ function FactoryModelSectionBody({
   parent: string[];
   query: string;
   selected: string[];
-  title: string;
   onInheritChange: (checked: boolean) => void;
   onQueryChange: (query: string) => void;
   onSave: () => void;
   onToggle: (model: string, checked: boolean) => void;
 }) {
-  if (isLoading) {
-    return <Text className="mt-2 text-[13px] text-muted-foreground">Loading models...</Text>;
-  }
-  if (parent.length === 0) {
-    return <Text className="mt-2 text-[13px] text-muted-foreground">{emptyMessage}</Text>;
-  }
+  if (isLoading) return <Text className="mt-4 text-[13px] text-muted-foreground">Loading models...</Text>;
+  if (parent.length === 0) return <Text className="mt-4 text-[13px] text-muted-foreground">{emptyMessage}</Text>;
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="mt-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <Label className="text-[13px]">Use organization list</Label>
         <Switch checked={inheritParent} disabled={!canUpdate || isPending} onCheckedChange={onInheritChange} />
@@ -182,16 +303,12 @@ function FactoryModelSectionBody({
           onQueryChange={onQueryChange}
           onToggle={onToggle}
           disabled={!canUpdate || isPending}
-          searchLabel={`Search ${title}`}
+          searchLabel="Search available models"
         />
       )}
-      {canUpdate ? (
-        <PermissionTooltip allowed={canUpdate} message="You do not have permission to update workspace models.">
-          <Button type="button" onClick={onSave} disabled={isPending}>
-            {isPending ? "Saving..." : "Save models"}
-          </Button>
-        </PermissionTooltip>
-      ) : null}
+      <Button type="button" onClick={onSave} disabled={!canUpdate || isPending}>
+        {isPending ? "Saving..." : "Save models"}
+      </Button>
     </div>
   );
 }

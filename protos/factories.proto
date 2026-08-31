@@ -97,6 +97,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactoryAgent(UpdateFactoryAgentRequest) returns (UpdateFactoryAgentResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/agent"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory agent";
+      description: "Updates the provider and credentials used by generated factory runners";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -628,6 +640,9 @@ message UpdateFactoryOnboardingRequest {
   optional bool complete = 10;
   // Default branch of the app repository.
   optional string default_branch = 11;
+  optional FactoryOnboarding.AgentProvider agent_provider = 12;
+  optional string agent_model = 13;
+  optional string agent_planning_model = 14;
 }
 
 message UpdateFactoryOnboardingResponse {
@@ -643,6 +658,17 @@ message UpdateFactoryRepositoryRequest {
 }
 
 message UpdateFactoryRepositoryResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryAgentRequest {
+  string id = 1;
+  FactoryOnboarding.AgentProvider provider = 2;
+  FactoryOnboarding.AgentCredentialSource credential_source = 3;
+  optional string integration_id = 4;
+}
+
+message UpdateFactoryAgentResponse {
   Factory factory = 1;
 }
 
@@ -668,6 +694,19 @@ message FactoryOnboarding {
     AGENT_HARNESS_CODEX = 3;
   }
 
+  enum AgentProvider {
+    AGENT_PROVIDER_UNSPECIFIED = 0;
+    AGENT_PROVIDER_ANTHROPIC = 1;
+    AGENT_PROVIDER_OPENAI = 2;
+    AGENT_PROVIDER_OPENROUTER = 3;
+  }
+
+  enum AgentCredentialSource {
+    AGENT_CREDENTIAL_SOURCE_UNSPECIFIED = 0;
+    AGENT_CREDENTIAL_SOURCE_HOSTED = 1;
+    AGENT_CREDENTIAL_SOURCE_INTEGRATION = 2;
+  }
+
   // Set when workspace setup finished. Null while onboarding is open.
   google.protobuf.Timestamp completed_at = 1;
   string vcs_integration_id = 2;
@@ -679,6 +718,9 @@ message FactoryOnboarding {
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
   string default_branch = 10;
+  AgentProvider agent_provider = 11;
+  string agent_model = 12;
+  string agent_planning_model = 13;
 }
 
 message Factory {
