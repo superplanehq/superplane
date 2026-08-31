@@ -1,14 +1,20 @@
+import type { CanvasesCanvas } from "@/api-client";
 import {
   requestCanvasAgentSidebarClose,
   requestCanvasAgentSidebarOpen,
   subscribeCanvasAgentSidebarChanged,
 } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { showErrorToast } from "@/lib/toast";
+import type { FactoryConfigureActions } from "@/pages/app";
+import { parseCanvasYamlForImport } from "@/pages/app/lib/workflow-spec-files";
+import { materializeFactoryCanvas } from "@/pages/home/factories";
 import {
   requestBuildingBlocksSidebar,
   subscribeBuildingBlocksSidebarChanged,
 } from "@/ui/CanvasPage/buildingBlocksSidebarRequest";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react";
+import { deriveFactoryAppResetWiring, resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
 import { factoryAppConfigurePath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
 import { setSearchParamFlag } from "../lib/factoryAppSearchParamFlag";
 
@@ -23,6 +29,9 @@ type FactoryAppCanvasEditActionsInput = {
   isConfigure: boolean;
   agentOpen: boolean;
   componentsOpen: boolean;
+  canvas?: CanvasesCanvas | null;
+  canUpdateCanvas: boolean;
+  configureActionsRef: MutableRefObject<FactoryConfigureActions | null>;
   setSearchParams: (updater: (current: URLSearchParams) => URLSearchParams, options?: { replace?: boolean }) => void;
   navigate: (to: string) => void;
 };
@@ -38,6 +47,9 @@ export function useFactoryAppCanvasEditActions({
   isConfigure,
   agentOpen,
   componentsOpen,
+  canvas,
+  canUpdateCanvas,
+  configureActionsRef,
   setSearchParams,
   navigate,
 }: FactoryAppCanvasEditActionsInput) {
@@ -99,6 +111,45 @@ export function useFactoryAppCanvasEditActions({
     handleAgentPromptOpenChange(true);
   }, [handleAgentPromptOpenChange]);
 
+  const resetTemplate = useMemo(() => resolveFactoryAppTemplate(canvas), [canvas]);
+  const resetAvailable = isConfigure && canUpdateCanvas && Boolean(resetTemplate);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  const handleOpenResetConfirm = useCallback(() => {
+    if (!resetAvailable) return;
+    setResetConfirmOpen(true);
+  }, [resetAvailable]);
+
+  const handleResetConfirmOpenChange = useCallback((open: boolean) => {
+    setResetConfirmOpen(open);
+  }, []);
+
+  // Rematerializes the app's bundled template with its own real repo/agent
+  // wiring and loads it as an unsaved configure draft. The user still needs
+  // to click Save — this never persists or calls a gRPC action.
+  const handleResetToFactoryDefaults = useCallback(() => {
+    setResetConfirmOpen(false);
+    if (!resetAvailable || !resetTemplate || !canvas) return;
+
+    const wiring = deriveFactoryAppResetWiring(canvas);
+    const yamlText = materializeFactoryCanvas({
+      definition: resetTemplate,
+      canvasName: canvas.metadata?.name || resetTemplate.title,
+      canvasId: appId,
+      installParams: wiring.installParams,
+      integrations: wiring.integrations,
+      agentRewrite: wiring.agentRewrite,
+    });
+
+    const parsed = parseCanvasYamlForImport(yamlText);
+    if (!parsed.ok) {
+      showErrorToast(parsed.error);
+      return;
+    }
+
+    configureActionsRef.current?.applyDraftSpec(parsed.spec);
+  }, [appId, canvas, configureActionsRef, resetAvailable, resetTemplate]);
+
   const handleAgentOpenChange = useCallback(
     (open: boolean) => {
       handleSearchParamFlag("agent", open);
@@ -130,6 +181,11 @@ export function useFactoryAppCanvasEditActions({
     handleEditWithLocalAgent,
     handleAgentOpenChange,
     handleComponentsOpenChange,
+    resetAvailable,
+    resetConfirmOpen,
+    handleOpenResetConfirm,
+    handleResetConfirmOpenChange,
+    handleResetToFactoryDefaults,
   };
 }
 
