@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Blocks } from "lucide-react";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
 
@@ -32,14 +33,11 @@ import {
   FactorySettingsSoonPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
-  FACTORY_SETTINGS_NAV_ITEMS,
-  isFactorySettingsComingSoon,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
-  OrganizationSettingsLayout,
-  organizationSettingsSectionRoutes,
+  OrganizationSettingsOverviewPage,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -49,12 +47,15 @@ import {
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import {
-  LegacyLLMSpendRedirect,
-  LegacyWorkspaceOrganizationSettingsRedirect,
-} from "@/pages/factories/lib/organizationSettingsRedirects";
+  LegacyFactoryOrganizationSettingsRedirect,
+  LegacyFactorySettingsIndexRedirect,
+  LegacyFactorySettingsRedirect,
+  LegacyOrganizationSettingsRedirect,
+} from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
+import { OrganizationSettingsLLMSpendPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsLLMSpendPage";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
@@ -282,36 +283,34 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
-            <Route index element={<Navigate to={FACTORY_SETTINGS_NAV_ITEMS[0].id} replace />} />
-            <Route path="general" element={<FactorySettingsGeneralPage />} />
-            <Route path="automations" element={<FactorySettingsAutomationsPage />} />
-            <Route path="models" element={<FactorySettingsModelsPage />} />
-            <Route path="usage" element={<FactorySettingsUsagePage />} />
-            <Route path="profile" element={<FactorySettingsProfilePage />} />
-            <Route path="notifications" element={<FactorySettingsNotificationsPage />} />
-            {FACTORY_SETTINGS_NAV_ITEMS.filter(isFactorySettingsComingSoon).map((item) => (
-              <Route
-                key={item.id}
-                path={item.id}
-                element={
-                  <FactorySettingsSoonPage
-                    title={item.label}
-                    description={`${item.label} settings for this workspace.`}
-                    Icon={item.Icon}
-                  />
-                }
-              />
-            ))}
+            <Route index element={<LegacyFactorySettingsIndexRedirect />} />
+            <Route path="account/general" element={<FactorySettingsProfilePage />} />
+            <Route path="account/notifications" element={<FactorySettingsNotificationsPage />} />
+            <Route path="workspace/general" element={<FactorySettingsGeneralPage />} />
+            <Route
+              path="workspace/repository"
+              element={
+                <FactorySettingsSoonPage
+                  title="Repository"
+                  description="Repository settings for this workspace."
+                  Icon={Blocks}
+                />
+              }
+            />
+            <Route path="workspace/automations" element={<FactorySettingsAutomationsPage />} />
+            <Route path="workspace/models" element={<FactorySettingsModelsPage />} />
+            <Route path="workspace/spending" element={<FactorySettingsUsagePage />} />
+            <Route path="organization/general" element={<OrganizationSettingsOverviewPage />} />
+            <Route path="organization/spending" element={<OrganizationSettingsLLMSpendPage />} />
+            <Route path="*" element={<LegacyFactorySettingsRedirect />} />
           </Route>
           <Route
             path=":factoryKey/organization/*"
-            element={factoryRoute(<LegacyWorkspaceOrganizationSettingsRedirect />)}
+            element={factoryRoute(<LegacyFactoryOrganizationSettingsRedirect />)}
           />
         </Route>
-        <Route path="organization" element={factoryRoute(<OrganizationSettingsLayout />)}>
-          {organizationSettingsSectionRoutes}
-        </Route>
-        <Route path="settings/llm-spend" element={<LegacyLLMSpendRedirect />} />
+        <Route path="organization/*" element={factoryRoute(<LegacyOrganizationSettingsRedirect />)} />
+        <Route path="settings/llm-spend" element={<LegacyOrganizationSettingsRedirect destination="llm-spend" />} />
         <Route
           path="settings/integrations/:integrationName/setup"
           element={<div data-testid="integration-setup-placeholder">Integration setup</div>}

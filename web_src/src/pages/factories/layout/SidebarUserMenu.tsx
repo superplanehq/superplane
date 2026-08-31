@@ -31,7 +31,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { factorySettingsSectionPath, organizationSettingsSectionPath } from "../lib/factoryPagePaths";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface SidebarUserMenuProps {
@@ -66,12 +66,11 @@ export function SidebarUserMenu({
   const navigate = useNavigate();
   const homeHref = `/${organizationId}`;
   const profileHref = factoryKey
-    ? factorySettingsSectionPath(organizationId, factoryKey, "profile")
+    ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
     : `/${organizationId}/settings/profile`;
   const organizationHref = factoryKey
-    ? organizationSettingsSectionPath(organizationId, "general")
+    ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
-  const organizationHrefState = factoryKey ? { fromFactoryKey: factoryKey } : undefined;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -105,7 +104,6 @@ export function SidebarUserMenu({
             organizationId={organizationId}
             organizationName={organizationName}
             organizationHref={organizationHref}
-            organizationHrefState={organizationHrefState}
           />
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -143,12 +141,10 @@ function OrganizationMenuHeader({
   organizationId,
   organizationName,
   organizationHref,
-  organizationHrefState,
 }: {
   organizationId: string;
   organizationName: string;
   organizationHref: string;
-  organizationHrefState?: { fromFactoryKey: string };
 }) {
   const navigate = useNavigate();
 
@@ -164,7 +160,7 @@ function OrganizationMenuHeader({
         aria-label="Organization settings"
         data-testid="factories-sidebar-organization-settings-link"
         className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
-        onSelect={() => navigate(organizationHref, { state: organizationHrefState })}
+        onSelect={() => navigate(organizationHref)}
       >
         <Settings className="size-3.5" aria-hidden />
       </DropdownMenuItem>
