@@ -419,7 +419,7 @@ func serializeCapabilities(registry *registry.Registry, integration *models.Inte
 		capabilities = append(capabilities, group.Capabilities...)
 	}
 	protos := []*pb.Integration_CapabilityState{}
-	for _, capability := range integration.Capabilities {
+	for _, capability := range mergeCapabilityStates(capabilities, integration.Capabilities) {
 		protos = append(protos, &pb.Integration_CapabilityState{
 			Name:  capability.Name,
 			State: CapabilityStateToProto(capability.State),
@@ -427,6 +427,25 @@ func serializeCapabilities(registry *registry.Registry, integration *models.Inte
 	}
 
 	return protos
+}
+
+func mergeCapabilityStates(capabilities []core.Capability, stored []models.CapabilityState) []models.CapabilityState {
+	storedByName := capabilityMap(stored)
+	states := make([]models.CapabilityState, 0, len(capabilities))
+
+	for _, capability := range capabilities {
+		state, ok := storedByName[capability.Name]
+		if !ok {
+			state = models.CapabilityState{
+				Name:  capability.Name,
+				State: core.IntegrationCapabilityStateAvailable,
+			}
+		}
+
+		states = append(states, state)
+	}
+
+	return states
 }
 
 func serializeLegacyCapabilities(integration core.Integration) []*pb.Integration_CapabilityState {
