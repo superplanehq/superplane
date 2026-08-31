@@ -179,12 +179,12 @@ function PRFeedbackGeneralTab({
           <div className="flex items-start gap-3">
             <Checkbox
               id="pr-feedback-ignore-bots"
-              className="mt-0.5"
+              className="mt-0.5 cursor-pointer"
               checked={draft.ignoreBots}
               onChange={(event) => onUpdate("ignoreBots", event.currentTarget.checked)}
               data-testid="pr-feedback-ignore-bots"
             />
-            <Label htmlFor="pr-feedback-ignore-bots">
+            <Label htmlFor="pr-feedback-ignore-bots" className="flex-col items-start cursor-pointer">
               <span className="block text-sm font-medium text-gray-800 dark:text-gray-100">
                 {PR_FEEDBACK_SETTINGS_COPY.ignoreBotsLabel}
               </span>
@@ -193,6 +193,8 @@ function PRFeedbackGeneralTab({
               </span>
             </Label>
           </div>
+
+          <PRFeedbackAllowedBotsField value={draft.allowedBots} onChange={(value) => onUpdate("allowedBots", value)} />
         </div>
       </div>
       <PRFeedbackSettingsFooter
@@ -233,6 +235,38 @@ function PRFeedbackTextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         data-testid={id}
+      />
+    </section>
+  );
+}
+
+function PRFeedbackAllowedBotsField({ value, onChange }: { value: string[]; onChange: (value: string[]) => void }) {
+  const [text, setText] = useState(value.join(", "));
+
+  useEffect(() => {
+    setText(value.join(", "));
+  }, [value]);
+
+  function commit(nextText: string) {
+    const bots = nextText
+      .split(",")
+      .map((bot) => bot.trim())
+      .filter((bot) => bot.length > 0);
+    onChange(bots);
+  }
+
+  return (
+    <section>
+      <Label htmlFor="pr-feedback-allowed-bots">{PR_FEEDBACK_SETTINGS_COPY.allowedBotsLabel}</Label>
+      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.allowedBotsHelper}</p>
+      <Input
+        id="pr-feedback-allowed-bots"
+        className="mt-2"
+        placeholder="coderabbitai, bugbot"
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onBlur={(event) => commit(event.target.value)}
+        data-testid="pr-feedback-allowed-bots"
       />
     </section>
   );

@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import type { FactoriesDescribeFactoryVelocityResponse, OrganizationsIntegration } from "@/api-client";
+import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory } from "@/api-client";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useFactoryVelocity } from "@/hooks/useFactoryVelocity";
-import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIntegrations";
 
 import {
   aggregateFactoryVelocityFlow,
@@ -24,14 +23,10 @@ export interface VelocityPageModel {
   periodLabel: string;
   setPeriodDays: (days: VelocityPeriodDays) => void;
 
-  githubIntegrations: OrganizationsIntegration[];
+  /** GitHub integration selected during workspace setup. */
   integrationId: string;
-  setIntegrationId: (integrationId: string) => void;
-
-  repositoryOptions: string[];
-  repositoriesLoading: boolean;
+  /** App repository selected during workspace setup, as `owner/repo`. */
   repository: string;
-  setRepository: (repository: string) => void;
 
   velocity: {
     data?: VelocityData;
@@ -89,41 +84,15 @@ function toVelocityData(response: FactoriesDescribeFactoryVelocityResponse, date
   };
 }
 
-export function useVelocityPageModel(organizationId: string, factoryId: string): VelocityPageModel {
+export function useVelocityPageModel(
+  organizationId: string,
+  factoryId: string,
+  onboarding: FactoriesFactory["onboarding"],
+): VelocityPageModel {
   const [periodDays, setPeriodDays] = useState<VelocityPeriodDays>(7);
-  const [integrationId, setIntegrationId] = useState<string>("");
-  const [repository, setRepository] = useState<string>("");
 
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId);
-  const githubIntegrations = useMemo(
-    () =>
-      connectedIntegrations.filter(
-        (integration) => integration.metadata?.integrationName === "github" && integration.status?.state === "ready",
-      ),
-    [connectedIntegrations],
-  );
-
-  const effectiveIntegrationId = useMemo(() => {
-    if (integrationId) return integrationId;
-    if (githubIntegrations.length === 1) {
-      return githubIntegrations[0].metadata?.id ?? "";
-    }
-    return "";
-  }, [integrationId, githubIntegrations]);
-
-  const { data: repositoryResources = [], isLoading: repositoriesLoading } = useIntegrationResources(
-    organizationId,
-    effectiveIntegrationId,
-    "repository",
-  );
-
-  const repositoryOptions = useMemo(
-    () =>
-      repositoryResources
-        .map((resource) => resource.name?.trim() ?? "")
-        .filter((name): name is string => name.length > 0),
-    [repositoryResources],
-  );
+  const integrationId = onboarding?.vcsIntegrationId?.trim() ?? "";
+  const repository = onboarding?.appRepository?.trim() ?? "";
 
   const {
     data: velocityResponse,
@@ -133,7 +102,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     refetch: refetchVelocity,
   } = useFactoryVelocity(organizationId, factoryId, {
     periodDays,
-    integrationId: effectiveIntegrationId || undefined,
+    integrationId: integrationId || undefined,
     repository: repository || undefined,
   });
 
@@ -147,7 +116,7 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
   const isVelocityLoading = velocityLoading || (velocityFetching && !velocityResponse);
   const isWorkOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
-  const hasRepoContext = Boolean(effectiveIntegrationId && repository);
+  const hasRepoContext = Boolean(integrationId && repository);
   const hasPeopleCohort = Boolean(velocityResponse?.hasPeopleCohort && hasRepoContext);
 
   const velocityData = velocityResponse
@@ -160,17 +129,8 @@ export function useVelocityPageModel(organizationId: string, factoryId: string):
     periodLabel: factoryVelocityPeriodLabel(periodDays),
     setPeriodDays,
 
-    githubIntegrations,
-    integrationId: effectiveIntegrationId,
-    setIntegrationId: (value: string) => {
-      setIntegrationId(value);
-      setRepository("");
-    },
-
-    repositoryOptions,
-    repositoriesLoading,
+    integrationId,
     repository,
-    setRepository,
 
     velocity: {
       data: velocityData,

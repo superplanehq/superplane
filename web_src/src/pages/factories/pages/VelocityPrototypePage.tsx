@@ -1,124 +1,115 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { cn } from "@/lib/utils";
-import { SegmentedNav } from "@/ui/SegmentedNav";
-
-import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { VELOCITY_PERIOD_OPTIONS } from "../lib/factoryVelocityFlow";
-import { FACTORY_VELOCITY_FLOW_BY_PERIOD } from "./factoryVelocityFlowMockData";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { workOrdersPath } from "../lib/factoryPagePaths";
 import {
-  FACTORY_VELOCITY_BY_PERIOD,
-  FACTORY_VELOCITY_YESTERDAY,
-  type FactoryVelocityDay,
-  type FactoryVelocityPeriodDays,
-} from "./factoryVelocityMockData";
-import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
+  CostCard,
+  DeliveryCard,
+  SummaryCard,
+  TaskTimeCard,
+  VelocityPrototypeChrome,
+  type VelocityComparison,
+} from "./velocityPrototypeCards";
+import { VelocityPeopleTable } from "./VelocityPeopleTable";
+import { VelocityZeroState } from "./VelocityZeroState";
 import {
-  VelocityLoadedView,
-  type VelocityCostConfig,
-  type VelocityData,
-  type VelocitySourceSplitConfig,
-  type VelocityWorkOrderFlowConfig,
-} from "./VelocityLoadedView";
+  EARLY_USAGE_CLOSED_TASKS,
+  buildEarlyUsageVelocityPoints,
+  buildPeople,
+  buildVelocityPoints,
+  summarizePoints,
+  type Breakdown,
+  type PeriodDays,
+  type VelocitySummary,
+} from "./velocityPrototypeData";
 
-function pointsFromMock(points: FactoryVelocityDay[]) {
-  return points.map((point) => ({
-    day: point.day,
-    merged: point.merged,
-    waste: point.waste,
-    peopleMerged: point.peopleMerged,
-    superplaneMerged: point.superplaneMerged,
-  }));
+function usePeopleShare(summary: VelocitySummary) {
+  return useMemo(
+    () =>
+      buildPeople({
+        peopleMerged: summary.peopleMerged,
+        superplaneMerged: summary.superplaneMerged,
+        waste: summary.waste,
+        costUsd: summary.cost,
+      }),
+    [summary.peopleMerged, summary.superplaneMerged, summary.waste, summary.cost],
+  );
 }
 
-function toVelocityDataFromMock(periodDays: FactoryVelocityPeriodDays): VelocityData {
-  const period = FACTORY_VELOCITY_BY_PERIOD[periodDays];
-  return {
-    yesterday: {
-      dateLabel: FACTORY_VELOCITY_YESTERDAY.dateLabel,
-      merged: FACTORY_VELOCITY_YESTERDAY.merged,
-      waste: FACTORY_VELOCITY_YESTERDAY.waste,
-      wastePct: FACTORY_VELOCITY_YESTERDAY.wastePct,
-    },
-    totals: {
-      merged: period.totals.merged,
-      waste: period.totals.waste,
-      wastePct: period.totals.wastePct,
-      superplaneMerged: period.totals.superplaneMerged,
-      peopleMerged: period.totals.peopleMerged,
-      superplaneSharePct: period.totals.superplaneSharePct,
-    },
-    points: pointsFromMock(period.points),
-  };
+/** First-run empty report: same chrome as the populated prototype, no charts. */
+export function VelocityPrototypeZeroStatePage() {
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(14);
+  const { organizationId, factoryKey } = useFactoriesLayout();
+
+  return (
+    <VelocityPrototypeChrome periodDays={periodDays} onPeriodDaysChange={setPeriodDays}>
+      <VelocityZeroState tasksHref={workOrdersPath(organizationId, factoryKey)} />
+    </VelocityPrototypeChrome>
+  );
 }
 
-function toCostConfigFromMock(periodDays: FactoryVelocityPeriodDays): VelocityCostConfig {
-  const period = FACTORY_VELOCITY_BY_PERIOD[periodDays];
-  return {
-    yesterdayCostUsd: FACTORY_VELOCITY_YESTERDAY.costUsd,
-    yesterdayTokens: FACTORY_VELOCITY_YESTERDAY.tokens,
-    yesterdayCostPerMerged: FACTORY_VELOCITY_YESTERDAY.costPerMergedPr,
-    totalCostUsd: period.totals.costUsd,
-    seriesUsd: period.points.map((point) => point.costUsd),
-  };
-}
+/**
+ * A workspace a few hours old. Every card holds real numbers, but SuperPlane
+ * has one day of output, so the page drops the period comparison and names the
+ * sample behind each median.
+ */
+export function VelocityPrototypeEarlyUsagePage() {
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(14);
+  const [breakdown, setBreakdown] = useState<Breakdown>("origin");
+  const points = useMemo(() => buildEarlyUsageVelocityPoints(periodDays), [periodDays]);
 
-function toWorkOrderFlowFromMock(periodDays: FactoryVelocityPeriodDays): VelocityWorkOrderFlowConfig {
-  const mock = FACTORY_VELOCITY_FLOW_BY_PERIOD[periodDays];
-  return {
-    flow: {
-      days: periodDays,
-      label: mock.label,
-      sampleSize: 42,
-      medianCycleHours: mock.medianCycleHours,
-      medianRunningHours: mock.medianRunningHours,
-      medianWaitingHours: mock.medianWaitingHours,
-      runningShareOfCyclePct: mock.runningShareOfCyclePct,
-      waitingShareOfCyclePct: mock.waitingShareOfCyclePct,
-      timeTrend: mock.timeTrend,
-    },
-  };
+  const summary = summarizePoints(points);
+  const people = usePeopleShare(summary);
+  const periodLabel = `Last ${periodDays} days`;
+  const sampleNote = `From ${EARLY_USAGE_CLOSED_TASKS} tasks closed today`;
+
+  return (
+    <VelocityPrototypeChrome periodDays={periodDays} onPeriodDaysChange={setPeriodDays}>
+      <SummaryCard
+        summary={summary}
+        caption={`${periodLabel}. SuperPlane started today, so there is no comparison yet.`}
+      />
+      <DeliveryCard points={points} breakdown={breakdown} onBreakdownChange={setBreakdown} />
+      <VelocityPeopleTable people={people} periodLabel={periodLabel} />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <TaskTimeCard summary={summary} points={points} sampleNote={sampleNote} />
+        <CostCard summary={summary} points={points} sampleNote={sampleNote} />
+      </div>
+    </VelocityPrototypeChrome>
+  );
 }
 
 export function VelocityPrototypePage() {
-  const [periodDays, setPeriodDays] = useState<FactoryVelocityPeriodDays>(7);
-  const period = FACTORY_VELOCITY_BY_PERIOD[periodDays];
+  const [periodDays, setPeriodDays] = useState<PeriodDays>(14);
+  const [breakdown, setBreakdown] = useState<Breakdown>("origin");
+  const points = useMemo(() => buildVelocityPoints(periodDays, periodDays), [periodDays]);
+  const previousPoints = useMemo(() => buildVelocityPoints(periodDays, 0), [periodDays]);
 
-  const sourceSplit: VelocitySourceSplitConfig = {
-    hasPeopleCohort: true,
-    repositoryLabel: "acme/refunds",
+  const summary = summarizePoints(points);
+  const previous = summarizePoints(previousPoints);
+  const people = usePeopleShare(summary);
+  const periodLabel = `Last ${periodDays} days`;
+
+  const comparison: VelocityComparison = {
+    merged: summary.merged - previous.merged,
+    wasteRate: summary.wasteRate - previous.wasteRate,
+    cycleHours: Math.round(summary.cycleHours - previous.cycleHours),
+    costPerMerge: Math.round((summary.costPerMerge - previous.costPerMerge) * 100) / 100,
   };
 
   return (
-    <>
-      <WorkspacePageHeader
-        className={factorySectionHeaderClassName}
-        title="Velocity"
-        subtitle="Merged pull requests, waste, cost, and task time."
-        actions={
-          <SegmentedNav
-            ariaLabel="Velocity period in days"
-            size="xs"
-            value={String(periodDays)}
-            onValueChange={(value) => {
-              const next = Number(value);
-              if (next === 7 || next === 30) setPeriodDays(next);
-            }}
-            options={VELOCITY_PERIOD_OPTIONS}
-          />
-        }
+    <VelocityPrototypeChrome periodDays={periodDays} onPeriodDaysChange={setPeriodDays}>
+      <SummaryCard
+        summary={summary}
+        caption={`${periodLabel}. Compared with the previous ${periodDays} days.`}
+        comparison={comparison}
       />
-
-      <div className={cn(factorySectionBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
-        <VelocityLoadedView
-          periodLabel={period.label}
-          periodDays={periodDays}
-          data={toVelocityDataFromMock(periodDays)}
-          sourceSplit={sourceSplit}
-          workOrderFlow={toWorkOrderFlowFromMock(periodDays)}
-          cost={toCostConfigFromMock(periodDays)}
-        />
+      <DeliveryCard points={points} breakdown={breakdown} onBreakdownChange={setBreakdown} />
+      <VelocityPeopleTable people={people} periodLabel={periodLabel} />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <TaskTimeCard summary={summary} points={points} />
+        <CostCard summary={summary} points={points} />
       </div>
-    </>
+    </VelocityPrototypeChrome>
   );
 }

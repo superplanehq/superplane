@@ -25,6 +25,8 @@ interface ColumnLaneMenuProps {
   editLabel?: string;
   /** Opens the inline agent editor. */
   onEditAgent?: () => void;
+  /** Opens the automation configure canvas as a separate item above Edit. */
+  automationHref?: string | null;
   /** Opens the parallelism modal for canvas-backed phases. */
   onSetParallelism?: () => void;
   parallelism?: number;
@@ -42,6 +44,7 @@ export function ColumnLaneMenu({
   onEdit,
   editLabel = "Edit",
   onEditAgent,
+  automationHref,
   onSetParallelism,
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   colorId,
@@ -49,7 +52,7 @@ export function ColumnLaneMenu({
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions = canEdit || Boolean(onEditAgent || onSetParallelism);
+  const hasActions = canEdit || Boolean(onEditAgent || onSetParallelism || automationHref);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -77,6 +80,12 @@ export function ColumnLaneMenu({
         {hasActions ? (
           <>
             <div className="p-1">
+              {automationHref ? (
+                <DropdownMenuItem onSelect={() => navigate(automationHref)} data-testid={`${testId}-edit-automation`}>
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                  Edit automation
+                </DropdownMenuItem>
+              ) : null}
               {onEditAgent ? (
                 <DropdownMenuItem onSelect={onEditAgent} data-testid={`${testId}-edit-agent`}>
                   <Bot className="h-3.5 w-3.5" aria-hidden />

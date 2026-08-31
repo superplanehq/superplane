@@ -585,6 +585,30 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-backlog-menu-edit")).toHaveTextContent("Edit");
     expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-edit-automation")).not.toBeInTheDocument();
+  });
+
+  it("offers Edit automation on the Backlog menu when a Backlog automation app exists", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const editAutomation = screen.getByTestId("lines-backlog-menu-edit-automation");
+    const edit = screen.getByTestId("lines-backlog-menu-edit");
+    expect(editAutomation).toHaveTextContent("Edit automation");
+    expect(edit).toHaveTextContent("Edit");
+    // Edit automation, then Edit, then Set color.
+    expect(editAutomation.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(edit.compareDocumentPosition(screen.getByText("Set color")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(editAutomation);
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-backlog", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
   });
 
   it("opens Set parallelism and saves a new cap", async () => {

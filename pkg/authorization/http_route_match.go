@@ -50,16 +50,39 @@ func matchPathPattern(pattern, path string) (literalSegments int, ok bool) {
 	}
 
 	for i, part := range patternParts {
-		if isPathParam(part) {
+		patternSegment, patternVerb := splitCustomVerb(part)
+		pathSegment := pathParts[i]
+
+		if patternVerb != "" {
+			var pathVerb string
+			pathSegment, pathVerb = splitCustomVerb(pathSegment)
+			if pathVerb != patternVerb {
+				return 0, false
+			}
+			literalSegments++
+		}
+
+		if isPathParam(patternSegment) {
 			continue
 		}
-		if part != pathParts[i] {
+		if patternSegment != pathSegment {
 			return 0, false
 		}
 		literalSegments++
 	}
 
 	return literalSegments, true
+}
+
+// splitCustomVerb separates a grpc-gateway custom verb from the last path
+// segment, so that "{app_id}:defaults" matches "some-id:defaults". A segment
+// without a verb is returned unchanged.
+func splitCustomVerb(segment string) (string, string) {
+	index := strings.LastIndex(segment, ":")
+	if index <= 0 || index == len(segment)-1 {
+		return segment, ""
+	}
+	return segment[:index], segment[index+1:]
 }
 
 func splitPath(path string) []string {
