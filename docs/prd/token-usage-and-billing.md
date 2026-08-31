@@ -4,10 +4,10 @@
 > Audience: Product and engineering  
 > Slides: [PDF](token-usage-and-billing-slides.pdf) · [source](token-usage-and-billing-slides.md)
 
-This draft is the project playbook for SuperPlane LLM usage tracking, hosted
-credits, bring-your-own-key (BYOK), and Polar prepaid billing. Phases 1–3 are
-shipped. This document describes Phases 4–6 as built: BYOK model pools, Polar
-sandbox checkout, and factory hosted spend limits.
+This draft is the project playbook for SuperPlane workspace usage tracking
+(LLM tokens and SuperPlane runner-fleet VM time), hosted credits,
+bring-your-own-key (BYOK), and Polar prepaid billing. Phases 1–6 are shipped
+for model usage. Runner-fleet compute is recorded on the same ledger.
 
 ## Locked decisions
 
@@ -33,17 +33,21 @@ BYOK usage is reported. It does not debit SuperPlane credit.
 
 Do not reinvent these pieces:
 
-- Factory UI already shows spend when `total_tokens` / `cost_cents` are
-  non-zero. Serialization already sums executions onto the work order.
-  **Nothing writes those columns.**
-- Org LLM integrations already store customer API keys. OpenAI and Anthropic
-  clients exist. There is no OpenRouter client and no SuperPlane-hosted key
-  path for factory agents.
-- `protos/usage.proto` and `/settings/billing` are **SaaS plan limits**
-  (canvases, events, canvas-agent tokens, runner minutes). Keep that service.
-  Do not use it as the spend ledger.
+- Factory UI already shows spend when `total_tokens` / `cost_cents` /
+  `duration_seconds` are non-zero. Serialization sums executions onto the
+  work order. `RecordUsage` and `RecordComputeUsage` write the ledger and
+  copy totals into the execution cache.
+- Org LLM integrations already store customer API keys. OpenAI, Anthropic,
+  and OpenRouter clients exist for factory agents.
+- `protos/usage.proto` and org settings **Usage** (`GET /organizations/{id}/usage`)
+  are **SaaS plan limits** (canvases, events, canvas-agent tokens, runner
+  minutes). Keep that service. Do not use it as the factory spend ledger.
+  Factory settings **Usage** and org **Workspace usage** read
+  `workspace_usage_events`.
 - The factory PRD defines tracked cost as model tokens plus execution compute.
-  It excludes third-party charges and human labor.
+  It excludes third-party charges and human labor. Compute in this ledger is
+  SuperPlane runner-fleet time only (`e1-large-*`, `e1-tiny-*`). Not Daytona.
+  Not customer GCP VMs.
 
 ## Product rules
 
@@ -54,7 +58,7 @@ Do not reinvent these pieces:
 | Hosted catalog | Admin picks one hosted provider and an allowlist of models. |
 | BYOK catalog | User connects keys. SuperPlane lists models. The list guides the picker. It does not gate a run. |
 | BYOK cost | Store estimated or provider-reported dollars. Mark `funding_source=byok`. |
-| Compute | Same ledger, `usage_kind=compute`, later. Phase 1 is model usage only. |
+| Compute | Same ledger, `usage_kind=compute`. SuperPlane runner fleets only. Record seconds and machine type. Local/Compose fleet `local` always records and prices at 0. |
 | Self-hosted | Tracking ships. Welcome credit and Polar checkout are cloud-only. |
 | Prompts | Do not store prompt or completion text on usage rows. |
 | Failed runs | Record tokens already consumed. Pass or fail does not erase spend. |
@@ -65,7 +69,7 @@ Do not reinvent these pieces:
 Organization (wallet, Polar customer, model allowlist, BYOK keys)
   └── Workspace / Factory (optional hosted spend limit, reports)
         └── Work order → line step execution
-              └── llm_usage_events (append-only)
+              └── workspace_usage_events (append-only; model + compute)
 ```
 
 - **Org** owns the Polar customer, credit balance, hosted provider config,
@@ -75,25 +79,43 @@ Organization (wallet, Polar customer, model allowlist, BYOK keys)
 - Do not create a second Polar customer per workspace.
 
 **Usage event** — one append-only row per LLM call (or per terminal usage
-snapshot for long-running Anthropic managed agents):
+snapshot for long-running Anthropic managed agents), or per finished runner
+task for compute:
 
 - Scope: organization, factory, work order, line, dispatch, execution, canvas
-  run, node execution
-- What: `provider` (`anthropic` \| `openai` \| `openrouter`), `model`,
-  `usage_kind` (`model` \| `compute`), `funding_source` (`hosted` \| `byok`)
-- Amounts: input, output, cache read/write, reasoning, total tokens,
-  `cost_cents`, currency, `price_book_version`
-- Safety: unique `idempotency_key`, `occurred_at`, no prompt payload
+  run, node execution. Factory canvases only. Org canvases are skipped.
+- Model rows: `provider` (`anthropic` \| `openai` \| `openrouter`), `model`,
+  `usage_kind=model`, `funding_source` (`hosted` \| `byok`), token columns.
+- Compute rows: `provider=runner`, `model` = catalog machine type,
+  `usage_kind=compute`, `machine_type`, `fleet_id`, `duration_seconds`.
+  Token columns stay 0. SuperPlane runner fleets only.
+- Amounts: tokens as above, `duration_seconds`, `cost_micros`, currency,
+  `price_book_version`.
+- Safety: unique `idempotency_key`, `occurred_at`, no prompt payload.
+  Compute keys are `runner:compute:<task_id>`.
 
-Execution `total_tokens` / `cost_cents` stay as **cached rollups** for the
-existing work-order API and UI. Reports that need “by model” read the ledger.
+Execution `total_tokens` / `cost_cents` / `duration_seconds` stay as
+**cached rollups** for the work-order API and UI. Reports that need “by model”
+or “by machine type” read the ledger. Line metrics wall minutes
+(`finished_at - created_at`) are not VM seconds. Billable VM time is broker
+`claimed_at` → `finished_at`.
+
+SaaS runner minutes (`RunnerTaskFinishedMessage`, org **Usage** plan limits)
+stay separate. SuperPlane still publishes that message. It is not the factory
+spend ledger. `SetRunnerMinutesLimitChecker` is not a factory VM billing gate.
+
+Hosted billed spend is `SUM(cost_micros) WHERE funding_source = hosted AND
+usage_kind = model`. Compute does not debit the `organization_llm_*` wallet
+in this phase. Markup and `PrepareHostedRun` stay LLM-only.
 
 ## Phases
 
 ### Phase 1 — Tracking and reporting (shipped)
 
 Ledger, price book, `RecordUsage`, execution rollups, org and workspace reports.
-Do not overload the plan-limits Usage page (`/settings/billing`).
+Do not overload the plan-limits Usage page (`GET /organizations/{id}/usage`,
+org settings nav **Usage**). Factory settings **Usage** and org **Workspace
+usage** (`GET /organizations/{id}/workspace-usage`) are the ledger.
 
 ### Phase 2 — Provider clients (shipped)
 
@@ -121,6 +143,11 @@ using the key it connected. It also rejects an agent CLI alias such as `opus`,
 because the list holds full model ids. Only `PrepareHostedRun` keeps a
 selected-model gate, because hosted spend debits the wallet.
 
+Rates live in `usage_price_books` / `usage_price_book_rates`. The process loads
+the latest book at start. Compute rows for SuperPlane runner fleets write
+`cost_micros` from `micros_per_second`. Fleet `local` is always 0. Compute
+does not debit the hosted credit wallet and does not use markup.
+
 ### Phase 5 — Polar prepaid checkout
 
 Polar is the payment bookkeeper. SuperPlane keeps the wallet, markup, and
@@ -132,7 +159,7 @@ this phase.
   metadata `superplane_credit_pack=true`.
 - `order.paid` inserts an `organization_llm_credit_grants` row of kind `polar`.
   Wallet credit equals pack face value. Tax is extra on the Polar invoice.
-- Org LLM spend shows **Add hosted credit** and **Manage invoices** when Polar
+- Org Workspace usage shows **Add hosted credit** and **Manage invoices** when Polar
   is configured. Hide those actions when Polar env is empty (self-hosted).
 - Do not put this UI on `/settings/billing` (SaaS plan limits).
 - Polar usage meters and PAYG invoices are deferred. SuperPlane remaining
@@ -187,9 +214,12 @@ Decide these while Phase 1 is in progress or before Phase 3:
    BYOK list and the installation hosted allowlist in Phase 4.
 7. **Ledger retention.** How long do we keep usage events? This is separate
    from `usage_retention_window_days` on the plan-limits service.
-8. **Rename `/settings/billing`.** That page is plan limits. LLM credit lives
-   on LLM spend. Keep the nav label **Usage** for plan limits.
-9. **Compute in the same reports.** When do runner minutes join the ledger?
+8. **Rename `/settings/billing`.** That page is plan limits. Workspace usage
+   and hosted credit live on **Workspace usage**. Keep the nav label **Usage**
+   for plan limits. Do not use the path `/usage` for the ledger.
+9. **Compute in the same reports.** Closed. SuperPlane runner-fleet seconds
+   and machine type share `workspace_usage_events` (`usage_kind=compute`).
+   SaaS runner minutes stay on the external Usage service.
 10. **Tax and invoicing entity.** Polar is the merchant of record. Polar
     invoices the customer and collects tax. SuperPlane is not the tax filer.
 
@@ -206,8 +236,11 @@ Decide these while Phase 1 is in progress or before Phase 3:
 ## First implementation slice
 
 1. Keep this PRD as the source of truth.
-2. Phases 1–3 are shipped.
-3. Implement Phases 4–6: BYOK model pools, Polar prepaid checkout, factory
-   hosted spend limits.
+2. Phases 1–6 are shipped for model usage, hosted credit, BYOK, Polar, and
+   workspace budgets.
+3. Runner-fleet compute is on the same `workspace_usage_events` ledger.
+   Org **Workspace usage** and factory **Usage** show tokens and VM seconds.
 4. Defer Polar meters until prepaid checkout works. If meters are added later,
-   ingest billed cents, not tokens.
+   ingest billed cents, not tokens. Markup-on-VM, wallet debit for compute,
+   and a runner hard-stop when credit is empty stay out of the tracking
+   phase.

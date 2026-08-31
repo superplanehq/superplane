@@ -39,5 +39,7 @@ export function LegacyLLMSpendRedirect() {
     return <Navigate to="/" replace />;
   }
 
-  return <Navigate to={`${organizationSettingsSectionPath(organizationId, "llm-spend")}${location.search}`} replace />;
+  return (
+    <Navigate to={`${organizationSettingsSectionPath(organizationId, "workspace-usage")}${location.search}`} replace />
+  );
 }

@@ -23,29 +23,31 @@ export const Workspaces: Story = {
   render: () => <FactoriesHarness pathSuffix="organization/workspaces" factoriesFixture={defaultFactoriesFixture} />,
 };
 
-export const LLMSpend: Story = {
-  name: "LLM spend",
-  render: () => <FactoriesHarness pathSuffix="organization/llm-spend" factoriesFixture={defaultFactoriesFixture} />,
+export const WorkspaceUsage: Story = {
+  name: "Workspace usage",
+  render: () => (
+    <FactoriesHarness pathSuffix="organization/workspace-usage" factoriesFixture={defaultFactoriesFixture} />
+  ),
 };
 
-export const LLMSpendEmpty: Story = {
-  name: "LLM spend (empty)",
+export const WorkspaceUsageEmpty: Story = {
+  name: "Workspace usage (empty)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
-      factoriesFixture={{ ...defaultFactoriesFixture, organizationLlmSpend: EMPTY_USAGE_REPORT }}
+      pathSuffix="organization/workspace-usage"
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationWorkspaceUsage: EMPTY_USAGE_REPORT }}
     />
   ),
 };
 
-export const LLMSpendBilling: Story = {
-  name: "LLM spend (add hosted credit)",
+export const WorkspaceUsageBilling: Story = {
+  name: "Workspace usage (add hosted credit)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
+      pathSuffix="organization/workspace-usage"
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "0",
           grantTotalCents: "0",
@@ -64,14 +66,14 @@ export const LLMSpendBilling: Story = {
   ),
 };
 
-export const LLMSpendBillingInvoices: Story = {
-  name: "LLM spend (manage invoices)",
+export const WorkspaceUsageBillingInvoices: Story = {
+  name: "Workspace usage (manage invoices)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
+      pathSuffix="organization/workspace-usage"
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "14630",
           grantTotalCents: "15000",
@@ -101,14 +103,14 @@ export const LLMSpendBillingInvoices: Story = {
   ),
 };
 
-export const LLMSpendCreditAdded: Story = {
-  name: "LLM spend (credit added)",
+export const WorkspaceUsageCreditAdded: Story = {
+  name: "Workspace usage (credit added)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend?credit=added"
+      pathSuffix="organization/workspace-usage?credit=added"
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "2500",
           grantTotalCents: "2500",

@@ -1,5 +1,5 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
 import {
   useCreateBillingPortalSession,
@@ -16,21 +16,25 @@ import { BYOKModelsCard } from "@/pages/organization/settings/BYOKModelsCard";
 import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
 import { factoryCardClassName } from "../factoryPageLayoutStyles";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
-import { LLMUsageByModelTable, LLMUsageTotals } from "../settings/LLMUsageBreakdown";
+import {
+  WorkspaceUsageByMachineTypeTable,
+  WorkspaceUsageByModelTable,
+  WorkspaceUsageTotals,
+} from "../settings/WorkspaceUsageBreakdown";
 
-export function OrganizationSettingsLLMSpendPage() {
+export function OrganizationSettingsWorkspaceUsagePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
-  usePageTitle(["LLM spend"]);
-  const { data, isLoading, error, refetch } = useOrganizationLLMSpend(organizationId || "");
+  usePageTitle(["Workspace usage"]);
+  const { data, isLoading, error, refetch } = useOrganizationWorkspaceUsage(organizationId || "");
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
 
   return (
     <FactorySettingsPageFrame
-      title="LLM spend"
-      subtitle="Review factory token usage and estimated model cost for this organization."
+      title="Workspace usage"
+      subtitle="Review factory token usage, VM time, and estimated spend for this organization."
     >
-      <LLMSpendBody
+      <WorkspaceUsageBody
         creditAdded={creditAdded}
         data={data}
         error={error}
@@ -42,7 +46,7 @@ export function OrganizationSettingsLLMSpendPage() {
   );
 }
 
-function LLMSpendBody({
+function WorkspaceUsageBody({
   organizationId,
   data,
   isLoading,
@@ -51,40 +55,42 @@ function LLMSpendBody({
   refetch,
 }: {
   organizationId: string;
-  data: ReturnType<typeof useOrganizationLLMSpend>["data"];
+  data: ReturnType<typeof useOrganizationWorkspaceUsage>["data"];
   isLoading: boolean;
   error: unknown;
   creditAdded: boolean;
-  refetch: ReturnType<typeof useOrganizationLLMSpend>["refetch"];
+  refetch: ReturnType<typeof useOrganizationWorkspaceUsage>["refetch"];
 }) {
   if (isLoading) {
     return (
       <FactorySettingsCard>
-        <p className="text-[13px] text-muted-foreground">Loading LLM spend...</p>
+        <p className="text-[13px] text-muted-foreground">Loading workspace usage...</p>
       </FactorySettingsCard>
     );
   }
   if (error || !data) {
     return (
       <FactorySettingsCard>
-        <p className="text-[13px] text-destructive">Unable to load LLM spend.</p>
+        <p className="text-[13px] text-destructive">Unable to load workspace usage.</p>
       </FactorySettingsCard>
     );
   }
 
-  return <LLMSpendLoaded creditAdded={creditAdded} data={data} organizationId={organizationId} refetch={refetch} />;
+  return (
+    <WorkspaceUsageLoaded creditAdded={creditAdded} data={data} organizationId={organizationId} refetch={refetch} />
+  );
 }
 
-function LLMSpendLoaded({
+function WorkspaceUsageLoaded({
   organizationId,
   data,
   creditAdded,
   refetch,
 }: {
   organizationId: string;
-  data: NonNullable<ReturnType<typeof useOrganizationLLMSpend>["data"]>;
+  data: NonNullable<ReturnType<typeof useOrganizationWorkspaceUsage>["data"]>;
   creditAdded: boolean;
-  refetch: ReturnType<typeof useOrganizationLLMSpend>["refetch"];
+  refetch: ReturnType<typeof useOrganizationWorkspaceUsage>["refetch"];
 }) {
   const { canAct } = usePermissions();
   const grantTotalCents = parseWorkOrderMetric(data.grantTotalCents);
@@ -98,10 +104,11 @@ function LLMSpendLoaded({
 
   return (
     <div className="flex flex-col gap-4">
-      <LLMUsageTotals
+      <WorkspaceUsageTotals
         periodDays={data.periodDays ?? 30}
         totalTokens={parseWorkOrderMetric(data.totalTokens)}
         totalCostCents={parseWorkOrderMetric(data.totalCostCents)}
+        totalDurationSeconds={parseWorkOrderMetric(data.totalDurationSeconds)}
       />
       <HostedCreditSummary
         remainingCreditCents={data.remainingCreditCents}
@@ -125,7 +132,8 @@ function LLMSpendLoaded({
         valueClassName="workspace-page-title mt-1"
       />
       <BYOKModelsCard organizationId={organizationId} />
-      <LLMUsageByModelTable byModel={data.byModel ?? []} />
+      <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
+      <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
     </div>
   );
 }

@@ -551,10 +551,10 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
-function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
+function organizationWorkspaceUsageRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
-    pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
-    resolve: () => ({ json: fixture.organizationLlmSpend ?? EMPTY_USAGE_REPORT }),
+    pattern: re("/api/v1/organizations/([^/]+)/workspace-usage"),
+    resolve: () => ({ json: fixture.organizationWorkspaceUsage ?? EMPTY_USAGE_REPORT }),
   };
 }
 
@@ -666,7 +666,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryLinesRoutes(fixture),
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
-    organizationLlmSpendRoute(fixture),
+    organizationWorkspaceUsageRoute(fixture),
     hostedLlmModelsRoute(),
     byokModelsRoute(),
     hostedCreditProductsRoute(fixture),

@@ -68,3 +68,22 @@ func TestMicrosToCents(t *testing.T) {
 	assert.Equal(t, int64(0), MicrosToCents(9_999))
 	assert.Equal(t, int64(0), MicrosToCents(-1))
 }
+
+func TestEstimateComputeMicros(t *testing.T) {
+	t.Cleanup(Reset)
+	SetComputeRates(map[string]int64{"e1-large-amd64": 50})
+
+	assert.Equal(t, int64(500), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
+	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "local", 10))
+	assert.Equal(t, int64(0), EstimateComputeMicros("e1-tiny-amd64", "e1-tiny-amd64", 10))
+	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 0))
+}
+
+func TestEstimateComputeMicros_DefaultCatalogRates(t *testing.T) {
+	t.Cleanup(Reset)
+	Reset()
+
+	assert.Equal(t, int64(5560), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
+	assert.Equal(t, int64(1390), EstimateComputeMicros("e1-tiny-arm64", "e1-tiny-arm64", 10))
+	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "local", 10))
+}

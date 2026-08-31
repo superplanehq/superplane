@@ -69,17 +69,20 @@ describe("OrganizationSettingsLayout", () => {
     expect(within(sidebar).getByTestId("organization-settings-nav-workspaces")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
-  it("opens LLM spend from the menu", async () => {
+  it("opens Workspace usage from the menu", async () => {
     const user = userEvent.setup();
     render(<FactoriesHarness pathSuffix="organization/general" factoriesFixture={defaultFactoriesFixture} />);
 
     const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    await user.click(within(sidebar).getByTestId("organization-settings-nav-llm-spend"));
+    await user.click(within(sidebar).getByTestId("organization-settings-nav-workspace-usage"));
 
     expect(
-      await screen.findByText("Review factory token usage and estimated model cost for this organization."),
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
     ).toBeInTheDocument();
-    expect(within(sidebar).getByTestId("organization-settings-nav-llm-spend")).toHaveAttribute("aria-current", "page");
+    expect(within(sidebar).getByTestId("organization-settings-nav-workspace-usage")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   }, 10000);
 
   it("opens Integrations from the menu", async () => {
@@ -107,15 +110,33 @@ describe("OrganizationSettingsLayout", () => {
     expect(within(sidebar).getByTestId("organization-settings-nav-members")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
+  it("redirects the old organization LLM spend URL into Workspace usage", async () => {
+    render(
+      <FactoriesHarness pathSuffix="organization/llm-spend?credit=added" factoriesFixture={defaultFactoriesFixture} />,
+    );
+
+    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("organization-settings-nav-workspace-usage")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
+    ).toBeInTheDocument();
+  }, 10000);
+
   it("redirects the old LLM spend URL into organization settings", async () => {
     render(
       <FactoriesHarness pathSuffix="settings/llm-spend?credit=added" factoriesFixture={defaultFactoriesFixture} />,
     );
 
     const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("organization-settings-nav-llm-spend")).toHaveAttribute("aria-current", "page");
+    expect(within(sidebar).getByTestId("organization-settings-nav-workspace-usage")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expect(
-      await screen.findByText("Review factory token usage and estimated model cost for this organization."),
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
     ).toBeInTheDocument();
     expect(await screen.findByText("Refreshing hosted credit totals.")).toBeInTheDocument();
   }, 10000);

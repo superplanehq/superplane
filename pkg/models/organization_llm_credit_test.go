@@ -60,7 +60,7 @@ func Test__AdminGrantRestoresHostedCredit(t *testing.T) {
 	db := database.DB(t.Context())
 
 	execution := dispatchWorkOrderExecution(t, r)
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -95,7 +95,7 @@ func Test__HostedRecordUsageAppliesOrgMarkupOverride(t *testing.T) {
 	override := 0
 	require.NoError(t, models.UpsertOrganizationLLMMarkup(db, r.Organization.ID, &override))
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -107,7 +107,7 @@ func Test__HostedRecordUsageAppliesOrgMarkupOverride(t *testing.T) {
 		FundingSource:   models.UsageFundingSourceHosted,
 	}))
 
-	var event models.LLMUsageEvent
+	var event models.WorkspaceUsageEvent
 	require.NoError(t, db.Where("work_order_execution_id = ?", execution.ID).First(&event).Error)
 	assert.Equal(t, models.UsageFundingSourceHosted, event.FundingSource)
 	assert.Equal(t, int64(3_000_000), event.ProviderCostMicros)
@@ -119,7 +119,7 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -130,7 +130,7 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 		TotalTokens:     1_000_000,
 	}))
 
-	var event models.LLMUsageEvent
+	var event models.WorkspaceUsageEvent
 	require.NoError(t, db.Where("work_order_execution_id = ?", execution.ID).First(&event).Error)
 	assert.Equal(t, models.UsageFundingSourceBYOK, event.FundingSource)
 	assert.Equal(t, event.ProviderCostMicros, event.CostMicros)
@@ -314,7 +314,7 @@ func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 	budget := int64(1)
 	require.NoError(t, factory.UpdateHostedSpendBudget(db, &budget))
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, workOrderExecution),
 		NodeExecutionID: uuid.New(),
