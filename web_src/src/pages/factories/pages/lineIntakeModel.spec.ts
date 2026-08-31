@@ -2,21 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import {
   ADD_INTAKE_TEMPLATES,
+  apiIntakeSource,
   filterAddIntakeTemplates,
   intakeAutomationFixture,
   intakeSourcesFromFactoryIntakes,
   intakeTicketAnalysisFixture,
   intakeTicketConfidenceScore,
+  isLineIntakeSourceId,
   LINE_INTAKE_SOURCES,
   lineIntakeSourceById,
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Sentry, and PagerDuty as automations that feed Backlog", () => {
+  it("defines GitHub, Sentry, PagerDuty, and Productive.io as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
+      "productive-tasks",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -265,7 +268,7 @@ describe("lineIntakeModel", () => {
     expect(canvas?.nodes.map((node) => node.component)).toEqual(["github.onIssue", "createWorkOrder"]);
   });
 
-  it("builds Sentry and PagerDuty canvases from catalogue triggers", () => {
+  it("builds Sentry, PagerDuty, and Productive.io canvases from catalogue triggers", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
@@ -277,18 +280,35 @@ describe("lineIntakeModel", () => {
       "pagerduty.onIncident",
       "createWorkOrder",
     ]);
+
+    const productive = intakeAutomationFixture(lineIntakeSourceById("productive-tasks")!);
+    expect(productive.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
+      "productive.onTask",
+      "createWorkOrder",
+    ]);
   });
 
-  it("lists six add-intake templates including CI and page performance", () => {
-    expect(ADD_INTAKE_TEMPLATES).toHaveLength(6);
+  it("lists seven add-intake templates including CI and page performance", () => {
+    expect(ADD_INTAKE_TEMPLATES).toHaveLength(7);
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-ci-runtime");
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-page-performance");
+  });
+
+  it("maps every intake template id to an API source the picker can create", () => {
+    for (const template of ADD_INTAKE_TEMPLATES) {
+      if (!isLineIntakeSourceId(template.id)) {
+        continue;
+      }
+      expect(apiIntakeSource(template.id)).toBeDefined();
+    }
+
+    expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
   });
 
   it("filters add-intake templates by name or description", () => {
     expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
     expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
     expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("")).toHaveLength(6);
+    expect(filterAddIntakeTemplates("")).toHaveLength(7);
   });
 });
