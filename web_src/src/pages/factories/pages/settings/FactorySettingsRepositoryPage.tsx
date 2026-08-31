@@ -53,9 +53,18 @@ export function FactorySettingsRepositoryPage() {
     >
       <FactorySettingsCard title="GitHub repository" data-testid="factory-settings-repository">
         {!integrationId ? (
-          <p className="text-[13px] text-muted-foreground">Connect GitHub during workspace setup before you select a repository.</p>
+          <p className="text-[13px] text-muted-foreground">
+            Connect GitHub during workspace setup before you select a repository.
+          </p>
+        ) : resources.isLoading ? (
+          <p className="text-[13px] text-muted-foreground">Loading repositories...</p>
         ) : (
-          <RepositoryPicker host="github" repos={repositories} selectedRepo={repository || null} onSelect={setRepository} />
+          <RepositoryPicker
+            host="github"
+            repos={repositories}
+            selectedRepo={repository || null}
+            onSelect={setRepository}
+          />
         )}
         {resources.isError ? (
           <p className="mt-3 text-[13px] text-destructive">We could not load repositories. Try again.</p>
@@ -64,7 +73,10 @@ export function FactorySettingsRepositoryPage() {
           <p className="text-[12px] text-muted-foreground">
             Saving updates factory GitHub issue intake and pull request automations.
           </p>
-          <PermissionTooltip enabled={!canUpdate} action="update this workspace">
+          <PermissionTooltip
+            allowed={canUpdate || permissionsLoading}
+            message="You do not have permission to update this workspace."
+          >
             <LoadingButton
               type="button"
               loading={updateRepository.isPending}

@@ -8,7 +8,11 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
-import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "../../__fixtures__/setupStoryFixtures";
+import {
+  CONNECTED_SETUP_INTEGRATIONS,
+  SETUP_ANSWERS,
+  factoriesFixtureWithSetupAnswers,
+} from "../../__fixtures__/setupStoryFixtures";
 
 /** Factory settings with Account, Workspace, and Organization navigation. */
 const meta = {
