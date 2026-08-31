@@ -10,6 +10,17 @@ import {
 } from "./onboardingAgentReadiness";
 import type { IntegrationId } from "./onboardingFixtures";
 
+export function onboardingAgentProvider(providerId: OnboardingAgentPlan["providerId"]) {
+  switch (providerId) {
+    case "claude":
+      return "AGENT_PROVIDER_ANTHROPIC" as const;
+    case "openai":
+      return "AGENT_PROVIDER_OPENAI" as const;
+    case "openrouter":
+      return "AGENT_PROVIDER_OPENROUTER" as const;
+  }
+}
+
 export function useOnboardingAgentPlan(
   organizationId: string,
   connected: Set<IntegrationId>,
