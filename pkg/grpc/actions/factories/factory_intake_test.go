@@ -10,11 +10,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/gorm"
 
 	// The intake graph uses built-in components and integration triggers, which
 	// only reach the registry through their init functions.
@@ -343,6 +346,75 @@ func Test__FactoryIntakeActions(t *testing.T) {
 				Labels:     []string{"bug"},
 				Assignment: pb.FactoryIntake_Settings_ASSIGNMENT_ASSIGNED,
 			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("a github intake whose filter node was removed rejects a filter change", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		// Simulate a manual edit that removed the filter node (and the edges
+		// that touched it), the way `applyIntakeSettings` would find the
+		// canvas if a user rewired it by hand.
+		nodesWithoutFilter := make([]models.Node, 0, len(liveVersion.Nodes)-1)
+		for _, node := range liveVersion.Nodes {
+			if node.ID != intakeFilterNodeID {
+				nodesWithoutFilter = append(nodesWithoutFilter, node)
+			}
+		}
+		require.Len(t, nodesWithoutFilter, len(liveVersion.Nodes)-1)
+
+		edgesWithoutFilter := make([]models.Edge, 0, len(liveVersion.Edges))
+		for _, edge := range liveVersion.Edges {
+			if edge.SourceID != intakeFilterNodeID && edge.TargetID != intakeFilterNodeID {
+				edgesWithoutFilter = append(edgesWithoutFilter, edge)
+			}
+		}
+
+		err = database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+			return canvases.PublishGeneratedCanvasNodes(
+				ctx,
+				tx,
+				canvas,
+				r.User,
+				"test: remove filter node",
+				nodesWithoutFilter,
+				edgesWithoutFilter,
+				changesets.CanvasPublisherOptions{
+					Registry:       r.Registry,
+					OrgID:          canvas.OrganizationID,
+					Encryptor:      r.Encryptor,
+					AuthService:    r.AuthService,
+					WebhookBaseURL: "http://localhost:8000",
+					GitProvider:    r.GitProvider,
+				},
+			)
+		})
+		require.NoError(t, err)
+
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"bug"},
+			},
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+
+		// A request that does not actually change any filter is still a
+		// no-op, even without a filter node to write into.
+		_, err = UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings:  &pb.FactoryIntake_Settings{},
 		})
 		require.NoError(t, err)
 	})
