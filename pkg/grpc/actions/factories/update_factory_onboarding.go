@@ -176,6 +176,8 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		DefaultBranch:      req.DefaultBranch,
 		ProvisionedAppID:   req.ProvisionedAppId,
 		ProvisionedLineID:  req.ProvisionedLineId,
+		AgentModel:         req.AgentModel,
+		AgentPlanningModel: req.AgentPlanningModel,
 	}
 
 	if req.IssuesSource != nil {
@@ -194,7 +196,30 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		patch.AgentHarness = &harness
 	}
 
+	if req.AgentProvider != nil {
+		provider, err := factoryOnboardingAgentProviderFromProto(*req.AgentProvider)
+		if err != nil {
+			return models.FactoryOnboardingPatch{}, err
+		}
+		patch.AgentProvider = &provider
+	}
+
 	return patch, nil
+}
+
+func factoryOnboardingAgentProviderFromProto(provider pb.FactoryOnboarding_AgentProvider) (string, error) {
+	switch provider {
+	case pb.FactoryOnboarding_AGENT_PROVIDER_UNSPECIFIED:
+		return "", nil
+	case pb.FactoryOnboarding_AGENT_PROVIDER_ANTHROPIC:
+		return models.FactoryOnboardingAgentProviderAnthropic, nil
+	case pb.FactoryOnboarding_AGENT_PROVIDER_OPENAI:
+		return models.FactoryOnboardingAgentProviderOpenAI, nil
+	case pb.FactoryOnboarding_AGENT_PROVIDER_OPENROUTER:
+		return models.FactoryOnboardingAgentProviderOpenRouter, nil
+	default:
+		return "", invalidArgument("invalid agent provider")
+	}
 }
 
 func factoryOnboardingIssuesSourceFromProto(source pb.FactoryOnboarding_IssuesSource) (string, error) {
