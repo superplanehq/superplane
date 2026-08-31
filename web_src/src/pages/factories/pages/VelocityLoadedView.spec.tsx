@@ -76,6 +76,22 @@ describe("VelocityLoadedView", () => {
     expect(split).not.toHaveTextContent(String(FACTORY_VELOCITY_BY_PERIOD[7].totals.peopleMerged));
   });
 
+  it("replaces empty charts with a note when the period has no pull requests", () => {
+    const data: VelocityData = {
+      yesterday: { dateLabel: "Yesterday · Sun, Aug 30", merged: 0, waste: 0, wastePct: 0 },
+      totals: { merged: 0, waste: 0, wastePct: 0, superplaneMerged: 0, peopleMerged: 0, superplaneSharePct: 0 },
+      points: [{ day: "Mon", merged: 0, waste: 0, peopleMerged: 0, superplaneMerged: 0 }],
+    };
+    const sourceSplit: VelocitySourceSplitConfig = { hasPeopleCohort: true };
+
+    render(<VelocityLoadedView periodLabel="Last 7 days" periodDays={7} data={data} sourceSplit={sourceSplit} />);
+
+    expect(screen.getByTestId("velocity-trend")).toHaveTextContent("No pull requests merged or closed in this period.");
+    expect(screen.getByTestId("velocity-source-split")).toHaveTextContent("No pull requests merged in this period.");
+    // Metric cells stay, so the zero counts are still readable.
+    expect(screen.getByTestId("velocity-trend")).toHaveTextContent("Merged PRs");
+  });
+
   it("renders the work-order flow card when a flow config is provided", () => {
     const mock = FACTORY_VELOCITY_FLOW_BY_PERIOD[7];
     const data = toData();

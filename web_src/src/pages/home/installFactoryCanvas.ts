@@ -4,6 +4,7 @@ import {
   canvasesInvokeNodeTriggerHook,
   canvasesListCanvases,
   canvasesPutCanvasStaging,
+  factoriesMaterializeFactoryAppTemplate,
   factoriesListFactoryApps,
   type CanvasesCanvasSummary,
   type FactoryApp,
@@ -85,6 +86,8 @@ export async function invokeFactoryRun(canvasId: string, definition: FactoryDefi
 }
 
 export async function materializeAndCommitFactoryTemplate(args: {
+  organizationId: string;
+  workspaceFactoryId?: string;
   canvasId: string;
   canvasName: string;
   definition: FactoryDefinition;
@@ -92,15 +95,50 @@ export async function materializeAndCommitFactoryTemplate(args: {
   integrations: IntegrationSelections;
   agentRewrite?: FactoryAgentRewrite;
 }) {
-  const canvasYaml = materializeFactoryCanvas({
-    definition: args.definition,
-    canvasName: args.canvasName,
-    canvasId: args.canvasId,
-    installParams: args.installParams,
-    integrations: args.integrations,
-    agentRewrite: args.agentRewrite,
-  });
-  const consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
+  let canvasYaml: string;
+  let consoleYaml: string;
+  if (args.workspaceFactoryId) {
+    const integrations = Object.entries(args.integrations).flatMap(([type, integration]) =>
+      integration ? [{ type, id: integration.id, name: integration.name }] : [],
+    );
+    const agent = args.agentRewrite
+      ? {
+          component: args.agentRewrite.component,
+          model: args.agentRewrite.model,
+          planningModel: args.agentRewrite.planningModel,
+          credentialSource: args.agentRewrite.credentials.source,
+          credentialIntegrationName:
+            args.agentRewrite.credentials.source === "integration" ? args.agentRewrite.credentials.name : undefined,
+        }
+      : undefined;
+    const response = await factoriesMaterializeFactoryAppTemplate(
+      withOrganizationHeader({
+        organizationId: args.organizationId,
+        path: { factoryId: args.workspaceFactoryId, templateId: args.definition.id },
+        body: {
+          appId: args.canvasId,
+          installParams: args.installParams,
+          integrations,
+          agent,
+        },
+      }),
+    );
+    canvasYaml = response.data?.canvasYaml ?? "";
+    consoleYaml = response.data?.consoleYaml ?? "";
+    if (!canvasYaml || !consoleYaml) {
+      throw new Error("Failed to materialize factory app template");
+    }
+  } else {
+    canvasYaml = materializeFactoryCanvas({
+      definition: args.definition,
+      canvasName: args.canvasName,
+      canvasId: args.canvasId,
+      installParams: args.installParams,
+      integrations: args.integrations,
+      agentRewrite: args.agentRewrite,
+    });
+    consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
+  }
   await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
 }
 

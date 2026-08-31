@@ -17,6 +17,7 @@ export interface PRFeedbackDraftSettings {
   repository: string;
   mention: string;
   ignoreBots: boolean;
+  allowedBots: string[];
 }
 
 export const PR_FEEDBACK_SETTINGS_COPY = {
@@ -31,6 +32,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   mentionHelper: "Use an exact GitHub mention, for example @superplaneagent.",
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
+  allowedBotsLabel: "Allowed bots",
+  allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   healthReady: "Ready",
   healthNeedsRepair: "Needs repair",
   healthReadyHelper: "This automation can receive a mention and address it.",
@@ -58,11 +61,13 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
 } as const;
 
 export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHandler): PRFeedbackDraftSettings {
+  const discussion = handler.settings?.discussion;
   return {
     name: handler.name?.trim() || "Address PR feedback",
     repository: handler.settings?.subject?.repository?.trim() ?? "",
-    mention: handler.settings?.discussion?.mention?.trim() || "@superplaneagent",
-    ignoreBots: handler.settings?.discussion?.ignoreBots !== false,
+    mention: discussion?.mention?.trim() || "@superplaneagent",
+    ignoreBots: discussion?.ignoreBots !== false,
+    allowedBots: discussion?.allowedBots ?? [],
   };
 }
 
@@ -77,7 +82,26 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     repository: draft.repository.trim(),
     mention: draft.mention.trim(),
     ignoreBots: draft.ignoreBots,
+    allowedBots: normalizeAllowedBots(draft.allowedBots),
   };
+}
+
+function normalizeAllowedBots(bots: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const bot of bots) {
+    const trimmed = bot.trim().replace(/^@/, "");
+    if (!trimmed) {
+      continue;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push(trimmed);
+  }
+  return normalized;
 }
 
 export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean {

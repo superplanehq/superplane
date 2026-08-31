@@ -3484,6 +3484,7 @@ export function AppPage({
     handleExitEditSession,
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
+    applyLocalWorkflowUpdate,
   });
 
   const buildYamlExportPayload = useCallback(
