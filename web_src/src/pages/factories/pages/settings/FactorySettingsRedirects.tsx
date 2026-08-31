@@ -21,6 +21,7 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   automations: { scope: "workspace", section: "automations" },
   models: { scope: "workspace", section: "models" },
   usage: { scope: "workspace", section: "spending" },
+  spending: { scope: "workspace", section: "spending" },
   repositories: { scope: "workspace", section: "repository" },
   repository: { scope: "workspace", section: "repository" },
   profile: { scope: "account", section: "general" },
@@ -35,7 +36,9 @@ const LEGACY_ORGANIZATION_SETTINGS: Record<string, FactorySettingsDestination> =
   members: { scope: "organization", section: "members" },
   "api-keys": { scope: "organization", section: "api-keys" },
   integrations: { scope: "organization", section: "integrations" },
+  spending: { scope: "organization", section: "spending" },
   "llm-spend": { scope: "organization", section: "spending" },
+  "workspace-usage": { scope: "organization", section: "spending" },
   secrets: { scope: "organization", section: "secrets" },
 };
 
