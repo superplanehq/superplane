@@ -51,9 +51,13 @@ function factorySettingsDestination(
   fallback: FactorySettingsDestination,
 ) {
   const [section, ...detailSegments] = splitLegacyPath(rest);
-  const destination = (section ? mapping[section] : undefined) ?? fallback;
+  const mappedDestination = section ? mapping[section] : undefined;
+  const destination = mappedDestination ?? fallback;
   const basePath = factorySettingsSectionPath(organizationId, factoryKey, destination.scope, destination.section);
-  return detailSegments.length > 0 ? `${basePath}/${detailSegments.join("/")}` : basePath;
+  if (!mappedDestination || detailSegments.length === 0) {
+    return basePath;
+  }
+  return `${basePath}/${detailSegments.join("/")}`;
 }
 
 export function LegacyFactorySettingsRedirect() {

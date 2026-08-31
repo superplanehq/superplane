@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
@@ -50,6 +50,23 @@ describe("FactorySettingsLayout sidebar", () => {
     const profile = await screen.findByTestId("factory-settings-profile-form");
     expect(within(profile).getByText("Name")).toBeInTheDocument();
   }, 10000);
+
+  it("redirects unknown legacy paths to Workspace General", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/unknown/nested`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-general")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+  });
 
   it.each([
     ["API keys", "api-keys"],

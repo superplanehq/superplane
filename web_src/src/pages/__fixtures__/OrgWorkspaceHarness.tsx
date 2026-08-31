@@ -341,7 +341,11 @@ const factorySettingsStorybookRoutes = [
   <Route
     key="factory-settings-organization-spending"
     path="organization/spending"
-    element={<OrganizationSettingsLLMSpendPage />}
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsLLMSpendPage />
+      </RequirePermission>
+    }
   />,
   <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
 ];
