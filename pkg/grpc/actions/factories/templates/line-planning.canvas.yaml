@@ -38,7 +38,7 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ install_params.appRepository }}'
+            value: '{{ order().repository }}'
             valueSource: literal
           - name: ORDER_DESCRIPTION
             value: '{{ toBase64(order().description) }}'
@@ -61,7 +61,7 @@ spec:
             prompt: |-
               You are writing an implementation plan for a SuperPlane Task. The repository is cloned out in your current working directory.
 
-              Repository: {{ install_params.appRepository }}
+              Repository: {{ order().repository }}
               Task Title: {{ root().data.work_order.title }}
 
               1/ The description is in the /tmp/ORDER.md

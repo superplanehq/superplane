@@ -85,6 +85,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory repository";
+      description: "Updates the repository used by a factory workspace";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -614,9 +626,23 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // Default branch of the app repository.
+  optional string default_branch = 11;
 }
 
 message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryRepositoryRequest {
+  string id = 1;
+  // Repository slug in owner/name form.
+  string repository = 2;
+  // Default branch resolved from the selected repository.
+  string default_branch = 3;
+}
+
+message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
@@ -652,6 +678,7 @@ message FactoryOnboarding {
   AgentHarness agent_harness = 7;
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
+  string default_branch = 10;
 }
 
 message Factory {
