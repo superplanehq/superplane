@@ -126,6 +126,16 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
+
 const useWorkOrderChecks = vi.hoisted(() =>
   vi.fn((_organizationId: string, _factoryId: string, _orderId: string, _options?: { enabled?: boolean }) => ({
     data: [] as unknown[],
@@ -167,6 +177,7 @@ describe("LinesPage board", () => {
     createFactoryIntakeMutateAsync.mockReset();
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
     useWorkOrderChecks.mockReset();
     useWorkOrderChecks.mockImplementation(
       (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
@@ -379,6 +390,40 @@ describe("LinesPage board", () => {
 
     await waitFor(() => {
       expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_GITHUB_ISSUES" });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+      );
+    });
+  });
+
+  it("hides the overflow-menu Add intake entry when the feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
+  });
+
+  it("creates a Sentry intake from the overflow menu when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
+
+    await waitFor(() => {
+      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_SENTRY_EXCEPTIONS" });
     });
     await waitFor(() => {
       expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
