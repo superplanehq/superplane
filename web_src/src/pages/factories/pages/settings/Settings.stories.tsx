@@ -107,6 +107,17 @@ export const Models: Story = {
   ),
 };
 
+export const ModelsWithOwnKey: Story = {
+  name: "Models (own key)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+    />
+  ),
+};
+
 export const Spending: Story = {
   render: () => (
     <FactoriesHarness

@@ -39,6 +39,29 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		assert.Equal(t, integrationName(t, organization.ID, agentID), integrationRefName(t, agent))
 	})
 
+	t.Run("the intake uses the workspace agent settings after they are saved", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		agentID := createReadyOnboardingIntegration(t, organization.ID, "openai")
+		harness := models.FactoryOnboardingAgentHarnessCodex
+		provider := models.FactoryOnboardingAgentProviderOpenAI
+		model := "gpt-5-mini"
+		planningModel := "gpt-5"
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+			AgentHarness:       &harness,
+			AgentProvider:      &provider,
+			AgentModel:         &model,
+			AgentPlanningModel: &planningModel,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		assert.Equal(t, "runnerCodex", agent.Component)
+		assert.Equal(t, "gpt-5-mini", agent.Model)
+		assert.Equal(t, integrationName(t, organization.ID, agentID), integrationRefName(t, agent))
+	})
+
 	t.Run("an agent on an installation still names the model it runs", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 
