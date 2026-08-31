@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -115,7 +115,7 @@ describe("client-side navigation updates document.title", () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/general`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
         factoriesFixture={defaultFactoriesFixture}
         pageOverrides={pageOverrides}
       />,
@@ -124,9 +124,8 @@ describe("client-side navigation updates document.title", () => {
     expect(await screen.findByTestId("factory-settings-general-form", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("General · Settings · Semaphore · SuperPlane");
 
-    await user.click(screen.getByTestId("factory-settings-nav-members"));
-    expect(await screen.findByTestId("factory-settings-soon", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Members · Settings · SuperPlane");
+    await user.click(screen.getByTestId("factory-settings-nav-organization-members"));
+    await waitFor(() => expect(document.title).toBe("Members · SuperPlane"), { timeout: 8000 });
   }, 15000);
 
   it("sets the tab title on the Missions and Wiki coming-soon pages", async () => {
