@@ -515,6 +515,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveOrderPayload(expression)
 		}),
+		expr.Function("workspace", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("workspace() takes no arguments")
+			}
+
+			return b.resolveWorkspacePayload()
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -981,6 +988,33 @@ func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
 	}, nil
 }
 
+// resolveWorkspacePayload exposes the factory workspace that owns this app.
+// It is intentionally unavailable for organization apps so expressions cannot
+// infer a workspace outside their execution scope.
+func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current app: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("workspace() is only available in factory apps")
+	}
+
+	factory, err := models.FindFactory(b.tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	return map[string]any{
+		"id":                 factory.ID.String(),
+		"key":                factory.Key,
+		"name":               factory.Name,
+		"repository":         config.AppRepository,
+		"backlog_repository": config.BacklogRepository,
+		"default_branch":     config.DefaultBranch,
+	}, nil
+}
+
 // resolveRunPayload exposes the current run to expressions via run().
 // It returns id, url, and started_at (a time.Time) for the run that the
 // current node belongs to, resolved from the builder's root event.
@@ -1042,12 +1076,14 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	payload := map[string]any{
-		"id":          order.ID.String(),
-		"title":       order.Title,
-		"description": order.Description,
-		"factory_id":  order.FactoryID.String(),
-		"state":       order.State,
-		"result":      order.Result,
+		"id":             order.ID.String(),
+		"title":          order.Title,
+		"description":    order.Description,
+		"factory_id":     order.FactoryID.String(),
+		"state":          order.State,
+		"result":         order.Result,
+		"repository":     stringValue(order.Repository),
+		"default_branch": stringValue(order.DefaultBranch),
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
@@ -1427,20 +1463,28 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
-	"$":        {},
-	"memory":   {},
-	"config":   {},
-	"root":     {},
-	"previous": {},
-	"run":      {},
-	"app":      {},
-	"order":    {},
-	"ctx":      {},
+	"$":         {},
+	"memory":    {},
+	"config":    {},
+	"root":      {},
+	"previous":  {},
+	"run":       {},
+	"app":       {},
+	"order":     {},
+	"workspace": {},
+	"ctx":       {},
 }
 
 func isReservedExpressionIdentifier(name string) bool {
 	_, ok := reservedExpressionIdentifiers[name]
 	return ok
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func parseDepth(param any) (int, error) {
