@@ -443,9 +443,9 @@ func authenticateUserByCookie(
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
-	organizationID := findOrganizationID(r)
-	if organizationID == "" {
-		return nil, nil, errors.New(OrganizationNotFoundError)
+	organizationID, err := resolveOrganizationRef(ctx, findOrganizationID(r))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	user, err = models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, account.Email)
@@ -454,6 +454,24 @@ func authenticateUserByCookie(
 	}
 
 	return user, nil, nil
+}
+
+// resolveOrganizationRef resolves a client-supplied organization identifier
+// (the x-organization-id header or organization_id query parameter, which
+// may be a UUID or a slug) to the organization's UUID. Cookie-based auth
+// looks up the user by organization_id, a UUID column, so a slug must be
+// resolved before that lookup runs.
+func resolveOrganizationRef(ctx context.Context, ref string) (string, error) {
+	if ref == "" {
+		return "", errors.New(OrganizationNotFoundError)
+	}
+
+	organization, err := models.FindOrganizationByIDOrSlug(database.DB(ctx), ref)
+	if err != nil {
+		return "", errors.New(OrganizationNotFoundError)
+	}
+
+	return organization.ID.String(), nil
 }
 
 // isActiveImpersonation returns true if there's a valid, non-expired
@@ -536,9 +554,9 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 	}
 
 	// Find the user in the org from the request header
-	organizationID := findOrganizationID(r)
-	if organizationID == "" {
-		return nil, nil, errors.New(OrganizationNotFoundError)
+	organizationID, err := resolveOrganizationRef(ctx, findOrganizationID(r))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	user, err := models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, impAccount.Email)
