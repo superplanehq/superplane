@@ -109,6 +109,9 @@ func defaultIntakeAgentModel(component string) string {
 // completes it in the canvas.
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
+	if agent := intakeAgentFromPersistedWorkspaceAgent(tx, factory, config); agent != nil {
+		return agent
+	}
 	if agent := intakeAgentFromSetup(tx, factory, config.AgentIntegrationID); agent != nil {
 		return agent
 	}
@@ -118,6 +121,48 @@ func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	}
 
 	return intakeAgentFromHostedProvider(tx, factory)
+}
+
+// intakeAgentFromPersistedWorkspaceAgent keeps newly created generated
+// automations on the agent selected in workspace settings. Older factories do
+// not have AgentProvider, so they retain the legacy discovery fallback below.
+func intakeAgentFromPersistedWorkspaceAgent(
+	tx *gorm.DB,
+	factory *models.Factory,
+	config models.FactoryOnboardingConfig,
+) *intakeAgent {
+	spec, ok := factoryAgentProviderSpecs[config.AgentProvider]
+	if !ok {
+		return nil
+	}
+	model := config.AgentModel
+	if model == "" {
+		model = spec.model
+	}
+	if config.AgentIntegrationID == "" {
+		return &intakeAgent{
+			Component:   spec.component,
+			Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
+			Model:       model,
+		}
+	}
+
+	integrationID, err := uuid.Parse(config.AgentIntegrationID)
+	if err != nil {
+		return nil
+	}
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, integrationID)
+	if err != nil || integration.State != models.IntegrationStateReady || integration.AppName != spec.integrationApp {
+		return nil
+	}
+	return &intakeAgent{
+		Component: spec.component,
+		Credentials: map[string]any{
+			"source":      runner.CredentialsSourceIntegration,
+			"integration": map[string]any{"name": integration.InstallationName},
+		},
+		Model: model,
+	}
 }
 
 // intakeAgentFromSetup reads the agent the workspace setup recorded. A setup
