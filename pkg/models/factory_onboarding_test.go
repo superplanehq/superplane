@@ -45,9 +45,11 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, "acme/api", factory.OnboardingConfigValue().AppRepository)
 
 		backlogRepo := "acme/backlog"
+		defaultBranch := "main"
 		issuesSource := models.FactoryOnboardingIssuesSourceVCS
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 			BacklogRepository: &backlogRepo,
+			DefaultBranch:     &defaultBranch,
 			IssuesSource:      &issuesSource,
 		}))
 
@@ -55,6 +57,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, vcsID, config.VCSIntegrationID)
 		assert.Equal(t, "acme/api", config.AppRepository)
 		assert.Equal(t, "acme/backlog", config.BacklogRepository)
+		assert.Equal(t, "main", config.DefaultBranch)
 		assert.Equal(t, models.FactoryOnboardingIssuesSourceVCS, config.IssuesSource)
 	})
 
