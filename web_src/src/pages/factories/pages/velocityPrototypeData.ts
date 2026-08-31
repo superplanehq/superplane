@@ -219,12 +219,71 @@ export function buildVelocityPoints(periodDays: PeriodDays, windowOffset = 0): V
   });
 }
 
+/** Factory fields of a day. `day`, `people`, and `merged` come from the series. */
+type FactoryDayOutput = Omit<VelocityPoint, "day" | "people" | "merged">;
+
+const IDLE_FACTORY_DAY: FactoryDayOutput = {
+  superplane: 0,
+  waste: 0,
+  githubIssues: 0,
+  sentryExceptions: 0,
+  manual: 0,
+  api: 0,
+  runningHours: 0,
+  waitingHours: 0,
+  costUsd: 0,
+  tokenCostUsd: 0,
+  computeCostUsd: 0,
+  wasteCostUsd: 0,
+  tokens: 0,
+};
+
+/** Two merges and one task closed without a merge: three closed tasks. */
+const FIRST_FACTORY_DAY: FactoryDayOutput = {
+  superplane: 2,
+  waste: 1,
+  githubIssues: 1,
+  sentryExceptions: 0,
+  manual: 1,
+  api: 0,
+  runningHours: 1.8,
+  waitingHours: 0.8,
+  costUsd: 6.13,
+  tokenCostUsd: 4.78,
+  computeCostUsd: 1.35,
+  wasteCostUsd: 1.85,
+  tokens: 49_400,
+};
+
+/** Sample behind every median on the early-usage page. */
+export const EARLY_USAGE_CLOSED_TASKS = FIRST_FACTORY_DAY.superplane + FIRST_FACTORY_DAY.waste;
+
+/**
+ * A workspace a few hours old. The repository already has people merges over
+ * the whole period, because Velocity reads repository history. SuperPlane has
+ * one day of output, so every median and cost rests on a three-task sample.
+ */
+export function buildEarlyUsageVelocityPoints(periodDays: PeriodDays): VelocityPoint[] {
+  const history = buildVelocityPoints(periodDays, periodDays);
+  const lastIndex = history.length - 1;
+
+  return history.map((point, index) => {
+    const factory = index === lastIndex ? FIRST_FACTORY_DAY : IDLE_FACTORY_DAY;
+    return { ...point, ...factory, merged: point.people + factory.superplane };
+  });
+}
+
+export type VelocitySummary = ReturnType<typeof summarizePoints>;
+
 export function summarizePoints(points: VelocityPoint[]) {
   const merged = sum(points, "merged");
   const superplaneMerged = sum(points, "superplane");
   const waste = sum(points, "waste");
   const cost = sum(points, "costUsd");
-  const cycleHours = median(points.map((point) => point.runningHours + point.waitingHours));
+  /* A day without a closed task holds no median. Counting it as zero would
+     hide the task time of the days that did close work. */
+  const closedTaskDays = points.filter((point) => point.runningHours > 0 || point.waitingHours > 0);
+  const cycleHours = median(closedTaskDays.map((point) => point.runningHours + point.waitingHours));
   const wasteRate = superplaneMerged + waste > 0 ? Math.round((waste / (superplaneMerged + waste)) * 100) : 0;
   const costPerMerge = superplaneMerged > 0 ? cost / superplaneMerged : 0;
 
@@ -235,8 +294,8 @@ export function summarizePoints(points: VelocityPoint[]) {
     waste,
     wasteRate,
     cycleHours,
-    runningHours: median(points.map((point) => point.runningHours)),
-    waitingHours: median(points.map((point) => point.waitingHours)),
+    runningHours: median(closedTaskDays.map((point) => point.runningHours)),
+    waitingHours: median(closedTaskDays.map((point) => point.waitingHours)),
     cost,
     tokenCost: sum(points, "tokenCostUsd"),
     computeCost: sum(points, "computeCostUsd"),
