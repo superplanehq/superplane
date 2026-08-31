@@ -28,6 +28,10 @@ const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 // factories organization until Velocity is generally available.
 const FeatureFactoryVelocity = "factory_velocity"
 
+// FeatureFactorySentryIntake gates the manual "Add intake" entry for Sentry
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactorySentryIntake = "factory_sentry_intake"
+
 func released() *bool {
 	v := true
 	return &v
@@ -38,6 +42,7 @@ var registry = []Feature{
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryVelocity, Label: "Factory Velocity", Description: "Show the Velocity view for a factory organization"},
+	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 }
 
 func All() []Feature {
