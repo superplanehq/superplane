@@ -67,18 +67,19 @@ import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
-import { APIKeyDetail } from "./pages/organization/settings/ApiKeyDetail";
-import { APIKeys } from "./pages/organization/settings/ApiKeys";
-import { Members } from "./pages/organization/settings/Members";
-import { SecretDetail } from "./pages/organization/settings/SecretDetail";
-import { Secrets } from "./pages/organization/settings/Secrets";
 import {
   OrganizationIntegrationDetailsPage,
   OrganizationIntegrationSetupPage,
 } from "./pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
 import { OrganizationSettingsIntegrationsPage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
 import { OrganizationSettingsLLMSpendPage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsLLMSpendPage";
-import { FactorySettingsPageFrame } from "./pages/factories/pages/settings/FactorySettingsCard";
+import {
+  FactoryOrganizationApiKeyDetailPage,
+  FactoryOrganizationApiKeysPage,
+  FactoryOrganizationMembersPage,
+  FactoryOrganizationSecretDetailPage,
+  FactoryOrganizationSecretsPage,
+} from "./pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import { AppDefaultTabGate } from "./pages/app/AppDefaultTabGate";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -401,43 +402,6 @@ const factorySettingsSectionRoutes = [
   />,
   <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
 ];
-
-function FactoryOrganizationMembersPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return (
-    <FactorySettingsPageFrame title="Members" subtitle="Invite people and manage organization access.">
-      <Members organizationId={organizationId} />
-    </FactorySettingsPageFrame>
-  );
-}
-
-function FactoryOrganizationApiKeysPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return (
-    <FactorySettingsPageFrame title="API keys" subtitle="Create and manage API keys for programmatic access.">
-      <APIKeys organizationId={organizationId} />
-    </FactorySettingsPageFrame>
-  );
-}
-
-function FactoryOrganizationApiKeyDetailPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return <APIKeyDetail organizationId={organizationId} />;
-}
-
-function FactoryOrganizationSecretsPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return (
-    <FactorySettingsPageFrame title="Secrets" subtitle="Store and manage organization secrets.">
-      <Secrets organizationId={organizationId} />
-    </FactorySettingsPageFrame>
-  );
-}
-
-function FactoryOrganizationSecretDetailPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
-  return <SecretDetail organizationId={organizationId} />;
-}
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();

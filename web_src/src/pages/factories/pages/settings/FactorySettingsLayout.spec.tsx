@@ -50,4 +50,22 @@ describe("FactorySettingsLayout sidebar", () => {
     const profile = await screen.findByTestId("factory-settings-profile-form");
     expect(within(profile).getByText("Name")).toBeInTheDocument();
   }, 10000);
+
+  it.each([
+    ["API keys", "api-keys"],
+    ["Secrets", "secrets"],
+  ])("selects the reused Organization %s page in the factory settings shell", async (_title, path) => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${path}`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId(`factory-settings-nav-organization-${path}`)).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
 });
