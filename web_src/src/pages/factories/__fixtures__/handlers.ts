@@ -230,12 +230,31 @@ function mergedOnboarding(
   if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
   if (request.appRepository) next.appRepository = request.appRepository;
   if (request.backlogRepository) next.backlogRepository = request.backlogRepository;
+  if (request.defaultBranch) next.defaultBranch = request.defaultBranch;
   if (request.issuesSource) next.issuesSource = request.issuesSource;
   if (request.agentHarness) next.agentHarness = request.agentHarness;
   if (request.provisionedAppId) next.provisionedAppId = request.provisionedAppId;
   if (request.provisionedLineId) next.provisionedLineId = request.provisionedLineId;
   if (request.complete) next.completedAt = new Date().toISOString();
   return next;
+}
+
+function factoryRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/repository"),
+    resolve: (match, method, body) => {
+      if (method !== "PATCH") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      const request = (body ?? {}) as { repository?: string; defaultBranch?: string };
+      factory.onboarding = mergedOnboarding(factory.onboarding, {
+        appRepository: request.repository,
+        backlogRepository: request.repository,
+        defaultBranch: request.defaultBranch,
+      });
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
 }
 
 /** Persists workspace setup answers so setup stories advance step by step. */
@@ -663,6 +682,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
+    factoryRepositoryRoute(fixture),
     ...factoryLinesRoutes(fixture),
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
