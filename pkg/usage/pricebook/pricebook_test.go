@@ -75,6 +75,7 @@ func TestEstimateComputeMicros(t *testing.T) {
 
 	assert.Equal(t, int64(500), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 10))
 	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "local", 10))
+	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "", 10))
 	assert.Equal(t, int64(0), EstimateComputeMicros("e1-tiny-amd64", "e1-tiny-amd64", 10))
 	assert.Equal(t, int64(0), EstimateComputeMicros("e1-large-amd64", "e1-large-amd64", 0))
 }

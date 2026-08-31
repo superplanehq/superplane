@@ -97,3 +97,59 @@ func TestRecordRunnerComputeUsageRecordsZeroDuration(t *testing.T) {
 	assert.Equal(t, MachineTypeE1TinyARM64, recorder.computes[0].MachineType)
 	assert.Equal(t, int64(0), recorder.computes[0].DurationSeconds)
 }
+
+func TestRecordRunnerComputeUsageResolvesFleetWhenKVMissing(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "local")
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+
+	claimed := time.Now()
+	finished := claimed.Add(time.Second)
+	recorder := &recordingComputeUsage{}
+	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &Task{
+		ID:         "task-4",
+		Status:     "succeeded",
+		ClaimedAt:  &claimed,
+		FinishedAt: &finished,
+	})
+	require.Len(t, recorder.computes, 1)
+	assert.Equal(t, MachineTypeE1LargeAMD64, recorder.computes[0].MachineType)
+	assert.Equal(t, "local", recorder.computes[0].FleetID)
+}
+
+func TestRecordRunnerComputeUsageResolvesLocalComposeFleetWhenKVMissing(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
+
+	claimed := time.Now()
+	finished := claimed.Add(time.Second)
+	recorder := &recordingComputeUsage{}
+	RecordRunnerComputeUsage(recorder, nil, &kvState{}, map[string]any{"machine_type": MachineTypeE1LargeAMD64}, &Task{
+		ID:         "task-5",
+		Status:     "succeeded",
+		ClaimedAt:  &claimed,
+		FinishedAt: &finished,
+	})
+	require.Len(t, recorder.computes, 1)
+	assert.Equal(t, "local", recorder.computes[0].FleetID)
+}
+
+func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "local")
+	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
+
+	claimed := time.Now()
+	finished := claimed.Add(time.Second)
+	state := &kvState{kv: map[string]string{
+		executionKVMachineType: MachineTypeE1LargeAMD64,
+		executionKVFleetID:     MachineTypeE1LargeAMD64,
+	}}
+	recorder := &recordingComputeUsage{}
+	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{"machine_type": MachineTypeE1TinyAMD64}, &Task{
+		ID:         "task-6",
+		Status:     "succeeded",
+		ClaimedAt:  &claimed,
+		FinishedAt: &finished,
+	})
+	require.Len(t, recorder.computes, 1)
+	assert.Equal(t, MachineTypeE1LargeAMD64, recorder.computes[0].FleetID)
+}

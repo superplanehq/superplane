@@ -186,12 +186,12 @@ func EstimateMicros(provider, model string, input, output, cacheRead, cacheWrite
 		micros(reasoning, rate.Reasoning)
 }
 
-// EstimateComputeMicros prices runner-fleet seconds. local fleet is 0.
+// EstimateComputeMicros prices runner-fleet seconds. Local and empty fleets are 0.
 func EstimateComputeMicros(machineType, fleetID string, seconds int64) int64 {
 	if seconds <= 0 {
 		return 0
 	}
-	if strings.EqualFold(strings.TrimSpace(fleetID), localFleetID) {
+	if isUnbilledFleet(fleetID) {
 		return 0
 	}
 	rate := computeRate(machineType)
@@ -199,6 +199,11 @@ func EstimateComputeMicros(machineType, fleetID string, seconds int64) int64 {
 		return 0
 	}
 	return seconds * rate
+}
+
+func isUnbilledFleet(fleetID string) bool {
+	id := strings.TrimSpace(fleetID)
+	return id == "" || strings.EqualFold(id, localFleetID)
 }
 
 func computeRate(machineType string) int64 {

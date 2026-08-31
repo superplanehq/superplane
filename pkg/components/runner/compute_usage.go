@@ -47,14 +47,8 @@ func RecordRunnerComputeUsage(
 	}
 
 	seconds := billableSeconds(task.FinishedAt.Sub(*task.ClaimedAt))
-	machineType := executionKV(state, executionKVMachineType)
-	if machineType == "" {
-		machineType = configurationMachineType(configuration)
-	}
-	if machineType == "" {
-		machineType = "unknown"
-	}
-	fleetID := executionKV(state, executionKVFleetID)
+	machineType := resolveComputeMachineType(state, configuration)
+	fleetID := resolveComputeFleetID(state, machineType)
 	taskID := task.brokerTaskID()
 
 	record := core.ComputeUsageRecord{
@@ -66,6 +60,28 @@ func RecordRunnerComputeUsage(
 	if err := usage.RecordCompute(record); err != nil && logger != nil {
 		logger.WithError(err).Error("failed to record runner compute usage")
 	}
+}
+
+func resolveComputeMachineType(state core.ExecutionStateContext, configuration any) string {
+	machineType := executionKV(state, executionKVMachineType)
+	if machineType == "" {
+		machineType = configurationMachineType(configuration)
+	}
+	if machineType == "" {
+		return "unknown"
+	}
+	return machineType
+}
+
+func resolveComputeFleetID(state core.ExecutionStateContext, machineType string) string {
+	if fleetID := executionKV(state, executionKVFleetID); fleetID != "" {
+		return fleetID
+	}
+	fleetID, err := resolveBrokerFleetID(machineType)
+	if err != nil {
+		return ""
+	}
+	return fleetID
 }
 
 func executionKV(state core.ExecutionStateContext, key string) string {
