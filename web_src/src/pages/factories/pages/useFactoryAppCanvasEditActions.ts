@@ -114,6 +114,63 @@ export function useFactoryAppCanvasEditActions({
     handleAgentPromptOpenChange(true);
   }, [handleAgentPromptOpenChange]);
 
+  const reset = useFactoryAppResetActions({
+    organizationId,
+    factoryId,
+    appId,
+    isConfigure,
+    canUpdateCanvas,
+    canvas,
+    configureActionsRef,
+  });
+
+  const handleAgentOpenChange = useCallback(
+    (open: boolean) => {
+      handleSearchParamFlag("agent", open);
+    },
+    [handleSearchParamFlag],
+  );
+
+  const handleComponentsOpenChange = useCallback(
+    (open: boolean) => {
+      handleSearchParamFlag("blocks", open);
+    },
+    [handleSearchParamFlag],
+  );
+
+  useFactoryAppCanvasWorkspaceSync({
+    appId,
+    isConfigure,
+    agentOpen,
+    componentsOpen,
+    onAgentOpenChange: handleAgentOpenChange,
+    onComponentsOpenChange: handleComponentsOpenChange,
+  });
+
+  return {
+    handleOpenVisualEditor,
+    handleAgentPromptOpenChange,
+    handleYamlViewOpenChange,
+    handleViewYaml,
+    handleEditWithLocalAgent,
+    handleAgentOpenChange,
+    handleComponentsOpenChange,
+    ...reset,
+  };
+}
+
+function useFactoryAppResetActions({
+  organizationId,
+  factoryId,
+  appId,
+  isConfigure,
+  canUpdateCanvas,
+  canvas,
+  configureActionsRef,
+}: Pick<
+  FactoryAppCanvasEditActionsInput,
+  "organizationId" | "factoryId" | "appId" | "isConfigure" | "canUpdateCanvas" | "canvas" | "configureActionsRef"
+>) {
   const resetAvailable = isConfigure && canUpdateCanvas && hasFactoryAppDefaults(canvas);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
@@ -151,37 +208,7 @@ export function useFactoryAppCanvasEditActions({
     }
   }, [appId, configureActionsRef, factoryId, organizationId, resetAvailable]);
 
-  const handleAgentOpenChange = useCallback(
-    (open: boolean) => {
-      handleSearchParamFlag("agent", open);
-    },
-    [handleSearchParamFlag],
-  );
-
-  const handleComponentsOpenChange = useCallback(
-    (open: boolean) => {
-      handleSearchParamFlag("blocks", open);
-    },
-    [handleSearchParamFlag],
-  );
-
-  useFactoryAppCanvasWorkspaceSync({
-    appId,
-    isConfigure,
-    agentOpen,
-    componentsOpen,
-    onAgentOpenChange: handleAgentOpenChange,
-    onComponentsOpenChange: handleComponentsOpenChange,
-  });
-
   return {
-    handleOpenVisualEditor,
-    handleAgentPromptOpenChange,
-    handleYamlViewOpenChange,
-    handleViewYaml,
-    handleEditWithLocalAgent,
-    handleAgentOpenChange,
-    handleComponentsOpenChange,
     resetAvailable,
     resetConfirmOpen,
     handleOpenResetConfirm,
