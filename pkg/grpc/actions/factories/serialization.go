@@ -58,6 +58,9 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		DefaultBranch:      config.DefaultBranch,
 		IssuesSource:       serializeFactoryOnboardingIssuesSource(config.IssuesSource),
 		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		AgentProvider:      serializeFactoryOnboardingAgentProvider(config.AgentProvider),
+		AgentModel:         config.AgentModel,
+		AgentPlanningModel: config.AgentPlanningModel,
 		ProvisionedAppId:   config.ProvisionedAppID,
 		ProvisionedLineId:  config.ProvisionedLineID,
 	}
@@ -92,6 +95,19 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
 	default:
 		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
+	}
+}
+
+func serializeFactoryOnboardingAgentProvider(provider string) pb.FactoryOnboarding_AgentProvider {
+	switch provider {
+	case models.FactoryOnboardingAgentProviderAnthropic:
+		return pb.FactoryOnboarding_AGENT_PROVIDER_ANTHROPIC
+	case models.FactoryOnboardingAgentProviderOpenAI:
+		return pb.FactoryOnboarding_AGENT_PROVIDER_OPENAI
+	case models.FactoryOnboardingAgentProviderOpenRouter:
+		return pb.FactoryOnboarding_AGENT_PROVIDER_OPENROUTER
+	default:
+		return pb.FactoryOnboarding_AGENT_PROVIDER_UNSPECIFIED
 	}
 }
 

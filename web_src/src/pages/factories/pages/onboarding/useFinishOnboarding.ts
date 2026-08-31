@@ -22,7 +22,7 @@ import {
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
-import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
+import { agentRewriteFromPlan, onboardingAgentProvider } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function finishOnboardingError(args: {
@@ -101,6 +101,9 @@ async function provisionWorkspace(args: {
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.setup.issuesChoice),
     agentHarness: args.agentPlan.harness,
+    agentProvider: onboardingAgentProvider(args.agentPlan.providerId),
+    agentModel: args.agentPlan.model,
+    agentPlanningModel: args.agentPlan.planningModel,
   });
   // Onboarding installs the Implement app with the real default branch (main,
   // master, staging, ...) instead of hardcoding "main", so Create Branch and
