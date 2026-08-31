@@ -177,6 +177,95 @@ func Test__OnPRReview__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 0, events.Count())
 	})
 
+	t.Run("allowed bot review with no mention -> event is emitted", func(t *testing.T) {
+		body := []byte(`{
+			"action":"submitted",
+			"review":{"id":987,"body":"Consider renaming this variable.","user":{"login":"coderabbitai[bot]","type":"Bot"}},
+			"pull_request":{"number":42,"title":"Add widget"},
+			"repository":{"full_name":"testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := reviewCommentsHTTPContext(`[]`)
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+			"allowedBots":   []string{"coderabbitai"},
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("bot not on allowlist with no mention -> ignored", func(t *testing.T) {
+		body := []byte(`{
+			"action":"submitted",
+			"review":{"id":987,"body":"Consider renaming this variable.","user":{"login":"codecov","type":"Bot"}},
+			"pull_request":{"number":42,"title":"Add widget"},
+			"repository":{"full_name":"testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := reviewCommentsHTTPContext(`[]`)
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+			"allowedBots":   []string{"coderabbitai"},
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("allowed bot review while ignoreBots is true -> still emitted", func(t *testing.T) {
+		body := []byte(`{
+			"action":"submitted",
+			"review":{"id":987,"body":"Consider renaming this variable.","user":{"login":"coderabbitai[bot]","type":"Bot"}},
+			"pull_request":{"number":42,"title":"Add widget"},
+			"repository":{"full_name":"testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := reviewCommentsHTTPContext(`[]`)
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+			"ignoreBots":    true,
+			"allowedBots":   []string{"@CodeRabbitAI"},
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("non-bot author matching allowlist name -> normal content filter behavior", func(t *testing.T) {
+		body := []byte(`{
+			"action":"submitted",
+			"review":{"id":987,"body":"Consider renaming this variable.","user":{"login":"coderabbitai","type":"User"}},
+			"pull_request":{"number":42,"title":"Add widget"},
+			"repository":{"full_name":"testhq/hello"}
+		}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+		events := &contexts.EventContext{}
+		httpCtx := reviewCommentsHTTPContext(`[]`)
+
+		code, _, err := trigger.HandleWebhook(reviewWebhookContext(body, headers, events, httpCtx, map[string]any{
+			"repository":    "hello",
+			"contentFilter": "@superplaneagent",
+			"allowedBots":   []string{"coderabbitai"},
+		}))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
 	t.Run("comment loading failure is retriable", func(t *testing.T) {
 		body := []byte(reviewBody)
 		headers := signedHeaders(body, "test-secret", eventType)
