@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import { Edit2, Key, Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -27,6 +28,7 @@ interface SecretDetailProps {
 export function SecretDetail({ organizationId }: SecretDetailProps) {
   const navigate = useNavigate();
   const { secretId } = useParams<{ secretId: string }>();
+  const settingsPaths = useOrganizationSettingsPaths(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
   const { data: secret, isLoading, error } = useSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION", secretId || "");
@@ -184,7 +186,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
     try {
       await deleteSecretMutation.mutateAsync(secret.metadata?.id ?? "");
       showSuccessToast("Secret deleted successfully");
-      navigate(`/${organizationId}/settings/secrets`);
+      navigate(settingsPaths.secrets);
     } catch (err) {
       showErrorToast(`Failed to delete secret: ${getApiErrorMessage(err)}`);
     }
@@ -192,7 +194,7 @@ export function SecretDetail({ organizationId }: SecretDetailProps) {
 
   const isUpdating =
     setSecretKeyMutation.isPending || deleteSecretKeyMutation.isPending || updateSecretNameMutation.isPending;
-  const handleBackToSecrets = () => navigate(`/${organizationId}/settings/secrets`);
+  const handleBackToSecrets = () => navigate(settingsPaths.secrets);
 
   if (isLoading || !secretId) {
     return (

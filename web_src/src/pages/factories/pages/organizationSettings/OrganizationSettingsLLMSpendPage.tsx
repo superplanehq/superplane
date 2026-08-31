@@ -20,14 +20,14 @@ import { LLMUsageByModelTable, LLMUsageTotals } from "../settings/LLMUsageBreakd
 
 export function OrganizationSettingsLLMSpendPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
-  usePageTitle(["LLM spend"]);
+  usePageTitle(["Spending"]);
   const { data, isLoading, error, refetch } = useOrganizationLLMSpend(organizationId || "");
   const [searchParams] = useSearchParams();
   const creditAdded = searchParams.get("credit") === "added";
 
   return (
     <FactorySettingsPageFrame
-      title="LLM spend"
+      title="Spending"
       subtitle="Review factory token usage and estimated model cost for this organization."
     >
       <LLMSpendBody
