@@ -15,26 +15,27 @@ import {
   type FactoryVelocityFlow,
   type FactoryVelocityFlowPeriodDays,
 } from "../lib/factoryVelocityFlow";
+import { VELOCITY_SERIES_COLORS } from "../lib/velocitySeriesColors";
 
 export type VelocityChartsPeriodDays = FactoryVelocityFlowPeriodDays;
 
 const outputChartConfig = {
-  merged: { label: "Merged", color: "#10b981" },
-  waste: { label: "Waste", color: "#ef4444" },
+  merged: { label: "Merged", color: VELOCITY_SERIES_COLORS.merged },
+  waste: { label: "Waste", color: VELOCITY_SERIES_COLORS.waste },
 } satisfies ChartConfig;
 
 const costChartConfig = {
-  costUsd: { label: "Cost", color: "#64748b" },
+  costUsd: { label: "Cost", color: VELOCITY_SERIES_COLORS.cost },
 } satisfies ChartConfig;
 
 const sourceChartConfig = {
-  peopleMerged: { label: "People", color: "#64748b" },
-  superplaneMerged: { label: "SuperPlane", color: "#10b981" },
+  peopleMerged: { label: "People", color: VELOCITY_SERIES_COLORS.people },
+  superplaneMerged: { label: "SuperPlane", color: VELOCITY_SERIES_COLORS.superplane },
 } satisfies ChartConfig;
 
 const timeTrendChartConfig = {
-  runningHours: { label: "Time running", color: "#60a5fa" },
-  waitingHours: { label: "Time in Waiting", color: "#f59e0b" },
+  runningHours: { label: "Time running", color: VELOCITY_SERIES_COLORS.running },
+  waitingHours: { label: "Time in Waiting", color: VELOCITY_SERIES_COLORS.waiting },
 } satisfies ChartConfig;
 
 function formatTimeTrendTooltip(value: unknown, name: unknown) {

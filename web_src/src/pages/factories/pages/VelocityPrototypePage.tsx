@@ -12,7 +12,7 @@ import {
   type FactoryVelocityDay,
   type FactoryVelocityPeriodDays,
 } from "./factoryVelocityMockData";
-import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
+import { factoryCenteredSectionBodyClassName, factoryCenteredSectionHeaderClassName } from "./factoryPageLayoutStyles";
 import {
   VelocityLoadedView,
   type VelocityCostConfig,
@@ -92,7 +92,7 @@ export function VelocityPrototypePage() {
   return (
     <>
       <WorkspacePageHeader
-        className={factorySectionHeaderClassName}
+        className={factoryCenteredSectionHeaderClassName}
         title="Velocity"
         subtitle="Merged pull requests, waste, cost, and task time."
         actions={
@@ -109,7 +109,7 @@ export function VelocityPrototypePage() {
         }
       />
 
-      <div className={cn(factorySectionBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
+      <div className={cn(factoryCenteredSectionBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
         <VelocityLoadedView
           periodLabel={period.label}
           periodDays={periodDays}
