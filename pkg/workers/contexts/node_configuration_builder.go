@@ -1074,6 +1074,10 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
 	}
+	repository, defaultBranch, err := b.resolveOrderRepository(order)
+	if err != nil {
+		return nil, err
+	}
 
 	payload := map[string]any{
 		"id":             order.ID.String(),
@@ -1082,8 +1086,8 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"factory_id":     order.FactoryID.String(),
 		"state":          order.State,
 		"result":         order.Result,
-		"repository":     stringValue(order.Repository),
-		"default_branch": stringValue(order.DefaultBranch),
+		"repository":     repository,
+		"default_branch": defaultBranch,
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
@@ -1183,6 +1187,33 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+// resolveOrderRepository keeps orders created before repository snapshots
+// compatible with workflow templates that use order().repository.
+func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryWorkOrder) (string, string, error) {
+	repository := stringValue(order.Repository)
+	defaultBranch := stringValue(order.DefaultBranch)
+	if repository != "" && defaultBranch != "" {
+		return repository, defaultBranch, nil
+	}
+
+	factory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", "", fmt.Errorf("order() could not resolve the workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	if repository == "" {
+		repository = config.AppRepository
+	}
+	if defaultBranch == "" {
+		defaultBranch = config.DefaultBranch
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	return repository, defaultBranch, nil
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
