@@ -37,6 +37,9 @@ interface VelocityPoint {
   runningHours: number;
   waitingHours: number;
   costUsd: number;
+  tokenCostUsd: number;
+  computeCostUsd: number;
+  wasteCostUsd: number;
   tokens: number;
 }
 
@@ -120,7 +123,8 @@ const flowChartConfig = {
 } satisfies ChartConfig;
 
 const costChartConfig = {
-  costUsd: { label: "Tracked cost", color: "#64748b" },
+  tokenCostUsd: { label: "Model tokens", color: "#64748b" },
+  computeCostUsd: { label: "Execution compute", color: "#6366f1" },
 } satisfies ChartConfig;
 
 const cardClassName = "rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5";
@@ -147,7 +151,11 @@ function buildVelocityPoints(periodDays: PeriodDays, windowOffset = 0): Velocity
     const api = Math.max(0, superplane - githubIssues - sentryExceptions - manual);
     const runningHours = 8 + 3 * Math.sin(day * 0.48 + 0.5);
     const waitingHours = 13 + 5 * Math.sin(day * 0.35 + 1.8) + day * 0.18;
-    const costUsd = superplane * 2.14 + waste * 0.72;
+    const mergedCostUsd = superplane * 2.14;
+    const wasteCostUsd = waste * 1.85;
+    const costUsd = mergedCostUsd + wasteCostUsd;
+    const tokenCostUsd = Math.round((superplane * 1.67 + waste * 1.44) * 100) / 100;
+    const computeCostUsd = Math.round((costUsd - tokenCostUsd) * 100) / 100;
 
     return {
       day: periodDays === 14 ? `${index + 1}` : index % 5 === 0 || index === periodDays - 1 ? `${index + 1}` : "",
@@ -162,7 +170,10 @@ function buildVelocityPoints(periodDays: PeriodDays, windowOffset = 0): Velocity
       runningHours: Math.max(2, Math.round(runningHours * 10) / 10),
       waitingHours: Math.max(3, Math.round(waitingHours * 10) / 10),
       costUsd: Math.round(costUsd * 100) / 100,
-      tokens: superplane * 18_500,
+      tokenCostUsd,
+      computeCostUsd,
+      wasteCostUsd: Math.round(wasteCostUsd * 100) / 100,
+      tokens: superplane * 18_500 + waste * 12_400,
     };
   });
 }
@@ -264,6 +275,9 @@ function summarizePoints(points: VelocityPoint[]) {
     runningHours: median(points.map((point) => point.runningHours)),
     waitingHours: median(points.map((point) => point.waitingHours)),
     cost,
+    tokenCost: sum(points, "tokenCostUsd"),
+    computeCost: sum(points, "computeCostUsd"),
+    wasteCost: sum(points, "wasteCostUsd"),
     tokens: sum(points, "tokens"),
     costPerMerge,
   };
@@ -425,7 +439,25 @@ function CostChart({ points }: { points: VelocityPoint[] }) {
           tickFormatter={(value: number) => `$${value}`}
         />
         <ChartTooltip content={<ChartTooltipContent />} />
-        <Area type="monotone" dataKey="costUsd" stroke="#64748b" fill="#64748b" fillOpacity={0.12} strokeWidth={1.5} />
+        <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
+        <Area
+          type="monotone"
+          dataKey="tokenCostUsd"
+          stackId="cost"
+          stroke="#64748b"
+          fill="#64748b"
+          fillOpacity={0.28}
+          strokeWidth={1.5}
+        />
+        <Area
+          type="monotone"
+          dataKey="computeCostUsd"
+          stackId="cost"
+          stroke="#6366f1"
+          fill="#6366f1"
+          fillOpacity={0.28}
+          strokeWidth={1.5}
+        />
       </AreaChart>
     </ChartContainer>
   );
@@ -548,7 +580,17 @@ export function VelocityPrototypePage() {
             <p className={cardSubtitleClassName}>Model tokens and execution compute. Third-party charges are excluded.</p>
             <div className="mt-5 grid grid-cols-2 gap-5">
               <Metric label="Total cost" value={formatUsd(current.cost)} />
-              <Metric label="Model tokens" value={formatCompactTokenValue(current.tokens)} />
+              <Metric
+                label="Spend on waste"
+                value={formatUsd(current.wasteCost)}
+                hint="Factory work that closed without a merge"
+              />
+              <Metric
+                label="Model tokens"
+                value={formatUsd(current.tokenCost)}
+                hint={`${formatCompactTokenValue(current.tokens)} tokens`}
+              />
+              <Metric label="Execution compute" value={formatUsd(current.computeCost)} />
             </div>
             <div className="mt-5 border-t border-border pt-4">
               <CostChart points={points} />
