@@ -3,11 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  FactoriesDescribeFactoryVelocityResponse,
-  FactoriesWorkOrder,
-  OrganizationsIntegration,
-} from "@/api-client";
+import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -29,10 +25,11 @@ interface WorkOrdersHookState {
 
 const velocityHookState: VelocityHookState = {};
 const workOrdersHookState: WorkOrdersHookState = {};
-const integrationsHookState: { data: OrganizationsIntegration[] } = { data: [] };
-const repositoryResourcesHookState: { data: Array<{ name?: string }>; isLoading: boolean } = {
-  data: [],
-  isLoading: false,
+
+/** Workspace setup picks the GitHub integration and the app repository. */
+const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
+  ...REFUND_FACTORY,
+  onboarding: { ...REFUND_FACTORY.onboarding, vcsIntegrationId: "int-1", appRepository: "acme/api" },
 };
 
 vi.mock("@/hooks/useFactoryVelocity", () => ({
@@ -54,15 +51,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: () => ({ data: integrationsHookState.data }),
-  useIntegrationResources: () => ({
-    data: repositoryResourcesHookState.data,
-    isLoading: repositoryResourcesHookState.isLoading,
-  }),
-}));
-
-function renderShell() {
+function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={["/velocity"]}>
@@ -71,8 +60,8 @@ function renderShell() {
             organizationId: "org-1",
             factoryId: PRIMARY_FACTORY_ID,
             factoryKey: PRIMARY_FACTORY_KEY,
-            factory: REFUND_FACTORY,
-            factories: [REFUND_FACTORY],
+            factory,
+            factories: [factory],
             openCreateWorkOrder: vi.fn(),
           }}
         >
@@ -92,9 +81,6 @@ function resetState() {
   workOrdersHookState.isLoading = false;
   workOrdersHookState.isFetching = false;
   workOrdersHookState.error = null;
-  integrationsHookState.data = [];
-  repositoryResourcesHookState.data = [];
-  repositoryResourcesHookState.isLoading = false;
 }
 
 describe("VelocityPage shell", () => {
@@ -148,7 +134,7 @@ describe("VelocityPage shell", () => {
     expect(screen.queryByTestId("velocity-error-state")).not.toBeInTheDocument();
   });
 
-  it("renders the loaded view and hides People cohort without a repo", () => {
+  it("renders the loaded view and hides People cohort when setup has no repository", () => {
     resetState();
     velocityHookState.data = {
       yesterday: { superplaneMerged: 3, waste: 1 },
@@ -174,19 +160,27 @@ describe("VelocityPage shell", () => {
     expect(yesterday).not.toHaveTextContent("Cost");
 
     const split = screen.getByTestId("velocity-source-split");
-    expect(split).toHaveTextContent("Connect GitHub to compare People and SuperPlane.");
+    expect(split).toHaveTextContent("Connect GitHub in workspace setup to compare People and SuperPlane.");
     expect(split).not.toHaveTextContent("SuperPlane authored");
+  });
+
+  it("names the repository from workspace setup in the header", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 1, waste: 0 },
+      totals: { superplaneMerged: 1, peopleMerged: 0, waste: 0, superplaneSharePct: 0, wastePct: 0 },
+      points: [{ day: "Mon", superplaneMerged: 1, peopleMerged: 0, waste: 0 }],
+      hasPeopleCohort: false,
+    };
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("acme/api");
+    expect(screen.queryByLabelText("Repository")).not.toBeInTheDocument();
   });
 
   it("explains when People merges could not be loaded", () => {
     resetState();
-    integrationsHookState.data = [
-      {
-        metadata: { id: "int-1", name: "GitHub", integrationName: "github" },
-        status: { state: "ready" },
-      },
-    ];
-    repositoryResourcesHookState.data = [{ name: "acme/api" }];
     velocityHookState.data = {
       yesterday: { superplaneMerged: 3, waste: 0 },
       totals: {
@@ -202,7 +196,7 @@ describe("VelocityPage shell", () => {
       repository: "acme/api",
     };
 
-    renderShell();
+    renderShell(FACTORY_WITH_SETUP_REPO);
 
     const split = screen.getByTestId("velocity-source-split");
     expect(split).toHaveTextContent("We could not load People merges. SuperPlane counts still show.");
