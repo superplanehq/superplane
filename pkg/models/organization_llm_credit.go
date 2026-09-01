@@ -20,7 +20,6 @@ const (
 
 var (
 	ErrHostedCreditEmpty        = errors.New("hosted LLM credit is empty")
-	ErrHostedRunInFlight        = errors.New("another hosted LLM run is already in progress")
 	ErrCreditGrantNotPositive   = errors.New("credit grant must be greater than zero")
 	ErrFactoryHostedBudgetEmpty = errors.New("this workspace has no remaining hosted credit")
 	ErrPolarOrderIDRequired     = errors.New("polar order id is required")
@@ -54,18 +53,6 @@ type OrganizationLLMSettings struct {
 
 func (OrganizationLLMSettings) TableName() string {
 	return "organization_llm_settings"
-}
-
-type OrganizationLLMCreditHold struct {
-	NodeExecutionID uuid.UUID `gorm:"primary_key"`
-	OrganizationID  uuid.UUID
-	FactoryID       *uuid.UUID
-	AmountMicros    int64
-	CreatedAt       time.Time
-}
-
-func (OrganizationLLMCreditHold) TableName() string {
-	return "organization_llm_credit_holds"
 }
 
 // OrganizationLLMCreditSummary is remaining hosted credit for an org.
@@ -429,106 +416,22 @@ func AssertFactoryHostedBudgetAvailable(tx *gorm.DB, factory *Factory) error {
 	return nil
 }
 
-// ReserveHostedCredit takes a short FOR UPDATE lock on organization LLM settings.
-// Pass a committed connection, not a long-lived executor transaction.
-func ReserveHostedCredit(tx *gorm.DB, orgID, nodeExecutionID uuid.UUID, factoryID *uuid.UUID) error {
+// AssertHostedRunAllowed rejects a new hosted start when org remaining credit
+// is empty or the factory hosted budget is exhausted. Pass a committed
+// connection so remaining credit includes billed spend from other runs.
+func AssertHostedRunAllowed(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid.UUID) error {
 	if orgID == uuid.Nil {
 		return fmt.Errorf("organization is required for hosted LLM credit")
 	}
-	if nodeExecutionID == uuid.Nil {
-		if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
-			return err
-		}
-		if factoryID != nil && *factoryID != uuid.Nil {
-			factory, err := FindFactory(tx, orgID, *factoryID)
-			if err != nil {
-				return err
-			}
-			return AssertFactoryHostedBudgetAvailable(tx, factory)
-		}
+	if err := AssertHostedCreditAvailable(tx, orgID); err != nil {
+		return err
+	}
+	if factoryID == nil || *factoryID == uuid.Nil {
 		return nil
 	}
-
-	return tx.Transaction(func(inner *gorm.DB) error {
-		if err := lockOrganizationLLMSettings(inner, orgID); err != nil {
-			return err
-		}
-		if err := releaseStaleHostedCreditHolds(inner, orgID); err != nil {
-			return err
-		}
-		if err := AssertHostedCreditAvailable(inner, orgID); err != nil {
-			return err
-		}
-		if factoryID != nil && *factoryID != uuid.Nil {
-			factory, err := FindFactory(inner, orgID, *factoryID)
-			if err != nil {
-				return err
-			}
-			if err := AssertFactoryHostedBudgetAvailable(inner, factory); err != nil {
-				return err
-			}
-		}
-
-		var inFlight int64
-		err := inner.Model(&OrganizationLLMCreditHold{}).
-			Where("organization_id = ? AND node_execution_id <> ?", orgID, nodeExecutionID).
-			Count(&inFlight).Error
-		if err != nil {
-			return err
-		}
-		if inFlight > 0 {
-			return fmt.Errorf("%w: wait for the current hosted run to finish", ErrHostedRunInFlight)
-		}
-
-		hold := OrganizationLLMCreditHold{
-			NodeExecutionID: nodeExecutionID,
-			OrganizationID:  orgID,
-			FactoryID:       factoryID,
-			AmountMicros:    1,
-			CreatedAt:       time.Now(),
-		}
-		return inner.Clauses(clause.OnConflict{
-			Columns:   []clause.Column{{Name: "node_execution_id"}},
-			DoNothing: true,
-		}).Create(&hold).Error
-	})
-}
-
-func ReleaseHostedCreditHold(tx *gorm.DB, nodeExecutionID uuid.UUID) error {
-	if nodeExecutionID == uuid.Nil {
-		return nil
-	}
-	return tx.Where("node_execution_id = ?", nodeExecutionID).Delete(&OrganizationLLMCreditHold{}).Error
-}
-
-func lockOrganizationLLMSettings(tx *gorm.DB, orgID uuid.UUID) error {
-	settings := OrganizationLLMSettings{
-		OrganizationID: orgID,
-		UpdatedAt:      time.Now(),
-	}
-	err := tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "organization_id"}},
-		DoNothing: true,
-	}).Create(&settings).Error
+	factory, err := FindFactory(tx, orgID, *factoryID)
 	if err != nil {
 		return err
 	}
-	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("organization_id = ?", orgID).
-		First(&settings).Error
-}
-
-// releaseStaleHostedCreditHolds deletes holds that no longer belong to an
-// active node execution. Holds have no foreign key, so canvas deletion can
-// leave orphan rows that would otherwise block every later hosted run.
-func releaseStaleHostedCreditHolds(tx *gorm.DB, orgID uuid.UUID) error {
-	return tx.
-		Where("organization_id = ?", orgID).
-		Where(`NOT EXISTS (
-			SELECT 1
-			FROM workflow_node_executions AS executions
-			WHERE executions.id = organization_llm_credit_holds.node_execution_id
-			  AND executions.state IN ?
-		)`, CanvasNodeExecutionActiveStates).
-		Delete(&OrganizationLLMCreditHold{}).Error
+	return AssertFactoryHostedBudgetAvailable(tx, factory)
 }
