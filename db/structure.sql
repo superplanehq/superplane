@@ -469,13 +469,13 @@ CREATE TABLE public.factory_velocity_repository_merges (
     factory_id uuid NOT NULL,
     repository text NOT NULL,
     number bigint NOT NULL,
+    source text DEFAULT 'people'::text NOT NULL,
     author_login text NOT NULL,
     author_name text DEFAULT ''::text NOT NULL,
     author_avatar_url text DEFAULT ''::text NOT NULL,
     merged_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    source text DEFAULT 'people'::text NOT NULL,
     CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
 );
@@ -1518,11 +1518,11 @@ ALTER TABLE ONLY public.factory_pull_requests
 
 
 --
--- Name: factory_velocity_repository_merges factory_velocity_people_merges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_velocity_repository_merges factory_velocity_repository_merges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_velocity_repository_merges
-    ADD CONSTRAINT factory_velocity_people_merges_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT factory_velocity_repository_merges_pkey PRIMARY KEY (id);
 
 
 --
@@ -3088,19 +3088,19 @@ ALTER TABLE ONLY public.factory_pull_requests
 
 
 --
--- Name: factory_velocity_repository_merges factory_velocity_people_merges_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_velocity_repository_merges factory_velocity_repository_merges_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_velocity_repository_merges
-    ADD CONSTRAINT factory_velocity_people_merges_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+    ADD CONSTRAINT factory_velocity_repository_merges_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
 
 
 --
--- Name: factory_velocity_repository_merges factory_velocity_people_merges_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: factory_velocity_repository_merges factory_velocity_repository_merges_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_velocity_repository_merges
-    ADD CONSTRAINT factory_velocity_people_merges_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+    ADD CONSTRAINT factory_velocity_repository_merges_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
 
 
 --
@@ -3807,7 +3807,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260831153702	f
+20260901064405	f
 \.
 
 
