@@ -145,7 +145,7 @@ func (s *magicCodeSteps) enterCodeAndSubmit(code string) {
 
 func (s *magicCodeSteps) assertRedirectedToOrganization() {
 	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.session.OrgID.String(),
+	assert.Contains(s.t, currentURL, "/"+s.session.OrgSlug,
 		"expected redirect to organization home, got %s", currentURL)
 }
 
