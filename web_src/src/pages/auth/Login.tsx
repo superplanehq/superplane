@@ -317,10 +317,13 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         });
 
         if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
+          const organizations = (await orgsResponse.json()) as Array<{ id?: string; slug?: string }>;
           if (organizations.length === 1) {
-            window.location.href = `/${organizations[0].id}`;
-            return;
+            const orgRef = organizations[0].slug || organizations[0].id;
+            if (orgRef) {
+              window.location.href = `/${orgRef}`;
+              return;
+            }
           }
         }
       } catch {

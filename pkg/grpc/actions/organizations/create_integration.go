@@ -49,10 +49,11 @@ func CreateIntegrationWithUsage(
 		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s not found", integrationName))
 	}
 
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization")
+		return nil, err
 	}
+	orgID = org.String()
 
 	//
 	// Check if an integration with this name already exists in the organization

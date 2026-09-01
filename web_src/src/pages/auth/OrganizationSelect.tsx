@@ -20,6 +20,7 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 interface Organization {
   id: string;
+  slug: string;
   name: string;
   canvasCount?: number;
   memberCount?: number;
@@ -76,12 +77,14 @@ const OrganizationSelect: React.FC = () => {
 
         const explicitSelection = new URLSearchParams(location.search).has("select");
         if (!explicitSelection) {
-          const redirectOrganizationId = pickAutoRedirectOrganization(
-            organizations,
+          // The URL routes by slug, and last-visited is recorded from the
+          // URL segment, so match the last-visited value against slugs.
+          const redirectOrganizationSlug = pickAutoRedirectOrganization(
+            organizations.map((org) => ({ id: org.slug })),
             readLastVisitedOrganization(account.id),
           );
-          if (redirectOrganizationId) {
-            navigate(`/${redirectOrganizationId}`, { replace: true });
+          if (redirectOrganizationSlug) {
+            navigate(`/${redirectOrganizationSlug}`, { replace: true });
             return;
           }
         }
@@ -225,7 +228,7 @@ const OrganizationSelect: React.FC = () => {
           <ul className="flex flex-col gap-3 list-none p-0 m-0">
             {organizations.map((org) => (
               <li key={org.id}>
-                <Link to={`/${org.id}`} className={organizationRowClassName}>
+                <Link to={`/${org.slug}`} className={organizationRowClassName}>
                   <div className="flex items-center gap-4 min-w-0">
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-medium text-white dark:bg-gray-300 dark:text-gray-950"
