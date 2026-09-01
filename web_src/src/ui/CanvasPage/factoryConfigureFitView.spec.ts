@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { FACTORY_LAYOUT_ANIMATION_DURATION_MS } from "./nodePositionAnimation";
 import {
   FACTORY_CONFIGURE_FIT_SETTLE_MS,
   factoryConfigureEnterFitViewOptions,
@@ -41,30 +40,30 @@ describe("shouldFitFactoryConfigureEnter", () => {
 });
 
 describe("FACTORY_CONFIGURE_FIT_SETTLE_MS", () => {
-  it("waits for the factory layout animation plus a short measure buffer", () => {
-    expect(FACTORY_CONFIGURE_FIT_SETTLE_MS).toBe(FACTORY_LAYOUT_ANIMATION_DURATION_MS + 50);
+  it("waits a short measure buffer after the layout snaps", () => {
+    expect(FACTORY_CONFIGURE_FIT_SETTLE_MS).toBe(50);
   });
 });
 
 describe("factoryConfigureEnterFitViewOptions", () => {
-  it("frames the whole graph at 100% zoom", () => {
+  it("frames the whole graph at 100% zoom immediately", () => {
     expect(factoryConfigureEnterFitViewOptions()).toEqual({
       includeHiddenNodes: true,
       minZoom: 1,
       maxZoom: 1,
       padding: 0.08,
-      duration: 500,
+      duration: 0,
     });
   });
 
-  it("centers a deep-linked node at 100% zoom", () => {
+  it("centers a deep-linked node at 100% zoom immediately", () => {
     const focusNode = { id: "implementation-agent-no-issue" };
     expect(factoryConfigureEnterFitViewOptions(focusNode)).toEqual({
       includeHiddenNodes: true,
       minZoom: 1,
       maxZoom: 1,
       padding: 0.08,
-      duration: 500,
+      duration: 0,
       nodes: [focusNode],
     });
   });

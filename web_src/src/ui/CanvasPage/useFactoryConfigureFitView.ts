@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   FACTORY_CONFIGURE_FIT_SETTLE_MS,
   factoryConfigureEnterFitViewOptions,
@@ -32,15 +32,16 @@ export function useFactoryConfigureFitView({
   getViewport,
   viewportRef,
   reportZoom,
-}: UseFactoryConfigureFitViewInput) {
+}: UseFactoryConfigureFitViewInput): { ready: boolean } {
   const fittedThisVisitRef = useRef(false);
+  const factoryConfigureRef = useRef(factoryConfigure);
+  const [ready, setReady] = useState(!factoryConfigure);
 
-  useEffect(() => {
-    if (factoryConfigure) {
-      return;
-    }
+  if (factoryConfigure !== factoryConfigureRef.current) {
+    factoryConfigureRef.current = factoryConfigure;
     fittedThisVisitRef.current = false;
-  }, [factoryConfigure]);
+    setReady(!factoryConfigure);
+  }
 
   useEffect(() => {
     if (
@@ -52,6 +53,10 @@ export function useFactoryConfigureFitView({
         nodeCount,
       })
     ) {
+      if (factoryConfigure && isEditing && hasReactFlowInitialized && nodeCount === 0) {
+        fittedThisVisitRef.current = true;
+        setReady(true);
+      }
       return;
     }
 
@@ -60,17 +65,17 @@ export function useFactoryConfigureFitView({
         return;
       }
       if (getNodeCount() === 0) {
+        fittedThisVisitRef.current = true;
+        setReady(true);
         return;
       }
       fittedThisVisitRef.current = true;
-      void fitView(factoryConfigureEnterFitViewOptions(getFocusNode())).then(
-        () => {
-          const nextViewport = getViewport();
-          viewportRef.current = nextViewport;
-          reportZoom(nextViewport.zoom);
-        },
-        () => undefined,
-      );
+      void fitView(factoryConfigureEnterFitViewOptions(getFocusNode())).finally(() => {
+        const nextViewport = getViewport();
+        viewportRef.current = nextViewport;
+        reportZoom(nextViewport.zoom);
+        setReady(true);
+      });
     }, FACTORY_CONFIGURE_FIT_SETTLE_MS);
 
     return () => window.clearTimeout(timeoutId);
@@ -86,4 +91,6 @@ export function useFactoryConfigureFitView({
     reportZoom,
     viewportRef,
   ]);
+
+  return { ready };
 }
