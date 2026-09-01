@@ -121,17 +121,22 @@ func processBrokerTaskStatus(
 	usage core.UsageRecorder,
 	configuration any,
 ) error {
-	if state.IsFinished() {
-		return nil
-	}
-
 	if !task.IsInTerminalState() {
+		if state.IsFinished() {
+			return nil
+		}
 		return fmt.Errorf("task is not in terminal state")
 	}
 
+	// Persist spend when the broker reports a terminal task after SuperPlane
+	// already finished the node. A late webhook still carries billed tokens.
 	publishRunnerUsage(organizationID, task, logger)
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
 	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
+
+	if state.IsFinished() {
+		return nil
+	}
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {

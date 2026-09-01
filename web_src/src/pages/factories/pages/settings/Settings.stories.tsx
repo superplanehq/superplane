@@ -6,6 +6,7 @@ import {
   EMPTY_FACTORY_KEY,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 import {
@@ -103,6 +104,7 @@ export const Models: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
       factoriesFixture={defaultFactoriesFixture}
+      experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
     />
   ),
 };
