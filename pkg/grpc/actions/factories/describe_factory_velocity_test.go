@@ -291,8 +291,8 @@ func TestBuildDayBuckets(t *testing.T) {
 	assert.Equal(t, time.Date(2026, 8, 11, 0, 0, 0, 0, loc), buckets[0].start)
 	assert.Equal(t, time.Date(2026, 8, 17, 0, 0, 0, 0, loc), buckets[6].start)
 	assert.Equal(t, buckets[0].end, buckets[1].start)
-	assert.Equal(t, "Tue 11", dayLabel(buckets[0].start, 7, 0))
-	assert.Equal(t, "Mon 17", dayLabel(buckets[6].start, 7, 6))
+	assert.Equal(t, "Tue 11", dayLabel(buckets[0].start))
+	assert.Equal(t, "Mon 17", dayLabel(buckets[6].start))
 }
 
 func TestFillBuckets_IgnoresTimestampsOutsideWindow(t *testing.T) {
@@ -406,25 +406,18 @@ func TestDayLabel(t *testing.T) {
 	loc := time.Local
 	start := time.Date(2026, 8, 11, 0, 0, 0, 0, loc)
 
-	assert.Equal(t, "Tue 11", dayLabel(start, 7, 0),
-		"the first tick reads like every other one")
-	assert.Equal(t, "Tue 11", dayLabel(start, 14, 7),
-		"a weekday explains a gap that a bare day number cannot")
-
-	assert.Equal(t, "", dayLabel(start, 30, 7), "a month labels every fifth day")
-	assert.Equal(t, "Tue 11", dayLabel(start, 30, 5))
-	assert.Equal(t, "Tue 11", dayLabel(start, 30, 29))
+	assert.Equal(t, "Tue 11", dayLabel(start), "a mid-month day names the weekday and the date")
 }
 
 func TestDayLabel_NamesTheMonthWhenTheWindowCrossesIt(t *testing.T) {
 	loc := time.Local
 	firstOfMonth := time.Date(2026, 9, 1, 0, 0, 0, 0, loc)
 
-	assert.Equal(t, "Tue Sep 1", dayLabel(firstOfMonth, 14, 5),
+	assert.Equal(t, "Tue Sep 1", dayLabel(firstOfMonth),
 		"a date in a new month repeats the month so it cannot be misread")
 
 	midMonth := time.Date(2026, 9, 12, 0, 0, 0, 0, loc)
-	assert.Equal(t, "Sat 12", dayLabel(midMonth, 14, 5), "days inside one month drop the month")
+	assert.Equal(t, "Sat 12", dayLabel(midMonth), "days inside one month drop the month")
 }
 
 func TestDescribeFactoryVelocity_ComparesPreviousWindow(t *testing.T) {
