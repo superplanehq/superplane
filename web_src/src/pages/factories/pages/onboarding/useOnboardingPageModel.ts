@@ -1,4 +1,4 @@
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
@@ -7,6 +7,7 @@ import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } f
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
+import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
@@ -35,6 +36,31 @@ import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardin
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
+
+/**
+ * Sends the browser to the GitHub App installation settings page so the user
+ * can grant access to more repositories, remembering where to return once
+ * GitHub redirects back.
+ *
+ * Navigates in the same tab (not a new one, as `window.open` would) so
+ * GitHub's post-save redirect chain (Setup URL -> integration settings ->
+ * stored return) lands back on this step. A new tab never receives that
+ * redirect, so the original tab is left showing "Choose a repository" with
+ * no way back for the user.
+ */
+export function requestGitHubInstallationConfigure(params: {
+  organizationId: string;
+  returnTo: string;
+  integration: OrganizationsIntegration | null | undefined;
+  remember?: typeof rememberIntegrationSetupReturn;
+  navigate?: (url: string) => void;
+}): void {
+  const remember = params.remember ?? rememberIntegrationSetupReturn;
+  const navigate = params.navigate ?? ((url: string) => window.location.assign(url));
+
+  remember(params.organizationId, params.returnTo);
+  navigate(githubInstallationUrl(params.integration));
+}
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key
@@ -207,12 +233,13 @@ export function useOnboardingPageModel(args: {
     const requestedStep = searchParams.get("step");
     return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
   });
+  // Return to this step after the provider round trip.
+  const setupReturnTo = `${factorySetupPath(args.organizationId, args.factoryKey)}?step=${openSection}${
+    openSection === "vcs" ? "&pick=newest" : ""
+  }`;
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
-    // Return to this step after the provider round trip.
-    returnTo: `${factorySetupPath(args.organizationId, args.factoryKey)}?step=${openSection}${
-      openSection === "vcs" ? "&pick=newest" : ""
-    }`,
+    returnTo: setupReturnTo,
     integrationNames: ONBOARDING_INTEGRATIONS,
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
@@ -299,7 +326,11 @@ export function useOnboardingPageModel(args: {
     selectedVcsConnectionId: githubIntegrationId || undefined,
     requestConfigure: () => {
       // Manage which repositories the GitHub App can access, on GitHub itself.
-      window.open(githubInstallationUrl(github.githubIntegration.data), "_blank", "noopener,noreferrer");
+      requestGitHubInstallationConfigure({
+        organizationId: args.organizationId,
+        returnTo: setupReturnTo,
+        integration: github.githubIntegration.data,
+      });
     },
     integrationDialogs: connect.dialogs,
     repositories: github.repositories,
