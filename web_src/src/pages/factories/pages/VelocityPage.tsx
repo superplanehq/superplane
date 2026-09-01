@@ -1,460 +1,237 @@
-import { useState } from "react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
-import {
-  ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
+import { useState, type ReactNode } from "react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { SegmentedNav } from "@/ui/SegmentedNav";
+
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { FACTORY_VELOCITY_FLOW_BY_PERIOD, type FactoryVelocityFlowPeriod } from "./factoryVelocityFlowMockData";
+import { workOrdersPath } from "../lib/factoryPagePaths";
 import {
-  FACTORY_VELOCITY_BY_PERIOD,
-  FACTORY_VELOCITY_YESTERDAY,
-  type FactoryVelocityDay,
-  type FactoryVelocityPeriodDays,
-  type FactoryVelocityYesterday,
-} from "./factoryVelocityMockData";
-import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+  VELOCITY_PERIOD_OPTIONS,
+  type VelocityBreakdown,
+  type VelocityPeriodDays,
+  type VelocityReport,
+} from "../lib/factoryVelocityReport";
+import { factoryCenteredSectionBodyClassName, factoryCenteredSectionHeaderClassName } from "./factoryPageLayoutStyles";
+import { CostCard, DeliveryCard, SummaryCard, TaskTimeCard } from "./velocityCards";
+import { VelocityPeopleTable } from "./VelocityPeopleTable";
+import { VelocityZeroState } from "./VelocityZeroState";
+import { useVelocityPageModel, type VelocityPageModel } from "./useVelocityPageModel";
 
-const PERIOD_OPTIONS: { value: string; label: string }[] = [
-  { value: "7", label: "7d" },
-  { value: "30", label: "30d" },
-];
+const CARD_CLASSES =
+  "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center";
 
-const outputChartConfig = {
-  merged: { label: "Merged", color: "#10b981" },
-  waste: { label: "Waste", color: "#ef4444" },
-} satisfies ChartConfig;
+export function VelocityPage() {
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const model = useVelocityPageModel(organizationId, factoryId, factory?.onboarding);
+  usePageTitle(["Velocity", factory?.name ?? "Workspace"]);
 
-const costChartConfig = {
-  costUsd: { label: "Cost", color: "#64748b" },
-} satisfies ChartConfig;
+  const header = <VelocityHeader model={model} />;
 
-const sourceChartConfig = {
-  peopleMerged: { label: "People", color: "#64748b" },
-  superplaneMerged: { label: "SuperPlane", color: "#10b981" },
-} satisfies ChartConfig;
-
-const timeTrendChartConfig = {
-  runningHours: { label: "Time running", color: "#60a5fa" },
-  waitingHours: { label: "Time in Waiting", color: "#f59e0b" },
-} satisfies ChartConfig;
-
-function formatUsd(value: number) {
-  return `$${value.toFixed(2)}`;
-}
-
-/** Formats elapsed hours as `14h` or `1.5d` for compact metric cells. */
-function formatDurationHours(hours: number) {
-  if (hours < 48) {
-    return `${Math.round(hours)}h`;
+  if (model.velocity.error && !model.velocity.report) {
+    return renderShell(header, <VelocityErrorState onRetry={model.velocity.refetch} />);
   }
-  const days = hours / 24;
-  return `${days % 1 === 0 ? days.toFixed(0) : days.toFixed(1)}d`;
-}
 
-function formatTokens(value: number) {
-  if (value >= 1000) {
-    const thousands = value / 1000;
-    return `${thousands % 1 === 0 ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
+  if (model.velocity.isLoading || !model.velocity.report) {
+    return renderShell(header, <VelocityLoadingState />);
   }
-  return String(value);
+
+  if (model.velocity.isEmpty) {
+    return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, factoryKey)} />);
+  }
+
+  return renderShell(header, <VelocityReportView model={model} report={model.velocity.report} />);
 }
 
-function formatPct(value: number) {
-  return `${value}%`;
-}
-
-function formatTimeTrendTooltip(value: unknown, name: unknown) {
-  const hours = Array.isArray(value) ? Number(value[0]) : Number(value);
-  const seriesKey = String(name);
-  const label =
-    seriesKey in timeTrendChartConfig
-      ? timeTrendChartConfig[seriesKey as keyof typeof timeTrendChartConfig].label
-      : seriesKey;
-
+/**
+ * Gray page, white cards, so the report reads as a stack of separate findings.
+ * Dark mode keeps its darker page, because the factories theme paints the
+ * sidebar and the cards the same color.
+ */
+function renderShell(header: ReactNode, body: ReactNode) {
   return (
-    <div className="flex w-full items-center justify-between gap-8">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono font-medium text-foreground tabular-nums">
-        {Number.isFinite(hours) ? formatDurationHours(hours) : String(value)}
-      </span>
+    <div className="min-h-full bg-sidebar dark:bg-background">
+      {header}
+      <div className={cn(factoryCenteredSectionBodyClassName, "space-y-5 pb-10")} data-testid="factory-velocity-page">
+        {body}
+      </div>
     </div>
   );
 }
 
-function MetricCell({ value, label, hint }: { value: string; label: string; hint?: string }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[12px] text-muted-foreground">{label}</p>
-      <p className="mt-2 text-[32px] leading-none font-semibold tracking-[-0.04em] tabular-nums text-foreground">
-        {value}
-      </p>
-      {hint ? <p className="mt-2 min-h-[1rem] text-[12px] text-muted-foreground">{hint}</p> : null}
-    </div>
-  );
-}
-
-type YesterdayMetric = {
-  value: string;
-  label: string;
-  hint: string;
-};
-
-function yesterdayMetrics(snapshot: FactoryVelocityYesterday): YesterdayMetric[] {
-  return [
-    { value: String(snapshot.merged), label: "Merged PRs", hint: "Productive SuperPlane work" },
-    { value: String(snapshot.waste), label: "Waste", hint: `${formatPct(snapshot.wastePct)} of SuperPlane output` },
-    { value: formatUsd(snapshot.costUsd), label: "Cost", hint: `${formatTokens(snapshot.tokens)} tokens` },
-    { value: formatUsd(snapshot.costPerMergedPr), label: "Cost per merged PR", hint: "Average spend" },
-  ];
-}
-
-function YesterdayCard({ snapshot }: { snapshot: FactoryVelocityYesterday }) {
-  const metrics = yesterdayMetrics(snapshot);
-
-  return (
-    <section
-      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
-      data-testid="velocity-yesterday"
-    >
-      <p className="text-[12px] font-medium text-foreground">{snapshot.dateLabel}</p>
-      <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="min-w-0">
-            <p className="text-[12px] text-muted-foreground">{metric.label}</p>
-            <p className="mt-2 text-[32px] leading-none font-semibold tracking-[-0.04em] tabular-nums text-foreground">
-              {metric.value}
-            </p>
-            <p className="mt-2 min-h-[1rem] text-[12px] text-muted-foreground">{metric.hint}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function DailyOutputChart({ points, days }: { points: FactoryVelocityDay[]; days: FactoryVelocityPeriodDays }) {
-  const height = days === 7 ? 240 : 220;
-
-  return (
-    <ChartContainer
-      config={outputChartConfig}
-      className="aspect-auto w-full"
-      style={{ height }}
-      initialDimension={{ width: 720, height }}
-    >
-      <BarChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
-        <YAxis
-          allowDecimals={false}
-          tickLine={false}
-          axisLine={false}
-          width={28}
-          tickMargin={4}
-          className="text-[11px]"
-        />
-        <ChartTooltip content={<ChartTooltipContent />} />
-        <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
-        <Bar dataKey="merged" stackId="day" fill="var(--color-merged)" maxBarSize={days === 7 ? 36 : 12} />
-        <Bar
-          dataKey="waste"
-          stackId="day"
-          fill="var(--color-waste)"
-          radius={[3, 3, 0, 0]}
-          maxBarSize={days === 7 ? 36 : 12}
-        />
-      </BarChart>
-    </ChartContainer>
-  );
-}
-
-function CostSparkline({ points, days }: { points: FactoryVelocityDay[]; days: FactoryVelocityPeriodDays }) {
-  const height = days === 7 ? 180 : 160;
-
-  return (
-    <ChartContainer
-      config={costChartConfig}
-      className="aspect-auto w-full"
-      style={{ height }}
-      initialDimension={{ width: 720, height }}
-    >
-      <AreaChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          width={44}
-          tickMargin={4}
-          className="text-[11px]"
-          tickFormatter={(value: number) => `$${Number(value).toFixed(0)}`}
-        />
-        <ChartTooltip content={<ChartTooltipContent />} />
-        <Area
-          type="monotone"
-          dataKey="costUsd"
-          stroke="var(--color-costusd)"
-          fill="var(--color-costusd)"
-          fillOpacity={0.12}
-          strokeWidth={1.5}
-        />
-      </AreaChart>
-    </ChartContainer>
-  );
-}
-
-function TrendCard({ periodDays }: { periodDays: FactoryVelocityPeriodDays }) {
-  const period = FACTORY_VELOCITY_BY_PERIOD[periodDays];
-
-  return (
-    <section className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5" data-testid="velocity-trend">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">SuperPlane output</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">Merged, waste, and cost by day.</p>
-        </div>
-        <p className="text-[12px] text-muted-foreground">{period.label}</p>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
-        <MetricCell value={String(period.totals.merged)} label="Merged PRs" />
-        <MetricCell
-          value={String(period.totals.waste)}
-          label="Waste"
-          hint={`${formatPct(period.totals.wastePct)} of SuperPlane output`}
-        />
-        <MetricCell value={formatUsd(period.totals.costUsd)} label="Cost" />
-      </div>
-
-      <div className="mt-6">
-        <DailyOutputChart points={period.points} days={period.days} />
-      </div>
-
-      <div className="mt-4 border-t border-border pt-3">
-        <p className="mb-1 text-[12px] text-muted-foreground">Cost</p>
-        <CostSparkline points={period.points} days={period.days} />
-      </div>
-    </section>
-  );
-}
-
-function SourceSplitCard({ periodDays }: { periodDays: FactoryVelocityPeriodDays }) {
-  const period = FACTORY_VELOCITY_BY_PERIOD[periodDays];
-  const height = period.days === 7 ? 200 : 180;
-
-  return (
-    <section
-      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
-      data-testid="velocity-source-split"
-    >
-      <div>
-        <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">Merged PRs by source</h2>
-        <p className="mt-0.5 text-[12px] text-muted-foreground">
-          SuperPlane authored {formatPct(period.totals.superplaneSharePct)} of merged PRs in this period.
-        </p>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-5">
-        <MetricCell value={String(period.totals.peopleMerged)} label="People" />
-        <MetricCell value={String(period.totals.superplaneMerged)} label="SuperPlane" />
-      </div>
-
-      <div className="mt-6">
-        <ChartContainer
-          config={sourceChartConfig}
-          className="aspect-auto w-full"
-          style={{ height }}
-          initialDimension={{ width: 720, height }}
-        >
-          <LineChart data={period.points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-            <XAxis
-              dataKey="day"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              interval={0}
-              className="text-[11px]"
-            />
-            <YAxis
-              allowDecimals={false}
-              tickLine={false}
-              axisLine={false}
-              width={28}
-              tickMargin={4}
-              className="text-[11px]"
-            />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
-            <Line
-              type="monotone"
-              dataKey="peopleMerged"
-              stroke="var(--color-peoplemerged)"
-              strokeWidth={2}
-              dot={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="superplaneMerged"
-              stroke="var(--color-superplanemerged)"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ChartContainer>
-      </div>
-    </section>
-  );
-}
-
-function TimeTrendChart({ period }: { period: FactoryVelocityFlowPeriod }) {
-  const height = period.days === 7 ? 240 : 220;
-
-  return (
-    <ChartContainer
-      config={timeTrendChartConfig}
-      className="aspect-auto w-full"
-      style={{ height }}
-      initialDimension={{ width: 720, height }}
-    >
-      <AreaChart data={period.timeTrend} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-        <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} interval={0} className="text-[11px]" />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          width={36}
-          tickMargin={4}
-          className="text-[11px]"
-          tickFormatter={(value: number) => `${Number(value).toFixed(0)}h`}
-        />
-        <ChartTooltip content={<ChartTooltipContent formatter={formatTimeTrendTooltip} />} />
-        <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" />
-        <Area
-          type="monotone"
-          dataKey="runningHours"
-          stackId="day"
-          stroke="var(--color-runninghours)"
-          fill="var(--color-runninghours)"
-          fillOpacity={0.35}
-          strokeWidth={1.5}
-        />
-        <Area
-          type="monotone"
-          dataKey="waitingHours"
-          stackId="day"
-          stroke="var(--color-waitinghours)"
-          fill="var(--color-waitinghours)"
-          fillOpacity={0.35}
-          strokeWidth={1.5}
-        />
-      </AreaChart>
-    </ChartContainer>
-  );
-}
-
-function WorkOrderFlowCard({ periodDays }: { periodDays: FactoryVelocityPeriodDays }) {
-  const period = FACTORY_VELOCITY_FLOW_BY_PERIOD[periodDays];
-
-  return (
-    <section
-      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
-      data-testid="velocity-work-order-flow"
-    >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">Work order time</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Median times for work orders that closed in this period. Cycle time is time running plus time in Waiting
-            after the work order leaves Draft.
-          </p>
-        </div>
-        <p className="text-[12px] text-muted-foreground">{period.label}</p>
-      </div>
-
-      <div className="mt-5">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3">
-          <MetricCell
-            value={formatDurationHours(period.medianCycleHours)}
-            label="Cycle time"
-            hint="From start to close"
-          />
-          <MetricCell
-            value={formatDurationHours(period.medianRunningHours)}
-            label="Time running"
-            hint={`${period.runningShareOfCyclePct}% of cycle time`}
-          />
-          <MetricCell
-            value={formatDurationHours(period.medianWaitingHours)}
-            label="Time in Waiting"
-            hint={`${period.waitingShareOfCyclePct}% of cycle time`}
-          />
-        </div>
-        <p className="mt-3 text-[12px] text-muted-foreground">
-          Time running is time on a line. Time in Waiting is review or a pause before the next dispatch.
-        </p>
-      </div>
-
-      <div className="mt-6 border-t border-border pt-5">
-        <h3 className="text-[13px] font-medium text-foreground">Time running and Time in Waiting by day</h3>
-        <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
-          Median for work orders that closed on that day. The stacked area is the two parts of cycle time.
-        </p>
-        <TimeTrendChart period={period} />
-      </div>
-    </section>
-  );
-}
-
-export type VelocityPageProps = {
-  /** Storybook prototype: show work-order lifecycle and Waiting bottleneck. */
-  includeWorkOrderFlow?: boolean;
-};
-
-/** Storybook entry that enables the work-order flow prototype section. */
-export function VelocityPrototypePage() {
-  return <VelocityPage includeWorkOrderFlow />;
-}
-
-export function VelocityPage({ includeWorkOrderFlow = false }: VelocityPageProps = {}) {
-  const [periodDays, setPeriodDays] = useState<FactoryVelocityPeriodDays>(7);
+function VelocityReportView({ model, report }: { model: VelocityPageModel; report: VelocityReport }) {
+  const [breakdown, setBreakdown] = useState<VelocityBreakdown>("origin");
+  const flow = model.taskTime.flow;
 
   return (
     <>
-      <WorkspacePageHeader
-        title="Velocity"
-        subtitle={
-          includeWorkOrderFlow
-            ? "Merged pull requests, waste, cost, and work order time."
-            : "Merged pull requests from SuperPlane, waste, and cost."
-        }
-        actions={
+      <SummaryCard
+        totals={report.totals}
+        caption={summaryCaption(model.periodLabel, model.periodDays, Boolean(report.previous))}
+        medianCycleHours={flow && flow.sampleSize > 0 ? flow.medianCycleHours : undefined}
+        comparison={model.comparison}
+      />
+      <DeliveryCard
+        points={report.points}
+        breakdown={breakdown}
+        onBreakdownChange={setBreakdown}
+        intakeSeries={report.intakeSeries}
+        hasOutput={report.totals.merged > 0 || report.totals.waste > 0}
+      />
+      {report.people.length > 0 ? (
+        <VelocityPeopleTable
+          people={report.people}
+          periodLabel={model.periodLabel}
+          emptyAuthorship={peopleEmptyAuthorship(report, model)}
+        />
+      ) : null}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <TaskTimeCard flow={flow} emptyLabel={taskTimeEmptyLabel(model)} />
+        <CostCard totals={report.totals} points={report.points} />
+      </div>
+    </>
+  );
+}
+
+function summaryCaption(periodLabel: string, periodDays: VelocityPeriodDays, hasPrevious: boolean): string {
+  if (hasPrevious) {
+    return `${periodLabel}. Compared with the previous ${periodDays} days.`;
+  }
+  return `${periodLabel}. There is no earlier period to compare with yet.`;
+}
+
+/** Explains a People table that lists SuperPlane work but no direct authorship. */
+function peopleEmptyAuthorship(report: VelocityReport, model: VelocityPageModel): string | undefined {
+  if (report.hasPeopleCohort) return undefined;
+  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people merged.";
+  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people merged.";
+  if (model.velocity.peopleSyncPending) {
+    return "SuperPlane is collecting merges from GitHub. The Authored column fills in after the first sync.";
+  }
+  return undefined;
+}
+
+function taskTimeEmptyLabel(model: VelocityPageModel): string | undefined {
+  if (model.taskTime.error) return "We could not load task time.";
+  if (model.taskTime.isLoading) return "Loading task time…";
+  return undefined;
+}
+
+function VelocityHeader({ model }: { model: VelocityPageModel }) {
+  return (
+    <>
+      <VelocityHeaderBar model={model} />
+      {model.sync.isSyncing ? (
+        <div className={cn(factoryCenteredSectionBodyClassName, "pt-1 pb-4")}>
+          <VelocitySyncProgress />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
+  return (
+    <WorkspacePageHeader
+      className={cn(factoryCenteredSectionHeaderClassName, "bg-transparent")}
+      title="Velocity"
+      subtitle={
+        model.repository
+          ? `What ${model.repository} ships, how long the work takes, and what it costs.`
+          : "What this workspace ships, how long the work takes, and what it costs."
+      }
+      actions={
+        <div className="flex items-center gap-2">
+          <VelocitySyncButton model={model} />
           <SegmentedNav
             ariaLabel="Velocity period in days"
             size="xs"
-            value={String(periodDays)}
+            value={String(model.periodDays)}
             onValueChange={(value) => {
               const next = Number(value);
-              if (next === 7 || next === 30) setPeriodDays(next);
+              if (next === 14 || next === 30) model.setPeriodDays(next as VelocityPeriodDays);
             }}
-            options={PERIOD_OPTIONS}
+            options={VELOCITY_PERIOD_OPTIONS}
           />
-        }
-      />
+        </div>
+      }
+    />
+  );
+}
 
-      <div className={cn(factoryContentBodyClassName, "space-y-6")} data-testid="factory-velocity-page">
-        <YesterdayCard snapshot={FACTORY_VELOCITY_YESTERDAY} />
-        <TrendCard periodDays={periodDays} />
-        <SourceSplitCard periodDays={periodDays} />
-        {includeWorkOrderFlow ? <WorkOrderFlowCard periodDays={periodDays} /> : null}
+/**
+ * Shows that a sync is in flight.
+ *
+ * The sync reads sixty days of history in a background worker that reports no
+ * progress of its own, so the bar is indeterminate: it says work is happening
+ * without claiming to know how much is left.
+ */
+function VelocitySyncProgress() {
+  return (
+    <div
+      className="h-1 w-full overflow-hidden rounded-full bg-primary/15"
+      role="progressbar"
+      aria-label="Reading merges from GitHub"
+      data-testid="velocity-sync-progress"
+    >
+      <div className="sp-indeterminate-bar h-full w-1/4 rounded-full bg-primary" />
+    </div>
+  );
+}
+
+/**
+ * Merge counts come from a background sync rather than from GitHub at request
+ * time, so a merge made moments ago is not on the page yet. This asks for a
+ * fresh read instead of leaving the user to wait for the next scheduled sync.
+ */
+function VelocitySyncButton({ model }: { model: VelocityPageModel }) {
+  if (model.sync.isUnavailable) return null;
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      onClick={model.sync.start}
+      disabled={model.sync.isSyncing}
+      title={syncButtonTitle(model.velocity.syncedAt)}
+      data-testid="velocity-sync-button"
+    >
+      <RefreshCw className={cn("size-3.5", model.sync.isSyncing && "animate-spin")} aria-hidden />
+      {model.sync.isSyncing ? "Syncing…" : "Sync now"}
+    </Button>
+  );
+}
+
+function syncButtonTitle(syncedAt?: Date): string {
+  const action = "Read the merges of the last 60 days from GitHub.";
+  if (!syncedAt) return action;
+  return `${action} Last synced ${syncedAt.toLocaleString()}.`;
+}
+
+function VelocityLoadingState() {
+  return (
+    <div className={CARD_CLASSES} data-testid="velocity-loading-state">
+      <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+      <p className="text-[13px] text-muted-foreground">Loading velocity…</p>
+    </div>
+  );
+}
+
+function VelocityErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className={CARD_CLASSES} data-testid="velocity-error-state">
+      <AlertCircle className="size-5 text-destructive" aria-hidden />
+      <div className="space-y-1">
+        <p className="text-[13px] font-medium text-foreground">We could not load velocity.</p>
+        <p className="text-[12px] text-muted-foreground">Check your network and try again.</p>
       </div>
-    </>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} data-testid="velocity-error-retry">
+        Retry
+      </Button>
+    </div>
   );
 }

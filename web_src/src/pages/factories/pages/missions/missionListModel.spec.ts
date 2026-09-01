@@ -32,13 +32,13 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [],
+    lineDispatches: [],
     ...overrides,
   };
 }
 
 describe("applyMissionFilter", () => {
-  it("keeps work orders that belong to the selected mission", () => {
+  it("keeps tasks that belong to the selected mission", () => {
     const entries = buildWorkOrderListEntries(
       [order({ id: "wo-open-refunds" }), order({ id: "wo-draft-refunds" })],
       factory,
@@ -60,7 +60,7 @@ describe("applyMissionFilter", () => {
 });
 
 describe("resolveMissionProgress", () => {
-  it("counts completed work orders in the mission and formats the label", () => {
+  it("counts completed tasks in the mission and formats the label", () => {
     const entries = buildWorkOrderListEntries(
       [
         order({ id: "wo-a", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
@@ -84,7 +84,7 @@ describe("resolveMissionProgress", () => {
 });
 
 describe("buildMissionRailItems", () => {
-  it("builds one card per mission with progress from every member work order", () => {
+  it("builds one card per mission with progress from every member task", () => {
     const entries = buildWorkOrderListEntries(
       [
         order({ id: "wo-open-refunds" }),
@@ -195,7 +195,7 @@ describe("factoryMissionDetailPath", () => {
 });
 
 describe("assignWorkOrderToMission", () => {
-  it("assigns a work order to a mission without mutating the source map", () => {
+  it("assigns a task to a mission without mutating the source map", () => {
     const source = { "wo-draft-refunds": CHECKOUT_RELIABILITY_MISSION.id };
 
     const next = assignWorkOrderToMission(source, "wo-open-refunds", REFUNDS_V2_MISSION.id);
@@ -207,7 +207,7 @@ describe("assignWorkOrderToMission", () => {
     expect(source).toEqual({ "wo-draft-refunds": CHECKOUT_RELIABILITY_MISSION.id });
   });
 
-  it("moves a work order from one mission to another", () => {
+  it("moves a task from one mission to another", () => {
     const next = assignWorkOrderToMission(
       { "wo-open-refunds": CHECKOUT_RELIABILITY_MISSION.id },
       "wo-open-refunds",
@@ -217,7 +217,7 @@ describe("assignWorkOrderToMission", () => {
     expect(next).toEqual({ "wo-open-refunds": REFUNDS_V2_MISSION.id });
   });
 
-  it("removes the work order from every mission when the mission is cleared", () => {
+  it("removes the task from every mission when the mission is cleared", () => {
     const next = assignWorkOrderToMission(
       {
         "wo-open-refunds": CHECKOUT_RELIABILITY_MISSION.id,
@@ -232,7 +232,7 @@ describe("assignWorkOrderToMission", () => {
 });
 
 describe("resolveMissionStatus", () => {
-  it("is draft when the mission has no work orders", () => {
+  it("is draft when the mission has no tasks", () => {
     const entries = buildWorkOrderListEntries([order({ id: "wo-other" })], factory);
 
     expect(resolveMissionStatus(entries, "mission-1", {})).toBe("draft");
@@ -244,7 +244,13 @@ describe("resolveMissionStatus", () => {
         order({
           id: "wo-a",
           state: "STATE_OPEN",
-          executions: [{ id: "exec-1", state: "STATE_STARTED", step: "plan" }],
+          lineDispatches: [
+            {
+              id: "dispatch-1",
+              state: "STATE_ACTIVE",
+              stepExecutions: [{ id: "exec-1", state: "STATE_STARTED", step: "plan" }],
+            },
+          ],
         }),
         order({ id: "wo-b", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
       ],

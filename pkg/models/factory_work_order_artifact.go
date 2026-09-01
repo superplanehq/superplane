@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	FactoryWorkOrderArtifactTypePR       = factory.ArtifactTypePR
 	FactoryWorkOrderArtifactTypeMarkdown = factory.ArtifactTypeMarkdown
 	FactoryWorkOrderArtifactTypeBranch   = factory.ArtifactTypeBranch
+	FactoryWorkOrderArtifactTypeLink     = factory.ArtifactTypeLink
 
 	// MaxFactoryWorkOrderArtifactDataBytes caps JSON-encoded artifact data.
 	MaxFactoryWorkOrderArtifactDataBytes = 64 * 1024
@@ -29,23 +29,6 @@ const (
 )
 
 const factoryWorkOrderArtifactKeyUniqueConstraint = "idx_factory_work_order_artifacts_factory_key_unique"
-
-// Valid values for a PR artifact's optional `data.state` field. Mirrors
-// GitHub's own pull request lifecycle states so the UI can render the
-// matching icon/color (see WorkOrderArtifactInline.tsx).
-const (
-	PrArtifactStateOpen   = "open"
-	PrArtifactStateDraft  = "draft"
-	PrArtifactStateClosed = "closed"
-	PrArtifactStateMerged = "merged"
-)
-
-var validPrArtifactStates = map[string]bool{
-	PrArtifactStateOpen:   true,
-	PrArtifactStateDraft:  true,
-	PrArtifactStateClosed: true,
-	PrArtifactStateMerged: true,
-}
 
 var (
 	ErrFactoryWorkOrderArtifactNotFound         = errors.New("factory work order artifact not found")
@@ -177,7 +160,7 @@ func (o *FactoryWorkOrder) CreateArtifact(
 // `order.artifact.*` timeline event — a PR flipping open → draft →
 // merged should update the live chip, not spam the timeline with one
 // entry per transition. Callers still notify the websocket channel
-// (see FactoryContext.UpdateWorkOrderArtifact) so the UI refreshes.
+// (see FactoryContext websocket notify) so the UI refreshes.
 func (o *FactoryWorkOrder) UpdateArtifactData(
 	tx *gorm.DB,
 	key string,
@@ -253,7 +236,7 @@ func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifac
 // IsValidWorkOrderArtifactType reports whether CreateArtifact accepts t.
 func IsValidWorkOrderArtifactType(t string) bool {
 	switch t {
-	case FactoryWorkOrderArtifactTypePR, FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch:
+	case FactoryWorkOrderArtifactTypeMarkdown, FactoryWorkOrderArtifactTypeBranch, FactoryWorkOrderArtifactTypeLink:
 		return true
 	}
 	return false
@@ -265,17 +248,6 @@ func IsValidWorkOrderArtifactType(t string) bool {
 // URL-scheme guard that applies regardless of type.
 func validateArtifactData(artifactType string, data map[string]any) error {
 	switch artifactType {
-	case FactoryWorkOrderArtifactTypePR:
-		if extractArtifactString(data, "url") == "" {
-			return fmt.Errorf("%w: pull request artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
-		}
-		if state := extractArtifactString(data, "state"); state != "" && !validPrArtifactStates[state] {
-			return fmt.Errorf(
-				"%w: invalid pull request state %q (want one of open, draft, closed, merged)",
-				ErrFactoryWorkOrderArtifactInvalid,
-				state,
-			)
-		}
 	case FactoryWorkOrderArtifactTypeMarkdown:
 		if extractArtifactString(data, "body") == "" {
 			return fmt.Errorf("%w: markdown artifacts require data.body", ErrFactoryWorkOrderArtifactInvalid)
@@ -283,6 +255,10 @@ func validateArtifactData(artifactType string, data map[string]any) error {
 	case FactoryWorkOrderArtifactTypeBranch:
 		if extractArtifactString(data, "name") == "" {
 			return fmt.Errorf("%w: branch artifacts require data.name", ErrFactoryWorkOrderArtifactInvalid)
+		}
+	case FactoryWorkOrderArtifactTypeLink:
+		if extractArtifactString(data, "url") == "" {
+			return fmt.Errorf("%w: link artifacts require a url", ErrFactoryWorkOrderArtifactInvalid)
 		}
 	default:
 		return fmt.Errorf("%w: unknown artifact type %q", ErrFactoryWorkOrderArtifactInvalid, artifactType)
@@ -348,4 +324,15 @@ func extractArtifactString(data map[string]any, key string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+func validateOptionalTimestamp(data map[string]any, key string) error {
+	raw := extractArtifactString(data, key)
+	if raw == "" {
+		return nil
+	}
+	if _, err := time.Parse(time.RFC3339, raw); err != nil {
+		return fmt.Errorf("%w: %s must be RFC3339 (got %q)", ErrFactoryWorkOrderArtifactInvalid, key, raw)
+	}
+	return nil
 }

@@ -448,6 +448,28 @@ export function shouldClearRunDetailNode({
   return !participantNodeIds.includes(runDetailNodeId);
 }
 
+/**
+ * True when run-inspection mode was entered with a run already selected (e.g.
+ * a fresh page load / navigation landing on `?run=<id>`, such as Lines,
+ * Automations, or Task deep links) and no specific node is already
+ * about to be focused via the sidebar (`?sidebar=1&node=<id>`). Used to
+ * request a one-time "fit all participants" on entry, mirroring what
+ * `handleSelectRun` already does for in-app run selection.
+ */
+export function shouldRequestInitialRunFit({
+  isRunInspectionMode,
+  selectedRunId,
+  searchParams,
+}: {
+  isRunInspectionMode: boolean;
+  selectedRunId: string | null;
+  searchParams: URLSearchParams;
+}): boolean {
+  if (!isRunInspectionMode || !selectedRunId) return false;
+  const hasPendingNodeFocus = searchParams.get("sidebar") === "1" && !!searchParams.get("node");
+  return !hasPendingNodeFocus;
+}
+
 export function clearRunDetailNodeSearchParams(searchParams: URLSearchParams, nodeId: string): URLSearchParams {
   const next = new URLSearchParams(searchParams);
   if (next.get("sidebar") === "1" && next.get("node") === nodeId) {

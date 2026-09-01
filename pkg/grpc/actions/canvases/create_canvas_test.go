@@ -82,6 +82,43 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
 
+func TestCreateCanvasNameUniquenessIsScopedToWorkspace(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	baseURL := "https://example.com"
+
+	firstWorkspace, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	secondWorkspace, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	createPlan := func(factoryID *uuid.UUID) error {
+		_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, "Plan", "", factoryID, nil)
+		return err
+	}
+
+	// Every workspace installs the same templates, so a second workspace has to
+	// be able to keep the template name instead of falling back to "Plan (2)".
+	t.Run("two workspaces can both hold an app with the same name", func(t *testing.T) {
+		require.NoError(t, createPlan(&firstWorkspace.ID))
+		require.NoError(t, createPlan(&secondWorkspace.ID))
+	})
+
+	t.Run("one workspace rejects two apps with the same name", func(t *testing.T) {
+		err := createPlan(&firstWorkspace.ID)
+		require.Error(t, err)
+		require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	})
+
+	t.Run("apps outside a workspace stay unique per organization", func(t *testing.T) {
+		require.NoError(t, createPlan(nil))
+
+		err := createPlan(nil)
+		require.Error(t, err)
+		require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+	})
+}
+
 func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

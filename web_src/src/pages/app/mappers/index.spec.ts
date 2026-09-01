@@ -137,7 +137,11 @@ describe("getExecutionDetails", () => {
         isCollapsed: false,
         configuration: {
           machineType: "e1-large-amd64",
-          prompt: "Fix the failing tests",
+          steps: [
+            { name: "Clone repo", type: "bash" },
+            { name: "Write implementation plan", type: "prompt" },
+            { name: "Use plan as output", type: "bash" },
+          ],
         },
         metadata: {},
       },
@@ -156,6 +160,38 @@ describe("getExecutionDetails", () => {
     });
 
     expect(props.customField).toBeDefined();
+    expect(props.factoryBody).toBeDefined();
     expect(getStateMap("runnerClaudeCode")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
+
+  it("resolves runnerCodex mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerCodex");
+    const props = mapper.props({
+      node: {
+        id: "node-codex-1",
+        name: "Run Codex",
+        componentName: "runnerCodex",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerCodex",
+        label: "Run Codex",
+        description: "Runs the Codex CLI on a fleet runner",
+        icon: "code",
+        color: "#10A37F",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
 });

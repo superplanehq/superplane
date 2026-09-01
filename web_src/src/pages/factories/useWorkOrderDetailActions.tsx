@@ -20,9 +20,9 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
       await updateAssignees.mutateAsync({ orderId, assigneeIds: nextAssigneeIds });
-      showSuccessToast("Owners updated.");
+      showSuccessToast("Owner updated.");
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to update owners"));
+      showErrorToast(getApiErrorMessage(error, "Failed to update the owner"));
       throw error;
     }
   };
@@ -35,25 +35,25 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const handleClose = async (result: FactoriesWorkOrderResult) => {
     try {
       await closeWorkOrder.mutateAsync({ orderId, result });
-      showSuccessToast(`Work order closed as ${formatWorkOrderResult(result).toLowerCase()}.`);
+      showSuccessToast(`Task closed as ${formatWorkOrderResult(result).toLowerCase()}.`);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to close work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to close task"));
     }
   };
 
   const handleStatusChange = async (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => {
     try {
       await updateStatus.mutateAsync({ orderId, state, result });
-      showSuccessToast(`Work order moved to ${formatWorkOrderState(state).toLowerCase()}.`);
+      showSuccessToast(`Task moved to ${formatWorkOrderState(state).toLowerCase()}.`);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to update status"));
       throw error;
     }
   };
 
-  const handleAddComment = async (body: string) => {
+  const handleAddComment = async (body: string, mentionedUserIds: string[]) => {
     try {
-      await addComment.mutateAsync({ orderId, body });
+      await addComment.mutateAsync({ orderId, body, mentionedUserIds });
       showSuccessToast("Comment added.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to add comment"));

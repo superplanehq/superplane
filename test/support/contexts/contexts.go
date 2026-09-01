@@ -472,6 +472,28 @@ func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string
 	return keys, nil
 }
 
+type HostedLLMContext struct {
+	Access        core.HostedLLMAccess
+	CreditErr     error
+	ResolveErr    error
+	SelectableErr error
+}
+
+func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
+	if c.ResolveErr != nil {
+		return core.HostedLLMAccess{}, c.ResolveErr
+	}
+	return c.Access, nil
+}
+
+func (c *HostedLLMContext) AssertCreditAvailable() error {
+	return c.CreditErr
+}
+
+func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
+	return c.SelectableErr
+}
+
 type ExpressionContext struct {
 	Output                any
 	Error                 error
@@ -722,6 +744,8 @@ type RunExecutionContext struct {
 	CancelErr        error
 	CancelCalled     bool
 	LastCreateParams *core.RunCreationParams
+	AddErrorCalls    []string
+	AddErrorErr      error
 }
 
 func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, error) {
@@ -745,4 +769,9 @@ func (c *RunExecutionContext) Create(params core.RunCreationParams) (*core.Run, 
 func (c *RunExecutionContext) Cancel() error {
 	c.CancelCalled = true
 	return c.CancelErr
+}
+
+func (c *RunExecutionContext) AddError(message string) error {
+	c.AddErrorCalls = append(c.AddErrorCalls, message)
+	return c.AddErrorErr
 }

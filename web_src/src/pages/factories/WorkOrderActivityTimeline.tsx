@@ -1,14 +1,19 @@
 import { Text } from "@/components/Text/text";
-import type { FactoriesWorkOrder, FactoriesWorkOrderArtifact, FactoriesWorkOrderEvent } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
+} from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
-import type { OrgUserDisplay, OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
+import type { OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/pages/app/Markdown";
 import { useMemo, type ReactNode } from "react";
-import { FileText, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
-import { buildLatestArtifactDataById, overlayLiveArtifactData } from "./lib/workOrderArtifact";
+import { Clock, FileText, Gauge, GitPullRequest, MessageSquare, Play, UserRound, type LucideIcon } from "lucide-react";
+import { buildLatestArtifactDataById } from "./lib/workOrderArtifact";
+import { indexPullRequestsById } from "./lib/workOrderPullRequest";
 import {
   buildWorkOrderTimelineView,
   buildWorkOrderUserDisplayLookup,
@@ -18,8 +23,12 @@ import {
   type WorkOrderTimelineEventKind,
 } from "./lib/workOrderTimelineEvents";
 import { formatWorkOrderDateTime as formatTimelineDate } from "./lib/workOrderDateTime";
-import { getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { flattenWorkOrderExecutions, getWorkOrderRunHref } from "./lib/workOrderExecutions";
+import { ArtifactEventBody } from "./timeline/ArtifactEventBody";
+import { CheckReportedEventBody } from "./timeline/CheckReportedEventBody";
+import { CommentEventBody } from "./timeline/CommentEventBody";
 import { DispatchTimelineItem } from "./timeline/DispatchTimelineItem";
+import { PullRequestEventBody } from "./timeline/PullRequestEventBody";
 import { TimelineAutomationActor } from "./timeline";
 import { TimelineMarker } from "./timeline/TimelineMarker";
 import {
@@ -28,7 +37,6 @@ import {
   timelineParagraphClassName as inlineParagraphClassName,
   timelineTimeClassName as inlineTimeClassName,
 } from "./timeline/timelineStyles";
-import { WorkOrderArtifactInline } from "./WorkOrderArtifactInline";
 import { AssigneeChangeDescription } from "./workOrderTimelineAssignee";
 
 interface WorkOrderTimelineProps {
@@ -44,13 +52,12 @@ interface WorkOrderTimelineProps {
   onRetryEvents?: () => void;
   /**
    * Current artifacts list (from useWorkOrderArtifacts), used to overlay
-   * live data — e.g. a PR's current `state` — on top of each
-   * `artifactAdded` event's data snapshot, so the "attached" chip in the
-   * timeline doesn't go stale the moment the PR changes state. Falls
-   * back to the event's own snapshot when an artifact isn't found here
-   * (very old events beyond the artifacts list, or a deleted artifact).
+   * live data on `artifactAdded` event snapshots so chips do not go stale.
+   * Falls back to the event's own snapshot when an artifact isn't found here.
    */
   artifacts?: FactoriesWorkOrderArtifact[];
+  /** Live pull requests used to overlay state onto timeline chips. */
+  pullRequests?: FactoriesFactoryPullRequest[];
   /** Optional trailing timeline content, such as the comment composer. */
   footer?: ReactNode;
 }
@@ -67,16 +74,18 @@ export function WorkOrderActivityTimeline({
   onLoadMoreEvents,
   onRetryEvents,
   artifacts,
+  pullRequests,
   footer,
 }: WorkOrderTimelineProps) {
   const { data: users = [] } = useOrganizationUsers(organizationId);
   const resolveUserName = useMemo(() => buildWorkOrderUserNameLookup(users, order), [users, order]);
   const resolveUserDisplay = useMemo(() => buildWorkOrderUserDisplayLookup(users, order), [users, order]);
   const latestArtifactDataById = useMemo(() => buildLatestArtifactDataById(artifacts), [artifacts]);
+  const latestPullRequestById = useMemo(() => indexPullRequestsById(pullRequests), [pullRequests]);
   const pendingView = renderTimelinePendingView({ events, eventsError, isLoading, onRetryEvents });
   const timeline = pendingView
     ? { events: [] as WorkOrderTimelineEvent[] }
-    : buildWorkOrderTimelineView(events, resolveUserName, order.executions);
+    : buildWorkOrderTimelineView(events, resolveUserName, flattenWorkOrderExecutions(order));
 
   // Without a footer, keep the historical "single message" layout: the
   // pending/empty state occupies the whole slot on its own.
@@ -99,6 +108,7 @@ export function WorkOrderActivityTimeline({
           events={timeline.events}
           resolveUserDisplay={resolveUserDisplay}
           latestArtifactDataById={latestArtifactDataById}
+          latestPullRequestById={latestPullRequestById}
           hasMoreEvents={hasMoreEvents}
           isLoadingMoreEvents={isLoadingMoreEvents}
           onLoadMoreEvents={onLoadMoreEvents}
@@ -121,6 +131,7 @@ interface TimelineEventsListProps {
   events: WorkOrderTimelineEvent[];
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
   hasMoreEvents: boolean;
   isLoadingMoreEvents: boolean;
   onLoadMoreEvents?: () => void;
@@ -133,6 +144,7 @@ function TimelineEventsList({
   events,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
   hasMoreEvents,
   isLoadingMoreEvents,
   onLoadMoreEvents,
@@ -166,6 +178,7 @@ function TimelineEventsList({
               orderNumber={orderNumber}
               resolveUserDisplay={resolveUserDisplay}
               latestArtifactDataById={latestArtifactDataById}
+              latestPullRequestById={latestPullRequestById}
               isLatestDispatch={index === latestDispatchIndex}
             />
           ))}
@@ -231,6 +244,8 @@ const AVATAR_MARKER_KINDS: WorkOrderTimelineEventKind[] = [
   "closed",
   "commented",
   "artifactAdded",
+  "pullRequestAdded",
+  "pullRequestUpdated",
 ];
 
 function TimelineItem({
@@ -240,6 +255,7 @@ function TimelineItem({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
   isLatestDispatch,
 }: {
   event: WorkOrderTimelineEvent;
@@ -248,6 +264,7 @@ function TimelineItem({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
   isLatestDispatch: boolean;
 }) {
   if (event.kind === "dispatched") {
@@ -258,6 +275,7 @@ function TimelineItem({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         isLatestDispatch={isLatestDispatch}
+        latestPullRequestById={latestPullRequestById}
       />
     );
   }
@@ -280,6 +298,7 @@ function TimelineItem({
             orderNumber={orderNumber}
             resolveUserDisplay={resolveUserDisplay}
             latestArtifactDataById={latestArtifactDataById}
+            latestPullRequestById={latestPullRequestById}
           />
         </div>
       </div>
@@ -294,6 +313,7 @@ function TimelineItemBody({
   orderNumber,
   resolveUserDisplay,
   latestArtifactDataById,
+  latestPullRequestById,
 }: {
   event: WorkOrderTimelineEvent;
   organizationId: string;
@@ -301,6 +321,7 @@ function TimelineItemBody({
   orderNumber?: string;
   resolveUserDisplay: OrgUserDisplayLookup;
   latestArtifactDataById: Map<string, Record<string, unknown>>;
+  latestPullRequestById: Map<string, FactoriesFactoryPullRequest>;
 }) {
   const actorDisplay = resolveUserDisplay(event.actorUserId, event.actorName);
   const timeLabel = formatTimelineDate(new Date(event.at));
@@ -329,6 +350,29 @@ function TimelineItemBody({
     );
   }
 
+  if (event.kind === "pullRequestAdded" || event.kind === "pullRequestUpdated") {
+    return (
+      <PullRequestEventBody
+        event={event}
+        actorDisplay={actorDisplay}
+        timeLabel={timeLabel}
+        latestPullRequestById={latestPullRequestById}
+      />
+    );
+  }
+
+  if (event.kind === "checkReported") {
+    return (
+      <CheckReportedEventBody
+        event={event}
+        timeLabel={timeLabel}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+      />
+    );
+  }
+
   return (
     <UserActionEventDescription
       event={event}
@@ -338,94 +382,6 @@ function TimelineItemBody({
       resolveUserDisplay={resolveUserDisplay}
       timeLabel={timeLabel}
     />
-  );
-}
-
-function CommentEventBody({
-  event,
-  actorDisplay,
-  timeLabel,
-  organizationId,
-  factoryKey,
-  orderNumber,
-}: {
-  event: WorkOrderTimelineEvent;
-  actorDisplay: OrgUserDisplay | null;
-  timeLabel: string;
-  organizationId: string;
-  factoryKey: string;
-  orderNumber?: string;
-}) {
-  const comment = event.comment;
-  if (!comment) return null;
-  const isAutomation = (comment.authorKind ?? "").toLowerCase() === "automation";
-  const runHref = getWorkOrderRunHref(organizationId, factoryKey, event.sourceAppId, event.sourceRunId, {
-    orderNumber,
-  });
-
-  return (
-    <>
-      <p className={inlineParagraphClassName}>
-        {isAutomation && (event.actorAutomation || comment.automation) ? (
-          <TimelineAutomationActor actor={event.actorAutomation ?? comment.automation!} fallbackLabel="Automation" />
-        ) : actorDisplay ? (
-          <span className={inlineActorClassName}>{actorDisplay.name}</span>
-        ) : (
-          <span className={inlineActorClassName}>Someone</span>
-        )}{" "}
-        commented
-        {isAutomation && runHref ? (
-          <>
-            {" "}
-            via{" "}
-            <Link href={runHref} className={inlineLinkClassName}>
-              run
-            </Link>
-          </>
-        ) : null}
-        <span className={inlineTimeClassName}>
-          {" · "}
-          {timeLabel}
-        </span>
-      </p>
-      <div className="mt-1" data-testid="work-order-timeline-comment-body">
-        <MarkdownContent content={comment.body} variant="workspace" />
-      </div>
-    </>
-  );
-}
-
-function ArtifactEventBody({
-  event,
-  actorDisplay,
-  timeLabel,
-  latestArtifactDataById,
-}: {
-  event: WorkOrderTimelineEvent;
-  actorDisplay: OrgUserDisplay | null;
-  timeLabel: string;
-  latestArtifactDataById: Map<string, Record<string, unknown>>;
-}) {
-  const artifact = event.artifact;
-  if (!artifact) return null;
-
-  const displayArtifact = overlayLiveArtifactData(artifact, latestArtifactDataById);
-
-  return (
-    <p className={inlineParagraphClassName}>
-      {actorDisplay ? (
-        <span className={inlineActorClassName}>{actorDisplay.name}</span>
-      ) : event.actorAutomation ? (
-        <TimelineAutomationActor actor={event.actorAutomation} />
-      ) : (
-        <span className={inlineActorClassName}>Someone</span>
-      )}{" "}
-      attached <WorkOrderArtifactInline artifact={displayArtifact} className="align-baseline" />
-      <span className={inlineTimeClassName}>
-        {" · "}
-        {timeLabel}
-      </span>
-    </p>
   );
 }
 
@@ -486,7 +442,7 @@ function UserActionEventDescription({
         </span>
       </p>
       {event.kind === "created" && actorDisplay ? (
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create work order form</p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">Create task form</p>
       ) : null}
     </div>
   );
@@ -526,6 +482,13 @@ function getFallbackMarkerIcon(kind: WorkOrderTimelineEventKind): LucideIcon {
   switch (kind) {
     case "artifactAdded":
       return FileText;
+    case "pullRequestAdded":
+    case "pullRequestUpdated":
+      return GitPullRequest;
+    case "checkReported":
+      return Gauge;
+    case "queued":
+      return Clock;
     case "statusChanged":
     case "closed":
       return Play;

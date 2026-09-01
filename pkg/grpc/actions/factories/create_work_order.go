@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateWorkOrderRequest) (*pb.CreateWorkOrderResponse, error) {
@@ -47,15 +48,13 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
 
-	assigneeIDs, err := parseAssigneeIDs(db, orgID, req.GetAssigneeIds())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-
+	assigneeIDs := []uuid.UUID{createdByID}
 	order, err := factory.CreateWorkOrder(db, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
 	}
+
+	workersctx.EmitWorkOrderCreated(db, factory, order)
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
@@ -63,6 +62,20 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 		factoryevents.EventTypeOrderStatusUpdated,
 	); err != nil {
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if assignedIDs := newAssigneeIDs(nil, assigneeIDs); len(assignedIDs) > 0 {
+		notification := messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:  orgID.String(),
+			FactoryID:       factory.ID.String(),
+			OrderID:         order.ID.String(),
+			EventType:       factoryevents.EventTypeOrderAssigneesUpdated,
+			ActorUserID:     createdByID.String(),
+			AssignedUserIDs: assignedIDs,
+		}
+		if err := notification.Publish(); err != nil {
+			log.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+		}
 	}
 
 	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)

@@ -15,12 +15,15 @@ import {
   factoriesListWorkOrders,
   factoriesUpdateFactory,
   factoriesUpdateFactoryLine,
+  factoriesUpdateWorkOrder,
   factoriesUpdateWorkOrderAssignees,
   factoriesUpdateWorkOrderStatus,
+  factoriesListFactoryPullRequests,
 } from "@/api-client";
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
   FactoriesWorkOrderResult,
@@ -29,11 +32,29 @@ import type {
   FactoryLineStep,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
+import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
 } from "@/pages/factories/lib/workOrderEventsPagination";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+export type FactoryPullRequestFilters = {
+  order?: number | string;
+  workOrderIds?: string[];
+};
+
+type NormalizedFactoryPullRequestFilters = {
+  order?: string;
+  workOrderIds: string[];
+};
+
+function normalizeFactoryPullRequestFilters(filters?: FactoryPullRequestFilters): NormalizedFactoryPullRequestFilters {
+  const workOrderIds = [...new Set(filters?.workOrderIds ?? [])].filter(Boolean).sort();
+  const order = filters?.order == null || String(filters.order) === "" ? undefined : String(filters.order);
+  return { order, workOrderIds };
+}
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -46,7 +67,16 @@ export const factoryQueryKeys = {
     ["factories", organizationId, factoryId, "work-orders", orderId, "events"] as const,
   workOrderArtifacts: (organizationId: string, factoryId: string, orderId: string) =>
     ["factories", organizationId, factoryId, "work-orders", orderId, "artifacts"] as const,
+  workOrderChecks: (organizationId: string, factoryId: string, orderId: string) =>
+    ["factories", organizationId, factoryId, "work-orders", orderId, "checks"] as const,
+  pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
+    ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
+  velocity: (organizationId: string, factoryId: string, periodDays: number, repository: string) =>
+    ["factories", organizationId, factoryId, "velocity", periodDays, repository] as const,
+  /** Every period and repository of one workspace, for refreshing after a sync. */
+  velocityAll: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "velocity"] as const,
 };
 
 function factoryListKey(organizationId: string) {
@@ -125,6 +155,32 @@ export function useFactoryWorkOrders(organizationId: string, factoryId: string) 
   });
 }
 
+export function factoryPullRequestsKey(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
+  return factoryQueryKeys.pullRequests(organizationId, factoryId, normalizeFactoryPullRequestFilters(filters));
+}
+
+export function useFactoryPullRequests(organizationId: string, factoryId: string, filters?: FactoryPullRequestFilters) {
+  const normalized = normalizeFactoryPullRequestFilters(filters);
+  return useQuery({
+    queryKey: factoryQueryKeys.pullRequests(organizationId, factoryId, normalized),
+    queryFn: async (): Promise<FactoriesFactoryPullRequest[]> => {
+      const response = await factoriesListFactoryPullRequests(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          query: {
+            order: normalized.order,
+            workOrderIds: normalized.workOrderIds.length > 0 ? normalized.workOrderIds : undefined,
+          },
+        }),
+      );
+      return response.data?.pullRequests ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId),
+    staleTime: 0,
+  });
+}
+
 export function useWorkOrder(organizationId: string, factoryId: string, orderId: string) {
   return useQuery({
     queryKey: workOrderDetailKey(organizationId, factoryId, orderId),
@@ -136,7 +192,7 @@ export function useWorkOrder(organizationId: string, factoryId: string, orderId:
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Work order not found");
+        throw new Error("Task not found");
       }
       return response.data.order;
     },
@@ -198,7 +254,12 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; description?: string; key?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      description?: string;
+      key?: string;
+      hostedSpendBudgetCents?: number | null;
+    }) => {
       const response = await factoriesUpdateFactory(
         withOrganizationHeader({
           organizationId,
@@ -207,6 +268,11 @@ export function useUpdateFactory(organizationId: string, factoryId: string) {
             name: input.name,
             description: input.description,
             key: input.key,
+            hostedSpendBudgetCents:
+              input.hostedSpendBudgetCents === null || input.hostedSpendBudgetCents === undefined
+                ? undefined
+                : String(input.hostedSpendBudgetCents),
+            clearHostedSpendBudget: input.hostedSpendBudgetCents === null ? true : undefined,
           },
         }),
       );
@@ -263,17 +329,57 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to create work order");
+        throw new Error("Failed to create task");
       }
       return response.data.order;
     },
     onSuccess: (order) => {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      // The Backlog run for this order is created asynchronously after this
+      // RPC returns, so show "Analyzing" optimistically and start polling
+      // for the real run right away instead of waiting for a page reload.
+      markBacklogAnalysisPending(order.id);
+      void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({
           queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
         });
       }
+    },
+  });
+}
+
+export function useUpdateWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; title?: string; description?: string }) => {
+      const response = await factoriesUpdateWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: {
+            title: input.title,
+            description: input.description,
+          },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to update task");
+      }
+      return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: factoryQueryKeys.workOrderArtifacts(organizationId, factoryId, variables.orderId),
+      });
     },
   });
 }
@@ -293,7 +399,7 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to update work order assignees");
+        throw new Error("Failed to update task assignees");
       }
       return response.data.order;
     },
@@ -313,22 +419,69 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; lineName: string }) => {
+    mutationFn: async (input: {
+      orderId: string;
+      lineName: string;
+      startStepIndex?: number;
+      replaceActive?: boolean;
+    }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             lineName: input.lineName,
+            startStepIndex: input.startStepIndex,
+            replaceActive: input.replaceActive,
           },
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to dispatch work order");
+        throw new Error("Failed to dispatch task");
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
+    // Dispatch is synchronous on the server, but the UI would otherwise wait
+    // for the whole-factory ListWorkOrders refetch triggered by onSuccess
+    // before the card leaves Backlog. Patch the cache immediately instead, so
+    // the card is already on the line's first phase column when this
+    // function returns, and roll the patch back if the request fails.
+    onMutate: async (variables) => {
+      const ordersKey = workOrdersKey(organizationId, factoryId);
+      await queryClient.cancelQueries({ queryKey: ordersKey });
+
+      const previousOrders = queryClient.getQueryData<FactoriesWorkOrder[]>(ordersKey);
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      const line = factory?.lines?.find((candidate) => candidate.name === variables.lineName);
+
+      // Placing the card needs the line's id (and its steps, for the phase
+      // label); skip the patch when the factory detail isn't cached yet.
+      // Dispatch still succeeds — the card just waits for the invalidated
+      // list below to move it, same as before this change.
+      if (line && previousOrders) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
+          (current ?? []).map((order) =>
+            order.id === variables.orderId ? buildOptimisticDispatchedOrder(order, line, now) : order,
+          ),
+        );
+      }
+
+      return { previousOrders };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(workOrdersKey(organizationId, factoryId), context.previousOrders);
+      }
+    },
+    onSuccess: (order, variables) => {
+      // Reconcile the optimistic placeholder with the real dispatch id,
+      // execution id, and run refs, so the card doesn't flicker back to
+      // Backlog before the invalidated queries below refetch.
+      queryClient.setQueryData<FactoriesWorkOrder[]>(workOrdersKey(organizationId, factoryId), (current) =>
+        (current ?? []).map((existing) => (existing.id === order.id ? order : existing)),
+      );
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
@@ -360,7 +513,7 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to update work order status");
+        throw new Error("Failed to update task status");
       }
       return response.data.order;
     },
@@ -380,13 +533,14 @@ export function useAddWorkOrderComment(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { orderId: string; body: string }) => {
+    mutationFn: async (input: { orderId: string; body: string; mentionedUserIds?: string[] }) => {
       const response = await factoriesAddWorkOrderComment(
         withOrganizationHeader({
           organizationId,
           path: { factoryId, orderId: input.orderId },
           body: {
             body: input.body,
+            mentionedUserIds: input.mentionedUserIds,
           },
         }),
       );
@@ -434,7 +588,7 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
         }),
       );
       if (!response.data?.order) {
-        throw new Error("Failed to close work order");
+        throw new Error("Failed to close task");
       }
       return response.data.order;
     },

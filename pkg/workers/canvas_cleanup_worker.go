@@ -278,6 +278,16 @@ func (w *CanvasCleanupWorker) finalizeCanvas(tx *gorm.DB, canvas models.Canvas) 
 		return nil, nil, fmt.Errorf("delete canvas agent sessions: %w", err)
 	}
 
+	// A factory intake holds a RESTRICT reference to its canvas, so the row has
+	// to go before the canvas does.
+	if err := models.DeleteFactoryIntakesByCanvas(tx, canvas.ID); err != nil {
+		return nil, nil, fmt.Errorf("delete factory intakes: %w", err)
+	}
+
+	if err := models.DeleteFactoryPRFeedbackHandlersByCanvas(tx, canvas.ID); err != nil {
+		return nil, nil, fmt.Errorf("delete factory PR feedback handlers: %w", err)
+	}
+
 	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
 		return nil, nil, fmt.Errorf("failed to delete canvas: %w", err)
 	}

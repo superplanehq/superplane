@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,9 +41,10 @@ const (
 )
 
 type BrokerClient struct {
-	httpClient core.HTTPContext
-	baseURL    string
-	authToken  string
+	httpClient       core.HTTPContext
+	unrestrictedHTTP *http.Client
+	baseURL          string
+	authToken        string
 }
 
 func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
@@ -57,10 +59,39 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	}
 
 	return &BrokerClient{
-		httpClient: httpClient,
-		baseURL:    baseURL,
-		authToken:  authToken,
+		httpClient:       httpClient,
+		unrestrictedHTTP: &http.Client{Timeout: brokerHTTPTimeout},
+		baseURL:          baseURL,
+		authToken:        authToken,
 	}, nil
+}
+
+func (b *BrokerClient) do(req *http.Request) (*http.Response, error) {
+	if brokerUsesUnrestrictedHTTP(b.baseURL) {
+		return b.unrestrictedHTTP.Do(req)
+	}
+	return b.httpClient.Do(req)
+}
+
+// Operator-configured TASK_BROKER_BASE_URL is not a user-controlled URL.
+// The component HTTP client blocks RFC1918, including Docker Desktop
+// host.docker.internal (192.168.65.254). Use a plain client for those origins.
+func brokerUsesUnrestrictedHTTP(baseURL string) bool {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "host.docker.internal" || host == "localhost" {
+		return true
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 // Create Task
@@ -110,10 +141,13 @@ type BrokerTaskFile struct {
 }
 
 // BrokerCommand is one command_list entry sent as {"name","command"} (name optional).
-// Unmarshal still accepts legacy plain strings for tests/fixtures.
+// Kind and Preview are optional live-log labels. Unmarshal still accepts legacy
+// plain strings for tests/fixtures.
 type BrokerCommand struct {
 	Name    string `json:"name,omitempty"`
 	Command string `json:"command"`
+	Kind    string `json:"kind,omitempty"`
+	Preview string `json:"preview,omitempty"`
 }
 
 func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
@@ -133,11 +167,18 @@ func (c *BrokerCommand) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		Name    string `json:"name"`
 		Command string `json:"command"`
+		Kind    string `json:"kind"`
+		Preview string `json:"preview"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	*c = BrokerCommand{Name: strings.TrimSpace(raw.Name), Command: strings.TrimSpace(raw.Command)}
+	*c = BrokerCommand{
+		Name:    strings.TrimSpace(raw.Name),
+		Command: strings.TrimSpace(raw.Command),
+		Kind:    strings.TrimSpace(raw.Kind),
+		Preview: strings.TrimSpace(raw.Preview),
+	}
 	return nil
 }
 
@@ -149,7 +190,11 @@ func BrokerCommandsFromLines(lines []string) []BrokerCommand {
 		if line == "" {
 			continue
 		}
-		out = append(out, BrokerCommand{Command: line})
+		out = append(out, BrokerCommand{
+			Command: line,
+			Kind:    LiveLogKindBash,
+			Preview: LiveLogPreview(line),
+		})
 	}
 	return out
 }
@@ -199,7 +244,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		webhookPayloadSizeLimit = config.MaxWebhookPayloadSize
 	}
 
-	fleetID, err := requireMachineType(p.MachineType)
+	fleetID, err := resolveBrokerFleetID(p.MachineType)
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +285,7 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
-	resp, err := b.httpClient.Do(httpReq)
+	resp, err := b.do(httpReq)
 	if err != nil {
 		return "", fmt.Errorf("broker request: %w", err)
 	}
@@ -329,7 +374,7 @@ func (b *BrokerClient) CancelTask(brokerTaskID string) error {
 		}
 		httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
-		resp, err := b.httpClient.Do(httpReq)
+		resp, err := b.do(httpReq)
 		if err != nil {
 			cancel()
 			return fmt.Errorf("broker request: %w", err)
@@ -375,7 +420,7 @@ func (b *BrokerClient) ListActiveTasks() ([]ActiveTask, error) {
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
-	resp, err := b.httpClient.Do(httpReq)
+	resp, err := b.do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("broker request: %w", err)
 	}
@@ -414,7 +459,7 @@ func (b *BrokerClient) FetchTaskStatus(taskID string) (*Task, error) {
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
-	resp, err := b.httpClient.Do(httpReq)
+	resp, err := b.do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("broker request: %w", err)
 	}

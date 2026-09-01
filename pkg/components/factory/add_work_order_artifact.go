@@ -28,11 +28,10 @@ type AddWorkOrderArtifactConfiguration struct {
 	OrderID      string              `json:"orderId" mapstructure:"orderId"`
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
 	URL          string              `json:"url" mapstructure:"url"`
-	Number       string              `json:"number" mapstructure:"number"`
-	State        string              `json:"state" mapstructure:"state"`
 	Title        string              `json:"title" mapstructure:"title"`
 	Body         string              `json:"body" mapstructure:"body"`
 	Name         string              `json:"name" mapstructure:"name"`
+	Repository   string              `json:"repository" mapstructure:"repository"`
 	ArtifactKey  string              `json:"artifactKey" mapstructure:"artifactKey"`
 	Data         []ArtifactDataEntry `json:"data" mapstructure:"data"`
 }
@@ -46,7 +45,7 @@ func (c *AddWorkOrderArtifact) Label() string {
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
-	return "Attach a typed artifact (PR, markdown note, or branch) to a work order"
+	return "Attach a typed artifact (markdown note, branch, or link) to a work order"
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
@@ -54,15 +53,15 @@ func (c *AddWorkOrderArtifact) Documentation() string {
 
 Supported types:
 
-- **Pull request** (` + "`pr`" + `): requires ` + "`url`" + `; optional ` + "`number`" + `, ` + "`title`" + `, and ` + "`state`" + ` (` + "`open`" + `/` + "`draft`" + `/` + "`closed`" + `/` + "`merged`" + `, defaults to ` + "`open`" + `) which drives the icon/color of the artifact chip in the work order UI.
 - **Markdown note** (` + "`markdown`" + `): requires ` + "`body`" + `; optional ` + "`title`" + `.
-- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` (the branch name); optional ` + "`url`" + ` to link to the branch on its provider (e.g. a GitHub tree URL).
+- **Branch** (` + "`branch`" + `): requires ` + "`name`" + ` and ` + "`repository`" + ` (` + "`owner/repo`" + ` or a repository http(s) URL), or an explicit ` + "`url`" + `. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time.
+- **Link** (` + "`link`" + `): requires ` + "`url`" + ` (must be http or https); optional ` + "`title`" + ` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-PR and markdown types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
+Use the Add Pull Request component to attach a pull request to a work order.
 
-Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key (e.g. the pull request's URL) so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order from it — useful in flows that aren't dispatched from a factory line, such as closing a work order from a ` + "`github.onPullRequest`" + ` merged event. Keys are unique per factory.
+Markdown and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
-A pull request's ` + "`state`" + ` normally changes after it's attached — set ` + "`artifactKey`" + ` at attach time, then use ` + "`updateWorkOrderArtifact`" + ` (targeting the same key) from a ` + "`github.onPullRequest`" + ` flow to keep it current as the PR is drafted, reopened, closed, or merged.
+Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this work order. Keys are unique per factory.
 
 ` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. ` + "`{{ previous().data.workOrder.id }}`" + `. This component can only be used in factory-owned apps.`
 }
@@ -82,13 +81,10 @@ func (c *AddWorkOrderArtifact) ExampleOutput() map[string]any {
 		"data": map[string]any{
 			"artifact": map[string]any{
 				"id":   "art-123",
-				"type": "pr",
+				"type": "markdown",
 				"data": map[string]any{
-					"url":      "https://github.com/example/repo/pull/42",
-					"number":   "42",
-					"title":    "Draft implementation",
-					"state":    "open",
-					"provider": "github",
+					"title": "Design notes",
+					"body":  "Investigation notes.",
 				},
 			},
 		},
@@ -100,12 +96,11 @@ func (c *AddWorkOrderArtifact) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
-	prOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr"}}}
 	markdownOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown"}}}
 	branchOnly := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch"}}}
-	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "branch"}}}
-	bothTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
-	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"pr", "markdown"}}}
+	linkableTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"branch", "link"}}}
+	titledTypes := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown", "link"}}}
+	withMetadata := []configuration.VisibilityCondition{{Field: "artifactType", Values: []string{"markdown", "link"}}}
 
 	return []configuration.Field{
 		{
@@ -122,13 +117,13 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			Description: "The kind of artifact to store",
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
-			Default:     "pr",
+			Default:     "markdown",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Pull Request", Value: "pr"},
 						{Label: "Markdown", Value: "markdown"},
 						{Label: "Branch", Value: "branch"},
+						{Label: "Link", Value: "link"},
 					},
 				},
 			},
@@ -136,39 +131,12 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "url",
 			Label:                "URL",
-			Description:          "Link to the pull request or branch (must be http or https). Required for pull requests; optional for branches — e.g. a GitHub tree URL like https://github.com/{owner}/{repo}/tree/{branch}.",
+			Description:          "Link to the branch or external resource (must be http or https). Required for links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: linkableTypes,
 			RequiredConditions: []configuration.RequiredCondition{
-				{Field: "artifactType", Values: []string{"pr"}},
-			},
-		},
-		{
-			Name:                 "number",
-			Label:                "Number",
-			Description:          "Optional pull request number (rendered as #<n>)",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			VisibilityConditions: prOnly,
-		},
-		{
-			Name:                 "state",
-			Label:                "State",
-			Description:          "Pull request state — drives the artifact chip's icon/color. Update it later with updateWorkOrderArtifact as the PR progresses.",
-			Type:                 configuration.FieldTypeSelect,
-			Required:             false,
-			Default:              "open",
-			VisibilityConditions: prOnly,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Open", Value: "open"},
-						{Label: "Draft", Value: "draft"},
-						{Label: "Closed", Value: "closed"},
-						{Label: "Merged", Value: "merged"},
-					},
-				},
+				{Field: "artifactType", Values: []string{"link"}},
 			},
 		},
 		{
@@ -194,17 +162,25 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:                 "title",
-			Label:                "Title",
-			Description:          "Optional artifact title",
+			Name:                 "repository",
+			Label:                "Repository",
+			Description:          "Repository that owns the branch (`owner/repo` or the repository https URL). Required when URL is empty. SuperPlane writes a GitHub tree URL from this value and the branch name.",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			VisibilityConditions: bothTypes,
+			VisibilityConditions: branchOnly,
+		},
+		{
+			Name:                 "title",
+			Label:                "Title",
+			Description:          "Optional artifact title — for links, this becomes the chip's label (e.g. \"Preview\")",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			VisibilityConditions: titledTypes,
 		},
 		{
 			Name:        "artifactKey",
 			Label:       "Artifact Key",
-			Description: "Optional queryable key for this artifact (e.g. a pull request's URL), unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
+			Description: "Optional queryable key for this artifact, unique per factory. Lets findWorkOrder (by: artifactKey) resolve this work order later.",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Togglable:   true,
@@ -233,13 +209,24 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 	}
 }
 
+func (c *AddWorkOrderArtifact) ValidateNodeConfiguration(config map[string]any) error {
+	decoded := AddWorkOrderArtifactConfiguration{}
+	if err := mapstructure.Decode(config, &decoded); err != nil {
+		return err
+	}
+	return validateBranchArtifactConfiguration(decoded)
+}
+
 func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	config := AddWorkOrderArtifactConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return err
 	}
 
-	data := buildArtifactData(config)
+	data, err := buildArtifactData(config)
+	if err != nil {
+		return err
+	}
 
 	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
 		OrderID: config.OrderID,
@@ -287,16 +274,14 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 // buildArtifactData folds the free-form list into a map and layers the
 // typed inputs on top, so a user who defines both `url` and a `url`
 // row still ends up with the typed value on the wire.
-func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any {
+func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any, error) {
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
-		"url":    config.URL,
-		"number": config.Number,
-		"state":  config.State,
-		"title":  config.Title,
-		"body":   config.Body,
-		"name":   config.Name,
+		"url":   config.URL,
+		"title": config.Title,
+		"body":  config.Body,
+		"name":  config.Name,
 	}
 
 	for key, value := range typed {
@@ -309,7 +294,12 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) map[string]any 
 		data[key] = value
 	}
 
-	return data
+	data = applyBranchTreeURL(config, data)
+	if err := requireReachableBranchURL(config.ArtifactType, data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // artifactDataToMap flattens the list into a map; blank names are

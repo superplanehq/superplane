@@ -31,6 +31,10 @@ func (u *User) IsAPIKey() bool {
 	return u.Type == UserTypeAPIKey
 }
 
+func (u *User) IsHuman() bool {
+	return u.Type == UserTypeHuman
+}
+
 func (u *User) IsExpiredAPIKey() bool {
 	return u.IsAPIKey() && u.APIKeyExpiresAt != nil && !time.Now().Before(*u.APIKeyExpiresAt)
 }
@@ -297,6 +301,36 @@ func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, erro
 	err := tx.
 		Where("id = ?", id).
 		Where("organization_id = ?", orgID).
+		First(&user).
+		Error
+
+	return &user, err
+}
+
+// FindActiveUserByIDAnyOrg loads an active user by ID without scoping to an
+// organization. Used by the personal API token auth path, which resolves a
+// user from a token hash before the request's organization is known.
+func FindActiveUserByIDAnyOrg(tx *gorm.DB, id uuid.UUID) (*User, error) {
+	var user User
+
+	err := tx.
+		Where("id = ?", id).
+		First(&user).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func FindActiveHumanUserByAccountAndOrganization(tx *gorm.DB, orgID, accountID uuid.UUID) (*User, error) {
+	var user User
+
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("account_id = ?", accountID).
+		Where("type = ?", UserTypeHuman).
 		First(&user).
 		Error
 

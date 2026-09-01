@@ -68,15 +68,6 @@ func requireSecurityGroupID(value string) (string, error) {
 	return securityGroupID, nil
 }
 
-func requireAlarmName(value string) (string, error) {
-	alarmName := strings.TrimSpace(value)
-	if alarmName == "" {
-		return "", fmt.Errorf("alarm name is required")
-	}
-
-	return alarmName, nil
-}
-
 func hasConfigKey(configuration any, key string) bool {
 	configurationMap, ok := configuration.(map[string]any)
 	if !ok {

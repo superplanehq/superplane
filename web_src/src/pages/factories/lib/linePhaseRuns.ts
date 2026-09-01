@@ -1,15 +1,27 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
-import { isActiveWorkOrderExecution } from "./workOrderExecutions";
+import type {
+  FactoriesFactoryLine,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderLineDispatch,
+} from "@/api-client";
+import { automationNameForLineStep, lineStepParallelism } from "./factoryLineFormShared";
+import { factoryAppPath, factoryAppRunPath, factoryHomePath, factoryLineDetailPath } from "./factoryPagePaths";
+import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { dispatchStepRows, isActiveWorkOrderExecution, type WorkOrderStepRow } from "./workOrderExecutions";
+import { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 
+export { resolvePhaseRunStatus } from "./linePhaseRunStatus";
 export type LinePhaseTick = "running" | "waiting" | "queued" | "failed" | null;
+
+/** Phase status expressed with a distinct glyph shape, not colour alone. */
+export type PhaseGlyphKind = "running" | "waiting" | "queued" | "failed" | "passed" | "pending" | "cancelled";
 
 export type LinePhaseRunCard = {
   executionId: string;
   workOrderId: string;
-  /** Work order's factory-scoped sequence number, for building the permalink. */
-  workOrderNumber: string | undefined;
-  title: string;
-  execution: FactoriesWorkOrderExecution;
+  /** Raw task, so the board can build the shared task card model. */
+  order: FactoriesWorkOrder;
+  execution: WorkOrderStepRow;
 };
 
 export type LinePhaseColumn = {
@@ -17,6 +29,8 @@ export type LinePhaseColumn = {
   stepIndex: number;
   /** Factory app id for this runApp step, when present. */
   appId?: string;
+  /** In-flight cap for this step. Defaults to 10 when the line omits it. */
+  maxParallelism: number;
   runs: LinePhaseRunCard[];
   tick: LinePhaseTick;
 };
@@ -25,76 +39,255 @@ export type LinePhaseColumn = {
 export const LINE_PHASE_RUNS_PAGE_SIZE = 3;
 
 /**
- * Builds the Lines detail board: one column per line step. Each work order
- * appears once, in the column for its current (furthest active, else furthest
- * finished) step on this line — newest cards first within a column.
+ * Destination for a phase-board card: the split-run page for this phase.
+ * Never the task page — that destination stays on the Tasks list.
  */
-export function buildLinePhaseBoard(line: FactoriesFactoryLine, workOrders: FactoriesWorkOrder[]): LinePhaseColumn[] {
+export function linePhaseRunHref(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | undefined,
+  run: LinePhaseRunCard,
+  stepAppId?: string,
+): string {
+  const appId = run.execution.run?.appId || stepAppId;
+  const runId = run.execution.run?.id;
+  if (appId && runId) {
+    return factoryAppRunPath(organizationId, factoryKey, appId, runId, {
+      from: "lines",
+      lineId,
+      orderNumber: run.order.number,
+    });
+  }
+  if (appId) {
+    return factoryAppPath(organizationId, factoryKey, appId, { from: "lines", lineId });
+  }
+  if (lineId) {
+    return factoryLineDetailPath(organizationId, factoryKey, lineId);
+  }
+  return factoryHomePath(organizationId, factoryKey);
+}
+
+/**
+ * Builds the Lines detail board: one column per line step. Each task
+ * appears once, in the column for its current (furthest active, else furthest
+ * finished) step on this line — newest cards first within a column. Work
+ * orders that reached a terminal outcome move to the Done column instead.
+ */
+export function buildLinePhaseBoard(
+  line: FactoriesFactoryLine,
+  workOrders: FactoriesWorkOrder[],
+  apps: Array<{ id?: string; name?: string }> = [],
+): LinePhaseColumn[] {
   const lineId = line.id;
   const steps = line.steps ?? [];
   if (!lineId || steps.length === 0) {
     return [];
   }
 
-  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  const columns: LinePhaseColumn[] = steps.map((step, stepIndex) => ({
+    stepName: automationNameForLineStep(step, apps, stepIndex),
+    stepIndex,
+    appId: step.app?.app?.trim() || undefined,
+    maxParallelism: lineStepParallelism(step),
+    runs: [],
+    tick: null,
+  }));
 
-  return steps.map((step, stepIndex) => {
-    const stepName = step.name?.trim() || `Phase ${stepIndex + 1}`;
-    const runs = runsByStep.get(step.name ?? "") ?? [];
-    const appId = step.app?.app?.trim() || undefined;
-    return {
-      stepName,
-      stepIndex,
-      appId,
-      runs,
-      tick: resolvePhaseTick(runs),
-    };
+  const runsByStep = collectCurrentRunsByStep(lineId, steps, workOrders);
+  for (const column of columns) {
+    column.runs = runsByStep.get(column.stepIndex) ?? [];
+    column.tick = resolvePhaseTick(column.runs);
+  }
+
+  return columns;
+}
+
+/**
+ * True when the last step is the line's own Done automation. Such a line keeps
+ * finished tasks on that step; every other line hands them to the board
+ * Done column, which no app backs.
+ */
+export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
+  const last = columns[columns.length - 1];
+  return last ? isDoneLineColumn(last) : false;
+}
+
+/**
+ * Draft tasks. A draft that already ran on a line still belongs
+ * here after To Backlog. Newest updated drafts come first.
+ */
+export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
+  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+}
+
+/**
+ * Closed work that belongs on this line, plus open work still on a Done or
+ * PR-closure step. Newest orders come first.
+ */
+export function collectLineDoneOrders(
+  workOrders: FactoriesWorkOrder[],
+  line: FactoriesFactoryLine,
+  board: LinePhaseColumn[] = [],
+): FactoriesWorkOrder[] {
+  const doneById = new Map<string, FactoriesWorkOrder>();
+
+  for (const order of workOrders) {
+    if (!order.id || order.state !== "STATE_CLOSED" || !belongsToLineBoard(order, line.id)) {
+      continue;
+    }
+    doneById.set(order.id, order);
+  }
+
+  for (const column of board) {
+    if (!isDoneLineColumn(column)) {
+      continue;
+    }
+    for (const run of column.runs) {
+      if (run.order.id) {
+        doneById.set(run.order.id, run.order);
+      }
+    }
+  }
+
+  return [...doneById.values()].sort(compareOrdersNewestFirst);
+}
+
+/** Open work that waits for review after the last stage passed. Newest first. */
+export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWorkOrder[] {
+  const lastStage = lineStageColumns(board).at(-1);
+  if (!lastStage) {
+    return [];
+  }
+
+  const verifyById = new Map<string, FactoriesWorkOrder>();
+  for (const run of lastStage.runs) {
+    if (!run.order.id || !isWaitingAfterPassedStage(run)) {
+      continue;
+    }
+    verifyById.set(run.order.id, run.order);
+  }
+
+  return [...verifyById.values()].sort(compareOrdersNewestFirst);
+}
+
+function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
+  if (run.order.state === "STATE_CLOSED") {
+    return false;
+  }
+  if (getWorkOrderDisplayStatus(run.order) !== "waiting") {
+    return false;
+  }
+  return run.execution.state === "STATE_FINISHED" && run.execution.result === "RESULT_PASSED";
+}
+
+/** Stage columns only. Done is a fixed bookend, not a line step. */
+export function lineStageColumns(columns: LinePhaseColumn[]): LinePhaseColumn[] {
+  return columns.filter((column) => !isDoneLineColumn(column));
+}
+
+/** Stage columns with waiting review work already moved to Verify. */
+export function visibleLineStageColumns(
+  columns: LinePhaseColumn[],
+  verifyOrders: FactoriesWorkOrder[],
+): LinePhaseColumn[] {
+  const verifyIds = new Set(verifyOrders.flatMap((order) => (order.id ? [order.id] : [])));
+  return lineStageColumns(columns).map((column) => {
+    const runs = column.runs.filter((run) => !verifyIds.has(run.workOrderId));
+    if (runs.length === column.runs.length) {
+      return column;
+    }
+    return { ...column, runs, tick: resolvePhaseTick(runs) };
   });
 }
 
-export function resolvePhaseRunStatus(execution: FactoriesWorkOrderExecution): {
-  kind: "running" | "waiting" | "queued" | "failed" | "idle";
-  label: string;
-} {
-  if (execution.state === "STATE_STARTED") {
-    return { kind: "running", label: "Executing" };
+/** Factory-level intake automation. It is not a line step. */
+export function findBacklogAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find(
+    (app) => app.id && (app.name === "Backlog" || app.name === "Ingest" || app.id === "app-refund-backlog"),
+  );
+  if (!match?.id) {
+    return undefined;
   }
-  if (execution.state === "STATE_CANCELLING") {
-    // In-flight like Automations (running tick), but keep Cancelling label.
-    return { kind: "running", label: "Cancelling" };
+  return { id: match.id, name: match.name ?? "Ingest" };
+}
+
+/** Factory-level PR Closure automation. It is not a line step. */
+export function findClosureAutomationApp(
+  apps: Array<{ id?: string; name?: string }>,
+): { id: string; name: string } | undefined {
+  const match = apps.find(
+    (app) =>
+      Boolean(app.id) &&
+      (app.name === "PR Closure" || app.id === "app-refund-done" || (app.id ?? "").includes("pr-closure")),
+  );
+  if (!match?.id) {
+    return undefined;
   }
-  if (execution.state === "STATE_PENDING") {
-    return { kind: "queued", label: "Queued" };
+  return { id: match.id, name: match.name ?? "PR Closure" };
+}
+
+/** Backlog and Done are not canvas-backed columns. */
+export function isDoneLineColumn(column: Pick<LinePhaseColumn, "stepName" | "appId">): boolean {
+  if (column.stepName.trim().toLowerCase() === "done") {
+    return true;
   }
-  if (execution.state === "STATE_FINISHED") {
-    if (execution.result === "RESULT_PASSED") {
-      return { kind: "idle", label: "Passed" };
-    }
-    if (execution.result === "RESULT_FAILED") {
-      return { kind: "failed", label: "Failed" };
-    }
-    if (execution.result === "RESULT_CANCELLED") {
-      return { kind: "idle", label: "Cancelled" };
-    }
+  if (!column.appId) {
+    return false;
   }
-  return { kind: "idle", label: "Unknown" };
+  return column.appId === "app-refund-done" || column.appId.includes("pr-closure");
+}
+
+function isLineBacklogOrder(order: FactoriesWorkOrder): boolean {
+  return Boolean(order.id) && order.state === "STATE_DRAFT";
+}
+
+// A finished task belongs on this board when it ran on this line, or
+// when it closed before any line picked it up — the same rule the shared
+// backlog follows.
+function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | undefined): boolean {
+  const dispatches = order.lineDispatches ?? [];
+  if (dispatches.length === 0) {
+    return true;
+  }
+  return dispatches.some((dispatch) => dispatch.line?.id === lineId);
+}
+
+function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
+  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
+  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
+  if (leftTime !== rightTime) {
+    return rightTime - leftTime;
+  }
+  return (right.id ?? "").localeCompare(left.id ?? "");
+}
+
+/** Board-level status for a phase column header. */
+export function resolveColumnGlyph(column: LinePhaseColumn): PhaseGlyphKind {
+  if (column.tick) {
+    return column.tick;
+  }
+  return column.runs.length > 0 ? "passed" : "pending";
+}
+
+/** Row-level status for a single run card. */
+export function resolveRunGlyph(run: LinePhaseRunCard): PhaseGlyphKind {
+  const { kind, label } = resolvePhaseRunStatus(run.execution);
+  if (kind === "idle") {
+    return label === "Passed" ? "passed" : "pending";
+  }
+  return kind;
 }
 
 function collectCurrentRunsByStep(
   lineId: string,
   steps: NonNullable<FactoriesFactoryLine["steps"]>,
   workOrders: FactoriesWorkOrder[],
-): Map<string, LinePhaseRunCard[]> {
-  const stepIndexByName = new Map<string, number>();
-  for (const [index, step] of steps.entries()) {
-    if (step.name) {
-      stepIndexByName.set(step.name, index);
-    }
-  }
-
-  const runsByStep = new Map<string, LinePhaseRunCard[]>();
+): Map<number, LinePhaseRunCard[]> {
+  const runsByStep = new Map<number, LinePhaseRunCard[]>();
   for (const order of workOrders) {
-    appendCurrentRunForOrder(order, lineId, stepIndexByName, runsByStep);
+    appendCurrentRunForOrder(order, lineId, steps, runsByStep);
   }
   for (const runs of runsByStep.values()) {
     runs.sort(compareRunsNewestFirst);
@@ -102,54 +295,120 @@ function collectCurrentRunsByStep(
   return runsByStep;
 }
 
+function executionStepIndex(execution: FactoriesWorkOrderExecution): number | undefined {
+  if (execution.stepIndex == null || execution.stepIndex < 0) {
+    return undefined;
+  }
+  return execution.stepIndex;
+}
+
+function liveColumnIndexForExecution(
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  execution: FactoriesWorkOrderExecution,
+): number | undefined {
+  const stepIndex = executionStepIndex(execution);
+  if (stepIndex == null) {
+    return undefined;
+  }
+
+  // Dispatch stepIndex is a snapshot. A later line edit can move that
+  // index onto a different automation. Keep the snapshot index when the
+  // app still matches; otherwise place the card on the live column with
+  // the same app.
+  const executionAppId = execution.run?.appId?.trim();
+  const liveAppId = steps[stepIndex]?.app?.app?.trim();
+  if (stepIndex < steps.length && (!executionAppId || liveAppId === executionAppId)) {
+    return stepIndex;
+  }
+
+  if (!executionAppId) {
+    return undefined;
+  }
+
+  return closestAppColumnIndex(steps, executionAppId, stepIndex);
+}
+
+function closestAppColumnIndex(
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  executionAppId: string,
+  stepIndex: number,
+): number | undefined {
+  const matches: number[] = [];
+  for (let index = 0; index < steps.length; index++) {
+    if (steps[index]?.app?.app?.trim() === executionAppId) {
+      matches.push(index);
+    }
+  }
+  if (matches.length === 0) {
+    return undefined;
+  }
+  if (matches.length === 1) {
+    return matches[0];
+  }
+  return matches.reduce((best, index) => (Math.abs(index - stepIndex) < Math.abs(best - stepIndex) ? index : best));
+}
+
 function appendCurrentRunForOrder(
   order: FactoriesWorkOrder,
   lineId: string,
-  stepIndexByName: Map<string, number>,
-  runsByStep: Map<string, LinePhaseRunCard[]>,
+  steps: NonNullable<FactoriesFactoryLine["steps"]>,
+  runsByStep: Map<number, LinePhaseRunCard[]>,
 ): void {
-  if (!order.id) {
+  if (!order.id || order.state === "STATE_CLOSED" || order.state === "STATE_DRAFT") {
     return;
   }
 
-  const lineExecutions = (order.executions ?? []).filter(
-    (execution) => execution.line?.id === lineId && execution.step != null && stepIndexByName.has(execution.step),
+  // A line can have more than one dispatch (traversal) for this order; the
+  // board is a compact status summary, so it shows the most recent one —
+  // the full history of every dispatch lives in WorkOrderExecutionsList.
+  const dispatchesForLine = (order.lineDispatches ?? []).filter((dispatch) => dispatch.line?.id === lineId);
+  if (dispatchesForLine.length === 0) {
+    return;
+  }
+  const currentDispatch = pickMostRecentDispatch(dispatchesForLine);
+
+  const lineExecutions = dispatchStepRows(currentDispatch).filter(
+    (execution) => liveColumnIndexForExecution(steps, execution) != null,
   );
   if (lineExecutions.length === 0) {
     return;
   }
 
-  const currentExecution = pickCurrentLineExecution(lineExecutions, stepIndexByName);
-  if (!currentExecution?.step) {
+  const currentExecution = pickCurrentLineExecution(lineExecutions);
+  const stepIndex = currentExecution ? liveColumnIndexForExecution(steps, currentExecution) : undefined;
+  if (!currentExecution || stepIndex == null) {
     return;
   }
 
   const card: LinePhaseRunCard = {
-    executionId: currentExecution.id ?? `${order.id}-${currentExecution.step}-${currentExecution.createdAt ?? ""}`,
+    executionId: currentExecution.id ?? `${order.id}-${stepIndex}-${currentExecution.createdAt ?? ""}`,
     workOrderId: order.id,
-    workOrderNumber: order.number,
-    title: order.title?.trim() || "Untitled work order",
+    order,
     execution: currentExecution,
   };
-  const existing = runsByStep.get(currentExecution.step);
+  const existing = runsByStep.get(stepIndex);
   if (existing) {
     existing.push(card);
     return;
   }
-  runsByStep.set(currentExecution.step, [card]);
+  runsByStep.set(stepIndex, [card]);
 }
 
-function executionTimestamp(execution: FactoriesWorkOrderExecution): number {
+function pickMostRecentDispatch(dispatches: FactoriesWorkOrderLineDispatch[]): FactoriesWorkOrderLineDispatch {
+  return dispatches.reduce((latest, candidate) => {
+    const latestAt = Date.parse(latest.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= latestAt ? candidate : latest;
+  });
+}
+
+function executionTimestamp(execution: WorkOrderStepRow): number {
   return Date.parse(execution.updatedAt ?? execution.createdAt ?? "") || 0;
 }
 
-function isPreferableCurrentExecution(
-  candidate: FactoriesWorkOrderExecution,
-  incumbent: FactoriesWorkOrderExecution,
-  stepIndexByName: Map<string, number>,
-): boolean {
-  const candidateStep = stepIndexByName.get(candidate.step ?? "") ?? -1;
-  const incumbentStep = stepIndexByName.get(incumbent.step ?? "") ?? -1;
+function isPreferableCurrentExecution(candidate: WorkOrderStepRow, incumbent: WorkOrderStepRow): boolean {
+  const candidateStep = executionStepIndex(candidate) ?? -1;
+  const incumbentStep = executionStepIndex(incumbent) ?? -1;
   if (candidateStep !== incumbentStep) {
     return candidateStep > incumbentStep;
   }
@@ -161,20 +420,16 @@ function isPreferableCurrentExecution(
   return (candidate.id ?? "") > (incumbent.id ?? "");
 }
 
-function pickCurrentLineExecution(
-  executions: FactoriesWorkOrderExecution[],
-  stepIndexByName: Map<string, number>,
-): FactoriesWorkOrderExecution | null {
+function pickCurrentLineExecution(executions: WorkOrderStepRow[]): WorkOrderStepRow | null {
   const active = executions.filter(isActiveWorkOrderExecution);
   const candidates = active.length > 0 ? active : executions;
-  let best: FactoriesWorkOrderExecution | null = null;
+  let best: WorkOrderStepRow | null = null;
 
   for (const execution of candidates) {
-    const stepIndex = stepIndexByName.get(execution.step ?? "") ?? -1;
-    if (stepIndex < 0) {
+    if (executionStepIndex(execution) == null) {
       continue;
     }
-    if (!best || isPreferableCurrentExecution(execution, best, stepIndexByName)) {
+    if (!best || isPreferableCurrentExecution(execution, best)) {
       best = execution;
     }
   }

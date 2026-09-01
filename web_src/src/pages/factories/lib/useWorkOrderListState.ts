@@ -1,26 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   EMPTY_WORK_ORDER_FILTERS,
   WORK_ORDER_LAYOUTS,
   WORK_ORDER_ORDERINGS,
+  WORK_ORDER_SCOPES,
   countWorkOrderFilters,
   type WorkOrderFilters,
   type WorkOrderLayoutId,
   type WorkOrderOrdering,
   type WorkOrderScope,
 } from "./workOrderListModel";
+import { WORK_ORDER_DISPLAY_STATUSES, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
 /** One of the three dimensions the Filter menu can narrow. */
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
 
 /**
- * Title-bar and view state for the Work Orders page.
+ * Title-bar and view state for the Tasks page.
  *
- * Layout and ordering are the two knobs users tune once and expect to
- * carry across sessions, so we persist them in `localStorage` under a
- * factory-agnostic key. Scope, filters, and search are intentionally
- * session-local — they express what the user is looking at right now, not
- * a long-term preference.
+ * Layout and ordering are pure display preferences that don't reference
+ * factory-specific data, so they're persisted in `localStorage` under a
+ * single factory-agnostic key and follow the user everywhere.
+ *
+ * Scope (All/Active/My) and filters are also persisted, but namespaced per
+ * factory: filters can reference factory-specific data (lines), so a value
+ * chosen in one factory shouldn't silently apply — and likely hide
+ * everything — in another. Search stays session-local; it expresses what
+ * the user is looking for right now, not a long-term preference.
  */
 export interface WorkOrderListState {
   layout: WorkOrderLayoutId;
@@ -49,6 +55,8 @@ export interface WorkOrderListState {
 
 const LAYOUT_STORAGE_KEY = "sp:work-orders:layout";
 const ORDERING_STORAGE_KEY = "sp:work-orders:ordering";
+const SCOPE_STORAGE_PREFIX = "sp:work-orders:scope";
+const FILTERS_STORAGE_PREFIX = "sp:work-orders:filters";
 
 const DEFAULT_LAYOUT: WorkOrderLayoutId = "board";
 const DEFAULT_ORDERING: WorkOrderOrdering = "updated";
@@ -56,6 +64,13 @@ const DEFAULT_SCOPE: WorkOrderScope = "all";
 
 const VALID_LAYOUTS = new Set(WORK_ORDER_LAYOUTS.map((item) => item.id));
 const VALID_ORDERINGS = new Set(WORK_ORDER_ORDERINGS.map((item) => item.id));
+const VALID_SCOPES = new Set(WORK_ORDER_SCOPES.map((item) => item.id));
+const VALID_DISPLAY_STATUSES = new Set<string>(WORK_ORDER_DISPLAY_STATUSES);
+
+/** Per-factory key, falling back to a bare key when `factoryId` is unavailable. */
+function scopedStorageKey(prefix: string, factoryId: string): string {
+  return factoryId ? `${prefix}:${factoryId}` : prefix;
+}
 
 function readPersisted<T>(key: string, valid: Set<T>, fallback: T): T {
   if (typeof window === "undefined") {
@@ -83,18 +98,144 @@ function writePersisted(key: string, value: string) {
   }
 }
 
-export function useWorkOrderListState(): WorkOrderListState {
+/** Narrows an unknown array down to the statuses recognized today, dropping the rest. */
+function sanitizeStatuses(value: unknown): WorkOrderDisplayStatus[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (entry): entry is WorkOrderDisplayStatus => typeof entry === "string" && VALID_DISPLAY_STATUSES.has(entry),
+  );
+}
+
+/** Opaque string arrays: kept as-is, stale IDs just render an "Unknown" chip. */
+function sanitizeIds(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function readPersistedFilters(key: string): WorkOrderFilters {
+  if (typeof window === "undefined") {
+    return EMPTY_WORK_ORDER_FILTERS;
+  }
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (!stored) {
+      return EMPTY_WORK_ORDER_FILTERS;
+    }
+    const parsed = JSON.parse(stored) as Partial<WorkOrderFilters> | null;
+    if (!parsed || typeof parsed !== "object") {
+      return EMPTY_WORK_ORDER_FILTERS;
+    }
+    return {
+      statuses: sanitizeStatuses(parsed.statuses),
+      lineIds: sanitizeIds(parsed.lineIds),
+      assigneeIds: sanitizeIds(parsed.assigneeIds),
+    };
+  } catch {
+    return EMPTY_WORK_ORDER_FILTERS;
+  }
+}
+
+function writePersistedFilters(key: string, filters: WorkOrderFilters) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify(filters));
+  } catch {
+    // Persistence is best-effort; ignore quota or privacy-mode failures.
+  }
+}
+
+/**
+ * Owns `scope` and `filters`, namespacing their storage per `factoryId` and
+ * resetting `search`/`searchOpen`/`filterMenuOpen` whenever `factoryId`
+ * changes (the Tasks route can be revisited across factories without
+ * necessarily remounting its page component).
+ *
+ * Reset-on-factory-change and persist-on-value-change are both driven by
+ * effects, so a "suppress" ref pair guards against the two racing in the
+ * commit where `factoryId` changes: without it, the persist effects would
+ * see the *old* factory's scope/filters values (state hasn't re-rendered
+ * yet) paired with the *new* `factoryId`, and clobber the new factory's
+ * storage before the reset effect's reads land.
+ */
+function usePersistedScopeAndFilters(
+  factoryId: string,
+  onFactoryChange: () => void,
+): {
+  scope: WorkOrderScope;
+  setScope: (scope: WorkOrderScope) => void;
+  filters: WorkOrderFilters;
+  setFilters: Dispatch<SetStateAction<WorkOrderFilters>>;
+} {
+  const [scope, setScope] = useState<WorkOrderScope>(() =>
+    readPersisted(scopedStorageKey(SCOPE_STORAGE_PREFIX, factoryId), VALID_SCOPES, DEFAULT_SCOPE),
+  );
+  const [filters, setFilters] = useState<WorkOrderFilters>(() =>
+    readPersistedFilters(scopedStorageKey(FILTERS_STORAGE_PREFIX, factoryId)),
+  );
+
+  const previousFactoryIdRef = useRef(factoryId);
+  const suppressScopeWriteRef = useRef(false);
+  const suppressFiltersWriteRef = useRef(false);
+
+  // Callers pass a fresh closure each render, so we read it through a ref to
+  // keep the factory-change effect keyed solely on `factoryId`. Re-running it
+  // for a new closure would defeat the factoryId-transition check below.
+  const onFactoryChangeRef = useRef(onFactoryChange);
+  onFactoryChangeRef.current = onFactoryChange;
+
+  useEffect(() => {
+    if (previousFactoryIdRef.current === factoryId) {
+      return;
+    }
+    previousFactoryIdRef.current = factoryId;
+    suppressScopeWriteRef.current = true;
+    suppressFiltersWriteRef.current = true;
+    setScope(readPersisted(scopedStorageKey(SCOPE_STORAGE_PREFIX, factoryId), VALID_SCOPES, DEFAULT_SCOPE));
+    setFilters(readPersistedFilters(scopedStorageKey(FILTERS_STORAGE_PREFIX, factoryId)));
+    onFactoryChangeRef.current();
+  }, [factoryId]);
+
+  useEffect(() => {
+    if (suppressScopeWriteRef.current) {
+      suppressScopeWriteRef.current = false;
+      return;
+    }
+    writePersisted(scopedStorageKey(SCOPE_STORAGE_PREFIX, factoryId), scope);
+  }, [scope, factoryId]);
+
+  useEffect(() => {
+    if (suppressFiltersWriteRef.current) {
+      suppressFiltersWriteRef.current = false;
+      return;
+    }
+    writePersistedFilters(scopedStorageKey(FILTERS_STORAGE_PREFIX, factoryId), filters);
+  }, [filters, factoryId]);
+
+  return { scope, setScope, filters, setFilters };
+}
+
+export function useWorkOrderListState(factoryId: string): WorkOrderListState {
   const [layout, setLayoutState] = useState<WorkOrderLayoutId>(() =>
     readPersisted(LAYOUT_STORAGE_KEY, VALID_LAYOUTS, DEFAULT_LAYOUT),
   );
   const [ordering, setOrderingState] = useState<WorkOrderOrdering>(() =>
     readPersisted(ORDERING_STORAGE_KEY, VALID_ORDERINGS, DEFAULT_ORDERING),
   );
-  const [scope, setScope] = useState<WorkOrderScope>(DEFAULT_SCOPE);
-  const [filters, setFilters] = useState<WorkOrderFilters>(EMPTY_WORK_ORDER_FILTERS);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+
+  const { scope, setScope, filters, setFilters } = usePersistedScopeAndFilters(factoryId, () => {
+    setSearch("");
+    setSearchOpen(false);
+    setFilterMenuOpen(false);
+  });
 
   useEffect(() => {
     writePersisted(LAYOUT_STORAGE_KEY, layout);
@@ -112,28 +253,37 @@ export function useWorkOrderListState(): WorkOrderListState {
     setOrderingState(next);
   }, []);
 
-  const toggleFilter = useCallback((dimension: WorkOrderFilterDimension, value: string) => {
-    setFilters((current) => {
-      const values = current[dimension] as string[];
-      const next = values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
-      return { ...current, [dimension]: next } as WorkOrderFilters;
-    });
-  }, []);
+  const toggleFilter = useCallback(
+    (dimension: WorkOrderFilterDimension, value: string) => {
+      setFilters((current) => {
+        const values = current[dimension] as string[];
+        const next = values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
+        return { ...current, [dimension]: next } as WorkOrderFilters;
+      });
+    },
+    [setFilters],
+  );
 
-  const removeFilter = useCallback((dimension: WorkOrderFilterDimension, value: string) => {
-    setFilters((current) => {
-      const values = current[dimension] as string[];
-      return { ...current, [dimension]: values.filter((entry) => entry !== value) } as WorkOrderFilters;
-    });
-  }, []);
+  const removeFilter = useCallback(
+    (dimension: WorkOrderFilterDimension, value: string) => {
+      setFilters((current) => {
+        const values = current[dimension] as string[];
+        return { ...current, [dimension]: values.filter((entry) => entry !== value) } as WorkOrderFilters;
+      });
+    },
+    [setFilters],
+  );
 
-  const clearFilterDimension = useCallback((dimension: WorkOrderFilterDimension) => {
-    setFilters((current) => ({ ...current, [dimension]: [] }) as WorkOrderFilters);
-  }, []);
+  const clearFilterDimension = useCallback(
+    (dimension: WorkOrderFilterDimension) => {
+      setFilters((current) => ({ ...current, [dimension]: [] }) as WorkOrderFilters);
+    },
+    [setFilters],
+  );
 
   const clearFilters = useCallback(() => {
     setFilters(EMPTY_WORK_ORDER_FILTERS);
-  }, []);
+  }, [setFilters]);
 
   const clearSearch = useCallback(() => {
     setSearch("");
@@ -152,7 +302,7 @@ export function useWorkOrderListState(): WorkOrderListState {
     setScope(DEFAULT_SCOPE);
     setFilters(EMPTY_WORK_ORDER_FILTERS);
     setSearch("");
-  }, []);
+  }, [setScope, setFilters]);
 
   const filterCount = countWorkOrderFilters(filters);
 

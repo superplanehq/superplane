@@ -17,8 +17,29 @@ describe("factoryCanvasChrome", () => {
     });
   });
 
-  it("uses thin slate edges in light mode", () => {
-    expect(factoryEdgePalette(false).default).toEqual({ stroke: "#cbd5e1", strokeWidth: 1.5 });
+  it("uses 3px dots while editing so the grid reads as the edit surface", () => {
+    expect(factoryCanvasBackground(true, true)).toEqual({
+      gap: 22,
+      size: 3,
+      color: "#33312b",
+      bgColor: "#14120b",
+    });
+    expect(factoryCanvasBackground(false, true)).toMatchObject({ gap: 22, size: 3, color: "#b8c4d0" });
+  });
+
+  it("uses a darker light-mode pane so white nodes contrast", () => {
+    expect(factoryCanvasBackground(false)).toEqual({
+      gap: 22,
+      size: 1,
+      color: "#b8c4d0",
+      bgColor: "#e2e8f0",
+    });
+  });
+
+  it("uses darker, thicker slate edges in light mode", () => {
+    expect(factoryEdgePalette(false).default).toEqual({ stroke: "#94a3b8", strokeWidth: 2 });
+    expect(factoryEdgePalette(false).running.strokeWidth).toBe(2);
+    expect(factoryEdgePalette(true).default.strokeWidth).toBe(2);
   });
 
   it("maps event state to edge tone and class", () => {

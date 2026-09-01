@@ -7,6 +7,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { integrationDetailPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import {
   useAvailableIntegrations,
   useConnectedIntegrations,
@@ -49,7 +50,7 @@ export function useIntegrationSetupController(organizationId: string) {
   });
 
   usePageTitle(["Integrations", progress.setupPageTitle]);
-  useSetupCompletionRedirect({ organizationId, route, queries, state, progress });
+  useSetupCompletionRedirect({ route, queries, state, progress });
 
   return {
     organizationId,
@@ -68,7 +69,7 @@ function useIntegrationSetupRoute(organizationId: string) {
   const location = useLocation();
   const { integrationName: routeIntegrationName } = useParams<{ integrationName: string }>();
   const integrationName = routeIntegrationName || "";
-  const integrationsHref = `/${organizationId}/settings/integrations`;
+  const integrationsHref = useIntegrationsBasePath(organizationId);
   const routeState = location.state as IntegrationSetupRouteState | null;
   // Query param supports opening setup in a new tab (location.state does not cross tabs).
   const integrationIdFromQuery = new URLSearchParams(location.search).get("integrationId") || undefined;
@@ -312,14 +313,13 @@ function useResumeIntegrationDescribe(
 }
 
 interface CompletionRedirectParams {
-  organizationId: string;
   route: ReturnType<typeof useIntegrationSetupRoute>;
   queries: ReturnType<typeof useIntegrationSetupQueries>;
   state: ReturnType<typeof useIntegrationSetupLocalState>;
   progress: ReturnType<typeof useIntegrationSetupProgress>;
 }
 
-function useSetupCompletionRedirect({ organizationId, route, queries, state, progress }: CompletionRedirectParams) {
+function useSetupCompletionRedirect({ route, queries, state, progress }: CompletionRedirectParams) {
   useEffect(() => {
     const id = state.createdIntegration?.metadata?.id;
     if (!id || progress.currentStep) {
@@ -334,8 +334,8 @@ function useSetupCompletionRedirect({ organizationId, route, queries, state, pro
       return;
     }
 
-    route.navigate(`/${organizationId}/settings/integrations/${id}`, { replace: true });
-  }, [organizationId, route, queries, state.createdIntegration, progress.currentStep]);
+    route.navigate(integrationDetailPath(route.integrationsHref, id), { replace: true });
+  }, [route, queries, state.createdIntegration, progress.currentStep]);
 }
 
 function getIntegrationCapabilities(integrationDefinition?: IntegrationsIntegrationDefinition) {

@@ -13,6 +13,20 @@ export function isCapabilityBasedIntegrationDefinition(integration: Integrations
   return integration.legacySetupOnly === false;
 }
 
+export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationDefinition): boolean {
+  return definition?.name === "github" && definition.hostedAppInstall === true;
+}
+
+/** Show Create your own GitHub App beside hosted Connect. */
+export function offersPrivateGitHubAppSetup(definition?: IntegrationsIntegrationDefinition): boolean {
+  return usesHostedGitHubAppInstall(definition);
+}
+
+/** New setup wizard. Feature off uses the legacy Sync manifest instead. */
+export function usesPrivateGitHubAppWizard(definition?: IntegrationsIntegrationDefinition): boolean {
+  return offersPrivateGitHubAppSetup(definition) && isCapabilityBasedIntegrationDefinition(definition ?? {});
+}
+
 export function openRedirectPrompt(step: IntegrationSetupStepDefinition | null) {
   const redirectPrompt = step?.redirectPrompt;
   if (!redirectPrompt?.url) {

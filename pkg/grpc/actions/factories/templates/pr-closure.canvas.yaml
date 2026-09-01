@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: PR Closure
+  description: Close the task when the attached pull request merges or is closed without a merge.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-pr-closed
+      targetId: find-pull-request
+    - channel: found
+      sourceId: find-pull-request
+      targetId: add-pr-activity
+    - channel: default
+      sourceId: add-pr-activity
+      targetId: is-pr-merged
+    - channel: "true"
+      sourceId: is-pr-merged
+      targetId: stamp-pr-merged
+    - channel: "false"
+      sourceId: is-pr-merged
+      targetId: stamp-pr-closed
+    - channel: default
+      sourceId: stamp-pr-merged
+      targetId: complete-work-order
+    - channel: default
+      sourceId: stamp-pr-closed
+      targetId: reject-work-order
+  nodes:
+    - id: on-pr-closed
+      name: On Pull Request Closed
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      configuration:
+        actions:
+          - closed
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 1272
+        'y': 72
+      isCollapsed: true
+    - id: find-pull-request
+      name: Find Pull Request
+      type: TYPE_ACTION
+      component: findPullRequest
+      configuration:
+        provider: github
+        repository: '{{ root().data.repository.full_name }}'
+        number: '{{ root().data.pull_request.number }}'
+        url: '{{ root().data.pull_request.html_url }}'
+      position:
+        x: 1272
+        'y': 432
+      isCollapsed: true
+    - id: add-pr-activity
+      name: Add Pull Request Activity
+      type: TYPE_ACTION
+      component: addPullRequestActivity
+      configuration:
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        description: '{{ "PR #" + string(root().data.pull_request.number) + " was " + (root().data.pull_request.merged == true ? "merged" : "closed") }}'
+      position:
+        x: 1272
+        'y': 612
+      isCollapsed: true
+    - id: is-pr-merged
+      name: PR Merged?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: root().data.pull_request.merged == true
+      position:
+        x: 1202
+        'y': 792
+      isCollapsed: true
+    - id: stamp-pr-merged
+      name: Stamp Merged Pull Request
+      type: TYPE_ACTION
+      component: updatePullRequest
+      configuration:
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        merged: '{{ root().data.pull_request.merged }}'
+        mergedAt: '{{ root().data.pull_request.merged_at }}'
+        state: '{{ root().data.pull_request.state }}'
+      position:
+        x: 1132
+        'y': 972
+      isCollapsed: true
+    - id: stamp-pr-closed
+      name: Stamp Closed Pull Request
+      type: TYPE_ACTION
+      component: updatePullRequest
+      configuration:
+        pullRequestId: '{{ $["Find Pull Request"].data.pullRequest.id }}'
+        closedAt: '{{ root().data.pull_request.closed_at }}'
+        merged: '{{ root().data.pull_request.merged }}'
+        state: '{{ root().data.pull_request.state }}'
+      position:
+        x: 1600
+        'y': 972
+      isCollapsed: true
+    - id: complete-work-order
+      name: Complete Task
+      type: TYPE_ACTION
+      component: updateWorkOrderStatus
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        result: completed
+        status: closed
+      position:
+        x: 1132
+        'y': 1332
+      isCollapsed: true
+    - id: reject-work-order
+      name: Reject Task
+      type: TYPE_ACTION
+      component: updateWorkOrderStatus
+      configuration:
+        orderId: '{{ $["Find Pull Request"].data.workOrder.id }}'
+        result: rejected
+        status: closed
+      position:
+        x: 1600
+        'y': 1332
+      isCollapsed: true

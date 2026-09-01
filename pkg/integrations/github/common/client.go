@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -200,6 +201,85 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+// ListPullRequests returns one page of a repository's pull requests.
+//
+// This is the plain REST endpoint, which draws on the 5000-per-hour budget.
+// Prefer it over a Search query, because Search allows only 30 requests a
+// minute per installation.
+func (c *Client) ListPullRequests(
+	ctx context.Context,
+	repository string,
+	opts *github.PullRequestListOptions,
+) ([]*github.PullRequest, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.List(ctx, owner, name, opts)
+}
+
+// ListCommits returns one page of a repository's commits.
+//
+// The commit message carries the trailers a squashed merge collected, which name
+// the co-authors of the work. A pull request listing does not include them.
+func (c *Client) ListCommits(
+	ctx context.Context,
+	repository string,
+	opts *github.CommitsListOptions,
+) ([]*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListCommits(ctx, owner, name, opts)
+}
+
+func (c *Client) ListPullRequestReviewComments(
+	ctx context.Context,
+	repository string,
+	pullNumber int,
+	reviewID int64,
+) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListReviewComments(ctx, owner, name, pullNumber, reviewID, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list review comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+// ListIssueComments returns an issue's comments oldest first, paginating
+// through every page. It uses the REST Issues.ListComments endpoint, which
+// returns issue comments only, never pull request review comments.
+func (c *Client) ListIssueComments(ctx context.Context, repository string, issueNumber int) ([]*github.IssueComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.IssueListCommentsOptions{
+		Sort:        github.Ptr("created"),
+		Direction:   github.Ptr("asc"),
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.IssueComment
+	for {
+		comments, resp, err := c.underlying.Issues.ListComments(ctx, owner, name, issueNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issue comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) EditPullRequest(ctx context.Context, repository string, pullNumber int, pullRequest *github.PullRequest) (*github.PullRequest, *github.Response, error) {
 	owner, name := c.ownerAndName(repository)
 	return c.underlying.PullRequests.Edit(ctx, owner, name, pullNumber, pullRequest)
@@ -219,7 +299,7 @@ func (c *Client) MarkPullRequestReadyForReview(ctx context.Context, pullRequestI
 	  }
 	}`
 
-	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID})
+	return c.doGraphQL(ctx, mutation, map[string]any{"pullRequestId": pullRequestID}, nil)
 }
 
 func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
@@ -391,12 +471,23 @@ func (c *Client) GetOrganizationUsageReport() (*github.UsageReport, *github.Resp
 	return c.underlying.Billing.GetOrganizationUsageReport(context.Background(), c.owner, nil)
 }
 
+// SearchIssues wraps the /search/issues endpoint. The Velocity page uses it to
+// list a repository's merged pull requests within a window; keeping the SDK
+// pass-through thin means callers can build any query GitHub Search supports
+// (issues, PRs, drafts, authors) without a new helper per shape.
+func (c *Client) SearchIssues(ctx context.Context, query string, opts *github.SearchOptions) (*github.IssuesSearchResult, *github.Response, error) {
+	return c.underlying.Search.Issues(ctx, query, opts)
+}
+
 type graphQLRequest struct {
 	Query     string         `json:"query"`
 	Variables map[string]any `json:"variables,omitempty"`
 }
 
+// graphQLResponse reports a failure in its `errors` array on an HTTP 200, so
+// err() turns that array into a regular error.
 type graphQLResponse struct {
+	Data   json.RawMessage `json:"data"`
 	Errors []struct {
 		Message string `json:"message"`
 	} `json:"errors"`
@@ -404,9 +495,9 @@ type graphQLResponse struct {
 
 // doGraphQL sends a mutation or query to GitHub's GraphQL endpoint, reusing the
 // REST client so that authentication and the HTTP context transport apply.
-// GraphQL reports failures as an `errors` array on an HTTP 200, so those are
-// turned into a regular error here.
-func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any) error {
+// A query that reads data passes a target for the `data` object; a mutation
+// passes nil.
+func (c *Client) doGraphQL(ctx context.Context, query string, variables map[string]any, data any) error {
 	request, err := c.underlying.NewRequest(http.MethodPost, "graphql", graphQLRequest{
 		Query:     query,
 		Variables: variables,
@@ -420,12 +511,28 @@ func (c *Client) doGraphQL(ctx context.Context, query string, variables map[stri
 		return err
 	}
 
-	if len(response.Errors) == 0 {
+	if err := response.err(); err != nil {
+		return err
+	}
+
+	if data == nil || len(response.Data) == 0 {
+		return nil
+	}
+
+	if err := json.Unmarshal(response.Data, data); err != nil {
+		return fmt.Errorf("failed to read GraphQL response: %w", err)
+	}
+
+	return nil
+}
+
+func (r graphQLResponse) err() error {
+	if len(r.Errors) == 0 {
 		return nil
 	}
 
 	messages := []string{}
-	for _, e := range response.Errors {
+	for _, e := range r.Errors {
 		if e.Message != "" {
 			messages = append(messages, e.Message)
 		}
@@ -453,7 +560,7 @@ func NewClient(ctx core.IntegrationContext, httpCtx core.HTTPContext) (*Client, 
 		return nil, fmt.Errorf("failed to parse installation ID: %v", err)
 	}
 
-	pem, err := FindSecret(ctx, GitHubAppPEM)
+	pem, err := LegacyAppPrivateKey(ctx, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PEM: %v", err)
 	}

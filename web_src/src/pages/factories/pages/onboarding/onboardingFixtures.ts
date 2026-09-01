@@ -1,8 +1,9 @@
 export type VcsHostId = "github" | "gitlab";
 /** Matches SuperPlane integration registry names (Claude = `claude`, not anthropic). */
-export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "linear" | "jira";
+export type IntegrationId = "github" | "gitlab" | "claude" | "cursor" | "openai" | "openrouter" | "linear" | "jira";
 export type AgentHarnessId = "claude-code" | "cursor" | "codex";
 export type IssuesChoiceId = "vcs" | "linear" | "jira" | "skip";
+export type WizardStepId = "vcs" | "repo" | "issues" | "agent" | "name";
 
 export type IntegrationOption = {
   id: IntegrationId;
@@ -13,35 +14,30 @@ export type IntegrationOption = {
 };
 
 export const VCS_OPTIONS: IntegrationOption[] = [
-  { id: "github", label: "GitHub", detail: "Connect the app repository on GitHub." },
-  { id: "gitlab", label: "GitLab", detail: "Connect the app repository on GitLab.", soon: true },
+  { id: "github", label: "GitHub", detail: "Connect GitHub to list repositories and open pull requests." },
+  { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
 
-export const AGENT_OPTIONS: {
-  id: AgentHarnessId;
-  label: string;
-  integrationId: IntegrationId;
-  detail: string;
-  soon?: boolean;
-}[] = [
+export const AGENT_OPTIONS: IntegrationOption[] = [
   {
-    id: "claude-code",
-    label: "Claude Code",
-    integrationId: "claude",
-    detail: "Cloud agent that changes the app repository and opens pull requests.",
+    id: "claude",
+    label: "Anthropic",
+    detail: "Connect an Anthropic API key for Claude Code.",
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    detail: "Connect an OpenAI API key for Codex and OpenAI models.",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    detail: "Connect an OpenRouter API key for many model providers.",
   },
   {
     id: "cursor",
     label: "Cursor",
-    integrationId: "cursor",
     detail: "Cloud agent that changes the app repository and opens pull requests.",
-    soon: true,
-  },
-  {
-    id: "codex",
-    label: "Codex",
-    integrationId: "openai",
-    detail: "Cloud agent (OpenAI) that changes the app repository and opens pull requests.",
     soon: true,
   },
 ];
@@ -110,13 +106,33 @@ export function fixtureIssueCount(repo: string): number {
   return 5 + (hash % 40);
 }
 
-export const FIXTURE_INVITE_URL = "https://app.superplane.dev/invite/storybook-demo-token";
-
-export const RAIL_STEPS = [
-  { id: "name", label: "Workspace", detail: "Name the workspace for continuous AI work" },
-  { id: "repo", label: "Version control", detail: "App repository agents analyze and change" },
-  { id: "issues", label: "Issues", detail: "Backlog SuperPlane can turn into work" },
-  { id: "agent", label: "Coding agent", detail: "Runs work in the app repository" },
+export const WIZARD_STEPS = [
+  {
+    id: "vcs" as const,
+    label: "VCS",
+    purpose: "Choose GitHub or GitLab and connect it. Agents use this host for the app repository.",
+  },
+  {
+    id: "repo" as const,
+    label: "Repository",
+    purpose: "Pick the app repository. SuperPlane analyzes that codebase. Agents change it and open pull requests.",
+  },
+  {
+    id: "issues" as const,
+    label: "Issues",
+    purpose:
+      "Optional. Point SuperPlane at a backlog so it can find small work that agents can solve. Or skip and create tasks yourself.",
+  },
+  {
+    id: "agent" as const,
+    label: "Agent",
+    purpose: "Connect Anthropic, OpenAI, or OpenRouter. Hosted credit lets you continue without your own keys.",
+  },
+  {
+    id: "name" as const,
+    label: "Name",
+    purpose: "Name the workspace for the app or product area you want to improve.",
+  },
 ] as const;
 
 export function vcsLabel(host: VcsHostId) {
@@ -135,6 +151,8 @@ export function integrationLabel(id: IntegrationId) {
       return "Cursor";
     case "openai":
       return "OpenAI";
+    case "openrouter":
+      return "OpenRouter";
     case "linear":
       return "Linear";
     case "jira":

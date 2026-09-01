@@ -95,19 +95,13 @@ func listRootEventsForRuns(ctx context.Context, db *gorm.DB, canvasID uuid.UUID,
 		return eventsByRunID, nil
 	}
 
-	var events []models.CanvasEvent
-	err := db.
-		Where("workflow_id = ?", canvasID).
-		Where("run_id IN ?", runIDs).
-		Where("execution_id IS NULL").
-		Find(&events).
-		Error
+	events, err := models.ListRootEventsForRuns(db, canvasID, runIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, event := range events {
-		eventsByRunID[event.RunID.String()] = event
+	for runID, event := range events {
+		eventsByRunID[runID.String()] = event
 	}
 
 	return eventsByRunID, nil
@@ -211,6 +205,7 @@ func serializeCanvasRunWithQueueItemInputs(
 		Result:     RunResultToProto(run.Result),
 		Executions: executionRefs,
 		QueueItems: serializedQueueItems,
+		Errors:     run.ErrorMessages(),
 		CreatedAt:  timestamppb.New(*run.CreatedAt),
 		UpdatedAt:  timestamppb.New(*run.UpdatedAt),
 	}

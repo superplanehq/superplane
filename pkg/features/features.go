@@ -19,6 +19,19 @@ const FeatureClaudeManagedAgents = "claude_managed_agents"
 // for a organization until the feature is generally available.
 const FeatureFactories = "factories"
 
+// FeatureNewIntegrationSetupFlow enables the SetupProvider wizard for
+// integrations that register one (for example GitHub). When disabled, create
+// still uses the legacy IntegrationCreateDialog path.
+const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
+
+// FeatureFactoryVelocity gates the Velocity rail link and page for a
+// factories organization until Velocity is generally available.
+const FeatureFactoryVelocity = "factory_velocity"
+
+// FeatureFactorySentryIntake gates the manual "Add intake" entry for Sentry
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactorySentryIntake = "factory_sentry_intake"
+
 func released() *bool {
 	v := true
 	return &v
@@ -27,6 +40,9 @@ func released() *bool {
 var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
+	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
+	{ID: FeatureFactoryVelocity, Label: "Factory Velocity", Description: "Show the Velocity view for a factory organization"},
+	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 }
 
 func All() []Feature {

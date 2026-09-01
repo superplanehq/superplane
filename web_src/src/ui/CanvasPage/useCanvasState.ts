@@ -1,8 +1,10 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { expandFactoryEditVerticalPositions } from "@/lib/factoryEditVerticalSpacing";
 import type { CanvasPageProps } from ".";
 import { isFactoryAutoLayout } from "./layoutMode";
+import { selectOpenSidebarNode } from "./nodesWithSelectedId";
 import {
   createLayoutNodeInterpolator,
   easeOutQuadratic,
@@ -92,6 +94,12 @@ function buildSyncedNodes(
   return [...syncedNodes, ...localOnlyNodes];
 }
 
+function withFactoryEditVerticalSpacing(nodes: Node[], specNodeIds: Set<string>): Node[] {
+  const specNodes = nodes.filter((node) => specNodeIds.has(node.id));
+  const localOnlyNodes = nodes.filter((node) => !specNodeIds.has(node.id));
+  return [...expandFactoryEditVerticalPositions(specNodes), ...localOnlyNodes];
+}
+
 export interface CanvasPageState {
   nodes: Node[];
   edges: Edge[];
@@ -116,7 +124,13 @@ export interface CanvasPageState {
 export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const { nodes: initialNodes, edges: initialEdges, startCollapsed } = props;
 
-  const [nodes, setNodes] = useState<Node[]>(() => initialNodes ?? []);
+  const [nodes, setNodes] = useState<Node[]>(() => {
+    const list = initialNodes ?? [];
+    if (!isFactoryAutoLayout(props.layoutMode)) {
+      return list;
+    }
+    return expandFactoryEditVerticalPositions(list);
+  });
   const [edges, setEdges] = useState<Edge[]>(() => initialEdges ?? []);
   const pendingNodePositionsRef = useRef<Map<string, PendingNodePosition>>(new Map());
   const displayedNodesRef = useRef(nodes);
@@ -124,6 +138,10 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const animationTargetKeyRef = useRef<string | null>(null);
   const animationTargetNodesRef = useRef<Node[]>([]);
   const animationEdgesRef = useRef<Edge[]>([]);
+  const snapNextFactoryLayoutRef = useRef(true);
+  const sidebarSelectedNodeIdRef = useRef<string | null>(
+    props.initialSidebar?.isOpen ? (props.initialSidebar.nodeId ?? null) : null,
+  );
   displayedNodesRef.current = nodes;
   const localOnlyNodeIdsKey = useMemo(
     () =>
@@ -141,6 +159,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
     const factoryAutoLayout = isFactoryAutoLayout(props.layoutMode);
     if (!factoryAutoLayout) {
+      snapNextFactoryLayoutRef.current = true;
       if (animationFrameRef.current !== null) {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -151,7 +170,15 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     }
 
     const currentNodes = displayedNodesRef.current;
-    const targetNodes = buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current);
+    const targetNodes = withFactoryEditVerticalSpacing(
+      buildSyncedNodes(currentNodes, initialNodes, pendingNodePositionsRef.current),
+      new Set(initialNodes.map((node) => node.id)),
+    );
+    const publishLayoutNodes = (nextNodes: Node[]) => {
+      const next = selectOpenSidebarNode(nextNodes, sidebarSelectedNodeIdRef.current);
+      displayedNodesRef.current = next;
+      setNodes(next);
+    };
     const targetKey = getLayoutTargetKey(targetNodes);
     const animationEnabled = !(
       typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -177,8 +204,14 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
     if (!shouldAnimate) {
       animationTargetKeyRef.current = null;
-      displayedNodesRef.current = targetNodes;
-      setNodes(targetNodes);
+      publishLayoutNodes(targetNodes);
+      return;
+    }
+
+    if (snapNextFactoryLayoutRef.current) {
+      snapNextFactoryLayoutRef.current = false;
+      animationTargetKeyRef.current = null;
+      publishLayoutNodes(targetNodes);
       return;
     }
 
@@ -189,16 +222,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       const linearProgress = Math.min((now - startedAt) / FACTORY_LAYOUT_ANIMATION_DURATION_MS, 1);
       const latestTargetNodes = animationTargetNodesRef.current;
       if (linearProgress >= 1) {
-        displayedNodesRef.current = latestTargetNodes;
-        setNodes(latestTargetNodes);
+        publishLayoutNodes(latestTargetNodes);
         animationFrameRef.current = null;
         animationTargetKeyRef.current = null;
         return;
       }
 
-      const animatedNodes = interpolateNodes(latestTargetNodes, easeOutQuadratic(linearProgress));
-      displayedNodesRef.current = animatedNodes;
-      setNodes(animatedNodes);
+      publishLayoutNodes(interpolateNodes(latestTargetNodes, easeOutQuadratic(linearProgress)));
       animationFrameRef.current = window.requestAnimationFrame(animate);
     };
 
@@ -344,6 +374,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   );
 
   const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
+  sidebarSelectedNodeIdRef.current = componentSidebar.isOpen ? componentSidebar.selectedNodeId : null;
 
   return {
     nodes,

@@ -18,8 +18,8 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
           },
           artifact: {
             id: "artifact-1",
-            type: "pr",
-            data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+            type: "markdown",
+            data: { title: "plan.md" },
           },
         },
       },
@@ -34,8 +34,8 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
           artifacts: [
             {
               id: "artifact-1",
-              type: "pr",
-              data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+              type: "markdown",
+              data: { title: "plan.md" },
             },
           ],
         },
@@ -82,7 +82,7 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
         type: "order.artifact.added",
         event: {
           automation: { lineId: "line-1", lineName: "CI" },
-          artifact: { id: "artifact-1", type: "pr", data: { url: "https://example.com/pr/1" } },
+          artifact: { id: "artifact-1", type: "markdown", data: { title: "plan.md" } },
         },
       },
     ]);
@@ -159,5 +159,58 @@ describe("buildWorkOrderTimelineViewFromEvents: dispatch-step grouping", () => {
 
     const dispatched = view.events.find((event) => event.kind === "dispatched");
     expect(dispatched?.steps?.[0]?.comments).toEqual([{ body: "Ready for review" }]);
+  });
+
+  it("groups an added pull request into its dispatch step", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      stepExecutionEvent("step.execution.created", "2026-08-04T12:00:00.000Z", "started"),
+      {
+        timestamp: "2026-08-04T12:01:00.000Z",
+        type: "order.pull_request.added",
+        event: {
+          automation: {
+            lineId: "line-1",
+            lineName: "CI",
+            stepName: "Build",
+          },
+          pullRequest: {
+            id: "pr-1",
+            number: 42,
+            url: "https://github.com/example/repo/pull/42",
+            title: "Fix refund retry",
+            state: "open",
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(1);
+    expect(view.events[0]?.steps?.[0]?.pullRequests).toMatchObject([
+      {
+        id: "pr-1",
+        number: "42",
+        url: "https://github.com/example/repo/pull/42",
+        title: "Fix refund retry",
+        state: "STATE_OPEN",
+      },
+    ]);
+  });
+
+  it("skips leftover pull request artifacts in the timeline", () => {
+    const view = buildWorkOrderTimelineViewFromEvents([
+      {
+        timestamp: "2026-08-04T12:00:00.000Z",
+        type: "order.artifact.added",
+        event: {
+          artifact: {
+            id: "art-pr-1",
+            type: "pr",
+            data: { number: 42, url: "https://github.com/example/repo/pull/42" },
+          },
+        },
+      },
+    ]);
+
+    expect(view.events).toHaveLength(0);
   });
 });

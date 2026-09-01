@@ -101,15 +101,24 @@ type Action interface {
 	Cleanup(ctx SetupContext) error
 }
 
+// NodeConfigurationValidator is implemented by actions whose field schema
+// cannot express every save-time rule. Canvas updates call this after
+// schema validation and store a failure on the node error message.
+type NodeConfigurationValidator interface {
+	ValidateNodeConfiguration(config map[string]any) error
+}
+
 /*
  * QueueItemProcessor is implemented by actions that process their node's
  * queue items themselves (merge, loop) instead of the engine's default
  * processing, which creates an execution and dequeues the item.
  *
- * These components keep executions open while waiting for more queue
+ * Implementing this interface also means the engine always dispatches
+ * the component's queue items instead of gating them on queue capacity:
+ * these components keep executions open while waiting for more queue
  * items — later source events for merge, feedback events for loop — so
- * they decide per item whether to create an execution, feed an existing
- * one, or defer the item.
+ * capacity-gating their items would starve the very items needed to
+ * finish those executions. Queue capacity does not apply.
  */
 type QueueItemProcessor interface {
 	/*

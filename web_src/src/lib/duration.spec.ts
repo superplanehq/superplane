@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
+import {
+  formatClockDuration,
+  formatClockDurationLabel,
+  formatDuration,
+  formatMinutesSecondsDuration,
+} from "@/lib/duration";
 
 describe("duration", () => {
   afterEach(() => {
@@ -63,6 +68,38 @@ describe("duration", () => {
     expect(formatMinutesSecondsDuration(51_988)).toBe("51s");
     expect(formatMinutesSecondsDuration(61_500)).toBe("1m 1s");
     expect(formatMinutesSecondsDuration(5_400_000)).toBe("90m");
+  });
+});
+
+describe("formatClockDuration", () => {
+  it("pads minutes and seconds so columns line up", () => {
+    expect(formatClockDuration(0)).toBe("00:00");
+    expect(formatClockDuration(2_000)).toBe("00:02");
+    expect(formatClockDuration(29_000)).toBe("00:29");
+    expect(formatClockDuration(179_000)).toBe("02:59");
+    expect(formatClockDuration(1_436_000)).toBe("23:56");
+  });
+
+  it("adds hours when the duration is an hour or longer", () => {
+    expect(formatClockDuration(3_600_000)).toBe("1:00:00");
+    expect(formatClockDuration(4_222_000)).toBe("1:10:22");
+  });
+});
+
+describe("formatClockDurationLabel", () => {
+  it("converts spoken duration labels to clock time", () => {
+    expect(formatClockDurationLabel("2s")).toBe("00:02");
+    expect(formatClockDurationLabel("1m")).toBe("01:00");
+    expect(formatClockDurationLabel("1m 12s")).toBe("01:12");
+    expect(formatClockDurationLabel("2m 59s so far")).toBe("02:59");
+    expect(formatClockDurationLabel("10m 12s")).toBe("10:12");
+    expect(formatClockDurationLabel("23m 56s")).toBe("23:56");
+  });
+
+  it("keeps placeholders and status words", () => {
+    expect(formatClockDurationLabel("—")).toBe("—");
+    expect(formatClockDurationLabel("Running")).toBe("Running");
+    expect(formatClockDurationLabel("")).toBe("—");
   });
 });
 

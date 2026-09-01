@@ -77,6 +77,8 @@ spec:
               value: "yes"
             - name: START_FACTORY_CLEANUP_WORKER
               value: "yes"
+            - name: START_FACTORY_VELOCITY_SYNC_WORKER
+              value: "yes"
             - name: START_NODE_REQUEST_CLEANUP_WORKER
               value: "yes"
             - name: START_REPOSITORY_PROVISIONER

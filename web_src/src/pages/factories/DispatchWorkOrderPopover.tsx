@@ -13,6 +13,7 @@ interface DispatchWorkOrderPopoverProps {
   isSaving: boolean;
   canDispatch: boolean;
   align?: "start" | "center" | "end";
+  submitLabel?: string;
   onDispatch: (input: { lineName: string }) => Promise<void>;
   children: ReactNode;
 }
@@ -22,6 +23,7 @@ export function DispatchWorkOrderPopover({
   isSaving,
   canDispatch,
   align = "end",
+  submitLabel = "Dispatch",
   onDispatch,
   children,
 }: DispatchWorkOrderPopoverProps) {
@@ -51,7 +53,7 @@ export function DispatchWorkOrderPopover({
       await onDispatch({ lineName });
       setOpen(false);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to dispatch work order"));
+      showErrorToast(getApiErrorMessage(error, "Failed to dispatch task"));
     }
   };
 
@@ -61,7 +63,11 @@ export function DispatchWorkOrderPopover({
       <PopoverContent align={align} className="w-80 p-3" sideOffset={8}>
         <div className="space-y-3">
           {lines.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Configure at least one line before dispatching work orders.</p>
+            <p className="text-sm text-muted-foreground">
+              {submitLabel === "Start"
+                ? "Configure at least one line before you start a task."
+                : "Configure at least one line before dispatching tasks."}
+            </p>
           ) : (
             <div className="space-y-1.5">
               <Label htmlFor="dispatch-line-select" className="text-xs">
@@ -82,16 +88,16 @@ export function DispatchWorkOrderPopover({
             </div>
           )}
 
-          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
             <LoadingButton
               onClick={() => void handleDispatch()}
               disabled={!canDispatch || lines.length === 0 || !lineName}
               loading={isSaving}
-              loadingText="Dispatching..."
+              loadingText={submitLabel === "Start" ? "Starting..." : "Dispatching..."}
               className="w-full"
               data-testid="dispatch-work-order-submit"
             >
-              Dispatch
+              {submitLabel}
             </LoadingButton>
           </PermissionTooltip>
         </div>

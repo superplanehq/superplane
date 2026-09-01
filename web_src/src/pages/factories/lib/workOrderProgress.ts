@@ -1,14 +1,33 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import { hasActiveWorkOrderExecution } from "./workOrderExecutions";
+import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { formatWorkOrderIdentifier } from "./workspaceKey";
 
+// Running when the dispatch is still active, or when a step is still in
+// flight. Dispatch state can lag behind step executions.
+function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
+  return (order.lineDispatches ?? []).some((dispatch) => {
+    if (dispatch.state === "STATE_ACTIVE") {
+      return true;
+    }
+    return (dispatch.stepExecutions ?? []).some(isActiveWorkOrderExecution);
+  });
+}
+
 /**
- * Display vocabulary for the Work Orders workspace. Mirrors the six labels
- * from the reference application: Draft, Running, Waiting, Completed,
- * Failed, Cancelled. Persisted state + result columns in the database stay
- * unchanged; this file is the single mapping layer.
+ * Display vocabulary for the Tasks workspace: Draft, Running, Needs
+ * attention, Completed, Failed, Rejected, Canceled. The idle-open key stays
+ * `waiting` so stored filters keep working. Persisted state + result
+ * columns in the database stay unchanged; this file is the single mapping
+ * layer.
  */
-export type WorkOrderDisplayStatus = "draft" | "running" | "waiting" | "completed" | "failed" | "cancelled";
+export type WorkOrderDisplayStatus =
+  | "draft"
+  | "running"
+  | "waiting"
+  | "completed"
+  | "failed"
+  | "rejected"
+  | "cancelled";
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
@@ -31,9 +50,9 @@ const DISPLAY_STATUS_META: Record<
     dotClassName: "bg-[color:var(--status-running-dot)]",
   },
   waiting: {
-    label: "Waiting",
-    filterLabel: "Waiting",
-    summary: "Waiting for review or the next dispatch.",
+    label: "Needs attention",
+    filterLabel: "Needs attention",
+    summary: "A person must act before this work can continue.",
     className:
       "border-[color:var(--status-waiting-border)] bg-[color:var(--status-waiting-bg)] text-[color:var(--status-waiting-fg)]",
     dotClassName: "bg-[color:var(--status-waiting-dot)]",
@@ -41,7 +60,7 @@ const DISPLAY_STATUS_META: Record<
   completed: {
     label: "Completed",
     filterLabel: "Completed",
-    summary: "Work order completed successfully.",
+    summary: "Task completed successfully.",
     className:
       "border-[color:var(--status-completed-border)] bg-[color:var(--status-completed-bg)] text-[color:var(--status-completed-fg)]",
     dotClassName: "bg-[color:var(--status-completed-dot)]",
@@ -54,10 +73,18 @@ const DISPLAY_STATUS_META: Record<
       "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
     dotClassName: "bg-[color:var(--status-failed-dot)]",
   },
+  rejected: {
+    label: "Rejected",
+    filterLabel: "Rejected",
+    summary: "A person rejected this task.",
+    className:
+      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
+    dotClassName: "bg-[color:var(--status-failed-dot)]",
+  },
   cancelled: {
-    label: "Cancelled",
-    filterLabel: "Cancelled",
-    summary: "Closed as cancelled.",
+    label: "Canceled",
+    filterLabel: "Canceled",
+    summary: "This task was canceled.",
     className:
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
@@ -70,6 +97,7 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "waiting",
   "completed",
   "failed",
+  "rejected",
   "cancelled",
 ];
 
@@ -98,15 +126,15 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   },
   {
     id: "review",
-    title: "Review",
-    description: "Waiting for reviewers or the next dispatch.",
+    title: "Needs attention",
+    description: "Tasks that wait for a human decision.",
     statuses: ["waiting"],
   },
   {
     id: "done",
     title: "Done",
-    description: "Completed, failed, or cancelled work.",
-    statuses: ["completed", "failed", "cancelled"],
+    description: "Completed, failed, rejected, or canceled work.",
+    statuses: ["completed", "failed", "rejected", "cancelled"],
   },
 ];
 
@@ -135,10 +163,16 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
     if (order.result === "RESULT_REJECTED") {
-      return "cancelled";
+      return "rejected";
     }
     if (order.result === "RESULT_FAILED") {
       return "failed";
+    }
+    if (
+      order.result !== "RESULT_COMPLETED" &&
+      (order.lineDispatches ?? []).some((dispatch) => dispatch.result === "RESULT_CANCELLED")
+    ) {
+      return "cancelled";
     }
     return "completed";
   }
@@ -147,7 +181,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
     return "draft";
   }
 
-  if (hasActiveWorkOrderExecution(order.executions ?? [])) {
+  if (hasActiveLineDispatch(order)) {
     return "running";
   }
 
@@ -247,12 +281,14 @@ export function getWorkOrderDetailDerived(order: FactoriesWorkOrder | undefined)
   const displayStatus = getWorkOrderDisplayStatus(order);
   const isOpen = order.state === "STATE_OPEN";
   const isDraft = order.state === "STATE_DRAFT";
+  const owner = (order.assignees ?? [])[0];
+  const ownerId = owner?.id;
 
   return {
     displayStatus,
     statusMeta: getWorkOrderDisplayStatusMeta(displayStatus),
-    assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
-    assigneeNames: (order.assignees ?? []).map((assignee) => assignee.name ?? "Unknown"),
+    assigneeIds: ownerId ? [ownerId] : [],
+    assigneeNames: ownerId ? [owner.name ?? "Unknown"] : [],
     isOpen,
     isDispatchable: isOpen || isDraft,
     isClosed: order.state === "STATE_CLOSED",

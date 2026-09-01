@@ -3,6 +3,7 @@ import type { DraftDiffStatus } from "@/lib/draftDiff";
 import type { EventStateMap } from "../componentBase/eventState";
 import type { MetadataItem } from "../metadataList";
 import { FactoryNodeCardShell } from "./FactoryNodeCardShell";
+import { factoryNodeCardFrameClassName, factoryNodeCardSelectedAttr } from "./factoryNodeSelectedRing";
 import { NodeHoverActions } from "./NodeHoverActions";
 import { WarningBadge } from "./WarningBadge";
 import { resolveFactoryNodeCardTitles } from "./resolveFactoryNodeCardTitles";
@@ -53,6 +54,8 @@ export type FactoryNodeCardProps = {
   runIsActive?: boolean;
   /** Mapper eventStateMap — same source the run sidebar uses for badge color. */
   eventStateMap?: EventStateMap;
+  /** Optional content between the node header and status footer. */
+  body?: React.ReactNode;
 };
 
 function useFactoryNodeMetrics(
@@ -140,6 +143,7 @@ export function FactoryNodeCard({
   showRuntimeStatus = true,
   runIsActive = true,
   eventStateMap,
+  body,
 }: FactoryNodeCardProps) {
   const primarySection = eventSections?.[0];
   const runtimeStatus = resolveFactoryRuntimeStatus({
@@ -163,7 +167,11 @@ export function FactoryNodeCard({
   });
 
   return (
-    <div className="group relative" data-view-mode={isCompactView ? "compact" : "expanded"}>
+    <div
+      className={factoryNodeCardFrameClassName(selected)}
+      data-view-mode={isCompactView ? "compact" : "expanded"}
+      data-selected={factoryNodeCardSelectedAttr(selected)}
+    >
       <NodeHoverActions
         showHeader={showHeader}
         onDuplicate={onDuplicate}
@@ -186,6 +194,7 @@ export function FactoryNodeCard({
         dimBodyBelowHeader={dimBodyBelowHeader}
         isCompactView={isCompactView}
         showStatusFooter={footer.showStatusFooter}
+        body={body}
       />
     </div>
   );

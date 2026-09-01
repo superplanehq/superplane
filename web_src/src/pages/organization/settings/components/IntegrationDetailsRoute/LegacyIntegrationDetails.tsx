@@ -12,13 +12,16 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { appPath } from "@/lib/appPaths";
+import { hostedGitHubAppSlug, hostedGitHubState, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
+import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 
 interface LegacyIntegrationDetailsProps {
   organizationId: string;
@@ -44,7 +47,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
 
   const updateMutation = useUpdateIntegration(organizationId, integration.metadata?.id || "");
   const deleteMutation = useDeleteIntegration(organizationId, integration.metadata?.id || "");
-  const integrationsHref = `/${organizationId}/settings/integrations`;
+  const integrationsHref = useIntegrationsBasePath(organizationId);
 
   // Initialize config values when installation loads
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -131,6 +134,11 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     }));
   }, [integration?.status?.usedIn]);
 
+  const pendingInstallations = pendingGitHubInstallations(integration.status?.metadata);
+  const pendingInstallState = hostedGitHubState(integration.status?.metadata);
+  const showInstallPicker =
+    pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
+
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canUpdateIntegrations) return;
@@ -189,7 +197,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     if (!canDeleteIntegrations) return;
     try {
       await deleteMutation.mutateAsync({ integrationName: integration?.metadata?.integrationName ?? "" });
-      navigate(`/${organizationId}/settings/integrations`);
+      navigate(integrationsHref);
     } catch {
       showErrorToast("Failed to delete integration");
     }
@@ -250,11 +258,19 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
           </Alert>
         )}
 
-        {integration?.status?.browserAction && (
-          <IntegrationInstructions
-            description={integration.status.browserAction.description}
-            onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
+        {showInstallPicker ? (
+          <HostedGitHubInstallPicker
+            installations={pendingInstallations}
+            state={pendingInstallState}
+            appSlug={hostedGitHubAppSlug(integration.status?.metadata)}
           />
+        ) : (
+          integration?.status?.browserAction && (
+            <IntegrationInstructions
+              description={integration.status.browserAction.description}
+              onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
+            />
+          )
         )}
 
         {instructionsContent}

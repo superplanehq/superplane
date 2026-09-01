@@ -16,7 +16,12 @@ import (
 
 var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
 
-const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
+// Canvas names are unique inside the factory that owns the canvas, and unique
+// per organization for canvases that no factory owns.
+var canvasNameUniqueConstraints = []string{
+	"workflows_organization_id_name_active_key",
+	"workflows_factory_id_name_active_key",
+}
 
 type Canvas struct {
 	ID                          uuid.UUID
@@ -72,11 +77,22 @@ func MapCanvasNameUniqueConstraintError(err error) error {
 	}
 
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.ConstraintName == canvasNameUniqueConstraint {
+	if errors.As(err, &pgErr) && slices.Contains(canvasNameUniqueConstraints, pgErr.ConstraintName) {
 		return ErrCanvasNameAlreadyExists
 	}
 
 	return err
+}
+
+// scopeToCanvasNameOwner narrows a query to the scope a canvas name is unique
+// in: the factory when one owns the canvas, the organization otherwise.
+func scopeToCanvasNameOwner(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) *gorm.DB {
+	query := tx.Where("organization_id = ?", organizationID)
+	if factoryID == nil {
+		return query.Where("factory_id IS NULL")
+	}
+
+	return query.Where("factory_id = ?", *factoryID)
 }
 
 func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
@@ -174,14 +190,13 @@ func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
 	return FindCanvasInTransaction(database.Conn(), orgID, id)
 }
 
-func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
-	return FindCanvasByNameInTransaction(database.Conn(), name, organizationID)
-}
-
-func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid.UUID) (*Canvas, error) {
+// FindCanvasByName looks a canvas up in the scope its name is unique in. Pass
+// the factory ID to search inside a factory, or nil to search the canvases that
+// no factory owns.
+func FindCanvasByName(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID, name string) (*Canvas, error) {
 	var canvas Canvas
-	err := tx.
-		Where("name = ? AND organization_id = ?", name, organizationID).
+	err := scopeToCanvasNameOwner(tx, organizationID, factoryID).
+		Where("name = ?", name).
 		First(&canvas).
 		Error
 
@@ -300,6 +315,37 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	}
 
 	return canvases, nil
+}
+
+// AvailableCanvasName returns preferred, or preferred with the lowest " (n)"
+// suffix that no other canvas in the same scope holds. A generated canvas has to
+// pick a free name before insert. Pass the factory ID for a canvas the factory
+// owns, or nil for an organization-level canvas.
+func AvailableCanvasName(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID, preferred string) (string, error) {
+	var names []string
+	err := scopeToCanvasNameOwner(tx.Model(&Canvas{}), organizationID, factoryID).
+		Where("name = ? OR name LIKE ?", preferred, preferred+" (%)").
+		Pluck("name", &names).
+		Error
+	if err != nil {
+		return "", err
+	}
+
+	taken := make(map[string]bool, len(names))
+	for _, name := range names {
+		taken[name] = true
+	}
+
+	if !taken[preferred] {
+		return preferred, nil
+	}
+
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s (%d)", preferred, suffix)
+		if !taken[candidate] {
+			return candidate, nil
+		}
+	}
 }
 
 func ListOrganizationCanvases(tx *gorm.DB, organizationID uuid.UUID) ([]Canvas, error) {

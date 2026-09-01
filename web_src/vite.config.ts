@@ -37,6 +37,9 @@ export default defineConfig(() => {
       port: devPort,
       strictPort: true,
       host: true,
+      fs: {
+        allow: [import.meta.dirname, path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates")],
+      },
       headers: !isProduction ? { "X-Robots-Tag": "noindex" } : undefined,
       watch: {
         usePolling: true,
@@ -75,8 +78,12 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         "@/canvas": path.resolve(import.meta.dirname, "src/pages/canvas"),
+        "@factory-templates": path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates"),
         "@": path.resolve(import.meta.dirname, "src"),
       },
+    },
+    optimizeDeps: {
+      include: ["@pierre/diffs/react", "@pierre/trees/react"],
     },
     build: {
       target: "es2020",

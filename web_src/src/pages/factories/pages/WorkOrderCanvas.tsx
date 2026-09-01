@@ -361,7 +361,7 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const palette = useMemo(() => edgePalette(isDark), [isDark]);
-  const background = useMemo(() => backgroundColors(isDark), [isDark]);
+  const background = useMemo(() => backgroundColors(isDark, editable), [isDark, editable]);
 
   const initialGraph = useMemo(() => buildWorkflowGraph(editable), [editable]);
   const [nodes, , onNodesChange] = useNodesState(initialGraph.nodes);
@@ -446,6 +446,7 @@ export function WorkOrderCanvas({ editable = false }: { editable?: boolean } = {
           colorMode={isDark ? "dark" : "light"}
         >
           <Background
+            id={`dots-${editable ? "edit" : "view"}-${background.size}`}
             gap={background.gap}
             size={background.size}
             color={background.color}

@@ -34,3 +34,23 @@ func Test__toIntegrationResources__fallsBackToName(t *testing.T) {
 	require.Len(t, resources, 1)
 	assert.Equal(t, "web", resources[0].Name)
 }
+
+func Test__toDefaultBranchResources__usesRepositoryDefaultBranch(t *testing.T) {
+	for _, branch := range []string{"main", "master", "staging"} {
+		defaultBranch := branch
+		resources := toDefaultBranchResources(&github.Repository{DefaultBranch: &defaultBranch})
+
+		require.Len(t, resources, 1)
+		assert.Equal(t, "default_branch", resources[0].Type)
+		assert.Equal(t, branch, resources[0].Name)
+		assert.Equal(t, branch, resources[0].ID)
+	}
+}
+
+func Test__toDefaultBranchResources__fallsBackToMainWhenEmpty(t *testing.T) {
+	resources := toDefaultBranchResources(&github.Repository{})
+
+	require.Len(t, resources, 1)
+	assert.Equal(t, "main", resources[0].Name)
+	assert.Equal(t, "main", resources[0].ID)
+}

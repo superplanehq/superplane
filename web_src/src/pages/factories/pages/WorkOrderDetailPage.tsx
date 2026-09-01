@@ -1,113 +1,63 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import {
   useFactory,
+  useFactoryPullRequests,
   useFactoryWorkOrders,
   useWorkOrder,
   useWorkOrderArtifacts,
   useWorkOrderEvents,
 } from "@/hooks/useFactoryData";
+import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useLocation, useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
+import { canonicalWorkOrderNumber, resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
-import {
-  resolveWorkOrderByNumber,
-  workOrderRouteNeedsCanonicalRedirect,
-  type WorkOrderResolution,
-} from "../lib/workOrderNumberResolution";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import { useWorkOrderDetailActions } from "../useWorkOrderDetailActions";
 import { WorkOrderDetailLoadedView } from "../WorkOrderDetailLoadedView";
+import { presentWorkOrderStatusNotes } from "../lib/workOrderStatusNote";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import { LinesPage } from "./LinesPage";
 
+/** Canonical `/work-order/:orderNumber` opens the line board with the popup. */
 export function WorkOrderDetailPage() {
-  const { orderNumber } = useParams<{ orderNumber: string }>();
-  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
-  const location = useLocation();
-  const {
-    data: workOrders = [],
-    isLoading: workOrdersLoading,
-    isFetching: workOrdersFetching,
-  } = useFactoryWorkOrders(organizationId, factoryId);
-
-  if (!orderNumber) {
-    return null;
-  }
-
-  // `isFetching` (not just `isLoading`) so a just-created work order — whose
-  // list invalidation is still in flight when we navigate to its permalink —
-  // shows the loading state instead of bouncing back to the list.
-  const resolution = resolveWorkOrderByNumber(workOrders, orderNumber, workOrdersLoading || workOrdersFetching);
-
-  if (workOrderRouteNeedsCanonicalRedirect(resolution, orderNumber) && resolution.order?.number !== undefined) {
-    const canonicalHref = workOrderDetailPath(organizationId, factoryKey, String(Number(resolution.order.number)));
-    return <Navigate to={`${canonicalHref}${location.search}`} replace />;
-  }
-
-  if (resolution.status === "not-found") {
-    return <Navigate to={workOrdersPath(organizationId, factoryKey)} replace />;
-  }
-
-  if (resolution.status === "loading" || !resolution.order?.id) {
-    return (
-      <div className={factoryContentBodyClassName}>
-        <p className="text-[13px] text-muted-foreground">Loading work order…</p>
-      </div>
-    );
-  }
-
-  return (
-    <WorkOrderDetailPageContent
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={resolution.order.id}
-    />
-  );
+  return <LinesPage />;
 }
 
-/** Legacy `/work-orders/:orderId` bookmarks redirect to the canonical `/work-order/:number` permalink. */
+/** Legacy `/work-orders/:orderId` bookmarks go to the canonical permalink. */
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
-  const { organizationId, factoryId, factoryKey } = useFactoriesLayout();
-  const location = useLocation();
-  const { data: workOrders = [], isLoading, isFetching } = useFactoryWorkOrders(organizationId, factoryId);
-
-  if (!orderId) {
-    return <Navigate to={workOrdersPath(organizationId, factoryKey)} replace />;
-  }
-
-  const resolution: WorkOrderResolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading || isFetching);
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
+  const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
+  const number = canonicalWorkOrderNumber(resolution.order);
 
   if (resolution.status === "loading") {
-    return (
-      <div className={factoryContentBodyClassName}>
-        <p className="text-[13px] text-muted-foreground">Loading work order…</p>
-      </div>
-    );
+    return null;
   }
-
-  if (resolution.status === "not-found" || resolution.order?.number === undefined) {
-    return <Navigate to={workOrdersPath(organizationId, factoryKey)} replace />;
+  if (number) {
+    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, number)} replace />;
   }
-
-  const canonicalHref = workOrderDetailPath(organizationId, factoryKey, String(Number(resolution.order.number)));
-  return <Navigate to={`${canonicalHref}${location.search}`} replace />;
+  return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
 }
 
-function WorkOrderDetailPageContent({
+export function WorkOrderDetailPanel({
   organizationId,
   factoryId,
   factoryKey,
   orderId,
+  chrome = "page",
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   orderId: string;
+  chrome?: "page" | "dialog";
 }) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
 
@@ -116,47 +66,86 @@ function WorkOrderDetailPageContent({
   const eventsQuery = useWorkOrderEvents(organizationId, factoryId, orderId);
   const events = useMemo(() => flattenWorkOrderEventsPages(eventsQuery.data?.pages), [eventsQuery.data?.pages]);
   const artifactsQuery = useWorkOrderArtifacts(organizationId, factoryId, orderId);
+  const pullRequestsQuery = useFactoryPullRequests(organizationId, factoryId, { workOrderIds: [orderId] });
+  const checksQuery = useWorkOrderChecks(organizationId, factoryId, orderId);
+  const checks = useMemo(() => presentWorkOrderChecks(checksQuery.data ?? []), [checksQuery.data]);
 
   const actions = useWorkOrderDetailActions(organizationId, factoryId, orderId);
   // Memoize so derived arrays (e.g. `assigneeIds`) keep a stable reference
   // across re-renders/refetches that don't actually change `order`.
   const derived = useMemo(() => getWorkOrderDetailDerived(order), [order]);
 
-  usePageTitle([order?.title ?? "Work Order", factory?.name ?? "Workspace"]);
+  usePageTitle(workOrderDetailTitle(order, factory), { enabled: chrome === "page" });
 
-  const workOrdersHref = workOrdersPath(organizationId, factoryKey);
+  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const unavailable = shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError });
+  const ready = isWorkOrderDetailReady(factory, order, derived);
 
-  if (shouldRedirectAfterError({ factoryLoading, factoryError, orderLoading, orderError })) {
-    return <Navigate to={workOrdersHref} replace />;
+  if (unavailable) {
+    return <WorkOrderDetailUnavailable chrome={chrome} boardHref={boardHref} />;
   }
 
   if (factoryLoading || orderLoading) {
-    return (
-      <div className={factoryContentBodyClassName}>
-        <p className="text-[13px] text-muted-foreground">Loading work order…</p>
-      </div>
-    );
+    return <WorkOrderDetailLoading chrome={chrome} />;
   }
 
-  if (!factory || !order || !derived.statusMeta || !derived.displayStatus) {
+  if (!ready) {
     return null;
   }
 
   return (
     <LoadedWorkOrderDetail
-      order={order}
+      order={order!}
       derived={derived}
-      factoryLines={factory.lines ?? []}
+      factoryLines={factory!.lines ?? []}
       organizationId={organizationId}
       factoryKey={factoryKey}
+      chrome={chrome}
       events={events}
       eventsQuery={eventsQuery}
       artifactsQuery={artifactsQuery}
+      pullRequestsQuery={pullRequestsQuery}
+      checks={checks}
+      isChecksLoading={checksQuery.isLoading}
+      checksError={checksQuery.error ?? null}
       canManageWorkOrders={canAct("work_orders", "update")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />
   );
+}
+
+function workOrderDetailTitle(
+  order: ReturnType<typeof useWorkOrder>["data"],
+  factory: ReturnType<typeof useFactory>["data"],
+) {
+  return [order?.title ?? "Task", factory?.name ?? "Workspace"];
+}
+
+function isWorkOrderDetailReady(
+  factory: ReturnType<typeof useFactory>["data"],
+  order: ReturnType<typeof useWorkOrder>["data"],
+  derived: ReturnType<typeof getWorkOrderDetailDerived>,
+): derived is ReturnType<typeof getWorkOrderDetailDerived> & {
+  statusMeta: NonNullable<ReturnType<typeof getWorkOrderDetailDerived>["statusMeta"]>;
+  displayStatus: NonNullable<ReturnType<typeof getWorkOrderDetailDerived>["displayStatus"]>;
+} {
+  return Boolean(factory && order && derived.statusMeta && derived.displayStatus);
+}
+
+function WorkOrderDetailLoading({ chrome }: { chrome: "page" | "dialog" }) {
+  return (
+    <div className={chrome === "dialog" ? "px-6 py-8" : factoryContentBodyClassName}>
+      <p className="text-[13px] text-muted-foreground">Loading task…</p>
+    </div>
+  );
+}
+
+function WorkOrderDetailUnavailable({ chrome, boardHref }: { chrome: "page" | "dialog"; boardHref: string }) {
+  if (chrome === "dialog") {
+    return <p className="px-6 py-8 text-[13px] text-muted-foreground">This task cannot be opened.</p>;
+  }
+  return <Navigate to={boardHref} replace />;
 }
 
 function shouldRedirectAfterError(state: {
@@ -176,9 +165,14 @@ interface LoadedWorkOrderDetailProps {
   factoryLines: FactoriesFactoryLine[];
   organizationId: string;
   factoryKey: string;
+  chrome?: "page" | "dialog";
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
   eventsQuery: ReturnType<typeof useWorkOrderEvents>;
   artifactsQuery: ReturnType<typeof useWorkOrderArtifacts>;
+  pullRequestsQuery: ReturnType<typeof useFactoryPullRequests>;
+  checks: WorkOrderCheckPresentation[];
+  isChecksLoading: boolean;
+  checksError: Error | null;
   canManageWorkOrders: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
@@ -190,17 +184,24 @@ function LoadedWorkOrderDetail({
   factoryLines,
   organizationId,
   factoryKey,
+  chrome = "page",
   events,
   eventsQuery,
   artifactsQuery,
+  pullRequestsQuery,
+  checks,
+  isChecksLoading,
+  checksError,
   canManageWorkOrders,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
   return (
     <WorkOrderDetailLoadedView
+      statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
       organizationId={organizationId}
       factoryKey={factoryKey}
+      chrome={chrome}
       order={order}
       events={events}
       eventsError={eventsQuery.error ?? null}
@@ -216,6 +217,12 @@ function LoadedWorkOrderDetail({
       artifacts={artifactsQuery.data ?? []}
       isArtifactsLoading={artifactsQuery.isLoading}
       artifactsError={artifactsQuery.error ?? null}
+      pullRequests={pullRequestsQuery.data ?? []}
+      isPullRequestsLoading={pullRequestsQuery.isLoading}
+      pullRequestsError={pullRequestsQuery.error ?? null}
+      checks={checks}
+      isChecksLoading={isChecksLoading}
+      checksError={checksError}
       displayStatus={derived.displayStatus!}
       statusMeta={derived.statusMeta!}
       assigneeIds={derived.assigneeIds}

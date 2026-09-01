@@ -114,8 +114,14 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     name: "order",
     snippet: "order().",
     description:
-      "Returns the work order for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, artifacts, and comments (both loaded when accessed).",
+      "Returns the task for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, url, artifacts, and comments (the last three loaded when accessed).",
     example: 'none(order().artifacts, {#.type == "pr"})',
+  },
+  {
+    name: "workspace",
+    snippet: "workspace().",
+    description: "Returns the factory workspace, including its repository and default branch.",
+    example: "workspace().repository",
   },
   // String
   {
@@ -1482,6 +1488,11 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
   const orderMatch = expr.match(/^order\(\)/);
   if (orderMatch) {
     return `__order${expr.slice(orderMatch[0].length)}`;
+  }
+
+  const workspaceMatch = expr.match(/^workspace\(\)/);
+  if (workspaceMatch) {
+    return `__workspace${expr.slice(workspaceMatch[0].length)}`;
   }
 
   return expr;

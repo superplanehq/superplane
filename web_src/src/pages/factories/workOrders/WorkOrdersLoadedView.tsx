@@ -1,4 +1,9 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactory,
+  FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+} from "@/api-client";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import {
@@ -9,7 +14,8 @@ import {
   buildWorkOrderListEntries,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
-import { factoryContentBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
+import { useActivePRFeedbackWorkOrderIds } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -26,6 +32,7 @@ interface WorkOrdersLoadedViewProps {
   factory: FactoriesFactory;
   factoryLines: FactoriesFactoryLine[];
   workOrders: FactoriesWorkOrder[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   state: WorkOrderListState;
   currentUserId?: string;
   canCreate: boolean;
@@ -33,20 +40,22 @@ interface WorkOrdersLoadedViewProps {
   canDispatch: boolean;
   canAssign: boolean;
   permissionsLoading: boolean;
-  isDispatching: boolean;
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
 }
 
 /**
- * Data-agnostic Work Orders view. Receives raw work orders + the shared
+ * Data-agnostic Tasks view. Receives raw tasks + the shared
  * `WorkOrderListState` and renders the toolbar + selected layout. Kept
  * separate from `WorkOrdersPage` so stories can drive it with fixtures
  * and the shell page only handles fetching + mutations.
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
-  const { workOrders, factory, state, currentUserId } = props;
+  const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
+  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -57,6 +66,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const ordered = useMemo(() => applyWorkOrderOrdering(searched, state.ordering), [searched, state.ordering]);
 
   const totalCount = entries.length;
+  const showKanbanBoard = state.layout === "board" && totalCount > 0 && ordered.length > 0;
 
   const body = () => {
     if (totalCount === 0) {
@@ -87,14 +97,20 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       factoryLines: props.factoryLines,
       canDispatch: props.canDispatch,
       canAssign: props.canAssign,
-      isDispatching: props.isDispatching,
+      dispatchingOrderIds: props.dispatchingOrderIds,
       isAssigneesSaving: props.isAssigneesSaving,
       onDispatch: props.onDispatch,
       onAssigneesSave: props.onAssigneesSave,
     };
 
     if (state.layout === "board") {
-      return <WorkOrdersBoardView {...sharedProps} />;
+      return (
+        <WorkOrdersBoardView
+          {...sharedProps}
+          factoryId={factory.id}
+          addressingFeedbackOrderIds={addressingFeedbackOrderIds}
+        />
+      );
     }
     if (state.layout === "list") {
       return <WorkOrdersListView {...sharedProps} />;
@@ -103,17 +119,19 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   };
 
   return (
-    <>
-      <WorkOrdersHeader
-        state={state}
-        entries={entries}
-        factoryLines={props.factoryLines}
-        onCreateWorkOrder={props.onCreateWorkOrder}
-        canCreate={props.canCreate}
-        permissionsLoading={props.permissionsLoading}
-      />
+    <div className={showKanbanBoard ? factoryKanbanPageClassName : undefined}>
+      <div className="shrink-0">
+        <WorkOrdersHeader
+          state={state}
+          entries={entries}
+          factoryLines={props.factoryLines}
+          onCreateWorkOrder={props.onCreateWorkOrder}
+          canCreate={props.canCreate}
+          permissionsLoading={props.permissionsLoading}
+        />
+      </div>
 
-      <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>{body()}</div>
-    </>
+      <div className={cn(factoryWorkOrdersBodyClassName, "flex flex-col gap-4")}>{body()}</div>
+    </div>
   );
 }

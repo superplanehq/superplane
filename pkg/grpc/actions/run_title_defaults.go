@@ -11,6 +11,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"onError":     "{{ root().data.node.name }} errored",
 	"onBroadcast": "{{ root().data.app.name }}",
 	"onRun":       "App run {{ date(root().timestamp).Format(\"2006-01-02 15:04:05\") }}",
+	"onWorkOrder": "#{{ root().data.workOrder.number }} {{ root().data.workOrder.title }}",
 
 	"aws.cloudwatch.onAlarm":            "{{ root().data.detail.alarmName }} - {{ root().data.detail.previousState.value }} -> {{ root().data.detail.state.value }}",
 	"aws.codeArtifact.onPackageVersion": "{{ root().data.detail.packageName }} {{ root().data.detail.packageVersion }}",
@@ -58,6 +59,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"github.onIssue":           "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onIssueComment":    "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
 	"github.onPRComment":       "#{{ root().data.issue.number }} - {{ root().data.issue.title }}",
+	"github.onPRReview":        "#{{ root().data.pull_request.number }} - {{ root().data.pull_request.title }}",
 	"github.onPRReviewComment": "#{{ root().data.pull_request.number }} - {{ root().data.pull_request.title }}",
 	"github.onPullRequest":     "#{{ root().data.number }} - {{ root().data.pull_request.title }}",
 	"github.onPush":            "{{ root().data.head_commit.message }} - {{ root().data.head_commit.id[:7] }}",

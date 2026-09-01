@@ -398,6 +398,7 @@ func TestValidateEnvironment(t *testing.T) {
 func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -450,7 +451,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
-	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
+	assert.Equal(t, []BrokerCommand{{Command: "echo hello", Kind: LiveLogKindBash, Preview: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Equal(t, map[string]string{
 		"canvas_id":       "canvas-1",
@@ -463,6 +464,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -491,9 +493,10 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	assert.Equal(t, MachineTypeE1LargeARM64, req.FleetID)
 }
 
-func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
+func TestRunnerExecuteSendsOnlyPagerDefaultsWithoutConfiguredEnvironment(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -517,12 +520,16 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
-	assert.NotContains(t, string(body), "environment")
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, pagerDefaults, req.Environment)
 }
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{}
 
@@ -611,6 +618,7 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 func TestBrokerCancelTaskSuccess(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -631,6 +639,7 @@ func TestBrokerCancelTaskSuccess(t *testing.T) {
 func TestBrokerCancelTask404Noop(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -647,6 +656,7 @@ func TestBrokerCancelTask404Noop(t *testing.T) {
 func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -666,6 +676,7 @@ func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 func TestRunnerCancelCallsBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -686,6 +697,7 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 func TestBrokerListActiveTasks(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{

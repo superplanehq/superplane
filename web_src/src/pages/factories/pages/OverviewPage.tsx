@@ -1,20 +1,26 @@
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { Badge } from "@/components/ui/badge";
 import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { factoryLineDetailPath, linesPath, workOrderDetailPath, workOrdersPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId, workOrdersPath } from "../lib/factoryPagePaths";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { factoryCardClassName, factoryContentBodyClassName } from "./factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factorySectionBodyClassName,
+  factorySectionHeaderClassName,
+} from "./factoryPageLayoutStyles";
 
 const MAX_ROWS = 8;
 
 export function OverviewPage() {
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  usePageTitle(["Overview", factory?.name ?? "Workspace"]);
   const {
     data: workOrders = [],
     isLoading: workOrdersLoading,
@@ -33,13 +39,18 @@ export function OverviewPage() {
 
   return (
     <>
-      <WorkspacePageHeader title="Overview" subtitle="Your workspace at a glance. Content for this page comes next." />
+      <WorkspacePageHeader
+        className={factorySectionHeaderClassName}
+        title="Overview"
+        subtitle="Your workspace at a glance. Content for this page comes next."
+      />
 
-      <div className={factoryContentBodyClassName}>
+      <div className={factorySectionBodyClassName}>
         <div className="grid gap-6 lg:grid-cols-2">
           <WorkOrdersOverviewCard
             organizationId={organizationId}
             factoryKey={factoryKey}
+            lineId={firstFactoryLineId(factory)}
             orders={recentOrders}
             isLoading={workOrdersLoading}
             error={workOrdersError}
@@ -54,12 +65,14 @@ export function OverviewPage() {
 function WorkOrdersOverviewCard({
   organizationId,
   factoryKey,
+  lineId,
   orders,
   isLoading,
   error,
 }: {
   organizationId: string;
   factoryKey: string;
+  lineId: string | undefined;
   orders: FactoriesWorkOrder[];
   isLoading: boolean;
   error: Error | null;
@@ -68,7 +81,7 @@ function WorkOrdersOverviewCard({
     <section className={cn("overflow-hidden", factoryCardClassName)} data-testid="overview-work-orders-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Work Orders</h2>
+          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Tasks</h2>
           <p className="text-[12px] text-muted-foreground">Recent activity by status.</p>
         </div>
         <Link
@@ -82,18 +95,17 @@ function WorkOrdersOverviewCard({
 
       <div>
         {error ? (
-          <p className="px-4 py-6 text-[13px] text-destructive">Failed to load work orders.</p>
+          <p className="px-4 py-6 text-[13px] text-destructive">Failed to load tasks.</p>
         ) : isLoading ? (
-          <p className="px-4 py-6 text-[13px] text-muted-foreground">Loading work orders…</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">Loading tasks…</p>
         ) : orders.length === 0 ? (
-          <p className="px-4 py-6 text-[13px] text-muted-foreground">No work orders yet.</p>
+          <p className="px-4 py-6 text-[13px] text-muted-foreground">No tasks yet.</p>
         ) : (
           <ul>
             {orders.map((order) => {
               const status = getWorkOrderDisplayStatus(order);
               const statusMeta = getWorkOrderDisplayStatusMeta(status);
-              const href =
-                order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, order.number) : "#";
+              const href = factoryHomePath(organizationId, factoryKey, lineId);
               const updatedAt = order.updatedAt ?? order.createdAt;
               const timeLabel = updatedAt ? formatTimeAgo(new Date(updatedAt)) : "—";
               return (
@@ -116,7 +128,7 @@ function WorkOrdersOverviewCard({
                       {statusMeta.label}
                     </Badge>
                     <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
-                      {order.title || "Untitled work order"}
+                      {order.title || "Untitled task"}
                     </p>
                     <span className="shrink-0 text-[12px] text-muted-foreground">{timeLabel}</span>
                     <ChevronRight
@@ -151,7 +163,7 @@ function LinesOverviewCard({
           <p className="text-[12px] text-muted-foreground">Lines and their steps.</p>
         </div>
         <Link
-          to={linesPath(organizationId, factoryKey)}
+          to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId({ lines }))}
           className="text-[12px] font-medium text-muted-foreground hover:text-foreground"
           data-testid="overview-lines-view-all"
         >

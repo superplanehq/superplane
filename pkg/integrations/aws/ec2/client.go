@@ -2633,45 +2633,6 @@ type xmlAlarmDimension struct {
 	Value string `xml:"Value"`
 }
 
-func (c *Client) DeleteAlarms(alarmNames ...string) error {
-	params := url.Values{}
-	index := 0
-	for _, name := range alarmNames {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		index++
-		params.Set(fmt.Sprintf("AlarmNames.member.%d", index), name)
-	}
-
-	if len(params) == 0 {
-		return fmt.Errorf("at least one alarm name is required")
-	}
-
-	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DeleteAlarms", params, nil)
-}
-
-func (c *Client) DescribeAlarm(alarmName string) (*MetricAlarm, error) {
-	params := url.Values{}
-	params.Set("AlarmNames.member.1", strings.TrimSpace(alarmName))
-
-	response := describeAlarmsResponse{}
-	if err := c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DescribeAlarms", params, &response); err != nil {
-		return nil, err
-	}
-
-	if len(response.Result.MetricAlarms) == 0 {
-		return nil, fmt.Errorf("alarm not found: %s", alarmName)
-	}
-
-	return alarmFromXML(response.Result.MetricAlarms[0], c.region), nil
-}
-
-func (c *Client) ListAlarms() ([]MetricAlarm, error) {
-	return c.listAlarms(url.Values{})
-}
-
 func (c *Client) ListAlarmsForInstance(instanceID string) ([]MetricAlarm, error) {
 	all, err := c.listAlarms(url.Values{})
 	if err != nil {
@@ -2748,36 +2709,6 @@ func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
 		Dimensions:         dimensions,
 		AlarmActions:       x.AlarmActions,
 		Region:             region,
-	}
-}
-
-func alarmToMap(alarm *MetricAlarm) map[string]any {
-	if alarm == nil {
-		return map[string]any{}
-	}
-
-	dims := make([]map[string]any, 0, len(alarm.Dimensions))
-	for _, d := range alarm.Dimensions {
-		dims = append(dims, map[string]any{"name": d.Name, "value": d.Value})
-	}
-
-	return map[string]any{
-		"alarmName":          alarm.AlarmName,
-		"alarmArn":           alarm.AlarmArn,
-		"alarmDescription":   alarm.AlarmDescription,
-		"namespace":          alarm.Namespace,
-		"metricName":         alarm.MetricName,
-		"statistic":          alarm.Statistic,
-		"period":             alarm.Period,
-		"evaluationPeriods":  alarm.EvaluationPeriods,
-		"threshold":          alarm.Threshold,
-		"comparisonOperator": alarm.ComparisonOperator,
-		"stateValue":         alarm.StateValue,
-		"stateReason":        alarm.StateReason,
-		"treatMissingData":   alarm.TreatMissingData,
-		"dimensions":         dims,
-		"alarmActions":       alarm.AlarmActions,
-		"region":             alarm.Region,
 	}
 }
 

@@ -4,19 +4,20 @@ import { Check } from "lucide-react";
 import { Link } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { linesPath } from "../../lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId } from "../../lib/factoryPagePaths";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 
 /**
- * Storybook-only post-onboarding checklist (v3 parity).
+ * Storybook-only post-setup checklist (v3 parity).
  * Shown on overview when tips are active for the current workspace.
  */
-export function GettingStartedWireframe() {
-  const { organizationId, factoryKey, openCreateWorkOrder } = useFactoriesLayout();
+export function GettingStartedWireframe({ onDismiss }: { onDismiss?: () => void }) {
+  const { organizationId, factoryKey, factory, openCreateWorkOrder } = useFactoriesLayout();
   const onboarding = useOnboardingStorybook();
 
   function handleCreateWorkOrder() {
     onboarding?.clearOverviewTips();
+    onDismiss?.();
     openCreateWorkOrder();
   }
 
@@ -56,15 +57,13 @@ export function GettingStartedWireframe() {
             2
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">
-              Create your first work order
-            </div>
+            <div className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Create your first task</div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              A work order is one task for the coding agent. Create one manually and watch the agent open a pull
+              A task is one unit of work for the coding agent. Create one manually and watch the agent open a pull
               request.
             </p>
             <Button type="button" size="sm" className="mt-3" onClick={() => handleCreateWorkOrder()}>
-              Create work order
+              Create task
             </Button>
           </div>
         </div>
@@ -78,16 +77,17 @@ export function GettingStartedWireframe() {
               See the agent pipeline on a line
             </div>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
-              Each work order runs through a line: intake, build, verify, and related phases you can configure later.
+              Each task runs through a line: intake, build, verify, and related phases you can configure later.
             </p>
             <Link
-              to={linesPath(organizationId, factoryKey)}
+              to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))}
+              onClick={onDismiss}
               className={cn(
                 "mt-3 inline-flex h-8 items-center rounded-md border border-border px-3 text-[13px]",
                 "text-foreground transition-colors hover:bg-accent",
               )}
             >
-              View lines
+              Open board
             </Link>
           </div>
         </div>

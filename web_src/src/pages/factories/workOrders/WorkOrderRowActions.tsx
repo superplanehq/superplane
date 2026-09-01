@@ -1,19 +1,52 @@
 import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { cn } from "@/lib/utils";
-import { Forward, UserPlus } from "lucide-react";
+import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
 import { OrgUserReference } from "../OrgUserReference";
-import { WorkOrderAssigneesPopover } from "../WorkOrderAssigneesPopover";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
-/** Actions callable from any Work Orders layout (board card, list row, table row). */
+/** Actions callable from list and table rows. Cards do not change the owner. */
 export interface WorkOrderRowCallbacks {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+}
+
+interface CardOwnerMarkProps {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+}
+
+/**
+ * Display-only owner avatar for cards. The owner cannot be changed here.
+ */
+export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  if (entry.displayStatus === "draft") {
+    return null;
+  }
+
+  const owner = entry.order.assignees?.[0];
+  if (!owner) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-flex size-5 shrink-0 items-center justify-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size="xs"
+        showName={false}
+        className="rounded-full leading-none"
+      />
+    </span>
+  );
 }
 
 interface AssigneeGroupProps {
@@ -22,103 +55,107 @@ interface AssigneeGroupProps {
   canAssign: boolean;
   isAssigneesSaving: boolean;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
-  /** Cap for the visible avatars before "+N" collapses the rest. */
-  maxVisible?: number;
   size?: "sm" | "md";
 }
 
 /**
- * Small avatar stack with a `+N` overflow indicator and, when the caller
- * has permission, an inline picker to change assignees without opening
- * the detail page. Shared across board, list, and table.
+ * Single owner avatar. The owner cannot be changed here.
  */
-export function AssigneeGroup({
-  entry,
-  organizationId,
-  canAssign,
-  isAssigneesSaving,
-  onAssigneesSave,
-  maxVisible = 1,
-  size = "sm",
-}: AssigneeGroupProps) {
+export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGroupProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
-  const assignees = entry.order.assignees ?? [];
-  const visible = assignees.slice(0, maxVisible);
-  const hiddenCount = Math.max(assignees.length - visible.length, 0);
-
-  const stack = (
-    <button
-      type="button"
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full transition-colors",
-        canAssign ? "hover:bg-accent" : "cursor-default",
-      )}
-      aria-label="Change owners"
-      data-testid={`work-order-row-assignees-${entry.id}`}
-      disabled={!canAssign}
-    >
-      {assignees.length === 0 ? (
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground",
-            canAssign && "hover:border-foreground hover:text-foreground",
-          )}
-        >
-          <UserPlus className="size-3" aria-hidden />
-          Assign
-        </span>
-      ) : (
-        <span className="inline-flex items-center -space-x-1.5">
-          {visible.map((assignee, index) => (
-            <OrgUserReference
-              key={assignee.id ?? index}
-              display={resolveUser(assignee.id, assignee.name)}
-              size={size}
-              showName={false}
-              className="rounded-full ring-2 ring-background"
-            />
-          ))}
-          {hiddenCount > 0 ? (
-            <span
-              className="inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground ring-2 ring-background"
-              aria-label={`${hiddenCount} more owners`}
-            >
-              +{hiddenCount}
-            </span>
-          ) : null}
-        </span>
-      )}
-    </button>
-  );
-
-  const trigger = canAssign ? (
-    stack
-  ) : (
-    <Tooltip>
-      <TooltipTrigger asChild>{stack}</TooltipTrigger>
-      <TooltipContent>You don't have permission to update owners.</TooltipContent>
-    </Tooltip>
-  );
-
-  if (!canAssign) {
-    return (
-      <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-        {trigger}
-      </div>
-    );
+  const owner = entry.order.assignees?.[0];
+  if (!owner) {
+    return null;
   }
 
   return (
+    <span
+      className="pointer-events-none inline-flex items-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size={size}
+        showName={false}
+        className="rounded-full ring-2 ring-background"
+      />
+    </span>
+  );
+}
+
+/** Line to start on: the preferred line when it exists, else the only line. */
+function resolveStartLineName(lines: FactoriesFactoryLine[], preferredLineName?: string): string | undefined {
+  const names = lines.map((line) => line.name?.trim()).filter((name): name is string => Boolean(name));
+  if (preferredLineName && names.includes(preferredLineName)) {
+    return preferredLineName;
+  }
+  if (names.length === 1) {
+    return names[0];
+  }
+  return undefined;
+}
+
+interface StartDraftButtonProps {
+  entry: WorkOrderListEntry;
+  lines: FactoriesFactoryLine[];
+  preferredLineName?: string;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+}
+
+/**
+ * Persistent Start control on a draft card. One click sends the task
+ * to the preferred line, or opens the line picker when more than one line
+ * exists.
+ */
+export function StartDraftButton({
+  entry,
+  lines,
+  preferredLineName,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+}: StartDraftButtonProps) {
+  if (entry.displayStatus !== "draft") {
+    return null;
+  }
+
+  const lineName = resolveStartLineName(lines, preferredLineName);
+  const disabled = !canDispatch || lines.length === 0;
+
+  const startButton = (
+    <LoadingButton
+      type="button"
+      size="xs"
+      disabled={disabled}
+      loading={isDispatching}
+      loadingText="Starting..."
+      data-testid={`work-order-card-start-${entry.id}`}
+      onClick={lineName ? () => void onDispatch(entry.id, { lineName }) : undefined}
+    >
+      Start
+    </LoadingButton>
+  );
+
+  return (
     <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <WorkOrderAssigneesPopover
-        organizationId={organizationId}
-        selectedIds={entry.assigneeIds}
-        canEdit={canAssign}
-        isSaving={isAssigneesSaving}
-        onSave={(ids) => onAssigneesSave(entry.id, ids)}
-      >
-        {trigger}
-      </WorkOrderAssigneesPopover>
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to start this task.">
+        {lineName ? (
+          startButton
+        ) : (
+          <DispatchWorkOrderPopover
+            lines={lines}
+            isSaving={isDispatching}
+            canDispatch={canDispatch}
+            submitLabel="Start"
+            onDispatch={(input) => onDispatch(entry.id, input)}
+          >
+            {startButton}
+          </DispatchWorkOrderPopover>
+        )}
+      </PermissionTooltip>
     </div>
   );
 }
@@ -129,7 +166,7 @@ interface DispatchButtonProps {
   canDispatch: boolean;
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
-  /** Only draft/open work orders show the button. */
+  /** Only draft/open tasks show the button. */
   visible: boolean;
   variant?: "ghost" | "outline";
 }
@@ -148,7 +185,7 @@ export function InlineDispatchButton({
   }
   return (
     <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
-      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
         <DispatchWorkOrderPopover
           lines={lines}
           isSaving={isDispatching}

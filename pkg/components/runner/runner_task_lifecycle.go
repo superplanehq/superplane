@@ -17,6 +17,9 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
+	if err := storeRunnerFleetKV(ctx, ""); err != nil {
+		return fmt.Errorf("set runner fleet kv: %w", err)
+	}
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
@@ -57,7 +60,7 @@ func pollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error 
 	}
 
 	if task.IsInTerminalState() {
-		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger)
+		return processBrokerTaskStatus(ctx.ExecutionState, task, finishedEventType, organizationID, ctx.Logger, ctx.Usage, ctx.Configuration)
 	}
 
 	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{
@@ -102,7 +105,7 @@ func handleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 		}
 	}
 
-	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType, executionCtx.OrganizationID, ctx.Logger); err != nil {
+	if err := processBrokerTaskStatus(executionCtx.ExecutionState, task, finishedEventType, executionCtx.OrganizationID, ctx.Logger, executionCtx.Usage, executionCtx.Configuration); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
 	}
 
@@ -115,6 +118,8 @@ func processBrokerTaskStatus(
 	finishedEventType string,
 	organizationID string,
 	logger *log.Entry,
+	usage core.UsageRecorder,
+	configuration any,
 ) error {
 	if state.IsFinished() {
 		return nil
@@ -125,6 +130,8 @@ func processBrokerTaskStatus(
 	}
 
 	publishRunnerUsage(organizationID, task, logger)
+	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
+	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {

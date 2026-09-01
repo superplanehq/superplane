@@ -1,11 +1,9 @@
 import {
   automationDetailPath,
   automationsPath,
+  factoryHomePath,
   factoryLineDetailPath,
-  factoryOverviewPath,
-  linesPath,
   workOrderDetailPath,
-  workOrdersPath,
 } from "./factoryPagePaths";
 
 export type FactoryAppBackNav = {
@@ -15,7 +13,7 @@ export type FactoryAppBackNav = {
 
 /**
  * Resolves the route-aware back link for the factory-embedded canvas view.
- * Unknown / missing `from` falls back to Overview.
+ * Unknown / missing `from` falls back to the line board home.
  */
 export function resolveFactoryAppBackNav(
   organizationId: string,
@@ -47,23 +45,22 @@ export function resolveFactoryAppBackNav(
   if (from === "lines") {
     if (options.lineId) {
       return {
-        label: options.lineName?.trim() || "All lines",
+        label: "Back",
         href: factoryLineDetailPath(organizationId, factoryKey, options.lineId),
       };
     }
-    return { label: "All lines", href: linesPath(organizationId, factoryKey) };
+    return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };
   }
 
   if (from === "work-order") {
-    const orderRef = options.orderNumber || options.orderId;
-    if (orderRef) {
+    if (options.orderNumber) {
       return {
-        label: options.orderTitle?.trim() || "Work Orders",
-        href: workOrderDetailPath(organizationId, factoryKey, orderRef),
+        label: "Back",
+        href: workOrderDetailPath(organizationId, factoryKey, options.orderNumber),
       };
     }
-    return { label: "Work Orders", href: workOrdersPath(organizationId, factoryKey) };
+    return { label: "Back", href: factoryHomePath(organizationId, factoryKey, options.lineId) };
   }
 
-  return { label: "Overview", href: factoryOverviewPath(organizationId, factoryKey) };
+  return { label: "Back", href: factoryHomePath(organizationId, factoryKey) };
 }

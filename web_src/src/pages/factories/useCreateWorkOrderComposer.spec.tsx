@@ -1,14 +1,17 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createMutate, dispatchMutate } = vi.hoisted(() => ({
+const { createMutate, meResult } = vi.hoisted(() => ({
   createMutate: vi.fn(),
-  dispatchMutate: vi.fn(),
+  meResult: { current: { data: null as { id: string; name: string } | null } },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateWorkOrder: () => ({ mutateAsync: createMutate, isPending: false }),
-  useDispatchWorkOrder: () => ({ mutateAsync: dispatchMutate, isPending: false }),
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => meResult.current,
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -23,12 +26,12 @@ describe("useCreateWorkOrderComposer", () => {
 
   beforeEach(() => {
     createMutate.mockReset();
-    dispatchMutate.mockReset();
     onClose.mockReset();
     onCreated.mockReset();
+    meResult.current = { data: null };
   });
 
-  it("marks Send to line as loading while the work order is created", async () => {
+  it("marks Create as loading while the task is created", async () => {
     let resolveCreate: (order: { id: string }) => void = () => {};
     createMutate.mockImplementation(
       () =>
@@ -36,7 +39,6 @@ describe("useCreateWorkOrderComposer", () => {
           resolveCreate = resolve;
         }),
     );
-    dispatchMutate.mockResolvedValue({});
 
     const { result } = renderHook(() =>
       useCreateWorkOrderComposer({
@@ -49,22 +51,89 @@ describe("useCreateWorkOrderComposer", () => {
 
     act(() => {
       result.current.updateTitle("Ship the refunds line");
-      result.current.setSelectedLineName("plan-and-implement");
     });
 
     act(() => {
-      void result.current.handleSendToLine();
+      void result.current.handleCreate();
     });
 
-    expect(result.current.isSendingToLine).toBe(true);
-    expect(result.current.isSavingDraft).toBe(false);
+    expect(result.current.isCreating).toBe(true);
 
     await act(async () => {
       resolveCreate({ id: "order-1" });
     });
   });
 
-  it("opens the new work order without closing to the list first", async () => {
+  it("seeds assigneeIds with the current user once me resolves", () => {
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual(["user-me"]);
+  });
+
+  it("keeps assigneeIds empty when there is no current user", () => {
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual([]);
+  });
+
+  it("does not override a manual assignment made before me resolves", () => {
+    const { result, rerender } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    act(() => {
+      result.current.setAssigneeIds(["user-manual"]);
+    });
+
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+    rerender();
+
+    expect(result.current.assigneeIds).toEqual(["user-manual"]);
+  });
+
+  it("does not clobber a manual change made after me resolves", () => {
+    meResult.current = { data: { id: "user-me", name: "Me" } };
+
+    const { result } = renderHook(() =>
+      useCreateWorkOrderComposer({
+        organizationId: "org-1",
+        factoryId: "factory-1",
+        onClose,
+        onCreated,
+      }),
+    );
+
+    expect(result.current.assigneeIds).toEqual(["user-me"]);
+
+    act(() => {
+      result.current.setAssigneeIds([]);
+    });
+
+    expect(result.current.assigneeIds).toEqual([]);
+  });
+
+  it("opens the new task without closing to the list first", async () => {
     createMutate.mockResolvedValue({ id: "order-1", number: "101" });
 
     const { result } = renderHook(() =>
@@ -81,7 +150,7 @@ describe("useCreateWorkOrderComposer", () => {
     });
 
     await act(async () => {
-      await result.current.handleSaveDraft();
+      await result.current.handleCreate();
     });
 
     expect(onCreated).toHaveBeenCalledWith("101");

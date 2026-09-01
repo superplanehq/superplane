@@ -1,63 +1,140 @@
 import type {
+  FactoriesDescribeFactoryVelocityResponse,
   FactoriesFactory,
+  FactoriesFactoryIntake,
+  FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
+  FactoriesFactoryPullRequest,
+  MeNotificationSettings,
   FactoriesWorkOrder,
   FactoriesWorkOrderArtifact,
-  FactoriesWorkOrderExecution,
+  FactoriesWorkOrderEvent,
   FactoryApp,
   FactoryLineStep,
+  SuperplaneUsersUser,
 } from "@/api-client";
 
-/** Shared with the home fixture so routes stay in sync across HomePage → Factories navigation. */
-export const FACTORIES_ORGANIZATION_ID = "3ee1aa47-3a60-4c1f-b645-0b9859ab91f8";
+import type { FactoriesWorkOrderCheck } from "@/api-client";
+import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
+import {
+  ACME_ONBOARDING_FACTORY_ID,
+  ACME_ONBOARDING_LINE_ID,
+  GITHUB_ISSUES_INTAKE_APP_ID,
+  EMPTY_FACTORY_ID,
+  FACTORIES_ORGANIZATION_ID,
+  LAST_WEEK,
+  PRIMARY_FACTORY_ID,
+  REFUND_LINE_HOTFIX_ID,
+  REFUND_LINE_PLAN_ID,
+  YESTERDAY,
+  type ORGANIZATION_USERS,
+} from "./factoryPageIds";
+import {
+  APPROVAL_WORK_ORDER,
+  CLOSED_FAILED_WORK_ORDER,
+  CLOSED_WORK_ORDER,
+  DRAFT_WORK_ORDER,
+  FAILED_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
+  OPEN_WORK_ORDER_SECONDARY,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
+  QUESTION_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+} from "./factoryPageWorkOrders";
 
-export const PRIMARY_FACTORY_ID = "factory-refunds";
-export const EMPTY_FACTORY_ID = "factory-payments";
+export * from "./factoryPageIds";
+export * from "./factoryPageWorkOrders";
 
-/** Workspace key for `PRIMARY_FACTORY_ID` — routes use this, not the raw id. */
-export const PRIMARY_FACTORY_KEY = "RF";
-/** Workspace key for `EMPTY_FACTORY_ID` — routes use this, not the raw id. */
-export const EMPTY_FACTORY_KEY = "PF";
+export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[number]): SuperplaneUsersUser {
+  const avatarUrl = "avatarUrl" in user ? user.avatarUrl : undefined;
+  return {
+    metadata: { id: user.id, email: user.email },
+    spec: { displayName: user.name },
+    ...(avatarUrl ? { status: { accountProviders: [{ avatarUrl }] } } : {}),
+  };
+}
 
-export const STORYBOOK_ME_USER_ID = "storybook-user";
-export const STORYBOOK_ME_USER_NAME = "Storybook User";
-export const STORYBOOK_ME_USER_EMAIL = "storybook@superplane.dev";
+export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
+  id: GITHUB_ISSUES_INTAKE_APP_ID,
+  name: "GitHub issue intake",
+  description: "Listens for GitHub issues and creates backlog tasks.",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
 
-// Relative timestamps so `formatTimeAgo` stays stable across story loads.
-const NOW_MS = Date.now();
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-const relativeIso = (offsetMs: number) => new Date(NOW_MS - offsetMs).toISOString();
+export const GITHUB_ISSUES_INTAKE_ID = "intake-github-issues";
 
-export const HOUR_AGO = relativeIso(HOUR_MS);
-export const TWO_HOURS_AGO = relativeIso(2 * HOUR_MS);
-export const YESTERDAY = relativeIso(DAY_MS);
-export const LAST_WEEK = relativeIso(7 * DAY_MS);
+export const GITHUB_ISSUES_INTAKE: FactoriesFactoryIntake = {
+  id: GITHUB_ISSUES_INTAKE_ID,
+  canvasId: GITHUB_ISSUES_INTAKE_APP_ID,
+  name: "GitHub issues",
+  description: "Listens for GitHub issues and creates backlog tasks.",
+  source: "SOURCE_GITHUB_ISSUES",
+  settings: {
+    confidencePct: 65,
+    labels: [],
+    labelFilterMode: "LABEL_FILTER_MODE_INCLUDE",
+    assignment: "ASSIGNMENT_ANY",
+  },
+  healthy: true,
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+};
 
-export const REVIEWER_USER = {
-  id: "user-reviewer-alex",
-  name: "Alex Reviewer",
-  email: "alex@superplane.dev",
-} as const;
+function minutesBefore(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
 
-export const OPERATOR_USER = {
-  id: "user-operator-jamie",
-  name: "Jamie Operator",
-  email: "jamie@superplane.dev",
-} as const;
-
-export const ORGANIZATION_USERS = [
-  { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME, email: STORYBOOK_ME_USER_EMAIL },
-  REVIEWER_USER,
-  OPERATOR_USER,
+/** Two tickets still in analysis, plus scored runs for the Runs tab. */
+export const GITHUB_ISSUES_INTAKE_RUNS: FactoriesFactoryIntakeRun[] = [
+  {
+    id: "intake-run-analyzing-1",
+    title: "Handle duplicate refunds on retry",
+    placement: "PLACEMENT_ANALYZING",
+    createdAt: minutesBefore(4),
+  },
+  {
+    id: "intake-run-analyzing-2",
+    title: "Return 409 when the invoice is already paid",
+    placement: "PLACEMENT_ANALYZING",
+    createdAt: minutesBefore(2),
+  },
+  {
+    id: "intake-run-progressed",
+    title: "Show a clearer empty state on the billing page",
+    confidencePct: 94,
+    placement: "PLACEMENT_PROGRESSED",
+    stage: "implement",
+    createdAt: minutesBefore(180),
+    analyzedAt: minutesBefore(170),
+  },
+  {
+    id: "intake-run-backlog",
+    title: "Upgrade the Node 20 base image",
+    confidencePct: 81,
+    placement: "PLACEMENT_BACKLOG",
+    createdAt: minutesBefore(90),
+    analyzedAt: minutesBefore(80),
+  },
+  {
+    id: "intake-run-below-threshold",
+    title: "Document the refund webhook contract",
+    confidencePct: 52,
+    placement: "PLACEMENT_BELOW_THRESHOLD",
+    createdAt: minutesBefore(8),
+    analyzedAt: minutesBefore(5),
+  },
 ];
 
 const RUN_APP_TYPE = "runApp";
 
-function runAppStep(name: string, appId: string, entrypoint: string): FactoryLineStep {
+function runAppStep(appId: string, entrypoint: string): FactoryLineStep {
   return {
-    name,
     type: RUN_APP_TYPE,
     app: { app: appId, entrypoint },
   };
@@ -85,10 +162,15 @@ export const REFUND_FACTORY_APPS: FactoryApp[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
   },
+  {
+    id: "app-pr-closure",
+    name: "PR Closure",
+    description: "Closes the task when the pull request merges or is closed.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
+  },
+  GITHUB_ISSUES_INTAKE_APP,
 ];
-
-const REFUND_LINE_PLAN_ID = "line-plan-and-implement";
-const REFUND_LINE_HOTFIX_ID = "line-hotfix";
 
 export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
   {
@@ -97,9 +179,8 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
     steps: [
-      runAppStep("plan", "app-refund-planner", "start-plan"),
-      runAppStep("implement", "app-refund-implementer", "start-implementation"),
-      runAppStep("verify", "app-refund-verifier", "start-verification"),
+      runAppStep("app-refund-implementer", "start-implementation"),
+      runAppStep("app-refund-verifier", "start-verification"),
     ],
   },
   {
@@ -107,241 +188,89 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
     name: "hotfix",
     createdAt: LAST_WEEK,
     updatedAt: YESTERDAY,
-    steps: [runAppStep("verify", "app-refund-verifier", "start-verification")],
+    steps: [runAppStep("app-refund-verifier", "start-verification")],
   },
 ];
 
 export const REFUND_FACTORY: FactoriesFactory = {
   id: PRIMARY_FACTORY_ID,
-  name: "Refunds Factory",
+  name: "Semaphore",
   key: "RF",
   description:
-    "Handles reconciliation work: plan a change, implement across affected services, and verify with regression suites.",
+    "Handles reconciliation work: implement a change across affected services, and verify with regression suites.",
   lines: REFUND_FACTORY_LINES,
+  onboarding: { completedAt: LAST_WEEK },
 };
 
 export const EMPTY_FACTORY: FactoriesFactory = {
   id: EMPTY_FACTORY_ID,
-  name: "Payments Factory",
+  name: "SuperPlane",
   key: "PF",
-  description: "New factory. No lines or work orders configured yet.",
+  description: "New factory. No lines or tasks configured yet.",
   lines: [],
 };
 
-function planLineExecution(
-  step: string,
-  overrides: Partial<FactoriesWorkOrderExecution> = {},
-): FactoriesWorkOrderExecution {
-  return {
-    id: `exec-${step}-${overrides.id ?? Math.random().toString(36).slice(2, 8)}`,
-    line: { id: REFUND_LINE_PLAN_ID, name: "plan-and-implement" },
-    step,
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    createdAt: TWO_HOURS_AGO,
-    updatedAt: HOUR_AGO,
-    run: {
-      id: `run-${step}`,
-      appId: "app-refund-planner",
-      appName: "Refund Planner",
-    },
-    ...overrides,
-  };
-}
+const ACME_ONBOARDING_DONE_APP_ID = "app-acme-done";
+const ACME_ONBOARDING_BACKLOG_APP_ID = "app-acme-backlog";
 
-export const OPEN_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-open-refunds",
-  number: "101",
-  key: "RF-101",
-  title: "Reconcile duplicate refunds in ledger",
-  description:
-    "Users are seeing duplicate refund entries after retries. Reconcile the ledger, patch retry logic, and add a regression test.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: HOUR_AGO,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
-  executions: [],
-};
-
-/**
- * Second open work order assigned to the storybook user so the FactoryDetailPage
- * "Populated" story shows a real list under the default `mine + open` filters.
- */
-export const OPEN_WORK_ORDER_SECONDARY: FactoriesWorkOrder = {
-  id: "wo-open-refunds-schema",
-  number: "102",
-  key: "RF-102",
-  title: "Add refund reason enum to schema",
-  description: "Extend the refund ledger schema with a nullable reason enum so audit can categorize.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: TWO_HOURS_AGO,
-  updatedAt: TWO_HOURS_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
-};
-
-// Storybook user is co-assigned so "mine + running" surfaces this order.
-export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-running-refunds",
-  number: "103",
-  key: "RF-103",
-  title: "Add refund reconciliation test",
-  description: "Cover the newly discovered duplicate refund case with a regression test running in CI.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: YESTERDAY,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: REVIEWER_USER.id, name: REVIEWER_USER.name } },
-  assignees: [
-    { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME },
-    { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-  ],
-  executions: [
-    planLineExecution("plan", { id: "1", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "2",
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      run: { id: "run-implement", appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
-  ],
-};
-
-// Storybook user is co-assigned so "mine + failed" surfaces this order.
-export const FAILED_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-failed-refunds",
-  number: "104",
-  key: "RF-104",
-  title: "Ship idempotent refund retries",
-  description: "Retry logic should be idempotent so replays don't create duplicate refunds.",
-  state: "STATE_OPEN",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: YESTERDAY,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "3", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: TWO_HOURS_AGO }),
-    planLineExecution("implement", {
-      id: "4",
-      state: "STATE_FINISHED",
-      result: "RESULT_FAILED",
-      run: { id: "run-implement-2", appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: HOUR_AGO,
-    }),
-  ],
-};
-
-export const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-draft-refunds",
-  number: "105",
-  key: "RF-105",
-  title: "Draft: rework refund telemetry",
-  description: "Still scoping the metric shape and dashboards before we mark this ready.",
-  state: "STATE_DRAFT",
-  result: "RESULT_UNSPECIFIED",
-  createdAt: HOUR_AGO,
-  updatedAt: HOUR_AGO,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
-};
-
-export const CLOSED_FAILED_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-closed-failed-refunds",
-  number: "92",
-  key: "RF-92",
-  title: "Failed: reconcile refund ledger for Q1 audit",
-  description: "Line completed but validation flagged a mismatch; closed as failed for follow-up.",
-  state: "STATE_CLOSED",
-  result: "RESULT_FAILED",
-  createdAt: LAST_WEEK,
-  updatedAt: YESTERDAY,
-  createdBy: { user: { id: OPERATOR_USER.id, name: OPERATOR_USER.name } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [],
-};
-
-export const CLOSED_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-closed-refunds",
-  number: "87",
-  key: "RF-87",
-  title: "Backfill refund audit trail",
-  description: "Add historical audit entries so the reconciliation report has a full retroactive picture.",
-  state: "STATE_CLOSED",
-  result: "RESULT_COMPLETED",
-  createdAt: LAST_WEEK,
-  updatedAt: YESTERDAY,
-  createdBy: { user: { id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME } },
-  assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
-  executions: [
-    planLineExecution("plan", { id: "5", state: "STATE_FINISHED", result: "RESULT_PASSED", updatedAt: LAST_WEEK }),
-    planLineExecution("implement", {
-      id: "6",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: "run-implement-3", appId: "app-refund-implementer", appName: "Refund Implementer" },
-      updatedAt: LAST_WEEK,
-    }),
-    planLineExecution("verify", {
-      id: "7",
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      run: { id: "run-verify-3", appId: "app-refund-verifier", appName: "Refund Verifier" },
-      updatedAt: YESTERDAY,
-    }),
-  ],
-};
-
-export const OPEN_WORK_ORDER_ARTIFACTS: FactoriesWorkOrderArtifact[] = [
+export const ACME_ONBOARDING_APPS: FactoryApp[] = [
   {
-    id: "art-pr-1",
-    type: "TYPE_PR",
-    data: {
-      url: "https://github.com/example/ledger/pull/482",
-      title: "Fix duplicate refund on retry",
-      number: 482,
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
+    id: ACME_ONBOARDING_BACKLOG_APP_ID,
+    name: "Backlog",
+    description: "Scopes tasks before they enter a line.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
   },
   {
-    id: "art-md-1",
-    type: "TYPE_MARKDOWN",
-    data: {
-      title: "Investigation notes",
-      body: "Retry policy exceeded idempotency window when the ledger writer was under load; details captured in the design doc.",
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
+    id: "app-acme-implementer",
+    name: "Implement",
+    description: "Implements the plan.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
   },
   {
-    id: "art-branch-1",
-    type: "TYPE_BRANCH",
-    data: {
-      name: "feature/refund-retry",
-      url: "https://github.com/example/ledger/tree/feature/refund-retry",
-    },
-    createdBy: { id: REVIEWER_USER.id, name: REVIEWER_USER.name },
-    createdAt: HOUR_AGO,
+    id: ACME_ONBOARDING_DONE_APP_ID,
+    name: "Done",
+    description: "Completes the task.",
+    createdAt: LAST_WEEK,
+    updatedAt: YESTERDAY,
   },
+  GITHUB_ISSUES_INTAKE_APP,
 ];
+
+export const ACME_ONBOARDING_LINE: FactoriesFactoryLine = {
+  id: ACME_ONBOARDING_LINE_ID,
+  name: "Plan and Implement",
+  createdAt: LAST_WEEK,
+  updatedAt: YESTERDAY,
+  steps: [
+    runAppStep("app-acme-implementer", "start-implementation"),
+    runAppStep(ACME_ONBOARDING_DONE_APP_ID, "start-done"),
+  ],
+};
+
+export const ACME_ONBOARDING_FACTORY: FactoriesFactory = {
+  id: ACME_ONBOARDING_FACTORY_ID,
+  name: "Acme onboarding",
+  key: "AO",
+  description: "Empty first-run workspace. The board has no tickets yet.",
+  lines: [ACME_ONBOARDING_LINE],
+  onboarding: { completedAt: LAST_WEEK },
+};
 
 export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
   OPEN_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
+  QUESTION_WORK_ORDER,
+  APPROVAL_WORK_ORDER,
   RUNNING_WORK_ORDER,
   FAILED_WORK_ORDER,
   DRAFT_WORK_ORDER,
+  INGEST_DRAFT_WORK_ORDER,
+  SENTRY_DRAFT_WORK_ORDER,
+  SLACK_DRAFT_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  PR_CLOSURE_COMPLETED_WORK_ORDER,
   CLOSED_FAILED_WORK_ORDER,
 ];
 
@@ -350,33 +279,63 @@ export interface FactoriesFixture {
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryApp[]>;
+  /** Intakes the workspace declared. Created intakes are appended here. */
+  intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
+  /** Runs the intake produced, keyed by intake id. */
+  intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
+  usageByFactoryId?: Record<string, StorybookUsageReport>;
+  /**
+   * Velocity reports keyed by factory, then by requested period in days. A
+   * period without an entry falls back to the empty report.
+   */
+  velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
+  organizationWorkspaceUsage?: StorybookUsageReport;
+  hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
+  /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
+  notificationSettings?: MeNotificationSettings;
+  /**
+   * Per-order activity timelines. When an order id is absent, the handlers
+   * fall back to `DEFAULT_EVENTS_BY_ORDER_ID` from `factoryPageEventFixtures`.
+   */
+  eventsByOrderId?: Record<string, FactoriesWorkOrderEvent[]>;
+  /** Per-order artifacts; same fallback pattern as `eventsByOrderId`. */
+  artifactsByOrderId?: Record<string, FactoriesWorkOrderArtifact[]>;
+  /** Per-order pull requests; same fallback pattern as `eventsByOrderId`. */
+  pullRequestsByOrderId?: Record<string, FactoriesFactoryPullRequest[]>;
+  /** Per-order checks (automation-reported scores); same fallback pattern as `eventsByOrderId`. */
+  checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
+  /** Storybook-only intake items for the Backlog create search. */
+  intakeItemCatalog?: BacklogIntakeItemCatalog;
 }
 
 export const defaultFactoriesFixture: FactoriesFixture = {
   organizationId: FACTORIES_ORGANIZATION_ID,
-  factories: [REFUND_FACTORY, EMPTY_FACTORY],
+  factories: [REFUND_FACTORY, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY],
   workOrdersByFactoryId: {
     [PRIMARY_FACTORY_ID]: DEFAULT_WORK_ORDERS,
     [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: [],
   },
   appsByFactoryId: {
     [PRIMARY_FACTORY_ID]: REFUND_FACTORY_APPS,
     [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: ACME_ONBOARDING_APPS,
   },
-};
-
-export const emptyFactoriesFixture: FactoriesFixture = {
-  organizationId: FACTORIES_ORGANIZATION_ID,
-  factories: [],
-  workOrdersByFactoryId: {},
-  appsByFactoryId: {},
-};
-
-/** Same shape as {@link defaultFactoriesFixture} but with only closed orders in the primary factory. */
-export const emptyWorkOrdersFactoriesFixture: FactoriesFixture = {
-  ...defaultFactoriesFixture,
-  workOrdersByFactoryId: {
-    [PRIMARY_FACTORY_ID]: [CLOSED_WORK_ORDER],
+  intakesByFactoryId: {
+    [PRIMARY_FACTORY_ID]: [GITHUB_ISSUES_INTAKE],
     [EMPTY_FACTORY_ID]: [],
+    [ACME_ONBOARDING_FACTORY_ID]: [GITHUB_ISSUES_INTAKE],
   },
+  intakeRunsByIntakeId: {
+    [GITHUB_ISSUES_INTAKE_ID]: GITHUB_ISSUES_INTAKE_RUNS,
+  },
+  usageByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_USAGE,
+    [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
+    [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
+  },
+  velocityByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
+  },
+  organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
 };

@@ -59,6 +59,18 @@ Run these three steps once, in order:
    server. UI at http://localhost:8000; health check at
    http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
 
+To run Runner nodes locally, start `make dev` in the runner repository.
+Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
+only for a remote broker (see `.env.example`).
+
+The runner `make dev` image includes Claude Code, Codex, git, `gh`, and `jq`.
+Factory line apps run on that worker. Do not install those CLIs on the host.
+Connect GitHub and Claude integrations in the organization before you dispatch
+a factory line. Factory nodes use those integrations, not `.env`
+`ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
+again so Compose rebuilds the worker. Check tools with `make doctor-local` in
+the runner repository.
+
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
 (`BLOCK_SIGNUP=yes`).
@@ -75,7 +87,9 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
-- After editing JS/TS code: `make format.js`, then `make check.build.ui`.
+- After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
+  `make check.build.ui`. Run `make check.lint.ui` locally before you open a
+  pull request. CI fails when the ESLint budget grows.
 - After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
   SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
   After removing proto fields, renumber remaining fields so message field numbers
@@ -280,7 +294,8 @@ contractions, slang, or idioms).
   (`Signed-off-by: Name <email>`). Use `git commit -s` (or `git commit --amend -s`).
 - Before submitting, run the checks relevant to your change:
   - Backend: `make format.go`, `make lint`, `make check.build.app`, `make test`.
-  - Frontend: `make format.js`, `make check.build.ui`.
+  - Frontend: `make format.js`, `make check.lint.ui`, `make check.build.ui`.
+    Run ESLint locally (`make check.lint.ui`) before you open a pull request.
   - Protos: `make pb.gen` and `make check.proto.field.numbers`.
 
 For user-facing UI strings while designing or implementing frontend work, follow

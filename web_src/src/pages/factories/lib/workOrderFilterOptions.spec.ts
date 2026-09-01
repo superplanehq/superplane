@@ -19,7 +19,7 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
     state: "STATE_OPEN",
     createdAt: "2024-06-01T00:00:00Z",
     updatedAt: "2024-06-02T00:00:00Z",
-    executions: [],
+    lineDispatches: [],
     ...overrides,
   };
 }
@@ -33,9 +33,11 @@ describe("buildStatusFilterOptions", () => {
       "waiting",
       "completed",
       "failed",
+      "rejected",
       "cancelled",
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);
+    expect(options.find((option) => option.value === "waiting")?.label).toBe("Needs attention");
   });
 });
 
@@ -59,13 +61,7 @@ describe("buildAssigneeFilterOptions", () => {
     const entries = buildWorkOrderListEntries(
       [
         order({ id: "wo-1", assignees: [{ id: "u2", name: "Zoe" }] }),
-        order({
-          id: "wo-2",
-          assignees: [
-            { id: "u1", name: "Alex" },
-            { id: "u2", name: "Zoe" },
-          ],
-        }),
+        order({ id: "wo-2", assignees: [{ id: "u1", name: "Alex" }] }),
         order({ id: "wo-3" }),
       ],
       factory,

@@ -1,4 +1,5 @@
-import type { FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesWorkOrder, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
 export type WorkOrderResolutionStatus = "loading" | "found" | "not-found";
 
@@ -26,7 +27,7 @@ function parsePositiveInteger(value: string): number | null {
 
 /**
  * Resolves the `:orderNumber` route segment to a `FactoriesWorkOrder` using
- * the already-fetched work orders list (same query the sidebar's "recent
+ * the already-fetched tasks list (same query the sidebar's "recent
  * orders" section uses — no extra network round trip on a warm workspace).
  * Matches the factory-scoped `number` first (tolerating leading zeros, e.g.
  * `007` -> `7`), then falls back to `id` so old permalinks keep working.
@@ -77,11 +78,90 @@ export function workOrderRouteNeedsCanonicalRedirect(resolution: WorkOrderResolu
   return String(Number(resolution.order.number)) !== routeNumber;
 }
 
-/** Canonical route identifier for a resolved work order, or `null`. */
+/** Find the task whose line dispatch ran this canvas run. */
+export function findWorkOrderByRunId(
+  orders: FactoriesWorkOrder[],
+  runId: string | null | undefined,
+): FactoriesWorkOrder | undefined {
+  const id = runId?.trim();
+  if (!id) {
+    return undefined;
+  }
+  return orders.find((order) => flattenWorkOrderExecutions(order).some((execution) => execution.run?.id === id));
+}
+
+/** Latest dispatch on this line, or the latest dispatch on the order. */
+export function latestDispatchForLine(
+  order: FactoriesWorkOrder | undefined,
+  lineId?: string | null,
+): FactoriesWorkOrderLineDispatch | undefined {
+  const dispatches = (order?.lineDispatches ?? []).filter((dispatch) => !lineId || dispatch.line?.id === lineId);
+  if (dispatches.length === 0) {
+    return undefined;
+  }
+  return dispatches.reduce((best, candidate) => {
+    const bestAt = Date.parse(best.createdAt ?? "") || 0;
+    const candidateAt = Date.parse(candidate.createdAt ?? "") || 0;
+    return candidateAt >= bestAt ? candidate : best;
+  });
+}
+
+/** Canonical route identifier for a resolved task, or `null`. */
 export function canonicalWorkOrderNumber(order: FactoriesWorkOrder | null): string | null {
   if (!order || order.number === undefined || order.number === null || order.number === "") {
     return null;
   }
   const parsed = Number(order.number);
   return Number.isFinite(parsed) ? String(parsed) : null;
+}
+
+/**
+ * Order stashed on `navigate(..., { state })` so a just-imported task
+ * can open before the list query includes it (and so remount after permalink
+ * navigation does not drop the peek).
+ */
+export function peekOrderFromNavigationState(state: unknown): FactoriesWorkOrder | undefined {
+  if (!state || typeof state !== "object" || !("peekOrder" in state)) {
+    return undefined;
+  }
+  const order = (state as { peekOrder?: unknown }).peekOrder;
+  if (!order || typeof order !== "object" || !("id" in order)) {
+    return undefined;
+  }
+  const id = (order as { id?: unknown }).id;
+  if (typeof id !== "string" || id.length === 0) {
+    return undefined;
+  }
+  return order as FactoriesWorkOrder;
+}
+
+/**
+ * Prefer the list match. Fall back to a navigation hint that matches the
+ * route, then to a local hint when there is no permalink yet (import that
+ * returned no `number`).
+ */
+export function resolvePeekWorkOrder(
+  permalink: WorkOrderResolution,
+  routeNumber: string | undefined,
+  navigationHint: FactoriesWorkOrder | undefined,
+  localHint: FactoriesWorkOrder | null,
+): FactoriesWorkOrder | undefined {
+  if (permalink.status === "found" && permalink.order) {
+    return permalink.order;
+  }
+  if (navigationHint && peekHintMatchesRoute(navigationHint, routeNumber)) {
+    return navigationHint;
+  }
+  if (!routeNumber && localHint) {
+    return localHint;
+  }
+  return undefined;
+}
+
+function peekHintMatchesRoute(order: FactoriesWorkOrder, routeNumber: string | undefined): boolean {
+  if (!routeNumber) {
+    return true;
+  }
+  const number = canonicalWorkOrderNumber(order);
+  return number === routeNumber || order.id === routeNumber;
 }

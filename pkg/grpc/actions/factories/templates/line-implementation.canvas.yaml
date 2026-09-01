@@ -1,0 +1,281 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Implement
+  description: Create a branch, implement the plan, and open a pull request.
+spec:
+  edges:
+    - channel: default
+      sourceId: onrun-implement
+      targetId: implementation-agent-no-issue
+    - channel: passed
+      sourceId: implementation-agent-no-issue
+      targetId: add-branch-artifact
+    - channel: default
+      sourceId: add-branch-artifact
+      targetId: create-pr
+    - channel: default
+      sourceId: create-pr
+      targetId: attach-pr-artifact
+    - channel: default
+      sourceId: attach-pr-artifact
+      targetId: set-pr-closure-note
+    - channel: failed
+      sourceId: implementation-agent-no-issue
+      targetId: add-run-error
+  nodes:
+    - id: onrun-implement
+      name: Start
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 1542
+        'y': 144
+      isCollapsed: true
+    - id: implementation-agent-no-issue
+      name: Agent - Implement from order description
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 5
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ order().repository }}'
+            valueSource: literal
+          - name: BASE
+            value: '{{ order().default_branch }}'
+            valueSource: literal
+          - name: WORK_ORDER_TITLE
+            value: '{{ order().title }}'
+            valueSource: literal
+          - name: ORDER_DESCRIPTION
+            value: '{{ toBase64(order().description) }}'
+            valueSource: literal
+          - name: PLAN
+            value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}'
+            valueSource: literal
+          - name: COAUTHORS
+            value: '{{ join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: sonnet
+        steps:
+          - name: Set Up Git User
+            type: bash
+            command: |-
+              echo "Using superplaneagent@superplane.com"
+              git config --global user.email "superplaneagent@superplane.com"
+              git config --global user.name "SuperPlane Agent"
+          - name: Provide order
+            type: bash
+            command: |-
+              echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
+              cat /tmp/ORDER.md
+          - name: Provide Plan
+            type: bash
+            command: |-
+              echo $PLAN | base64 -d > /tmp/PLAN.md
+              cat /tmp/PLAN.md
+          - name: Create Branch
+            type: bash
+            command: |-
+              set -euo pipefail
+
+              # Unique branch name: fix/{slug-of-task-title}-{unix-timestamp}-{random}
+              SLUG="$(printf '%s' "${WORK_ORDER_TITLE:-}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-50 | sed -E 's/-+$//')"
+              [ -z "$SLUG" ] && SLUG="issue"
+              RAND="$(openssl rand -hex 4 2>/dev/null || head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+              BRANCH="fix/${SLUG}-$(date +%s)-${RAND}"
+              echo "$BRANCH" > /tmp/BRANCH
+
+              rm -rf repo
+              git clone --depth 1 --branch "${BASE:-main}" "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+              cd repo
+              git checkout -b "$BRANCH"
+              echo "Working on $BRANCH"
+          - name: Set Up DCO Signing
+            type: bash
+            workingDirectory: repo
+            command: |-
+              cat > .git/hooks/prepare-commit-msg <<'HOOK'
+              git interpret-trailers --in-place --if-exists doNothing \
+                --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"
+
+              printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do
+                if [ -n "$trailer" ]; then
+                  git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"
+                fi
+              done
+
+              exit 0
+              HOOK
+
+              chmod +x .git/hooks/prepare-commit-msg
+          - name: Implementation
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are implementing a fix for a SuperPlane task. The repository is already checked out in your current working directory, on the branch to work on.
+
+              Repository: {{ order().repository }}
+              Task title: {{ order().title }}
+
+              1/ The original task description is at /tmp/ORDER.md. Read it before implementing.
+              2/ The preliminary plan is at /tmp/PLAN.md. Read it before writing any implementation.
+              3/ Implement. Make the code changes required to resolve the task description and plan.
+              4/ Keep the change focused and commit your work to the current branch with clear commit messages.
+
+              Guidelines:
+
+              1/ Focus on clean code.
+              2/ Make long term fixes, not fast patches.
+              3/ Add tests where it makes sense.
+          - name: Commit and Push
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+              BRANCH="$(cat /tmp/BRANCH)"
+              echo "cwd=$(pwd -P)"
+              git status
+              git log --oneline -5
+              git add -A
+              if ! git diff --cached --quiet; then
+                git commit -s -m "fix: implement task via SuperPlane"
+              fi
+              if [ "$(git rev-list --count "origin/${BASE:-main}..HEAD")" -eq 0 ]; then
+                echo "No file changes and no unpushed commits on ${BRANCH}" >&2
+                exit 1
+              fi
+              git push -u origin "$BRANCH"
+              echo "Pushed implementation to $BRANCH"
+          - name: Generate PR title and description
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Write the pull request title and description for the change you pushed.
+
+              Task title: {{ order().title }}
+
+              1/ Compare the current branch with {{ order().default_branch }} and review the commits you made.
+              2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
+              3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
+              4/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+
+              Write clearly, for humans, in ASD-STE100 / Simplified Technical English
+          - name: Push output
+            type: bash
+            command: |-
+              if [ -s /tmp/TITLE ] && [ -s /tmp/DESCRIPTION.md ]; then
+                echo "Title and description found. Using as output"
+                jq -n \
+                  --arg branch "$(cat /tmp/BRANCH)" \
+                  --rawfile title /tmp/TITLE \
+                  --rawfile description /tmp/DESCRIPTION.md \
+                  '{branch: $branch, title: ($title | @base64), description: ($description | @base64)}' \
+                  > "$SUPERPLANE_RESULT_FILE"
+              else
+                jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
+                  > "$SUPERPLANE_RESULT_FILE"
+                echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
+                exit 1
+              fi
+      position:
+        x: 1475
+        'y': 312
+      isCollapsed: false
+    - id: add-branch-artifact
+      name: Add Branch Artifact
+      type: TYPE_ACTION
+      component: addWorkOrderArtifact
+      concurrency:
+        max: 100
+      configuration:
+        artifactType: branch
+        name: '{{ $["Agent - Implement from order description"].data.result.branch }}'
+        orderId: '{{ order().id }}'
+        repository: '{{ order().repository }}'
+      position:
+        x: 1495
+        'y': 648
+      isCollapsed: true
+    - id: create-pr
+      name: Create Pull Request
+      type: TYPE_ACTION
+      component: github.createPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        base: '{{ order().default_branch }}'
+        body: |-
+          [Task]({{ order().url }}).
+
+          {{ fromBase64($["Agent - Implement from order description"].data.result.description) }}
+
+          <hr>
+
+          Created via [SuperPlane](https://superplane.com).
+        draft: false
+        head: '{{ $["Agent - Implement from order description"].data.result.branch }}'
+        repository: '{{ order().repository }}'
+        title: '{{ fromBase64($["Agent - Implement from order description"].data.result.title) }}'
+      position:
+        x: 1442
+        'y': 816
+      isCollapsed: true
+    - id: attach-pr-artifact
+      name: Attach PR to Task
+      type: TYPE_ACTION
+      component: addPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        orderId: '{{ order().id }}'
+        provider: github
+        repository: '{{ order().repository }}'
+        number: '{{ $["Create Pull Request"].data.number }}'
+        url: '{{ $["Create Pull Request"].data._links.html.href }}'
+        title: '{{ $["Create Pull Request"].data.title }}'
+        state: open
+        externalId: '{{ $["Create Pull Request"].data.id }}'
+      position:
+        x: 1442
+        'y': 984
+      isCollapsed: true
+    - id: set-pr-closure-note
+      name: Set PR closure note
+      type: TYPE_ACTION
+      component: setWorkOrderStatusNote
+      configuration:
+        orderId: '{{ order().id }}'
+        noteKey: pr-closure
+        headline: Waiting for user review
+        body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
+        ctaLabel: 'Review PR #{{ $["Create Pull Request"].data.number }}'
+        ctaUrl: '{{ $["Create Pull Request"].data.html_url }}'
+        showOnlyWhenWaiting: true
+      position:
+        x: 1442
+        'y': 1152
+      isCollapsed: true
+    - id: add-run-error
+      name: Record Implementation Failure
+      type: TYPE_ACTION
+      component: addRunError
+      configuration:
+        message: The implementation agent failed. Open the agent logs to find the cause.
+      position:
+        x: 1770
+        'y': 648
+      isCollapsed: true

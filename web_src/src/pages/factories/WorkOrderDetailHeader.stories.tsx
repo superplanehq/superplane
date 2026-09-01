@@ -5,7 +5,7 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { WorkOrderDetailHeader } from "./WorkOrderDetailHeader";
 
 /**
- * Header for the work order detail page: back link + `SP-42` identifier +
+ * Header for the task detail page: back link + `SP-42` identifier +
  * title on the left, Copy link + kebab menu of lifecycle actions on the
  * right. Status and dispatch live in the sidebar, so the header stays
  * minimal.
@@ -42,7 +42,7 @@ const commonFlags = {
   isRejecting: false,
   isClosing: false,
   isUpdatingStatus: false,
-  backHref: "/org-1/workspaces/SP/work-orders",
+  backHref: "/org-1/workspaces/SP/lines/line-plan-and-implement",
   orderIdentifier: "SP-42",
 };
 

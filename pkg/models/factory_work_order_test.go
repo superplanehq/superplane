@@ -37,6 +37,63 @@ func TestFactoryWorkOrder_CreateStartsAsDraft(t *testing.T) {
 	assert.Equal(t, FactoryWorkOrderStateDraft, payload.ToState)
 }
 
+func TestFactoryWorkOrder_CreateWithOriginPersistsTicket(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "create-origin")
+	tx := database.DB(t.Context())
+	origin := WorkOrderOrigin{
+		URL:   "https://github.com/acme/payments/issues/12",
+		Label: "acme/payments#12",
+	}
+
+	order, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds",
+		"Retrying a refund posts twice.",
+		&userID,
+		nil,
+		nil,
+		origin,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, order.Origin())
+	assert.Equal(t, origin.URL, order.Origin().URL)
+	assert.Equal(t, origin.Label, order.Origin().Label)
+
+	duplicate, err := factoryModel.CreateWorkOrderWithOrigin(
+		tx,
+		"Handle duplicate refunds again",
+		"",
+		&userID,
+		nil,
+		nil,
+		origin,
+	)
+	require.NoError(t, err)
+	assert.NotEqual(t, order.ID, duplicate.ID)
+	require.NotNil(t, duplicate.Origin())
+	assert.Equal(t, origin.URL, duplicate.Origin().URL)
+}
+
+func TestFactoryWorkOrder_UpdateContent(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "update-content")
+	tx := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(tx, "Old title", "Old body", &userID, nil, nil)
+	require.NoError(t, err)
+
+	title := "New title"
+	description := "New body"
+	require.NoError(t, order.UpdateContent(tx, &title, &description))
+
+	refreshed, err := factoryModel.FindWorkOrder(tx, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New title", refreshed.Title)
+	assert.Equal(t, "New body", refreshed.Description)
+}
+
 func TestResolveFactoryWorkOrderCreatorAutomations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -251,6 +308,60 @@ func TestFactoryWorkOrder_UpdateStatusTransitions(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_DraftToOpenAssignsActor(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org, creatorID, factoryModel := setupFactoryWithUser(t, "assign-on-start")
+	starter := createOrgUser(t, org.ID, "starter")
+
+	t.Run("assigns the person who opens an unassigned draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Intake draft", "", nil, nil, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &starter.ID,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("replaces the creator when someone else starts the draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Manual draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+			Actor:   &starter.ID,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, starter.ID, loaded.Assignees[0].UserID)
+	})
+
+	t.Run("leaves assignees unchanged when no person opens the draft", func(t *testing.T) {
+		order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation draft", "", &creatorID, []uuid.UUID{creatorID}, nil)
+		require.NoError(t, err)
+
+		_, err = order.UpdateStatus(database.Conn(), FactoryWorkOrderStatusUpdate{
+			ToState: FactoryWorkOrderStateOpen,
+		})
+		require.NoError(t, err)
+
+		loaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+		require.NoError(t, err)
+		require.Len(t, loaded.Assignees, 1)
+		assert.Equal(t, creatorID, loaded.Assignees[0].UserID)
+	})
+}
+
 func TestFactoryWorkOrder_UpdateStatusForwardsAutomation(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
@@ -307,24 +418,34 @@ func TestFactoryWorkOrder_RecordCommentAdded(t *testing.T) {
 	require.NoError(t, err)
 
 	userIDStr := userID.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Hello there", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
+	comment, err := order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Hello there",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, comment)
+	assert.Equal(t, "Hello there", comment.Body)
+	assert.Equal(t, factory.CommentAuthorKindUser, comment.AuthorKind)
+	require.NotNil(t, comment.AuthorUserID)
+	assert.Equal(t, userID, *comment.AuthorUserID)
 
 	events, err := order.ListEvents(database.Conn(), 10, nil)
 	require.NoError(t, err)
 	assert.Contains(t, eventTypes(events), factory.EventTypeOrderCommentAdded)
 
-	var comment factory.WorkOrderCommentAdded
+	var payload factory.WorkOrderCommentAdded
 	for _, e := range events {
 		if e.Type == factory.EventTypeOrderCommentAdded {
-			require.NoError(t, json.Unmarshal(e.Data, &comment))
+			require.NoError(t, json.Unmarshal(e.Data, &payload))
 		}
 	}
-	assert.Equal(t, "Hello there", comment.Body)
-	require.NotNil(t, comment.Author)
-	assert.Equal(t, factory.CommentAuthorKindUser, comment.Author.Kind)
+	assert.Equal(t, "Hello there", payload.Body)
+	assert.Equal(t, comment.ID, payload.CommentID)
+	require.NotNil(t, payload.Author)
+	assert.Equal(t, factory.CommentAuthorKindUser, payload.Author.Kind)
 }
 
 func TestFactoryWorkOrder_ListComments(t *testing.T) {
@@ -343,18 +464,27 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 	})
 
 	userIDStr := userID.String()
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "First comment", factory.WorkOrderCommentAuthor{
-		Kind:   factory.CommentAuthorKindUser,
-		UserID: &userIDStr,
-	}, nil))
-
-	require.NoError(t, order.RecordCommentAdded(database.Conn(), "Second comment", factory.WorkOrderCommentAuthor{
-		Kind: factory.CommentAuthorKindAutomation,
-		Automation: &factory.AutomationRef{
-			NodeID:   "node-1",
-			NodeName: "Node One",
+	_, err = order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "First comment",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
 		},
-	}, &factory.RunRef{ID: uuid.New(), State: "finished"}))
+	})
+	require.NoError(t, err)
+
+	_, err = order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Second comment",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind: factory.CommentAuthorKindAutomation,
+			Automation: &factory.AutomationRef{
+				NodeID:   "node-1",
+				NodeName: "Node One",
+			},
+		},
+		Run: &factory.RunRef{ID: uuid.New(), State: "finished"},
+	})
+	require.NoError(t, err)
 
 	// A status update event should never show up in the comment thread.
 	require.NoError(t, order.RecordStatusUpdated(database.Conn(), statusUpdatedRecord{
@@ -366,25 +496,68 @@ func TestFactoryWorkOrder_ListComments(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, comments, 2)
 
-	for _, e := range comments {
-		assert.Equal(t, factory.EventTypeOrderCommentAdded, e.Type)
+	assert.Equal(t, "First comment", comments[0].Body)
+	assert.Equal(t, factory.CommentAuthorKindUser, comments[0].AuthorKind)
+
+	assert.Equal(t, "Second comment", comments[1].Body)
+	assert.Equal(t, factory.CommentAuthorKindAutomation, comments[1].AuthorKind)
+	require.NotNil(t, comments[1].Author().Automation)
+	assert.Equal(t, "node-1", comments[1].Author().Automation.NodeID)
+	require.NotNil(t, comments[1].SourceRunID)
+}
+
+func TestFactoryWorkOrder_RecordCommentAdded_Mentions(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	organization, userID, factoryModel := setupFactoryWithUser(t, "mentions")
+	mentioned := createUserInOrganization(t, organization.ID, "mentioned")
+	outsiderOrg, _, _ := setupFactoryWithUser(t, "mentions-outsider")
+	outsider := createUserInOrganization(t, outsiderOrg.ID, "outsider")
+
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Mention target", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	userIDStr := userID.String()
+	comment, err := order.RecordCommentAdded(database.Conn(), FactoryWorkOrderCommentParams{
+		Body: "Hello @Mentioned",
+		Author: factory.WorkOrderCommentAuthor{
+			Kind:   factory.CommentAuthorKindUser,
+			UserID: &userIDStr,
+		},
+		MentionedUserIDs: []uuid.UUID{mentioned.ID, mentioned.ID, outsider.ID, uuid.New()},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{mentioned.ID}, comment.MentionedUserIDs)
+
+	events, err := order.ListEvents(database.Conn(), 10, nil)
+	require.NoError(t, err)
+	var payload factory.WorkOrderCommentAdded
+	for _, event := range events {
+		if event.Type == factory.EventTypeOrderCommentAdded {
+			require.NoError(t, json.Unmarshal(event.Data, &payload))
+		}
 	}
+	assert.Equal(t, []factory.UserRef{{ID: mentioned.ID}}, payload.MentionedUsers)
 
-	var first, second factory.WorkOrderCommentAdded
-	require.NoError(t, json.Unmarshal(comments[0].Data, &first))
-	require.NoError(t, json.Unmarshal(comments[1].Data, &second))
+	var stored []FactoryWorkOrderCommentMention
+	require.NoError(t, database.Conn().Where("comment_id = ?", comment.ID).Find(&stored).Error)
+	require.Len(t, stored, 1)
+	assert.Equal(t, mentioned.ID, stored[0].UserID)
+}
 
-	// Oldest first — chronological reading order.
-	assert.Equal(t, "First comment", first.Body)
-	require.NotNil(t, first.Author)
-	assert.Equal(t, factory.CommentAuthorKindUser, first.Author.Kind)
+func createUserInOrganization(t *testing.T, organizationID uuid.UUID, prefix string) *User {
+	t.Helper()
 
-	assert.Equal(t, "Second comment", second.Body)
-	require.NotNil(t, second.Author)
-	assert.Equal(t, factory.CommentAuthorKindAutomation, second.Author.Kind)
-	require.NotNil(t, second.Author.Automation)
-	assert.Equal(t, "node-1", second.Author.Automation.NodeID)
-	require.NotNil(t, second.Run)
+	nonce := time.Now().UnixNano()
+	account, err := CreateAccount(
+		fmt.Sprintf("%s %d", prefix, nonce),
+		fmt.Sprintf("%s-%d@example.com", prefix, nonce),
+	)
+	require.NoError(t, err)
+
+	user, err := CreateUser(organizationID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	return user
 }
 
 func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
@@ -397,13 +570,13 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 
 	t.Run("pr requires data.url", func(t *testing.T) {
 		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
 
 		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 			Data: map[string]any{"url": "   "},
 		})
 		require.Error(t, err)
@@ -422,7 +595,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		for _, prURL := range cases {
 			t.Run(prURL, func(t *testing.T) {
 				_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-					Type: FactoryWorkOrderArtifactTypePR,
+					Type: FactoryWorkOrderArtifactTypeLink,
 					Data: map[string]any{"url": prURL},
 				})
 				require.Error(t, err)
@@ -497,7 +670,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 
 	t.Run("creates pr and emits event", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 			Data: map[string]any{
 				"url":    "https://github.com/example/repo/pull/1",
 				"title":  "Draft PR",
@@ -507,7 +680,7 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, artifact)
-		assert.Equal(t, FactoryWorkOrderArtifactTypePR, artifact.Type)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeLink, artifact.Type)
 
 		artifacts, err := order.ListArtifacts(database.Conn())
 		require.NoError(t, err)
@@ -564,6 +737,66 @@ func TestFactoryWorkOrder_CreateArtifact(t *testing.T) {
 		assert.Equal(t, "feature/refund-retry", payload.Artifact.Data["name"])
 	})
 
+	t.Run("link requires data.url", func(t *testing.T) {
+		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{"url": "   "},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+	})
+
+	t.Run("link rejects non-http(s) data.url", func(t *testing.T) {
+		cases := []string{
+			"javascript:alert(1)",
+			"data:text/html,<script>alert(1)</script>",
+			"file:///etc/passwd",
+			"mailto:someone@example.com",
+			"//evil.example/preview",
+			"not a url at all",
+		}
+		for _, linkURL := range cases {
+			t.Run(linkURL, func(t *testing.T) {
+				_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeLink,
+					Data: map[string]any{"url": linkURL},
+				})
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+			})
+		}
+	})
+
+	t.Run("creates link and emits event", func(t *testing.T) {
+		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/pr-42",
+				"title": "Preview",
+			},
+			CreatedBy: &userID,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, artifact)
+		assert.Equal(t, FactoryWorkOrderArtifactTypeLink, artifact.Type)
+
+		events, err := order.ListEvents(database.Conn(), 10, nil)
+		require.NoError(t, err)
+
+		artifactEvent := findEventOfType(t, events, factory.EventTypeOrderArtifactAdded)
+		var payload factory.WorkOrderArtifactAdded
+		require.NoError(t, json.Unmarshal(artifactEvent.Data, &payload))
+		require.NotNil(t, payload.Artifact)
+		assert.Equal(t, "https://preview.example.com/pr-42", payload.Artifact.Data["url"])
+		assert.Equal(t, "Preview", payload.Artifact.Data["title"])
+	})
+
 	// A markdown artifact with no data.url must succeed — the http(s)
 	// guard only kicks in when url is actually present. Runs last so
 	// earlier subtests that count artifacts stay accurate.
@@ -589,7 +822,7 @@ func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 
 	t.Run("creates artifact with a key", func(t *testing.T) {
 		artifact, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
 			Key:  "https://github.com/example/repo/pull/1",
 		})
@@ -600,7 +833,7 @@ func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 
 	t.Run("rejects a duplicate key in the same factory", func(t *testing.T) {
 		_, err := order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 			Data: map[string]any{"url": "https://github.com/example/repo/pull/2"},
 			Key:  "https://github.com/example/repo/pull/1",
 		})
@@ -615,7 +848,7 @@ func TestFactoryWorkOrder_CreateArtifact_Key(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = otherOrder.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-			Type: FactoryWorkOrderArtifactTypePR,
+			Type: FactoryWorkOrderArtifactTypeLink,
 			Data: map[string]any{"url": "https://github.com/example/repo/pull/1"},
 			Key:  "https://github.com/example/repo/pull/1",
 		})
@@ -670,7 +903,7 @@ func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 
 	const prKey = "https://github.com/example/repo/pull/7"
 	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-		Type: FactoryWorkOrderArtifactTypePR,
+		Type: FactoryWorkOrderArtifactTypeLink,
 		Data: map[string]any{
 			"url":    prKey,
 			"title":  "Draft implementation",
@@ -711,12 +944,6 @@ func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 		assert.Len(t, after, len(before))
 	})
 
-	t.Run("rejects an unknown state value", func(t *testing.T) {
-		_, err := order.UpdateArtifactData(database.Conn(), prKey, map[string]any{"state": "not-a-state"})
-		require.Error(t, err)
-		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
-	})
-
 	t.Run("errors when the key does not resolve to an artifact on this order", func(t *testing.T) {
 		_, err := order.UpdateArtifactData(database.Conn(), "no-such-key", map[string]any{"state": "open"})
 		require.Error(t, err)
@@ -747,7 +974,7 @@ func TestFactory_FindWorkOrderByArtifactKey(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = order.CreateArtifact(database.Conn(), FactoryWorkOrderArtifactParams{
-		Type: FactoryWorkOrderArtifactTypePR,
+		Type: FactoryWorkOrderArtifactTypeLink,
 		Data: map[string]any{"url": "https://github.com/example/repo/pull/42"},
 		Key:  "https://github.com/example/repo/pull/42",
 	})
@@ -811,6 +1038,21 @@ func setupFactoryWithUser(t *testing.T, prefix string) (org *Organization, userI
 	require.NoError(t, err)
 
 	return organization, user.ID, factoryModel
+}
+
+func createOrgUser(t *testing.T, orgID uuid.UUID, prefix string) *User {
+	t.Helper()
+
+	nonce := time.Now().UnixNano()
+	account, err := CreateAccount(
+		fmt.Sprintf("%s %d", prefix, nonce),
+		fmt.Sprintf("%s-%d@example.com", prefix, nonce),
+	)
+	require.NoError(t, err)
+
+	user, err := CreateUser(orgID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	return user
 }
 
 func eventTypes(events []FactoryWorkOrderEvent) []string {

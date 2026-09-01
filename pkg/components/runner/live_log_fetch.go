@@ -18,7 +18,10 @@ const (
 
 type LiveLogRecord struct {
 	Type       string `json:"type,omitempty"`
+	ID         string `json:"id,omitempty"`
 	Text       string `json:"text,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Preview    string `json:"preview,omitempty"`
 	Message    string `json:"message,omitempty"`
 	Index      *int   `json:"index,omitempty"`
 	Status     string `json:"status,omitempty"`
@@ -44,7 +47,7 @@ func FetchLiveLogRecords(ctx context.Context, brokerTaskID string, opts LiveLogF
 		now = time.Now()
 	}
 
-	session, err := NewLiveLogSession(brokerTaskID, now)
+	session, err := newInternalLiveLogSession(brokerTaskID, now)
 	if err != nil {
 		return nil, err
 	}

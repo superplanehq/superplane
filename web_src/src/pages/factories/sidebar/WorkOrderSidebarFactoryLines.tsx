@@ -1,4 +1,4 @@
-import type { FactoriesFactoryLine, FactoriesWorkOrderExecution } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrderLineDispatch } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import { SidebarSectionHeading } from "./SidebarPrimitives";
 interface WorkOrderSidebarFactoryLinesProps {
   organizationId: string;
   factoryKey: string;
-  executions: FactoriesWorkOrderExecution[];
+  lineDispatches: FactoriesWorkOrderLineDispatch[];
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   permissionsLoading: boolean;
@@ -29,7 +29,7 @@ interface WorkOrderSidebarFactoryLinesProps {
 export function WorkOrderSidebarFactoryLines({
   organizationId,
   factoryKey,
-  executions,
+  lineDispatches,
   factoryLines,
   canDispatch,
   permissionsLoading,
@@ -37,7 +37,7 @@ export function WorkOrderSidebarFactoryLines({
   isDispatching,
   onDispatch,
 }: WorkOrderSidebarFactoryLinesProps) {
-  const rows = deriveFactoryLineRows(executions);
+  const rows = deriveFactoryLineRows(lineDispatches);
   const isDispatchDisabled = !canDispatch || factoryLines.length === 0;
 
   return (
@@ -54,7 +54,7 @@ export function WorkOrderSidebarFactoryLines({
         )}
 
         {isDispatchable ? (
-          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch work orders.">
+          <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
             <DispatchWorkOrderPopover
               lines={factoryLines}
               isSaving={isDispatching}

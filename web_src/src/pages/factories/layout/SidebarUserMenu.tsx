@@ -1,58 +1,76 @@
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { Avatar } from "@/components/Avatar/avatar";
 import { useTheme } from "@/contexts/useTheme";
+import { isThemePreference } from "@/lib/themePreference";
+import type { ThemePreference } from "@/lib/themePreference";
 import { cn } from "@/lib/utils";
 import { posthog } from "@/posthog";
-import type { ThemePreference } from "@/lib/themePreference";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { LogOut, Monitor, Moon, MoreHorizontal, Sun, User as UserIcon } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Building2,
+  Check,
+  LayoutGrid,
+  LogOut,
+  Plus,
+  Settings,
+  SunMoon,
+  User as UserIcon,
+} from "lucide-react";
 import { useNavigate } from "react-router";
+import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface SidebarUserMenuProps {
   organizationId: string;
+  factoryKey?: string;
   userName: string;
-  userEmail?: string;
   userAvatarUrl?: string | null;
   organizationName: string;
+  defaultOpen?: boolean;
 }
 
-const THEME_OPTIONS: Array<{ value: ThemePreference; label: string; Icon: LucideIcon }> = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "System", Icon: Monitor },
+const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
 ];
 
-function initialsFor(name: string): string {
-  const parts = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part[0]?.toUpperCase() ?? "");
-  if (parts.length === 0) {
-    return "?";
-  }
-  if (parts.length === 1) {
-    return parts[0];
-  }
-  return `${parts[0]}${parts[parts.length - 1]}`;
+const MENU_ITEM_CLASS = "py-1 text-[13px] [&>svg]:size-3.5";
+
+function labelForTheme(preference: ThemePreference): string {
+  return THEME_OPTIONS.find((option) => option.value === preference)?.label ?? "System";
 }
 
 export function SidebarUserMenu({
   organizationId,
+  factoryKey,
   userName,
-  userEmail,
   userAvatarUrl,
   organizationName,
+  defaultOpen = false,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
   const homeHref = `/${organizationId}`;
-  const profileHref = `/${organizationId}/settings/profile`;
+  const profileHref = factoryKey
+    ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
+    : `/${organizationId}/settings/profile`;
+  const organizationHref = factoryKey
+    ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
+    : `/${organizationId}/settings/general`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -60,53 +78,54 @@ export function SidebarUserMenu({
   };
 
   return (
-    <div
-      className="flex items-center gap-2 border-t border-sidebar-border px-2 py-3"
-      data-testid="factories-sidebar-user-menu"
-    >
-      <Avatar
-        src={userAvatarUrl ?? undefined}
-        initials={initialsFor(userName || "?")}
-        alt={userName}
-        className="size-7 text-[10px]"
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] tracking-[-0.01em] text-foreground">{userName}</p>
-        <p className="truncate text-[12px] text-muted-foreground">{organizationName}</p>
-      </div>
-      <DropdownMenu>
+    <div className="flex justify-center border-t border-sidebar-border p-1.5" data-testid="factories-sidebar-user-menu">
+      <DropdownMenu defaultOpen={defaultOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="Open user menu"
             data-testid="factories-sidebar-user-menu-trigger"
-            className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            aria-label={`${userName}, ${organizationName}`}
+            title={`${userName}, ${organizationName}`}
+            className={cn(factoriesRailControlClassName, "data-[state=open]:bg-sidebar-accent")}
           >
-            <MoreHorizontal className="size-3.5" aria-hidden />
+            <Avatar
+              src={userAvatarUrl ?? undefined}
+              initials={userAvatarUrl ? undefined : initialsForName(userName || "?")}
+              alt=""
+              className="size-7 text-[10px]"
+            />
+            <span className="sr-only">
+              {userName}, {organizationName}
+            </span>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={() => navigate(homeHref)} data-testid="factories-sidebar-back-to-apps">
-            <UserIcon className="h-3.5 w-3.5" aria-hidden />
+        <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
+          <OrganizationMenuHeader
+            organizationId={organizationId}
+            organizationName={organizationName}
+            organizationHref={organizationHref}
+          />
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            onClick={() => navigate(homeHref)}
+            data-testid="factories-sidebar-back-to-apps"
+          >
+            <LayoutGrid aria-hidden />
             Back to Apps
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate(profileHref)}>
-            <UserIcon className="h-3.5 w-3.5" aria-hidden />
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            onClick={() => navigate(profileHref)}
+            data-testid="factories-sidebar-profile"
+          >
+            <UserIcon aria-hidden />
             Profile
           </DropdownMenuItem>
-          {userEmail ? (
-            <>
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-[11px] text-muted-foreground" aria-hidden>
-                {userEmail}
-              </div>
-            </>
-          ) : null}
+          <AppearanceMenuItem />
           <DropdownMenuSeparator />
-          <ThemeMenuSection />
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleSignOut}>
-            <LogOut className="h-3.5 w-3.5" aria-hidden />
+          <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={handleSignOut}>
+            <LogOut aria-hidden />
             Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -115,52 +134,122 @@ export function SidebarUserMenu({
   );
 }
 
-/**
- * Segmented theme picker (Light / Dark / System) rendered inline in the user
- * menu. Rendered outside the DropdownMenuItem primitive so clicking a theme
- * option doesn't dismiss the menu — that lets the user preview each mode
- * without reopening the menu each time.
- */
-function ThemeMenuSection() {
+const HEADER_ICON_CLASS =
+  "flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+
+function OrganizationMenuHeader({
+  organizationId,
+  organizationName,
+  organizationHref,
+}: {
+  organizationId: string;
+  organizationName: string;
+  organizationHref: string;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex items-center gap-0.5 px-1 py-1" data-testid="factories-sidebar-organization">
+      <p
+        className="min-w-0 flex-1 truncate px-2 py-1 text-[13px] font-medium tracking-[-0.01em] text-foreground"
+        data-testid="factories-sidebar-organization-name"
+      >
+        {organizationName}
+      </p>
+      <DropdownMenuItem
+        aria-label="Organization settings"
+        data-testid="factories-sidebar-organization-settings-link"
+        className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0")}
+        onSelect={() => navigate(organizationHref)}
+      >
+        <Settings className="size-3.5" aria-hidden />
+      </DropdownMenuItem>
+      <OrganizationSwitchSub currentOrganizationId={organizationId} />
+    </div>
+  );
+}
+
+function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationId: string }) {
+  const navigate = useNavigate();
+  const { data: organizations = [] } = useAccountOrganizations();
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger
+        aria-label="Switch organization"
+        data-testid="factories-sidebar-organization-switch"
+        className={cn(HEADER_ICON_CLASS, "cursor-pointer p-0 [&_svg]:size-3.5 [&>svg:last-child]:hidden")}
+      >
+        <ArrowRightLeft className="size-3.5" aria-hidden />
+      </DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent className="w-64" data-testid="factories-sidebar-organization-switch-menu">
+          <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
+          {organizations.map((organization) => {
+            const isCurrent = organization.id === currentOrganizationId;
+            return (
+              <DropdownMenuItem
+                key={organization.id}
+                onClick={() => {
+                  if (!isCurrent) {
+                    navigate(`/${organization.id}`);
+                  }
+                }}
+                data-testid={`factories-sidebar-organization-option-${organization.id}`}
+              >
+                <Building2 className="h-3.5 w-3.5" aria-hidden />
+                <span className="truncate">{organization.name}</span>
+                {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
+              </DropdownMenuItem>
+            );
+          })}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => navigate("/create")} data-testid="factories-sidebar-organization-create">
+            <Plus className="h-3.5 w-3.5" aria-hidden />
+            Create new organization
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
+  );
+}
+
+function AppearanceMenuItem() {
   const { preference, setPreference } = useTheme();
 
   return (
-    <div
-      className="px-2 pt-1 pb-2"
-      onPointerDown={(event) => {
-        // Radix dismisses the menu on any pointerdown inside DropdownMenuContent
-        // that isn't handled by a menu primitive; blocking the event here keeps
-        // the menu open while the user cycles through themes.
-        event.stopPropagation();
-      }}
-      data-testid="factories-sidebar-theme-picker"
-    >
-      <DropdownMenuLabel className="px-0 pt-0 pb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
-        Theme
-      </DropdownMenuLabel>
-      <div role="radiogroup" aria-label="Theme" className="flex gap-1 rounded-md bg-muted p-1">
-        {THEME_OPTIONS.map(({ value, label, Icon }) => {
-          const isActive = preference === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              aria-label={label}
-              title={label}
-              onClick={() => setPreference(value)}
-              className={cn(
-                "flex flex-1 items-center justify-center rounded-sm px-2 py-1 transition-colors",
-                isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-              data-testid={`factories-sidebar-theme-${value}`}
-            >
-              <Icon className="size-3.5" aria-hidden />
-            </button>
-          );
-        })}
-      </div>
-    </div>
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger
+        className="py-1 text-[13px] [&_svg]:size-3.5 [&>svg:last-child]:ml-0"
+        data-testid="factories-sidebar-appearance"
+      >
+        <SunMoon aria-hidden />
+        Appearance
+        <span className="ml-auto text-[11px] text-muted-foreground">{labelForTheme(preference)}</span>
+      </DropdownMenuSubTrigger>
+      <DropdownMenuPortal>
+        <DropdownMenuSubContent>
+          <DropdownMenuRadioGroup
+            value={preference}
+            onValueChange={(value) => {
+              if (isThemePreference(value)) {
+                setPreference(value);
+              }
+            }}
+          >
+            {THEME_OPTIONS.map(({ value, label }) => (
+              <DropdownMenuRadioItem
+                key={value}
+                value={value}
+                className="py-1 text-[13px]"
+                data-testid={`factories-sidebar-theme-${value}`}
+              >
+                {label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuSubContent>
+      </DropdownMenuPortal>
+    </DropdownMenuSub>
   );
 }

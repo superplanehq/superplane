@@ -1,91 +1,353 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it, vi } from "vitest";
 
-import { FACTORY_VELOCITY_BY_PERIOD, FACTORY_VELOCITY_YESTERDAY } from "./factoryVelocityMockData";
-import { FACTORY_VELOCITY_FLOW_BY_PERIOD } from "./factoryVelocityFlowMockData";
+import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+
+import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { VelocityPage } from "./VelocityPage";
 
-describe("VelocityPage", () => {
-  it("shows yesterday metrics, period pills, trend, and source split", () => {
-    render(<VelocityPage />);
+interface VelocityHookState {
+  data?: FactoriesDescribeFactoryVelocityResponse;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  error?: Error | null;
+}
 
-    expect(screen.getByRole("heading", { name: "Velocity" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "7d" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "30d" })).toBeInTheDocument();
+interface WorkOrdersHookState {
+  data?: FactoriesWorkOrder[];
+  isLoading?: boolean;
+  isFetching?: boolean;
+  error?: Error | null;
+}
 
-    const yesterday = screen.getByTestId("velocity-yesterday");
-    expect(yesterday).toHaveTextContent("Yesterday");
-    expect(yesterday).toHaveTextContent(String(FACTORY_VELOCITY_YESTERDAY.merged));
-    expect(yesterday).toHaveTextContent("Merged PRs");
-    expect(yesterday).toHaveTextContent("Waste");
-    expect(yesterday).toHaveTextContent("Cost");
-    expect(yesterday).toHaveTextContent("Cost per merged PR");
+const velocityHookState: VelocityHookState = {};
+const workOrdersHookState: WorkOrdersHookState = {};
 
-    const trend = screen.getByTestId("velocity-trend");
-    expect(trend).toHaveTextContent("Last 7 days");
-    expect(trend).toHaveTextContent(String(FACTORY_VELOCITY_BY_PERIOD[7].totals.merged));
-    expect(trend).toHaveTextContent("SuperPlane output");
+/** Workspace setup picks the GitHub integration and the app repository. */
+const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
+  ...REFUND_FACTORY,
+  onboarding: { ...REFUND_FACTORY.onboarding, vcsIntegrationId: "int-1", appRepository: "acme/api" },
+};
 
-    const split = screen.getByTestId("velocity-source-split");
-    expect(split).toHaveTextContent("Merged PRs by source");
-    expect(split).toHaveTextContent("SuperPlane");
-    expect(split).toHaveTextContent(`${FACTORY_VELOCITY_BY_PERIOD[7].totals.superplaneSharePct}%`);
+const startSync = vi.fn();
+const syncHookState: { isPending?: boolean } = {};
 
-    expect(screen.queryByTestId("velocity-work-order-flow")).not.toBeInTheDocument();
+vi.mock("@/hooks/useFactoryVelocity", () => ({
+  useFactoryVelocity: () => ({
+    data: velocityHookState.data,
+    isLoading: velocityHookState.isLoading ?? false,
+    isFetching: velocityHookState.isFetching ?? false,
+    error: velocityHookState.error ?? null,
+    refetch: vi.fn(),
+  }),
+  useSyncFactoryVelocity: () => ({
+    mutate: startSync,
+    isPending: syncHookState.isPending ?? false,
+  }),
+}));
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactoryWorkOrders: () => ({
+    data: workOrdersHookState.data ?? [],
+    isLoading: workOrdersHookState.isLoading ?? false,
+    isFetching: workOrdersHookState.isFetching ?? false,
+    error: workOrdersHookState.error ?? null,
+  }),
+}));
+
+/** A window with output, so the page renders the report instead of a state card. */
+function populatedResponse(
+  overrides: Partial<FactoriesDescribeFactoryVelocityResponse> = {},
+): FactoriesDescribeFactoryVelocityResponse {
+  return {
+    yesterday: { superplaneMerged: 3, waste: 1 },
+    totals: {
+      superplaneMerged: 12,
+      peopleMerged: 8,
+      waste: 4,
+      superplaneSharePct: 60,
+      wastePct: 25,
+      costCents: "4200",
+      tokens: "185000",
+      wasteCostCents: "900",
+    },
+    points: [
+      { day: "1", superplaneMerged: 2, peopleMerged: 1, waste: 1, costCents: "800", tokens: "20000" },
+      { day: "2", superplaneMerged: 3, peopleMerged: 2, waste: 0, costCents: "1200", tokens: "30000" },
+    ],
+    hasPeopleCohort: true,
+    ...overrides,
+  };
+}
+
+function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/velocity"]}>
+        <FactoriesLayoutContext.Provider
+          value={{
+            organizationId: "org-1",
+            factoryId: PRIMARY_FACTORY_ID,
+            factoryKey: PRIMARY_FACTORY_KEY,
+            factory,
+            factories: [factory],
+            openCreateWorkOrder: vi.fn(),
+          }}
+        >
+          <VelocityPage />
+        </FactoriesLayoutContext.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function resetState() {
+  startSync.mockClear();
+  syncHookState.isPending = false;
+  velocityHookState.data = undefined;
+  velocityHookState.isLoading = false;
+  velocityHookState.isFetching = false;
+  velocityHookState.error = null;
+  workOrdersHookState.data = [];
+  workOrdersHookState.isLoading = false;
+  workOrdersHookState.isFetching = false;
+  workOrdersHookState.error = null;
+}
+
+describe("VelocityPage shell", () => {
+  it("sets the document title from the page and workspace name", () => {
+    resetState();
+    renderShell();
+
+    expect(document.title).toBe(`Velocity · ${REFUND_FACTORY.name} · SuperPlane`);
   });
 
-  it("updates trend totals when the period changes and keeps yesterday fixed", async () => {
-    const user = userEvent.setup();
-    render(<VelocityPage />);
+  it("shows the loading state while velocity is loading", () => {
+    resetState();
+    velocityHookState.isLoading = true;
 
-    const yesterdayMerged = FACTORY_VELOCITY_YESTERDAY.merged;
-    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent(String(yesterdayMerged));
+    renderShell();
 
-    await user.click(screen.getByRole("tab", { name: "30d" }));
+    expect(screen.getByTestId("velocity-loading-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("velocity-trend")).toHaveTextContent("Last 30 days");
-    expect(screen.getByTestId("velocity-trend")).toHaveTextContent(
-      String(FACTORY_VELOCITY_BY_PERIOD[30].totals.merged),
+  it("shows an error state with retry when velocity fails to load", () => {
+    resetState();
+    velocityHookState.error = new Error("network");
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-error-state")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-error-retry")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  // Merge counts come from a background sync, so a user who just merged
+  // something needs a way to ask for a fresh read.
+  it("starts a sync when the workspace has a repository", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+    await userEvent.click(screen.getByTestId("velocity-sync-button"));
+
+    expect(startSync).toHaveBeenCalledTimes(1);
+  });
+
+  // A sync rebuilds sixty days of history, which takes long enough that the
+  // page has to say the work is running.
+  it("shows progress while a sync runs, and keeps the report readable", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    syncHookState.isPending = true;
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.getByTestId("velocity-sync-progress")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+  });
+
+  it("shows no progress bar when no sync is running", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
+  });
+
+  it("hides the sync control when there is no repository to read", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    expect(screen.queryByTestId("velocity-sync-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps the report when a refetch fails and cached data remains", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.error = new Error("network");
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-error-state")).not.toBeInTheDocument();
+  });
+
+  it("shows the zero state when the window holds no output", () => {
+    resetState();
+    velocityHookState.data = {
+      yesterday: { superplaneMerged: 0, waste: 0 },
+      totals: { superplaneMerged: 0, peopleMerged: 0, waste: 0, superplaneSharePct: 0, wastePct: 0 },
+      points: [{ day: "1", superplaneMerged: 0, peopleMerged: 0, waste: 0 }],
+      hasPeopleCohort: false,
+    };
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-zero-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("names the repository from workspace setup in the header", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("acme/api");
+  });
+
+  it("sums people and SuperPlane merges into the headline number", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Merged PRs");
+    expect(summary).toHaveTextContent("20");
+    expect(summary).toHaveTextContent("25%");
+  });
+
+  it("compares against the previous window when it holds output", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      hasPreviousWindow: true,
+      previousTotals: {
+        superplaneMerged: 6,
+        peopleMerged: 6,
+        waste: 6,
+        superplaneSharePct: 50,
+        wastePct: 50,
+        costCents: "3000",
+      },
+    });
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Compared with the previous 14 days");
+    // Waste fell from 50% to 25% of SuperPlane closes.
+    expect(summary).toHaveTextContent("25 pp");
+  });
+
+  it("drops the comparison for a workspace without an earlier period", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({ hasPreviousWindow: false });
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("There is no earlier period to compare with yet.");
+    expect(summary).not.toHaveTextContent("No change");
+  });
+
+  it("lists people with their authored and SuperPlane merges", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      people: [
+        {
+          id: "user-1",
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          authoredMerged: 5,
+          factoryMerged: 3,
+          factoryWaste: 1,
+          medianCycleHours: 12,
+          costCents: "1500",
+        },
+      ],
+    });
+
+    renderShell();
+
+    const people = screen.getByTestId("velocity-people");
+    expect(people).toHaveTextContent("Ada Lovelace");
+    expect(people).toHaveTextContent("1 person with activity in this period");
+  });
+
+  it("explains an empty Authored column when GitHub is not connected", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      hasPeopleCohort: false,
+      people: [{ id: "user-1", name: "Ada Lovelace", factoryMerged: 3 }],
+    });
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent(
+      "Connect GitHub in workspace setup to count the pull requests people merged.",
     );
-    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent(String(yesterdayMerged));
   });
 
-  it("shows work-order time metrics when includeWorkOrderFlow is set", () => {
-    render(<VelocityPage includeWorkOrderFlow />);
+  it("hides the intake split when no intake source produced a merge", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({ intakeSources: [] });
 
-    const flow = screen.getByTestId("velocity-work-order-flow");
-    const period = FACTORY_VELOCITY_FLOW_BY_PERIOD[7];
+    renderShell();
 
-    expect(flow).toHaveTextContent("Work order time");
-    expect(flow).not.toHaveTextContent("Closed work orders");
-    expect(flow).toHaveTextContent("Last 7 days");
-    expect(flow).toHaveTextContent("Cycle time");
-    expect(flow).toHaveTextContent("Time running");
-    expect(flow).toHaveTextContent("Time in Waiting");
-    expect(flow).toHaveTextContent(`${period.runningShareOfCyclePct}% of cycle time`);
-    expect(flow).toHaveTextContent(`${period.waitingShareOfCyclePct}% of cycle time`);
-    expect(flow).toHaveTextContent("Time running and Time in Waiting by day");
-    expect(flow).not.toHaveTextContent("Work orders in Waiting");
-    expect(flow).not.toHaveTextContent("Open in Waiting");
-    expect(flow).not.toHaveTextContent("Waiting now");
-    expect(flow).not.toHaveTextContent("Median age");
-    expect(flow).not.toHaveTextContent("Lead time");
+    expect(screen.queryByText("Intake source")).not.toBeInTheDocument();
+    expect(screen.getByText("Origin")).toBeInTheDocument();
   });
 
-  it("updates closed-period metrics when the period changes", async () => {
-    const user = userEvent.setup();
-    render(<VelocityPage includeWorkOrderFlow />);
+  it("offers the intake split when the response names its sources", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      intakeSources: [{ key: "github-issues", label: "GitHub issue", merged: 7 }],
+    });
 
-    expect(screen.getByTestId("velocity-work-order-flow")).toHaveTextContent(
-      `${FACTORY_VELOCITY_FLOW_BY_PERIOD[7].waitingShareOfCyclePct}% of cycle time`,
-    );
+    renderShell();
 
-    await user.click(screen.getByRole("tab", { name: "30d" }));
+    expect(screen.getByText("Intake source")).toBeInTheDocument();
+  });
 
-    const flow = screen.getByTestId("velocity-work-order-flow");
-    expect(flow).toHaveTextContent("Last 30 days");
-    expect(flow).toHaveTextContent(`${FACTORY_VELOCITY_FLOW_BY_PERIOD[30].waitingShareOfCyclePct}% of cycle time`);
+  it("explains when task time could not be loaded", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    workOrdersHookState.error = new Error("network");
+
+    renderShell();
+
+    const taskTime = screen.getByTestId("velocity-task-time");
+    expect(taskTime).toHaveTextContent("We could not load task time.");
+  });
+
+  it("reports tracked spend and the part of it that went to waste", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    const cost = screen.getByTestId("velocity-cost");
+    expect(cost).toHaveTextContent("$42.00");
+    expect(cost).toHaveTextContent("$9.00 of this went to tasks that closed without a merge.");
   });
 });

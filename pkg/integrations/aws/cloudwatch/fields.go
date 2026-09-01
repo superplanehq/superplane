@@ -24,6 +24,26 @@ func regionField() configuration.Field {
 	}
 }
 
+// alarmField picks one of the metric alarms that exist in the selected region.
+func alarmField(description string) configuration.Field {
+	return configuration.Field{
+		Name:        "alarm",
+		Label:       "Alarm",
+		Type:        configuration.FieldTypeIntegrationResource,
+		Required:    true,
+		Description: description,
+		VisibilityConditions: []configuration.VisibilityCondition{
+			{Field: "region", Values: []string{"*"}},
+		},
+		TypeOptions: &configuration.TypeOptions{
+			Resource: &configuration.ResourceTypeOptions{
+				Type:       "cloudwatch.alarm",
+				Parameters: []configuration.ParameterRef{regionParameter()},
+			},
+		},
+	}
+}
+
 // unitField offers the metric units. Only Update Alarm can clear a unit, so
 // only it gets the "No unit" option; on create, leaving the field off is the
 // same thing.
@@ -94,6 +114,41 @@ func ec2ActionField(visibilityConditions []configuration.VisibilityCondition) co
 		TypeOptions: &configuration.TypeOptions{
 			Select: &configuration.SelectTypeOptions{
 				Options: AlarmEC2ActionOptions,
+			},
+		},
+	}
+}
+
+// timestampTimezoneOptions is a curated set of IANA zones, matching the
+// select statuspage.CreateIncident already offers for the same "disambiguate
+// an offset-less timestamp" problem.
+var timestampTimezoneOptions = []configuration.FieldOption{
+	{Label: "UTC", Value: "UTC"},
+	{Label: "America/New_York", Value: "America/New_York"},
+	{Label: "America/Los_Angeles", Value: "America/Los_Angeles"},
+	{Label: "America/Chicago", Value: "America/Chicago"},
+	{Label: "Europe/London", Value: "Europe/London"},
+	{Label: "Europe/Paris", Value: "Europe/Paris"},
+	{Label: "Asia/Tokyo", Value: "Asia/Tokyo"},
+	{Label: "Asia/Singapore", Value: "Asia/Singapore"},
+}
+
+// timestampTimezoneField lets a component disambiguate a timestamp field's
+// offset-less values (e.g. from the datetime widget), which are otherwise
+// ambiguously interpreted. Only relevant when the paired timestamp is set,
+// so callers should gate its visibility on that field having a value.
+func timestampTimezoneField(visibilityConditions []configuration.VisibilityCondition) configuration.Field {
+	return configuration.Field{
+		Name:                 "timezone",
+		Label:                "Timezone",
+		Type:                 configuration.FieldTypeSelect,
+		Required:             false,
+		Default:              "UTC",
+		Description:          "Timezone the timestamp above is in, when it has no UTC offset of its own",
+		VisibilityConditions: visibilityConditions,
+		TypeOptions: &configuration.TypeOptions{
+			Select: &configuration.SelectTypeOptions{
+				Options: timestampTimezoneOptions,
 			},
 		},
 	}

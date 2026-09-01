@@ -2,9 +2,10 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/lib/date";
 import { Link } from "react-router";
-import { workOrderDetailPath } from "../lib/factoryPagePaths";
+import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import { formatCompactTokens, formatDurationSeconds, formatUsdCents } from "../lib/workOrderUsage";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
@@ -15,26 +16,45 @@ interface WorkOrdersTableViewProps {
   factoryLines: FactoriesFactoryLine[];
   canDispatch: boolean;
   canAssign: boolean;
-  isDispatching: boolean;
+  /** Tasks with a dispatch in flight. Only their controls show a busy state. */
+  dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
 }
 
 /**
+ * Shared grid-template-columns tracks for the header and every row. Every
+ * track is a fixed length or `1fr` — never `auto` — so the header and each
+ * row (which are separate CSS grid formatting contexts) always resolve to
+ * identical pixel widths and stay aligned regardless of row content (e.g.
+ * whether a row has an avatar or a dispatch button in the Owner column).
+ * Keep the header `<div>` and row `<article>` className referencing this
+ * constant so the two templates can never drift apart.
+ */
+const TABLE_GRID_COLS =
+  "grid-cols-[118px_52px_1fr_88px_96px] md:grid-cols-[130px_60px_1fr_120px_96px_100px_110px] lg:grid-cols-[130px_70px_1fr_160px_110px_110px_120px]";
+
+/**
  * Responsive table. Columns collapse gracefully on narrower viewports —
- * Spend and Updated hide first, Line hides second. Status/ID/Title stay
- * visible in every layout.
+ * Updated and Line hide below md. Status, ID, Title, Spend, and Owner stay
+ * visible in every layout so token and USD cost stay visible on the main
+ * work-order list.
  */
 export function WorkOrdersTableView(props: WorkOrdersTableViewProps) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card" data-testid="work-orders-table">
-      <div className="grid grid-cols-[110px_60px_1fr_auto] items-center gap-3 border-b border-border bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground md:grid-cols-[110px_60px_1fr_140px_120px_auto] lg:grid-cols-[110px_70px_1fr_180px_100px_120px_auto]">
+      <div
+        className={cn(
+          "grid items-center gap-3 border-b border-border bg-muted/30 px-3 py-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground",
+          TABLE_GRID_COLS,
+        )}
+      >
         <span>Status</span>
         <span>ID</span>
         <span>Title</span>
         <span className="hidden md:inline">Line</span>
-        <span className="hidden lg:inline">Spend</span>
+        <span className="text-right">Spend</span>
         <span className="hidden md:inline">Updated</span>
         <span className="text-right">Owner</span>
       </div>
@@ -56,25 +76,27 @@ function TableRow({
   factoryLines,
   canDispatch,
   canAssign,
-  isDispatching,
+  dispatchingOrderIds,
   isAssigneesSaving,
   onDispatch,
   onAssigneesSave,
 }: WorkOrdersTableViewProps & { entry: WorkOrderListEntry }) {
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
-  const href =
-    entry.order.number !== undefined ? workOrderDetailPath(organizationId, factoryKey, entry.order.number) : "#";
+  const href = workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const timeLabel = entry.updatedAtMs > 0 ? formatTimeAgo(new Date(entry.updatedAtMs)) : "—";
   return (
     <article
-      className="group relative grid grid-cols-[110px_60px_1fr_auto] items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40 md:grid-cols-[110px_60px_1fr_140px_120px_auto] lg:grid-cols-[110px_70px_1fr_180px_100px_120px_auto]"
+      className={cn(
+        "group relative grid items-center gap-3 px-3 py-2 transition-colors hover:bg-accent/40",
+        TABLE_GRID_COLS,
+      )}
       data-testid={`work-orders-table-row-${entry.id}`}
     >
       <Link to={href} className="absolute inset-0 z-0" aria-label={`Open ${entry.title}`} />
 
       <span
         className={cn(
-          "relative z-10 pointer-events-none inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.04em]",
+          "relative z-10 pointer-events-none inline-flex w-fit items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
           meta.className,
         )}
       >
@@ -96,12 +118,7 @@ function TableRow({
         fallback="—"
       />
 
-      <span
-        className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground lg:inline"
-        title={entry.usageTooltip ?? undefined}
-      >
-        {entry.usageLabel ?? "—"}
-      </span>
+      <SpendCell entry={entry} />
 
       <span className="relative z-10 pointer-events-none hidden text-[11px] text-muted-foreground md:inline">
         {timeLabel}
@@ -112,7 +129,7 @@ function TableRow({
           entry={entry}
           lines={factoryLines}
           canDispatch={canDispatch}
-          isDispatching={isDispatching}
+          isDispatching={dispatchingOrderIds.has(entry.id)}
           onDispatch={onDispatch}
           visible={entry.isDispatchable}
         />
@@ -125,5 +142,29 @@ function TableRow({
         />
       </div>
     </article>
+  );
+}
+
+function SpendCell({ entry }: { entry: WorkOrderListEntry }) {
+  const usd = entry.totalCostCents > 0 ? formatUsdCents(entry.totalCostCents) : null;
+  const tokens = entry.totalTokens > 0 ? formatCompactTokens(entry.totalTokens) : null;
+  const duration = entry.durationSeconds > 0 ? formatDurationSeconds(entry.durationSeconds) : null;
+  if (!usd && !tokens && !duration) {
+    return (
+      <span className="relative z-10 pointer-events-none text-right text-[11px] tabular-nums text-muted-foreground">
+        —
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="relative z-10 pointer-events-none text-right text-[11px] leading-tight tabular-nums text-muted-foreground"
+      title={entry.usageTooltip ?? undefined}
+    >
+      {usd ? <span className="block">{usd}</span> : null}
+      {tokens ? <span className="block">{tokens}</span> : null}
+      {duration ? <span className="block">{duration}</span> : null}
+    </span>
   );
 }

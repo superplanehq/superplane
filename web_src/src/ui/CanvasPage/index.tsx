@@ -46,6 +46,7 @@ import type {
   ActionsAction,
   ComponentsEdge,
   ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
   SuperplaneComponentsNode as ComponentsNode,
   ConfigurationField,
   OrganizationsIntegration,
@@ -62,6 +63,7 @@ import {
   useCanvasToolSidebarState,
   type CanvasToolSidebarState,
 } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
+import { FactoryCanvasToolSidebar } from "@/pages/factories/agent/FactoryCanvasToolSidebar";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/app/lib/canvas-runs";
@@ -78,6 +80,8 @@ import {
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
+  resolveInitialCanvasFitViewOptions,
+  resolveInitialFitViewDuration,
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useTheme } from "@/contexts/useTheme";
@@ -91,21 +95,28 @@ import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { RunErrorsCard } from "../Runs/RunErrorsCard";
 import { RunInspectorLoadingPanel } from "../Runs/RunInspectorLoadingPanel";
 import { RunInspectorPanel } from "../Runs/RunInspectorPanel";
+import { normalizeRunErrors, shouldShowFactoryCanvasRunErrors } from "../Runs/runErrors";
 import { getRunStatus } from "../Runs/runPresentation";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
+import { CanvasPageLoadingOverlay } from "./CanvasPageLoadingOverlay";
 import { Header } from "./Header";
 import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { shouldUseFactoryRunLeafLayout } from "./factoryRunLeafLayoutGate";
+import { useFactoryConfigureFitView } from "./useFactoryConfigureFitView";
+import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
 import { computeAppendFromNodePlacement } from "./appendFromNodePlacement";
 import { selectCreatedRerun } from "./runInspectionRerunSelection";
+import { nodesWithSelectedId } from "./nodesWithSelectedId";
 import { resolveRunInspectorOpen } from "./resolveRunInspectorOpen";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -156,6 +167,11 @@ export interface NodeEditData {
   integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
+  /** Inline concurrency configuration; only action nodes support it. */
+  concurrency?: ComponentsConcurrencySpec;
+  supportsConcurrency?: boolean;
+  /** Loop only honors max (its parallel-session cap); hides key. */
+  concurrencyMaxOnly?: boolean;
 }
 
 export interface NewNodeData {
@@ -270,6 +286,10 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Versions left panel toggle (templates only). */
   hideCanvasToolSidebar?: boolean;
+  /** Hide the + / note rail. Factory edit mode uses header workspace toggles instead. */
+  hideRightSideControls?: boolean;
+  /** Overlay on the canvas column (factory YAML workspace). */
+  canvasOverlay?: ReactNode;
   /** Hide the top PageHeader / SecondaryHeader chrome (factory embed shell owns the header). */
   hidePageChrome?: boolean;
   /** Enables managed agent chat controls when the user has the required RBAC permissions. */
@@ -293,6 +313,7 @@ export interface CanvasPageProps {
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
@@ -430,6 +451,25 @@ export interface CanvasPageProps {
    * selected, and chrome is Close-only (no newer/older/copy link).
    */
   factoryEmbed?: boolean;
+  /**
+   * Frame the graph at 100% zoom on first load. Do not shrink to fit the
+   * viewport. Used by settings automation previews.
+   */
+  lockNativeZoom?: boolean;
+  /**
+   * Apply the same ephemeral leaf-right layout as factory run inspection.
+   * Used by settings automation previews so the graph matches Automations.
+   */
+  factoryDisplayLayout?: boolean;
+  /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
+  factoryConfigure?: boolean;
+  /**
+   * True after the mandatory Factory Configure layout snap. Fit waits on this
+   * so the enter cover does not lift on live positions.
+   */
+  factoryConfigureLayoutReady?: boolean;
+  /** Factory-shell edit workspace. Enables factory agent sidebar and edit-grid dots. */
+  factoryEditWorkspace?: boolean;
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -801,7 +841,7 @@ function CanvasPage(props: CanvasPageProps) {
   const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef ?? localHasUserToggledSidebarRef;
   const isSidebarOpenRef = props.isSidebarOpenRef ?? localIsSidebarOpenRef;
 
-  if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
+  if (isSidebarOpenRef.current === null && typeof window !== "undefined" && !props.factoryEmbed) {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
     if (storedSidebarState !== null) {
       try {
@@ -813,13 +853,15 @@ function CanvasPage(props: CanvasPageProps) {
     }
   }
 
-  // Initialize sidebar state from ref if available, otherwise based on whether nodes exist
+  // Factory embed opens from the Components tab (`blocks=1`), not from empty
+  // canvases or the shared localStorage preference.
   const [isBuildingBlocksSidebarOpen, setIsBuildingBlocksSidebarOpen] = useState(() => {
-    // If we have a persisted state in the ref, use it
+    if (props.factoryEmbed) {
+      return isSidebarOpenRef.current === true;
+    }
     if (isSidebarOpenRef.current !== null) {
       return isSidebarOpenRef.current;
     }
-    // Otherwise, open if no nodes exist
     return props.nodes.length === 0;
   });
 
@@ -1100,7 +1142,7 @@ function CanvasPage(props: CanvasPageProps) {
     [props, readOnly],
   );
 
-  const handleSidebarToggle = useCallback(
+  const applyBuildingBlocksSidebarOpen = useCallback(
     (open: boolean) => {
       hasUserToggledSidebarRef.current = true;
       isSidebarOpenRef.current = open;
@@ -1111,6 +1153,18 @@ function CanvasPage(props: CanvasPageProps) {
     },
     [hasUserToggledSidebarRef, isSidebarOpenRef],
   );
+
+  const handleSidebarToggle = useCallback(
+    (open: boolean) => {
+      applyBuildingBlocksSidebarOpen(open);
+      if (props.canvasId) {
+        publishBuildingBlocksSidebarChanged(props.canvasId, open);
+      }
+    },
+    [applyBuildingBlocksSidebarOpen, props.canvasId],
+  );
+
+  useBuildingBlocksSidebarRequest(props.canvasId, applyBuildingBlocksSidebarOpen);
 
   /**
    * Keyboard equivalent of dropping a block onto the canvas via drag-and-drop.
@@ -1163,11 +1217,16 @@ function CanvasPage(props: CanvasPageProps) {
 
   const onNodeConfigurationSave = props.onNodeConfigurationSave;
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (
+      configuration: Record<string, unknown>,
+      nodeName: string,
+      integrationRef?: ComponentsIntegrationRef,
+      concurrency?: ComponentsConcurrencySpec,
+    ) => {
       if (!editingNodeData?.nodeId || !onNodeConfigurationSave) {
         return;
       }
-      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      return onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef, concurrency);
     },
     [editingNodeData?.nodeId, onNodeConfigurationSave],
   );
@@ -1267,6 +1326,13 @@ function CanvasPage(props: CanvasPageProps) {
     setPendingRuntimeEditNodeId(null);
   }, [pendingRuntimeEditNodeId, props.isEditing, props.isRunInspectionMode, state.componentSidebar]);
 
+  useEffect(() => {
+    if (!props.isEditing || props.isRunInspectionMode || !state.componentSidebar.isOpen) {
+      return;
+    }
+    setCurrentTab("settings");
+  }, [props.isEditing, props.isRunInspectionMode, state.componentSidebar.isOpen]);
+
   const canvasStateMode = props.canvasStateMode || "default";
   const showRunInspectionFloatingBar =
     props.isRunInspectionMode && !props.isEditSessionActive && !props.isEditing && !!props.onBackToLiveCanvas;
@@ -1280,6 +1346,13 @@ function CanvasPage(props: CanvasPageProps) {
     hasRunOrLoading: !!props.runNodeDetailRun || !!props.runCanvasLoading,
     factoryEmbed: props.factoryEmbed,
     selectedNodeId: props.runNodeDetailNodeId,
+  });
+  const runErrors = normalizeRunErrors(props.runNodeDetailRun?.errors);
+  const showFactoryCanvasRunErrors = shouldShowFactoryCanvasRunErrors({
+    factoryEmbed: props.factoryEmbed,
+    isRunInspectionMode: props.isRunInspectionMode,
+    runInspectorOpen,
+    errorCount: runErrors.length,
   });
 
   const renderInspectorSidebar = useCallback(
@@ -1450,7 +1523,11 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        {props.factoryEmbed && props.factoryEditWorkspace ? (
+          <FactoryCanvasToolSidebar toolSidebarState={toolSidebarState} />
+        ) : (
+          <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        )}
 
         <CanvasRunsSidebar isOpen={isRunsSidebarOpen}>{props.toolSidebarRunsContent ?? null}</CanvasRunsSidebar>
 
@@ -1458,7 +1535,7 @@ function CanvasPage(props: CanvasPageProps) {
           {props.toolSidebarVersionsContent ?? null}
         </CanvasVersionsSidebar>
 
-        {isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
+        {props.hideRightSideControls || isPanelHeaderMode(workflowHeaderMode) ? null : props.isEditing ? (
           props.headerMode === "console" ? null : (
             <RightSideControls
               mode="edit"
@@ -1476,7 +1553,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && !!props.isEditing && allowsBuildingBlocksSidebar(workflowHeaderMode)}
+            isOpen={
+              isBuildingBlocksSidebarOpen &&
+              allowsBuildingBlocksSidebar(workflowHeaderMode) &&
+              (!!props.isEditing || Boolean(props.factoryEmbed && props.factoryEditWorkspace))
+            }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1485,6 +1566,7 @@ function CanvasPage(props: CanvasPageProps) {
             disabledMessage="You don't have permission to edit this canvas."
             onBlockClick={handleBuildingBlockSelect}
             onEnterSubmit={handleBuildingBlockSelect}
+            factoryChrome={Boolean(props.factoryEmbed || props.factoryId)}
           />
         )}
 
@@ -1515,6 +1597,11 @@ function CanvasPage(props: CanvasPageProps) {
                 }}
               />
             ) : null}
+            {showFactoryCanvasRunErrors ? (
+              <div className="absolute inset-x-0 top-0 z-[19] px-4 pt-3" data-testid="factory-run-errors-banner">
+                <RunErrorsCard errors={runErrors} className="mx-auto max-w-2xl shadow-sm" />
+              </div>
+            ) : null}
             {props.headerMode === "files" ? (
               <div
                 className="absolute inset-0 bg-slate-50 dark:bg-gray-900"
@@ -1527,6 +1614,11 @@ function CanvasPage(props: CanvasPageProps) {
                   state={state}
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
+                  lockNativeZoom={props.lockNativeZoom}
+                  factoryDisplayLayout={props.factoryDisplayLayout}
+                  factoryConfigure={props.factoryConfigure}
+                  factoryConfigureLayoutReady={props.factoryConfigureLayoutReady}
+                  factoryEditWorkspace={props.factoryEditWorkspace}
                   layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
                   onNodesDelete={handleNodesDelete}
@@ -1583,6 +1675,11 @@ function CanvasPage(props: CanvasPageProps) {
             {isComponentSidebarVisibleMode(props.headerMode) && !props.isRunInspectionMode && props.isEditing
               ? renderInspectorSidebar("sidebar")
               : null}
+            {props.canvasOverlay ? (
+              <div className="absolute inset-0 z-20 flex flex-col bg-background" data-testid="canvas-center-overlay">
+                {props.canvasOverlay}
+              </div>
+            ) : null}
           </div>
         </div>
         {runInspectorOpen && props.runNodeDetailRun ? (
@@ -1724,6 +1821,7 @@ function Sidebar({
     configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1870,6 +1968,9 @@ function Sidebar({
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
+      showNodeConcurrency={editingNodeData?.supportsConcurrency ?? false}
+      nodeConcurrency={editingNodeData?.concurrency}
+      nodeConcurrencyMaxOnly={editingNodeData?.concurrencyMaxOnly ?? false}
       onNodeConfigCancel={undefined}
       domainId={organizationId}
       customField={
@@ -2161,6 +2262,11 @@ function CanvasContent({
   state,
   factoryId,
   factoryEmbed = false,
+  lockNativeZoom = false,
+  factoryDisplayLayout = false,
+  factoryConfigure = false,
+  factoryConfigureLayoutReady = true,
+  factoryEditWorkspace = false,
   layoutMode,
   onNodeDelete,
   onNodesDelete,
@@ -2215,6 +2321,11 @@ function CanvasContent({
   state: CanvasPageState;
   factoryId?: string;
   factoryEmbed?: boolean;
+  lockNativeZoom?: boolean;
+  factoryDisplayLayout?: boolean;
+  factoryConfigure?: boolean;
+  factoryConfigureLayoutReady?: boolean;
+  factoryEditWorkspace?: boolean;
   layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
@@ -2280,15 +2391,18 @@ function CanvasContent({
   const isReadOnly = readOnly ?? false;
   const flowDirection = resolveCanvasFlowDirection(factoryId);
   const isVerticalFlow = flowDirection === "vertical";
-  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark") : null;
-  const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#F1F5F9");
-  const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#cbd5e1");
+  const factoryEditGrid = Boolean(factoryEditWorkspace && (isEditing || factoryConfigure));
+  const factoryBackground = isVerticalFlow ? factoryCanvasBackground(resolvedTheme === "dark", factoryEditGrid) : null;
+  const flowBgColor = factoryBackground?.bgColor ?? (resolvedTheme === "dark" ? DARK_BASE_BG_HEX : "#e2e8f0");
+  const flowDotColor = factoryBackground?.color ?? (resolvedTheme === "dark" ? "#374151" : "#b8c4d0");
   const flowDotGap = factoryBackground?.gap ?? 8;
   const flowDotSize = factoryBackground?.size ?? 2;
   // The content-key driven re-fit only applies when viewing the live/version
   // canvas. Run inspection keeps its own dedicated fit/viewport handling, and
   // while editing the viewport must stay put (the draft is the same graph the
   // user was already looking at, and re-fitting would disrupt interactions).
+  // Factory Configure is the exception: Edit stretches ranks / re-lays out, so
+  // CanvasContent fits once after that visit settles.
   const fitViewContentKey = isRunInspectionMode || isEditing ? undefined : fitViewContentKeyProp;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
@@ -2618,29 +2732,23 @@ function CanvasContent({
       return;
     }
 
-    stateRef.current.setNodes((nodes) => {
-      if (!runSelectedNodeId) {
-        if (nodes.every((node) => !node.selected)) {
-          return nodes;
-        }
-        return nodes.map((node) => ({ ...node, selected: false }));
-      }
-
-      if (!nodes.some((node) => node.id === runSelectedNodeId)) {
-        return nodes;
-      }
-
-      const alreadyCorrect = nodes.every((node) => node.selected === (node.id === runSelectedNodeId));
-      if (alreadyCorrect) {
-        return nodes;
-      }
-
-      return nodes.map((node) => ({
-        ...node,
-        selected: node.id === runSelectedNodeId,
-      }));
-    });
+    stateRef.current.setNodes((nodes) => nodesWithSelectedId(nodes, runSelectedNodeId ?? null));
   }, [isRunInspectionMode, runSelectedNodeId, runCanvasNodeIdsKey]);
+
+  useEffect(() => {
+    if (isRunInspectionMode || !isEditing) {
+      return;
+    }
+
+    const selectedNodeId = state.componentSidebar.isOpen ? state.componentSidebar.selectedNodeId : null;
+    stateRef.current.setNodes((nodes) => nodesWithSelectedId(nodes, selectedNodeId));
+  }, [
+    isEditing,
+    isRunInspectionMode,
+    runCanvasNodeIdsKey,
+    state.componentSidebar.isOpen,
+    state.componentSidebar.selectedNodeId,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -2719,10 +2827,11 @@ function CanvasContent({
             ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
             : null;
 
+        const fitDuration = resolveInitialFitViewDuration(factoryDisplayLayout, factoryConfigure);
         if (focusNode) {
-          fitView({ nodes: [focusNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
+          fitView({ nodes: [focusNode], duration: fitDuration, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
-          fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
+          fitView({ ...resolveInitialCanvasFitViewOptions(lockNativeZoom), duration: fitDuration });
         }
 
         if (hasNodes) {
@@ -2761,6 +2870,9 @@ function CanvasContent({
       initialFocusNodeId,
       fitViewContentKey,
       lastFittedContentKeyRef,
+      lockNativeZoom,
+      factoryDisplayLayout,
+      factoryConfigure,
     ],
   );
 
@@ -2792,6 +2904,46 @@ function CanvasContent({
     reportZoom,
     viewportRef,
   ]);
+
+  const getFactoryConfigureNodeCount = useCallback(() => stateRef.current.nodes?.length ?? 0, []);
+  const getFactoryConfigureFocusNode = useCallback(() => {
+    const nodeId = stateRef.current.componentSidebar.selectedNodeId ?? initialFocusNodeId ?? null;
+    if (!nodeId) {
+      return undefined;
+    }
+    return getNodes().find((node) => node.id === nodeId) ?? stateRef.current.nodes.find((node) => node.id === nodeId);
+  }, [getNodes, initialFocusNodeId]);
+  useEffect(() => {
+    if (!factoryDisplayLayout || !hasReactFlowInitialized) {
+      return;
+    }
+    if ((stateRef.current.nodes?.length ?? 0) === 0) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      void fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 0 }).then(() => {
+        const nextViewport = getViewport();
+        viewportRef.current = nextViewport;
+        reportZoom(nextViewport.zoom);
+      });
+    }, 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, reportZoom, viewportRef]);
+
+  const { ready: factoryConfigureEnterReady } = useFactoryConfigureFitView({
+    factoryConfigure,
+    isEditing,
+    hasReactFlowInitialized,
+    nodeCount: state.nodes?.length ?? 0,
+    layoutReady: factoryConfigureLayoutReady,
+    getNodeCount: getFactoryConfigureNodeCount,
+    getFocusNode: getFactoryConfigureFocusNode,
+    fitView,
+    getViewport,
+    viewportRef,
+    reportZoom,
+  });
+  const hideFactoryConfigureEnter = factoryConfigure && !factoryConfigureEnterReady;
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
   // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching
@@ -2849,6 +3001,7 @@ function CanvasContent({
     getNodes,
     getViewport,
     hasFitToViewRef,
+    hasReactFlowInitialized,
     isAutoFocusEnabled,
     isRunInspectionMode,
     reportZoom,
@@ -2910,13 +3063,19 @@ function CanvasContent({
     return status === "running" || status === "cancelling";
   }, [runNodeDetailRun]);
 
-  // Ephemeral leaf-right layout while inspecting a factory run (does not persist).
+  // Ephemeral leaf-right layout for factory run inspection and display previews.
+  // Does not persist to the saved workflow.
   const factoryRunLeafLayout = useMemo(() => {
-    if (!factoryEmbed || !isRunInspectionMode) {
+    if (!shouldUseFactoryRunLeafLayout({ factoryEmbed, isRunInspectionMode, factoryDisplayLayout })) {
       return null;
     }
     return layoutFactoryRunLeafGraph(
-      state.nodes.map((node) => ({ id: node.id, position: node.position })),
+      state.nodes.map((node) => ({
+        id: node.id,
+        position: node.position,
+        width: node.measured?.width ?? node.width,
+        height: node.measured?.height ?? node.height,
+      })),
       (state.edges ?? []).map((edge) => ({
         id: edge.id,
         source: edge.source,
@@ -2924,7 +3083,7 @@ function CanvasContent({
         sourceHandle: edge.sourceHandle,
       })),
     );
-  }, [factoryEmbed, isRunInspectionMode, state.nodes, state.edges]);
+  }, [factoryDisplayLayout, factoryEmbed, isRunInspectionMode, state.nodes, state.edges]);
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
@@ -3246,7 +3405,10 @@ function CanvasContent({
     [handleOpenCommandPalette],
   );
   const zoomSliderContent = useMemo(() => <>{commandPaletteSearchControl}</>, [commandPaletteSearchControl]);
-  const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
+  const reactFlowStyle = useMemo(
+    () => ({ opacity: isInitialized && !hideFactoryConfigureEnter ? 1 : 0 }),
+    [hideFactoryConfigureEnter, isInitialized],
+  );
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
     const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
@@ -3303,7 +3465,13 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={flowDotGap} size={flowDotSize} bgColor={flowBgColor} color={flowDotColor} />
+            <Background
+              id={factoryBackground ? `dots-${factoryEditGrid ? "edit" : "view"}-${flowDotSize}` : undefined}
+              gap={flowDotGap}
+              size={flowDotSize}
+              bgColor={flowBgColor}
+              color={flowDotColor}
+            />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
@@ -3536,6 +3704,9 @@ function CanvasContent({
           onRunExecutionSelect={onRunExecutionSelect}
           onAcknowledgeErrors={onAcknowledgeErrors}
         />
+      ) : null}
+      {hideFactoryConfigureEnter ? (
+        <CanvasPageLoadingOverlay message="Loading canvas..." opaque testId="factory-configure-enter-loading" />
       ) : null}
     </div>
   );

@@ -304,6 +304,17 @@ type AssignComponentColumnsOptions = {
   isMainSuccessor: SpinePickers["isMainSuccessor"];
 };
 
+/** Off-spine forks start after lanes that still have nodes below the roots. */
+export function firstSideColumnForComponent(spineColumns: Map<string, number>, layer: Map<string, number>): number {
+  let maxContinuingColumn = -1;
+  for (const [id, col] of spineColumns) {
+    if ((layer.get(id) ?? 0) > 0) {
+      maxContinuingColumn = Math.max(maxContinuingColumn, col);
+    }
+  }
+  return Math.max(maxContinuingColumn + 1, 1);
+}
+
 export function assignComponentColumns(options: AssignComponentColumnsOptions): Map<string, number> {
   const { component, componentSet, spineColumns, firstSideColumn, layer, incoming, isMainSuccessor } = options;
   const column = new Map(spineColumns);

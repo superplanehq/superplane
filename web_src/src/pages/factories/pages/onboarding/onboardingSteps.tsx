@@ -2,43 +2,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { TooltipProvider } from "@/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Check, Copy, ListTodo, Loader2, Search } from "lucide-react";
+import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
-import {
-  AGENT_OPTIONS,
-  FIXTURE_INVITE_URL,
-  FIXTURE_REPOS,
-  VCS_OPTIONS,
-  integrationLabel,
-  vcsLabel,
-  type AgentHarnessId,
-  type IntegrationId,
-  type IssuesChoiceId,
-  type VcsHostId,
-} from "./onboardingFixtures";
+import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
-export function Shell({ children, className }: { children: ReactNode; className?: string }) {
-  useFactoriesThemeClass();
-  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider delayDuration={150}>
-        <div className={cn("w-full bg-background text-foreground", className)} data-testid="onboarding-shell">
-          {children}
-        </div>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
-
-function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
+export function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
   return <IntegrationIcon integrationName={name} className={size <= 16 ? "size-3.5" : "size-5"} size={size} />;
 }
 
@@ -68,7 +40,7 @@ function connectOptionRowTone(soon: boolean, selected: boolean): string {
  * Shared row for version control, issues, and coding agent options.
  * Connectable rows always show Connect / Connected on the right.
  */
-function ConnectOptionRow({
+export function ConnectOptionRow({
   icon,
   title,
   detail,
@@ -153,66 +125,40 @@ function ConnectOptionRow({
   );
 }
 
-export function NameInviteStep({ setup }: { setup: OnboardingSetupApi }) {
+export function NameStep({ setup }: { setup: OnboardingSetupApi }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <Label htmlFor="workspace-name" className="text-[13px] font-medium">
-          Workspace name
-        </Label>
-        <Input
-          id="workspace-name"
-          value={setup.workspaceName}
-          onChange={(event) => setup.setWorkspaceName(event.target.value)}
-          placeholder="Tempered Loom"
-          className="mt-2 h-10"
-          autoFocus
-        />
-        <p className="mt-1.5 text-[12px] text-muted-foreground">
-          Starter name is editable. Use a short name for the app or product area this workspace will improve.
-        </p>
-      </div>
-
-      <div className="rounded-lg border border-border p-4">
-        <div className="text-[13px] font-medium">Invite teammates</div>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          Optional. Share the organization invite link so teammates can collaborate on work orders. People join as
-          viewers. You can change roles later.
-        </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <code className="max-w-full truncate rounded-md border border-border bg-accent/40 px-2 py-1.5 text-[12px]">
-            {FIXTURE_INVITE_URL}
-          </code>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              void navigator.clipboard?.writeText(FIXTURE_INVITE_URL);
-              setup.setInviteCopied(true);
-            }}
-          >
-            <Copy className="size-3.5" aria-hidden />
-            {setup.inviteCopied ? "Copied" : "Copy link"}
-          </Button>
-        </div>
-      </div>
+    <div>
+      <Label htmlFor="workspace-name" className="text-[13px] font-medium">
+        Workspace name
+      </Label>
+      <Input
+        id="workspace-name"
+        value={setup.workspaceName}
+        onChange={(event) => setup.editWorkspaceName(event.target.value)}
+        placeholder="Payments Service"
+        className="mt-2 h-10"
+        autoFocus
+      />
+      <p className="mt-1.5 text-[12px] text-muted-foreground">
+        Use a name for the app or product area this workspace will improve.
+      </p>
     </div>
   );
 }
 
-function RepositoryPicker({
+export function RepositoryPicker({
   host,
   repos,
   selectedRepo,
   onSelect,
-  title = "Select repository",
-  description = "Choose the app repository SuperPlane will analyze and agents will change. Pull requests open here.",
+  title,
+  description,
 }: {
   host: VcsHostId;
   repos: string[];
   selectedRepo: string | null;
   onSelect: (repo: string) => void;
+  /** Only for pickers that need their own heading, such as the backlog picker. */
   title?: string;
   description?: string;
 }) {
@@ -229,9 +175,9 @@ function RepositoryPicker({
   }, [repos, query]);
 
   return (
-    <div className="space-y-3 rounded-lg border border-border p-4">
-      <div className="text-[13px] font-medium">{title}</div>
-      <p className="text-[12px] text-muted-foreground">{description}</p>
+    <div className="space-y-3">
+      {title ? <div className="text-[13px] font-medium">{title}</div> : null}
+      {description ? <p className="text-[12px] text-muted-foreground">{description}</p> : null}
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -277,258 +223,126 @@ function RepositoryPicker({
           </ul>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {filtered.length} of {repos.length} repositories
-      </p>
     </div>
   );
 }
 
-export function RepoStep({
-  setup,
-  onRequestConnect,
+export function VcsStep({
+  github,
+  selectedConnectionId,
+  onSelectConnection,
+  onCreateConnection,
 }: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
+  github: IntegrationInstanceSummary;
+  selectedConnectionId?: string;
+  onSelectConnection: (id: string, name: string) => void;
+  onCreateConnection: () => void;
 }) {
-  const host = setup.vcsHost;
-  const hostConnected = host ? setup.connected.has(host) : false;
-  const repos = host && hostConnected ? FIXTURE_REPOS[host] : [];
+  const githubOption = VCS_OPTIONS.find((option) => option.id === "github");
+  const gitlabOption = VCS_OPTIONS.find((option) => option.id === "gitlab");
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-2">
-        {VCS_OPTIONS.map((option) => {
-          const optionId = option.id as VcsHostId;
-          const connected = setup.connected.has(optionId);
-          const selected = setup.vcsHost === optionId;
-          return (
-            <ConnectOptionRow
-              key={option.id}
-              icon={<IntegrationChoiceIcon name={option.id} />}
-              title={option.label}
-              detail={option.detail}
-              selected={selected}
-              connectLabel={vcsLabel(optionId)}
-              connected={connected}
-              soon={option.soon}
-              onSelect={() => setup.selectVcsHost(optionId)}
-              onConnect={() => onRequestConnect(optionId)}
-            />
-          );
-        })}
-      </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <section className="rounded-lg border border-border bg-background p-5">
+        <div className="flex items-center gap-3">
+          <IntegrationIcon integrationName="github" className="size-10" size={40} />
+          <div>
+            <h2 className="text-[22px] font-semibold tracking-[-0.02em]">{githubOption?.label ?? "GitHub"}</h2>
+            <p className="text-[12px] text-muted-foreground">
+              {github.readyInstances.length > 0
+                ? "Choose a connection or connect a new one."
+                : "Connect GitHub to continue."}
+            </p>
+          </div>
+        </div>
 
-      {host && hostConnected ? (
-        <RepositoryPicker host={host} repos={repos} selectedRepo={setup.selectedRepo} onSelect={setup.selectRepo} />
+        {github.readyInstances.length > 0 ? (
+          <div className="mt-5 space-y-2">
+            <p className="text-[12px] font-medium text-muted-foreground">Existing connections</p>
+            {github.readyInstances.map((connection) => {
+              const id = connection.metadata?.id;
+              const name = connection.metadata?.name || "Unnamed connection";
+              if (!id) return null;
+
+              const selected = id === selectedConnectionId;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onSelectConnection(id, name)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left transition-colors",
+                    selected
+                      ? "border-foreground bg-accent/50"
+                      : "border-border bg-background hover:border-foreground hover:bg-accent/30",
+                  )}
+                >
+                  <IntegrationIcon integrationName="github" className="size-4 shrink-0" size={16} />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
+                  {selected ? <Check className="size-4 shrink-0" aria-hidden /> : null}
+                </button>
+              );
+            })}
+            <Button type="button" variant="outline" className="mt-3 w-full" onClick={onCreateConnection}>
+              <Plus className="size-4" aria-hidden />
+              Connect new GitHub
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" className="mt-5 w-full" onClick={onCreateConnection}>
+            Connect GitHub
+          </Button>
+        )}
+      </section>
+
+      {gitlabOption ? (
+        <div
+          className="relative flex min-h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-border/70 bg-muted/20 px-6 py-12 opacity-70"
+          aria-disabled="true"
+        >
+          <ComingSoonRibbon />
+          <IntegrationIcon integrationName="gitlab" className="size-10" size={40} />
+          <span className="text-[22px] font-semibold tracking-[-0.02em] text-muted-foreground">
+            {gitlabOption.label}
+          </span>
+        </div>
       ) : null}
     </div>
   );
 }
 
-export function IssuesStep({
+export function RepositoryStep({
   setup,
-  onRequestConnect,
-  autoDiscover,
+  repos,
+  onSelect,
+  onEditConnection,
 }: {
   setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
-  autoDiscover?: boolean;
+  repos?: string[];
+  /** Selecting a repository is the answer for this step, so it also continues. */
+  onSelect: (repo: string) => void;
+  onEditConnection: () => void;
 }) {
-  const {
-    selectedRepo,
-    issuesRepo,
-    issuesDiscovered,
-    issuesDiscovering,
-    issuesChoice,
-    startIssuesDiscovery,
-    selectIssuesRepo,
-  } = setup;
-  const [pickingBacklogRepo, setPickingBacklogRepo] = useState(false);
-
-  useEffect(() => {
-    if (!autoDiscover) return;
-    if (!selectedRepo || issuesDiscovered || issuesDiscovering || issuesChoice) return;
-    startIssuesDiscovery();
-  }, [autoDiscover, selectedRepo, issuesDiscovered, issuesDiscovering, issuesChoice, startIssuesDiscovery]);
-
-  useEffect(() => {
-    setPickingBacklogRepo(false);
-  }, [selectedRepo]);
-
   const host = setup.vcsHost;
-  if (!host || !selectedRepo) {
-    return <p className="text-[13px] text-muted-foreground">Select an app repository first.</p>;
+  if (!host || !setup.connected.has(host)) {
+    return <p className="text-[13px] text-muted-foreground">Connect version control first.</p>;
   }
 
-  const backlogRepo = issuesRepo ?? selectedRepo;
-  const repos = FIXTURE_REPOS[host];
-  const showDiscoveryResult = setup.issuesDiscovered || Boolean(setup.issuesChoice);
+  const availableRepos = repos ?? FIXTURE_REPOS[host];
 
   return (
-    <div className="space-y-4">
-      {(setup.issuesDiscovering || (!showDiscoveryResult && !pickingBacklogRepo)) && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-accent/30 px-4 py-3 text-[13px]">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          Looking for backlog issues on {backlogRepo}…
-        </div>
-      )}
-
-      {showDiscoveryResult && !setup.issuesDiscovering ? (
-        <>
-          <div className="rounded-lg border border-border px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[13px] font-medium">
-                  Found {setup.issueCount} open issues on {vcsLabel(host)}
-                </div>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  SuperPlane can score these for autonomous work.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setPickingBacklogRepo((open) => !open)}
-                className={cn(
-                  "inline-flex max-w-[55%] shrink-0 items-center gap-1.5 rounded-md border border-border bg-accent/40 px-2 py-1 text-left text-[12px] font-medium tracking-[-0.01em] transition-colors hover:bg-accent",
-                  pickingBacklogRepo && "border-foreground bg-accent",
-                )}
-                aria-label="Change backlog repository"
-                aria-expanded={pickingBacklogRepo}
-              >
-                <IntegrationChoiceIcon name={host} size={14} />
-                <span className="truncate">{backlogRepo}</span>
-              </button>
-            </div>
-            {pickingBacklogRepo ? (
-              <div className="mt-3">
-                <RepositoryPicker
-                  host={host}
-                  repos={repos}
-                  selectedRepo={backlogRepo}
-                  title="Select backlog repository"
-                  description="Choose the repository that holds the issue backlog. The app repository does not change."
-                  onSelect={(repo) => {
-                    selectIssuesRepo(repo);
-                    setPickingBacklogRepo(false);
-                  }}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name={host} />}
-              title={`Use ${vcsLabel(host)} Issues`}
-              detail={`Find agent-ready work in open issues on ${backlogRepo}.`}
-              selected={setup.issuesChoice === "vcs"}
-              connectLabel={vcsLabel(host)}
-              connected
-              onSelect={() => setup.setIssuesChoice("vcs")}
-            />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="linear" />}
-              title="Linear"
-              detail="Find agent-ready work in your Linear backlog."
-              selected={setup.issuesChoice === "linear"}
-              connectLabel="Linear"
-              connected={setup.connected.has("linear")}
-              soon
-              onSelect={() => setup.setIssuesChoice("linear")}
-              onConnect={() => onRequestConnect("linear")}
-            />
-            <ConnectOptionRow
-              icon={<IntegrationChoiceIcon name="jira" />}
-              title="Jira"
-              detail="Find agent-ready work in your Jira backlog."
-              selected={setup.issuesChoice === "jira"}
-              connectLabel="Jira"
-              connected={setup.connected.has("jira")}
-              soon
-              onSelect={() => setup.setIssuesChoice("jira")}
-              onConnect={() => onRequestConnect("jira")}
-            />
-            <ConnectOptionRow
-              icon={<ListTodo className="size-5 text-muted-foreground" aria-hidden />}
-              title="Skip for now"
-              detail="Do not import a backlog. Create work orders yourself for selected tasks."
-              selected={setup.issuesChoice === "skip"}
-              onSelect={() => setup.setIssuesChoice("skip")}
-            />
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-export function AgentStep({
-  setup,
-  onRequestConnect,
-}: {
-  setup: OnboardingSetupApi;
-  onRequestConnect: (id: IntegrationId) => void;
-}) {
-  return (
-    <div className="grid gap-2">
-      {AGENT_OPTIONS.map((option) => {
-        const connected = setup.connected.has(option.integrationId);
-        return (
-          <ConnectOptionRow
-            key={option.id}
-            icon={<IntegrationChoiceIcon name={option.integrationId} />}
-            title={option.label}
-            detail={option.detail}
-            selected={setup.agent === option.id}
-            connectLabel={integrationLabel(option.integrationId)}
-            connected={connected}
-            soon={option.soon}
-            onSelect={() => setup.setAgent(option.id as AgentHarnessId)}
-            onConnect={() => onRequestConnect(option.integrationId)}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-export function DonePanel({ setup }: { setup: OnboardingSetupApi }) {
-  const issuesLabel = (choice: IssuesChoiceId | null) => {
-    if (choice === "vcs" && setup.vcsHost) {
-      const backlog = setup.issuesRepo ?? setup.selectedRepo;
-      return backlog ? `${vcsLabel(setup.vcsHost)} Issues · ${backlog}` : `${vcsLabel(setup.vcsHost)} Issues`;
-    }
-    if (choice === "linear") return "Linear";
-    if (choice === "jira") return "Jira";
-    if (choice === "skip") return "Manual work orders";
-    return "Not set";
-  };
-
-  return (
-    <div className="space-y-4 rounded-lg border border-border p-5">
-      <div>
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em]">Workspace ready</h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          SuperPlane can keep analyzing the app and backlog. Create a work order to hand the first task to your coding
-          agent.
-        </p>
-      </div>
-      <ul className="space-y-2 text-[13px]">
-        <li>
-          <span className="text-muted-foreground">Workspace</span> · {setup.summary.workspaceName}
-        </li>
-        <li>
-          <span className="text-muted-foreground">App repository</span> · {setup.summary.selectedRepo}
-        </li>
-        <li>
-          <span className="text-muted-foreground">Backlog</span> · {issuesLabel(setup.issuesChoice)}
-        </li>
-        <li>
-          <span className="text-muted-foreground">Coding agent</span> ·{" "}
-          {AGENT_OPTIONS.find((option) => option.id === setup.agent)?.label ?? "—"}
-        </li>
-      </ul>
+    <div className="space-y-3">
+      <RepositoryPicker host={host} repos={availableRepos} selectedRepo={setup.selectedRepo} onSelect={onSelect} />
+      <p className="text-[13px] text-muted-foreground">
+        Do not see your repo?{" "}
+        <button
+          type="button"
+          onClick={onEditConnection}
+          className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+        >
+          Edit {vcsLabel(host)} connection
+        </button>
+      </p>
     </div>
   );
 }

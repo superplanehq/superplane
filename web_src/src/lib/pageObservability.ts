@@ -99,6 +99,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return resolveSettingsPageObservability(organizationId, segments.slice(2));
   }
 
+  if (second === "organization") {
+    return resolveOrganizationSettingsPageObservability(organizationId, segments.slice(2));
+  }
+
   return null;
 }
 
@@ -165,9 +169,49 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
       return { pageKey: "settingsAPIKeys", attributes: organizationAttributes };
     case "profile":
       return { pageKey: "settingsProfile", attributes: organizationAttributes };
+    case "notifications":
+      return { pageKey: "settingsNotifications", attributes: organizationAttributes };
     case "billing":
       return { pageKey: "settingsUsage", attributes: organizationAttributes };
     default:
       return { pageKey: "settingsUnknown", attributes: organizationAttributes };
   }
+}
+
+function resolveOrganizationSettingsPageObservability(
+  organizationId: string,
+  segments: string[],
+): PageObservabilityContext {
+  const organizationAttributes = { organization_id: organizationId };
+  const [section, ...rest] = segments;
+
+  if (!section || section === "general") {
+    return { pageKey: "organizationSettingsGeneral", attributes: organizationAttributes };
+  }
+
+  if (section === "workspaces") {
+    return { pageKey: "organizationSettingsWorkspaces", attributes: organizationAttributes };
+  }
+
+  if (section === "workspace-usage" || section === "llm-spend" || section === "spending") {
+    return { pageKey: "organizationSettingsWorkspaceUsage", attributes: organizationAttributes };
+  }
+
+  if (section === "integrations") {
+    if (!rest[0]) {
+      return { pageKey: "organizationSettingsIntegrations", attributes: organizationAttributes };
+    }
+    if (rest[1] === "setup") {
+      return {
+        pageKey: "organizationSettingsIntegrationSetup",
+        attributes: { ...organizationAttributes, integration_name: rest[0] },
+      };
+    }
+    return {
+      pageKey: "organizationSettingsIntegrationDetail",
+      attributes: { ...organizationAttributes, integration_id: rest[0] },
+    };
+  }
+
+  return { pageKey: "organizationSettingsUnknown", attributes: { ...organizationAttributes, section } };
 }

@@ -21,11 +21,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/git"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
@@ -285,6 +287,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_FACTORY_VELOCITY_SYNC_WORKER") == "yes" {
+		log.Println("Starting Factory Velocity Sync Worker")
+
+		w := workers.NewFactoryVelocitySyncWorker(rabbitMQURL, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{
@@ -342,6 +351,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
+
+	log.Println("Starting Factory Notification Consumer")
+	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
+	go factoryNotificationConsumer.Start()
 }
 
 func buildGRPCServices(
@@ -554,6 +567,10 @@ func Start() {
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
 
+	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
+		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
+	}
+
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
 		panic("ENCRYPTION_KEY can't be empty")
@@ -594,7 +611,6 @@ func Start() {
 		panic("OIDC_KEYS_PATH must be set")
 	}
 
-	appEnv := os.Getenv("APP_ENV")
 	jwtSigner := jwt.NewSigner(jwtSecret)
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
@@ -610,7 +626,6 @@ func Start() {
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
-		AppEnv:    appEnv,
 		HTTP: registry.HTTPOptions{
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {

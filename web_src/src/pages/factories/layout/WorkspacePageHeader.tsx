@@ -9,34 +9,36 @@ interface WorkspacePageHeaderBaseProps {
   className?: string;
   /** Optional test id on the outer header element. */
   "data-testid"?: string;
-  /** Trailing actions, right-aligned. */
+  /** Trailing actions. Default is right-aligned; `start` keeps them in the title row. */
   actions?: ReactNode;
+  /** Where to place `actions` in the title row. */
+  actionsAlign?: "start" | "end";
   /** Optional content stacked below the title/actions row (filter chips, tabs, etc.). */
   belowRow?: ReactNode;
 }
 
 interface WorkspaceSectionHeaderProps extends WorkspacePageHeaderBaseProps {
   variant?: "section";
-  /** Section title, e.g. "Work Orders", "Lines". */
-  title: string;
+  /** Section title, e.g. "Tasks", "Lines". */
+  title: ReactNode;
   /** Optional description below the title. */
   subtitle?: ReactNode;
-  /** Optional inline element rendered next to the title (e.g. Work Orders scope pills). */
+  /** Optional inline element rendered next to the title (e.g. Tasks scope pills). */
   leading?: ReactNode;
 }
 
 interface WorkspaceEntityHeaderProps extends WorkspacePageHeaderBaseProps {
   variant: "entity";
-  /** Entity title, e.g. work order title, line name, automation name. */
-  title: string;
+  /** Entity title, e.g. task title, line name, automation name. */
+  title: ReactNode;
   /** Optional short identifier shown above the title (e.g. "SP-42"). */
   kicker?: ReactNode;
   /** Optional description below the title. */
   subtitle?: ReactNode;
-  /** Back link target. Renders "<Icon> <label>" affordance above the title. */
-  backHref: string;
-  /** Label for the back link, e.g. "Work Orders", "Lines", "Automations". */
-  backLabel: string;
+  /** Back link target. Omit on landing surfaces that have no parent list. */
+  backHref?: string;
+  /** Label for the back link, e.g. "Tasks", "Lines", "Automations". */
+  backLabel?: string;
   /** Optional test id on the back link. */
   backTestId?: string;
 }
@@ -48,10 +50,10 @@ export type WorkspacePageHeaderProps = WorkspaceSectionHeaderProps | WorkspaceEn
  * route. Two variants:
  *
  * - `section` (default): title + optional subtitle + trailing actions. Used
- *   for Overview, Work Orders list, Lines list, Automations list, Wiki,
+ *   for Overview, Tasks list, Lines list, Automations list, Wiki,
  *   Velocity, and other section pages.
  * - `entity`: back link + optional identifier kicker + entity title +
- *   trailing actions. Used for work order, line, and automation detail.
+ *   trailing actions. Used for task, line, and automation detail.
  *
  * The header always uses the same gutter, max width, and vertical rhythm
  * so pages match. Callers put body content in `factoryContentBodyClassName`
@@ -60,15 +62,24 @@ export type WorkspacePageHeaderProps = WorkspaceSectionHeaderProps | WorkspaceEn
 export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
   const isEntity = props.variant === "entity";
   const hasSubtitle = Boolean(props.subtitle);
+  const actionsAlign = props.actionsAlign ?? "end";
   const alignItems = hasSubtitle || isEntity ? "items-start" : "items-center";
   return (
     <header
       className={cn(factoryContentHeaderClassName, props.className)}
       data-testid={props["data-testid"] ?? "workspace-page-header"}
     >
-      <div className={cn("flex w-full flex-wrap justify-between gap-3", alignItems)}>
-        <div className="min-w-0 flex-1">
-          {isEntity ? <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} /> : null}
+      <div
+        className={cn(
+          "flex w-full flex-wrap gap-x-4 gap-y-2",
+          actionsAlign === "start" ? "justify-start" : "justify-between",
+          alignItems,
+        )}
+      >
+        <div className={cn("min-w-0", actionsAlign === "start" ? "shrink-0" : "flex-1")}>
+          {isEntity && props.backHref && props.backLabel ? (
+            <BackLink href={props.backHref} label={props.backLabel} testId={props.backTestId} />
+          ) : null}
           {isEntity && props.kicker ? (
             <p
               className="mt-2 text-[12px] font-medium uppercase tracking-[0.06em] text-muted-foreground tabular-nums"
@@ -78,7 +89,7 @@ export function WorkspacePageHeader(props: WorkspacePageHeaderProps) {
             </p>
           ) : null}
           <div className={cn("flex min-w-0 flex-wrap items-center gap-3", isEntity && "mt-1")}>
-            <h1 className="workspace-page-title min-w-0" data-testid="workspace-page-header-title">
+            <h1 className="workspace-page-title min-w-0 overflow-visible" data-testid="workspace-page-header-title">
               {props.title}
             </h1>
             {!isEntity && props.leading ? <div className="flex items-center gap-2">{props.leading}</div> : null}

@@ -65,6 +65,11 @@ func (s *TestContext) Start() {
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+	os.Setenv("BLOCK_SIGNUP", "no")
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		os.Setenv("GOOGLE_CLIENT_ID", "e2e-google-client-id")
+		os.Setenv("GOOGLE_CLIENT_SECRET", "e2e-google-client-secret")
+	}
 
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()

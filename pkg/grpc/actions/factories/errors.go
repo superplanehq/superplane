@@ -22,6 +22,40 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.AlreadyExists(err, "workspace key already exists in this organization")
 	case errors.Is(err, models.ErrFactoryNotFound):
 		return grpcerrors.NotFound(err, "factory not found")
+	case errors.Is(err, models.ErrFactoryHostedSpendBudgetNegative):
+		return grpcerrors.InvalidArgument(err, "hosted spend limit cannot be negative")
+	case errors.Is(err, models.ErrModelNotInParentList):
+		return grpcerrors.InvalidArgument(err, "model is not in the parent selected-model list")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidIssuesSource):
+		return grpcerrors.InvalidArgument(err, "invalid issues source")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidAgentHarness):
+		return grpcerrors.InvalidArgument(err, "invalid agent harness")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidIntegrationID):
+		return grpcerrors.InvalidArgument(err, "invalid integration id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidAppID):
+		return grpcerrors.InvalidArgument(err, "invalid provisioned app id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidLineID):
+		return grpcerrors.InvalidArgument(err, "invalid provisioned line id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidRepository):
+		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
+	case errors.Is(err, models.ErrFactoryOnboardingVCSIntegrationRequired):
+		return grpcerrors.InvalidArgument(err, "version control integration is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAgentIntegrationRequired):
+		return grpcerrors.InvalidArgument(err, "agent integration or hosted credit is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingHostedAgentUnavailable):
+		return grpcerrors.InvalidArgument(err, "agent integration or SuperPlane-hosted models are required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAppRepositoryRequired):
+		return grpcerrors.InvalidArgument(err, "app repository is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingBacklogRepoRequired):
+		return grpcerrors.InvalidArgument(err, "backlog repository is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingIssuesSourceRequired):
+		return grpcerrors.InvalidArgument(err, "issues source is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAgentHarnessRequired):
+		return grpcerrors.InvalidArgument(err, "agent harness is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingAppIDRequired):
+		return grpcerrors.InvalidArgument(err, "provisioned app id is required to complete onboarding")
+	case errors.Is(err, models.ErrFactoryOnboardingLineIDRequired):
+		return grpcerrors.InvalidArgument(err, "provisioned line id is required to complete onboarding")
 	case errors.Is(err, models.ErrFactoryWorkOrderNotFound):
 		return grpcerrors.NotFound(err, "work order not found")
 	case errors.Is(err, models.ErrFactoryLineNotFound):
@@ -32,14 +66,50 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "work order cannot be dispatched in its current state")
 	case errors.Is(err, models.ErrFactoryWorkOrderInvalidState):
 		return grpcerrors.FailedPrecondition(err, err.Error())
-	case errors.Is(err, models.ErrFactoryWorkOrderExecutionActive):
-		return grpcerrors.FailedPrecondition(err, "work order already has an active execution")
+	case errors.Is(err, models.ErrFactoryWorkOrderLineDispatchActive):
+		return grpcerrors.FailedPrecondition(err, "work order already has an active line dispatch")
 	case errors.Is(err, models.ErrFactoryLineHasNoSteps):
 		return grpcerrors.FailedPrecondition(err, "factory line has no steps")
+	case errors.Is(err, models.ErrFactoryLineStepOutOfRange):
+		return grpcerrors.InvalidArgument(err, "factory line step index is out of range")
 	case errors.Is(err, models.ErrFactoryLineStepNotOnRun):
 		return grpcerrors.FailedPrecondition(err, "factory line step entrypoint must use the onRun trigger")
 	case errors.Is(err, models.ErrFactoryWorkOrderArtifactInvalid):
 		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryIntakeNotFound):
+		return grpcerrors.NotFound(err, "factory intake not found")
+	case errors.Is(err, models.ErrFactoryIntakeSourceInvalid):
+		return grpcerrors.InvalidArgument(err, "intake source is not supported")
+	case errors.Is(err, models.ErrFactoryIntakeCanvasInUse):
+		return grpcerrors.AlreadyExists(err, "canvas already implements an intake")
+	case errors.Is(err, models.ErrFactoryIntakeCanvasRequired):
+		return grpcerrors.InvalidArgument(err, "intake canvas is required")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerNotFound):
+		return grpcerrors.NotFound(err, "factory PR feedback handler not found")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerSubjectInvalid):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler subject is not supported")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerSourceInvalid):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler source is not supported")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasInUse):
+		return grpcerrors.AlreadyExists(err, "canvas already implements a PR feedback handler")
+	case errors.Is(err, models.ErrFactoryPRFeedbackHandlerCanvasRequired):
+		return grpcerrors.InvalidArgument(err, "PR feedback handler canvas is required")
+	case errors.Is(err, models.ErrFactoryPullRequestNotFound):
+		return grpcerrors.NotFound(err, "factory pull request not found")
+	case errors.Is(err, models.ErrFactoryPullRequestInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPullRequestAlreadyExists):
+		return grpcerrors.AlreadyExists(err, "factory pull request already exists")
+	case errors.Is(err, models.ErrFactoryPullRequestRunAlreadyLinked):
+		return grpcerrors.FailedPrecondition(err, "run is already linked to a different pull request")
+	case errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete):
+		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
+	case errors.Is(err, errIntakeNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
+	case errors.Is(err, errIntakeSearchUnsupported):
+		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
+	case errors.Is(err, errIntakeItemNotFound):
+		return grpcerrors.NotFound(err, "intake item not found")
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

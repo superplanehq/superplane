@@ -28,10 +28,19 @@ type fakeFactoryContext struct {
 	findOrder  *core.WorkOrder
 	findErr    error
 
-	updateArtifactCalls  int
-	updateArtifactParams core.UpdateWorkOrderArtifactParams
-	updateArtifactResult *core.WorkOrderArtifact
-	updateArtifactErr    error
+	reportCheckCalls  int
+	reportCheckParams core.ReportWorkOrderCheckParams
+	reportCheckResult *core.WorkOrderCheck
+	reportCheckErr    error
+
+	setStatusNoteCalls  int
+	setStatusNoteParams core.SetWorkOrderStatusNoteParams
+	setStatusNoteResult *core.WorkOrderStatusNote
+	setStatusNoteErr    error
+
+	lastActivityParams core.AddPullRequestActivityParams
+	activityMatch      *core.PullRequestMatch
+	activityErr        error
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -58,10 +67,42 @@ func (f *fakeFactoryContext) AddWorkOrderArtifact(_ core.AddWorkOrderArtifactPar
 	return nil, nil
 }
 
-func (f *fakeFactoryContext) UpdateWorkOrderArtifact(params core.UpdateWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
-	f.updateArtifactCalls++
-	f.updateArtifactParams = params
-	return f.updateArtifactResult, f.updateArtifactErr
+func (f *fakeFactoryContext) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	f.reportCheckCalls++
+	f.reportCheckParams = params
+	return f.reportCheckResult, f.reportCheckErr
+}
+
+func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	f.setStatusNoteCalls++
+	f.setStatusNoteParams = params
+	return f.setStatusNoteResult, f.setStatusNoteErr
+}
+
+func (f *fakeFactoryContext) AddPullRequest(_ core.AddPullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) UpdatePullRequest(_ core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) FindPullRequest(_ core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	return nil, nil
+}
+
+func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestMatch, error) {
+	f.lastActivityParams = params
+	if f.activityErr != nil {
+		return nil, f.activityErr
+	}
+	if f.activityMatch != nil {
+		return f.activityMatch, nil
+	}
+	return &core.PullRequestMatch{
+		PullRequest: &core.PullRequest{ID: params.PullRequestID, Number: 42},
+		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 123, Key: "SP-123"},
+	}, nil
 }
 
 func TestUpdateWorkOrderStatus_Execute(t *testing.T) {
@@ -346,16 +387,6 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	c := &AddWorkOrderArtifact{}
 	fields := c.Configuration()
 
-	t.Run("requires url for pr", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-		})
-		if err == nil {
-			t.Fatal("expected error for pr without url")
-		}
-	})
-
 	t.Run("requires body for markdown", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
@@ -370,32 +401,82 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
+			"repository":   "example/repo",
 		})
 		if err == nil {
 			t.Fatal("expected error for branch without name")
 		}
 	})
 
-	t.Run("requires orderId", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing orderId")
-		}
-	})
-
-	t.Run("accepts valid pr", func(t *testing.T) {
+	t.Run("accepts branch with name and url without repository", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
-			"number":       "1",
-			"title":        "Draft",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("rejects name-only branch on component validator", func(t *testing.T) {
+		config := map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+		}
+		err := configuration.ValidateConfiguration(fields, config)
+		if err != nil {
+			t.Fatalf("schema should still allow name-only branch: %v", err)
+		}
+		err = c.ValidateNodeConfiguration(config)
+		if err == nil {
+			t.Fatal("expected error for branch without url or repository")
+		}
+	})
+
+	t.Run("component validator accepts url-only branch", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("component validator accepts repository expression without url", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"name":         "{{ previous().result.branch }}",
+			"repository":   "{{ install_params.appRepository }}",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("requires url for link", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "link",
+		})
+		if err == nil {
+			t.Fatal("expected error for link without url")
+		}
+	})
+
+	t.Run("requires orderId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"artifactType": "markdown",
+			"body":         "notes",
+		})
+		if err == nil {
+			t.Fatal("expected error for missing orderId")
 		}
 	})
 
@@ -411,22 +492,24 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts branch with name", func(t *testing.T) {
+	t.Run("accepts branch with name and repository", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
 		})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
-	t.Run("accepts branch with name and url", func(t *testing.T) {
+	t.Run("accepts branch with name, repository, and url", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
 			"artifactType": "branch",
 			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
 			"url":          "https://github.com/example/repo/tree/feature/refund-retry",
 		})
 		if err != nil {
@@ -434,7 +517,45 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("url field is visible for both pr and branch", func(t *testing.T) {
+	t.Run("accepts valid link", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/pr-42",
+			"title":        "Preview",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("repository field is visible only for branch", func(t *testing.T) {
+		var repositoryField *configuration.Field
+		for i := range fields {
+			if fields[i].Name == "repository" {
+				repositoryField = &fields[i]
+				break
+			}
+		}
+		if repositoryField == nil {
+			t.Fatal("expected a repository field in configuration")
+		}
+		if len(repositoryField.RequiredConditions) != 0 {
+			t.Fatalf("expected repository not to be required when URL is set, got %d required conditions", len(repositoryField.RequiredConditions))
+		}
+		if len(repositoryField.VisibilityConditions) != 1 {
+			t.Fatalf("expected a single visibility condition for repository, got %d", len(repositoryField.VisibilityConditions))
+		}
+		condition := repositoryField.VisibilityConditions[0]
+		if condition.Field != "artifactType" {
+			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
+		}
+		if len(condition.Values) != 1 || condition.Values[0] != "branch" {
+			t.Fatalf("expected repository visibility to be branch-only, got %v", condition.Values)
+		}
+	})
+
+	t.Run("url field is visible for branch and link", func(t *testing.T) {
 		var urlField *configuration.Field
 		for i := range fields {
 			if fields[i].Name == "url" {
@@ -452,7 +573,7 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		if condition.Field != "artifactType" {
 			t.Fatalf("expected visibility condition on artifactType, got %q", condition.Field)
 		}
-		for _, want := range []string{"pr", "branch"} {
+		for _, want := range []string{"branch", "link"} {
 			found := false
 			for _, got := range condition.Values {
 				if got == want {
@@ -466,11 +587,11 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 		}
 	})
 
-	t.Run("accepts pr with free-form data entries", func(t *testing.T) {
+	t.Run("accepts link with free-form data entries", func(t *testing.T) {
 		err := configuration.ValidateConfiguration(fields, map[string]any{
 			"orderId":      "{{ order().id }}",
-			"artifactType": "pr",
-			"url":          "https://github.com/example/repo/pull/1",
+			"artifactType": "link",
+			"url":          "https://preview.example.com/pr-1",
 			"data": []any{
 				map[string]any{"name": "provider", "value": "github"},
 			},
@@ -481,166 +602,41 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 	})
 }
 
-func TestUpdateWorkOrderArtifact_Execute(t *testing.T) {
-	component := &UpdateWorkOrderArtifact{}
-	artifact := &core.WorkOrderArtifact{ID: "art-1", WorkOrderID: "wo-1", Type: "pr", Data: map[string]any{
-		"url":   "https://github.com/example/repo/pull/1",
-		"state": "merged",
-	}}
+func TestResolvePrArtifactState_Precedence(t *testing.T) {
+	cases := []struct {
+		name   string
+		state  any
+		merged any
+		draft  any
+		want   string
+	}{
+		{"empty inputs stay empty", nil, nil, nil, ""},
+		{"explicit open passes through", "open", nil, nil, "open"},
+		{"case-insensitive", "MERGED", nil, nil, "merged"},
+		{"trimmed whitespace", "  draft  ", nil, nil, "draft"},
+		{"merged bool wins over closed state", "closed", true, nil, "merged"},
+		{"merged bool wins over open state", "open", true, nil, "merged"},
+		{"merged string wins", nil, "true", nil, "merged"},
+		{"draft bool sets draft when not merged", "open", nil, true, "draft"},
+		{"draft bool ignored when merged", nil, true, true, "merged"},
+		{"non-string state is treated as absent", 42, nil, nil, ""},
+		{"merged false vetoes leftover state merged", "merged", false, nil, ""},
+		{"draft false vetoes leftover state draft", "draft", nil, false, ""},
+		{"merged false keeps closed", "closed", false, nil, "closed"},
+	}
 
-	t.Run("merges state and title into the artifact resolved by key", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "merged",
-				"title":       "Retitled PR",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := resolvePrArtifactState(tc.state, tc.merged, tc.draft)
+			if got != tc.want {
+				t.Fatalf("resolvePrArtifactState(%v,%v,%v) = %q, want %q", tc.state, tc.merged, tc.draft, got, tc.want)
+			}
 		})
-		require.NoError(t, err)
-		assert.Equal(t, 1, factoryCtx.updateArtifactCalls)
-		assert.Equal(t, "wo-1", factoryCtx.updateArtifactParams.OrderID)
-		assert.Equal(t, "https://github.com/example/repo/pull/1", factoryCtx.updateArtifactParams.Key)
-		assert.Equal(t, map[string]any{"state": "merged", "title": "Retitled PR"}, factoryCtx.updateArtifactParams.Data)
-		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-		assert.Equal(t, "workOrder.artifactUpdated", stateCtx.Type)
-		assert.Len(t, stateCtx.Payloads, 1)
-	})
-
-	t.Run("omits blank fields from the merge so they're left untouched", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactResult: artifact}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "draft",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{"state": "draft"}, factoryCtx.updateArtifactParams.Data)
-	})
-
-	t.Run("propagates errors from the factory context", func(t *testing.T) {
-		factoryCtx := &fakeFactoryContext{updateArtifactErr: errors.New("boom")}
-		stateCtx := &contexts.ExecutionStateContext{}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"orderId":     "wo-1",
-				"artifactKey": "https://github.com/example/repo/pull/1",
-				"state":       "open",
-			},
-			ExecutionState: stateCtx,
-			Factory:        factoryCtx,
-		})
-		require.Error(t, err)
-	})
-}
-
-func TestUpdateWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
-	c := &UpdateWorkOrderArtifact{}
-	fields := c.Configuration()
-
-	t.Run("requires orderId", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"artifactKey": "https://github.com/example/repo/pull/1",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing orderId")
-		}
-	})
-
-	t.Run("requires artifactKey", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId": "{{ order().id }}",
-		})
-		if err == nil {
-			t.Fatal("expected error for missing artifactKey")
-		}
-	})
-
-	t.Run("accepts orderId, artifactKey, and state", func(t *testing.T) {
-		err := configuration.ValidateConfiguration(fields, map[string]any{
-			"orderId":     "{{ order().id }}",
-			"artifactKey": "https://github.com/example/repo/pull/1",
-			"state":       "merged",
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-}
-
-func TestArtifactDataToMap_FlattensEntries(t *testing.T) {
-	entries := []ArtifactDataEntry{
-		{Name: "number", Value: "482"},
-		{Name: "provider", Value: "github"},
-		{Name: "", Value: "ignored"},
-	}
-	out := artifactDataToMap(entries)
-	if got := out["number"]; got != "482" {
-		t.Fatalf("expected number=482, got %v", got)
-	}
-	if got := out["provider"]; got != "github" {
-		t.Fatalf("expected provider=github, got %v", got)
-	}
-	if len(out) != 2 {
-		t.Fatalf("expected only two entries (blank names skipped), got %d", len(out))
-	}
-	if artifactDataToMap(nil) != nil {
-		t.Fatal("expected nil map when no entries were provided")
-	}
-}
-
-func TestBuildArtifactData_TypedFieldsWinOverFreeForm(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		Number:       "9",
-		Title:        "Typed title",
-		Data: []ArtifactDataEntry{
-			{Name: "url", Value: "https://evil.example/typosquat"},
-			{Name: "provider", Value: "github"},
-		},
-	})
-
-	if got := data["url"]; got != "https://github.com/example/repo/pull/9" {
-		t.Fatalf("expected typed url to win, got %v", got)
-	}
-	if got := data["provider"]; got != "github" {
-		t.Fatalf("expected free-form provider to survive, got %v", got)
-	}
-	if got := data["number"]; got != "9" {
-		t.Fatalf("expected typed number, got %v", got)
-	}
-	if got := data["title"]; got != "Typed title" {
-		t.Fatalf("expected typed title, got %v", got)
-	}
-}
-
-func TestBuildArtifactData_IncludesPrState(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
-		ArtifactType: "pr",
-		URL:          "https://github.com/example/repo/pull/9",
-		State:        "draft",
-	})
-
-	if got := data["state"]; got != "draft" {
-		t.Fatalf("expected state=draft, got %v", got)
 	}
 }
 
 func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
-	data := buildArtifactData(AddWorkOrderArtifactConfiguration{
+	data := mustBuildArtifactData(t, AddWorkOrderArtifactConfiguration{
 		ArtifactType: "markdown",
 		Body:         "note body",
 	})
@@ -657,4 +653,87 @@ func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 	if _, ok := data["state"]; ok {
 		t.Fatal("expected blank state to be skipped")
 	}
+}
+
+func mustBuildArtifactData(t *testing.T, config AddWorkOrderArtifactConfiguration) map[string]any {
+	t.Helper()
+	data, err := buildArtifactData(config)
+	require.NoError(t, err)
+	return data
+}
+
+func TestPrArtifactStateUpdates_ClearsStaleMergedFlag(t *testing.T) {
+	updates, err := prArtifactStateUpdates(nil, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"merged": false}, updates)
+}
+
+func TestPrArtifactStateUpdates_DoesNotPersistVetoedMergedState(t *testing.T) {
+	// Incoming `state: merged` + `merged: false` must not write `state: merged`
+	// back — that leftover is what kept the chip purple.
+	updates, err := prArtifactStateUpdates("merged", false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"merged": false}, updates)
+}
+
+func TestPrArtifactLifecycleFields_SharedByAddAndUpdate(t *testing.T) {
+	addNames := fieldNames((&AddPullRequest{}).Configuration())
+	updateNames := fieldNames((&UpdatePullRequest{}).Configuration())
+	for _, name := range []string{"state", "merged", "draft"} {
+		assert.Contains(t, addNames, name)
+		assert.Contains(t, updateNames, name)
+	}
+}
+
+func TestAddPullRequestActivity_Execute(t *testing.T) {
+	component := &AddPullRequestActivity{}
+
+	t.Run("passes description to the factory context", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		stateCtx := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"pullRequestId": "pr-1",
+				"description":   "Please add tests for the retry path.",
+			},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "pr-1", factoryCtx.lastActivityParams.PullRequestID)
+		assert.Equal(t, "Please add tests for the retry path.", factoryCtx.lastActivityParams.Description)
+		assert.Equal(t, "pullRequest.activityAdded", stateCtx.Type)
+		require.Len(t, stateCtx.Payloads, 1)
+		payload, ok := stateCtx.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Please add tests for the retry path.", data["description"])
+	})
+}
+
+func TestAddPullRequestActivity_ValidatesConfiguration(t *testing.T) {
+	fields := (&AddPullRequestActivity{}).Configuration()
+
+	t.Run("requires pullRequestId", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{})
+		require.Error(t, err)
+	})
+
+	t.Run("accepts an optional description", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"pullRequestId": "pr-1",
+			"description":   "Please add tests for the retry path.",
+		})
+		require.NoError(t, err)
+	})
+}
+
+func fieldNames(fields []configuration.Field) []string {
+	names := make([]string, 0, len(fields))
+	for _, field := range fields {
+		names = append(names, field.Name)
+	}
+	return names
 }

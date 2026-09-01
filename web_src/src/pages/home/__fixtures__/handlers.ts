@@ -1,4 +1,10 @@
+import {
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_EMAIL,
+  STORYBOOK_ME_USER_NAME,
+} from "@/pages/factories/__fixtures__/factoryPageResponses";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
+import { storybookHostedLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -6,11 +12,11 @@ export const homePageIds = {
   organizationId: defaultHomePageFixture.organizationId,
 };
 
-function buildMeUser(orgId: string) {
+export function buildStorybookMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: STORYBOOK_ME_USER_NAME,
+    email: STORYBOOK_ME_USER_EMAIL,
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
@@ -23,9 +29,11 @@ function buildMeUser(orgId: string) {
       "users",
       "roles",
       "organization",
+      "org",
       "agents",
       "factories",
       "work_orders",
+      "notifications",
     ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
@@ -41,7 +49,7 @@ interface Route {
 
 function buildRoutes(fixture: HomePageFixture): Route[] {
   const orgId = fixture.organizationId;
-  const meUser = buildMeUser(orgId);
+  const meUser = buildStorybookMeUser(orgId);
 
   return [
     { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
@@ -111,6 +119,14 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({ json: {} }),
     },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
+      resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
+    },
+    {
+      pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
+      resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+    },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -157,10 +173,19 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
             },
           ],
         },
+      }),
+    },
+    {
+      pattern: re("/organizations"),
+      resolve: () => ({
+        json: [
+          { id: orgId, name: fixture.organizationName },
+          { id: "org-storybook-acme", name: "Acme" },
+        ],
       }),
     },
     {
@@ -171,6 +196,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           email: meUser.email,
           name: meUser.name,
           organization_id: orgId,
+          avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
         },
       }),
     },
@@ -260,32 +286,28 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
         togglable: false,
       },
     ],
-    // Dev compose sets APP_ENV=development → GitHub SetupProvider path is on.
+    // Org experimental feature new_integration_setup_flow → GitHub SetupProvider path.
     { legacySetupOnly: false },
   ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
-    {
-      name: "apiKey",
-      type: "string",
-      description: "Claude API key",
-      required: true,
-      label: "API Key",
-      visibilityConditions: [],
-      requiredConditions: [],
-      sensitive: true,
-      togglable: false,
-    },
+    storybookApiKeyField("Claude API key"),
     {
       name: "adminKey",
       type: "string",
-      description: "Admin API key, required for fetching usage and cost reports.",
+      description: "Use this key only to fetch usage and cost reports.",
       required: false,
       label: "Admin API Key",
       visibilityConditions: [],
       requiredConditions: [],
       sensitive: true,
-      togglable: false,
+      togglable: true,
     },
+  ]),
+  storybookIntegrationDefinition("openai", "OpenAI", "Generate text responses with OpenAI models", [
+    storybookApiKeyField("OpenAI API key"),
+  ]),
+  storybookIntegrationDefinition("openrouter", "OpenRouter", "Use OpenRouter models in workflows", [
+    storybookApiKeyField("OpenRouter API key"),
   ]),
 ];
 
@@ -297,6 +319,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
 ];
 
 /** Storybook definitions aligned with real integration Configuration() fields. */
+function storybookApiKeyField(description: string): StorybookConfigField {
+  return {
+    name: "apiKey",
+    type: "string",
+    description,
+    required: true,
+    label: "API Key",
+    visibilityConditions: [],
+    requiredConditions: [],
+    sensitive: true,
+    togglable: false,
+  };
+}
+
 function storybookIntegrationDefinition(
   name: string,
   label: string,
@@ -311,8 +347,8 @@ function storybookIntegrationDefinition(
     description,
     configuration,
     instructions: "",
-    // Mirrors API LegacySetupOnly (!registry.SupportsNewSetupFlow).
-    // SupportsNewSetupFlow = SetupProvider registered AND APP_ENV == "development".
+    // Mirrors API LegacySetupOnly (!registry.UseNewSetupFlow).
+    // UseNewSetupFlow = SetupProvider registered AND org has new_integration_setup_flow.
     legacySetupOnly: options?.legacySetupOnly ?? true,
   };
 }
@@ -406,6 +442,9 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
+    if (url.searchParams.get("type") === "default_branch") {
+      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }
 

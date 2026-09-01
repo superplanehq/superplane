@@ -8,7 +8,7 @@ import { useMemo } from "react";
 import { Navigate, useParams } from "react-router";
 import { FactoryLineForm } from "../FactoryLineForm";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { factoryLineDetailPath, linesPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factoryLineDetailPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { useFactoryLineEditActions } from "../useFactoryLineEditActions";
 import {
   factoryCardClassName,
@@ -34,22 +34,22 @@ export function FactoryLineEditPage() {
     return factory?.lines?.find((entry) => entry.id === lineId) ?? null;
   }, [factory?.lines, isCreate, lineId]);
 
-  const linesHref = linesPath(organizationId, factoryKey);
-  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : linesHref;
+  const boardHref = factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory));
+  const returnHref = line?.id ? factoryLineDetailPath(organizationId, factoryKey, line.id) : boardHref;
   const actions = useFactoryLineEditActions(organizationId, factoryId, returnHref, isCreate, lineId);
 
   const pageTitleBase = resolvePageTitleBase(isCreate, line?.name);
   usePageTitle([pageTitleBase, factory?.name ?? "Workspace"]);
 
   if (!canUpdate) {
-    return <Navigate to={linesHref} replace />;
+    return <Navigate to={boardHref} replace />;
   }
 
   // FactoriesLayout guarantees `factory` is loaded before rendering us, so a
   // missing line means the URL points at a line that doesn't exist — redirect
   // immediately instead of flashing an empty "Edit line" form.
   if (!isCreate && factory && !line) {
-    return <Navigate to={linesHref} replace />;
+    return <Navigate to={boardHref} replace />;
   }
 
   // Show a loading state while apps are still fetching so the form isn't
@@ -65,7 +65,7 @@ export function FactoryLineEditPage() {
         className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
-        Lines
+        Board
       </Link>
 
       {isInitialLoading ? (
@@ -108,7 +108,7 @@ function LineEditCard({ isCreate, line, organizationId, factoryApps, isSaving, o
       <h1 className={factoryPageTitleClassName}>{title}</h1>
       {isCreate ? (
         <p className="mt-2 text-[13px] text-muted-foreground">
-          Define the apps and triggers that run when work is dispatched to this line.
+          Define the automations and triggers that run when work is dispatched to this line.
         </p>
       ) : null}
 

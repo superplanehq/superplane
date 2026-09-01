@@ -202,19 +202,63 @@ export const canvasAppIds = {
 function buildMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: "Leonardo DiCaprio",
+    email: "john.doe@superplane.dev",
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
-      (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
-    ),
+    permissions: [
+      "canvases",
+      "integrations",
+      "secrets",
+      "groups",
+      "users",
+      "roles",
+      "organization",
+      "agents",
+      "factories",
+      "work_orders",
+      "members",
+      "notifications",
+    ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
 
 type FixtureResult = { json: unknown } | { text: string } | null;
+
+/**
+ * Live version of a fixture canvas. The capture kept the version list but not
+ * `metadata.liveVersionId`, which every canvas has in the real API.
+ */
+function fixtureLiveVersionId(fixture: CanvasAppFixture): string | undefined {
+  const captured =
+    fixture.versionId ??
+    fixture.versionsLatest?.versions?.[0]?.metadata?.id ??
+    fixture.versions?.versions?.[0]?.metadata?.id;
+  return typeof captured === "string" ? captured : undefined;
+}
+
+/**
+ * GET /api/v1/canvases/{canvasId}. Adds `liveVersionId` when the capture has
+ * none: without it AppPage cannot resolve the live version, so edit sessions
+ * (including factory Configure) never start and the canvas stays read-only.
+ */
+function canvasDetailResponse(fixture: CanvasAppFixture) {
+  const canvas = fixture.canvas?.canvas;
+  if (!canvas) {
+    return { canvas: {} };
+  }
+  const metadata = (canvas.metadata ?? {}) as Record<string, unknown>;
+  if (metadata.liveVersionId) {
+    return { canvas };
+  }
+  const liveVersionId = fixtureLiveVersionId(fixture);
+  if (!liveVersionId) {
+    return { canvas };
+  }
+  return { canvas: { ...canvas, metadata: { ...metadata, liveVersionId } } };
+}
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
@@ -350,7 +394,7 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
         },
       }),
     },
-    { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas ?? { canvas: {} } }) },
+    { pattern: re(CANVAS), resolve: () => ({ json: canvasDetailResponse(fixture) }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
 
     {
@@ -420,13 +464,18 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
             },
           ],
         },
       }),
     },
-    { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
+    {
+      pattern: re("/account"),
+      resolve: () => ({
+        json: { id: meUser.id, email: meUser.email, name: meUser.name, avatar_url: "/storybook/leonardo-dicaprio.jpg" },
+      }),
+    },
   ];
 }
 

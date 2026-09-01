@@ -1,29 +1,40 @@
+import { formatCompactTokenLabel } from "@/lib/formatTokenCount";
+
 export function parseWorkOrderMetric(value: string | number | undefined): number {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function formatCompactTokens(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(0)}k tokens`;
-  }
-  return `${tokens} tokens`;
+  return formatCompactTokenLabel(tokens);
 }
 
 export function formatUsdCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number): string | null {
+export function formatDurationSeconds(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  if (rest === 0) {
+    return `${minutes} min`;
+  }
+  return `${minutes} min ${rest} s`;
+}
+
+export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number, durationSeconds = 0): string | null {
   const parts: string[] = [];
+  if (totalCostCents > 0) {
+    parts.push(formatUsdCents(totalCostCents));
+  }
   if (totalTokens > 0) {
     parts.push(formatCompactTokens(totalTokens));
   }
-  if (totalCostCents > 0) {
-    parts.push(formatUsdCents(totalCostCents));
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -31,14 +42,17 @@ export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number
 interface WorkOrderExecutionUsage {
   totalTokens?: string | number;
   costCents?: string | number;
+  durationSeconds?: string | number;
 }
 
 export function formatWorkOrderExecutionUsage(executions: WorkOrderExecutionUsage[]): string | null {
   let totalTokens = 0;
   let totalCostCents = 0;
+  let durationSeconds = 0;
   for (const execution of executions) {
     totalTokens += parseWorkOrderMetric(execution.totalTokens);
     totalCostCents += parseWorkOrderMetric(execution.costCents);
+    durationSeconds += parseWorkOrderMetric(execution.durationSeconds);
   }
-  return formatWorkOrderUsage(totalTokens, totalCostCents);
+  return formatWorkOrderUsage(totalTokens, totalCostCents, durationSeconds);
 }

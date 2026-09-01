@@ -63,6 +63,17 @@ After the first setup, run `make dev.up` when the stack is not running, then `ma
 
 When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
 
+To run Runner nodes locally, start `make dev` in the runner repository.
+Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
+only for a remote broker (see `.env.example`).
+
+The runner `make dev` image includes Claude Code, Codex, git, `gh`, and `jq`
+so factory line apps can run locally. Do not install those CLIs on the host.
+Connect GitHub and Claude integrations in the organization before you dispatch
+a factory line. Factory nodes use those integrations, not `.env`
+`ANTHROPIC_API_KEY`. After you change the runner Dockerfile, run `make dev`
+again in the runner repository. Check tools with `make doctor-local`.
+
 ## Additional Development Resources
 
 ### Overview

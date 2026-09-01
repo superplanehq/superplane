@@ -1,9 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -17,6 +16,9 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { selectCreateStepFields, selectVisibleFields, selectWebhookStepFields } from "./configurationFields";
+import { createWithGeneratedName, useGeneratedIntegrationName } from "./generatedName";
+import { IntegrationCreateDialogFooter } from "./IntegrationCreateDialogFooter";
 import { useBrowserActionSetup } from "./useBrowserActionSetup";
 import type {
   ConfigurationField,
@@ -49,6 +51,8 @@ export interface IntegrationCreateDialogProps {
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
   initialStepFieldNames?: string[];
+  /** Configuration field names this flow never shows, e.g. optional keys that would distract during onboarding. */
+  hiddenFieldNames?: string[];
   /** Optional custom description for the webhook completion step. */
   webhookStepDescription?: ReactNode;
   /** Pre-created integration state for resuming a flow started inline (e.g. browser action after inline creation). */
@@ -57,7 +61,14 @@ export interface IntegrationCreateDialogProps {
   initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
   /** Existing configuration to pre-populate when resuming a pending integration flow. */
   initialConfiguration?: Record<string, unknown>;
+  /** Where to send the browser after the external provider redirects back (e.g. workspace setup). */
+  setupReturnTo?: string;
+  /** Names already taken in the organization, used to keep generated names unique. */
+  existingIntegrationNames?: Set<string>;
 }
+
+const NO_EXISTING_NAMES: Set<string> = new Set();
+const NO_HIDDEN_FIELDS: string[] = [];
 
 export function IntegrationCreateDialog({
   open,
@@ -72,11 +83,14 @@ export function IntegrationCreateDialog({
   onCapabilitySetupRequired,
   instructionsEndBeforeHeading,
   initialStepFieldNames,
+  hiddenFieldNames = NO_HIDDEN_FIELDS,
   webhookStepDescription,
   initialCreatedIntegrationId,
   initialBrowserAction,
   initialWebhookSetup,
   initialConfiguration,
+  setupReturnTo,
+  existingIntegrationNames = NO_EXISTING_NAMES,
 }: IntegrationCreateDialogProps) {
   const [integrationName, setIntegrationName] = useState(defaultName);
   const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
@@ -100,11 +114,25 @@ export function IntegrationCreateDialog({
     return idx >= 0 ? raw.slice(0, idx).trim() : raw;
   }, [integrationDefinition?.instructions, instructionsEndBeforeHeading]);
 
-  const configurationFields = useMemo(() => {
-    const fields = integrationDefinition?.configuration ?? [];
-    if (!initialStepFieldNames?.length) return fields;
-    return fields.filter((f) => f.name && initialStepFieldNames.includes(f.name));
-  }, [integrationDefinition?.configuration, initialStepFieldNames]);
+  const { createStepFields, webhookStepFields } = useMemo(() => {
+    const visibleFields = selectVisibleFields(integrationDefinition?.configuration, hiddenFieldNames);
+    return {
+      createStepFields: selectCreateStepFields(visibleFields, initialStepFieldNames),
+      webhookStepFields: selectWebhookStepFields(visibleFields, initialStepFieldNames),
+    };
+  }, [integrationDefinition?.configuration, hiddenFieldNames, initialStepFieldNames]);
+
+  const isGitHub = integrationDefinition?.name === "github";
+  const {
+    name: effectiveIntegrationName,
+    baseName: githubBaseName,
+    setCreatedName,
+  } = useGeneratedIntegrationName({
+    isGitHub,
+    typedName: integrationName,
+    owner: configuration.organization,
+    existingNames: existingIntegrationNames,
+  });
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -113,12 +141,13 @@ export function IntegrationCreateDialog({
         setConfiguration({});
         setPendingWebhookSetup(null);
         setCreatedIntegrationId(undefined);
+        setCreatedName(undefined);
         setCreateError(null);
         onReset?.();
       }
       onOpenChange(next);
     },
-    [onOpenChange, onReset],
+    [onOpenChange, onReset, setCreatedName],
   );
 
   const handleClose = useCallback(() => {
@@ -138,7 +167,8 @@ export function IntegrationCreateDialog({
     configuration,
     organizationId,
     integrationId: resolvedIntegrationId,
-    integrationName,
+    integrationName: effectiveIntegrationName,
+    returnTo: setupReturnTo,
     onCreated,
     handleClose,
   });
@@ -153,6 +183,7 @@ export function IntegrationCreateDialog({
     resetBrowserAction(initialBrowserAction ?? undefined);
     setPendingWebhookSetup(initialWebhookSetup ?? null);
     setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
+    setCreatedName(undefined);
   }, [
     open,
     defaultName,
@@ -161,11 +192,13 @@ export function IntegrationCreateDialog({
     initialCreatedIntegrationId,
     initialConfiguration,
     resetBrowserAction,
+    setCreatedName,
   ]);
 
   const handleSubmit = useCallback(async () => {
     if (!integrationDefinition?.name || !organizationId) return;
-    const nextName = integrationName.trim();
+    const definitionName = integrationDefinition.name;
+    const nextName = effectiveIntegrationName.trim();
     if (!nextName) {
       showErrorToast("Integration name is required");
       return;
@@ -174,13 +207,19 @@ export function IntegrationCreateDialog({
     setCreateError(null);
     setIsCreatePending(true);
     try {
-      const result = await onCreateIntegration({
-        integrationName: integrationDefinition.name,
-        name: nextName,
-        configuration,
-      });
+      const created = isGitHub
+        ? await createWithGeneratedName({
+            baseName: githubBaseName,
+            takenNames: existingIntegrationNames,
+            create: (name) => onCreateIntegration({ integrationName: definitionName, name, configuration }),
+          })
+        : {
+            result: await onCreateIntegration({ integrationName: definitionName, name: nextName, configuration }),
+            name: nextName,
+          };
 
-      const integration = result.integration;
+      setCreatedName(created.name);
+      const integration = created.result.integration;
       const browserAction = integration?.status?.browserAction;
       const webhookUrl = getIntegrationWebhookUrl(integration?.status?.metadata);
 
@@ -210,7 +249,7 @@ export function IntegrationCreateDialog({
       }
       handleClose();
       if (integration?.metadata?.id) {
-        onCreated?.(integration.metadata.id, nextName);
+        onCreated?.(integration.metadata.id, integration.metadata.name || created.name);
       }
     } catch (error) {
       setCreateError(error);
@@ -221,13 +260,17 @@ export function IntegrationCreateDialog({
   }, [
     integrationDefinition?.name,
     organizationId,
-    integrationName,
+    effectiveIntegrationName,
     configuration,
+    existingIntegrationNames,
+    githubBaseName,
+    isGitHub,
     onCreateIntegration,
     handleClose,
     onCreated,
     onCapabilitySetupRequired,
     setCreateIntegrationBrowserAction,
+    setCreatedName,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
@@ -238,11 +281,11 @@ export function IntegrationCreateDialog({
         configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
-      onCreated?.(pendingWebhookSetup.id, integrationName);
+      onCreated?.(pendingWebhookSetup.id, effectiveIntegrationName);
     } catch {
       showErrorToast("Failed to complete setup");
     }
-  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, integrationName]);
+  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, effectiveIntegrationName]);
 
   if (!integrationDefinition) return null;
 
@@ -324,31 +367,25 @@ export function IntegrationCreateDialog({
                   </Button>
                 </div>
               </div>
-              {(integrationDefinition?.configuration ?? [])
-                .filter((f: ConfigurationField) => {
-                  if (!f.name) return false;
-                  if (initialStepFieldNames?.length) return !initialStepFieldNames.includes(f.name);
-                  return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                })
-                .map((field) => (
-                  <ConfigurationFieldRenderer
-                    key={field.name}
-                    field={field}
-                    value={configuration[field.name!]}
-                    onChange={(value) =>
-                      setConfiguration((prev) => ({
-                        ...prev,
-                        [field.name!]: value,
-                      }))
-                    }
-                    allValues={configuration}
-                    organizationId={organizationId}
-                  />
-                ))}
+              {webhookStepFields.map((field: ConfigurationField) => (
+                <ConfigurationFieldRenderer
+                  key={field.name}
+                  field={field}
+                  value={configuration[field.name!]}
+                  onChange={(value) =>
+                    setConfiguration((prev) => ({
+                      ...prev,
+                      [field.name!]: value,
+                    }))
+                  }
+                  allValues={configuration}
+                  organizationId={organizationId}
+                />
+              ))}
             </>
           ) : (
             <>
-              {!browserActionCompleted && (
+              {!browserActionCompleted && !isGitHub && (
                 <div>
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">
                     Integration Name
@@ -363,9 +400,9 @@ export function IntegrationCreateDialog({
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
                 </div>
               )}
-              {configurationFields.length > 0 && (
+              {createStepFields.length > 0 && (
                 <div className="space-y-4">
-                  {configurationFields.map((field: ConfigurationField) => {
+                  {createStepFields.map((field: ConfigurationField) => {
                     if (!field.name) return null;
                     return (
                       <ConfigurationFieldRenderer
@@ -395,7 +432,7 @@ export function IntegrationCreateDialog({
           browserActionCompleted={browserActionCompleted}
           mutationPending={updateIntegrationMutation.isPending}
           isCreatePending={isCreatePending}
-          integrationName={integrationName}
+          integrationName={effectiveIntegrationName}
           onCompleteWebhookSetup={handleCompleteWebhookSetup}
           onBrowserActionContinue={handleBrowserActionContinue}
           onBrowserActionConfigSave={handleBrowserActionConfigSave}
@@ -413,115 +450,5 @@ export function IntegrationCreateDialog({
         ) : null}
       </DialogContent>
     </Dialog>
-  );
-}
-
-interface IntegrationCreateDialogFooterProps {
-  pendingWebhookSetup: { id: string; webhookUrl: string; config: Record<string, unknown> } | null;
-  createIntegrationBrowserAction: OrganizationsBrowserAction | undefined;
-  browserActionCompleted: boolean;
-  mutationPending: boolean;
-  isCreatePending: boolean;
-  integrationName: string;
-  onCompleteWebhookSetup: () => Promise<void>;
-  onBrowserActionContinue: () => void;
-  onBrowserActionConfigSave: () => Promise<void>;
-  onFinishBrowserActionSetup: () => Promise<void>;
-  onSubmit: () => Promise<void>;
-  onClose: () => void;
-}
-
-function IntegrationCreateDialogFooter({
-  pendingWebhookSetup,
-  createIntegrationBrowserAction,
-  browserActionCompleted,
-  mutationPending,
-  isCreatePending,
-  integrationName,
-  onCompleteWebhookSetup,
-  onBrowserActionContinue,
-  onBrowserActionConfigSave,
-  onFinishBrowserActionSetup,
-  onSubmit,
-  onClose,
-}: IntegrationCreateDialogFooterProps) {
-  if (pendingWebhookSetup) {
-    return (
-      <DialogFooter className="gap-2 sm:justify-start mt-6">
-        <LoadingButton
-          color="blue"
-          onClick={() => void onCompleteWebhookSetup()}
-          loading={mutationPending}
-          loadingText="Completing..."
-          className="flex items-center gap-2"
-        >
-          Complete setup
-        </LoadingButton>
-        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
-          Done
-        </Button>
-      </DialogFooter>
-    );
-  }
-
-  if (createIntegrationBrowserAction && !browserActionCompleted) {
-    return (
-      <DialogFooter className="gap-2 sm:justify-start mt-6">
-        {createIntegrationBrowserAction.url ? (
-          <Button type="button" onClick={onBrowserActionContinue} className="flex items-center gap-2">
-            <ExternalLink className="h-4 w-4" />
-            Continue setup
-          </Button>
-        ) : (
-          <LoadingButton
-            color="blue"
-            onClick={() => void onBrowserActionConfigSave()}
-            loading={mutationPending}
-            loadingText="Saving..."
-          >
-            Save
-          </LoadingButton>
-        )}
-        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
-          Cancel
-        </Button>
-      </DialogFooter>
-    );
-  }
-
-  if (createIntegrationBrowserAction) {
-    return (
-      <DialogFooter className="gap-2 sm:justify-start mt-6">
-        <LoadingButton
-          color="blue"
-          onClick={() => void onFinishBrowserActionSetup()}
-          loading={mutationPending}
-          loadingText="Saving..."
-        >
-          Done
-        </LoadingButton>
-        <Button variant="outline" onClick={onClose} disabled={mutationPending}>
-          Cancel
-        </Button>
-      </DialogFooter>
-    );
-  }
-
-  return (
-    <DialogFooter className="gap-2 sm:justify-start mt-6">
-      <LoadingButton
-        color="blue"
-        onClick={() => void onSubmit()}
-        disabled={!integrationName?.trim()}
-        loading={isCreatePending}
-        loadingText="Connecting..."
-        className="flex items-center gap-2"
-      >
-        Connect
-      </LoadingButton>
-      <Button variant="outline" onClick={onClose} disabled={isCreatePending}>
-        Cancel
-      </Button>
-    </DialogFooter>
   );
 }

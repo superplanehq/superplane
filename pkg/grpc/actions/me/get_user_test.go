@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -49,7 +50,7 @@ func Test_ListUserPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp.User)
 		assert.NotEmpty(t, resp.User.Permissions)
-		assert.ElementsMatch(t, resp.User.Permissions, getExpectedPermissions([]string{
+		expected := getExpectedPermissions([]string{
 			"org",
 			"roles",
 			"groups",
@@ -59,7 +60,14 @@ func Test_ListUserPermissions(t *testing.T) {
 			"work_orders",
 			"api_keys",
 			"agents",
-		}))
+			"notifications",
+		})
+		expected = append(expected, &pbAuth.Permission{
+			Resource:   "notifications",
+			Action:     "update",
+			DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+		})
+		assert.ElementsMatch(t, resp.User.Permissions, expected)
 	})
 
 	t.Run("canceled context bubbles up for gateway sanitization", func(t *testing.T) {
@@ -70,6 +78,28 @@ func Test_ListUserPermissions(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, context.Canceled)
 	})
+}
+
+func Test_GetUser_HasToken(t *testing.T) {
+	r := support.Setup(t)
+	ctx := metadata.NewIncomingContext(
+		context.Background(),
+		metadata.Pairs(
+			"x-organization-id", r.Organization.ID.String(),
+			"x-user-id", r.User.String(),
+		),
+	)
+
+	resp, err := GetUser(ctx, r.AuthService, false)
+	require.NoError(t, err)
+	assert.False(t, resp.User.HasToken, "a user with no personal tokens should report has_token=false")
+
+	token := models.NewUserAPIToken(r.User, "CI token", "hash-has-token")
+	require.NoError(t, models.CreateUserAPIToken(database.Conn(), token))
+
+	resp, err = GetUser(ctx, r.AuthService, false)
+	require.NoError(t, err)
+	assert.True(t, resp.User.HasToken, "a user with a personal token should report has_token=true")
 }
 
 func getExpectedPermissions(resources []string) []*pbAuth.Permission {

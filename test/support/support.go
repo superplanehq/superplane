@@ -28,11 +28,14 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
+	_ "github.com/superplanehq/superplane/pkg/components/loop"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/runner/claude"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/codex"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -75,6 +78,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
+	_ = models.LoadCurrentPriceBook(database.Conn())
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
@@ -344,6 +348,161 @@ func CreateNextNodeExecution(
 	return &execution
 }
 
+// CreateFactoryLineDispatch creates a bare FactoryWorkOrderLineDispatch row
+// directly (bypassing FactoryLine.Dispatch/StartStep), for tests that build
+// a raw FactoryWorkOrderExecution and just need a valid parent to satisfy
+// the line_dispatch_id NOT NULL FK.
+func CreateFactoryLineDispatch(
+	t require.TestingT,
+	orgID, factoryID, workOrderID, lineID uuid.UUID,
+	lineName string,
+	steps []models.FactoryLineStep,
+) *models.FactoryWorkOrderLineDispatch {
+	now := time.Now()
+	dispatch := models.FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		LineID:         lineID,
+		LineName:       lineName,
+		Steps:          datatypes.NewJSONSlice(steps),
+		State:          models.FactoryWorkOrderLineDispatchStateActive,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	require.NoError(t, database.Conn().Create(&dispatch).Error)
+	return &dispatch
+}
+
+// CompleteFactoryOnboarding marks a factory as past the setup wizard so
+// workspace pages render instead of redirecting to /setup.
+func CompleteFactoryOnboarding(t require.TestingT, factory *models.Factory) {
+	vcsID := uuid.New().String()
+	agentID := uuid.New().String()
+	appRepository := "acme/app"
+	backlogRepository := "acme/backlog"
+	issuesSource := models.FactoryOnboardingIssuesSourceVCS
+	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+	appID := uuid.New().String()
+	lineID := uuid.New().String()
+	require.NoError(t, factory.CompleteOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &agentID,
+		AppRepository:      &appRepository,
+		BacklogRepository:  &backlogRepository,
+		IssuesSource:       &issuesSource,
+		AgentHarness:       &agentHarness,
+		ProvisionedAppID:   &appID,
+		ProvisionedLineID:  &lineID,
+	}))
+}
+
+// CreateFactoryAppWithOnRunTrigger creates a factory-owned canvas with a
+// single onRun-triggered node, ready to be used as a factory line step's
+// entrypoint.
+func CreateFactoryAppWithOnRunTrigger(
+	t require.TestingT,
+	r *ResourceRegistry,
+	factoryID uuid.UUID,
+	name, entrypoint string,
+) (*models.Canvas, string) {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     entrypoint,
+			Name:       name,
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "onRun"},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{
+				{
+					ID:   entrypoint,
+					Name: name,
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "onRun"},
+					},
+				},
+			}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas, entrypoint
+}
+
+// CreateFactoryCanvas creates a factory-owned canvas with an empty live
+// version. Use it when a test needs a factory app to point at and does not
+// care about the graph.
+func CreateFactoryCanvas(t require.TestingT, r *ResourceRegistry, factoryID uuid.UUID, name string) *models.Canvas {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas
+}
+
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
@@ -359,6 +518,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
+			Concurrency:   node.ConcurrencySpec(),
 		}
 	}
 
@@ -397,6 +557,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
+			canvasNode.SetConcurrencySpec(node.Concurrency)
 
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
 				return err

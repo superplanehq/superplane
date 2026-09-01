@@ -1,13 +1,18 @@
 import type { FactoriesWorkOrderEvent, FactoriesWorkOrderResult } from "@/api-client";
 import { formatWorkOrderResult } from "./workOrderPresentation";
-import { extractArtifactName, extractArtifactTitle, extractArtifactUrl } from "./workOrderArtifact";
-import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
+import { isPullRequestArtifactType, pullRequestFromEventPayload } from "./workOrderPullRequest";
+import {
+  describeArtifactAdded,
+  describeAssigneesUpdated,
+  describePullRequestEvent,
+  findAutomationStep,
+  resolveUserDisplayName,
+  toAutomationActor,
+} from "./workOrderTimelineFromEvents.helpers";
 import type {
   UserNameLookup,
-  WorkOrderTimelineAutomationActor,
   WorkOrderTimelineEvent,
   WorkOrderTimelineEventKind,
-  WorkOrderTimelineStep,
   WorkOrderTimelineStepComment,
   WorkOrderTimelineViewModel,
 } from "./workOrderTimelineEvents";
@@ -16,8 +21,6 @@ import {
   type DispatchBatchContext,
   type LineStepExecutionPayload,
 } from "./workOrderTimelineStepBuilder";
-
-const UNKNOWN_MEMBER_LABEL = UNKNOWN_ORG_USER_NAME;
 
 interface EventUserRef {
   id?: string;
@@ -46,6 +49,24 @@ interface EventArtifactPayload {
   data?: Record<string, unknown>;
 }
 
+interface EventPullRequestPayload {
+  id?: string;
+  provider?: string;
+  repository?: string;
+  number?: number | string;
+  url?: string;
+  title?: string;
+  state?: string;
+}
+
+interface EventCheckPayload {
+  name?: string;
+  score?: number;
+  maxScore?: number;
+  format?: "fraction" | "percent" | "boolean";
+  previousScore?: number;
+}
+
 interface EventPayload extends LineStepExecutionPayload {
   user?: EventUserRef;
   automation?: EventAutomationRefPayload;
@@ -62,6 +83,8 @@ interface EventPayload extends LineStepExecutionPayload {
   body?: string;
   author?: EventCommentAuthorPayload;
   artifact?: EventArtifactPayload;
+  pullRequest?: EventPullRequestPayload;
+  check?: EventCheckPayload;
 }
 
 interface TimelineBuildState {
@@ -72,10 +95,14 @@ interface TimelineBuildState {
 const WORK_ORDER_EVENT_TYPE_ORDER: Record<string, number> = {
   "order.status.updated": 15,
   "order.assignees.updated": 20,
+  "step.execution.queued": 25,
   "step.execution.created": 30,
   "step.execution.finished": 40,
   "order.comment.added": 45,
+  "order.check.reported": 46,
   "order.artifact.added": 47,
+  "order.pull_request.added": 48,
+  "order.pull_request.updated": 49,
 };
 
 function compareWorkOrderEventsChronologically(left: FactoriesWorkOrderEvent, right: FactoriesWorkOrderEvent): number {
@@ -131,6 +158,9 @@ function applyApiEventToTimeline(
     case "order.assignees.updated":
       appendAssigneesUpdatedEvent(state.events, index, payload, at, resolveUserName);
       return;
+    case "step.execution.queued":
+      appendStepQueuedEvent(state.events, index, payload, at);
+      return;
     case "step.execution.created":
       appendStepExecutionEvent(toDispatchBatchContext(state), payload, at, "step.execution.created");
       return;
@@ -142,6 +172,27 @@ function applyApiEventToTimeline(
       return;
     case "order.artifact.added":
       appendArtifactEvent(state, index, payload, at, resolveUserName);
+      return;
+    case "order.pull_request.added":
+      appendPullRequestEvent(state, {
+        index,
+        payload,
+        at,
+        kind: "pullRequestAdded",
+        resolveUserName,
+      });
+      return;
+    case "order.pull_request.updated":
+      appendPullRequestEvent(state, {
+        index,
+        payload,
+        at,
+        kind: "pullRequestUpdated",
+        resolveUserName,
+      });
+      return;
+    case "order.check.reported":
+      appendCheckReportedEvent(state, index, payload, at);
   }
 }
 
@@ -150,6 +201,26 @@ function toDispatchBatchContext(state: TimelineBuildState): DispatchBatchContext
     timelineEvents: state.events,
     dispatchBatchByLine: state.dispatchBatchByLine,
   };
+}
+
+// The step is at its max parallelism: the task waits in the step
+// queue until a run completes and frees a slot.
+function appendStepQueuedEvent(
+  events: WorkOrderTimelineEvent[],
+  index: number,
+  payload: EventPayload,
+  at: string,
+): void {
+  const stepName = payload.stepName?.trim() || "Unnamed step";
+  const lineName = payload.line?.name?.trim();
+  events.push({
+    id: `step-queued-${index}`,
+    kind: "queued",
+    at,
+    lineId: payload.line?.id,
+    lineName,
+    title: `Queued at ${stepName} — waiting for a free slot`,
+  });
 }
 
 function appendAssigneesUpdatedEvent(
@@ -217,20 +288,20 @@ function deriveStatusEventKind(fromState: string, toState: string): WorkOrderTim
 
 function describeStatusTransition(fromState: string, toState: string, toResult: string): string {
   if (!fromState) {
-    return "created this work order";
+    return "created this task";
   }
   if (toState === "closed") {
     const result = formatWorkOrderResult(CLOSED_RESULT_TO_PROTO[toResult] ?? undefined);
-    return result ? `closed as ${result.toLowerCase()}` : "closed this work order";
+    return result ? `closed as ${result.toLowerCase()}` : "closed this task";
   }
   if (fromState === "draft" && toState === "open") {
-    return "opened this work order";
+    return "opened this task";
   }
   if (fromState === "open" && toState === "draft") {
-    return "moved this work order back to Draft";
+    return "moved this task back to Draft";
   }
   if (fromState === "closed" && toState === "open") {
-    return "reopened this work order";
+    return "reopened this task";
   }
   return `moved ${humanizeState(fromState)} → ${humanizeState(toState)}`;
 }
@@ -297,7 +368,7 @@ function appendArtifactEvent(
   resolveUserName?: UserNameLookup,
 ): void {
   const artifact = payload.artifact;
-  if (!artifact?.type) {
+  if (!artifact?.type || isPullRequestArtifactType(artifact.type)) {
     return;
   }
 
@@ -325,60 +396,71 @@ function appendArtifactEvent(
   });
 }
 
-function findAutomationStep(
+function appendPullRequestEvent(
   state: TimelineBuildState,
-  actor: WorkOrderTimelineAutomationActor | undefined,
-): WorkOrderTimelineStep | undefined {
-  if (!actor) {
-    return undefined;
+  args: {
+    index: number;
+    payload: EventPayload;
+    at: string;
+    kind: "pullRequestAdded" | "pullRequestUpdated";
+    resolveUserName?: UserNameLookup;
+  },
+): void {
+  const { index, payload, at, kind, resolveUserName } = args;
+  if (!payload.pullRequest) {
+    return;
   }
 
-  const dispatch = [...state.events]
-    .reverse()
-    .find(
-      (event) =>
-        event.kind === "dispatched" &&
-        ((actor.lineId && event.lineId === actor.lineId) || (actor.lineName && event.lineName === actor.lineName)),
-    );
-  if (!dispatch?.steps?.length) {
-    return undefined;
+  const pullRequest = pullRequestFromEventPayload(payload.pullRequest);
+  const automationActor = toAutomationActor(payload.automation);
+  const step = findAutomationStep(state, automationActor);
+  if (step) {
+    step.pullRequests = [...(step.pullRequests ?? []), pullRequest];
+    return;
   }
 
-  if (actor.stepName) {
-    const matchingName = [...dispatch.steps].reverse().find((step) => step.stepName === actor.stepName);
-    if (matchingName) {
-      return matchingName;
-    }
-  }
-
-  if (actor.stepIndex !== undefined && actor.stepIndex >= 0 && actor.stepIndex < dispatch.steps.length) {
-    return dispatch.steps[actor.stepIndex];
-  }
-
-  // No confident match. Let the caller push a top-level event rather than
-  // attaching to an arbitrary step (last would misattribute step-0 refs when
-  // JSON `omitempty` dropped the index).
-  return undefined;
+  state.events.push({
+    id: `pull-request-${kind}-${index}`,
+    kind,
+    at,
+    actorUserId: payload.user?.id,
+    actorName: resolveUserDisplayName(payload.user?.id, resolveUserName),
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    pullRequest,
+    title: describePullRequestEvent(kind, pullRequest),
+  });
 }
 
-const ARTIFACT_KIND_SHORT_LABEL: Record<string, string> = {
-  pr: "PR",
-  markdown: "note",
-  branch: "branch",
-};
-
-function formatArtifactKindShort(type: string | undefined): string {
-  if (!type) {
-    return "artifact";
+// Check reports stay top-level: they come from dedicated automations
+// (risk review, coverage), not from a dispatched line step.
+function appendCheckReportedEvent(state: TimelineBuildState, index: number, payload: EventPayload, at: string): void {
+  const check = payload.check;
+  if (!check?.name || check.score === undefined || check.maxScore === undefined) {
+    return;
   }
-  return ARTIFACT_KIND_SHORT_LABEL[type] ?? "artifact";
-}
 
-function describeArtifactAdded(artifact: EventArtifactPayload): string {
-  const label =
-    extractArtifactTitle(artifact.data) || extractArtifactUrl(artifact.data) || extractArtifactName(artifact.data);
-  const type = formatArtifactKindShort(artifact.type);
-  return label ? `attached ${type}: ${label}` : `attached ${type}`;
+  const automationActor = toAutomationActor(payload.automation);
+  // Same wording rule as CheckReportedEventBody: a re-report with an
+  // unchanged score still reads as "reported".
+  const isRescore = check.previousScore !== undefined && check.previousScore !== check.score;
+  state.events.push({
+    id: `check-${index}`,
+    kind: "checkReported",
+    at,
+    actorAutomation: automationActor,
+    sourceRunId: payload.run?.id,
+    sourceAppId: automationActor?.appId ?? payload.app?.id,
+    check: {
+      name: check.name,
+      score: check.score,
+      maxScore: check.maxScore,
+      format: check.format,
+      previousScore: check.previousScore,
+    },
+    title: isRescore ? `re-scored ${check.name}` : `reported ${check.name}`,
+  });
 }
 
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
@@ -386,95 +468,3 @@ const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   rejected: "RESULT_REJECTED",
   failed: "RESULT_FAILED",
 };
-
-function toAutomationActor(
-  payload: EventAutomationRefPayload | undefined,
-): WorkOrderTimelineAutomationActor | undefined {
-  if (!payload) {
-    return undefined;
-  }
-
-  const anySet =
-    payload.nodeId || payload.nodeName || payload.appId || payload.appName || payload.lineId || payload.lineName;
-  if (!anySet) {
-    return undefined;
-  }
-
-  return {
-    nodeId: payload.nodeId,
-    nodeName: payload.nodeName,
-    appId: payload.appId,
-    appName: payload.appName,
-    lineId: payload.lineId,
-    lineName: payload.lineName,
-    stepIndex: payload.stepIndex,
-    stepName: payload.stepName,
-  };
-}
-
-function resolveUserDisplayName(userId: string | undefined, resolveUserName?: UserNameLookup): string | undefined {
-  if (!userId) {
-    return undefined;
-  }
-
-  return resolveUserName?.(userId) ?? UNKNOWN_MEMBER_LABEL;
-}
-
-function describeAssigneesUpdated(payload: EventPayload, resolveUserName?: UserNameLookup): string {
-  const actorId = payload.user?.id;
-  const assignedIds = (payload.assigned ?? []).map((user) => user.id).filter((id): id is string => Boolean(id));
-  const assignedOthers = actorId ? assignedIds.filter((userId) => userId !== actorId) : assignedIds;
-  const selfAssigned = Boolean(actorId && assignedIds.includes(actorId));
-  const unassignedNames = formatEventUserNames(payload.unassigned, resolveUserName);
-  const parts: string[] = [];
-
-  if (selfAssigned && assignedOthers.length === 0) {
-    parts.push("took ownership");
-  } else if (selfAssigned && assignedOthers.length > 0) {
-    const otherNames = formatEventUserNames(
-      assignedOthers.map((id) => ({ id })),
-      resolveUserName,
-    );
-    parts.push(otherNames ? `took ownership and assigned ${otherNames} as owner` : "took ownership");
-  } else {
-    const assignedNames = formatEventUserNames(payload.assigned, resolveUserName);
-    if (assignedNames) {
-      parts.push(`assigned ${assignedNames} as owner`);
-    }
-  }
-
-  if (unassignedNames) {
-    parts.push(`removed ${unassignedNames} as owner`);
-  }
-
-  if (parts.length === 0) {
-    return "updated owners";
-  }
-
-  return parts.join(" and ");
-}
-
-function formatEventUserNames(users: EventUserRef[] | undefined, resolveUserName?: UserNameLookup): string | null {
-  if (!users?.length) {
-    return null;
-  }
-
-  const names = users.map((user) => resolveUserDisplayName(user.id, resolveUserName) ?? UNKNOWN_MEMBER_LABEL);
-  return formatNameList(names);
-}
-
-function formatNameList(names: string[]): string {
-  if (names.length === 0) {
-    return "";
-  }
-
-  if (names.length === 1) {
-    return names[0];
-  }
-
-  if (names.length === 2) {
-    return `${names[0]} and ${names[1]}`;
-  }
-
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-}

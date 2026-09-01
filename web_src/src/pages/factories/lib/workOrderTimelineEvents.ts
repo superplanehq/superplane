@@ -1,4 +1,5 @@
 import type {
+  FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderExecution,
@@ -17,10 +18,14 @@ import { buildWorkOrderTimelineViewFromEvents } from "./workOrderTimelineFromEve
 export type WorkOrderTimelineEventKind =
   | "created"
   | "dispatched"
+  | "queued"
   | "assigned"
   | "statusChanged"
   | "commented"
   | "artifactAdded"
+  | "pullRequestAdded"
+  | "pullRequestUpdated"
+  | "checkReported"
   | "closed";
 export type UserNameLookup = (userId: string | undefined) => string | undefined;
 export type { OrgUserDisplayLookup };
@@ -34,6 +39,7 @@ export interface WorkOrderTimelineStep {
   finishedAt?: string;
   comments?: WorkOrderTimelineStepComment[];
   artifacts?: WorkOrderTimelineArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
   execution: FactoriesWorkOrderExecution;
 }
 
@@ -76,6 +82,16 @@ export interface WorkOrderTimelineArtifact {
   data?: Record<string, unknown>;
 }
 
+/** Score snapshot carried by an `order.check.reported` event. */
+export interface WorkOrderTimelineCheck {
+  name: string;
+  score: number;
+  maxScore: number;
+  format?: "fraction" | "percent" | "boolean";
+  /** Score from the previous report of the same check, when one exists. */
+  previousScore?: number;
+}
+
 export interface WorkOrderTimelineEvent {
   id: string;
   kind: WorkOrderTimelineEventKind;
@@ -89,6 +105,8 @@ export interface WorkOrderTimelineEvent {
   statusChange?: WorkOrderTimelineStatusChange;
   comment?: WorkOrderTimelineComment;
   artifact?: WorkOrderTimelineArtifact;
+  pullRequest?: FactoriesFactoryPullRequest;
+  check?: WorkOrderTimelineCheck;
   title: string;
   lineId?: string;
   lineName?: string;

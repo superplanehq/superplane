@@ -62,5 +62,40 @@ describe("resolvePageObservability", () => {
       pageKey: "settingsGroupMembers",
       attributes: { organization_id: "org-1", group_name: "admins" },
     });
+    expect(resolvePageObservability("/org-1/settings/notifications")).toEqual({
+      pageKey: "settingsNotifications",
+      attributes: { organization_id: "org-1" },
+    });
+  });
+
+  it("maps factories organization settings routes", () => {
+    expect(resolvePageObservability("/org-1/organization/general")).toEqual({
+      pageKey: "organizationSettingsGeneral",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/workspace-usage")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/llm-spend")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/spending")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/integrations")).toEqual({
+      pageKey: "organizationSettingsIntegrations",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/integrations/slack/setup")).toEqual({
+      pageKey: "organizationSettingsIntegrationSetup",
+      attributes: { organization_id: "org-1", integration_name: "slack" },
+    });
+    expect(resolvePageObservability("/org-1/organization/integrations/int-9")).toEqual({
+      pageKey: "organizationSettingsIntegrationDetail",
+      attributes: { organization_id: "org-1", integration_id: "int-9" },
+    });
   });
 });

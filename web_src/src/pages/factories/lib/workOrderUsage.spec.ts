@@ -6,10 +6,10 @@ describe("formatWorkOrderExecutionUsage", () => {
   it("sums usage from every execution in the dispatch", () => {
     expect(
       formatWorkOrderExecutionUsage([
-        { totalTokens: "1200", costCents: "45" },
-        { totalTokens: "1800", costCents: "105" },
+        { totalTokens: "1200", costCents: "45", durationSeconds: "12" },
+        { totalTokens: "1800", costCents: "105", durationSeconds: "8" },
       ]),
-    ).toBe("3k tokens · $1.50");
+    ).toBe("$1.50 · 3k tokens · 20 s");
   });
 
   it("ignores absent and invalid usage", () => {

@@ -1,5 +1,9 @@
 import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
-import { isCapabilityBasedIntegration, isCapabilityBasedIntegrationDefinition } from "@/lib/integrations";
+import {
+  isCapabilityBasedIntegration,
+  isCapabilityBasedIntegrationDefinition,
+  usesHostedGitHubAppInstall,
+} from "@/lib/integrations";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 type ConnectDialogMode = "create" | "resume";
@@ -36,16 +40,22 @@ export function useHomeIntegrationConnectActions({
   };
 
   /**
-   * Two GitHub setup paths (see registry.SupportsNewSetupFlow):
-   * - SetupProvider enabled (APP_ENV=development): definition.legacySetupOnly === false →
-   *   multi-step wizard at /settings/integrations/:name/setup
-   * - SetupProvider disabled / non-dev: legacySetupOnly === true →
+   * Two GitHub setup paths (see registry.UseNewSetupFlow):
+   * - hosted public app (definition.hostedAppInstall): skip the dialog and
+   *   follow the Sync browserAction to the SuperPlane GitHub App install page
+   * - org experimental feature new_integration_setup_flow + SetupProvider:
+   *   definition.legacySetupOnly === false → wizard at /settings/integrations/:name/setup
+   * - feature off: legacySetupOnly === true →
    *   IntegrationCreateDialog + Sync browserAction (Continue on GitHub in the modal)
    */
   const openConnectDialog = (integrationName: string) => {
     const definition = availableIntegrations.find((item) => item.name === integrationName) as
       | IntegrationsIntegrationDefinition
       | undefined;
+    // Hosted Connect is started by requestConnect, not this dialog.
+    if (usesHostedGitHubAppInstall(definition)) {
+      return;
+    }
     if (definition && isCapabilityBasedIntegrationDefinition(definition)) {
       const pending = connected.find(
         (item) => item.metadata?.integrationName === integrationName && item.status?.state !== "ready",

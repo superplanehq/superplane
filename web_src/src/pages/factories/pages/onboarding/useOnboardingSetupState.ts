@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { isAgentStepReady } from "./onboardingAgentReadiness";
 import {
   fixtureIssueCount,
   type AgentHarnessId,
@@ -7,10 +8,10 @@ import {
   type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
+import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
 export type OnboardingSetupState = {
   workspaceName: string;
-  inviteCopied: boolean;
   connected: Set<IntegrationId>;
   vcsHost: VcsHostId | null;
   selectedRepo: string | null;
@@ -35,33 +36,22 @@ function isIssuesReady(issuesChoice: IssuesChoiceId | null, connected: Set<Integ
   return false;
 }
 
-function isAgentReady(agent: AgentHarnessId | null, connected: Set<IntegrationId>): boolean {
-  if (agent === "claude-code") {
-    return connected.has("claude");
-  }
-  if (agent === "cursor") {
-    return connected.has("cursor");
-  }
-  if (agent === "codex") {
-    return connected.has("openai");
-  }
-  return false;
-}
-
 function setupReadiness(input: {
   workspaceName: string;
   vcsHost: VcsHostId | null;
   selectedRepo: string | null;
   connected: Set<IntegrationId>;
   issuesChoice: IssuesChoiceId | null;
-  agent: AgentHarnessId | null;
+  remainingCreditCents: number;
 }) {
   const nameReady = input.workspaceName.trim().length > 0;
-  const repoReady = input.vcsHost !== null && input.connected.has(input.vcsHost) && input.selectedRepo !== null;
+  const vcsReady = input.vcsHost !== null && input.connected.has(input.vcsHost);
+  const repoReady = vcsReady && input.selectedRepo !== null;
   const issuesReady = isIssuesReady(input.issuesChoice, input.connected);
-  const agentReady = isAgentReady(input.agent, input.connected);
+  const agentReady = isAgentStepReady(input.connected, input.remainingCreditCents);
   return {
     nameReady,
+    vcsReady,
     repoReady,
     issuesReady,
     agentReady,
@@ -69,10 +59,21 @@ function setupReadiness(input: {
   };
 }
 
-export function useOnboardingSetupState(initialName = "") {
+export function useOnboardingSetupState(
+  initialName = "",
+  options?: {
+    connected?: Set<IntegrationId>;
+    remainingCreditCents?: number;
+    simulateDiscovery?: boolean;
+  },
+) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
-  const [inviteCopied, setInviteCopied] = useState(false);
-  const [connected, setConnected] = useState<Set<IntegrationId>>(() => new Set());
+  // A restored custom name must not be overwritten when the repository is
+  // restored. Placeholder names stay open to the repository-derived suggestion.
+  const [workspaceNameEdited, setWorkspaceNameEdited] = useState(
+    () => initialName.trim().length > 0 && !isPlaceholderWorkspaceName(initialName),
+  );
+  const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
   const [vcsHost, setVcsHost] = useState<VcsHostId | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   /** True after Continue to issues — starts repository analysis. */
@@ -87,6 +88,7 @@ export function useOnboardingSetupState(initialName = "") {
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
   const [finished, setFinished] = useState(false);
   const discoveryTimerRef = useRef<number | null>(null);
+  const connected = options?.connected ?? localConnected;
 
   const clearDiscoveryTimer = useCallback(() => {
     if (discoveryTimerRef.current === null) {
@@ -99,8 +101,22 @@ export function useOnboardingSetupState(initialName = "") {
   useEffect(() => clearDiscoveryTimer, [clearDiscoveryTimer]);
 
   const connectIntegration = useCallback((id: IntegrationId) => {
-    setConnected((prev) => new Set(prev).add(id));
+    setLocalConnected((prev) => new Set(prev).add(id));
   }, []);
+
+  const editWorkspaceName = useCallback((name: string) => {
+    setWorkspaceName(name);
+    setWorkspaceNameEdited(true);
+  }, []);
+
+  /** Derived names never overwrite a name the user typed. */
+  const suggestWorkspaceName = useCallback(
+    (name: string) => {
+      if (workspaceNameEdited) return;
+      setWorkspaceName(name);
+    },
+    [workspaceNameEdited],
+  );
 
   const resetIssuesState = useCallback(() => {
     clearDiscoveryTimer();
@@ -128,8 +144,9 @@ export function useOnboardingSetupState(initialName = "") {
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
+      suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [resetIssuesState],
+    [resetIssuesState, suggestWorkspaceName],
   );
 
   const commitRepoStep = useCallback(() => {
@@ -144,6 +161,13 @@ export function useOnboardingSetupState(initialName = "") {
     (backlogRepo: string) => {
       clearDiscoveryTimer();
       setIssuesRepo(backlogRepo);
+      if (options?.simulateDiscovery === false) {
+        setIssuesDiscovering(false);
+        setIssuesDiscovered(true);
+        setIssuesChoice((current) => current ?? "vcs");
+        return;
+      }
+
       setIssuesDiscovering(true);
       setIssuesDiscovered(false);
       discoveryTimerRef.current = window.setTimeout(() => {
@@ -154,7 +178,7 @@ export function useOnboardingSetupState(initialName = "") {
         setIssuesChoice((current) => current ?? "vcs");
       }, 900);
     },
-    [clearDiscoveryTimer],
+    [clearDiscoveryTimer, options?.simulateDiscovery],
   );
 
   const startIssuesDiscovery = useCallback(() => {
@@ -172,14 +196,15 @@ export function useOnboardingSetupState(initialName = "") {
   );
 
   const backlogRepo = issuesRepo ?? selectedRepo;
-  const issueCount = backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
-  const { nameReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
+  const issueCount =
+    options?.simulateDiscovery === false ? undefined : backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
+  const { nameReady, vcsReady, repoReady, issuesReady, agentReady, canFinish } = setupReadiness({
     workspaceName,
     vcsHost,
     selectedRepo,
     connected,
     issuesChoice,
-    agent,
+    remainingCreditCents: options?.remainingCreditCents ?? 0,
   });
 
   const summary = useMemo(
@@ -197,9 +222,8 @@ export function useOnboardingSetupState(initialName = "") {
 
   return {
     workspaceName,
-    setWorkspaceName,
-    inviteCopied,
-    setInviteCopied,
+    editWorkspaceName,
+    suggestWorkspaceName,
     connected,
     connectIntegration,
     vcsHost,
@@ -223,6 +247,7 @@ export function useOnboardingSetupState(initialName = "") {
     setFinished,
     issueCount,
     nameReady,
+    vcsReady,
     repoReady,
     issuesReady,
     agentReady,

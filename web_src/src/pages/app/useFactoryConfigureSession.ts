@@ -14,6 +14,12 @@ export type FactoryConfigureActions = {
   busy: boolean;
   /** True when Configure has graph/console/files changes to stage+commit. */
   hasUncommittedChanges: boolean;
+  /**
+   * Loads `spec` into the current edit session as an unsaved draft (merged
+   * onto the live canvas snapshot). Leaves the session dirty — the caller
+   * still needs Save to persist it.
+   */
+  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => void;
 };
 
 type UpdateCanvasVersionMutation = {
@@ -25,6 +31,8 @@ type UseFactoryConfigureSessionOptions = {
   factoryConfigureActionsRef?: MutableRefObject<FactoryConfigureActions | null>;
   onFactoryConfigureBusyChange?: (busy: boolean) => void;
   onFactoryConfigureDone?: () => void;
+  /** Called after Configure Save. Discard still uses onFactoryConfigureDone. */
+  onFactoryConfigureSaved?: () => void;
   editSessionActive: boolean;
   setEditSessionActive: Dispatch<SetStateAction<boolean>>;
   canStageCanvasVersion: boolean;
@@ -57,6 +65,7 @@ type UseFactoryConfigureSessionOptions = {
   handleExitEditSession: () => void;
   hasStagingChanges: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
+  applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
 };
 
 /**
@@ -69,6 +78,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     factoryConfigureActionsRef,
     onFactoryConfigureBusyChange,
     onFactoryConfigureDone,
+    onFactoryConfigureSaved,
     editSessionActive,
     setEditSessionActive,
     canStageCanvasVersion,
@@ -87,13 +97,16 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     handleExitEditSession,
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
+    applyLocalWorkflowUpdate,
   } = options;
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
   onFactoryConfigureDoneRef.current = onFactoryConfigureDone;
+  const onFactoryConfigureSavedRef = useRef(onFactoryConfigureSaved);
+  onFactoryConfigureSavedRef.current = onFactoryConfigureSaved;
   const [factoryConfigureSavePending, setFactoryConfigureSavePending] = useState(false);
 
-  useFactoryConfigureEnter(options);
+  const { allowNextConfigureEnter } = useFactoryConfigureEnter(options);
 
   const factoryConfigureBusy = commitStagingPending || resetStagingPending || factoryConfigureSavePending;
   const hasUncommittedChanges = hasStagingChanges || hasUncommittedCanvasDraftChanges;
@@ -129,7 +142,8 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               setLastSavedWorkflowSnapshot,
               handleCommitStaging,
               canvasName: saveOptions?.canvasName,
-              onDone: () => onFactoryConfigureDoneRef.current?.(),
+              onAfterCommit: allowNextConfigureEnter,
+              onDone: () => (onFactoryConfigureSavedRef.current ?? onFactoryConfigureDoneRef.current)?.(),
             });
           },
           discard: () => {
@@ -145,6 +159,15 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               onDone: () => onFactoryConfigureDoneRef.current?.(),
             });
           },
+          applyDraftSpec: (spec) => {
+            const current = getCurrentWorkflowSnapshot();
+            if (!current) {
+              return;
+            }
+            applyLocalWorkflowUpdate({ ...current, spec });
+          },
         };
   }
+
+  return { allowNextConfigureEnter };
 }

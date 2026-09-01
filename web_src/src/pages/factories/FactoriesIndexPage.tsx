@@ -4,18 +4,15 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactory, useFactories } from "@/hooks/useFactoryData";
+import { useFactories } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Factory as FactoryIcon, Plus } from "lucide-react";
-import { useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
-import { CreateFactoryDialog } from "./CreateFactoryDialog";
-import { factoryDetailPath, factoryOnboardingPath } from "./lib/factoryPagePaths";
+import { factoryHomePath, firstFactoryLineId, newFactoryPath } from "./lib/factoryPagePaths";
 import { pickInitialFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
-import { useOnboardingStorybook } from "./pages/onboarding/useOnboardingStorybook";
 
 export function FactoriesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
@@ -31,10 +28,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [createOpen, setCreateOpen] = useState(false);
   const { data: factories = [], isLoading, error } = useFactories(organizationId);
-  const createFactory = useCreateFactory(organizationId);
-  const storybookOnboarding = useOnboardingStorybook();
 
   useFactoriesThemeClass();
   usePageTitle(["Workspaces"]);
@@ -65,28 +59,12 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   const targetFactory = pickInitialFactory(factories, lastVisited);
 
   if (targetFactory?.key) {
-    return <Navigate to={factoryDetailPath(organizationId, targetFactory.key)} replace />;
+    return (
+      <Navigate to={factoryHomePath(organizationId, targetFactory.key, firstFactoryLineId(targetFactory))} replace />
+    );
   }
 
   const canCreate = canAct("factories", "create");
-
-  const handleCreate = async (input: { name: string; description: string; key: string }) => {
-    // Let CreateFactoryDialog catch failures so duplicate-name inline errors work.
-    const factory = await createFactory.mutateAsync(input);
-    setCreateOpen(false);
-    if (!factory.key) {
-      return;
-    }
-    if (storybookOnboarding && factory.id) {
-      storybookOnboarding.beginOnboarding({
-        workspaceId: factory.id,
-        workspaceName: factory.name || input.name,
-      });
-      navigate(factoryOnboardingPath(organizationId, factory.key));
-      return;
-    }
-    navigate(factoryDetailPath(organizationId, factory.key));
-  };
 
   return (
     <div
@@ -99,7 +77,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           Create your first workspace
         </Heading>
         <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Workspaces group work orders, automations, and apps.
+          Workspaces group tasks, automations, and apps.
         </Text>
         <PermissionTooltip
           allowed={canCreate || permissionsLoading}
@@ -108,7 +86,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           <Button
             type="button"
             className="mt-6"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => navigate(newFactoryPath(organizationId))}
             disabled={!canCreate}
             data-testid="factories-index-create-button"
           >
@@ -117,13 +95,6 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
           </Button>
         </PermissionTooltip>
       </div>
-
-      <CreateFactoryDialog
-        open={createOpen}
-        isSaving={createFactory.isPending}
-        onClose={() => setCreateOpen(false)}
-        onCreate={handleCreate}
-      />
     </div>
   );
 }

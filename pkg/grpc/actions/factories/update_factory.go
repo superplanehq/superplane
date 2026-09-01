@@ -29,12 +29,27 @@ func UpdateFactory(ctx context.Context, organizationID string, req *pb.UpdateFac
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
+	if req.GetClearHostedSpendBudget() {
+		if err := factory.UpdateHostedSpendBudget(db, nil); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	} else if req.HostedSpendBudgetCents != nil {
+		if err := factory.UpdateHostedSpendBudget(db, req.HostedSpendBudgetCents); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory")
+		}
+	}
+
 	lines, err := factory.ListLines(db)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory")
 	}
 
+	serialized, err := serializeFactoryWithLineMetrics(db, factory, lines)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory")
+	}
+
 	return &pb.UpdateFactoryResponse{
-		Factory: serializeFactoryWithLines(factory, lines),
+		Factory: serialized,
 	}, nil
 }

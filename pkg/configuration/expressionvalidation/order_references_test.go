@@ -35,6 +35,66 @@ func TestExpressionUsesOrderArtifacts(t *testing.T) {
 	}
 }
 
+func TestExpressionUsesOrderURL(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "artifact url", raw: `order().artifacts[0].data.url`, want: false},
+		{name: "dot url", raw: `order().url`, want: true},
+		{name: "bracket url", raw: `order()["url"]`, want: true},
+		{name: "concatenated", raw: `"[Work Order](" + order().url + ")"`, want: true},
+		{name: "unrelated", raw: `app().url`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderURL(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExpressionUsesOrderAssignees(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "order comments", raw: `order().comments`, want: false},
+		{name: "dot assignees", raw: `order().assignees`, want: true},
+		{name: "bracket assignees", raw: `order()["assignees"]`, want: true},
+		{name: "indexed", raw: `order().assignees[0]`, want: true},
+		{name: "nested email", raw: `order().assignees[0].email`, want: true},
+		{name: "mixed bracket", raw: `order()["assignees"][0]["name"]`, want: true},
+		{name: "len", raw: `len(order().assignees)`, want: true},
+		{name: "filter", raw: `filter(order().assignees, {#.email != ""})`, want: true},
+		{name: "unrelated", raw: `root().data.work_order`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderAssignees(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpressionUsesOrderComments(t *testing.T) {
 	cases := []struct {
 		name string

@@ -1,4 +1,4 @@
-import type { CanvasesCanvasSummary, FactoryApp } from "@/api-client";
+import type { FactoryApp } from "@/api-client";
 import { canvasKeys, useCreateCanvas, useDeleteCanvas } from "@/hooks/useCanvasData";
 import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -15,6 +15,11 @@ type PendingDuplicateCanvas = {
   name: string;
 };
 
+/**
+ * Collects the names taken in this workspace. Automation names only have to be
+ * unique inside their workspace, so apps in other workspaces and at the
+ * organization level do not compete for the name.
+ */
 function collectExistingCanvasNames(
   queryClient: ReturnType<typeof useQueryClient>,
   organizationId: string,
@@ -22,12 +27,6 @@ function collectExistingCanvasNames(
   sessionNames: Iterable<string>,
 ): string[] {
   const names = new Set<string>([...sessionNames]);
-  const canvases = queryClient.getQueryData<CanvasesCanvasSummary[]>(canvasKeys.list(organizationId));
-  for (const canvas of canvases ?? []) {
-    if (canvas.name?.trim()) {
-      names.add(canvas.name.trim());
-    }
-  }
   const apps = queryClient.getQueryData<FactoryApp[]>(factoryAppsKey(organizationId, factoryId));
   for (const app of apps ?? []) {
     if (app.name?.trim()) {

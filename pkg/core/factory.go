@@ -1,11 +1,19 @@
 package core
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ErrWorkOrderNotFound is returned by FindWorkOrder when nothing matches
 // the given lookup. Components that treat "not found" as benign (e.g. a
 // PR merge with no tracked order) check for it with errors.Is.
 var ErrWorkOrderNotFound = errors.New("work order not found")
+
+// ErrPullRequestNotFound is returned by FindPullRequest when nothing
+// matches. Components that treat "not found" as benign check for it with
+// errors.Is.
+var ErrPullRequestNotFound = errors.New("pull request not found")
 
 type FactoryContext interface {
 	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
@@ -20,12 +28,22 @@ type FactoryContext interface {
 	UpdateWorkOrderStatus(params UpdateWorkOrderStatusParams) (order *WorkOrder, changed bool, err error)
 	AddWorkOrderComment(params AddWorkOrderCommentParams) error
 	AddWorkOrderArtifact(params AddWorkOrderArtifactParams) (*WorkOrderArtifact, error)
-	// UpdateWorkOrderArtifact merges Data into an artifact already
-	// attached to the work order, resolved by the key it was given at
-	// attach time (AddWorkOrderArtifactParams.Key). This is how a
-	// PR artifact's `state` stays in sync with GitHub after the initial
-	// attach — see the updateWorkOrderArtifact component.
-	UpdateWorkOrderArtifact(params UpdateWorkOrderArtifactParams) (*WorkOrderArtifact, error)
+	// ReportWorkOrderCheck upserts a scored check on the work order,
+	// keyed by CheckKey: the first report creates the check, later
+	// reports with the same key update it in place and keep the prior
+	// score as PreviousScore. Every report also lands an
+	// `order.check.reported` timeline event.
+	ReportWorkOrderCheck(params ReportWorkOrderCheckParams) (*WorkOrderCheck, error)
+	// SetWorkOrderStatusNote upserts a status note on the work order,
+	// keyed by NoteKey: the first set creates the note, later sets with
+	// the same key update it in place, and a different key sits beside
+	// it. Any lifecycle transition clears the whole set. The order must
+	// be open.
+	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
+	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
+	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
+	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
+	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestMatch, error)
 }
 
 type WorkOrderParams struct {
@@ -70,19 +88,42 @@ type AddWorkOrderArtifactParams struct {
 	Key string
 }
 
-// UpdateWorkOrderArtifactParams targets an existing artifact by the key
-// it was attached with, rather than by id — the same key
-// FindWorkOrder(by: artifactKey) uses, typically a pull request's URL.
-// Data is shallow-merged into the artifact's existing data, not
-// replaced wholesale, so e.g. sending only `{"state": "merged"}` leaves
-// `title`/`number` untouched.
-type UpdateWorkOrderArtifactParams struct {
+// ReportWorkOrderCheckParams carries one check report. Format must be
+// "fraction", "percent", or "boolean" (empty defaults to fraction; a
+// boolean check pins Score to 0/1 and MaxScore to 1); Level must be
+// "positive", "neutral", "caution", or "critical" (empty defaults to
+// neutral) — the reporting component computes it from its thresholds.
+type ReportWorkOrderCheckParams struct {
 	// OrderID identifies the work order to target; see
 	// UpdateWorkOrderStatusParams.OrderID.
 	OrderID string
-	// Key is required: the artifactKey the artifact was attached with.
-	Key  string
-	Data map[string]any
+	// CheckKey identifies the check across reports (e.g. "risk-review").
+	CheckKey string
+	Name     string
+	Score    float64
+	MaxScore float64
+	Format   string
+	Level    string
+	Summary  string
+	Analysis string
+}
+
+// SetWorkOrderStatusNoteParams carries one status note. NoteKey identifies
+// the note across sets (e.g. "pr-closure"). Kind is "info" (the default
+// when empty); Headline is required; CtaLabel and CtaURL must be set
+// together and the URL must be absolute http(s).
+type SetWorkOrderStatusNoteParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// NoteKey identifies the note across sets (e.g. "pr-closure").
+	NoteKey             string
+	Kind                string
+	Headline            string
+	Body                string
+	CtaLabel            string
+	CtaURL              string
+	ShowOnlyWhenWaiting bool
 }
 
 type WorkOrder struct {
@@ -91,6 +132,63 @@ type WorkOrder struct {
 	Description string `json:"description"`
 	State       string `json:"state"`
 	Result      string `json:"result,omitempty"`
+	Number      int64  `json:"number,omitempty"`
+	Key         string `json:"key,omitempty"`
+}
+
+type PullRequest struct {
+	ID          string `json:"id"`
+	WorkOrderID string `json:"workOrderId"`
+	Provider    string `json:"provider"`
+	ExternalID  string `json:"externalId,omitempty"`
+	Repository  string `json:"repository"`
+	Number      int64  `json:"number"`
+	URL         string `json:"url"`
+	Title       string `json:"title,omitempty"`
+	State       string `json:"state"`
+}
+
+type PullRequestMatch struct {
+	PullRequest *PullRequest
+	WorkOrder   *WorkOrder
+}
+
+type AddPullRequestParams struct {
+	OrderID    string
+	Provider   string
+	ExternalID string
+	Repository string
+	Number     int64
+	URL        string
+	Title      string
+	State      string
+	MergedAt   *time.Time
+	ClosedAt   *time.Time
+}
+
+type UpdatePullRequestParams struct {
+	PullRequestID string
+	ExternalID    *string
+	Repository    *string
+	URL           *string
+	Title         *string
+	State         *string
+	MergedAt      *time.Time
+	ClosedAt      *time.Time
+}
+
+type FindPullRequestParams struct {
+	ID         string
+	Provider   string
+	ExternalID string
+	Repository string
+	Number     int64
+	URL        string
+}
+
+type AddPullRequestActivityParams struct {
+	PullRequestID string
+	Description   string
 }
 
 type WorkOrderArtifact struct {
@@ -98,4 +196,30 @@ type WorkOrderArtifact struct {
 	WorkOrderID string         `json:"workOrderId"`
 	Type        string         `json:"type"`
 	Data        map[string]any `json:"data,omitempty"`
+}
+
+type WorkOrderStatusNote struct {
+	WorkOrderID         string `json:"workOrderId"`
+	Key                 string `json:"key"`
+	Kind                string `json:"kind"`
+	Headline            string `json:"headline"`
+	Body                string `json:"body,omitempty"`
+	CtaLabel            string `json:"ctaLabel,omitempty"`
+	CtaURL              string `json:"ctaUrl,omitempty"`
+	ShowOnlyWhenWaiting bool   `json:"showOnlyWhenWaiting,omitempty"`
+}
+
+type WorkOrderCheck struct {
+	ID            string   `json:"id"`
+	WorkOrderID   string   `json:"workOrderId"`
+	Key           string   `json:"key"`
+	Name          string   `json:"name"`
+	Score         float64  `json:"score"`
+	MaxScore      float64  `json:"maxScore"`
+	Format        string   `json:"format"`
+	Level         string   `json:"level"`
+	PreviousScore *float64 `json:"previousScore,omitempty"`
+	// RecentScores lists the latest report scores, oldest first and
+	// ending with Score, capped server-side.
+	RecentScores []float64 `json:"recentScores,omitempty"`
 }

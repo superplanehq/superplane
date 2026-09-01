@@ -18,7 +18,7 @@ export interface MissionRailItem {
   status: MissionDisplayStatus;
 }
 
-const TERMINAL_WORK_ORDER_STATUSES: WorkOrderDisplayStatus[] = ["completed", "failed", "cancelled"];
+const TERMINAL_WORK_ORDER_STATUSES: WorkOrderDisplayStatus[] = ["completed", "failed", "rejected", "cancelled"];
 
 export const MISSION_STATUS_META: Record<
   MissionDisplayStatus,
@@ -69,7 +69,7 @@ export function findMissionById(missions: FactoryMission[], missionId: string): 
   return missions.find((mission) => mission.id === missionId) ?? null;
 }
 
-/** Returns a new map. A work order belongs to one mission, or to none. */
+/** Returns a new map. A task belongs to one mission, or to none. */
 export function assignWorkOrderToMission(
   missionByWorkOrderId: Record<string, string>,
   workOrderId: string,
@@ -122,7 +122,7 @@ export function resolveMissionProgress(
 }
 
 /**
- * Status comes only from member work orders.
+ * Status comes only from member tasks.
  * Empty → draft. Any unfinished work → active. Only finished work → completed.
  */
 export function resolveMissionStatus(
@@ -161,7 +161,7 @@ export function isMissionHiddenFromActive(
   return item.status === "completed" || item.status === "closed" || Boolean(closedByMissionId[item.mission.id]);
 }
 
-/** Follows the Work Orders page scope. Active hides finished missions. */
+/** Follows the Tasks page scope. Active hides finished missions. */
 export function applyMissionScope(
   items: MissionRailItem[],
   scope: WorkOrderScope,
@@ -180,7 +180,7 @@ export function applyMissionScope(
   return items;
 }
 
-/** Progress on each card uses every work order in the mission, not the current filters. */
+/** Progress on each card uses every task in the mission, not the current filters. */
 export function buildMissionRailItems(
   missions: FactoryMission[],
   entries: WorkOrderListEntry[],

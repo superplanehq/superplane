@@ -1,10 +1,15 @@
-import type { FactoriesAutomationRef, FactoriesWorkOrderCreator } from "@/api-client";
+import type {
+  FactoriesAutomationRef,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderCreator,
+  SuperplaneFactoriesUserRef,
+} from "@/api-client";
 import type { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 type ResolveUserFn = ReturnType<typeof useOrgUserLookup>["resolveUser"];
 
-// Resolves a work order's `createdBy` union into a display suitable for
+// Resolves a task's `createdBy` union into a display suitable for
 // avatar/name rendering. When the creator is an automation, callers that
 // want a richer rendering (e.g. a link to the app) should check
 // `createdBy.automation` themselves; this helper guarantees at least a
@@ -34,5 +39,27 @@ function buildAutomationCreatorDisplay(automation: FactoriesAutomationRef): OrgU
     id,
     name,
     initials: getUserInitials(name) || "A",
+  };
+}
+
+/** Storybook/fixture owner chip for a task. Prefers automation, then user. */
+export function workOrderOwnerDisplay(order: Pick<FactoriesWorkOrder, "createdBy">, fallback: OrgUserDisplay) {
+  const automation = order.createdBy?.automation;
+  if (automation) {
+    return buildAutomationCreatorDisplay(automation) ?? userOwnerDisplay(order.createdBy?.user, fallback);
+  }
+  return userOwnerDisplay(order.createdBy?.user, fallback);
+}
+
+function userOwnerDisplay(user: SuperplaneFactoriesUserRef | undefined, fallback: OrgUserDisplay): OrgUserDisplay {
+  if (!user || (!user.id && !user.name)) {
+    return fallback;
+  }
+  const name = user.name?.trim() || fallback.name;
+  return {
+    id: user.id ?? fallback.id,
+    name,
+    initials: getUserInitials(name),
+    avatarUrl: user.id === fallback.id ? fallback.avatarUrl : undefined,
   };
 }

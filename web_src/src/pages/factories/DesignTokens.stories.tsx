@@ -52,9 +52,14 @@ const RADIUS_STEPS: { name: string; className: string }[] = [
 ];
 
 const TYPOGRAPHY_STEPS: { name: string; sample: string; className: string }[] = [
-  { name: "Page title (22 / 700)", sample: "Overview", className: "text-[22px] font-semibold tracking-[-0.02em]" },
-  { name: "Section heading (15 / 600)", sample: "Workspace details", className: "text-[15px] font-semibold" },
-  { name: "Card heading (13 / 500)", sample: "Work Orders", className: "text-[13px] font-medium tracking-[-0.01em]" },
+  { name: "Settings page title (22 / 600)", sample: "General", className: "workspace-page-title" },
+  {
+    name: "Section page title (15 / 500)",
+    sample: "Overview",
+    className: "workspace-section-title font-medium",
+  },
+  { name: "Section heading (15 / 600)", sample: "Workspace details", className: "workspace-section-title" },
+  { name: "Card heading (13 / 500)", sample: "Tasks", className: "text-[13px] font-medium tracking-[-0.01em]" },
   { name: "Body (13 / 400)", sample: "The quick brown fox jumps over the lazy dog.", className: "text-[13px]" },
   {
     name: "Subtitle (13 / 400 muted)",

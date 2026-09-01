@@ -15,25 +15,31 @@ export type FactoryEdgePalette = {
   failed: { stroke: string; strokeWidth: number };
 };
 
-export function factoryCanvasBackground(isDark: boolean): FactoryCanvasBackground {
+export function factoryCanvasBackground(isDark: boolean, isEditing = false): FactoryCanvasBackground {
+  const size = isEditing ? 3 : 1;
   if (isDark) {
-    return { gap: 22, size: 1, color: "#33312b", bgColor: "#14120b" };
+    return { gap: 22, size, color: "#33312b", bgColor: "#14120b" };
   }
-  return { gap: 22, size: 1, color: "#e5e7eb", bgColor: "#f9fafb" };
+  return { gap: 22, size, color: "#b8c4d0", bgColor: "#e2e8f0" };
 }
 
+/** Light-mode factory wires. Darker than the canvas dots; used in edit and view. */
+export const FACTORY_EDGE_STROKE = "#94a3b8";
+export const FACTORY_EDGE_STROKE_WIDTH = 2;
+
 export function factoryEdgePalette(isDark: boolean): FactoryEdgePalette {
+  const strokeWidth = FACTORY_EDGE_STROKE_WIDTH;
   if (isDark) {
     return {
-      default: { stroke: "#4a4740", strokeWidth: 1.5 },
-      running: { stroke: "#818cf8", strokeWidth: 1.5 },
-      failed: { stroke: "#f87171", strokeWidth: 1.5 },
+      default: { stroke: "#4a4740", strokeWidth },
+      running: { stroke: "#818cf8", strokeWidth },
+      failed: { stroke: "#f87171", strokeWidth },
     };
   }
   return {
-    default: { stroke: "#cbd5e1", strokeWidth: 1.5 },
-    running: { stroke: "#818cf8", strokeWidth: 1.5 },
-    failed: { stroke: "#fca5a5", strokeWidth: 1.5 },
+    default: { stroke: FACTORY_EDGE_STROKE, strokeWidth },
+    running: { stroke: "#818cf8", strokeWidth },
+    failed: { stroke: "#fca5a5", strokeWidth },
   };
 }
 
@@ -90,5 +96,23 @@ export const FACTORY_HANDLE_STYLE = {
 /** Keep FactoryNodeCard, append ghost, placement gap, and ELK estimates aligned. */
 export const FACTORY_NODE_CARD_WIDTH = 280;
 export const FACTORY_NODE_CARD_HEIGHT = 104;
-/** Vertical gap below a factory card when appending / layering. */
+export const FACTORY_NODE_STEP_CARD_WIDTH = 320;
+const FACTORY_NODE_STEP_ROW_HEIGHT = 28;
+const FACTORY_NODE_STEP_LIST_PADDING = 20;
+
+export function factoryNodeCardSize(stepCount = 0): { width: number; height: number } {
+  if (stepCount <= 0) {
+    return { width: FACTORY_NODE_CARD_WIDTH, height: FACTORY_NODE_CARD_HEIGHT };
+  }
+  return {
+    width: FACTORY_NODE_STEP_CARD_WIDTH,
+    height: FACTORY_NODE_CARD_HEIGHT + FACTORY_NODE_STEP_LIST_PADDING + stepCount * FACTORY_NODE_STEP_ROW_HEIGHT,
+  };
+}
+/** Vertical gap below a factory card in persisted ELK layout, live, and run. */
 export const FACTORY_NODE_VERTICAL_GAP = 64;
+/**
+ * Edit/configure only. Compact 64px leaves node duplicate/delete on top of
+ * the edge-delete control. Live and run keep FACTORY_NODE_VERTICAL_GAP.
+ */
+export const FACTORY_NODE_EDIT_VERTICAL_GAP = 200;

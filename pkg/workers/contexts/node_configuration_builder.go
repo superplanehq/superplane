@@ -515,6 +515,13 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveOrderPayload(expression)
 		}),
+		expr.Function("workspace", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("workspace() takes no arguments")
+			}
+
+			return b.resolveWorkspacePayload()
+		}),
 	}
 
 	vm, err := expr.Compile(expression, exprOptions...)
@@ -981,6 +988,33 @@ func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
 	}, nil
 }
 
+// resolveWorkspacePayload exposes the factory workspace that owns this app.
+// It is intentionally unavailable for organization apps so expressions cannot
+// infer a workspace outside their execution scope.
+func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current app: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("workspace() is only available in factory apps")
+	}
+
+	factory, err := models.FindFactory(b.tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	return map[string]any{
+		"id":                 factory.ID.String(),
+		"key":                factory.Key,
+		"name":               factory.Name,
+		"repository":         config.AppRepository,
+		"backlog_repository": config.BacklogRepository,
+		"default_branch":     config.DefaultBranch,
+	}, nil
+}
+
 // resolveRunPayload exposes the current run to expressions via run().
 // It returns id, url, and started_at (a time.Time) for the run that the
 // current node belongs to, resolved from the builder's root event.
@@ -1013,8 +1047,8 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order().
 // Returns nil when the run is not attached to a factory work-order execution.
-// Artifacts and comments are loaded only when the expression AST references
-// order().artifacts / order().comments.
+// The url, artifacts, comments, and assignees are loaded only when the expression AST
+// references order().url / order().artifacts / order().comments / order().assignees.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1040,18 +1074,36 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
 	}
+	repository, defaultBranch, err := b.resolveOrderRepository(order)
+	if err != nil {
+		return nil, err
+	}
 
 	payload := map[string]any{
-		"id":          order.ID.String(),
-		"title":       order.Title,
-		"description": order.Description,
-		"factory_id":  order.FactoryID.String(),
-		"state":       order.State,
-		"result":      order.Result,
+		"id":             order.ID.String(),
+		"title":          order.Title,
+		"description":    order.Description,
+		"factory_id":     order.FactoryID.String(),
+		"state":          order.State,
+		"result":         order.Result,
+		"repository":     repository,
+		"default_branch": defaultBranch,
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
+	}
+
+	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL {
+		url, err := b.buildWorkOrderURL(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["url"] = url
 	}
 
 	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
@@ -1096,7 +1148,70 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		payload["comments"] = commentPayloads
 	}
 
+	usesPullRequests, err := expressionvalidation.ExpressionUsesOrderPullRequests(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesPullRequests {
+		factoryModel, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
+		}
+		pullRequests, err := factoryModel.ListPullRequests(b.tx, models.FactoryPullRequestFilter{WorkOrderID: &order.ID})
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
+		}
+
+		payloads := make([]any, 0, len(pullRequests))
+		for i := range pullRequests {
+			payloads = append(payloads, pullRequestExpressionPayload(&pullRequests[i]))
+		}
+		payload["pullRequests"] = payloads
+	}
+
+	usesAssignees, err := expressionvalidation.ExpressionUsesOrderAssignees(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesAssignees {
+		assignees, err := order.ListAssignees(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load assignees: %w", err)
+		}
+
+		assigneePayloads := make([]any, 0, len(assignees))
+		for i := range assignees {
+			assigneePayloads = append(assigneePayloads, assigneeExpressionPayload(&assignees[i]))
+		}
+		payload["assignees"] = assigneePayloads
+	}
+
 	return payload, nil
+}
+
+// resolveOrderRepository keeps orders created before repository snapshots
+// compatible with workflow templates that use order().repository.
+func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryWorkOrder) (string, string, error) {
+	repository := stringValue(order.Repository)
+	defaultBranch := stringValue(order.DefaultBranch)
+	if repository != "" && defaultBranch != "" {
+		return repository, defaultBranch, nil
+	}
+
+	factory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", "", fmt.Errorf("order() could not resolve the workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	// Repository and branch are one snapshot. Do not combine a saved value
+	// with current workspace settings when a legacy row contains only one.
+	repository = config.AppRepository
+	defaultBranch = config.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	return repository, defaultBranch, nil
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
@@ -1121,6 +1236,19 @@ func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[
 	return nil
 }
 
+func assigneeExpressionPayload(assignee *models.FactoryWorkOrderAssignee) map[string]any {
+	payload := map[string]any{
+		"id":    assignee.UserID.String(),
+		"name":  "",
+		"email": "",
+	}
+	if assignee.User != nil {
+		payload["name"] = assignee.User.Name
+		payload["email"] = assignee.User.GetEmail()
+	}
+	return payload
+}
+
 func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
 	data := map[string]any{}
 	if len(artifact.Data) > 0 {
@@ -1136,26 +1264,34 @@ func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[s
 	}, nil
 }
 
-func commentExpressionPayload(event *models.FactoryWorkOrderEvent) (map[string]any, error) {
-	var decoded factory.WorkOrderCommentAdded
-	if len(event.Data) > 0 {
-		if err := json.Unmarshal(event.Data, &decoded); err != nil {
-			return nil, fmt.Errorf("order() could not decode comment data: %w", err)
-		}
-	}
-
+func pullRequestExpressionPayload(pullRequest *models.FactoryPullRequest) map[string]any {
 	payload := map[string]any{
-		"id":         event.ID.String(),
-		"body":       decoded.Body,
-		"created_at": event.CreatedAt,
+		"id":          pullRequest.ID.String(),
+		"workOrderId": pullRequest.WorkOrderID.String(),
+		"provider":    pullRequest.Provider,
+		"repository":  pullRequest.Repository,
+		"number":      pullRequest.Number,
+		"url":         pullRequest.URL,
+		"title":       pullRequest.Title,
+		"state":       pullRequest.State,
+	}
+	if pullRequest.ExternalID != nil {
+		payload["externalId"] = *pullRequest.ExternalID
+	}
+	return payload
+}
+
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
+	payload := map[string]any{
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
 	}
 
-	if decoded.Author != nil {
-		payload["author"] = commentAuthorExpressionPayload(decoded.Author)
-	}
-
-	if decoded.Run != nil {
-		payload["run"] = map[string]any{"id": decoded.Run.ID.String()}
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
 	}
 
 	return normalizeExpressionValue(payload).(map[string]any), nil
@@ -1200,6 +1336,17 @@ func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[
 	}
 
 	return authorPayload
+}
+
+// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
+// The factory key is part of that path, so the owning factory has to be loaded.
+func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
+	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
+	}
+
+	return uiBaseURL() + order.URLPath(owner.Key), nil
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
@@ -1345,20 +1492,28 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
-	"$":        {},
-	"memory":   {},
-	"config":   {},
-	"root":     {},
-	"previous": {},
-	"run":      {},
-	"app":      {},
-	"order":    {},
-	"ctx":      {},
+	"$":         {},
+	"memory":    {},
+	"config":    {},
+	"root":      {},
+	"previous":  {},
+	"run":       {},
+	"app":       {},
+	"order":     {},
+	"workspace": {},
+	"ctx":       {},
 }
 
 func isReservedExpressionIdentifier(name string) bool {
 	_, ok := reservedExpressionIdentifiers[name]
 	return ok
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func parseDepth(param any) (int, error) {

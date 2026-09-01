@@ -29,15 +29,28 @@ const installationSettingsResponse = {
   smtp_password_configured: false,
 };
 
+const llmSettingsResponse = {
+  welcome_grant_cents: 5000,
+  markup_bps: 2000,
+  warning_threshold_bps: 2000,
+  providers: [
+    { provider: "anthropic", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
+    { provider: "openai", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
+    { provider: "openrouter", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
+  ],
+};
+
 const mockInstallationSettingsFetch = () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(installationSettingsResponse), {
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("/llm-settings") ? llmSettingsResponse : installationSettingsResponse;
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }),
-    ),
+      });
+    }),
   );
 };
 
@@ -61,6 +74,7 @@ describe("InstallationSettings", () => {
     renderInstallationSettings();
 
     expect(await screen.findByText("Network policy")).toBeInTheDocument();
+    expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();
     expect(screen.queryByTestId("installation-signups-switch")).not.toBeInTheDocument();

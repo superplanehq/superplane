@@ -169,6 +169,234 @@ func Test__OnPRReviewComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, events.Count())
 	})
 
+	t.Run("includeReviewSubmissions false ignores submitted reviews", func(t *testing.T) {
+		body := []byte(`{"action":"submitted","review":{"body":"LGTM"},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", "pull_request_review")
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":               "test",
+				"includeReviewSubmissions": false,
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("replies scope ignores top-level review comments", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"@superplaneagent please","user":{"type":"User"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":   "test",
+				"commentScope": "replies",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("replies scope accepts mentioned replies", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"@superplaneagent please","in_reply_to_id":99,"user":{"type":"User"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"commentScope":  "replies",
+				"contentFilter": "@superplaneagent",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("replies scope ignores replies without the mention", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"just a follow-up","in_reply_to_id":99,"user":{"type":"User"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"commentScope":  "replies",
+				"contentFilter": "@superplaneagent",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("ignoreBots skips bot comments", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"@superplaneagent","user":{"type":"Bot"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"ignoreBots":    true,
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("allowed bot comment with no mention -> event is emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"Consider extracting this into a helper.","user":{"login":"coderabbitai[bot]","type":"Bot"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"allowedBots":   []string{"coderabbitai"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("bot not on allowlist with no mention -> ignored", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"Consider extracting this into a helper.","user":{"login":"codecov","type":"Bot"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"allowedBots":   []string{"coderabbitai"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("allowed bot comment while ignoreBots is true -> still emitted", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"Consider extracting this into a helper.","user":{"login":"coderabbitai[bot]","type":"Bot"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"ignoreBots":    true,
+				"allowedBots":   []string{"@CodeRabbitAI"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
+	t.Run("non-bot author matching allowlist name -> normal content filter behavior", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"Consider extracting this into a helper.","user":{"login":"coderabbitai","type":"User"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+				"allowedBots":   []string{"coderabbitai"},
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("near mention does not match", func(t *testing.T) {
+		body := []byte(`{"action":"created","comment":{"body":"@superplaneagent-old please","user":{"type":"User"}},"pull_request":{"number":1}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository":    "test",
+				"contentFilter": "@superplaneagent",
+			},
+			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:  events,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, events.Count())
+	})
+
 	t.Run("issue_comment event type -> ignored", func(t *testing.T) {
 		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/test/test/pulls/1"}},"comment":{"body":"comment on PR conversation"}}`)
 		headers := signedHeaders(body, "test-secret", "issue_comment")
@@ -219,5 +447,35 @@ func Test__OnPRReviewComment__Setup(t *testing.T) {
 		assert.Equal(t, "hello", webhookRequest.Repository)
 		assert.ElementsMatch(t, []string{"pull_request_review_comment", "pull_request_review"}, webhookRequest.EventTypes)
 		assert.Empty(t, webhookRequest.EventType)
+	})
+
+	t.Run("webhook is requested without review submissions when disabled", func(t *testing.T) {
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"id": 123456,
+					"name": "hello",
+					"html_url": "https://github.com/testhq/hello"
+				}`),
+			},
+		}
+		nodeMetadataCtx := contexts.MetadataContext{}
+
+		require.NoError(t, trigger.Setup(core.TriggerContext{
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+			Metadata:    &nodeMetadataCtx,
+			Configuration: map[string]any{
+				"repository":               "hello",
+				"includeReviewSubmissions": false,
+			},
+		}))
+
+		require.Len(t, integrationCtx.WebhookRequests, 1)
+		webhookRequest := integrationCtx.WebhookRequests[0].(common.WebhookConfiguration)
+		assert.Equal(t, "hello", webhookRequest.Repository)
+		assert.Equal(t, "pull_request_review_comment", webhookRequest.EventType)
+		assert.Empty(t, webhookRequest.EventTypes)
 	})
 }

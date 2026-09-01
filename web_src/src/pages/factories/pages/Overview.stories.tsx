@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  emptyWorkOrdersFactoriesFixture,
-  PRIMARY_FACTORY_KEY,
-} from "../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
+import { emptyWorkOrdersFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
 import { OverviewPage } from "./OverviewPage";
 
 /**
- * Overview page: compact work orders + lines snapshot inside the FactoriesLayout.
+ * Overview page: compact section header aligned with the sidebar workspace
+ * name, plus tasks and lines snapshot inside FactoriesLayout.
  * Mounted through the real router so the sidebar (nav + recent) appears.
+ * Canvas clicks stay on FactoryAppCanvasPage because FactoriesHarness serves
+ * a factory-owned canvas by default.
  */
 const meta = {
   title: "Factories/Pages/Overview",
@@ -29,6 +29,6 @@ export const Populated: Story = {
 };
 
 export const EmptyWorkOrders: Story = {
-  name: "No active work orders",
+  name: "No active tasks",
   render: () => <FactoriesHarness pathSuffix={overviewPath} factoriesFixture={emptyWorkOrdersFactoriesFixture} />,
 };

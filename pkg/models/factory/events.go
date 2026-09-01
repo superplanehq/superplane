@@ -9,18 +9,39 @@ const (
 	// lifecycle event: every FSM transition emits one, enriched with the
 	// actor / automation / originating run / app when applicable.
 	EventTypeOrderAssigneesUpdated = "order.assignees.updated"
-	EventTypeOrderStatusUpdated    = "order.status.updated"
-	EventTypeOrderCommentAdded     = "order.comment.added"
-	EventTypeOrderArtifactAdded    = "order.artifact.added"
+	// EventTypeOrderUpdated is a websocket-only notification reason.
+	// Title and description edits update the row in place and do not
+	// write a timeline event.
+	EventTypeOrderUpdated       = "order.updated"
+	EventTypeOrderStatusUpdated = "order.status.updated"
+	EventTypeOrderCommentAdded  = "order.comment.added"
+	EventTypeOrderArtifactAdded = "order.artifact.added"
 	// EventTypeOrderArtifactUpdated is a websocket-only notification
-	// reason (see FactoryContext.UpdateWorkOrderArtifact) — it does not
-	// back a timeline event/struct. Flipping a PR artifact's state
-	// shouldn't spam the timeline with one entry per open/draft/closed/
-	// merged transition; the row is updated in place and this reason
-	// just tells the frontend which query to invalidate.
-	EventTypeOrderArtifactUpdated = "order.artifact.updated"
+	// reason — it does not back a timeline event/struct. Artifact data
+	// updates re-save the row in place and this reason tells the
+	// frontend which query to invalidate.
+	EventTypeOrderArtifactUpdated    = "order.artifact.updated"
+	EventTypeOrderPullRequestAdded   = "order.pull_request.added"
+	EventTypeOrderPullRequestUpdated = "order.pull_request.updated"
+	// EventTypeOrderCheckReported records every check report, including
+	// re-reports of the same check key. The check row itself is
+	// latest-only state (one row per key, updated in place); the events
+	// keep the score history on the timeline.
+	EventTypeOrderCheckReported = "order.check.reported"
+	// EventTypeOrderStatusNoteUpdated does not back a timeline event
+	// (like EventTypeOrderArtifactUpdated): the status note is
+	// current-wait metadata on the order row, not a discrete history
+	// entry, so the websocket fan-out just tells the frontend to
+	// refetch the order. It does, however, back an email notification
+	// (see FactoryContext.SetWorkOrderStatusNote): a note is how a line
+	// tells an order's owners/creator it's waiting on their review, so
+	// setting one publishes a FactoryWorkOrderNotificationMessage the
+	// same way status changes and comments do. Clearing rides on
+	// `order.status.updated`.
+	EventTypeOrderStatusNoteUpdated = "order.status_note.updated"
 
 	// Factory line events
+	EventTypeLineStepExecutionQueued   = "step.execution.queued"
 	EventTypeLineStepExecutionCreated  = "step.execution.created"
 	EventTypeLineStepExecutionFinished = "step.execution.finished"
 )
@@ -34,9 +55,37 @@ const (
 
 // Artifact types
 const (
-	ArtifactTypePR       = "pr"
 	ArtifactTypeMarkdown = "markdown"
 	ArtifactTypeBranch   = "branch"
+	ArtifactTypeLink     = "link"
+)
+
+// Check levels. The reporting component computes the level from its
+// declarative thresholds (direction + cautionAt/criticalAt); the model
+// only validates and stores it.
+const (
+	CheckLevelPositive = "positive"
+	CheckLevelNeutral  = "neutral"
+	CheckLevelCaution  = "caution"
+	CheckLevelCritical = "critical"
+)
+
+// Check score formats: render as `score/maxScore` or as a percentage.
+const (
+	CheckFormatFraction = "fraction"
+	CheckFormatPercent  = "percent"
+	// CheckFormatBoolean is a pass/fail verdict: score 1 (pass) or 0
+	// (fail) on a max score of 1.
+	CheckFormatBoolean = "boolean"
+)
+
+// Status note kinds. A status note is a display-only announcement of
+// what a waiting work order is blocked on and what resolves it. `info`
+// is the only kind today; the tag exists so future kinds (e.g. an
+// interactive decision prompt) extend the payload instead of changing
+// its meaning.
+const (
+	StatusNoteKindInfo = "info"
 )
 
 // Events
@@ -86,10 +135,12 @@ type WorkOrderCommentAuthor struct {
 }
 
 type WorkOrderCommentAdded struct {
-	Order  *WorkOrderRef           `json:"order,omitempty"`
-	Body   string                  `json:"body"`
-	Author *WorkOrderCommentAuthor `json:"author,omitempty"`
-	Run    *RunRef                 `json:"run,omitempty"`
+	Order          *WorkOrderRef           `json:"order,omitempty"`
+	CommentID      uuid.UUID               `json:"commentId,omitempty"`
+	Body           string                  `json:"body"`
+	Author         *WorkOrderCommentAuthor `json:"author,omitempty"`
+	Run            *RunRef                 `json:"run,omitempty"`
+	MentionedUsers []UserRef               `json:"mentionedUsers,omitempty"`
 }
 
 type WorkOrderArtifactAdded struct {
@@ -98,6 +149,39 @@ type WorkOrderArtifactAdded struct {
 	User       *UserRef       `json:"user,omitempty"`
 	Automation *AutomationRef `json:"automation,omitempty"`
 	Run        *RunRef        `json:"run,omitempty"`
+}
+
+type WorkOrderPullRequestAdded struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
+type WorkOrderPullRequestUpdated struct {
+	Order       *WorkOrderRef   `json:"order,omitempty"`
+	PullRequest *PullRequestRef `json:"pullRequest,omitempty"`
+	User        *UserRef        `json:"user,omitempty"`
+	Automation  *AutomationRef  `json:"automation,omitempty"`
+	Run         *RunRef         `json:"run,omitempty"`
+}
+
+type WorkOrderCheckReported struct {
+	Order      *WorkOrderRef  `json:"order,omitempty"`
+	Check      *CheckRef      `json:"check,omitempty"`
+	Automation *AutomationRef `json:"automation,omitempty"`
+	Run        *RunRef        `json:"run,omitempty"`
+}
+
+// LineStepExecutionQueued is recorded when a work order becomes ready for
+// a step that is at its maxParallelism, so the work order waits in the
+// step's queue instead of starting a run.
+type LineStepExecutionQueued struct {
+	StepName string        `json:"stepName"`
+	Order    *WorkOrderRef `json:"order,omitempty"`
+	Line     *LineRef      `json:"line,omitempty"`
+	App      *AppRef       `json:"app,omitempty"`
 }
 
 type LineStepExecutionCreated struct {
@@ -114,6 +198,9 @@ type LineStepExecutionFinished struct {
 	Line     *LineRef      `json:"line,omitempty"`
 	App      *AppRef       `json:"app,omitempty"`
 	Run      *RunRef       `json:"run,omitempty"`
+	// User is who cancelled the canvas run, when this finish is a
+	// cancellation. Passed finishes leave it empty.
+	User *UserRef `json:"user,omitempty"`
 }
 
 // Refs
@@ -134,7 +221,8 @@ type LineRef struct {
 }
 
 type AppRef struct {
-	ID uuid.UUID `json:"id"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name,omitempty"`
 }
 
 type RunRef struct {
@@ -147,4 +235,28 @@ type ArtifactRef struct {
 	ID   uuid.UUID      `json:"id"`
 	Type string         `json:"type"`
 	Data map[string]any `json:"data,omitempty"`
+}
+
+type PullRequestRef struct {
+	ID         uuid.UUID `json:"id"`
+	Provider   string    `json:"provider,omitempty"`
+	Repository string    `json:"repository,omitempty"`
+	Number     int64     `json:"number,omitempty"`
+	URL        string    `json:"url,omitempty"`
+	Title      string    `json:"title,omitempty"`
+	State      string    `json:"state,omitempty"`
+}
+
+// CheckRef snapshots a check report for the timeline. PreviousScore is
+// the score the same check key held before this report, if any, so the
+// timeline can show the movement without replaying older events.
+type CheckRef struct {
+	ID            uuid.UUID `json:"id"`
+	Key           string    `json:"key"`
+	Name          string    `json:"name"`
+	Score         float64   `json:"score"`
+	MaxScore      float64   `json:"maxScore"`
+	Format        string    `json:"format"`
+	Level         string    `json:"level"`
+	PreviousScore *float64  `json:"previousScore,omitempty"`
 }

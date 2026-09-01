@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Factory Event App
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: About this app
+        body: |
+          > [!SECTION:setup] Pull request events
+          >
+          > This app is not a factory line step. It listens for closed pull
+          > requests on the app repository.
+          >
+          > When a pull request is attached to a task:
+          > - A merge closes the task as completed.
+          > - A close without a merge closes the task as rejected.
+  layout:
+    - i: about
+      x: 0
+      'y': 0
+      w: 12
+      h: 6
+      minW: 3
+      minH: 5
