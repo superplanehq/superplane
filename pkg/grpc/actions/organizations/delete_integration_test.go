@@ -91,7 +91,7 @@ func Test__DeleteIntegration(t *testing.T) {
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, code)
-		assert.Contains(t, msg, "invalid organization ID")
+		assert.Contains(t, msg, "invalid organization id")
 	})
 
 	t.Run("invalid integration ID -> error", func(t *testing.T) {

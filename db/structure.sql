@@ -801,7 +801,8 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    slug text NOT NULL
 );
 
 
@@ -2823,6 +2824,13 @@ CREATE INDEX idx_workspace_usage_events_org_occurred ON public.workspace_usage_e
 --
 
 CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_events USING btree (work_order_id) WHERE (work_order_id IS NOT NULL);
+
+
+--
+-- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
 
 
 --

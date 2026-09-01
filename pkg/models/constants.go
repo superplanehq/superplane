@@ -33,6 +33,7 @@ const (
 
 var (
 	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
+	ErrSlugAlreadyUsed         = fmt.Errorf("slug already used")
 	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
 )
 
