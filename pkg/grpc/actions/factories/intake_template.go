@@ -121,6 +121,16 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
 	},
+	models.FactoryIntakeSourceProductiveTasks: {
+		name:                 "Productive.io tasks",
+		description:          "Create a work order when a Productive.io task is created.",
+		triggerComponent:     "productive.onTask",
+		triggerName:          "On Task",
+		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		analysisSubject:      "Productive.io task",
+		createTitle:          "{{ root().data.data.attributes.title }}",
+		createDescription:    "{{ root().data.data.attributes.description }}",
+	},
 }
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {

@@ -31,6 +31,31 @@ func Test__FactoryIntake(t *testing.T) {
 		assert.Equal(t, canvas.Name, found.Name())
 	})
 
+	t.Run("every known source round-trips through create and find", func(t *testing.T) {
+		for _, source := range []string{
+			models.FactoryIntakeSourceGitHubIssues,
+			models.FactoryIntakeSourceSentryExceptions,
+			models.FactoryIntakeSourcePagerDutyIncidents,
+			models.FactoryIntakeSourceProductiveTasks,
+		} {
+			assert.True(t, models.ValidFactoryIntakeSource(source))
+
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
+
+			intake, err := factory.CreateIntake(db, canvas.ID, source)
+			require.NoError(t, err)
+			assert.Equal(t, source, intake.Source)
+
+			found, err := factory.FindIntake(db, intake.ID)
+			require.NoError(t, err)
+			assert.Equal(t, source, found.Source)
+		}
+
+		assert.False(t, models.ValidFactoryIntakeSource("linear-issues"))
+	})
+
 	t.Run("source must be one we know how to run", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
