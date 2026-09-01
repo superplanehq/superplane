@@ -23,9 +23,9 @@ func DescribeOrganizationLLMSpend(
 	orgID string,
 	req *pb.DescribeOrganizationLLMSpendRequest,
 ) (*pb.DescribeOrganizationLLMSpendResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 
 	period := clampLLMSpendPeriodDays(int(req.GetPeriodDays()))
