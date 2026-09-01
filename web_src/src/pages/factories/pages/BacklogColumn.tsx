@@ -160,6 +160,7 @@ export function BacklogColumn({
       <CreateWithAgentDialog
         open={agentSession.open}
         workspaceName={factoryKey}
+        organizationId={organizationId}
         view={agentSession.view}
         onComposerChange={agentSession.onComposerChange}
         onSend={agentSession.onSend}

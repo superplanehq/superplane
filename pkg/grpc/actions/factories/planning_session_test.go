@@ -32,8 +32,7 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	assert.Equal(t, "acme/payments", resp.Session.Repository)
 	assert.Equal(t, models.PlanningSessionStateRunning, resp.Session.State)
 	assert.NotEmpty(t, resp.Session.CanvasRunId)
-	require.NotEmpty(t, resp.Session.Messages)
-	assert.Equal(t, models.PlanningSessionGreeting, resp.Session.Messages[0].Text)
+	assert.Empty(t, resp.Session.Messages)
 
 	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), r.Organization.ID, factoryModel.ID)
 	require.NoError(t, err)
@@ -101,7 +100,8 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 		Text:      "Add refund retries",
 	})
 	require.NoError(t, err)
-	require.GreaterOrEqual(t, len(sent.Session.Messages), 2)
+	require.Len(t, sent.Session.Messages, 1)
+	assert.Equal(t, "Add refund retries", sent.Session.Messages[0].Text)
 
 	db := database.DB(t.Context())
 	session, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(sessionID))

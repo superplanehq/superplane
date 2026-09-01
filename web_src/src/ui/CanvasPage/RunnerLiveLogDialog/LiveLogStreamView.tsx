@@ -6,13 +6,20 @@ import { sectionTitle } from "./liveLogSections";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
 
-export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
+export function LiveLogStreamView({
+  execution,
+  session,
+}: {
+  execution: ExecutionInfo;
+  session?: { organizationId?: string; canvasId?: string };
+}) {
   const executionInFlight = isExecutionInFlight(execution);
   const { sections, orphanLines, error, isStreaming, toggleSection, scrollRef } = useLiveLogStream(
     execution.id,
     executionInFlight,
     terminalCommandStatusForExecution(execution),
     terminalTimeMsForExecution(execution),
+    session,
   );
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;

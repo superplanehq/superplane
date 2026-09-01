@@ -12,7 +12,7 @@ export const CREATE_WITH_AGENT_COPY = {
   machineStarting: "The machine is starting",
   machineRunning: "Machine is running",
   emptyHeadline: "Waiting for your first work order.",
-  emptyBody: "Talk on the left. The agent will draft a task here.",
+  emptyBody: "The agent will draft a task here.",
   draftLabel: "Draft task",
   create: "Create",
   skip: "Skip",

@@ -2013,6 +2013,8 @@ message PlanningSession {
   repeated PlanningSessionMessage messages = 7;
   PlanningSessionDraft draft = 8;
   repeated PlanningSessionCreatedOrder created = 9;
+  string wait_state = 10;
+  string execution_id = 11;
 }
 
 message StartPlanningSessionRequest {

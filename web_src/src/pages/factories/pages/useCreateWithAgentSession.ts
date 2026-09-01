@@ -60,7 +60,9 @@ export function useCreateWithAgentSession(repository: string, organizationId = "
     setSessionId("");
     setOpen(true);
     if (live) {
-      void startPlanningSession(organizationId, factoryId, repository).then(applySession).catch(() => undefined);
+      void startPlanningSession(organizationId, factoryId, repository)
+        .then(applySession)
+        .catch(() => undefined);
     }
   }, [applySession, factoryId, live, organizationId, repository]);
 
@@ -82,9 +84,12 @@ export function useCreateWithAgentSession(repository: string, organizationId = "
         setView((current) => answerCreateWithAgentSurvey(current, surveyId, answers));
         return;
       }
-      void answerPlanningSessionSurvey(organizationId, factoryId, sessionId, answers).then(applySession).catch(() => undefined);
+      void answerPlanningSessionSurvey(organizationId, factoryId, sessionId, answers)
+        .then(applySession)
+        .catch(() => undefined);
     },
-    onDraftTitleChange: (title: string) => patchDraft({ live, sessionId, organizationId, factoryId, view, setView, title }),
+    onDraftTitleChange: (title: string) =>
+      patchDraft({ live, sessionId, organizationId, factoryId, view, setView, title }),
     onDraftDescriptionChange: (description: string) =>
       patchDraft({ live, sessionId, organizationId, factoryId, view, setView, description }),
     onCreateDraft: () => {
@@ -92,14 +97,18 @@ export function useCreateWithAgentSession(repository: string, organizationId = "
         setView((current) => createCreateWithAgentDraft(current));
         return;
       }
-      void createPlanningSessionWorkOrder(organizationId, factoryId, sessionId).then(applySession).catch(() => undefined);
+      void createPlanningSessionWorkOrder(organizationId, factoryId, sessionId)
+        .then(applySession)
+        .catch(() => undefined);
     },
     onSkipDraft: () => {
       if (!live || !sessionId) {
         setView((current) => skipCreateWithAgentDraft(current));
         return;
       }
-      void skipPlanningSessionDraft(organizationId, factoryId, sessionId).then(applySession).catch(() => undefined);
+      void skipPlanningSessionDraft(organizationId, factoryId, sessionId)
+        .then(applySession)
+        .catch(() => undefined);
     },
     onWorkOnNew: () => setView((current) => workOnNewCreateWithAgent(current)),
     onSelectCreated: (orderId: string) => setView((current) => selectCreateWithAgentCreated(current, orderId)),
@@ -148,10 +157,14 @@ function useLivePlanningSessionSync(args: {
       return;
     }
     const poll = window.setInterval(() => {
-      void describePlanningSession(organizationId, factoryId, sessionId).then(applySession).catch(() => undefined);
+      void describePlanningSession(organizationId, factoryId, sessionId)
+        .then(applySession)
+        .catch(() => undefined);
     }, POLL_MS);
     const heartbeat = window.setInterval(() => {
-      void heartbeatPlanningSession(organizationId, factoryId, sessionId).then(applySession).catch(() => undefined);
+      void heartbeatPlanningSession(organizationId, factoryId, sessionId)
+        .then(applySession)
+        .catch(() => undefined);
     }, HEARTBEAT_MS);
     const endOnLeave = () => {
       void endPlanningSession(organizationId, factoryId, sessionId, { keepalive: true }).catch(() => undefined);
@@ -174,6 +187,9 @@ function sendSessionMessage(args: {
   setView: (update: (current: CreateWithAgentView) => CreateWithAgentView) => void;
   applySession: (session: PlanningSessionPayload) => void;
 }) {
+  if (args.live && !args.sessionId) {
+    return;
+  }
   if (!args.live || !args.sessionId) {
     args.setView((current) => sendCreateWithAgentMessage(current));
     return;

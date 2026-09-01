@@ -34,11 +34,22 @@ export type CreateWithAgentSurveyMessage = {
   answered?: boolean;
 };
 
-export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentSurveyMessage;
+export type CreateWithAgentActivityMessage = {
+  id: string;
+  kind: "activity";
+  text: string;
+};
+
+export type CreateWithAgentMessage =
+  | CreateWithAgentTextMessage
+  | CreateWithAgentSurveyMessage
+  | CreateWithAgentActivityMessage;
 
 export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
+  canvasId: string;
+  executionId: string;
   messages: CreateWithAgentMessage[];
   composer: string;
   created: CreateWithAgentCreatedOrder[];

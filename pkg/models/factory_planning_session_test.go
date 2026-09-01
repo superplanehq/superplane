@@ -31,9 +31,7 @@ func TestFactory_StartPlanningSession(t *testing.T) {
 	assert.Equal(t, canvas.ID, *session.CanvasID)
 	require.NotNil(t, session.CanvasRunID)
 	assert.Equal(t, userID, session.CreatedByUserID)
-	require.Len(t, session.Messages, 1)
-	assert.Equal(t, PlanningSessionMessageKindText, session.Messages[0].Kind)
-	assert.Equal(t, PlanningSessionMessageRoleAgent, session.Messages[0].Role)
+	assert.Empty(t, session.Messages)
 
 	var run CanvasRun
 	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
@@ -118,6 +116,24 @@ func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
 	assert.Equal(t, "Add refund retries", result.Text)
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+}
+
+func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-queue")
+	db := database.Conn()
+
+	require.NoError(t, session.SendUserMessage(db, "Add a puppy color field"))
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+
+	require.NoError(t, session.BeginWait(db))
+	assert.Equal(t, PlanningWaitResolved, session.WaitState)
+
+	result, err := session.ConsumeWait(db)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
+	assert.Equal(t, "Add a puppy color field", result.Text)
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
 }
 

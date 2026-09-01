@@ -12,18 +12,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alertDialog";
-import { cn } from "@/lib/utils";
 import { Loader2, Sparkles } from "lucide-react";
 import type { FormEvent } from "react";
 
 import type { WorkOrderSurveyAnswerInput } from "../lib/workOrderSurvey";
 import { WorkOrderSurveyCard } from "../WorkOrderSurveyCard";
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
+import type {
+  CreateWithAgentCreatedOrder,
+  CreateWithAgentSurveyMessage,
+  CreateWithAgentView,
+} from "./createWithAgentTypes";
+import { planningSessionPhase } from "./planningSessionActivity";
+import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 
 export type CreateWithAgentDialogProps = {
   open: boolean;
   workspaceName: string;
+  organizationId?: string;
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
@@ -44,6 +50,7 @@ export type CreateWithAgentDialogProps = {
 export function CreateWithAgentDialog({
   open,
   workspaceName,
+  organizationId = "",
   view,
   onComposerChange,
   onSend,
@@ -77,7 +84,8 @@ export function CreateWithAgentDialog({
             onClose={onRequestClose}
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
-            <CreateWithAgentChat
+            <CreateWithAgentStream
+              organizationId={organizationId}
               view={view}
               onComposerChange={onComposerChange}
               onSend={onSend}
@@ -178,17 +186,20 @@ function CreateWithAgentHeader({
   );
 }
 
-function CreateWithAgentChat({
+function CreateWithAgentStream({
+  organizationId,
   view,
   onComposerChange,
   onSend,
   onAnswerSurvey,
 }: {
+  organizationId: string;
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
   onAnswerSurvey: (surveyId: string, answers: WorkOrderSurveyAnswerInput[]) => void;
 }) {
+  const openSurvey = view.messages.find(isOpenSurvey);
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSend();
@@ -196,18 +207,28 @@ function CreateWithAgentChat({
 
   return (
     <section
-      className="flex min-h-0 flex-col border-b border-border md:border-r md:border-b-0"
-      data-testid="create-with-agent-chat"
+      className="flex min-h-0 flex-col border-b border-border bg-muted/25 md:border-r md:border-b-0"
+      data-testid="create-with-agent-stream"
     >
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        {view.machineStatus === "starting" ? (
-          <p className="text-[13px] text-muted-foreground">{CREATE_WITH_AGENT_COPY.machineStarting}.</p>
-        ) : null}
-        {view.messages.map((message) => (
-          <ChatMessageBlock key={message.id} message={message} onAnswerSurvey={onAnswerSurvey} />
-        ))}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <PhaseLogCard
+          phase={planningSessionPhase(view)}
+          expanded
+          collapsible={false}
+          organizationId={organizationId}
+          canvasId={view.canvasId}
+        />
       </div>
-      <form className="border-t border-border p-3" onSubmit={handleSubmit}>
+      {openSurvey ? (
+        <div className="border-t border-border px-4 py-3">
+          <WorkOrderSurveyCard
+            survey={openSurvey.survey}
+            help={CREATE_WITH_AGENT_COPY.surveyHelp}
+            onSubmit={(answers) => onAnswerSurvey(openSurvey.survey.id, answers)}
+          />
+        </div>
+      ) : null}
+      <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
           {CREATE_WITH_AGENT_COPY.composerPlaceholder}
         </label>
@@ -216,7 +237,6 @@ function CreateWithAgentChat({
             id="create-with-agent-composer"
             data-testid="create-with-agent-composer"
             value={view.composer}
-            disabled={view.machineStatus !== "running"}
             placeholder={CREATE_WITH_AGENT_COPY.composerPlaceholder}
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {
@@ -228,7 +248,7 @@ function CreateWithAgentChat({
             className="min-h-[44px] resize-none text-[13px]"
             rows={2}
           />
-          <Button type="submit" size="sm" disabled={view.machineStatus !== "running" || !view.composer.trim()}>
+          <Button type="submit" size="sm" disabled={!view.composer.trim()}>
             {CREATE_WITH_AGENT_COPY.send}
           </Button>
         </div>
@@ -237,41 +257,8 @@ function CreateWithAgentChat({
   );
 }
 
-function ChatMessageBlock({
-  message,
-  onAnswerSurvey,
-}: {
-  message: CreateWithAgentMessage;
-  onAnswerSurvey: (surveyId: string, answers: WorkOrderSurveyAnswerInput[]) => void;
-}) {
-  if (message.kind === "survey") {
-    if (message.answered) {
-      return (
-        <p className="text-[12px] text-muted-foreground" data-testid={`create-with-agent-survey-done-${message.id}`}>
-          Answer sent.
-        </p>
-      );
-    }
-    return (
-      <WorkOrderSurveyCard
-        survey={message.survey}
-        help={CREATE_WITH_AGENT_COPY.surveyHelp}
-        onSubmit={(answers) => onAnswerSurvey(message.survey.id, answers)}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "max-w-[92%] rounded-lg px-3 py-2 text-[13px] leading-snug",
-        message.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted text-foreground",
-      )}
-      data-testid={`create-with-agent-message-${message.id}`}
-    >
-      {message.text}
-    </div>
-  );
+function isOpenSurvey(message: CreateWithAgentView["messages"][number]): message is CreateWithAgentSurveyMessage {
+  return message.kind === "survey" && !message.answered;
 }
 
 function CreateWithAgentWorkPane({

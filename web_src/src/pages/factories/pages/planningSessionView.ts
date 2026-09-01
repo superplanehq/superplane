@@ -15,6 +15,8 @@ export type PlanningSessionPayload = {
   state?: string;
   canvasId?: string;
   canvasRunId?: string;
+  waitState?: string;
+  executionId?: string;
   messages?: PlanningSessionMessagePayload[];
   draft?: { title?: string; description?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
@@ -40,7 +42,9 @@ export function createWithAgentViewFromSession(
   extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
 ): CreateWithAgentView {
   const created: CreateWithAgentCreatedOrder[] = (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } => Boolean(order.id && order.key && order.title))
+    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
+      Boolean(order.id && order.key && order.title),
+    )
     .map((order) => ({
       id: order.id,
       key: order.key,
@@ -60,7 +64,9 @@ export function createWithAgentViewFromSession(
 
   return {
     repository: session.repository ?? "",
-    machineStatus: session.canvasRunId ? "running" : "starting",
+    machineStatus: session.executionId ? "running" : "starting",
+    canvasId: session.canvasId ?? "",
+    executionId: session.executionId ?? "",
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
     composer: extras.composer,
     created,
@@ -83,7 +89,9 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
   return [];
 }
 
-function planningSurveyFromPayload(raw: NonNullable<PlanningSessionMessagePayload["survey"]>): WorkOrderSurveyView | undefined {
+function planningSurveyFromPayload(
+  raw: NonNullable<PlanningSessionMessagePayload["survey"]>,
+): WorkOrderSurveyView | undefined {
   if (!raw.id || !raw.questions?.length) {
     return undefined;
   }

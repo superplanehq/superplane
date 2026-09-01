@@ -339,6 +339,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		State:      session.State,
 		Messages:   messagesOut,
 		Created:    created,
+		WaitState:  session.WaitState,
 	}
 	if session.CanvasID != nil {
 		out.CanvasId = session.CanvasID.String()
@@ -346,10 +347,34 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	if session.CanvasRunID != nil {
 		out.CanvasRunId = session.CanvasRunID.String()
 	}
+	executionID, err := planningSessionExecutionID(tx, session)
+	if err != nil {
+		return nil, err
+	}
+	out.ExecutionId = executionID
 	if draft := session.PendingDraft.Data(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{Title: draft.Title, Description: draft.Description}
 	}
 	return out, nil
+}
+
+func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSession) (string, error) {
+	if session.CanvasID == nil || session.CanvasRunID == nil {
+		return "", nil
+	}
+	executions, err := models.ListExecutionsForRunsInTransaction(tx, *session.CanvasID, []uuid.UUID{*session.CanvasRunID})
+	if err != nil {
+		return "", err
+	}
+	for i := len(executions) - 1; i >= 0; i-- {
+		if executions[i].NodeID == "agent" {
+			return executions[i].ID.String(), nil
+		}
+	}
+	if len(executions) == 0 {
+		return "", nil
+	}
+	return executions[len(executions)-1].ID.String(), nil
 }
 
 func serializePlanningSessionSurvey(survey *models.FactoryPlanningSessionSurvey) *pb.WorkOrderSurvey {

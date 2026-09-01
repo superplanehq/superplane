@@ -35,7 +35,6 @@ const (
 	PlanningWaitKindSkipped = "skipped"
 	PlanningWaitKindEnded   = "ended"
 
-	PlanningSessionGreeting          = "The repository is ready. What do you want to do?"
 	PlanningSessionHeartbeatStale    = 45 * time.Second
 	DefaultPlanningSurveyTimeoutSecs = 3600
 )
@@ -60,6 +59,7 @@ type PlanningSessionMessage struct {
 	Text      string    `json:"text,omitempty"`
 	SurveyID  string    `json:"survey_id,omitempty"`
 	Answered  bool      `json:"answered,omitempty"`
+	Delivered bool      `json:"delivered,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -156,18 +156,10 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		State:           PlanningSessionStateRunning,
 		CanvasID:        &canvasID,
 		CanvasRunID:     &run.ID,
-		Messages: datatypes.JSONSlice[PlanningSessionMessage]{
-			{
-				ID:        "greet",
-				Kind:      PlanningSessionMessageKindText,
-				Role:      PlanningSessionMessageRoleAgent,
-				Text:      PlanningSessionGreeting,
-				CreatedAt: now,
-			},
-		},
-		HeartbeatAt: now,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		Messages:        datatypes.JSONSlice[PlanningSessionMessage]{},
+		HeartbeatAt:     now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := tx.Create(session).Error; err != nil {
 		return nil, err
@@ -279,6 +271,10 @@ func (s *FactoryPlanningSession) BeginWait(tx *gorm.DB) error {
 	if s.WaitState == PlanningWaitPending {
 		return nil
 	}
+	if text := s.nextUndeliveredUserText(); text != "" {
+		s.deliverUserText(text)
+		return s.saveMessagesAndWait(tx)
+	}
 	s.WaitState = PlanningWaitPending
 	s.WaitResult = datatypes.NewJSONType(PlanningWaitResult{})
 	s.UpdatedAt = time.Now()
@@ -315,7 +311,7 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 		CreatedAt: time.Now(),
 	})
 	if s.WaitState == PlanningWaitPending {
-		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: body})
+		s.deliverUserText(body)
 	}
 	return s.saveMessagesAndWait(tx)
 }
@@ -559,6 +555,29 @@ func (s *FactoryPlanningSession) appendMessage(message PlanningSessionMessage) {
 func (s *FactoryPlanningSession) resolveWait(result PlanningWaitResult) {
 	s.WaitState = PlanningWaitResolved
 	s.WaitResult = datatypes.NewJSONType(result)
+}
+
+func (s *FactoryPlanningSession) nextUndeliveredUserText() string {
+	for _, message := range s.Messages {
+		if message.Kind == PlanningSessionMessageKindText && message.Role == PlanningSessionMessageRoleUser && !message.Delivered {
+			return message.Text
+		}
+	}
+	return ""
+}
+
+func (s *FactoryPlanningSession) deliverUserText(text string) {
+	for i := range s.Messages {
+		if s.Messages[i].Kind != PlanningSessionMessageKindText || s.Messages[i].Role != PlanningSessionMessageRoleUser {
+			continue
+		}
+		if s.Messages[i].Delivered || s.Messages[i].Text != text {
+			continue
+		}
+		s.Messages[i].Delivered = true
+		break
+	}
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: text})
 }
 
 func (s *FactoryPlanningSession) saveMessagesAndWait(tx *gorm.DB) error {
