@@ -55,7 +55,7 @@ export function PRFeedbackSettingsHost({
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
   const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
 
-  function createFromSource(source: PRFeedbackSource) {
+  const createFromSource = (source: PRFeedbackSource) => {
     if (takenSourceIds.includes(source.id)) {
       return;
     }
@@ -70,7 +70,7 @@ export function PRFeedbackSettingsHost({
       .catch((error) => {
         showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
       });
-  }
+  };
 
   if (handlersQuery.isPending) {
     return (

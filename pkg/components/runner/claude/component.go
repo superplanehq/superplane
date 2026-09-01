@@ -217,7 +217,7 @@ func (c *RunClaudeCode) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 }
 
 func (c *RunClaudeCode) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerLLMTask(ctx, FinishedEventType)
+	return runner.CancelBrokerTask(ctx)
 }
 
 func (c *RunClaudeCode) Cleanup(ctx core.SetupContext) error { return nil }

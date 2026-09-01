@@ -122,13 +122,13 @@ export const waitForPullRequestChecksMapper: ComponentBaseMapper = {
         context.componentDefinition.name ||
         "Unnamed component",
       iconSrc: githubIcon,
-      iconColor: getColorClass(context.componentDefinition?.color!),
+      iconColor: getColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
       collapsedBackground: getBackgroundColorClass("white"),
       eventSections: waitChecksEventSections(context.nodes, context.lastExecutions[0]),
       includeEmptyState: !context.lastExecutions[0],
       metadata: waitChecksMetadataList(context.node, context.lastExecutions[0]),
-      specs: waitChecksSpecs(context.node, context.lastExecutions[0]),
+      specs: waitChecksSpecs(context.lastExecutions[0]),
       eventStateMap: WAIT_FOR_PULL_REQUEST_CHECKS_STATE_MAP,
     };
   },
@@ -137,33 +137,17 @@ export const waitForPullRequestChecksMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const output = firstWaitChecksOutput(context.execution);
-    const metadata = context.execution.metadata as ExecutionMetadata;
-    const checks = output?.checks || metadata.checks || [];
-    const selected = output?.selectedChecks || metadata.selectedChecks || checks;
-    const failed = output?.failedChecks || metadata.failedChecks || [];
-    const pending = selected.filter((check) => check.status !== "completed");
-
+    const snapshot = waitChecksSnapshot(context.execution);
     const details: Record<string, string> = {};
-    const repository = output?.repository || metadata.repository;
-    const sha = output?.sha || metadata.sha;
-    if (repository) {
-      details.Repository = repository;
+    if (snapshot.repository) {
+      details.Repository = snapshot.repository;
     }
-    if (sha) {
-      details.Revision = shortSHA(sha);
+    if (snapshot.sha) {
+      details.Revision = shortSHA(snapshot.sha);
     }
-    details["Selected checks"] = String(selected.length);
-    details["Pending checks"] =
-      pending
-        .map((check) => check.name)
-        .filter(Boolean)
-        .join(", ") || "None";
-    details["Failed checks"] =
-      failed
-        .map((check) => check.name)
-        .filter(Boolean)
-        .join(", ") || "None";
+    details["Selected checks"] = String(snapshot.selected.length);
+    details["Pending checks"] = namedCheckList(snapshot.pending);
+    details["Failed checks"] = namedCheckList(snapshot.failed);
     return details;
   },
 };
@@ -193,7 +177,7 @@ function waitChecksMetadataList(node: NodeInfo, execution?: ExecutionInfo): Meta
   return metadataItems;
 }
 
-function waitChecksSpecs(node: NodeInfo, execution?: ExecutionInfo): ComponentBaseSpec[] {
+function waitChecksSpecs(execution?: ExecutionInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const output = execution ? firstWaitChecksOutput(execution) : undefined;
   const metadata = execution?.metadata as ExecutionMetadata | undefined;
@@ -251,23 +235,60 @@ function waitChecksSpecs(node: NodeInfo, execution?: ExecutionInfo): ComponentBa
 }
 
 function waitChecksEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
-  if (!execution?.rootEvent) {
+  const rootEvent = execution?.rootEvent;
+  if (!rootEvent) {
     return undefined;
   }
 
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
   return [
     {
       showAutomaticTime: true,
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
       eventSubtitle: buildGithubExecutionSubtitle(execution),
       eventState: waitForPullRequestChecksStateFunction(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id,
     },
   ];
+}
+
+function waitChecksSnapshot(execution: ExecutionInfo): {
+  repository?: string;
+  sha?: string;
+  selected: PullRequestCheck[];
+  pending: PullRequestCheck[];
+  failed: PullRequestCheck[];
+} {
+  const output = firstWaitChecksOutput(execution);
+  const metadata = execution.metadata as ExecutionMetadata;
+  const selected = firstDefinedList(output?.selectedChecks, metadata.selectedChecks, output?.checks, metadata.checks);
+  return {
+    repository: output?.repository ?? metadata.repository,
+    sha: output?.sha ?? metadata.sha,
+    selected,
+    pending: selected.filter((check) => check.status !== "completed"),
+    failed: firstDefinedList(output?.failedChecks, metadata.failedChecks),
+  };
+}
+
+function firstDefinedList(...lists: Array<PullRequestCheck[] | undefined>): PullRequestCheck[] {
+  for (const list of lists) {
+    if (list) {
+      return list;
+    }
+  }
+  return [];
+}
+
+function namedCheckList(checks: PullRequestCheck[]): string {
+  const names = checks.map((check) => check.name).filter(Boolean);
+  if (names.length === 0) {
+    return "None";
+  }
+  return names.join(", ");
 }
 
 function firstWaitChecksOutput(execution: ExecutionInfo): WaitChecksOutput | undefined {
@@ -279,10 +300,16 @@ function firstWaitChecksOutput(execution: ExecutionInfo): WaitChecksOutput | und
         default?: OutputPayload[];
       }
     | undefined;
-  return (outputs?.passed?.[0]?.data ||
-    outputs?.failed?.[0]?.data ||
-    outputs?.timedOut?.[0]?.data ||
-    outputs?.default?.[0]?.data) as WaitChecksOutput | undefined;
+  if (!outputs) {
+    return undefined;
+  }
+  for (const channel of [outputs.passed, outputs.failed, outputs.timedOut, outputs.default]) {
+    const data = channel?.[0]?.data as WaitChecksOutput | undefined;
+    if (data) {
+      return data;
+    }
+  }
+  return undefined;
 }
 
 function shortSHA(sha: string): string {

@@ -170,37 +170,41 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
 }));
 
+async function resetLinesBoardMocks() {
+  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
+  window.localStorage.clear();
+  updateFactoryLineMutateAsync.mockReset();
+  useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useFactoryApps.mockReturnValue({ data: [] });
+  useFactoryIntakes.mockReturnValue({ data: [] });
+  createFactoryIntakeMutateAsync.mockReset();
+  createFactoryPRFeedbackHandler.mockReset();
+  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
+  searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
+  importFactoryIntakeItem.mockReset();
+  enabledExperimentalFeatures.clear();
+  useWorkOrderChecks.mockReset();
+  useWorkOrderChecks.mockImplementation(
+    (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
+      data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
+    }),
+  );
+  useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
+    if (options?.enabled === false) {
+      return { data: undefined, isPending: false, isError: false };
+    }
+    if (canvasId === "app-refund-implementer") {
+      return canvasQuery(implementerCanvas);
+    }
+    return canvasQuery(canvasWithoutAgent);
+  });
+  updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
+  commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+}
+
 describe("LinesPage board", () => {
   beforeEach(async () => {
-    const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
-    window.localStorage.clear();
-    updateFactoryLineMutateAsync.mockReset();
-    useFactoryWorkOrders.mockReturnValue({ data: [] });
-    useFactoryApps.mockReturnValue({ data: [] });
-    useFactoryIntakes.mockReturnValue({ data: [] });
-    createFactoryIntakeMutateAsync.mockReset();
-    createFactoryPRFeedbackHandler.mockReset();
-    useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
-    searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
-    importFactoryIntakeItem.mockReset();
-    enabledExperimentalFeatures.clear();
-    useWorkOrderChecks.mockReset();
-    useWorkOrderChecks.mockImplementation(
-      (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
-        data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
-      }),
-    );
-    useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
-      if (options?.enabled === false) {
-        return { data: undefined, isPending: false, isError: false };
-      }
-      if (canvasId === "app-refund-implementer") {
-        return canvasQuery(implementerCanvas);
-      }
-      return canvasQuery(canvasWithoutAgent);
-    });
-    updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
-    commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+    await resetLinesBoardMocks();
   });
 
   it("does not show a back link to the lines list", () => {

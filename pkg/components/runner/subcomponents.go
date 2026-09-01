@@ -35,10 +35,6 @@ func CancelBrokerTask(ctx core.ExecutionContext) error {
 	return cancelBrokerTask(ctx)
 }
 
-func CancelBrokerLLMTask(ctx core.ExecutionContext, finishedEventType string) error {
-	return cancelBrokerTaskWithUsage(ctx, finishedEventType)
-}
-
 func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {
 	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil, nil, nil)
 }

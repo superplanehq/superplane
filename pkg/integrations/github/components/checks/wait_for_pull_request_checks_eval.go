@@ -26,16 +26,16 @@ const (
 )
 
 var nonFailingConclusions = map[string]bool{
-	"success": true,
-	"neutral": true,
-	"skipped": true,
+	"success":   true,
+	"neutral":   true,
+	"skipped":   true,
+	"cancelled": true,
 }
 
 var failingConclusions = map[string]bool{
 	"failure":         true,
 	"error":           true,
 	"timed_out":       true,
-	"cancelled":       true,
 	"action_required": true,
 }
 

@@ -96,7 +96,6 @@ export function WorkOrderCard({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";
   const attentionReasons = getWorkOrderAttentionReasons(entry.order, {
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
@@ -110,16 +109,7 @@ export function WorkOrderCard({
       className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
       data-testid={`work-order-card-${entry.id}`}
     >
-      {onOpen ? (
-        <button
-          type="button"
-          className="absolute inset-0 z-0 rounded-md"
-          aria-label={`Open ${entry.title}`}
-          onClick={onOpen}
-        />
-      ) : (
-        <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
-      )}
+      <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
@@ -134,42 +124,110 @@ export function WorkOrderCard({
           </h3>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="flex h-5 min-w-0 items-center gap-1.5">
-            {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-            <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
-              {startedLabel}
-            </span>
-          </div>
-          {confidenceScore != null || isAnalyzing || showStart ? (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
-              {showStart ? (
-                <StartDraftButton
-                  entry={entry}
-                  lines={factoryLines}
-                  preferredLineName={preferredLineName}
-                  canDispatch={canDispatch}
-                  isDispatching={dispatchingOrderIds.has(entry.id)}
-                  onDispatch={onDispatch}
-                />
-              ) : null}
-            </div>
-          ) : null}
-          {attentionReasons.length > 0 ? (
-            <div className="flex shrink-0 flex-wrap justify-end gap-1">
-              {attentionReasons.map((reason) => (
-                <WorkOrderAttentionChip
-                  key={reason}
-                  reason={reason}
-                  label={reason === "feedback" ? addressingFeedbackLabels.get(entry.id) : undefined}
-                />
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <WorkOrderCardMetaRow
+          entry={entry}
+          organizationId={organizationId}
+          factoryLines={factoryLines}
+          preferredLineName={preferredLineName}
+          canDispatch={canDispatch}
+          isDispatching={dispatchingOrderIds.has(entry.id)}
+          onDispatch={onDispatch}
+          startedAt={startedAt}
+          showStart={showStart}
+          confidenceScore={confidenceScore}
+          isAnalyzing={isAnalyzing}
+          attentionReasons={attentionReasons}
+          feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+        />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardOpenControl({
+  onOpen,
+  destination,
+  title,
+}: {
+  onOpen?: () => void;
+  destination: string;
+  title: string;
+}) {
+  if (onOpen) {
+    return (
+      <button type="button" className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} onClick={onOpen} />
+    );
+  }
+  return <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} />;
+}
+
+function WorkOrderCardMetaRow({
+  entry,
+  organizationId,
+  factoryLines,
+  preferredLineName,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+  startedAt,
+  showStart,
+  confidenceScore,
+  isAnalyzing,
+  attentionReasons,
+  feedbackLabel,
+}: {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+  factoryLines: FactoriesFactoryLine[];
+  preferredLineName?: string;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: WorkOrderCardContext["onDispatch"];
+  startedAt: Date | null;
+  showStart: boolean;
+  confidenceScore?: number;
+  isAnalyzing: boolean;
+  attentionReasons: WorkOrderAttentionReason[];
+  feedbackLabel?: string;
+}) {
+  const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
+  const showActions = confidenceScore != null || isAnalyzing || showStart;
+
+  return (
+    <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="flex h-5 min-w-0 items-center gap-1.5">
+        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+        <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
+          {startedLabel}
+        </span>
+      </div>
+      {showActions ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
+          {showStart ? (
+            <StartDraftButton
+              entry={entry}
+              lines={factoryLines}
+              preferredLineName={preferredLineName}
+              canDispatch={canDispatch}
+              isDispatching={isDispatching}
+              onDispatch={onDispatch}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {attentionReasons.length > 0 ? (
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          {attentionReasons.map((reason) => (
+            <WorkOrderAttentionChip
+              key={reason}
+              reason={reason}
+              label={reason === "feedback" ? feedbackLabel : undefined}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

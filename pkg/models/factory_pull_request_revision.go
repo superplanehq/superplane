@@ -51,7 +51,7 @@ func (p *FactoryPullRequest) ObserveRevision(tx *gorm.DB, sha string) (*FactoryP
 		return nil, fmt.Errorf("%w: revision sha is required", ErrFactoryPullRequestInvalid)
 	}
 
-	revision, created, err := findOrCreatePullRequestRevision(tx, p.ID, sha)
+	revision, _, err := findOrCreatePullRequestRevision(tx, p.ID, sha)
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +61,9 @@ func (p *FactoryPullRequest) ObserveRevision(tx *gorm.DB, sha string) (*FactoryP
 		result.Current = true
 		return result, nil
 	}
-	if !created && p.CurrentRevisionID != nil {
-		return result, nil
-	}
 
-	// A newer head updates the current pointer. Do not cancel runs
+	// The caller observed the live head. Always move the pointer, including
+	// a force-push back to a SHA we already stored. Do not cancel runs
 	// still bound to the former SHA. A check fixer often creates that head.
 	p.CurrentRevisionID = &revision.ID
 	if err := tx.Model(p).Update("current_revision_id", revision.ID).Error; err != nil {

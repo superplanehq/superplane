@@ -35,6 +35,23 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		_ = canvas
 	})
 
+	t.Run("moves the current pointer back onto a known SHA", func(t *testing.T) {
+		pullRequest, _ := createActivityFixture(t, db, r)
+		firstSHA := activitySHA("aa")
+		secondSHA := activitySHA("bb")
+
+		first, err := pullRequest.ObserveRevision(db, firstSHA)
+		require.NoError(t, err)
+		_, err = pullRequest.ObserveRevision(db, secondSHA)
+		require.NoError(t, err)
+
+		restored, err := pullRequest.ObserveRevision(db, firstSHA)
+		require.NoError(t, err)
+		require.True(t, restored.Current)
+		assert.Equal(t, first.Revision.ID, restored.Revision.ID)
+		assert.Equal(t, first.Revision.ID, *reloadPullRequest(t, db, pullRequest).CurrentRevisionID)
+	})
+
 	t.Run("replaces the current revision without stopping older activities", func(t *testing.T) {
 		pullRequest, canvas := createActivityFixture(t, db, r)
 		handler := createCheckHandler(t, db, r, pullRequest, canvas, 3)

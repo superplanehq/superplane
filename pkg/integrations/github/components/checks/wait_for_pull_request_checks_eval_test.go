@@ -83,6 +83,24 @@ func Test__EvaluatePullRequestChecks(t *testing.T) {
 		assert.Equal(t, "build", evaluation.FailedChecks[0].Name)
 	})
 
+	t.Run("passed when remaining checks were cancelled", func(t *testing.T) {
+		t.Parallel()
+		cancelled := PullRequestCheck{Key: "check-run:ci:build", Name: "build", Status: checkStatusCompleted, Conclusion: "cancelled"}
+		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed, cancelled}, nil, false)
+		assert.Equal(t, waitChecksOutcomePassed, evaluation.Outcome)
+		assert.True(t, evaluation.AllTerminal)
+		assert.Empty(t, evaluation.FailedChecks)
+	})
+
+	t.Run("failed when a check failed among cancelled checks", func(t *testing.T) {
+		t.Parallel()
+		cancelled := PullRequestCheck{Key: "check-run:ci:lint", Name: "lint", Status: checkStatusCompleted, Conclusion: "cancelled"}
+		evaluation := evaluatePullRequestChecks([]PullRequestCheck{failed, cancelled}, nil, false)
+		assert.Equal(t, waitChecksOutcomeFailed, evaluation.Outcome)
+		require.Len(t, evaluation.FailedChecks, 1)
+		assert.Equal(t, "build", evaluation.FailedChecks[0].Name)
+	})
+
 	t.Run("passed when selected checks succeeded", func(t *testing.T) {
 		t.Parallel()
 		evaluation := evaluatePullRequestChecks([]PullRequestCheck{passed, failed}, []string{"DCO"}, false)

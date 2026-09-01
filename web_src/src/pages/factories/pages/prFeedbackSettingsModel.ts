@@ -149,15 +149,35 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
   const checks = handler.settings?.checks;
   return {
     source,
-    name: handler.name?.trim() || prFeedbackSourceById(source)?.defaultName || "Address PR feedback",
-    repository: handler.settings?.subject?.repository?.trim() ?? "",
-    mention: discussion?.mention?.trim() || "@superplaneagent",
+    name: handlerDraftName(handler.name, source),
+    repository: handlerDraftRepository(handler),
+    mention: handlerDraftMention(discussion?.mention),
     ignoreBots: discussion?.ignoreBots !== false,
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
     maximumAttempts: checks?.maximumAttempts ?? 3,
     runnerIntegrationIds: checks?.runnerIntegrationIds ?? [],
   };
+}
+
+function handlerDraftName(name: string | undefined, source: PRFeedbackSourceId): string {
+  const trimmed = name?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+  return prFeedbackSourceById(source)?.defaultName ?? "Address PR feedback";
+}
+
+function handlerDraftRepository(handler: FactoriesFactoryPrFeedbackHandler): string {
+  return handler.settings?.subject?.repository?.trim() ?? "";
+}
+
+function handlerDraftMention(mention: string | undefined): string {
+  const trimmed = mention?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+  return "@superplaneagent";
 }
 
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 import { waitForPullRequestChecksMapper } from "./wait_for_pull_request_checks";
 
+const REVISION = "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44";
+
 function makeNode(configuration: unknown, metadata: unknown = {}): NodeInfo {
   return {
     id: "node-1",
@@ -38,11 +40,34 @@ function makeContext(configuration: unknown, execution?: ExecutionInfo): Compone
   };
 }
 
+function makeExecution(overrides: Partial<ExecutionInfo> = {}): ExecutionInfo {
+  return {
+    id: "exec-1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    state: "STATE_STARTED",
+    result: "RESULT_UNKNOWN",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    rootEvent: undefined,
+    metadata: {},
+    configuration: {},
+    ...overrides,
+  };
+}
+
+function specBadge(specs: { title?: string; values?: Array<{ badges?: Array<{ label?: string }> }> }[], index: number) {
+  return {
+    title: specs[index]?.title,
+    label: specs[index]?.values?.[0]?.badges?.[0]?.label,
+  };
+}
+
 describe("github wait_for_pull_request_checks mapper", () => {
   it("shows the repository, revision, and selected check names", () => {
     const props = waitForPullRequestChecksMapper.props(
       makeContext({
-        ref: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        ref: REVISION,
         checkNames: ["DCO", "build"],
       }),
     );
@@ -53,55 +78,39 @@ describe("github wait_for_pull_request_checks mapper", () => {
   it("shows pending and failed checks from execution metadata", () => {
     const props = waitForPullRequestChecksMapper.props(
       makeContext(
-        { ref: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44" },
-        {
-          id: "exec-1",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          state: "STATE_STARTED",
-          result: "RESULT_UNKNOWN",
-          resultReason: "RESULT_REASON_OK",
-          resultMessage: "",
+        { ref: REVISION },
+        makeExecution({
           metadata: {
-            sha: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+            sha: REVISION,
             selectedChecks: [
               { name: "DCO", status: "completed", conclusion: "success" },
               { name: "build", status: "in_progress" },
             ],
             failedChecks: [{ name: "lint", status: "completed", conclusion: "failure" }],
           },
-          configuration: {},
-        },
+        }),
       ),
     );
+    const specs = props.specs ?? [];
 
-    expect(props.specs?.[0]?.title).toBe("pending");
-    expect(props.specs?.[0]?.values?.[0]?.badges?.[0]?.label).toBe("build");
-    expect(props.specs?.[1]?.title).toBe("failed");
-    expect(props.specs?.[1]?.values?.[0]?.badges?.[0]?.label).toBe("lint");
+    expect(specBadge(specs, 0)).toEqual({ title: "pending", label: "build" });
+    expect(specBadge(specs, 1)).toEqual({ title: "failed", label: "lint" });
   });
 
   it("summarizes repository, revision, pending checks, and failed checks", () => {
-    const node = makeNode({ ref: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44" });
+    const node = makeNode({ ref: REVISION });
     const context: ExecutionDetailsContext = {
       nodes: [node],
       node,
-      execution: {
-        id: "exec-1",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      execution: makeExecution({
         state: "STATE_FINISHED",
         result: "RESULT_PASSED",
-        resultReason: "RESULT_REASON_OK",
-        resultMessage: "",
-        metadata: {},
-        configuration: {},
         outputs: {
           failed: [
             {
               data: {
                 repository: "hello",
-                sha: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+                sha: REVISION,
                 selectedChecks: [
                   { name: "DCO", status: "completed", conclusion: "success" },
                   { name: "build", status: "completed", conclusion: "failure" },
@@ -111,7 +120,7 @@ describe("github wait_for_pull_request_checks mapper", () => {
             },
           ],
         },
-      },
+      }),
     };
 
     expect(waitForPullRequestChecksMapper.getExecutionDetails(context)).toEqual({

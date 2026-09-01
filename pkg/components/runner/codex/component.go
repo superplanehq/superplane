@@ -194,7 +194,7 @@ func (c *RunCodex) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (c *RunCodex) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerLLMTask(ctx, FinishedEventType)
+	return runner.CancelBrokerTask(ctx)
 }
 
 func (c *RunCodex) Cleanup(ctx core.SetupContext) error { return nil }

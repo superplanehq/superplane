@@ -215,7 +215,7 @@ func (c *RunOpenRouter) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 }
 
 func (c *RunOpenRouter) Cancel(ctx core.ExecutionContext) error {
-	return runner.CancelBrokerLLMTask(ctx, FinishedEventType)
+	return runner.CancelBrokerTask(ctx)
 }
 
 func (c *RunOpenRouter) Cleanup(ctx core.SetupContext) error { return nil }

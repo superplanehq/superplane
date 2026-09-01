@@ -20,6 +20,14 @@ vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
   ),
 }));
 
+function mockConnectedIntegrations(data: unknown[] = []) {
+  return {
+    data,
+    isLoading: false,
+    error: null,
+  } as unknown as ReturnType<typeof useConnectedIntegrations>;
+}
+
 function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedbackDraftSettings {
   return {
     source: "checks",
@@ -36,9 +44,7 @@ function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedba
 }
 
 beforeEach(() => {
-  vi.mocked(useConnectedIntegrations).mockReturnValue({
-    data: [],
-  } as ReturnType<typeof useConnectedIntegrations>);
+  vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
 });
 
 function renderChecksPopup(
@@ -122,14 +128,14 @@ describe("PRFeedbackSettingsPopup check names", () => {
 
 describe("PRFeedbackSettingsPopup additional integrations", () => {
   beforeEach(() => {
-    vi.mocked(useConnectedIntegrations).mockReturnValue({
-      data: [
+    vi.mocked(useConnectedIntegrations).mockReturnValue(
+      mockConnectedIntegrations([
         {
           metadata: { id: "int-circleci", name: "circleci-prod", integrationName: "circleci" },
           status: { state: "ready" },
         },
-      ],
-    } as ReturnType<typeof useConnectedIntegrations>);
+      ]),
+    );
   });
 
   it("shows the integration icon next to the integration name", () => {
@@ -162,9 +168,7 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
   });
 
   it("keeps the Integrations link when no extra integrations are connected", () => {
-    vi.mocked(useConnectedIntegrations).mockReturnValue({
-      data: [],
-    } as ReturnType<typeof useConnectedIntegrations>);
+    vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 
     expect(screen.getByTestId("pr-feedback-integrations-empty")).toBeInTheDocument();
