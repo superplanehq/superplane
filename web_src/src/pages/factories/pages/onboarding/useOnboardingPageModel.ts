@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -285,6 +285,9 @@ export function useOnboardingPageModel(args: {
 
   return {
     setup,
+    // True when hosted credentials cover the agent, so setup can skip the
+    // agent screen and provision from the ticket screen.
+    hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
