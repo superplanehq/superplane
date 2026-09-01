@@ -13,8 +13,8 @@ const spendState: { remainingCreditCents: string; grantTotalCents: string } = {
   grantTotalCents: "5000",
 };
 
-vi.mock("@/hooks/useOrganizationLLMSpend", () => ({
-  useOrganizationLLMSpend: () => ({ data: spendState }),
+vi.mock("@/hooks/useOrganizationWorkspaceUsage", () => ({
+  useOrganizationWorkspaceUsage: () => ({ data: spendState }),
 }));
 
 function renderAgentStep(args?: {

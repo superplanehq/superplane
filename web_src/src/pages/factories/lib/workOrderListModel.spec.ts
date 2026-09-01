@@ -212,6 +212,7 @@ describe("buildWorkOrderListEntry", () => {
             result: "RESULT_PASSED",
             totalTokens: "1200",
             costCents: "45",
+            durationSeconds: "12",
           },
           {
             id: "e2",
@@ -220,6 +221,7 @@ describe("buildWorkOrderListEntry", () => {
             result: "RESULT_PASSED",
             totalTokens: "500",
             costCents: "15",
+            durationSeconds: "8",
           },
         ],
       }),
@@ -228,7 +230,8 @@ describe("buildWorkOrderListEntry", () => {
 
     expect(entry.totalTokens).toBe(1700);
     expect(entry.totalCostCents).toBe(60);
-    expect(entry.usageLabel).toBe("$0.60 · 1.7k tokens");
+    expect(entry.durationSeconds).toBe(20);
+    expect(entry.usageLabel).toBe("$0.60 · 1.7k tokens · 20 s");
   });
 
   it("keeps closed orders out of the dispatchable set", () => {

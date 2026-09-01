@@ -34,4 +34,33 @@ describe("legacy factory organization settings routes", () => {
       "page",
     );
   }, 10000);
+
+  it("redirects workspace-usage into Organization Spending", async () => {
+    render(<FactoriesHarness pathSuffix="organization/workspace-usage" factoriesFixture={defaultFactoriesFixture} />);
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
+    ).toBeInTheDocument();
+  }, 10000);
+
+  it("redirects the old LLM spend URL into Organization Spending", async () => {
+    render(
+      <FactoriesHarness pathSuffix="settings/llm-spend?credit=added" factoriesFixture={defaultFactoriesFixture} />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Refreshing hosted credit totals.")).toBeInTheDocument();
+  }, 10000);
 });
