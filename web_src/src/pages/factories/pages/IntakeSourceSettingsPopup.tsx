@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { CanvasPage } from "@/ui/CanvasPage";
 import { History, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -24,6 +23,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
+import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
@@ -231,20 +231,7 @@ function IntakeAutomationTab({
         ) : null}
       </div>
       <div className="min-h-[18rem] flex-1">
-        <CanvasPage
-          nodes={graph.nodes}
-          edges={graph.edges}
-          factoryId={graph.factoryId}
-          factoryEmbed
-          isEditing
-          readOnly
-          hidePageChrome
-          hideAddControls
-          hideCanvasToolSidebar
-          hideRightSideControls
-          buildingBlocks={[]}
-          activeCanvasVersionId=""
-        />
+        <SettingsAutomationCanvas graph={graph} />
       </div>
     </section>
   );
