@@ -190,7 +190,7 @@ func prFeedbackPRHeadExpression() string {
 }
 
 func prFeedbackCoauthorsExpression() string {
-	return `{{ order() == nil ? "" : join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}`
+	return `{{ task() == nil ? "" : join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}`
 }
 
 func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {

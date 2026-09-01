@@ -422,6 +422,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, "Ship feature", built["title"])
 	})
 
+	t.Run("task is an alias of order", func(t *testing.T) {
+		id, err := builder.ResolveExpression(`task().id`)
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), id)
+
+		title, err := builder.ResolveExpression(`task().title`)
+		require.NoError(t, err)
+		assert.Equal(t, "Ship feature", title)
+
+		count, err := builder.ResolveExpression(`len(task().artifacts)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		_, err = builder.ResolveExpression(`task(1)`)
+		require.ErrorContains(t, err, "task() takes no arguments")
+	})
+
 	t.Run("permalink back to the work order", func(t *testing.T) {
 		expectedSuffix := fmt.Sprintf(
 			"/%s/workspaces/%s/work-order/%d",
