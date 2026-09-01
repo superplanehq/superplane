@@ -62,7 +62,7 @@ func (s *organizationCreationSteps) assertRedirectedToWorkspaceSetup(name string
 	org, err := models.FindOrganizationByName(name)
 	require.NoError(s.t, err)
 
-	setupPath := regexp.MustCompile("/" + org.ID.String() + "/workspaces/[^/]+/setup")
+	setupPath := regexp.MustCompile("/" + regexp.QuoteMeta(org.Slug) + "/workspaces/[^/]+/setup")
 	for i := 0; i < 25; i++ {
 		if setupPath.MatchString(s.session.Page().URL()) {
 			return
