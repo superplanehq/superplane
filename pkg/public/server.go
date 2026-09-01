@@ -1082,6 +1082,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
+	response["slug"] = organization.Slug
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -1151,6 +1152,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 
 	type Organization struct {
 		ID          string `json:"id"`
+		Slug        string `json:"slug"`
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		CanvasCount int64  `json:"canvasCount"`
@@ -1185,6 +1187,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		orgID := organization.ID.String()
 		response = append(response, Organization{
 			ID:          organization.ID.String(),
+			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],

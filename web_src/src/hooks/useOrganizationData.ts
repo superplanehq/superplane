@@ -547,7 +547,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string }) => {
+    mutationFn: async (params: { name?: string; description?: string; slug?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -556,6 +556,7 @@ export const useUpdateOrganization = (organizationId: string) => {
               metadata: {
                 name: params.name,
                 description: params.description,
+                slug: params.slug,
               },
             },
           },
