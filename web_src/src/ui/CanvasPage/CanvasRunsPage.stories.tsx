@@ -9,6 +9,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import type { CanvasesCanvasNodeExecution, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { CanvasRunsSidebar } from "@/components/CanvasRunsSidebar";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { cn } from "@/lib/utils";
 import { RunInspectorPanel } from "@/ui/Runs/RunInspectorPanel";
@@ -149,13 +150,15 @@ function StoryProviders({ children }: { children: ReactNode }) {
   const queryClient = useMemo(() => buildPrefilledQueryClient([failedRunDetail, passedRunDetail]), []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/${canvasFixture.organizationId}/apps/${canvasFixture.id}`]}>
-        <Routes>
-          <Route path="/:organizationId/apps/:appId" element={children} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>
+    <PermissionsContext.Provider value={{ permissions: [], isLoading: false, canAct: () => true } as unknown as React.ContextType<typeof PermissionsContext>}>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[`/${canvasFixture.organizationId}/apps/${canvasFixture.id}`]}>
+          <Routes>
+            <Route path="/:organizationId/apps/:appId" element={children} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </PermissionsContext.Provider>
   );
 }
 

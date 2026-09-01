@@ -2,7 +2,22 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
+import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { RunInspectorHeader } from "./RunInspectorHeader";
+
+const allowedPermissionsValue = {
+  permissions: [],
+  isLoading: false,
+  canAct: () => true,
+} as const;
+
+function withPermissions(children: React.ReactNode) {
+  return (
+    <PermissionsContext.Provider value={allowedPermissionsValue as unknown as React.ContextType<typeof PermissionsContext>}>
+      {children}
+    </PermissionsContext.Provider>
+  );
+}
 
 const baseRun: CanvasesCanvasRun = {
   id: "child-run-id",
@@ -14,17 +29,19 @@ const baseRun: CanvasesCanvasRun = {
 
 function renderHeader(run: CanvasesCanvasRun) {
   return render(
-    <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
-      <RunInspectorHeader
-        run={run}
-        title="Child run"
-        stepCount={1}
-        organizationId="org-1"
-        actionPending={false}
-        actionDisabled={false}
-        onAction={() => {}}
-      />
-    </MemoryRouter>,
+    withPermissions(
+      <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
+        <RunInspectorHeader
+          run={run}
+          title="Child run"
+          stepCount={1}
+          organizationId="org-1"
+          actionPending={false}
+          actionDisabled={false}
+          onAction={() => {}}
+        />
+      </MemoryRouter>,
+    ),
   );
 }
 
@@ -51,24 +68,48 @@ describe("RunInspectorHeader", () => {
 
   it("shows a disabled cancelling action while the run is stopping", () => {
     render(
-      <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
-        <RunInspectorHeader
-          run={{
-            ...baseRun,
-            state: "STATE_CANCELLING",
-            result: "RESULT_UNKNOWN",
-          }}
-          title="Child run"
-          stepCount={1}
-          organizationId="org-1"
-          actionPending={false}
-          actionDisabled
-          onAction={() => {}}
-        />
-      </MemoryRouter>,
+      withPermissions(
+        <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
+          <RunInspectorHeader
+            run={{
+              ...baseRun,
+              state: "STATE_CANCELLING",
+              result: "RESULT_UNKNOWN",
+            }}
+            title="Child run"
+            stepCount={1}
+            organizationId="org-1"
+            actionPending={false}
+            actionDisabled
+            onAction={() => {}}
+          />
+        </MemoryRouter>,
+      ),
     );
 
     expect(screen.getByLabelText("Cancelling")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelling" })).toBeDisabled();
+  });
+
+  it("hides the action button when the user lacks canvases:update permission", () => {
+    render(
+      <PermissionsContext.Provider
+        value={{ permissions: [], isLoading: false, canAct: () => false } as unknown as React.ContextType<typeof PermissionsContext>}
+      >
+        <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
+          <RunInspectorHeader
+            run={baseRun}
+            title="Child run"
+            stepCount={1}
+            organizationId="org-1"
+            actionPending={false}
+            actionDisabled={false}
+            onAction={() => {}}
+          />
+        </MemoryRouter>
+      </PermissionsContext.Provider>,
+    );
+
+    expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
   });
 });

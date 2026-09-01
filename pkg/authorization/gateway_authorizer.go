@@ -57,7 +57,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 
 	if !allowed {
 		log.Warnf("User %s tried to %s %s in organization %s", userID, rule.Action, rule.Resource, organizationID)
-		return nil, status.Error(codes.NotFound, "Not found")
+		return nil, status.Error(codes.PermissionDenied, "Permission denied")
 	}
 
 	if !hasRequiredScopedTokenPermissionForScopes(firstHTTPHeader(r, "x-token-scopes"), pathParams, rule) {
@@ -67,7 +67,7 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 			rule.Resource,
 			rule.Action,
 		)
-		return nil, status.Error(codes.NotFound, "Not found")
+		return nil, status.Error(codes.PermissionDenied, "Permission denied")
 	}
 
 	if err := checkRequiredExperimentalFeatures(ctx, organizationID, rule); err != nil {

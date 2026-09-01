@@ -2,6 +2,7 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/usePermissions";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 import { EventStatusBadge } from "@/ui/EventStatusBadge";
@@ -172,6 +173,9 @@ export function RunInspectorNodeActions({
   /** `bar` = full-width strip under factory Close chrome. */
   layout?: "inline" | "bar";
 }) {
+  const { canAct } = usePermissions();
+  if (!canAct("canvases", "update")) return null;
+
   const actionableApproval = findActionableApprovalRecord(section.actions.approvalRecords, currentUser ?? null);
   const hasActions =
     section.queueItem || section.actions.canStop || section.actions.canPushThrough || actionableApproval;
@@ -301,9 +305,12 @@ function NodeMetadata({
   onRerun: () => void;
   rerunPending: boolean;
 }) {
+  const { canAct } = usePermissions();
+  const canUpdateCanvas = canAct("canvases", "update");
+
   return (
     <div className="ml-auto flex shrink-0 items-center gap-3 px-4 text-xs text-slate-500 dark:text-gray-400">
-      {section.isTrigger ? (
+      {section.isTrigger && canUpdateCanvas ? (
         <Button
           type="button"
           variant="outline"
