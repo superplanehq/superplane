@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -47,9 +48,16 @@ func serializeFactoryPullRequests(
 			runIDs = append(runIDs, linked.Run.ID)
 		}
 	}
+	// Usage totals are enrichment-only. If the usage rollup lookup fails
+	// (for example, a transient schema migration issue), do not fail the
+	// whole PR listing. Log a warning and degrade to zero usage instead.
 	usageByRun, err := models.SumUsageForRunTrees(tx, runIDs)
 	if err != nil {
-		return nil, err
+		log.WithError(err).Warnf(
+			"factory PR listing: usage rollup unavailable for %d run(s), returning zero usage",
+			len(runIDs),
+		)
+		usageByRun = map[uuid.UUID]models.UsageTotals{}
 	}
 
 	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
