@@ -679,6 +679,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account/providers/github/connect", s.connectGitHubAccount).Methods("GET")
+	accountRoute.HandleFunc("/auth/github/callback/link", s.completeGitHubAccountLink).Methods("GET")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
@@ -1092,13 +1094,22 @@ type AccountImpersonation struct {
 }
 
 type AccountResponse struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	Email             string                `json:"email"`
-	AvatarURL         string                `json:"avatar_url"`
-	InstallationAdmin bool                  `json:"installation_admin"`
-	HasPassword       bool                  `json:"has_password"`
-	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
+	ID                string                    `json:"id"`
+	Name              string                    `json:"name"`
+	Email             string                    `json:"email"`
+	AvatarURL         string                    `json:"avatar_url"`
+	InstallationAdmin bool                      `json:"installation_admin"`
+	HasPassword       bool                      `json:"has_password"`
+	Impersonation     *AccountImpersonation     `json:"impersonation,omitempty"`
+	Providers         []AccountProviderResponse `json:"providers"`
+}
+
+type AccountProviderResponse struct {
+	Provider    string `json:"provider"`
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	AvatarURL   string `json:"avatar_url"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1108,7 +1119,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providers, err := account.GetAccountProviders()
+	providers, err := models.ListAccountProviders(database.DB(r.Context()), account.ID)
 	if err != nil {
 		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
 		http.Error(w, "", http.StatusInternalServerError)
@@ -1129,6 +1140,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
 		HasPassword:       hasPassword,
+		Providers:         accountProviderResponses(providers),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1140,6 +1152,20 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(accountResponse)
+}
+
+func accountProviderResponses(providers []models.AccountProvider) []AccountProviderResponse {
+	response := make([]AccountProviderResponse, 0, len(providers))
+	for _, provider := range providers {
+		response = append(response, AccountProviderResponse{
+			Provider:    provider.Provider,
+			Username:    provider.Username,
+			DisplayName: provider.Name,
+			Email:       provider.Email,
+			AvatarURL:   provider.AvatarURL,
+		})
+	}
+	return response
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {

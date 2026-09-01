@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar/avatar";
+import { GitHubAccountConnection } from "@/components/GitHubAccountConnection";
 import { Icon } from "@/components/Icon";
 import { PersonalApiTokenDialogs, PersonalApiTokensTable } from "@/components/PersonalApiTokens";
 import { Button } from "@/components/ui/button";
+import type { ConnectedAccountProvider } from "@/contexts/accountContextState";
 import { useAccount } from "@/contexts/useAccount";
 import { useMe } from "@/hooks/useMe";
 import { usePersonalTokensPanel } from "@/hooks/usePersonalTokensPanel";
@@ -30,6 +32,8 @@ export function FactorySettingsProfilePage() {
           user={user}
           avatarUrl={account?.avatar_url}
           canChangePassword={canChangePassword}
+          providers={account?.providers ?? []}
+          impersonating={account?.impersonation?.active === true}
           tokensPanel={tokensPanel}
           onChangePassword={() => setPasswordModalOpen(true)}
         />
@@ -53,6 +57,8 @@ function ProfileBody({
   user,
   avatarUrl,
   canChangePassword,
+  providers,
+  impersonating,
   tokensPanel,
   onChangePassword,
 }: {
@@ -61,6 +67,8 @@ function ProfileBody({
   user: ProfileUser | null | undefined;
   avatarUrl?: string | null;
   canChangePassword: boolean;
+  providers: ConnectedAccountProvider[];
+  impersonating: boolean;
   tokensPanel: PersonalTokensPanel;
   onChangePassword: () => void;
 }) {
@@ -82,6 +90,12 @@ function ProfileBody({
         canChangePassword={canChangePassword}
         onChangePassword={onChangePassword}
       />
+      <FactorySettingsCard title="Connected accounts">
+        <p className="mb-4 text-[12px] text-muted-foreground">
+          Connect your profiles to match your activity to your SuperPlane account.
+        </p>
+        <GitHubAccountConnection providers={providers} impersonating={impersonating} />
+      </FactorySettingsCard>
       <ApiTokensCard panel={tokensPanel} />
     </div>
   );

@@ -28,6 +28,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/utils"
+	"golang.org/x/oauth2"
+	githubOAuth "golang.org/x/oauth2/github"
 	"gorm.io/gorm"
 )
 
@@ -48,14 +50,15 @@ const (
 )
 
 type Handler struct {
-	jwtSigner            *jwt.Signer
-	authService          authorization.Authorization
-	encryptor            crypto.Encryptor
-	isDev                bool
-	templateDir          string
-	blockSignup          bool
-	passwordLoginEnabled bool
-	magicCodeEnabled     bool
+	jwtSigner              *jwt.Signer
+	authService            authorization.Authorization
+	encryptor              crypto.Encryptor
+	isDev                  bool
+	templateDir            string
+	blockSignup            bool
+	passwordLoginEnabled   bool
+	magicCodeEnabled       bool
+	githubAccountLinkOAuth *oauth2.Config
 }
 
 type ProviderConfig struct {
@@ -97,6 +100,13 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		switch providerName {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
+			a.githubAccountLinkOAuth = &oauth2.Config{
+				ClientID:     config.Key,
+				ClientSecret: config.Secret,
+				Endpoint:     githubOAuth.Endpoint,
+				RedirectURL:  strings.TrimRight(config.CallbackURL, "/") + "/link",
+				Scopes:       []string{"user:email"},
+			}
 			log.Infof("GitHub OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
