@@ -186,7 +186,9 @@ describe("splitRunPopupModel", () => {
   });
 
   it("uses live pull requests for a real task and fixture pull requests in Storybook", () => {
-    const fixturePullRequests = collectSplitRunPullRequests(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER));
+    const fixturePullRequests = collectSplitRunPullRequests(
+      splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER),
+    );
     const livePullRequests = [
       {
         id: "pr-live",
