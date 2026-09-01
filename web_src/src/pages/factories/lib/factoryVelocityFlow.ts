@@ -220,9 +220,6 @@ function pct(part: number, whole: number): number {
   return Math.round((part / whole) * 100);
 }
 
-/** How many days separate labelled ticks on a month-long window. */
-const MONTH_LABEL_STEP = 5;
-
 /**
  * Names the axis tick of a day, matching how the velocity API labels its own
  * points so both charts on the page share one axis language.
@@ -230,17 +227,13 @@ const MONTH_LABEL_STEP = 5;
  * The weekday explains the gaps in the chart: a quiet Saturday reads as a
  * weekend rather than as an outage. The month appears only where the window
  * crosses into a new one, so no single tick reads as the odd one out.
+ *
+ * Every day gets a full label; deciding how many of them a chart has room to
+ * draw is the chart's job (see `pickVelocityAxisTicks`), not this producer's.
  */
-function dayLabel(date: number, dayIndex: number, totalDays: number): string {
-  let step = 1;
-  if (totalDays > 14) {
-    step = MONTH_LABEL_STEP;
-    const isLast = dayIndex === totalDays - 1;
-    if (dayIndex !== 0 && dayIndex % step !== 0 && !isLast) return "";
-  }
-
+function dayLabel(date: number): string {
   const day = new Date(date);
-  const previous = new Date(addLocalCalendarDays(date, -step));
+  const previous = new Date(addLocalCalendarDays(date, -1));
   const startsNewMonth = day.getMonth() !== previous.getMonth();
 
   // Composed part by part: asking Intl for a weekday and a day together yields
@@ -266,10 +259,9 @@ function buildDayBuckets(periodDays: FactoryVelocityFlowPeriodDays, now: number)
 
   for (let offset = periodDays - 1; offset >= 0; offset--) {
     const key = addLocalCalendarDays(todayMidnight, -offset);
-    const dayIndex = periodDays - 1 - offset;
     buckets.push({
       key,
-      label: dayLabel(key, dayIndex, periodDays),
+      label: dayLabel(key),
       running: [],
       waiting: [],
     });
