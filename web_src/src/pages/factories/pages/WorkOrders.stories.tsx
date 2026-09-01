@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { EMPTY_FACTORY_KEY, PRIMARY_FACTORY_KEY, defaultFactoriesFixture } from "../__fixtures__/factoryPageResponses";
 import { emptyWorkOrdersFactoriesFixture } from "../__fixtures__/factoryPageFixtureVariants";
+import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../__fixtures__/usageReportFixtures";
 import { CHECKOUT_RELIABILITY_MISSION, REFUNDS_V2_MISSION } from "./missions/missionMocks";
 import { WorkOrdersPage } from "./WorkOrdersPage";
 
@@ -63,6 +64,24 @@ export const OnlyClosedOrders: Story = {
 export const EmptyWorkspace: Story = {
   name: "Empty workspace",
   render: () => <FactoriesHarness pathSuffix={emptyWorkspacePath} factoriesFixture={defaultFactoriesFixture} />,
+};
+
+/** Remaining hosted credit is empty. A banner sits above the task board. */
+export const HostedCreditEmpty: Story = {
+  name: "Hosted credit empty",
+  render: () => {
+    withWorkOrderLayout("board");
+    return (
+      <FactoriesHarness
+        pathSuffix={workOrdersPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+          hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        }}
+      />
+    );
+  },
 };
 
 export const MissionDetailCheckout: Story = {
