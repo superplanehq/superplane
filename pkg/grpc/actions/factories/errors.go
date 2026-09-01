@@ -104,6 +104,14 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "run is already linked to a different pull request")
 	case errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete):
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
+		return grpcerrors.NotFound(err, "planning session not found")
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
+		return grpcerrors.FailedPrecondition(err, "planning session has ended")
+	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
+		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):

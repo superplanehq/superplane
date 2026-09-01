@@ -156,26 +156,23 @@ function WorkOrderDetailMainColumn({
     <div className="min-w-0">
       {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-      {showStatusNotes ? (
-        <div className={order.description ? "mt-10" : undefined}>
-          <WorkOrderStatusNotesSection
-            notes={notesToShow}
-            organizationId={organizationId}
-            displayStatus={displayStatus}
-            isOpen={isOpen}
-            isDispatchable={isDispatchable}
-            isClosed={isClosed}
-            canClose={canClose}
-            canManage={canManage}
-            isCompleting={isCompleting}
-            isRejecting={isRejecting}
-            isClosing={isClosing}
-            isUpdatingStatus={isUpdatingStatus}
-            onClose={onClose}
-            onStatusChange={onStatusChange}
-          />
-        </div>
-      ) : null}
+      <WorkOrderDetailWaitSections
+        order={order}
+        organizationId={organizationId}
+        statusNotes={notesToShow}
+        displayStatus={displayStatus}
+        isOpen={isOpen}
+        isDispatchable={isDispatchable}
+        isClosed={isClosed}
+        canClose={canClose}
+        canManage={canManage}
+        isCompleting={isCompleting}
+        isRejecting={isRejecting}
+        isClosing={isClosing}
+        isUpdatingStatus={isUpdatingStatus}
+        onClose={onClose}
+        onStatusChange={onStatusChange}
+      />
 
       {hasChecksSection ? (
         <WorkOrderChecksSection
@@ -220,6 +217,67 @@ function WorkOrderDetailMainColumn({
         </div>
       </section>
     </div>
+  );
+}
+
+function WorkOrderDetailWaitSections({
+  order,
+  organizationId,
+  statusNotes,
+  displayStatus,
+  isOpen,
+  isDispatchable,
+  isClosed,
+  canClose,
+  canManage,
+  isCompleting,
+  isRejecting,
+  isClosing,
+  isUpdatingStatus,
+  onClose,
+  onStatusChange,
+}: Pick<
+  WorkOrderDetailLoadedViewProps,
+  | "order"
+  | "organizationId"
+  | "displayStatus"
+  | "isOpen"
+  | "isDispatchable"
+  | "isClosed"
+  | "canClose"
+  | "canManage"
+  | "isCompleting"
+  | "isRejecting"
+  | "isClosing"
+  | "isUpdatingStatus"
+  | "onClose"
+  | "onStatusChange"
+> & { statusNotes: NonNullable<WorkOrderDetailLoadedViewProps["statusNotes"]> }) {
+  const spaced = Boolean(order.description);
+
+  return (
+    <>
+      {statusNotes.length > 0 ? (
+        <div className={spaced ? "mt-10" : undefined}>
+          <WorkOrderStatusNotesSection
+            notes={statusNotes}
+            organizationId={organizationId}
+            displayStatus={displayStatus}
+            isOpen={isOpen}
+            isDispatchable={isDispatchable}
+            isClosed={isClosed}
+            canClose={canClose}
+            canManage={canManage}
+            isCompleting={isCompleting}
+            isRejecting={isRejecting}
+            isClosing={isClosing}
+            isUpdatingStatus={isUpdatingStatus}
+            onClose={onClose}
+            onStatusChange={onStatusChange}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 

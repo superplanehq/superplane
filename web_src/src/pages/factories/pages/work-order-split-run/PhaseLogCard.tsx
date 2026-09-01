@@ -18,7 +18,7 @@ import { PhaseGlyph } from "../linePhaseGlyph";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
-import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
+import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
 const LOG_FACE = "font-mono text-[14px]";
@@ -742,7 +742,7 @@ function StreamNode({
 }) {
   const { line, notes, artifact, pullRequest } = group;
   const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
-  const steps = groupClaudeSteps(liveNotes ?? notes);
+  const steps = groupClaudeSteps(mergeLiveStreamNotes(liveNotes, notes));
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
 
   return (
@@ -1045,7 +1045,7 @@ function useRunnerNodeLiveNotes(
   canvasId?: string,
 ): SplitRunStreamLine[] | undefined {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
@@ -1058,6 +1058,7 @@ function useRunnerNodeLiveNotes(
   return notesForLiveStream({
     nodeId: line.nodeId ?? line.id,
     sections,
+    orphanLines,
     error,
     isStreaming,
     nodeStatus: line.status,
