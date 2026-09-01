@@ -71,13 +71,11 @@ export const factoryQueryKeys = {
   pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
     ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
-  velocity: (
-    organizationId: string,
-    factoryId: string,
-    periodDays: number,
-    integrationId: string,
-    repository: string,
-  ) => ["factories", organizationId, factoryId, "velocity", periodDays, integrationId, repository] as const,
+  velocity: (organizationId: string, factoryId: string, periodDays: number, repository: string) =>
+    ["factories", organizationId, factoryId, "velocity", periodDays, repository] as const,
+  /** Every period and repository of one workspace, for refreshing after a sync. */
+  velocityAll: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "velocity"] as const,
 };
 
 function factoryListKey(organizationId: string) {
