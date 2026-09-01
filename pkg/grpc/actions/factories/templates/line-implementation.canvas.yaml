@@ -50,7 +50,7 @@ spec:
               name: github
         environment:
           - name: REPO_URL
-            value: 'https://x-access-token:${GITHUB_TOKEN}@github.com/{{ order().repository }}.git'
+            value: '{{ order().repository_url }}'
             valueSource: literal
           - name: BASE
             value: '{{ order().default_branch }}'
@@ -70,6 +70,9 @@ spec:
               # Identify commits as SuperPlane Agent.
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
+
+              # Authenticate canonical GitHub URLs with the integration token.
+              git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
 
               # Shallow clone of the default branch into ./repo.
               git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo && cd repo

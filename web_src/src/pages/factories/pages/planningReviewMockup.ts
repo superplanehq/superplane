@@ -49,14 +49,8 @@ const implementationConfiguration: Record<string, unknown> = {
   workingDirectory: "/tmp/repo",
   environmentFrom: [{ source: "integration", integration: "github-superplanehq" }],
   environment: [
-    { name: "REPO", valueSource: "literal", value: "superplanehq/superplane" },
-    { name: "BRANCH", valueSource: "literal", value: '{{ $["Create Branch"].data.result.branch }}' },
-    { name: "ORDER_DESCRIPTION", valueSource: "literal", value: "{{ toBase64(order().description) }}" },
-    {
-      name: "PLAN",
-      valueSource: "literal",
-      value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}',
-    },
+    { name: "REPO_URL", valueSource: "literal", value: "{{ order().repository_url }}" },
+    { name: "BASE", valueSource: "literal", value: "{{ order().default_branch }}" },
   ],
   executionTimeoutSeconds: 3600,
 };
