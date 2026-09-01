@@ -201,7 +201,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setup.commitIssuesStep();
     if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
     if (skipAgentScreen) {
-      await model.finish();
+      // The issues choice was just set above, in this same click; the setup
+      // state captured when this render closed over `model.finish` still
+      // holds the answer from before the click. Passing the answer here
+      // keeps a single click from saving a stale, empty issues source over
+      // the one `saveIssues` already stored.
+      await model.finish(DEFAULT_ISSUES_CHOICE);
       return;
     }
     goToScreen("agent");
