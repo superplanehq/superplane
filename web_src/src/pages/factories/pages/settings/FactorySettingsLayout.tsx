@@ -21,7 +21,11 @@ import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FACTORY_SETTINGS_NAV_GROUPS, type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
+import {
+  FACTORY_SETTINGS_NAV_GROUPS,
+  type FactorySettingsNavGroup,
+  type FactorySettingsNavItem,
+} from "./settingsNavItems";
 
 /** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
 const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
