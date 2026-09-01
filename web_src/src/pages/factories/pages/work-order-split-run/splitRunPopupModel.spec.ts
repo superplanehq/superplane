@@ -14,8 +14,10 @@ import { LINE_BOARD_DONE_RECEIPTS_ORDER } from "../../__fixtures__/lineMetricsFa
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import {
   collectSplitRunArtifacts,
+  collectSplitRunPullRequests,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
+  resolveSplitRunPopupPullRequests,
   SPLIT_RUN_PANE_GRID_CLASSNAME,
   splitRunAutomationRunHref,
   splitRunDescriptionMarkdown,
@@ -168,6 +170,39 @@ describe("splitRunPopupModel", () => {
     expect(resolveSplitRunPopupArtifacts({ fixtureArtifacts, liveArtifacts, useLive: false })).toEqual(
       fixtureArtifacts,
     );
+  });
+
+  it("collects unique pull requests from fixture streams", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER);
+    const pullRequests = collectSplitRunPullRequests(fixture);
+
+    expect(pullRequests).toEqual([
+      expect.objectContaining({
+        number: "510",
+        url: "https://github.com/example/ledger/pull/510",
+        state: "STATE_OPEN",
+      }),
+    ]);
+  });
+
+  it("uses live pull requests for a real task and fixture pull requests in Storybook", () => {
+    const fixturePullRequests = collectSplitRunPullRequests(splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER));
+    const livePullRequests = [
+      {
+        id: "pr-live",
+        number: "99",
+        url: "https://github.com/example/ledger/pull/99",
+        state: "STATE_OPEN" as const,
+      },
+    ];
+
+    expect(resolveSplitRunPopupPullRequests({ fixturePullRequests, livePullRequests, useLive: true })).toEqual(
+      livePullRequests,
+    );
+    expect(resolveSplitRunPopupPullRequests({ fixturePullRequests, livePullRequests, useLive: false })).toEqual(
+      fixturePullRequests,
+    );
+    expect(collectSplitRunPullRequests(splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]))).toEqual([]);
   });
 
   it("lists description artifacts oldest first", () => {
