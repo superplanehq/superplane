@@ -1,9 +1,9 @@
 package e2e
 
 import (
-	"regexp"
 	"testing"
 
+	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -62,13 +62,8 @@ func (s *organizationCreationSteps) assertRedirectedToWorkspaceSetup(name string
 	org, err := models.FindOrganizationByName(name)
 	require.NoError(s.t, err)
 
-	setupPath := regexp.MustCompile("/" + regexp.QuoteMeta(org.Slug) + "/workspaces/[^/]+/setup")
-	for i := 0; i < 25; i++ {
-		if setupPath.MatchString(s.session.Page().URL()) {
-			return
-		}
-		s.session.Sleep(200)
-	}
-
-	require.Regexp(s.t, setupPath, s.session.Page().URL())
+	waitErr := s.session.Page().WaitForURL("**/"+org.Slug+"/workspaces/*/setup**", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(30000),
+	})
+	require.NoError(s.t, waitErr)
 }
