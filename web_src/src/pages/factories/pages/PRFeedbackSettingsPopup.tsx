@@ -6,10 +6,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CanvasPage } from "@/ui/CanvasPage";
 import { Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
@@ -396,20 +396,7 @@ function PRFeedbackAutomationTab({
         ) : null}
       </div>
       <div className="min-h-[18rem] flex-1">
-        <CanvasPage
-          nodes={graph.nodes}
-          edges={graph.edges}
-          factoryId={graph.factoryId}
-          factoryEmbed
-          isEditing
-          readOnly
-          hidePageChrome
-          hideAddControls
-          hideCanvasToolSidebar
-          hideRightSideControls
-          buildingBlocks={[]}
-          activeCanvasVersionId=""
-        />
+        <SettingsAutomationCanvas graph={graph} />
       </div>
     </section>
   );

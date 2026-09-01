@@ -52,7 +52,7 @@ function githubIntakeGraph(): IntakeAutomationGraph {
     "app-github-issues-intake",
     new QueryClient(),
     null,
-    "edit",
+    "live",
   );
 
   return { nodes, edges, factoryId: "factory-1" };
@@ -128,6 +128,8 @@ describe("IntakeSourceSettingsPopup", () => {
       "href",
       "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1",
     );
+    expect(document.querySelector(".sp-canvas-editing")).toBeNull();
+    expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Accepted events go to Backlog" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
