@@ -103,7 +103,8 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return nil
+
+		return models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
 	})
 
 	if err != nil {

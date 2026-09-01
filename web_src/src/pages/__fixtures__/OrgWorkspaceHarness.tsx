@@ -28,8 +28,6 @@ import {
   FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsNotificationsPage,
-  FactorySettingsProfilePage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
@@ -74,6 +72,10 @@ import { NewAppPage } from "@/pages/home/NewAppPage";
 import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
+
+import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
+import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
+import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -238,11 +240,25 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
 
 const factorySettingsStorybookRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route key="factory-settings-account-general" path="account/general" element={<FactorySettingsProfilePage />} />,
+  <Route
+    key="factory-settings-account-general"
+    path="account/general"
+    element={<Navigate to="../profile" replace />}
+  />,
+  <Route
+    key="factory-settings-account-profile"
+    path="account/profile"
+    element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-security"
+    path="account/security"
+    element={<FactorySettingsAccountSecurityPage />}
+  />,
   <Route
     key="factory-settings-account-notifications"
     path="account/notifications"
-    element={<FactorySettingsNotificationsPage />}
+    element={<FactorySettingsAccountNotificationsPage />}
   />,
   <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
   <Route
