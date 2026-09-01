@@ -374,8 +374,19 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 			return nil
 		}
 
+		activityUpdate, err := finalizePullRequestActivityForRun(tx, runID)
+		if err != nil {
+			return err
+		}
+
 		nextFactoryLineRuns, factoryOrderUpdates, err = w.executeNextFactoryLineStep(tx, runID)
-		return err
+		if err != nil {
+			return err
+		}
+		if activityUpdate != nil {
+			factoryOrderUpdates = append(factoryOrderUpdates, *activityUpdate)
+		}
+		return nil
 	})
 
 	if err != nil {
@@ -641,4 +652,32 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 	}
 
 	return pendingRuns, orderUpdates, nil
+}
+
+func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, error) {
+	activity, err := models.FindPullRequestActivityByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	run, err := models.FindUnscopedCanvasRun(tx, runID)
+	if err != nil {
+		return nil, err
+	}
+	if err := activity.Finalize(tx, run); err != nil {
+		return nil, err
+	}
+
+	var pullRequest models.FactoryPullRequest
+	if err := tx.Where("id = ?", activity.PullRequestID).First(&pullRequest).Error; err != nil {
+		return nil, err
+	}
+
+	return &factoryWorkOrderUpdate{
+		factoryID: pullRequest.FactoryID,
+		orderID:   pullRequest.WorkOrderID,
+	}, nil
 }

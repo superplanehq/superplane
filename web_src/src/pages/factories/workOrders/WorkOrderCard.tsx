@@ -3,7 +3,7 @@ import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router";
 import {
-  getWorkOrderAttentionReason,
+  getWorkOrderAttentionReasons,
   WORK_ORDER_ATTENTION_CHIP_CLASSNAME,
   WORK_ORDER_ATTENTION_ICON,
   WORK_ORDER_ATTENTION_LABEL,
@@ -17,6 +17,10 @@ import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./W
 import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
 const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
+const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
+const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
+const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
@@ -30,8 +34,16 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   /** Tasks with a dispatch in flight. Only their controls show a busy state. */
   dispatchingOrderIds: ReadonlySet<string>;
   isAssigneesSaving: boolean;
-  /** Tasks with a queued or running PR-feedback run. */
+  /** Tasks with a queued or running discussion or exclusive-repair run. */
   addressingFeedbackOrderIds?: ReadonlySet<string>;
+  /** Activity text for an addressing run, keyed by task id. */
+  addressingFeedbackLabels?: ReadonlyMap<string, string>;
+  /** Tasks that wait for pull request checks and do not address comments yet. */
+  waitingOnChecksOrderIds?: ReadonlySet<string>;
+  /** Tasks whose latest check wait finished with passing checks. */
+  checksPassedOrderIds?: ReadonlySet<string>;
+  /** Tasks whose check handler stopped at the attempt limit. */
+  fixesPausedOrderIds?: ReadonlySet<string>;
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
@@ -71,6 +83,10 @@ export function WorkOrderCard({
   canDispatch,
   dispatchingOrderIds,
   addressingFeedbackOrderIds = EMPTY_ADDRESSING_FEEDBACK_IDS,
+  addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
+  waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
+  checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   onDispatch,
   href,
   onOpen,
@@ -80,10 +96,12 @@ export function WorkOrderCard({
   const meta = getWorkOrderDisplayStatusMeta(entry.displayStatus);
   const destination = href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id);
   const startedAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
-  const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
   const showStart = entry.displayStatus === "draft";
-  const attentionReason = getWorkOrderAttentionReason(entry.order, {
+  const attentionReasons = getWorkOrderAttentionReasons(entry.order, {
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
+    waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
+    checksPassed: checksPassedOrderIds.has(entry.id),
+    fixesPaused: fixesPausedOrderIds.has(entry.id),
   });
 
   return (
@@ -91,16 +109,7 @@ export function WorkOrderCard({
       className="group relative w-full rounded-md border border-border bg-card p-2.5 shadow-sm transition hover:border-foreground/20 hover:shadow"
       data-testid={`work-order-card-${entry.id}`}
     >
-      {onOpen ? (
-        <button
-          type="button"
-          className="absolute inset-0 z-0 rounded-md"
-          aria-label={`Open ${entry.title}`}
-          onClick={onOpen}
-        />
-      ) : (
-        <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${entry.title}`} />
-      )}
+      <WorkOrderCardOpenControl onOpen={onOpen} destination={destination} title={entry.title} />
 
       <div className="relative z-10 pointer-events-none">
         <div className="flex min-w-0 items-center gap-2">
@@ -115,32 +124,110 @@ export function WorkOrderCard({
           </h3>
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="flex h-5 min-w-0 items-center gap-1.5">
-            {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
-            <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
-              {startedLabel}
-            </span>
-          </div>
-          {confidenceScore != null || isAnalyzing || showStart ? (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
-              {showStart ? (
-                <StartDraftButton
-                  entry={entry}
-                  lines={factoryLines}
-                  preferredLineName={preferredLineName}
-                  canDispatch={canDispatch}
-                  isDispatching={dispatchingOrderIds.has(entry.id)}
-                  onDispatch={onDispatch}
-                />
-              ) : null}
-            </div>
-          ) : null}
-          {attentionReason ? <WorkOrderAttentionChip reason={attentionReason} /> : null}
-        </div>
+        <WorkOrderCardMetaRow
+          entry={entry}
+          organizationId={organizationId}
+          factoryLines={factoryLines}
+          preferredLineName={preferredLineName}
+          canDispatch={canDispatch}
+          isDispatching={dispatchingOrderIds.has(entry.id)}
+          onDispatch={onDispatch}
+          startedAt={startedAt}
+          showStart={showStart}
+          confidenceScore={confidenceScore}
+          isAnalyzing={isAnalyzing}
+          attentionReasons={attentionReasons}
+          feedbackLabel={addressingFeedbackLabels.get(entry.id)}
+        />
       </div>
     </article>
+  );
+}
+
+function WorkOrderCardOpenControl({
+  onOpen,
+  destination,
+  title,
+}: {
+  onOpen?: () => void;
+  destination: string;
+  title: string;
+}) {
+  if (onOpen) {
+    return (
+      <button type="button" className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} onClick={onOpen} />
+    );
+  }
+  return <Link to={destination} className="absolute inset-0 z-0 rounded-md" aria-label={`Open ${title}`} />;
+}
+
+function WorkOrderCardMetaRow({
+  entry,
+  organizationId,
+  factoryLines,
+  preferredLineName,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+  startedAt,
+  showStart,
+  confidenceScore,
+  isAnalyzing,
+  attentionReasons,
+  feedbackLabel,
+}: {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+  factoryLines: FactoriesFactoryLine[];
+  preferredLineName?: string;
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: WorkOrderCardContext["onDispatch"];
+  startedAt: Date | null;
+  showStart: boolean;
+  confidenceScore?: number;
+  isAnalyzing: boolean;
+  attentionReasons: WorkOrderAttentionReason[];
+  feedbackLabel?: string;
+}) {
+  const startedLabel = startedAt ? formatTimeAgo(startedAt) : "—";
+  const showActions = confidenceScore != null || isAnalyzing || showStart;
+
+  return (
+    <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="flex h-5 min-w-0 items-center gap-1.5">
+        {showStart ? null : <CardOwnerMark entry={entry} organizationId={organizationId} />}
+        <span className="truncate text-[11px] leading-4 text-muted-foreground" title={startedAt?.toLocaleString()}>
+          {startedLabel}
+        </span>
+      </div>
+      {showActions ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <CardConfidence entryId={entry.id} score={confidenceScore} isAnalyzing={isAnalyzing} />
+          {showStart ? (
+            <StartDraftButton
+              entry={entry}
+              lines={factoryLines}
+              preferredLineName={preferredLineName}
+              canDispatch={canDispatch}
+              isDispatching={isDispatching}
+              onDispatch={onDispatch}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {attentionReasons.length > 0 ? (
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          {attentionReasons.map((reason) => (
+            <WorkOrderAttentionChip
+              key={reason}
+              reason={reason}
+              label={reason === "feedback" ? feedbackLabel : undefined}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -159,17 +246,22 @@ function CardConfidence({ entryId, score, isAnalyzing }: { entryId: string; scor
   return null;
 }
 
-function WorkOrderAttentionChip({ reason }: { reason: WorkOrderAttentionReason }) {
+function WorkOrderAttentionChip({ reason, label }: { reason: WorkOrderAttentionReason; label?: string }) {
   const Icon = WORK_ORDER_ATTENTION_ICON[reason];
+  const text = label?.trim() || WORK_ORDER_ATTENTION_LABEL[reason];
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+        "inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
         WORK_ORDER_ATTENTION_CHIP_CLASSNAME[reason],
       )}
+      title={text}
     >
-      <Icon className={cn("size-3", reason === "feedback" && "animate-spin")} aria-hidden />
-      {WORK_ORDER_ATTENTION_LABEL[reason]}
+      <Icon
+        className={cn("size-3 shrink-0", (reason === "feedback" || reason === "checks") && "animate-spin")}
+        aria-hidden
+      />
+      <span className="truncate">{text}</span>
     </span>
   );
 }
