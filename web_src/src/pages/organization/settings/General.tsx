@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import type { OrganizationsOrganization } from "../../../api-client/types.gen";
@@ -13,6 +13,8 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
+import { getApiErrorMessage } from "@/lib/errors";
+import { organizationSlugValidationMessage, validateOrganizationSlug } from "@/lib/organizationSlug";
 import { settingsCardClassName } from "./settingsPageStyles";
 
 interface GeneralProps {
@@ -21,11 +23,15 @@ interface GeneralProps {
 
 export function General({ organization }: GeneralProps) {
   const { organizationId } = useParams<{ organizationId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   usePageTitle(["Settings"]);
   useReportPageReady(!permissionsLoading);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [name, setName] = useState(organization.metadata?.name || "");
+  const [slug, setSlug] = useState(organization.metadata?.slug || "");
+  const [slugError, setSlugError] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteForm, setShowDeleteForm] = useState(false);
@@ -42,16 +48,40 @@ export function General({ organization }: GeneralProps) {
       return;
     }
 
+    const trimmedSlug = slug.trim();
+    const currentSlug = organization.metadata?.slug || "";
+    const slugChanged = trimmedSlug !== currentSlug;
+
+    if (slugChanged) {
+      const validationError = validateOrganizationSlug(trimmedSlug);
+      if (validationError) {
+        setSlugError(organizationSlugValidationMessage(validationError));
+        return;
+      }
+    }
+    setSlugError(null);
+
     try {
       setSaveMessage(null);
 
       await updateOrganizationMutation.mutateAsync({
         name: name,
+        slug: slugChanged ? trimmedSlug : undefined,
       });
 
       setSaveMessage("Organization updated successfully");
       setTimeout(() => setSaveMessage(null), 3000);
-    } catch {
+
+      // The current route uses the old slug in its first path segment.
+      // Move to the new slug so the address bar and future reloads use it.
+      if (slugChanged) {
+        const newPath = location.pathname.replace(`/${organizationId}/`, `/${trimmedSlug}/`);
+        navigate(`${newPath}${location.search}`, { replace: true });
+      }
+    } catch (err) {
+      if (slugChanged) {
+        setSlugError(getApiErrorMessage(err, "Failed to update organization slug"));
+      }
       setSaveMessage("Failed to update organization");
       setTimeout(() => setSaveMessage(null), 3000);
     }
@@ -95,6 +125,33 @@ export function General({ organization }: GeneralProps) {
             className="max-w-sm"
             disabled={!canUpdateOrg}
           />
+        </Field>
+
+        <Field className="space-y-2">
+          <Label
+            htmlFor="organization-slug-input"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            Organization slug
+          </Label>
+          <Input
+            id="organization-slug-input"
+            type="text"
+            value={slug}
+            onChange={(e) => {
+              setSlug(e.target.value);
+              setSlugError(null);
+            }}
+            className="max-w-sm"
+            disabled={!canUpdateOrg}
+          />
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Used in your workspace URL. Use lowercase letters, numbers, and dashes only.
+          </p>
+          {slugError && <p className="text-sm text-red-600 dark:text-red-400">{slugError}</p>}
+        </Field>
+
+        <Field className="space-y-4">
           <div className="flex items-center gap-4">
             <PermissionTooltip
               allowed={canUpdateOrg || permissionsLoading}
