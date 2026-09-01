@@ -1,8 +1,8 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
-import { CanvasPage } from "@/ui/CanvasPage";
 
+import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
@@ -143,20 +143,7 @@ export function PRFeedbackAutomationTab({
         ) : null}
       </div>
       <div className="min-h-[18rem] flex-1">
-        <CanvasPage
-          nodes={graph.nodes}
-          edges={graph.edges}
-          factoryId={graph.factoryId}
-          factoryEmbed
-          isEditing
-          readOnly
-          hidePageChrome
-          hideAddControls
-          hideCanvasToolSidebar
-          hideRightSideControls
-          buildingBlocks={[]}
-          activeCanvasVersionId=""
-        />
+        <SettingsAutomationCanvas graph={graph} />
       </div>
     </section>
   );
