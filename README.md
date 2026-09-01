@@ -56,6 +56,8 @@ docker run --rm -p 3000:3000 -v spdata:/app/data -ti ghcr.io/superplanehq/superp
 
 Open [http://localhost:3000](http://localhost:3000).
 
+> **Tip:** The `-v spdata:/app/data` flag persists your data (workflows, runs, settings) across container restarts. To start fresh, remove the volume with `docker volume rm spdata` before running the container again.
+
 **Cloud:** Sign up at [app.superplane.com](https://app.superplane.com) ([cloud beta overview](https://superplane.com/blog/superplane-cloud-beta/)).
 
 For a guided first workflow, see the [quick start guide](https://docs.superplane.com/get-started/quickstart/).
