@@ -3,7 +3,12 @@ import { cn } from "@/lib/utils";
 import type { FactoriesFactoryPullRequest } from "@/api-client";
 import { ExternalLink, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from "lucide-react";
 
-import { pullRequestLabel, pullRequestState, type FactoryPullRequestState } from "./lib/workOrderPullRequest";
+import {
+  pullRequestLabel,
+  pullRequestListLabel,
+  pullRequestState,
+  type FactoryPullRequestState,
+} from "./lib/workOrderPullRequest";
 
 const PR_STATE_PRESENTATION: Record<FactoryPullRequestState, { icon: typeof GitPullRequest; className: string }> = {
   open: { icon: GitPullRequest, className: "text-emerald-600 dark:text-emerald-400" },
@@ -18,13 +23,16 @@ const pullRequestInlineClassName =
 export function WorkOrderPullRequestInline({
   pullRequest,
   className,
+  showTitle = false,
 }: {
   pullRequest: FactoriesFactoryPullRequest;
   className?: string;
+  /** Include the PR title after the number (sidebar lists). */
+  showTitle?: boolean;
 }) {
   const state = pullRequestState(pullRequest.state);
   const { icon: Icon, className: iconClassName } = PR_STATE_PRESENTATION[state];
-  const label = pullRequestLabel(pullRequest);
+  const label = showTitle ? pullRequestListLabel(pullRequest) : pullRequestLabel(pullRequest);
   const title = pullRequest.title?.trim();
   const safeUrl = safeExternalUrl(pullRequest.url);
   const content = (
