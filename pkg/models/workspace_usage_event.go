@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	UsageKindModel = "model"
+	UsageKindModel   = "model"
+	UsageKindCompute = "compute"
 
 	UsageFundingSourceBYOK   = "byok"
 	UsageFundingSourceHosted = "hosted"
@@ -22,15 +23,17 @@ const (
 	UsageProviderOpenAI     = "openai"
 	UsageProviderOpenRouter = "openrouter"
 	UsageProviderPerplexity = "perplexity"
+	UsageProviderRunner     = "runner"
 
 	UsageIdempotencyKeyRunner = "runner"
 )
 
 var ErrHostedUsageUnpriced = errors.New("hosted LLM usage has no price for this model")
 
-// LLMUsageEvent is one append-only LLM spend row. It is the source of truth
-// for reports. Factory execution token/cost columns are cached rollups.
-type LLMUsageEvent struct {
+// WorkspaceUsageEvent is one append-only spend row (model tokens or VM
+// seconds). It is the source of truth for reports. Factory execution
+// token/cost/duration columns are cached rollups.
+type WorkspaceUsageEvent struct {
 	ID                   uuid.UUID
 	OrganizationID       uuid.UUID
 	FactoryID            *uuid.UUID
@@ -51,6 +54,9 @@ type LLMUsageEvent struct {
 	CacheWriteTokens     int64
 	ReasoningTokens      int64
 	TotalTokens          int64
+	DurationSeconds      int64
+	MachineType          string
+	FleetID              string
 	CostMicros           int64
 	ProviderCostMicros   int64
 	Currency             string
@@ -60,12 +66,12 @@ type LLMUsageEvent struct {
 	CreatedAt            time.Time
 }
 
-func (LLMUsageEvent) TableName() string {
-	return "llm_usage_events"
+func (WorkspaceUsageEvent) TableName() string {
+	return "workspace_usage_events"
 }
 
-// LLMUsageEventInput is the call-site payload before factory scope is resolved.
-type LLMUsageEventInput struct {
+// WorkspaceUsageEventInput is the call-site payload before factory scope is resolved.
+type WorkspaceUsageEventInput struct {
 	OrganizationID   uuid.UUID
 	CanvasRunID      uuid.UUID
 	NodeExecutionID  uuid.UUID
@@ -83,14 +89,26 @@ type LLMUsageEventInput struct {
 	IdempotencyKey   string
 }
 
-// RecordUsage inserts one factory-linked usage row and copies ledger totals
-// into the line-step cache when the run belongs to a line execution.
+// ComputeUsageEventInput is the call-site payload for one runner-fleet task.
+type ComputeUsageEventInput struct {
+	OrganizationID  uuid.UUID
+	CanvasRunID     uuid.UUID
+	NodeExecutionID uuid.UUID
+	NodeID          string
+	MachineType     string
+	FleetID         string
+	DurationSeconds int64
+	IdempotencyKey  string
+}
+
+// RecordUsage inserts one factory-linked model-usage row and copies ledger
+// totals into the line-step cache when the run belongs to a line execution.
 // Factory canvases without a line step (Backlog analysis, PR feedback)
 // still persist. Org canvases are skipped. Each billed call gets its own
 // row, including retries of the same node execution.
-func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
+func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 	if in.Provider == "" || in.Model == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
-		return fmt.Errorf("llm usage event requires provider, model, node execution, and canvas run")
+		return fmt.Errorf("workspace usage event requires provider, model, node execution, and canvas run")
 	}
 
 	scope, err := resolveUsageScope(tx, in.CanvasRunID)
@@ -141,7 +159,7 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 	}
 
 	now := time.Now()
-	event := LLMUsageEvent{
+	event := WorkspaceUsageEvent{
 		ID:                   uuid.New(),
 		OrganizationID:       scope.OrganizationID,
 		FactoryID:            &scope.FactoryID,
@@ -171,7 +189,65 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		CreatedAt:            now,
 	}
 
-	err = tx.Clauses(clause.OnConflict{
+	return persistUsageEvent(tx, event, scope.execution)
+}
+
+// RecordComputeUsage inserts one factory-linked runner-fleet row. Cost comes
+// from the compute price book (zero until rates are published). Hosted
+// markup and wallet debit do not apply. Org canvases are skipped.
+func RecordComputeUsage(tx *gorm.DB, in ComputeUsageEventInput) error {
+	machineType := strings.TrimSpace(in.MachineType)
+	if machineType == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
+		return fmt.Errorf("compute usage event requires machine type, node execution, and canvas run")
+	}
+	if in.DurationSeconds < 0 {
+		return fmt.Errorf("compute usage event duration cannot be negative")
+	}
+
+	scope, err := resolveUsageScope(tx, in.CanvasRunID)
+	if err != nil {
+		return err
+	}
+	if scope == nil {
+		return nil
+	}
+
+	fleetID := strings.TrimSpace(in.FleetID)
+	providerCostMicros := pricebook.EstimateComputeMicros(machineType, fleetID, in.DurationSeconds)
+
+	now := time.Now()
+	event := WorkspaceUsageEvent{
+		ID:                   uuid.New(),
+		OrganizationID:       scope.OrganizationID,
+		FactoryID:            &scope.FactoryID,
+		WorkOrderID:          scope.WorkOrderID,
+		LineID:               scope.LineID,
+		LineDispatchID:       scope.LineDispatchID,
+		WorkOrderExecutionID: scope.WorkOrderExecutionID,
+		CanvasRunID:          in.CanvasRunID,
+		NodeExecutionID:      in.NodeExecutionID,
+		NodeID:               in.NodeID,
+		Provider:             UsageProviderRunner,
+		Model:                machineType,
+		UsageKind:            UsageKindCompute,
+		FundingSource:        UsageFundingSourceHosted,
+		DurationSeconds:      in.DurationSeconds,
+		MachineType:          machineType,
+		FleetID:              fleetID,
+		CostMicros:           providerCostMicros,
+		ProviderCostMicros:   providerCostMicros,
+		Currency:             "usd",
+		PriceBookVersion:     pricebook.Version,
+		IdempotencyKey:       usageIdempotencyKey(in.IdempotencyKey),
+		OccurredAt:           now,
+		CreatedAt:            now,
+	}
+
+	return persistUsageEvent(tx, event, scope.execution)
+}
+
+func persistUsageEvent(tx *gorm.DB, event WorkspaceUsageEvent, execution *FactoryWorkOrderExecution) error {
+	err := tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "idempotency_key"}},
 		DoNothing: true,
 	}).Create(&event).Error
@@ -179,12 +255,10 @@ func RecordUsage(tx *gorm.DB, in LLMUsageEventInput) error {
 		return err
 	}
 
-	if scope.execution != nil {
-		if err := scope.execution.RollupUsage(tx); err != nil {
-			return err
-		}
+	if execution != nil {
+		return execution.RollupUsage(tx)
 	}
-	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
+	return nil
 }
 
 func fundingSourceIsHosted(source string) bool {
@@ -203,14 +277,16 @@ type UsageReportFilter struct {
 	OrganizationID uuid.UUID
 	FactoryID      *uuid.UUID
 	WorkOrderID    *uuid.UUID
+	UsageKind      string
 	Since          time.Time
 	Until          time.Time
 }
 
-// UsageTotals is a token and cost sum.
+// UsageTotals is a token, duration, and cost sum.
 type UsageTotals struct {
-	TotalTokens int64
-	CostMicros  int64
+	TotalTokens     int64
+	DurationSeconds int64
+	CostMicros      int64
 }
 
 // UsageByModel is one model bucket in a spend report.
@@ -221,27 +297,54 @@ type UsageByModel struct {
 	CostMicros  int64
 }
 
+// UsageByMachineType is one fleet machine-type bucket in a compute report.
+type UsageByMachineType struct {
+	MachineType     string
+	DurationSeconds int64
+	CostMicros      int64
+}
+
 func (t UsageTotals) CostCents() int64 {
 	return pricebook.MicrosToCents(t.CostMicros)
+}
+
+// Add returns the field-wise sum of two ledger totals.
+func (t UsageTotals) Add(other UsageTotals) UsageTotals {
+	return UsageTotals{
+		TotalTokens:     t.TotalTokens + other.TotalTokens,
+		DurationSeconds: t.DurationSeconds + other.DurationSeconds,
+		CostMicros:      t.CostMicros + other.CostMicros,
+	}
 }
 
 func (r UsageByModel) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
 }
 
+func (r UsageByMachineType) CostCents() int64 {
+	return pricebook.MicrosToCents(r.CostMicros)
+}
+
 type usageSumRow struct {
-	ID          uuid.UUID
-	TotalTokens int64
-	CostMicros  int64
+	ID              uuid.UUID
+	TotalTokens     int64
+	DurationSeconds int64
+	CostMicros      int64
 }
 
 func scanUsageSums(rows []usageSumRow) map[uuid.UUID]UsageTotals {
 	result := make(map[uuid.UUID]UsageTotals, len(rows))
 	for _, row := range rows {
-		result[row.ID] = UsageTotals{TotalTokens: row.TotalTokens, CostMicros: row.CostMicros}
+		result[row.ID] = UsageTotals{
+			TotalTokens:     row.TotalTokens,
+			DurationSeconds: row.DurationSeconds,
+			CostMicros:      row.CostMicros,
+		}
 	}
 	return result
 }
+
+const usageSumSelect = "COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(duration_seconds), 0) AS duration_seconds, COALESCE(SUM(cost_micros), 0) AS cost_micros"
 
 // SumUsageForWorkOrders returns ledger totals keyed by work order. Missing
 // IDs are absent from the map (zero value).
@@ -251,8 +354,8 @@ func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID
 	}
 
 	var rows []usageSumRow
-	err := tx.Model(&LLMUsageEvent{}).
-		Select("work_order_id AS id, COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("work_order_id AS id, "+usageSumSelect).
 		Where("work_order_id IN ?", workOrderIDs).
 		Group("work_order_id").
 		Scan(&rows).Error
@@ -305,8 +408,8 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 	}
 
 	var rows []usageSumRow
-	err := tx.Model(&LLMUsageEvent{}).
-		Select("canvas_run_id AS id, COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("canvas_run_id AS id, "+usageSumSelect).
 		Where("canvas_run_id IN ?", treeIDs).
 		Group("canvas_run_id").
 		Scan(&rows).Error
@@ -321,6 +424,7 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 		}
 		totals := result[rootID]
 		totals.TotalTokens += row.TotalTokens
+		totals.DurationSeconds += row.DurationSeconds
 		totals.CostMicros += row.CostMicros
 		result[rootID] = totals
 	}
@@ -328,12 +432,15 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 }
 
 func usageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
-	query := tx.Model(&LLMUsageEvent{}).Where("organization_id = ?", filter.OrganizationID)
+	query := tx.Model(&WorkspaceUsageEvent{}).Where("organization_id = ?", filter.OrganizationID)
 	if filter.FactoryID != nil {
 		query = query.Where("factory_id = ?", *filter.FactoryID)
 	}
 	if filter.WorkOrderID != nil {
 		query = query.Where("work_order_id = ?", *filter.WorkOrderID)
+	}
+	if filter.UsageKind != "" {
+		query = query.Where("usage_kind = ?", filter.UsageKind)
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("occurred_at >= ?", filter.Since)
@@ -344,18 +451,28 @@ func usageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
 	return query
 }
 
-// SummarizeUsage returns org or workspace totals and a per-model breakdown.
+func modelUsageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
+	filter.UsageKind = UsageKindModel
+	return usageReportQuery(tx, filter)
+}
+
+func computeUsageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
+	filter.UsageKind = UsageKindCompute
+	return usageReportQuery(tx, filter)
+}
+
+// SummarizeUsage returns org or workspace model totals and a per-model breakdown.
 func SummarizeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, []UsageByModel, error) {
 	var totals UsageTotals
-	err := usageReportQuery(tx, filter).
-		Select("COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+	err := modelUsageReportQuery(tx, filter).
+		Select(usageSumSelect).
 		Scan(&totals).Error
 	if err != nil {
 		return UsageTotals{}, nil, err
 	}
 
 	var byModel []UsageByModel
-	err = usageReportQuery(tx, filter).
+	err = modelUsageReportQuery(tx, filter).
 		Select("provider, model, COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
 		Group("provider, model").
 		Order("cost_micros DESC").
@@ -368,6 +485,31 @@ func SummarizeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, []Usage
 	}
 
 	return totals, byModel, nil
+}
+
+// SummarizeComputeUsage returns org or workspace VM totals and a per-machine-type breakdown.
+func SummarizeComputeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, []UsageByMachineType, error) {
+	var totals UsageTotals
+	err := computeUsageReportQuery(tx, filter).
+		Select(usageSumSelect).
+		Scan(&totals).Error
+	if err != nil {
+		return UsageTotals{}, nil, err
+	}
+
+	var byMachine []UsageByMachineType
+	err = computeUsageReportQuery(tx, filter).
+		Select("machine_type, COALESCE(SUM(duration_seconds), 0) AS duration_seconds, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+		Group("machine_type").
+		Order("cost_micros DESC").
+		Order("duration_seconds DESC").
+		Order("machine_type ASC").
+		Scan(&byMachine).Error
+	if err != nil {
+		return UsageTotals{}, nil, err
+	}
+
+	return totals, byMachine, nil
 }
 
 // RollupUsage copies ledger totals into the cached execution columns.
@@ -384,8 +526,8 @@ func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
 		}
 
 		var totals UsageTotals
-		err = inner.Model(&LLMUsageEvent{}).
-			Select("COALESCE(SUM(total_tokens), 0) AS total_tokens, COALESCE(SUM(cost_micros), 0) AS cost_micros").
+		err = inner.Model(&WorkspaceUsageEvent{}).
+			Select(usageSumSelect).
 			Where("work_order_execution_id = ?", e.ID).
 			Scan(&totals).Error
 		if err != nil {
@@ -394,13 +536,15 @@ func (e *FactoryWorkOrderExecution) RollupUsage(tx *gorm.DB) error {
 
 		now := time.Now()
 		e.TotalTokens = totals.TotalTokens
+		e.DurationSeconds = totals.DurationSeconds
 		e.CostCents = totals.CostCents()
 		e.UpdatedAt = now
 
 		return inner.Model(e).Updates(map[string]any{
-			"total_tokens": e.TotalTokens,
-			"cost_cents":   e.CostCents,
-			"updated_at":   now,
+			"total_tokens":     e.TotalTokens,
+			"duration_seconds": e.DurationSeconds,
+			"cost_cents":       e.CostCents,
+			"updated_at":       now,
 		}).Error
 	})
 }

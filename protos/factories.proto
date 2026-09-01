@@ -85,6 +85,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory repository";
+      description: "Updates the repository used by a factory workspace";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -626,9 +638,23 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // Default branch of the app repository.
+  optional string default_branch = 11;
 }
 
 message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryRepositoryRequest {
+  string id = 1;
+  // Repository slug in owner/name form.
+  string repository = 2;
+  // Default branch resolved from the selected repository.
+  string default_branch = 3;
+}
+
+message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
@@ -664,6 +690,7 @@ message FactoryOnboarding {
   AgentHarness agent_harness = 7;
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
+  string default_branch = 10;
 }
 
 message Factory {
@@ -1206,6 +1233,7 @@ message WorkOrder {
   repeated WorkOrderStatusNote status_notes = 15;
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
 }
 
 message WorkOrderOrigin {
@@ -1346,6 +1374,7 @@ message WorkOrderExecution {
   int64 cost_cents = 10;
   // When the execution finished (set for finished executions only).
   google.protobuf.Timestamp finished_at = 11;
+  int64 duration_seconds = 12;
 }
 
 message WorkOrderExecutionStep {
@@ -1732,7 +1761,7 @@ message FactoryLineMetrics {
   repeated int32 throughput_trend = 11;
 }
 
-// LLM spend
+// Factory workspace usage (LLM tokens and runner-fleet VM time)
 
 message DescribeFactoryUsageRequest {
   string factory_id = 1;
@@ -1753,6 +1782,8 @@ message DescribeFactoryUsageResponse {
   int64 factory_hosted_billed_cents = 10;
   int64 factory_remaining_credit_cents = 11;
   bool factory_remaining_credit_warning = 12;
+  int64 total_duration_seconds = 13;
+  repeated UsageByMachineType by_machine_type = 14;
 }
 
 message ListFactoryLLMModelsRequest {
@@ -1789,4 +1820,10 @@ message UsageByModel {
   string model = 2;
   int64 total_tokens = 3;
   int64 cost_cents = 4;
+}
+
+message UsageByMachineType {
+  string machine_type = 1;
+  int64 duration_seconds = 2;
+  int64 cost_cents = 3;
 }

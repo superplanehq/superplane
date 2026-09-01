@@ -58,11 +58,12 @@ export const SETUP_ANSWERS = {
 /** Default dataset with saved setup answers on the primary workspace. */
 export function factoriesFixtureWithSetupAnswers(
   onboarding: FactoriesFactoryOnboarding,
-  options?: { organizationLlmSpend?: StorybookUsageReport },
+  options?: { organizationWorkspaceUsage?: StorybookUsageReport },
 ): FactoriesFixture {
   return {
     ...defaultFactoriesFixture,
-    organizationLlmSpend: options?.organizationLlmSpend ?? defaultFactoriesFixture.organizationLlmSpend,
+    organizationWorkspaceUsage:
+      options?.organizationWorkspaceUsage ?? defaultFactoriesFixture.organizationWorkspaceUsage,
     factories: defaultFactoriesFixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),

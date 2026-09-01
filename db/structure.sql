@@ -614,7 +614,8 @@ CREATE TABLE public.factory_work_order_executions (
     finished_at timestamp with time zone,
     total_tokens bigint DEFAULT 0 NOT NULL,
     cost_cents bigint DEFAULT 0 NOT NULL,
-    line_dispatch_id uuid NOT NULL
+    line_dispatch_id uuid NOT NULL,
+    duration_seconds bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -675,6 +676,8 @@ CREATE TABLE public.factory_work_orders (
     status_note jsonb,
     origin_url text,
     origin_label text,
+    repository text,
+    default_branch text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -746,41 +749,6 @@ CREATE TABLE public.installation_metadata (
 
 
 --
--- Name: llm_usage_events; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.llm_usage_events (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid,
-    work_order_id uuid,
-    line_id uuid,
-    line_dispatch_id uuid,
-    work_order_execution_id uuid,
-    canvas_run_id uuid NOT NULL,
-    node_execution_id uuid NOT NULL,
-    node_id text NOT NULL,
-    provider text NOT NULL,
-    model text NOT NULL,
-    usage_kind text DEFAULT 'model'::text NOT NULL,
-    funding_source text DEFAULT 'byok'::text NOT NULL,
-    input_tokens bigint DEFAULT 0 NOT NULL,
-    output_tokens bigint DEFAULT 0 NOT NULL,
-    cache_read_tokens bigint DEFAULT 0 NOT NULL,
-    cache_write_tokens bigint DEFAULT 0 NOT NULL,
-    reasoning_tokens bigint DEFAULT 0 NOT NULL,
-    total_tokens bigint DEFAULT 0 NOT NULL,
-    cost_micros bigint DEFAULT 0 NOT NULL,
-    currency text DEFAULT 'usd'::text NOT NULL,
-    price_book_version text NOT NULL,
-    idempotency_key text NOT NULL,
-    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    provider_cost_micros bigint DEFAULT 0 NOT NULL
-);
-
-
---
 -- Name: organization_byok_model_allowlists; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -839,20 +807,6 @@ CREATE TABLE public.organization_llm_credit_grants (
     polar_refund_id text,
     CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
     CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
-);
-
-
---
--- Name: organization_llm_credit_holds; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_llm_credit_holds (
-    node_execution_id uuid NOT NULL,
-    organization_id uuid NOT NULL,
-    amount_micros bigint NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    factory_id uuid,
-    CONSTRAINT organization_llm_credit_holds_amount_positive CHECK ((amount_micros > 0))
 );
 
 
@@ -957,6 +911,38 @@ CREATE TABLE public.secrets (
     data bytea NOT NULL,
     domain_type character varying(64) NOT NULL,
     domain_id character varying(64) NOT NULL
+);
+
+
+--
+-- Name: usage_price_book_rates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.usage_price_book_rates (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    version text NOT NULL,
+    usage_kind text NOT NULL,
+    match_key text NOT NULL,
+    match_mode text NOT NULL,
+    input_cents_per_million bigint DEFAULT 0 NOT NULL,
+    output_cents_per_million bigint DEFAULT 0 NOT NULL,
+    cache_read_cents_per_million bigint DEFAULT 0 NOT NULL,
+    cache_write_cents_per_million bigint DEFAULT 0 NOT NULL,
+    reasoning_cents_per_million bigint DEFAULT 0 NOT NULL,
+    micros_per_second bigint DEFAULT 0 NOT NULL,
+    CONSTRAINT usage_price_book_rates_match_mode_check CHECK ((match_mode = ANY (ARRAY['exact'::text, 'prefix'::text, 'family'::text]))),
+    CONSTRAINT usage_price_book_rates_usage_kind_check CHECK ((usage_kind = ANY (ARRAY['model'::text, 'compute'::text])))
+);
+
+
+--
+-- Name: usage_price_books; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.usage_price_books (
+    version text NOT NULL,
+    effective_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1243,6 +1229,46 @@ CREATE TABLE public.workflows (
     description text DEFAULT ''::text NOT NULL,
     dismissed_agent_suggestion_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
     factory_id uuid
+);
+
+
+--
+-- Name: workspace_usage_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_usage_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid,
+    work_order_id uuid,
+    line_id uuid,
+    line_dispatch_id uuid,
+    work_order_execution_id uuid,
+    canvas_run_id uuid NOT NULL,
+    node_execution_id uuid NOT NULL,
+    node_id text NOT NULL,
+    provider text NOT NULL,
+    model text NOT NULL,
+    usage_kind text DEFAULT 'model'::text NOT NULL,
+    funding_source text DEFAULT 'byok'::text NOT NULL,
+    input_tokens bigint DEFAULT 0 NOT NULL,
+    output_tokens bigint DEFAULT 0 NOT NULL,
+    cache_read_tokens bigint DEFAULT 0 NOT NULL,
+    cache_write_tokens bigint DEFAULT 0 NOT NULL,
+    reasoning_tokens bigint DEFAULT 0 NOT NULL,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    cost_micros bigint DEFAULT 0 NOT NULL,
+    currency text DEFAULT 'usd'::text NOT NULL,
+    price_book_version text NOT NULL,
+    idempotency_key text NOT NULL,
+    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider_cost_micros bigint DEFAULT 0 NOT NULL,
+    duration_seconds bigint DEFAULT 0 NOT NULL,
+    machine_type text DEFAULT ''::text NOT NULL,
+    fleet_id text DEFAULT ''::text NOT NULL,
+    CONSTRAINT workspace_usage_events_compute_shape CHECK (((usage_kind <> 'compute'::text) OR ((machine_type <> ''::text) AND (duration_seconds >= 0)))),
+    CONSTRAINT workspace_usage_events_usage_kind_known CHECK ((usage_kind = ANY (ARRAY['model'::text, 'compute'::text])))
 );
 
 
@@ -1678,22 +1704,6 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
--- Name: llm_usage_events llm_usage_events_idempotency_key_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.llm_usage_events
-    ADD CONSTRAINT llm_usage_events_idempotency_key_key UNIQUE (idempotency_key);
-
-
---
--- Name: llm_usage_events llm_usage_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.llm_usage_events
-    ADD CONSTRAINT llm_usage_events_pkey PRIMARY KEY (id);
-
-
---
 -- Name: organization_byok_model_allowlists organization_byok_model_allowlists_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1739,14 +1749,6 @@ ALTER TABLE ONLY public.organization_invite_links
 
 ALTER TABLE ONLY public.organization_llm_credit_grants
     ADD CONSTRAINT organization_llm_credit_grants_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_llm_credit_holds organization_llm_credit_holds_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_llm_credit_holds
-    ADD CONSTRAINT organization_llm_credit_holds_pkey PRIMARY KEY (node_execution_id);
 
 
 --
@@ -1851,6 +1853,30 @@ ALTER TABLE ONLY public.group_metadata
 
 ALTER TABLE ONLY public.role_metadata
     ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id);
+
+
+--
+-- Name: usage_price_book_rates usage_price_book_rates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usage_price_book_rates
+    ADD CONSTRAINT usage_price_book_rates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: usage_price_book_rates usage_price_book_rates_version_usage_kind_match_key_match_m_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usage_price_book_rates
+    ADD CONSTRAINT usage_price_book_rates_version_usage_kind_match_key_match_m_key UNIQUE (version, usage_kind, match_key, match_mode);
+
+
+--
+-- Name: usage_price_books usage_price_books_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usage_price_books
+    ADD CONSTRAINT usage_price_books_pkey PRIMARY KEY (version);
 
 
 --
@@ -1987,6 +2013,22 @@ ALTER TABLE ONLY public.workflow_versions
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_usage_events workspace_usage_events_idempotency_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_usage_events
+    ADD CONSTRAINT workspace_usage_events_idempotency_key_key UNIQUE (idempotency_key);
+
+
+--
+-- Name: workspace_usage_events workspace_usage_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_usage_events
+    ADD CONSTRAINT workspace_usage_events_pkey PRIMARY KEY (id);
 
 
 --
@@ -2473,34 +2515,6 @@ CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (gro
 
 
 --
--- Name: idx_llm_usage_events_execution; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_llm_usage_events_execution ON public.llm_usage_events USING btree (work_order_execution_id) WHERE (work_order_execution_id IS NOT NULL);
-
-
---
--- Name: idx_llm_usage_events_factory_occurred; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_llm_usage_events_factory_occurred ON public.llm_usage_events USING btree (factory_id, occurred_at DESC) WHERE (factory_id IS NOT NULL);
-
-
---
--- Name: idx_llm_usage_events_org_occurred; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_llm_usage_events_org_occurred ON public.llm_usage_events USING btree (organization_id, occurred_at DESC);
-
-
---
--- Name: idx_llm_usage_events_work_order; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_llm_usage_events_work_order ON public.llm_usage_events USING btree (work_order_id) WHERE (work_order_id IS NOT NULL);
-
-
---
 -- Name: idx_node_requests_state_run_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2533,13 +2547,6 @@ CREATE UNIQUE INDEX idx_org_llm_credit_grants_polar_refund ON public.organizatio
 --
 
 CREATE UNIQUE INDEX idx_org_llm_credit_grants_welcome ON public.organization_llm_credit_grants USING btree (organization_id) WHERE (kind = 'welcome'::text);
-
-
---
--- Name: idx_org_llm_credit_holds_org; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_org_llm_credit_holds_org ON public.organization_llm_credit_holds USING btree (organization_id);
 
 
 --
@@ -2841,6 +2848,55 @@ CREATE INDEX idx_workflows_live_version_id ON public.workflows USING btree (live
 --
 
 CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (organization_id);
+
+
+--
+-- Name: idx_workspace_usage_events_compute_factory_occurred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_compute_factory_occurred ON public.workspace_usage_events USING btree (factory_id, occurred_at DESC) WHERE ((usage_kind = 'compute'::text) AND (factory_id IS NOT NULL));
+
+
+--
+-- Name: idx_workspace_usage_events_compute_machine; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_compute_machine ON public.workspace_usage_events USING btree (organization_id, machine_type, occurred_at DESC) WHERE (usage_kind = 'compute'::text);
+
+
+--
+-- Name: idx_workspace_usage_events_compute_org_occurred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_compute_org_occurred ON public.workspace_usage_events USING btree (organization_id, occurred_at DESC) WHERE (usage_kind = 'compute'::text);
+
+
+--
+-- Name: idx_workspace_usage_events_execution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_execution ON public.workspace_usage_events USING btree (work_order_execution_id) WHERE (work_order_execution_id IS NOT NULL);
+
+
+--
+-- Name: idx_workspace_usage_events_factory_occurred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_factory_occurred ON public.workspace_usage_events USING btree (factory_id, occurred_at DESC) WHERE (factory_id IS NOT NULL);
+
+
+--
+-- Name: idx_workspace_usage_events_org_occurred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_org_occurred ON public.workspace_usage_events USING btree (organization_id, occurred_at DESC);
+
+
+--
+-- Name: idx_workspace_usage_events_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_events USING btree (work_order_id) WHERE (work_order_id IS NOT NULL);
 
 
 --
@@ -3429,6 +3485,14 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repository_seed_files
     ADD CONSTRAINT repository_seed_files_repository_id_fkey FOREIGN KEY (repository_id) REFERENCES public.repositories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: usage_price_book_rates usage_price_book_rates_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.usage_price_book_rates
+    ADD CONSTRAINT usage_price_book_rates_version_fkey FOREIGN KEY (version) REFERENCES public.usage_price_books(version);
 
 
 --

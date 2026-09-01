@@ -120,7 +120,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
     },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     {
-      pattern: re("/api/v1/organizations/[^/]+/llm-spend"),
+      pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
     },
     {
@@ -442,6 +442,9 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
+    if (url.searchParams.get("type") === "default_branch") {
+      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }
 

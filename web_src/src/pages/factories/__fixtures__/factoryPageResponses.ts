@@ -289,7 +289,7 @@ export interface FactoriesFixture {
    * period without an entry falls back to the empty report.
    */
   velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
-  organizationLlmSpend?: StorybookUsageReport;
+  organizationWorkspaceUsage?: StorybookUsageReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
@@ -337,5 +337,5 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   velocityByFactoryId: {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
   },
-  organizationLlmSpend: DEFAULT_FACTORY_USAGE,
+  organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
 };

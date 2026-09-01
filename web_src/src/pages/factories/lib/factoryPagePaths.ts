@@ -329,8 +329,19 @@ export function factorySettingsPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/settings`;
 }
 
-export function factorySettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
+export type FactorySettingsScope = "account" | "workspace" | "organization";
+
+export function factorySettingsSectionPath(
+  organizationId: string,
+  factoryKey: string,
+  scope: FactorySettingsScope,
+  section: string,
+) {
+  return `${factorySettingsPath(organizationId, factoryKey)}/${scope}/${section}`;
+}
+
+export function factorySettingsWorkspaceGeneralPath(organizationId: string, factoryKey: string) {
+  return factorySettingsSectionPath(organizationId, factoryKey, "workspace", "general");
 }
 
 export type OrganizationSettingsLocationState = {
@@ -361,7 +372,7 @@ export function factorySettingsGeneralPathAfterKeyChange(
   if (!nextKey || nextKey === previousKey) {
     return null;
   }
-  return factorySettingsSectionPath(organizationId, nextKey, "general");
+  return factorySettingsWorkspaceGeneralPath(organizationId, nextKey);
 }
 
 export function factoryMissionsPath(organizationId: string, factoryKey: string) {

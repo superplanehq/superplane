@@ -115,6 +115,10 @@ func (r *recordingUsage) Record(record core.UsageRecord) error {
 	return nil
 }
 
+func (r *recordingUsage) RecordCompute(core.ComputeUsageRecord) error {
+	return nil
+}
+
 func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	t.Parallel()
 
