@@ -3,39 +3,31 @@ package factories
 import (
 	"context"
 	"errors"
-	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
-	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
-	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
-	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
 const (
-	velocityPeriodDaysDefault = 7
+	velocityPeriodDaysDefault = 14
 	velocityPeriodDaysMax     = 30
-	velocitySearchMaxPages    = 3
-	velocitySearchPageSize    = 100
 )
 
-var githubPRURLRegex = regexp.MustCompile(`github\.com/(?:repos/)?([^/]+)/([^/]+)/(?:pull|pulls)/(\d+)`)
-
+// DescribeFactoryVelocity reports what a workspace shipped, how long the work
+// took, and what it cost.
+//
+// Every number comes from the database. Repository merges by people are stored
+// by the factory velocity sync worker, so this handler makes no external calls
+// and cannot lose the People series to a third-party failure.
 func DescribeFactoryVelocity(
 	ctx context.Context,
-	reg *registry.Registry,
 	organizationID string,
 	req *pb.DescribeFactoryVelocityRequest,
 ) (*pb.DescribeFactoryVelocityResponse, error) {
@@ -58,35 +50,36 @@ func DescribeFactoryVelocity(
 
 	now := time.Now().In(time.Local)
 	buckets := buildDayBuckets(now, period)
+	current := velocityWindow{start: buckets[0].start, end: buckets[len(buckets)-1].end}
+	previous := velocityWindow{start: current.start.AddDate(0, 0, -period), end: current.start}
+	previousBuckets := buildWindowBuckets(previous, period)
 
 	repoOwner, repoName, hasRepo := parseOwnerRepo(req.GetRepository())
 
-	artifacts, err := listVelocityArtifacts(db, factoryID, buckets[0].start, buckets[len(buckets)-1].end)
+	// One query covers both windows, so the comparison costs no extra round trip.
+	rows, err := models.ListFactoryVelocityPullRequests(db, factoryID, previous.start, current.end)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
+	rows = filterVelocityRowsByRepository(rows, repoOwner, repoName, hasRepo)
+
+	currentOrders := collectVelocityOrders(rows, current)
+	previousOrders := collectVelocityOrders(rows, previous)
+
+	usage, err := models.SumUsageForWorkOrders(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
+	applyVelocityOrderUsage(currentOrders, usage)
+	applyVelocityOrderUsage(previousOrders, usage)
+
+	cohort, err := loadMergeCohort(db, factoryID, hasRepo, previous.start, current.end)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
 
-	superplaneMerges, superplaneWaste := classifySuperPlaneArtifacts(artifacts, repoOwner, repoName, hasRepo)
-
-	hasPeople := false
-	peopleSearchFailed := false
-	var peopleHits []peopleMerge
-	if hasRepo && req.GetIntegrationId() != "" {
-		peopleHits, hasPeople, peopleSearchFailed = loadPeopleCohort(peopleCohortRequest{
-			ctx:           ctx,
-			reg:           reg,
-			tx:            db,
-			orgID:         orgID,
-			factoryID:     factoryID,
-			integrationID: req.GetIntegrationId(),
-			repoOwner:     repoOwner,
-			repoName:      repoName,
-			from:          buckets[0].start,
-			endExclusive:  buckets[len(buckets)-1].end,
-		})
-	}
-
-	fillBuckets(buckets, superplaneMerges, superplaneWaste, peopleHits)
+	fillBuckets(buckets, rows, currentOrders, cohort.merges, current)
+	fillBuckets(previousBuckets, rows, previousOrders, cohort.merges, previous)
 
 	yesterdayIdx := len(buckets) - 2
 	if yesterdayIdx < 0 {
@@ -94,17 +87,27 @@ func DescribeFactoryVelocity(
 	}
 	yesterday := buckets[yesterdayIdx]
 
-	totals := aggregateTotals(buckets, hasPeople)
+	totals := aggregateTotals(buckets, cohort.hasPeople)
+	previousTotals := aggregateTotals(previousBuckets, cohort.hasPeople)
+
+	people, err := buildVelocityPeople(db, orgID, currentOrders, cohort.merges, current)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
 
 	points := make([]*pb.DescribeFactoryVelocityDay, 0, len(buckets))
 	for i := range buckets {
 		b := &buckets[i]
 		points = append(points, &pb.DescribeFactoryVelocityDay{
-			Day:              dayLabel(b.start, period, i),
+			Day:              dayLabel(b.start),
 			Date:             timestamppb.New(b.start),
 			SuperplaneMerged: int32(b.superplaneMerged),
 			PeopleMerged:     int32(b.peopleMerged),
 			Waste:            int32(b.waste),
+			Intake:           serializeVelocityIntakeCounts(b.intake),
+			CostCents:        b.costCents,
+			Tokens:           b.tokens,
+			WasteCostCents:   b.wasteCostCents,
 		})
 	}
 
@@ -114,12 +117,172 @@ func DescribeFactoryVelocity(
 			SuperplaneMerged: int32(yesterday.superplaneMerged),
 			Waste:            int32(yesterday.waste),
 		},
-		Totals:             totals,
-		Points:             points,
-		Repository:         joinOwnerRepo(repoOwner, repoName),
-		HasPeopleCohort:    hasPeople,
-		PeopleSearchFailed: peopleSearchFailed,
+		Totals:            totals,
+		Points:            points,
+		Repository:        joinOwnerRepo(repoOwner, repoName),
+		HasPeopleCohort:   cohort.hasPeople,
+		PeopleSyncedAt:    cohort.syncedAt(),
+		PeopleSyncPending: cohort.pending,
+		PreviousTotals:    previousTotals,
+		HasPreviousWindow: hasVelocityOutput(previousTotals),
+		IntakeSources:     serializeVelocityIntakeSources(currentOrders, cohort.agentMergedIn(current)),
+		People:            people,
 	}, nil
+}
+
+// mergeCohort is the stored repository history both merge series are built
+// from, together with how fresh it is.
+type mergeCohort struct {
+	merges []models.FactoryVelocityRepositoryMerge
+	// hasPeople reports whether repository merges are stored, so the People
+	// series and the SuperPlane share are meaningful.
+	hasPeople bool
+	// pending reports a repository whose first sync has not stored merges yet.
+	// The UI explains the gap instead of claiming people merged nothing.
+	pending  bool
+	syncedOn *time.Time
+}
+
+func (c mergeCohort) syncedAt() *timestamppb.Timestamp {
+	if c.syncedOn == nil {
+		return nil
+	}
+	return timestamppb.New(*c.syncedOn)
+}
+
+// agentMergedIn counts the agent merges of a window. They carry no work order,
+// so the intake breakdown has to learn about them from here.
+func (c mergeCohort) agentMergedIn(window velocityWindow) int {
+	merged := 0
+	for i := range c.merges {
+		if c.merges[i].IsAgent() && window.contains(c.merges[i].MergedAt) {
+			merged++
+		}
+	}
+	return merged
+}
+
+// loadMergeCohort reads the repository merges the sync worker stored. A
+// workspace with no repository, or one whose first sync has not finished,
+// reports no cohort and the SuperPlane counts still return.
+func loadMergeCohort(
+	tx *gorm.DB,
+	factoryID uuid.UUID,
+	hasRepo bool,
+	from, to time.Time,
+) (mergeCohort, error) {
+	if !hasRepo {
+		return mergeCohort{}, nil
+	}
+
+	sync, err := models.FindFactoryVelocitySync(tx, factoryID)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return mergeCohort{}, err
+	}
+	if sync == nil || sync.SyncedAt == nil {
+		return mergeCohort{pending: true}, nil
+	}
+
+	merges, err := models.ListFactoryVelocityRepositoryMerges(tx, factoryID, from, to)
+	if err != nil {
+		return mergeCohort{}, err
+	}
+
+	return mergeCohort{
+		merges:    merges,
+		hasPeople: true,
+		syncedOn:  sync.SyncedAt,
+	}, nil
+}
+
+// hasVelocityOutput reports whether a window holds enough output to compare
+// against. A workspace younger than two windows has an empty baseline, and a
+// delta against nothing reads as infinite growth.
+func hasVelocityOutput(totals *pb.DescribeFactoryVelocityTotals) bool {
+	if totals == nil {
+		return false
+	}
+	return totals.GetSuperplaneMerged()+totals.GetPeopleMerged()+totals.GetWaste() > 0
+}
+
+func serializeVelocityIntakeCounts(counts map[string]int) []*pb.DescribeFactoryVelocityIntakeCount {
+	if len(counts) == 0 {
+		return nil
+	}
+
+	out := make([]*pb.DescribeFactoryVelocityIntakeCount, 0, len(counts))
+	for _, key := range velocityIntakeSeriesOrder {
+		merged, ok := counts[key]
+		if !ok || merged == 0 {
+			continue
+		}
+		out = append(out, &pb.DescribeFactoryVelocityIntakeCount{Key: key, Merged: int32(merged)})
+	}
+	return out
+}
+
+func serializeVelocityIntakeSources(
+	orders map[uuid.UUID]*velocityOrder,
+	agentMerged int,
+) []*pb.DescribeFactoryVelocityIntakeSource {
+	totals := velocityIntakeMergedCounts(orders, agentMerged)
+
+	keys := velocityIntakeKeysPresent(totals)
+	out := make([]*pb.DescribeFactoryVelocityIntakeSource, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, &pb.DescribeFactoryVelocityIntakeSource{
+			Key:    key,
+			Label:  velocityIntakeLabel(key),
+			Merged: int32(totals[key]),
+		})
+	}
+	return out
+}
+
+// buildVelocityPeople joins repository authorship with the work orders each
+// member opened. It reports no rows when the organization has no members with
+// activity, which is what a brand new workspace looks like.
+func buildVelocityPeople(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	orders map[uuid.UUID]*velocityOrder,
+	merges []models.FactoryVelocityRepositoryMerge,
+	window velocityWindow,
+) ([]*pb.DescribeFactoryVelocityPerson, error) {
+	members, err := models.ListFactoryVelocityMembers(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := newVelocityPeopleBuilder(members)
+	for i := range merges {
+		// An agent merge belongs to SuperPlane, not to the account that opened
+		// it, which is the GitHub App rather than a person.
+		if merges[i].IsAgent() || !window.contains(merges[i].MergedAt) {
+			continue
+		}
+		builder.addAuthoredMerge(&merges[i])
+	}
+	for _, order := range orders {
+		builder.addFactoryOrder(order)
+	}
+
+	rows := builder.rowsByMergedDesc()
+	out := make([]*pb.DescribeFactoryVelocityPerson, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &pb.DescribeFactoryVelocityPerson{
+			Id:               row.id,
+			Name:             row.name,
+			Email:            row.email,
+			AvatarUrl:        row.avatarURL,
+			AuthoredMerged:   int32(row.authoredMerged),
+			FactoryMerged:    int32(row.factoryMerged),
+			FactoryWaste:     int32(row.factoryWaste),
+			CostCents:        row.costCents,
+			MedianCycleHours: medianFloats(row.cycleHours),
+		})
+	}
+	return out, nil
 }
 
 func clampPeriodDays(v int) int {
@@ -138,17 +301,32 @@ type dayBucket struct {
 	superplaneMerged int
 	peopleMerged     int
 	waste            int
+	// Merged SuperPlane pull requests of the day, keyed by intake source.
+	intake         map[string]int
+	costCents      int64
+	tokens         int64
+	wasteCostCents int64
 }
 
-func dayLabel(start time.Time, periodDays, index int) string {
-	if periodDays <= 7 {
-		return start.Format("Mon")
+// dayLabel names the axis tick of a day, as a weekday and a date.
+//
+// The weekday carries most of the meaning: it explains the gaps in the chart,
+// because a quiet Saturday reads as a weekend rather than as an outage. The date
+// tells the reader which day it was, which a "day 9 of 14" number cannot.
+//
+// The month appears only where the window crosses into a new one, compared
+// against the day immediately before it. Naming it on every tick would make
+// no tick stand out; naming it nowhere would leave a reader unsure which
+// month a mid-window tick belongs to.
+//
+// Every day gets a full label. How many of them a chart has room to draw is
+// the chart's decision (see pickVelocityAxisTicks on the frontend), not this
+// producer's: it only names days.
+func dayLabel(start time.Time) string {
+	if start.Month() != start.AddDate(0, 0, -1).Month() {
+		return start.Format("Mon Jan 2")
 	}
-	dayNumber := index + 1
-	if dayNumber == 1 || index%5 == 0 || index == periodDays-1 {
-		return strconv.Itoa(dayNumber)
-	}
-	return ""
+	return start.Format("Mon 2")
 }
 
 func buildDayBuckets(now time.Time, periodDays int) []dayBucket {
@@ -156,9 +334,25 @@ func buildDayBuckets(now time.Time, periodDays int) []dayBucket {
 	buckets := make([]dayBucket, periodDays)
 	for i := 0; i < periodDays; i++ {
 		start := today.AddDate(0, 0, -(periodDays - 1 - i))
-		buckets[i] = dayBucket{start: start, end: start.AddDate(0, 0, 1)}
+		buckets[i] = newDayBucket(start)
 	}
 	return buckets
+}
+
+func buildWindowBuckets(window velocityWindow, periodDays int) []dayBucket {
+	buckets := make([]dayBucket, periodDays)
+	for i := 0; i < periodDays; i++ {
+		buckets[i] = newDayBucket(window.start.AddDate(0, 0, i))
+	}
+	return buckets
+}
+
+func newDayBucket(start time.Time) dayBucket {
+	return dayBucket{
+		start:  start,
+		end:    start.AddDate(0, 0, 1),
+		intake: map[string]int{},
+	}
 }
 
 // calendarDayUTCNoon returns 12:00 UTC on the civil date of t in t's location.
@@ -169,99 +363,29 @@ func calendarDayUTCNoon(t time.Time) time.Time {
 	return time.Date(year, month, day, 12, 0, 0, 0, time.UTC)
 }
 
-type prArtifactMeta struct {
-	url        string
-	owner      string
-	repo       string
-	number     int
-	mergedAt   *time.Time
-	closedAt   *time.Time
-	isMerged   bool
-	isClosedNM bool
-}
-
-func listVelocityArtifacts(tx *gorm.DB, factoryID uuid.UUID, from, to time.Time) ([]prArtifactMeta, error) {
-	merged, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{
-		State:      models.FactoryPullRequestStateMerged,
-		MergedFrom: &from,
-		MergedTo:   &to,
-	})
-	if err != nil {
-		return nil, err
+// filterVelocityRowsByRepository keeps only pull requests of the repository the
+// workspace reports on. Without a selected repository every factory pull
+// request counts.
+func filterVelocityRowsByRepository(
+	rows []models.FactoryVelocityPullRequest,
+	repoOwner, repoName string,
+	hasRepo bool,
+) []models.FactoryVelocityPullRequest {
+	if !hasRepo {
+		return rows
 	}
 
-	closed, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{
-		State:      models.FactoryPullRequestStateClosed,
-		ClosedFrom: &from,
-		ClosedTo:   &to,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]prArtifactMeta, 0, len(merged)+len(closed))
-	for i := range merged {
-		if meta, ok := toPRMeta(&merged[i]); ok {
-			meta.isMerged = true
-			out = append(out, meta)
+	out := make([]models.FactoryVelocityPullRequest, 0, len(rows))
+	for i := range rows {
+		owner, repo, ok := parseOwnerRepo(rows[i].Repository)
+		if !ok {
+			continue
+		}
+		if owner == repoOwner && repo == repoName {
+			out = append(out, rows[i])
 		}
 	}
-	for i := range closed {
-		if meta, ok := toPRMeta(&closed[i]); ok {
-			meta.isClosedNM = true
-			out = append(out, meta)
-		}
-	}
-	return out, nil
-}
-
-func listKnownSuperPlanePRs(tx *gorm.DB, factoryID uuid.UUID) ([]prArtifactMeta, error) {
-	// Every SuperPlane PR URL, including pull requests that predate
-	// merged_at / closed_at. People search still returns those PRs;
-	// subtracting only windowed timestamps would count them as People.
-	pullRequests, err := models.ListFactoryPullRequests(tx, factoryID, models.FactoryPullRequestFilter{})
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]prArtifactMeta, 0, len(pullRequests))
-	for i := range pullRequests {
-		if meta, ok := toPRMeta(&pullRequests[i]); ok {
-			out = append(out, meta)
-		}
-	}
-	return out, nil
-}
-
-func toPRMeta(pullRequest *models.FactoryPullRequest) (prArtifactMeta, bool) {
-	if pullRequest == nil || strings.TrimSpace(pullRequest.URL) == "" {
-		return prArtifactMeta{}, false
-	}
-
-	owner, repo, ok := parseOwnerRepo(pullRequest.Repository)
-	number := int(pullRequest.Number)
-	if !ok || number == 0 {
-		owner, repo, number = parsePRURL(pullRequest.URL)
-	}
-	return prArtifactMeta{
-		url:      pullRequest.URL,
-		owner:    owner,
-		repo:     repo,
-		number:   number,
-		mergedAt: pullRequest.MergedAt,
-		closedAt: pullRequest.ClosedAt,
-	}, true
-}
-
-func parsePRURL(url string) (owner, repo string, number int) {
-	m := githubPRURLRegex.FindStringSubmatch(url)
-	if len(m) != 4 {
-		return "", "", 0
-	}
-	owner = strings.ToLower(m[1])
-	repo = strings.ToLower(m[2])
-	_, _ = fmt.Sscanf(m[3], "%d", &number)
-	return owner, repo, number
+	return out
 }
 
 func parseOwnerRepo(repository string) (owner, repo string, ok bool) {
@@ -283,207 +407,16 @@ func joinOwnerRepo(owner, repo string) string {
 	return owner + "/" + repo
 }
 
-func classifySuperPlaneArtifacts(artifacts []prArtifactMeta, repoOwner, repoName string, hasRepo bool) (merges, waste []prArtifactMeta) {
-	for _, a := range artifacts {
-		if hasRepo && (a.owner != repoOwner || a.repo != repoName) {
-			continue
-		}
-		switch {
-		case a.isMerged:
-			merges = append(merges, a)
-		case a.isClosedNM:
-			waste = append(waste, a)
-		}
-	}
-	return merges, waste
-}
-
-type peopleMerge struct {
-	url      string
-	mergedAt time.Time
-}
-
-type peopleCohortRequest struct {
-	ctx           context.Context
-	reg           *registry.Registry
-	tx            *gorm.DB
-	orgID         uuid.UUID
-	factoryID     uuid.UUID
-	integrationID string
-	repoOwner     string
-	repoName      string
-	from          time.Time
-	endExclusive  time.Time
-}
-
-// loadPeopleCohort loads GitHub People merges and subtracts SuperPlane PRs.
-// Scan or search errors drop the People series and report failure so SuperPlane
-// counts still return.
-func loadPeopleCohort(req peopleCohortRequest) (hits []peopleMerge, hasPeople, failed bool) {
-	known, err := listKnownSuperPlanePRs(req.tx, req.factoryID)
-	if err != nil {
-		log.WithContext(req.ctx).WithError(err).Warn("factory velocity: SuperPlane PR scan failed")
-		return nil, false, true
-	}
-
-	found, err := searchPeopleMerges(
-		req.ctx,
-		req.reg,
-		req.orgID,
-		req.integrationID,
-		req.repoOwner,
-		req.repoName,
-		req.from,
-		req.endExclusive,
-	)
-	if err != nil {
-		log.WithContext(req.ctx).WithError(err).Warn("factory velocity: GitHub people search failed")
-		return nil, false, true
-	}
-
-	return subtractSuperPlaneHits(found, known), true, false
-}
-
-func searchPeopleMerges(
-	ctx context.Context,
-	reg *registry.Registry,
-	orgID uuid.UUID,
-	integrationID string,
-	repoOwner, repoName string,
-	from, endExclusive time.Time,
-) ([]peopleMerge, error) {
-	integrationUUID, err := uuid.Parse(integrationID)
-	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid integration id")
-	}
-
-	client, err := newVelocityGitHubClient(reg, orgID, integrationUUID)
-	if err != nil {
-		return nil, err
-	}
-
-	fromDate, toDate := githubMergedDateRange(from, endExclusive)
-	query := fmt.Sprintf(
-		"repo:%s/%s is:pr is:merged merged:%s..%s",
-		repoOwner,
-		repoName,
-		fromDate,
-		toDate,
-	)
-
-	opts := &github.SearchOptions{
-		Sort:        "updated",
-		Order:       "desc",
-		ListOptions: github.ListOptions{PerPage: velocitySearchPageSize},
-	}
-
-	var hits []peopleMerge
-	for page := 0; page < velocitySearchMaxPages; page++ {
-		result, resp, err := client.SearchIssues(ctx, query, opts)
-		if err != nil {
-			return nil, grpcerrors.FailedPrecondition(err, "failed to search GitHub for merged pull requests")
-		}
-		for _, issue := range result.Issues {
-			if issue == nil || issue.HTMLURL == nil {
-				continue
-			}
-			hits = append(hits, peopleMerge{
-				url:      *issue.HTMLURL,
-				mergedAt: issue.GetClosedAt().Time,
-			})
-		}
-		if resp == nil || resp.NextPage == 0 {
-			break
-		}
-		opts.Page = resp.NextPage
-	}
-	return hits, nil
-}
-
-// githubMergedDateRange returns inclusive UTC calendar dates that cover the
-// local window. GitHub Search interprets YYYY-MM-DD as UTC. fillBuckets then
-// drops hits that fall outside the local day buckets.
-func githubMergedDateRange(from, endExclusive time.Time) (string, string) {
-	lastInstant := endExclusive.Add(-time.Nanosecond)
-	return from.UTC().Format("2006-01-02"), lastInstant.UTC().Format("2006-01-02")
-}
-
-func newVelocityGitHubClient(reg *registry.Registry, orgID, integrationID uuid.UUID) (*common.Client, error) {
-	if reg == nil {
-		return nil, grpcerrors.FailedPrecondition(nil, "integration registry is unavailable")
-	}
-
-	instance, err := models.FindIntegration(orgID, integrationID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, grpcerrors.NotFound(err, "integration not found")
-		}
-		return nil, grpcerrors.Internal(err, "failed to load integration")
-	}
-
-	if instance.AppName != "github" {
-		return nil, grpcerrors.InvalidArgument(nil, "integration is not a GitHub integration")
-	}
-	if instance.State != models.IntegrationStateReady {
-		return nil, grpcerrors.FailedPrecondition(nil, "integration is not ready")
-	}
-
-	integrationCtx := contexts.NewIntegrationContext(
-		database.Conn(),
-		nil,
-		instance,
-		reg.Encryptor,
-		reg,
-		nil,
-	)
-
-	client, err := common.NewClient(integrationCtx, reg.HTTPContext())
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to build GitHub client")
-	}
-	return client, nil
-}
-
-func subtractSuperPlaneHits(hits []peopleMerge, superplane []prArtifactMeta) []peopleMerge {
-	if len(hits) == 0 || len(superplane) == 0 {
-		return hits
-	}
-
-	superSet := make(map[string]struct{}, len(superplane))
-	for _, a := range superplane {
-		superSet[normalizePRURL(a.url)] = struct{}{}
-		if a.owner != "" && a.repo != "" && a.number != 0 {
-			superSet[canonicalPRKey(a.owner, a.repo, a.number)] = struct{}{}
-		}
-	}
-
-	out := make([]peopleMerge, 0, len(hits))
-	for _, h := range hits {
-		norm := normalizePRURL(h.url)
-		if _, ok := superSet[norm]; ok {
-			continue
-		}
-		owner, repo, number := parsePRURL(h.url)
-		if owner != "" && repo != "" && number != 0 {
-			if _, ok := superSet[canonicalPRKey(owner, repo, number)]; ok {
-				continue
-			}
-		}
-		out = append(out, h)
-	}
-	return out
-}
-
-func normalizePRURL(u string) string {
-	u = strings.ToLower(strings.TrimSpace(u))
-	return strings.TrimSuffix(u, "/")
-}
-
-func canonicalPRKey(owner, repo string, number int) string {
-	return fmt.Sprintf("%s/%s#%d", owner, repo, number)
-}
-
-func fillBuckets(buckets []dayBucket, sp, waste []prArtifactMeta, people []peopleMerge) {
+// fillBuckets counts a window into its day buckets. Pull request counts come
+// from the pull requests themselves, while cost comes from the work orders
+// behind them, so an order that opened several pull requests is charged once.
+func fillBuckets(
+	buckets []dayBucket,
+	rows []models.FactoryVelocityPullRequest,
+	orders map[uuid.UUID]*velocityOrder,
+	merges []models.FactoryVelocityRepositoryMerge,
+	window velocityWindow,
+) {
 	starts := make([]time.Time, len(buckets))
 	for i := range buckets {
 		starts[i] = buckets[i].start
@@ -503,43 +436,78 @@ func fillBuckets(buckets []dayBucket, sp, waste []prArtifactMeta, people []peopl
 		return idx
 	}
 
-	for _, a := range sp {
-		if a.mergedAt == nil {
+	for i := range rows {
+		row := &rows[i]
+		if row.MergedAt != nil {
+			if !window.contains(*row.MergedAt) {
+				continue
+			}
+			if idx := locate(*row.MergedAt); idx >= 0 {
+				buckets[idx].superplaneMerged++
+				buckets[idx].intake[classifyVelocityIntake(row)]++
+			}
 			continue
 		}
-		if i := locate(*a.mergedAt); i >= 0 {
-			buckets[i].superplaneMerged++
-		}
-	}
-	for _, a := range waste {
-		if a.closedAt == nil {
+		if row.ClosedAt == nil || !window.contains(*row.ClosedAt) {
 			continue
 		}
-		if i := locate(*a.closedAt); i >= 0 {
-			buckets[i].waste++
+		if idx := locate(*row.ClosedAt); idx >= 0 {
+			buckets[idx].waste++
 		}
 	}
-	for _, h := range people {
-		if i := locate(h.mergedAt); i >= 0 {
-			buckets[i].peopleMerged++
+
+	for _, order := range orders {
+		idx := locate(order.day)
+		if idx < 0 {
+			continue
 		}
+		buckets[idx].costCents += order.costCents
+		buckets[idx].tokens += order.tokens
+		if !order.merged {
+			buckets[idx].wasteCostCents += order.costCents
+		}
+	}
+
+	for i := range merges {
+		if !window.contains(merges[i].MergedAt) {
+			continue
+		}
+		idx := locate(merges[i].MergedAt)
+		if idx < 0 {
+			continue
+		}
+		if !merges[i].IsAgent() {
+			buckets[idx].peopleMerged++
+			continue
+		}
+		// Agent work this instance did not open still is SuperPlane output. It
+		// has no work order here, so it counts as automation intake.
+		buckets[idx].superplaneMerged++
+		buckets[idx].intake[velocityIntakeKeyAutomation]++
 	}
 }
 
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
 	sp, people, waste := 0, 0, 0
+	var costCents, tokens, wasteCostCents int64
 	for _, b := range buckets {
 		sp += b.superplaneMerged
 		if hasPeople {
 			people += b.peopleMerged
 		}
 		waste += b.waste
+		costCents += b.costCents
+		tokens += b.tokens
+		wasteCostCents += b.wasteCostCents
 	}
 
 	totals := &pb.DescribeFactoryVelocityTotals{
 		SuperplaneMerged: int32(sp),
 		PeopleMerged:     int32(people),
 		Waste:            int32(waste),
+		CostCents:        costCents,
+		Tokens:           tokens,
+		WasteCostCents:   wasteCostCents,
 	}
 	totalMerged := sp + people
 	if totalMerged > 0 && hasPeople {
