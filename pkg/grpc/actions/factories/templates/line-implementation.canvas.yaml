@@ -150,22 +150,26 @@ spec:
               Write clearly, for humans, in ASD-STE100 / Simplified Technical English
           - name: Push output
             type: bash
+            workingDirectory: repo
             command: |-
+              set -euo pipefail
+
               # Emit branch name plus PR title/description for the next canvas nodes.
-              if [ -s /tmp/TITLE ] && [ -s /tmp/DESCRIPTION.md ]; then
-                echo "Title and description found. Using as output"
-                jq -n \
-                  --arg branch "$(git -C repo rev-parse --abbrev-ref HEAD)" \
-                  --rawfile title /tmp/TITLE \
-                  --rawfile description /tmp/DESCRIPTION.md \
-                  '{branch: $branch, title: ($title | @base64), description: ($description | @base64)}' \
-                  > "$SUPERPLANE_RESULT_FILE"
-              else
+              if [ ! -s /tmp/TITLE ] || [ ! -s /tmp/DESCRIPTION.md ]; then
                 jq -n '{error: "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md"}' \
                   > "$SUPERPLANE_RESULT_FILE"
                 echo "Missing title and/or description at /tmp/TITLE and /tmp/DESCRIPTION.md" >&2
                 exit 1
               fi
+
+              echo "Title and description found. Using as output"
+              BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+              jq -n \
+                --arg branch "$BRANCH" \
+                --rawfile title /tmp/TITLE \
+                --rawfile description /tmp/DESCRIPTION.md \
+                '{branch: $branch, title: ($title | @base64), description: ($description | @base64)}' \
+                > "$SUPERPLANE_RESULT_FILE"
       position:
         x: 1475
         'y': 312
