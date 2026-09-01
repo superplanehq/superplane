@@ -11,7 +11,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -271,7 +271,15 @@ const factorySettingsStorybookRoutes = [
     path="workspace/automations"
     element={<FactorySettingsAutomationsPage />}
   />,
-  <Route key="factory-settings-workspace-models" path="workspace/models" element={<FactorySettingsModelsPage />} />,
+  <Route
+    key="factory-settings-workspace-models"
+    path="workspace/models"
+    element={
+      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
+        <FactorySettingsModelsPage />
+      </RequireExperimentalFeature>
+    }
+  />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
   <Route
     key="factory-settings-organization-general"

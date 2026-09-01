@@ -1,5 +1,7 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -19,8 +21,32 @@ import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
+import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
-import { type FactorySettingsNavItem } from "./settingsNavItems";
+
+/** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
+const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
+
+/**
+ * Drops the Models nav item when the workspace-models experimental feature is
+ * off, and skips any group left with no items. The source groups stay static
+ * so other consumers (e.g. route lookups) keep seeing the full, approved list.
+ */
+function visibleFactorySettingsNavGroups(
+  groups: FactorySettingsNavGroup[],
+  modelsEnabled: boolean,
+): FactorySettingsNavGroup[] {
+  if (modelsEnabled) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.id !== WORKSPACE_MODELS_NAV_ITEM_ID),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -80,6 +106,11 @@ function FactorySettingsLayoutContent({
   useFactoriesThemeClass();
   const settingsNavGroups = useFactorySettingsNavGroups();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const navGroups = visibleFactorySettingsNavGroups(
+    settingsNavGroups,
+    hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
+  );
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
   // the `<Outlet/>` below mounts a leaf settings page that owns the full
@@ -132,7 +163,7 @@ function FactorySettingsLayoutContent({
                 </NavLink>
               </div>
               <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
-                {settingsNavGroups.map((group) => (
+                {navGroups.map((group) => (
                   <SettingsNavGroup
                     key={group.id}
                     organizationId={organizationId}

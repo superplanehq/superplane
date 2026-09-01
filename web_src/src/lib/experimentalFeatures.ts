@@ -12,3 +12,6 @@ export const FEATURE_FACTORY_VELOCITY = "factory_velocity";
 
 /** Organization experimental feature: manual "Add intake" entry for Sentry in the Backlog column menu. */
 export const FEATURE_FACTORY_SENTRY_INTAKE = "factory_sentry_intake";
+
+/** Organization experimental feature: in-progress workspace Models settings page. */
+export const FEATURE_WORKSPACE_MODELS = "workspace_models";
