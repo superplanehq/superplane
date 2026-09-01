@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { SPENT_CREDIT_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
+import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 /**
@@ -20,12 +20,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const spendingPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/spending`;
-
-const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
-  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
-  { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
-  { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
-];
 
 export const OrganizationSpending: Story = {
   name: "Organization Spending",

@@ -91,3 +91,10 @@ export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   billingEnabled: true,
   hasBillingCustomer: true,
 };
+
+/** Polar packs for empty-credit Storybook recovery screens. */
+export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
+  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
+  { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+  { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+];
