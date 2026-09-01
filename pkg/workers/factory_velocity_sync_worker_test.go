@@ -137,38 +137,6 @@ func Test__RepositoryMergeRows__KeepsTheSource(t *testing.T) {
 	assert.False(t, rows[1].IsAgent())
 }
 
-func Test__GroupVelocitySyncTargets__SharesOneSearchPerRepository(t *testing.T) {
-	integration := uuid.New()
-	other := uuid.New()
-
-	groups := groupVelocitySyncTargets([]models.FactoryVelocitySyncTarget{
-		{FactoryID: uuid.New(), IntegrationID: integration, Repository: "example/repo"},
-		{FactoryID: uuid.New(), IntegrationID: integration, Repository: "Example/Repo"},
-		{FactoryID: uuid.New(), IntegrationID: integration, Repository: "example/other"},
-		{FactoryID: uuid.New(), IntegrationID: other, Repository: "example/repo"},
-	})
-
-	require.Len(t, groups, 3, "workspaces on one repository and integration share a search")
-	assert.Len(t, groups[0].targets, 2, "the repository match ignores case")
-	assert.Equal(t, "example/other", groups[1].repository)
-	assert.Equal(t, other, groups[2].integrationID,
-		"a different installation has its own rate limit, so it is its own group")
-}
-
-func Test__MergesWithin__KeepsOnlyTheWorkspaceWindow(t *testing.T) {
-	now := time.Now()
-	merged := []repositoryMerge{
-		{number: 1, mergedAt: now.Add(-40 * 24 * time.Hour)},
-		{number: 2, mergedAt: now.Add(-2 * time.Hour)},
-		{number: 3, mergedAt: now.Add(time.Hour)},
-	}
-
-	within := mergesWithin(merged, now.Add(-24*time.Hour), now)
-
-	require.Len(t, within, 1, "a shared search reaches further back than every workspace needs")
-	assert.Equal(t, int64(2), within[0].number)
-}
-
 func Test__ToRepositoryMerge__KeepsOnlyMergesInsideTheWindow(t *testing.T) {
 	now := time.Now()
 	from := now.Add(-24 * time.Hour)
@@ -293,42 +261,6 @@ func Test__ConsumeSyncRequested__RejectsMessagesItCannotRead(t *testing.T) {
 	body, err := proto.Marshal(&pb.FactoryVelocitySyncRequestedMessage{FactoryId: "not-a-uuid"})
 	require.NoError(t, err)
 	assert.ErrorContains(t, w.consumeSyncRequested(tackle.NewFakeDelivery(body)), "parse factory id")
-}
-
-// A requested sync rebuilds the whole report, so a merge whose classification
-// changed is corrected instead of keeping what an earlier sync stored.
-func Test__VelocitySyncGroup__WindowStart(t *testing.T) {
-	now := time.Now()
-	syncedAt := now.Add(-10 * time.Minute)
-	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
-	target := models.FactoryVelocitySyncTarget{
-		Repository:       "example/repo",
-		SyncedRepository: "example/repo",
-		SyncedAt:         &syncedAt,
-		BackfilledFrom:   &backfilledFrom,
-	}
-
-	scheduled := velocitySyncGroup{repository: "example/repo"}
-	assert.WithinDuration(t, now.Add(-velocitySyncRecomputeWindow), scheduled.windowStart(target, now), time.Second,
-		"a scheduled sync of a complete history only recomputes recent days")
-
-	requested := velocitySyncGroup{repository: "example/repo", fullWindow: true}
-	assert.WithinDuration(t, velocitySyncBackfillStart(now), requested.windowStart(target, now), time.Second)
-}
-
-// An on-demand sync must not wait out the lease of a scheduled run, or a user
-// pressing the button right after a sync would see nothing happen.
-func Test__VelocitySyncGroup__ClaimHorizon(t *testing.T) {
-	now := time.Now()
-
-	scheduled := velocitySyncGroup{repository: "example/repo"}
-	assert.True(t, scheduled.claimHorizon(now).Equal(now.Add(-velocitySyncLease)),
-		"a scheduled sync respects the lease of another worker")
-
-	requested := velocitySyncGroup{repository: "example/repo", claimableFrom: now.Add(-velocitySyncOnDemandGuard)}
-	assert.True(t, requested.claimHorizon(now).Equal(now.Add(-velocitySyncOnDemandGuard)))
-	assert.True(t, requested.claimHorizon(now).After(scheduled.claimHorizon(now)),
-		"a requested sync claims a workspace a scheduled sync would still be holding")
 }
 
 func Test__SplitOwnerRepo(t *testing.T) {

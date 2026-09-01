@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	// How often a workspace is revisited. GitHub Search allows 30 requests a
-	// minute per installation, so the tick stays well clear of the budget.
+	// How often a workspace is revisited. A tick every few minutes keeps the
+	// report near live without walking GitHub on every page load.
 	velocitySyncEvery = 5 * time.Minute
 
 	// How long a claim lasts. It must exceed the longest expected backfill so
@@ -75,10 +75,9 @@ const (
 // FactoryVelocitySyncWorker keeps factory_velocity_repository_merges current
 // for every workspace that selected a GitHub integration and an app repository.
 //
-// Velocity used to search GitHub inside the request that rendered the page,
-// which made the people half of the report disappear on any API failure and
-// spent the Search budget on every page load. This worker moves that traffic
-// off the request path and makes the data durable.
+// Velocity used to call GitHub inside the request that rendered the page,
+// which made the people half of the report disappear on any API failure.
+// This worker moves that traffic off the request path and makes the data durable.
 type FactoryVelocitySyncWorker struct {
 	semaphore   *semaphore.Weighted
 	logger      *log.Entry
@@ -206,14 +205,9 @@ func (w *FactoryVelocitySyncWorker) SyncFactory(ctx context.Context, factoryID u
 		return false, nil
 	}
 
-	group := velocitySyncGroup{
-		integrationID: target.IntegrationID,
-		repository:    target.Repository,
-		targets:       []models.FactoryVelocitySyncTarget{*target},
-		claimableFrom: w.now().Add(-velocitySyncOnDemandGuard),
-		fullWindow:    true,
-	}
-	if err := w.ClaimAndSyncGroup(ctx, group); err != nil {
+	now := w.now()
+	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), velocitySyncBackfillStart(now))
+	if err != nil {
 		return false, err
 	}
 	return true, nil
@@ -235,209 +229,106 @@ func (w *FactoryVelocitySyncWorker) tick(ctx context.Context) {
 		return
 	}
 
-	groups := groupVelocitySyncTargets(targets)
-	w.logger.Infof(
-		"Found %d workspaces due for velocity sync across %d repositories",
-		len(targets), len(groups),
-	)
+	w.logger.Infof("Found %d workspaces due for velocity sync", len(targets))
 
-	for _, group := range groups {
+	for _, target := range targets {
 		if err := w.semaphore.Acquire(ctx, 1); err != nil {
 			return
 		}
 
-		go func(group velocitySyncGroup) {
+		go func(target models.FactoryVelocitySyncTarget) {
 			defer w.semaphore.Release(1)
 
-			if err := w.ClaimAndSyncGroup(ctx, group); err != nil {
-				w.logger.Errorf("Error syncing velocity for %s: %v", group.repository, err)
+			now := w.now()
+			from := velocitySyncWindow(target, now)
+			if err := w.claimAndSync(ctx, target, now.Add(-velocitySyncLease), from); err != nil {
+				w.logger.Errorf("Error syncing velocity for workspace %s: %v", target.FactoryID, err)
 			}
-		}(group)
+		}(target)
 	}
 }
 
-// velocitySyncGroup is the set of workspaces that report on one repository
-// through one integration.
+// claimAndSync reads one workspace's repository and stores the merges.
 //
-// Repository history is the same for all of them, so they share a single
-// search. Grouping keeps a deployment with many workspaces on a few
-// repositories inside the GitHub Search budget of 30 requests a minute.
-type velocitySyncGroup struct {
-	integrationID uuid.UUID
-	repository    string
-	targets       []models.FactoryVelocitySyncTarget
-	// claimableFrom overrides how old a claim must be before this worker may
-	// take it. A user-triggered sync sets a short guard so it does not have to
-	// wait out the lease of a scheduled run. Zero means the lease applies.
-	claimableFrom time.Time
-	// fullWindow re-reads the whole history window instead of recent days. A
-	// user who asks for a fresh report expects the report to be rebuilt, not
-	// only the last few days of it.
-	fullWindow bool
-}
-
-// claimHorizon is the age a claim must exceed before this worker takes it.
-func (g velocitySyncGroup) claimHorizon(now time.Time) time.Time {
-	if !g.claimableFrom.IsZero() {
-		return g.claimableFrom
-	}
-	return now.Add(-velocitySyncLease)
-}
-
-// windowStart is the earliest merge date to read for one workspace of the group.
-func (g velocitySyncGroup) windowStart(target models.FactoryVelocitySyncTarget, now time.Time) time.Time {
-	if g.fullWindow {
-		return velocitySyncBackfillStart(now)
-	}
-	return velocitySyncWindow(target, now)
-}
-
-func groupVelocitySyncTargets(targets []models.FactoryVelocitySyncTarget) []velocitySyncGroup {
-	order := make([]string, 0, len(targets))
-	byKey := make(map[string]*velocitySyncGroup, len(targets))
-
-	for _, target := range targets {
-		key := target.IntegrationID.String() + "|" + strings.ToLower(strings.TrimSpace(target.Repository))
-		group, seen := byKey[key]
-		if !seen {
-			byKey[key] = &velocitySyncGroup{
-				integrationID: target.IntegrationID,
-				repository:    target.Repository,
-				targets:       []models.FactoryVelocitySyncTarget{target},
-			}
-			order = append(order, key)
-			continue
-		}
-		group.targets = append(group.targets, target)
+// It claims the workspace, then talks to GitHub without holding a transaction.
+// A workspace another worker already holds is skipped.
+func (w *FactoryVelocitySyncWorker) claimAndSync(
+	ctx context.Context,
+	target models.FactoryVelocitySyncTarget,
+	claimableBefore time.Time,
+	from time.Time,
+) error {
+	if _, _, ok := splitOwnerRepo(target.Repository); !ok {
+		return fmt.Errorf("repository %q is not owner/name", target.Repository)
 	}
 
-	groups := make([]velocitySyncGroup, 0, len(order))
-	for _, key := range order {
-		groups = append(groups, *byKey[key])
+	sync, err := models.ClaimFactoryVelocitySync(database.Conn(), target.FactoryID, claimableBefore)
+	if err != nil {
+		return fmt.Errorf("claim velocity sync: %w", err)
 	}
-	return groups
-}
-
-// ClaimAndSyncGroup searches a repository once and stores the result for every
-// workspace that reports on it.
-//
-// It claims each workspace in a short transaction, then talks to GitHub without
-// holding one. Workspaces another worker holds are skipped.
-func (w *FactoryVelocitySyncWorker) ClaimAndSyncGroup(ctx context.Context, group velocitySyncGroup) error {
-	if _, _, ok := splitOwnerRepo(group.repository); !ok {
-		return fmt.Errorf("repository %q is not owner/name", group.repository)
-	}
-
-	claims := w.claimGroup(group)
-	if len(claims) == 0 {
+	if sync == nil {
 		return nil
 	}
 
 	now := w.now()
-	// One search must cover the longest window any claimed workspace needs.
-	from := now
-	for _, claim := range claims {
-		if claim.from.Before(from) {
-			from = claim.from
-		}
-	}
-
-	merged, err := w.listGroupMerges(ctx, claims[0].target, group.repository, from, now.Add(time.Hour))
+	to := now.Add(time.Hour)
+	merged, err := w.listTargetMerges(ctx, target, from, to)
 	if err != nil {
-		w.recordGroupError(claims, err)
+		w.recordSyncError(target, sync, err)
 		return nil
 	}
 
-	for _, claim := range claims {
-		if err := w.storeClaim(claim, merged, now); err != nil {
-			w.logger.Warnf("Velocity sync failed for workspace %s: %v", claim.target.FactoryID, err)
-			if err := claim.sync.RecordError(database.Conn(), err.Error()); err != nil {
-				w.logger.Errorf("Error recording velocity sync failure: %v", err)
-			}
-		}
+	if err := w.storeMerges(target, sync, from, merged, now); err != nil {
+		w.recordSyncError(target, sync, err)
+		return nil
 	}
 
 	w.logger.Infof(
-		"Synced %d merged pull requests of %s for %d workspaces",
-		len(merged), group.repository, len(claims),
+		"Synced %d merged pull requests of %s for workspace %s",
+		len(merged), target.Repository, target.FactoryID,
 	)
 	return nil
 }
 
-// velocitySyncClaim is one workspace this worker owns for the length of the
-// lease, with the window it needs.
-type velocitySyncClaim struct {
-	target            models.FactoryVelocitySyncTarget
-	sync              *models.FactoryVelocitySync
-	from              time.Time
-	repositoryChanged bool
-}
-
-func (w *FactoryVelocitySyncWorker) claimGroup(group velocitySyncGroup) []velocitySyncClaim {
-	now := w.now()
-	claimableBefore := group.claimHorizon(now)
-
-	claims := make([]velocitySyncClaim, 0, len(group.targets))
-	for _, target := range group.targets {
-		sync, err := models.ClaimFactoryVelocitySync(database.Conn(), target.FactoryID, claimableBefore)
-		if err != nil {
-			w.logger.Errorf("Error claiming velocity sync for workspace %s: %v", target.FactoryID, err)
-			continue
-		}
-		if sync == nil {
-			continue
-		}
-
-		claims = append(claims, velocitySyncClaim{
-			target:            target,
-			sync:              sync,
-			from:              group.windowStart(target, now),
-			repositoryChanged: target.SyncedRepository != "" && !sameRepository(target),
-		})
-	}
-	return claims
-}
-
-func (w *FactoryVelocitySyncWorker) listGroupMerges(
+func (w *FactoryVelocitySyncWorker) listTargetMerges(
 	ctx context.Context,
 	target models.FactoryVelocitySyncTarget,
-	repository string,
 	from, to time.Time,
 ) ([]repositoryMerge, error) {
 	client, err := w.githubClient(target.OrganizationID, target.IntegrationID)
 	if err != nil {
 		return nil, err
 	}
-	return listRepositoryMerges(ctx, client, repository, from, to)
+	return listRepositoryMerges(ctx, client, target.Repository, from, to)
 }
 
-func (w *FactoryVelocitySyncWorker) recordGroupError(claims []velocitySyncClaim, cause error) {
-	for _, claim := range claims {
-		w.logger.Warnf("Velocity sync failed for workspace %s: %v", claim.target.FactoryID, cause)
-		if err := claim.sync.RecordError(database.Conn(), cause.Error()); err != nil {
-			w.logger.Errorf("Error recording velocity sync failure: %v", err)
-		}
+func (w *FactoryVelocitySyncWorker) recordSyncError(
+	target models.FactoryVelocitySyncTarget,
+	sync *models.FactoryVelocitySync,
+	cause error,
+) {
+	w.logger.Warnf("Velocity sync failed for workspace %s: %v", target.FactoryID, cause)
+	if err := sync.RecordError(database.Conn(), cause.Error()); err != nil {
+		w.logger.Errorf("Error recording velocity sync failure: %v", err)
 	}
 }
 
-// storeClaim writes the merges of one workspace. Each workspace subtracts its
-// own SuperPlane pull requests, so a shared search still yields per-workspace
-// people output.
-func (w *FactoryVelocitySyncWorker) storeClaim(
-	claim velocitySyncClaim,
+// storeMerges writes the merges of one workspace. SuperPlane pull requests this
+// instance opened stay in factory_pull_requests and are not stored again.
+func (w *FactoryVelocitySyncWorker) storeMerges(
+	target models.FactoryVelocitySyncTarget,
+	sync *models.FactoryVelocitySync,
+	from time.Time,
 	merged []repositoryMerge,
 	now time.Time,
 ) error {
-	target := claim.target
-
-	// The search window ends at now, but the stored window must reach past it
+	repositoryChanged := target.SyncedRepository != "" && !sameRepository(target)
+	// The GitHub window ends at now, but the stored window must reach past it
 	// so a merge later today replaces the right rows on the next tick.
 	windowEnd := now.Add(time.Hour)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		// A workspace that switched repositories must not keep merges of the
-		// repository it no longer reports on.
-		if claim.repositoryChanged {
+		if repositoryChanged {
 			if err := models.DeleteFactoryVelocityRepositoryMerges(tx, target.FactoryID); err != nil {
 				return err
 			}
@@ -448,28 +339,15 @@ func (w *FactoryVelocitySyncWorker) storeClaim(
 			return err
 		}
 
-		rows := repositoryMergeRows(target, mergesWithin(merged, claim.from, windowEnd), superplane)
-		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, claim.from, windowEnd, rows)
+		rows := repositoryMergeRows(target, merged, superplane)
+		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, from, windowEnd, rows)
 	})
 	if err != nil {
 		return fmt.Errorf("store repository merges: %w", err)
 	}
 
-	backfilledFrom := earliestBackfill(target, claim.from, claim.repositoryChanged)
-	return claim.sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
-}
-
-// mergesWithin keeps the merges of one workspace's window. A shared search may
-// reach further back than a given workspace needs.
-func mergesWithin(merged []repositoryMerge, from, to time.Time) []repositoryMerge {
-	within := make([]repositoryMerge, 0, len(merged))
-	for _, merge := range merged {
-		if merge.mergedAt.Before(from) || !merge.mergedAt.Before(to) {
-			continue
-		}
-		within = append(within, merge)
-	}
-	return within
+	backfilledFrom := earliestBackfill(target, from, repositoryChanged)
+	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
 }
 
 // repositoryMergeRows keeps the merges SuperPlane did not open. Subtracting here
