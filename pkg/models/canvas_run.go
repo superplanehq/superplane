@@ -380,6 +380,12 @@ func (r *CanvasRun) DeleteChain(db *gorm.DB) (*RunDeletionSummary, error) {
 	}
 	summary.Events += count
 
+	if err := db.Model(&FactoryPullRequest{}).
+		Where("active_mutation_run_id = ?", r.ID).
+		Update("active_mutation_run_id", nil).Error; err != nil {
+		return nil, err
+	}
+
 	if _, err := deleteRows(db, &FactoryPullRequestRun{}, "run_id = ?", r.ID); err != nil {
 		return nil, err
 	}
@@ -886,6 +892,40 @@ type RunCancellationDrainResult struct {
 	RequestedExecutionIDs []uuid.UUID
 	DeletedQueueItems     []CanvasNodeQueueItem
 	SupersededEvents      []CanvasEvent
+}
+
+type RunCancellationResult struct {
+	Run             *CanvasRun
+	Drain           *RunCancellationDrainResult
+	NewlyCancelling bool
+}
+
+func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationResult, error) {
+	locked, err := LockCanvasRunInTransaction(tx, r.ID)
+	if err != nil {
+		return nil, err
+	}
+	*r = *locked
+
+	if r.State == CanvasRunStateFinished {
+		return &RunCancellationResult{Run: r}, nil
+	}
+
+	drain, err := r.DrainForCancellation(tx, cancelledBy)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &RunCancellationResult{Run: r, Drain: drain}
+	if r.State == CanvasRunStateCancelling {
+		return result, nil
+	}
+
+	if err := r.MarkAsCancelling(tx, cancelledBy); err != nil {
+		return nil, err
+	}
+	result.NewlyCancelling = true
+	return result, nil
 }
 
 func (r *CanvasRun) DrainForCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*RunCancellationDrainResult, error) {
