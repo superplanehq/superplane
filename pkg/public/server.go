@@ -378,6 +378,14 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/work-order-surveys", s.handleCreateRunnerWorkOrderSurvey).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/work-order-surveys/{id}/wait", s.handleWaitRunnerWorkOrderSurvey).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/ask", s.handleRunnerPlanningAsk).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys/{id}/wait", s.handleRunnerPlanningSurveyWait).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/drafts", s.handleRunnerPlanningDraft).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/messages", s.handleRunnerPlanningSay).Methods("POST")
+
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
@@ -1210,7 +1218,7 @@ func (s *Server) Serve(host string, port int) error {
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", host, port),
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 70 * time.Second,
 		IdleTimeout:  60 * time.Second,
 		Handler:      s.Router,
 	}

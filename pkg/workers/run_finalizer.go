@@ -565,6 +565,10 @@ func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) 
 		return nil, nil, err
 	}
 
+	if err := models.CancelPendingWorkOrderSurveysForRun(tx, runID); err != nil {
+		return nil, nil, err
+	}
+
 	//
 	// The finished run freed a slot at its step: admit queued work orders
 	// while slots are free. Failed and cancelled runs free their slot the

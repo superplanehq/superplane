@@ -23,7 +23,7 @@ func mustSerializeWorkOrder(
 	createdByAutomation *factory.AutomationRef,
 ) *pb.WorkOrder {
 	t.Helper()
-	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation, models.UsageTotals{})
+	serialized, err := serializeWorkOrder(f, order, dispatches, createdByAutomation, models.UsageTotals{}, nil)
 	require.NoError(t, err)
 	return serialized
 }
@@ -168,7 +168,7 @@ func TestSerializeWorkOrder_LineDispatchesReplaceFlatExecutions(t *testing.T) {
 	serialized, err := serializeWorkOrder(nil, order, dispatches, nil, models.UsageTotals{
 		TotalTokens: 10,
 		CostMicros:  50_000,
-	})
+	}, nil)
 	require.NoError(t, err)
 
 	require.Len(t, serialized.LineDispatches, 1)

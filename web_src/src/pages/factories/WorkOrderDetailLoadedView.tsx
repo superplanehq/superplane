@@ -22,6 +22,8 @@ import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
 import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
+import { WorkOrderSurveyCard } from "./WorkOrderSurveyCard";
+import { workOrderPendingSurvey, type WorkOrderSurveyAnswerInput } from "./lib/workOrderSurvey";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
@@ -71,6 +73,8 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
+  onAnswerSurvey?: (answers: WorkOrderSurveyAnswerInput[]) => Promise<void>;
+  isAnsweringSurvey?: boolean;
   /** Page chrome includes the back link. Dialog chrome is the card overlay. */
   chrome?: "page" | "dialog";
 }
@@ -147,6 +151,8 @@ function WorkOrderDetailMainColumn({
   canManage,
   isAddingComment,
   onAddComment,
+  onAnswerSurvey,
+  isAnsweringSurvey = false,
 }: WorkOrderDetailLoadedViewProps) {
   const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
   const notesToShow = statusNotes ?? [];
@@ -156,26 +162,25 @@ function WorkOrderDetailMainColumn({
     <div className="min-w-0">
       {order.description ? <WorkOrderDescription description={order.description} /> : null}
 
-      {showStatusNotes ? (
-        <div className={order.description ? "mt-10" : undefined}>
-          <WorkOrderStatusNotesSection
-            notes={notesToShow}
-            organizationId={organizationId}
-            displayStatus={displayStatus}
-            isOpen={isOpen}
-            isDispatchable={isDispatchable}
-            isClosed={isClosed}
-            canClose={canClose}
-            canManage={canManage}
-            isCompleting={isCompleting}
-            isRejecting={isRejecting}
-            isClosing={isClosing}
-            isUpdatingStatus={isUpdatingStatus}
-            onClose={onClose}
-            onStatusChange={onStatusChange}
-          />
-        </div>
-      ) : null}
+      <WorkOrderDetailWaitSections
+        order={order}
+        organizationId={organizationId}
+        statusNotes={notesToShow}
+        displayStatus={displayStatus}
+        isOpen={isOpen}
+        isDispatchable={isDispatchable}
+        isClosed={isClosed}
+        canClose={canClose}
+        canManage={canManage}
+        isCompleting={isCompleting}
+        isRejecting={isRejecting}
+        isClosing={isClosing}
+        isUpdatingStatus={isUpdatingStatus}
+        onClose={onClose}
+        onStatusChange={onStatusChange}
+        onAnswerSurvey={onAnswerSurvey}
+        isAnsweringSurvey={isAnsweringSurvey}
+      />
 
       {hasChecksSection ? (
         <WorkOrderChecksSection
@@ -220,6 +225,82 @@ function WorkOrderDetailMainColumn({
         </div>
       </section>
     </div>
+  );
+}
+
+function WorkOrderDetailWaitSections({
+  order,
+  organizationId,
+  statusNotes,
+  displayStatus,
+  isOpen,
+  isDispatchable,
+  isClosed,
+  canClose,
+  canManage,
+  isCompleting,
+  isRejecting,
+  isClosing,
+  isUpdatingStatus,
+  onClose,
+  onStatusChange,
+  onAnswerSurvey,
+  isAnsweringSurvey,
+}: Pick<
+  WorkOrderDetailLoadedViewProps,
+  | "order"
+  | "organizationId"
+  | "displayStatus"
+  | "isOpen"
+  | "isDispatchable"
+  | "isClosed"
+  | "canClose"
+  | "canManage"
+  | "isCompleting"
+  | "isRejecting"
+  | "isClosing"
+  | "isUpdatingStatus"
+  | "onClose"
+  | "onStatusChange"
+  | "onAnswerSurvey"
+  | "isAnsweringSurvey"
+> & { statusNotes: NonNullable<WorkOrderDetailLoadedViewProps["statusNotes"]> }) {
+  const pendingSurvey = workOrderPendingSurvey(order);
+  const spaced = Boolean(order.description);
+
+  return (
+    <>
+      {pendingSurvey ? (
+        <div className={spaced ? "mt-10" : undefined}>
+          <WorkOrderSurveyCard
+            survey={pendingSurvey}
+            canSubmit={canManage}
+            busy={isAnsweringSurvey}
+            onSubmit={onAnswerSurvey}
+          />
+        </div>
+      ) : null}
+      {statusNotes.length > 0 ? (
+        <div className={spaced ? "mt-10" : undefined}>
+          <WorkOrderStatusNotesSection
+            notes={statusNotes}
+            organizationId={organizationId}
+            displayStatus={displayStatus}
+            isOpen={isOpen}
+            isDispatchable={isDispatchable}
+            isClosed={isClosed}
+            canClose={canClose}
+            canManage={canManage}
+            isCompleting={isCompleting}
+            isRejecting={isRejecting}
+            isClosing={isClosing}
+            isUpdatingStatus={isUpdatingStatus}
+            onClose={onClose}
+            onStatusChange={onStatusChange}
+          />
+        </div>
+      ) : null}
+    </>
   );
 }
 

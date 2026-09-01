@@ -1,6 +1,8 @@
 package factories
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -108,12 +110,20 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 }
 
 func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, len(canvases))
-	for i, canvas := range canvases {
+	result := make([]*pb.Factory_App, 0, len(canvases))
+	for _, canvas := range canvases {
+		name := canvas.Name
+		description := canvas.Description
+		if models.IsPlanningCanvasName(canvas.Name) {
+			name = models.PlanningCanvasName
+			if strings.TrimSpace(description) == "" {
+				description = models.PlanningCanvasDescription
+			}
+		}
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
-			Name:        canvas.Name,
-			Description: canvas.Description,
+			Name:        name,
+			Description: description,
 		}
 		if canvas.CreatedAt != nil {
 			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
@@ -121,7 +131,7 @@ func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 		if canvas.UpdatedAt != nil {
 			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
 		}
-		result[i] = app
+		result = append(result, app)
 	}
 	return result
 }
@@ -288,6 +298,7 @@ func serializeWorkOrder(
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
 	usage models.UsageTotals,
+	pendingSurvey *models.FactoryWorkOrderSurvey,
 ) (*pb.WorkOrder, error) {
 	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
 
@@ -319,7 +330,39 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		PendingSurvey:        serializeWorkOrderSurvey(pendingSurvey),
 	}, nil
+}
+
+func serializeWorkOrderSurvey(survey *models.FactoryWorkOrderSurvey) *pb.WorkOrderSurvey {
+	if survey == nil {
+		return nil
+	}
+
+	questions := make([]*pb.WorkOrderSurveyQuestion, 0, len(survey.Questions))
+	for _, question := range survey.Questions {
+		questions = append(questions, &pb.WorkOrderSurveyQuestion{
+			Id:            question.ID,
+			Prompt:        question.Prompt,
+			Options:       question.Options,
+			AllowFreeText: question.AllowFreeText,
+		})
+	}
+	answers := make([]*pb.WorkOrderSurveyAnswer, 0, len(survey.Answers))
+	for _, answer := range survey.Answers {
+		answers = append(answers, &pb.WorkOrderSurveyAnswer{Id: answer.ID, Value: answer.Value})
+	}
+
+	return &pb.WorkOrderSurvey{
+		Id:             survey.ID.String(),
+		Status:         survey.Status,
+		CanvasRunId:    survey.CanvasRunID.String(),
+		Questions:      questions,
+		Answers:        answers,
+		TimeoutSeconds: int32(survey.TimeoutSeconds),
+		ExpiresAt:      timestamppb.New(survey.ExpiresAt),
+		CreatedAt:      timestamppb.New(survey.CreatedAt),
+	}
 }
 
 func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {

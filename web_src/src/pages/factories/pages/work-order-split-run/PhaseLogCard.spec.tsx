@@ -330,6 +330,41 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
   });
 
+  it("shows orphan live-log lines instead of Waiting for logs", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: ["Claude Code ready", "Cloning into 'repo'..."],
+      error: null,
+      isStreaming: true,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Claude Code ready")).toBeInTheDocument();
+    expect(screen.getByText("Cloning into 'repo'...")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
+  });
+
   it("shows a live log error on an expanded runner node", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [],

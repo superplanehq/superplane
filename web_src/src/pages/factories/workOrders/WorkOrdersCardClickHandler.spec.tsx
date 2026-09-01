@@ -410,6 +410,31 @@ describe("WorkOrderCard attention", () => {
     onOpen: vi.fn(),
   };
 
+  it("shows Agent question when the work order has a pending survey", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(
+              {
+                ...waitingOrder,
+                pendingSurvey: {
+                  id: "s-1",
+                  status: "pending",
+                  questions: [{ id: "q1", prompt: "Which option?" }],
+                },
+              },
+              factory,
+            )}
+            {...cardProps}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Agent question")).toBeInTheDocument();
+  });
+
   it("shows Waiting for user review when the task has a status note", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

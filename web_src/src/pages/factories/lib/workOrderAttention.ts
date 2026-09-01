@@ -3,6 +3,7 @@ import { CircleCheck, CircleX, LoaderCircle, MessageCircleQuestion, Timer, type 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
 import { getWorkOrderDisplayStatus } from "./workOrderProgress";
+import { workOrderPendingSurvey } from "./workOrderSurvey";
 import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
 /** Why a waiting task needs a person, or why it is addressing feedback. */
@@ -50,6 +51,9 @@ export function getWorkOrderAttentionReason(
   const status = getWorkOrderDisplayStatus(order);
   if (status === "failed") {
     return "failed";
+  }
+  if (workOrderPendingSurvey(order)) {
+    return "question";
   }
   if (status !== "waiting") {
     return null;

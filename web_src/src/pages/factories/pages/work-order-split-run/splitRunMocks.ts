@@ -32,6 +32,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { workOrderPendingSurvey } from "../../lib/workOrderSurvey";
 import { statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
@@ -394,6 +395,7 @@ function reviewSurfaces(
         note: runningFooterNote(current),
         run: footerRun(current),
         status: displayStatus,
+        survey: workOrderPendingSurvey(order),
       }),
       [],
       checks,
@@ -453,6 +455,7 @@ function waitingReviewSurface(
       kind: "waiting",
       note: notes[0] ?? WAITING_FALLBACK_NOTE,
       status: displayStatus,
+      survey: workOrderPendingSurvey(order),
     }),
     notes,
     checks,

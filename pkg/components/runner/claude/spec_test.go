@@ -187,6 +187,10 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
+	assert.Contains(t, runScript, `"bypassPermissions"`)
+	assert.Contains(t, runScript, "--mcp-config")
+	assert.Contains(t, runScript, "ask_work_order")
+	assert.Contains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
 }
 
@@ -203,6 +207,46 @@ func TestShellSingleQuote(t *testing.T) {
 
 	assert.Equal(t, `'hello'`, runner.ShellSingleQuote("hello"))
 	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
+}
+
+func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec)
+	got := applyPlanningFollowUp(base, nil, spec)
+	assert.Len(t, got.Commands, len(base.Commands))
+	assert.Len(t, got.Files, len(base.Files))
+}
+
+func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "opus",
+		Steps: []ClaudeCodeStep{
+			{Name: "Clone", Type: runner.AgentStepBash, Command: strPtr("git clone")},
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec)
+	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	last := got.Commands[len(got.Commands)-1]
+	assert.Equal(t, "Wait for the next message", last.Name)
+	assert.Equal(t, runner.LiveLogKindPrompt, last.Kind)
+	assert.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'opus'`)
+	assert.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
+	assert.Equal(t, followUpLoopScript, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {

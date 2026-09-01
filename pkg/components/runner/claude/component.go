@@ -161,8 +161,15 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
+	environment = runner.AttachWorkOrderSurveyEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+
 	// command_list tasks only accept commands (+ optional files).
 	task := buildClaudeCodeBrokerTask(spec)
+	task = applyPlanningFollowUp(task, environment, spec)
+	if runner.HasPlanningSessionToken(environment) || runner.HasWorkOrderSurveyToken(environment) {
+		task.Files = append(task.Files, claudeSurveyMCPFiles()...)
+	}
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

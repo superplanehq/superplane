@@ -1,5 +1,6 @@
 import {
   factoriesAddWorkOrderComment,
+  factoriesAnswerWorkOrderSurvey,
   factoriesCloseWorkOrder,
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
@@ -516,6 +517,35 @@ export function useUpdateWorkOrderStatus(organizationId: string, factoryId: stri
         throw new Error("Failed to update task status");
       }
       return response.data.order;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
+      });
+    },
+  });
+}
+
+export function useAnswerWorkOrderSurvey(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; answers: Array<{ id: string; value: string }> }) => {
+      const response = await factoriesAnswerWorkOrderSurvey(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: { answers: input.answers },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to submit the survey");
+      }
+      return response.data;
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });

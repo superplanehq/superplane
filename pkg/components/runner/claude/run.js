@@ -20,6 +20,47 @@ const SYSTEM_PROMPT =
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
   "Prefer plain paths, shell commands, and simple indentation.";
 
+const SURVEY_SYSTEM_PROMPT =
+  " If you need a human decision, call mcp__superplane__ask_work_order (also named ask_work_order). Do not print a survey in markdown.";
+
+const PLANNING_SYSTEM_PROMPT =
+  " This is a SuperPlane planning session. Call mcp__superplane__wait_for_user, mcp__superplane__ask, mcp__superplane__propose_draft, and mcp__superplane__say. Do not create work orders yourself.";
+
+const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
+const SURVEY_ALLOWED_TOOL = "mcp__superplane__ask_work_order";
+const PLANNING_ALLOWED_TOOLS = [
+  "mcp__superplane__wait_for_user",
+  "mcp__superplane__ask",
+  "mcp__superplane__propose_draft",
+  "mcp__superplane__say",
+];
+
+function envFlag(env, name) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function allowedClaudeTools(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
+    return [BASE_ALLOWED_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
+  }
+  if (envFlag(env, "SUPERPLANE_RUN_TOKEN") && envFlag(env, "SUPERPLANE_BASE_URL")) {
+    return `${BASE_ALLOWED_TOOLS},${SURVEY_ALLOWED_TOOL}`;
+  }
+  return BASE_ALLOWED_TOOLS;
+}
+
+function claudePermissionMode(env = process.env) {
+  if (mcpToolsEnabled(env)) {
+    return "bypassPermissions";
+  }
+  return "acceptEdits";
+}
+
+function mcpToolsEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID") ||
+    (envFlag(env, "SUPERPLANE_RUN_TOKEN") && envFlag(env, "SUPERPLANE_BASE_URL"));
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -56,16 +97,39 @@ async function runPrompt(promptFile, model) {
     "--verbose",
     "--include-partial-messages",
     "--permission-mode",
-    "acceptEdits",
+    claudePermissionMode(),
     "--add-dir",
     ".",
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
+  const planningSession = envFlag(process.env, "SUPERPLANE_PLANNING_SESSION_ID");
+  if (mcpToolsEnabled()) {
+    println(planningSession ? "Planning session tools enabled" : "Work order survey tool enabled");
+    println(`permission mode: ${claudePermissionMode()}`);
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + (planningSession ? PLANNING_SYSTEM_PROMPT : SURVEY_SYSTEM_PROMPT);
+    const mcpConfigPath = path.join(sp, "mcp.runtime.json");
+    fs.writeFileSync(
+      mcpConfigPath,
+      `${JSON.stringify({
+        mcpServers: {
+          superplane: {
+            command: "node",
+            args: [path.join(sp, "ask_work_order_mcp.js")],
+          },
+        },
+      })}\n`,
+    );
+    claudeArgs.push("--mcp-config", mcpConfigPath);
+    claudeArgs.push("--allowedTools", allowedClaudeTools());
+    println(`allowed tools: ${allowedClaudeTools()}`);
+  } else {
+    println("Work order survey tool not attached");
+    claudeArgs.push("--allowedTools", allowedClaudeTools());
+  }
   if (model) {
     claudeArgs.push("--model", model);
   }
-  claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write");
   if (promptCount > 0) {
     claudeArgs.push("--continue");
   }
@@ -317,6 +381,12 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
+  const tools = Array.isArray(event.tools) ? event.tools.map((tool) => String(tool)) : [];
+  const surveyTools = tools.filter((tool) => tool.includes("ask_work_order") || tool.includes("mcp__superplane"));
+  println(surveyTools.length > 0 ? `survey tools: ${surveyTools.join(", ")}` : "survey tools: none");
+  if (event.mcp_server_errors) {
+    println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
+  }
   println();
 }
 
@@ -575,4 +645,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { formatStreamJsonLines };
+module.exports = { allowedClaudeTools, claudePermissionMode, formatStreamJsonLines };

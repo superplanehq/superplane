@@ -264,6 +264,7 @@ export function WorkOrderSplitRunPopup({
         onReject={mutations.onReject}
         onBackToDraft={backToDraft}
         onStop={mutations.onStop}
+        onAnswerSurvey={canUpdate ? footerActions.handleAnswerSurvey : undefined}
         startBusy={isDispatching}
         actionBusy={footerActions.busy}
         startDisabled={!canDispatch}
