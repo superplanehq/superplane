@@ -43,6 +43,8 @@ interface FactoriesHarnessProps {
   openAgentSidebar?: boolean;
   /** Organization connections the story starts with. Defaults to none. */
   orgIntegrations?: StorybookOrgIntegration[];
+  /** Extra organization experimental features to enable on top of the defaults (factories, managed agents). */
+  experimentalFeatures?: string[];
 }
 
 function DefaultWikiWireframe() {
@@ -68,6 +70,7 @@ export function FactoriesHarness({
   enableOnboarding = true,
   openAgentSidebar = false,
   orgIntegrations,
+  experimentalFeatures = [],
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -76,6 +79,7 @@ export function FactoriesHarness({
       ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
       FEATURE_FACTORIES,
       FEATURE_CLAUDE_MANAGED_AGENTS,
+      ...experimentalFeatures,
     ],
     factories: factoriesFixture.factories.map((factory) => ({
       id: factory.id ?? "",
