@@ -13,6 +13,7 @@ type DummyIntegration struct {
 	onSync        func(ctx core.SyncContext) error
 	onCleanup     func(ctx core.IntegrationCleanupContext) error
 	listResources func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
+	configuration []configuration.Field
 }
 
 type DummyIntegrationOptions struct {
@@ -23,6 +24,9 @@ type DummyIntegrationOptions struct {
 	OnSync        func(ctx core.SyncContext) error
 	OnCleanup     func(ctx core.IntegrationCleanupContext) error
 	ListResources func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
+	// Configuration lets tests exercise fields with Required/RequiredConditions.
+	// Defaults to no configuration fields.
+	Configuration []configuration.Field
 }
 
 func NewDummyIntegration(options DummyIntegrationOptions) *DummyIntegration {
@@ -34,6 +38,7 @@ func NewDummyIntegration(options DummyIntegrationOptions) *DummyIntegration {
 		onSync:        options.OnSync,
 		onCleanup:     options.OnCleanup,
 		listResources: options.ListResources,
+		configuration: options.Configuration,
 	}
 }
 
@@ -58,7 +63,10 @@ func (t *DummyIntegration) Description() string {
 }
 
 func (t *DummyIntegration) Configuration() []configuration.Field {
-	return []configuration.Field{}
+	if t.configuration == nil {
+		return []configuration.Field{}
+	}
+	return t.configuration
 }
 
 func (t *DummyIntegration) Actions() []core.Action {
