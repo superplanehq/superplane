@@ -28,7 +28,7 @@ export interface PlanningReviewDraft {
 }
 
 const implementationSteps: PlanningReviewStep[] = [
-  { name: "Clone Repo", type: "bash", command: "git clone --depth 1 \"$REPO_URL\" repo" },
+  { name: "Clone Repo", type: "bash", command: 'git clone --depth 1 "$REPO_URL" repo' },
   {
     name: "Implementation",
     type: "prompt",
