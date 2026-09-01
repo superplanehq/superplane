@@ -40,3 +40,20 @@ export const OrganizationSpending: Story = {
     />
   ),
 };
+
+/** Tasks list with remaining hosted credit empty. The banner sits above the board. */
+export const Tasks: Story = {
+  render: () => {
+    window.localStorage.setItem("sp:work-orders:layout", "board");
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
+          hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
+        }}
+      />
+    );
+  },
+};
