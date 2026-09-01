@@ -9,7 +9,12 @@ import { Link } from "react-router";
 import { resolveWorkOrderCreatorDisplay } from "../lib/workOrderCreator";
 import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
 import type { WorkOrderDisplayStatus } from "../lib/workOrderProgress";
-import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../lib/workOrderUsage";
+import {
+  formatCompactTokens,
+  formatDurationSeconds,
+  formatUsdCents,
+  parseWorkOrderMetric,
+} from "../lib/workOrderUsage";
 import { OrgUserReference } from "../OrgUserReference";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
 import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
@@ -37,7 +42,8 @@ export function WorkOrderSidebarOverview({
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
-  const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const durationSeconds = parseWorkOrderMetric(order.totalDurationSeconds);
+  const showSpending = totalTokens > 0 || totalCostCents > 0 || durationSeconds > 0;
   const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
@@ -64,8 +70,8 @@ export function WorkOrderSidebarOverview({
 
         {showSpending ? (
           <OverviewRow icon={<CircleDollarSign className="size-3.5" aria-hidden />} srLabel="Spending">
-            <span title={formatSpendingTooltip(totalTokens, totalCostCents)}>
-              {formatSpendingLine(totalTokens, totalCostCents)}
+            <span title={formatSpendingTooltip(totalTokens, totalCostCents, durationSeconds)}>
+              {formatSpendingLine(totalTokens, totalCostCents, durationSeconds)}
             </span>
           </OverviewRow>
         ) : null}
@@ -183,22 +189,33 @@ function AssigneeButtonBody({
   return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
 }
 
-function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactNode {
-  const tokens = totalTokens > 0 ? formatCompactTokens(totalTokens) : null;
-  const usd = totalCostCents > 0 ? formatUsdCents(totalCostCents) : null;
-  if (tokens && usd) {
+function formatSpendingLine(totalTokens: number, totalCostCents: number, durationSeconds: number): ReactNode {
+  const parts: ReactNode[] = [];
+  if (totalCostCents > 0) {
+    parts.push(formatUsdCents(totalCostCents));
+  }
+  if (totalTokens > 0) {
+    parts.push(formatCompactTokens(totalTokens));
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
+  }
+  return parts.reduce<ReactNode>((acc, part, index) => {
+    if (index === 0) {
+      return part;
+    }
     return (
       <>
-        {usd} <span className="text-muted-foreground">·</span> {tokens}
+        {acc} <span className="text-muted-foreground">·</span> {part}
       </>
     );
-  }
-  return usd ?? tokens ?? "";
+  }, "");
 }
 
-function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
+function formatSpendingTooltip(totalTokens: number, totalCostCents: number, durationSeconds: number): string {
   const parts: string[] = [];
   if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
   if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
+  if (durationSeconds > 0) parts.push(formatDurationSeconds(durationSeconds));
   return parts.join(" · ");
 }

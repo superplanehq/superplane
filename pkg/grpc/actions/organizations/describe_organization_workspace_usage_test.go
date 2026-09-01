@@ -17,7 +17,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__DescribeOrganizationLLMSpend(t *testing.T) {
+func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
 		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
 		MarkupBPS:           models.DefaultMarkupBPS,
@@ -52,7 +52,7 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 	}))
 
 	require.NotNil(t, execution.RunID)
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
@@ -62,18 +62,32 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
 	}))
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     *execution.RunID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-tiny-amd64",
+		FleetID:         "e1-tiny-amd64",
+		DurationSeconds: 45,
+		IdempotencyKey:  "runner:compute:org-usage",
+	}))
 
-	resp, err := DescribeOrganizationLLMSpend(
+	resp, err := DescribeOrganizationWorkspaceUsage(
 		context.Background(),
 		r.Organization.ID.String(),
-		&pb.DescribeOrganizationLLMSpendRequest{},
+		&pb.DescribeOrganizationWorkspaceUsageRequest{},
 	)
 	require.NoError(t, err)
 	assert.Equal(t, int32(30), resp.PeriodDays)
 	assert.Equal(t, int64(1_000_000), resp.TotalTokens)
-	assert.Equal(t, int64(250), resp.TotalCostCents)
+	require.Len(t, resp.ByMachineType, 1)
+	assert.Equal(t, int64(250)+resp.ByMachineType[0].CostCents, resp.TotalCostCents)
 	require.Len(t, resp.ByModel, 1)
 	assert.Equal(t, "openai", resp.ByModel[0].Provider)
+	assert.Equal(t, int64(45), resp.TotalDurationSeconds)
+	assert.Equal(t, "e1-tiny-amd64", resp.ByMachineType[0].MachineType)
+	assert.Equal(t, int64(45), resp.ByMachineType[0].DurationSeconds)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.RemainingCreditCents)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.GrantTotalCents)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
@@ -83,7 +97,7 @@ func Test__DescribeOrganizationLLMSpend(t *testing.T) {
 	assert.Empty(t, resp.Invoices)
 }
 
-func Test__DescribeOrganizationLLMSpendListsPolarInvoices(t *testing.T) {
+func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_1"))
@@ -108,10 +122,10 @@ func Test__DescribeOrganizationLLMSpendListsPolarInvoices(t *testing.T) {
 	})
 	usePolarTestServer(t, server)
 
-	resp, err := DescribeOrganizationLLMSpend(
+	resp, err := DescribeOrganizationWorkspaceUsage(
 		context.Background(),
 		r.Organization.ID.String(),
-		&pb.DescribeOrganizationLLMSpendRequest{},
+		&pb.DescribeOrganizationWorkspaceUsageRequest{},
 	)
 	require.NoError(t, err)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)

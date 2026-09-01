@@ -62,7 +62,7 @@ export const SpendingEmpty: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("spending")}
-      factoriesFixture={{ ...defaultFactoriesFixture, organizationLlmSpend: EMPTY_USAGE_REPORT }}
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationWorkspaceUsage: EMPTY_USAGE_REPORT }}
     />
   ),
 };
@@ -74,7 +74,7 @@ export const SpendingBilling: Story = {
       pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "0",
           grantTotalCents: "0",
@@ -100,7 +100,7 @@ export const SpendingBillingInvoices: Story = {
       pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "14630",
           grantTotalCents: "15000",
@@ -137,7 +137,7 @@ export const SpendingCreditAdded: Story = {
       pathSuffix={`${organizationSettingsPath("spending")}?credit=added`}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "2500",
           grantTotalCents: "2500",

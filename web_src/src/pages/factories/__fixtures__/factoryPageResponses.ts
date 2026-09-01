@@ -282,7 +282,7 @@ export interface FactoriesFixture {
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
-  organizationLlmSpend?: StorybookUsageReport;
+  organizationWorkspaceUsage?: StorybookUsageReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
@@ -327,5 +327,5 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
     [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
   },
-  organizationLlmSpend: DEFAULT_FACTORY_USAGE,
+  organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
 };
