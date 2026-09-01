@@ -40,6 +40,11 @@ describe("getSuggestions", () => {
     expect(suggestions.some((item) => item.label === "trim")).toBe(true);
   });
 
+  it("suggests task() by prefix", () => {
+    const suggestions = getSuggestions("ta", 2, {});
+    expect(suggestions.some((item) => item.label === "task")).toBe(true);
+  });
+
   it("suggests the memory namespace by prefix", () => {
     const suggestions = getSuggestions("mem", "mem".length, {});
     const memorySuggestion = suggestions.find((item) => item.label === "memory");
@@ -132,6 +137,20 @@ describe("getSuggestions", () => {
     expect(labels).toContain("title");
     expect(labels).toContain("artifacts");
     expect(labels).toContain("comments");
+  });
+
+  it("suggests task() fields after dot as an order() alias", () => {
+    const suggestions = getSuggestions("task().", "task().".length, {
+      __order: {
+        id: "order-1",
+        title: "Ship feature",
+        artifacts: [{ type: "pr" }],
+      },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("id");
+    expect(labels).toContain("title");
+    expect(labels).toContain("artifacts");
   });
 
   it("suggests previous(n) payload fields after dot", () => {

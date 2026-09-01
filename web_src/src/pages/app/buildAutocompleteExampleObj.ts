@@ -106,6 +106,7 @@ function buildOrderExample(): Record<string, unknown> {
     state: "open",
     result: "",
     repository: "acme/service",
+    repository_url: "https://github.com/acme/service.git",
     default_branch: "main",
     url: exampleOrderUrl(),
     source: {

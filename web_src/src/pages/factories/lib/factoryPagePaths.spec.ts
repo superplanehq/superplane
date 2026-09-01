@@ -13,6 +13,7 @@ import {
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
+  prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
   factorySettingsSectionPath,
@@ -96,6 +97,13 @@ describe("factoryPRFeedbackPath", () => {
   it("reads the settings tab from the search string", () => {
     expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
     expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
+  });
+
+  it("opens a specific handler", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", undefined, "handler-1")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackHandler=handler-1",
+    );
+    expect(prFeedbackHandlerIdFromSearch("?prFeedback=1&prFeedbackHandler=handler-1")).toBe("handler-1");
   });
 });
 

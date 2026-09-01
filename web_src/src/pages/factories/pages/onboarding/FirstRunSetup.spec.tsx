@@ -93,6 +93,26 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
+  // Regression: the click that sets the issues choice and the call that
+  // provisions the workspace happen in the same handler. `finish` used to
+  // read the issues choice back off setup state captured before the click,
+  // which was still empty, so it saved an empty issues source over the one
+  // `saveIssues` had just stored and provisioning failed on the first click.
+  // A repository with no issues took the same "vcs" (GitHub Issues) answer as
+  // any other repository, so this reproduced on every repository, not only
+  // ones without issues.
+  it("passes the just-selected issues choice to finish instead of stale setup state", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
     renderSetup(pageModel({ hostedAgentReady: true }));
 

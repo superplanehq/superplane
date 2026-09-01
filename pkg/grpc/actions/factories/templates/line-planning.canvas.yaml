@@ -38,10 +38,10 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ order().repository }}'
+            value: '{{ task().repository }}'
             valueSource: literal
           - name: ORDER_DESCRIPTION
-            value: '{{ toBase64(order().description) }}'
+            value: '{{ toBase64(task().description) }}'
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
@@ -61,7 +61,7 @@ spec:
             prompt: |-
               You are writing an implementation plan for a SuperPlane Task. The repository is cloned out in your current working directory.
 
-              Repository: {{ order().repository }}
+              Repository: {{ task().repository }}
               Task Title: {{ root().data.work_order.title }}
 
               1/ The description is in the /tmp/ORDER.md
@@ -92,7 +92,7 @@ spec:
       configuration:
         artifactType: markdown
         body: '{{ fromBase64(previous().data.result.plan) }}'
-        orderId: '{{ order().id }}'
+        orderId: '{{ task().id }}'
         title: PLAN.md
       position:
         x: 360

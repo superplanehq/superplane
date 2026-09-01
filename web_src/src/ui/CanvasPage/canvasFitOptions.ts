@@ -10,13 +10,34 @@ export const LIVE_CANVAS_FIT_VIEW_OPTIONS = {
   padding: 0.08,
 } as const;
 
-/** Fit at 100% zoom when Factory Configure opens. Do not shrink the graph. */
-export const FACTORY_CONFIGURE_FIT_VIEW_OPTIONS = {
+/** Frame at 100% zoom. Do not shrink the graph to fit the viewport. */
+export const NATIVE_ZOOM_FIT_VIEW_OPTIONS = {
   ...CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
   minZoom: 1.0,
   maxZoom: 1.0,
   padding: 0.08,
 } as const;
+
+/** Fit at 100% zoom when Factory Configure opens. Do not shrink the graph. */
+export const FACTORY_CONFIGURE_FIT_VIEW_OPTIONS = NATIVE_ZOOM_FIT_VIEW_OPTIONS;
+
+/** First-load fit: lock 100% zoom for display previews, otherwise shrink to fit. */
+export function resolveInitialCanvasFitViewOptions(lockNativeZoom: boolean) {
+  return lockNativeZoom ? NATIVE_ZOOM_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
+}
+
+const DEFAULT_FIT_VIEW_DURATION_MS = 500;
+
+/** Factory display and Configure enter skip the fit animation so nodes do not slide. */
+export function resolveInitialFitViewDuration(factoryDisplayLayout: boolean, factoryConfigure: boolean): number {
+  if (factoryDisplayLayout) {
+    return 0;
+  }
+  if (factoryConfigure) {
+    return 0;
+  }
+  return DEFAULT_FIT_VIEW_DURATION_MS;
+}
 
 /** Fit options when framing run participant nodes during run inspection. */
 export const RUN_CANVAS_FIT_VIEW_OPTIONS = {
