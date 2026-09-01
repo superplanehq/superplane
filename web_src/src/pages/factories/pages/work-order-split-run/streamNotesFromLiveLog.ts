@@ -162,13 +162,20 @@ function streamAlreadyHasText(notes: SplitRunStreamLine[], text: string): boolea
 export function notesForLiveStream(input: {
   nodeId: string;
   sections: CommandSection[];
+  orphanLines?: string[];
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
     const notes = notesFromLiveLogSections(input.nodeId, input.sections);
-    return notes.length > 0 ? notes : undefined;
+    if (notes.length > 0) {
+      return notes;
+    }
+  }
+  const orphanNotes = notesFromOrphanLiveLogLines(input.nodeId, input.orphanLines ?? []);
+  if (orphanNotes.length > 0) {
+    return orphanNotes;
   }
   if (input.error) {
     return [liveStatusNote(input.nodeId, "Something went wrong while fetching logs.", "failed")];
@@ -177,6 +184,26 @@ export function notesForLiveStream(input: {
     return [liveStatusNote(input.nodeId, "Waiting for logs…", "running")];
   }
   return undefined;
+}
+
+function notesFromOrphanLiveLogLines(nodeId: string, lines: string[]): SplitRunStreamLine[] {
+  return lines.flatMap((line, index) => {
+    const text = line.trim();
+    if (!text) {
+      return [];
+    }
+    return [
+      {
+        id: `${nodeId}-orphan-${index}`,
+        nodeId,
+        at: "",
+        note: true,
+        componentType: "note",
+        componentName: text,
+        status: "passed" as const,
+      },
+    ];
+  });
 }
 
 function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatus): SplitRunStreamLine {

@@ -1045,7 +1045,7 @@ function useRunnerNodeLiveNotes(
   canvasId?: string,
 ): SplitRunStreamLine[] | undefined {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
@@ -1058,6 +1058,7 @@ function useRunnerNodeLiveNotes(
   return notesForLiveStream({
     nodeId: line.nodeId ?? line.id,
     sections,
+    orphanLines,
     error,
     isStreaming,
     nodeStatus: line.status,

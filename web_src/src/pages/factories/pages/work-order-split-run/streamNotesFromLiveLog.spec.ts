@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
-import { mergeLiveStreamNotes, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
+import { mergeLiveStreamNotes, notesForLiveStream, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
 import type { SplitRunStreamLine } from "./splitRunMocks";
 
 function bashSection(): CommandSection {
@@ -135,6 +135,41 @@ function talkLine(id: string, text: string, componentType: "prompt" | "note"): S
     status: "passed",
   };
 }
+
+describe("notesForLiveStream", () => {
+  it("shows orphan live-log lines instead of Waiting for logs", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [],
+      orphanLines: ["Claude Code ready", "Cloning into 'repo'...", ""],
+      error: null,
+      isStreaming: true,
+      nodeStatus: "running",
+    });
+
+    expect(notes?.map((note) => note.componentName)).toEqual(["Claude Code ready", "Cloning into 'repo'..."]);
+    expect(notes?.some((note) => note.componentName.includes("Waiting for logs"))).toBe(false);
+  });
+
+  it("keeps Waiting for logs when the stream has no lines yet", () => {
+    const notes = notesForLiveStream({
+      nodeId: "agent",
+      sections: [],
+      orphanLines: [],
+      error: null,
+      isStreaming: true,
+      nodeStatus: "running",
+    });
+
+    expect(notes).toEqual([
+      expect.objectContaining({
+        id: "agent-live-status",
+        componentName: "Waiting for logs…",
+        status: "running",
+      }),
+    ]);
+  });
+});
 
 describe("mergeLiveStreamNotes", () => {
   it("inserts a Send before the open follow-up prompt and skips a say already in the log", () => {
