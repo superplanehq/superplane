@@ -53,7 +53,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     githubConnections: { name: "github", allInstances: [], readyInstances: [] },
     selectedVcsConnectionId: "github-1",
     requestConfigure: vi.fn(),
-    integrationDialogs: null,
+    integrationDialogs: <></>,
     repositories: ["acme/payments-service"],
     repositoriesLoading: false,
     repositoriesError: null,
