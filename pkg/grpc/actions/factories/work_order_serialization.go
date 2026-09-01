@@ -31,18 +31,12 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
-	surveys, err := models.ListPendingWorkOrderSurveys(db, []uuid.UUID{order.ID})
-	if err != nil {
-		return nil, err
-	}
-
 	return serializeWorkOrder(
 		factory,
 		order,
 		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
 		usageByOrder[order.ID],
-		surveys[order.ID],
 	)
 }
 
@@ -78,11 +72,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 		return nil, err
 	}
 
-	surveys, err := models.ListPendingWorkOrderSurveys(db, workOrderIDs)
-	if err != nil {
-		return nil, err
-	}
-
 	result := make([]*pb.WorkOrder, len(orders))
 	for i := range orders {
 		serialized, err := serializeWorkOrder(
@@ -91,7 +80,6 @@ func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, or
 			dispatchesByOrderID[orders[i].ID],
 			creatorAutomations[orders[i].ID],
 			usageByOrder[orders[i].ID],
-			surveys[orders[i].ID],
 		)
 		if err != nil {
 			return nil, err

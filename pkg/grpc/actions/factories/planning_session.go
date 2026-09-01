@@ -16,7 +16,6 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -184,38 +183,6 @@ func SkipPlanningSessionDraft(ctx context.Context, organizationID string, req *p
 	return &pb.SkipPlanningSessionDraftResponse{Session: serialized}, nil
 }
 
-func AnswerPlanningSessionSurvey(ctx context.Context, organizationID string, req *pb.AnswerPlanningSessionSurveyRequest) (*pb.AnswerPlanningSessionSurveyResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
-	if err != nil {
-		return nil, err
-	}
-	_, _, userID, err := planningSessionActor(ctx, organizationID, req.GetFactoryId())
-	if err != nil {
-		return nil, err
-	}
-	db := database.DB(ctx)
-	survey, err := session.PendingSurvey(db)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to answer planning session survey")
-	}
-	answers := make([]models.WorkOrderSurveyAnswer, 0, len(req.GetAnswers()))
-	for _, answer := range req.GetAnswers() {
-		answers = append(answers, models.WorkOrderSurveyAnswer{ID: answer.GetId(), Value: answer.GetValue()})
-	}
-	if err := survey.Answer(db, userID, answers); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to answer planning session survey")
-	}
-	session, err = models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to answer planning session survey")
-	}
-	serialized, err := serializePlanningSession(db, factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to answer planning session survey")
-	}
-	return &pb.AnswerPlanningSessionSurveyResponse{Session: serialized}, nil
-}
-
 func planningSessionActor(ctx context.Context, organizationID, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
@@ -306,30 +273,14 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		})
 	}
 
-	surveys := map[string]*models.FactoryPlanningSessionSurvey{}
-	var stored []models.FactoryPlanningSessionSurvey
-	if err := tx.Where("session_id = ?", session.ID).Find(&stored).Error; err != nil {
-		return nil, err
-	}
-	for i := range stored {
-		surveys[stored[i].ID.String()] = &stored[i]
-	}
-
 	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(session.Messages))
 	for _, message := range session.Messages {
-		item := &pb.PlanningSessionMessage{
-			Id:       message.ID,
-			Kind:     message.Kind,
-			Role:     message.Role,
-			Text:     message.Text,
-			Answered: message.Answered,
-		}
-		if message.Kind == models.PlanningSessionMessageKindSurvey {
-			if survey := surveys[message.SurveyID]; survey != nil {
-				item.Survey = serializePlanningSessionSurvey(survey)
-			}
-		}
-		messagesOut = append(messagesOut, item)
+		messagesOut = append(messagesOut, &pb.PlanningSessionMessage{
+			Id:   message.ID,
+			Kind: message.Kind,
+			Role: message.Role,
+			Text: message.Text,
+		})
 	}
 
 	out := &pb.PlanningSession{
@@ -375,33 +326,4 @@ func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSess
 		return "", nil
 	}
 	return executions[len(executions)-1].ID.String(), nil
-}
-
-func serializePlanningSessionSurvey(survey *models.FactoryPlanningSessionSurvey) *pb.WorkOrderSurvey {
-	questions := make([]*pb.WorkOrderSurveyQuestion, 0, len(survey.Questions))
-	for _, question := range survey.Questions {
-		questions = append(questions, &pb.WorkOrderSurveyQuestion{
-			Id:            question.ID,
-			Prompt:        question.Prompt,
-			Options:       question.Options,
-			AllowFreeText: question.AllowFreeText,
-		})
-	}
-	answers := make([]*pb.WorkOrderSurveyAnswer, 0, len(survey.Answers))
-	for _, answer := range survey.Answers {
-		answers = append(answers, &pb.WorkOrderSurveyAnswer{Id: answer.ID, Value: answer.Value})
-	}
-	out := &pb.WorkOrderSurvey{
-		Id:             survey.ID.String(),
-		Status:         survey.Status,
-		CanvasRunId:    survey.CanvasRunID.String(),
-		Questions:      questions,
-		Answers:        answers,
-		TimeoutSeconds: int32(survey.TimeoutSeconds),
-		CreatedAt:      timestamppb.New(survey.CreatedAt),
-	}
-	if !survey.ExpiresAt.IsZero() {
-		out.ExpiresAt = timestamppb.New(survey.ExpiresAt)
-	}
-	return out
 }

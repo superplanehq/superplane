@@ -57,22 +57,6 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
-  it("shows a survey card while the run is still going", () => {
-    const footer = buildSplitRunFooter({
-      kind: "running",
-      survey: {
-        id: "s-1",
-        status: "pending",
-        questions: [{ id: "scope", prompt: "Where?", options: ["A", "B"], allowFreeText: false }],
-      },
-    });
-
-    expect(footer.attentionCard).toBe(true);
-    expect(footer.note?.headline).toBe("Agent question");
-    expect(footer.survey?.id).toBe("s-1");
-    expect(footer.actions).toEqual([]);
-  });
-
   it("keeps no close actions on a running order", () => {
     const footer = buildSplitRunFooter({
       kind: "running",

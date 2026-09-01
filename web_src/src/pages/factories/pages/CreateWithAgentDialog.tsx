@@ -15,14 +15,8 @@ import {
 import { Loader2, Sparkles } from "lucide-react";
 import type { FormEvent } from "react";
 
-import type { WorkOrderSurveyAnswerInput } from "../lib/workOrderSurvey";
-import { WorkOrderSurveyCard } from "../WorkOrderSurveyCard";
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import type {
-  CreateWithAgentCreatedOrder,
-  CreateWithAgentSurveyMessage,
-  CreateWithAgentView,
-} from "./createWithAgentTypes";
+import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createWithAgentTypes";
 import { planningSessionPhase } from "./planningSessionActivity";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 
@@ -33,7 +27,6 @@ export type CreateWithAgentDialogProps = {
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
-  onAnswerSurvey: (surveyId: string, answers: WorkOrderSurveyAnswerInput[]) => void;
   onDraftTitleChange: (title: string) => void;
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
@@ -54,7 +47,6 @@ export function CreateWithAgentDialog({
   view,
   onComposerChange,
   onSend,
-  onAnswerSurvey,
   onDraftTitleChange,
   onDraftDescriptionChange,
   onCreateDraft,
@@ -89,7 +81,6 @@ export function CreateWithAgentDialog({
               view={view}
               onComposerChange={onComposerChange}
               onSend={onSend}
-              onAnswerSurvey={onAnswerSurvey}
             />
             <CreateWithAgentWorkPane
               view={view}
@@ -189,15 +180,12 @@ function CreateWithAgentStream({
   view,
   onComposerChange,
   onSend,
-  onAnswerSurvey,
 }: {
   organizationId: string;
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
-  onAnswerSurvey: (surveyId: string, answers: WorkOrderSurveyAnswerInput[]) => void;
 }) {
-  const openSurvey = view.messages.find(isOpenSurvey);
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSend();
@@ -217,15 +205,6 @@ function CreateWithAgentStream({
           canvasId={view.canvasId}
         />
       </div>
-      {openSurvey ? (
-        <div className="border-t border-border px-4 py-3">
-          <WorkOrderSurveyCard
-            survey={openSurvey.survey}
-            help={CREATE_WITH_AGENT_COPY.surveyHelp}
-            onSubmit={(answers) => onAnswerSurvey(openSurvey.survey.id, answers)}
-          />
-        </div>
-      ) : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
           {CREATE_WITH_AGENT_COPY.composerPlaceholder}
@@ -262,10 +241,6 @@ function machineStatusLabel(repository: string, machineStatus: CreateWithAgentVi
   const label =
     machineStatus === "waiting" ? CREATE_WITH_AGENT_COPY.machineWaiting : CREATE_WITH_AGENT_COPY.machineRunning;
   return repository ? `${repository} · ${label}` : label;
-}
-
-function isOpenSurvey(message: CreateWithAgentView["messages"][number]): message is CreateWithAgentSurveyMessage {
-  return message.kind === "survey" && !message.answered;
 }
 
 function CreateWithAgentWorkPane({

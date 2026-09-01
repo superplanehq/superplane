@@ -4,7 +4,6 @@ import { MemoryRouter } from "react-router";
 
 import {
   CREATE_WITH_AGENT_DEMO_REPOSITORY,
-  createWithAgentSurveyMessage,
   emptyCreateWithAgentView,
   runningCreateWithAgentView,
   waitingCreateWithAgentView,
@@ -38,7 +37,6 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         view={view}
         onComposerChange={(composer) => setView((current) => ({ ...current, composer }))}
         onSend={() => undefined}
-        onAnswerSurvey={() => undefined}
         onDraftTitleChange={(title) =>
           setView((current) =>
             current.right.kind === "draft"
@@ -80,17 +78,6 @@ export const EmptyRight: Story = {
 export const Waiting: Story = {
   name: "Waiting for you",
   render: () => <StaticSession initial={waitingCreateWithAgentView()} />,
-};
-
-export const Survey: Story = {
-  name: "Survey",
-  render: () => (
-    <StaticSession
-      initial={runningCreateWithAgentView({
-        messages: [createWithAgentSurveyMessage()],
-      })}
-    />
-  ),
 };
 
 export const Draft: Story = {

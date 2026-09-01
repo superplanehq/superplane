@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
-  createWithAgentSurveyMessage,
   emptyCreateWithAgentView,
   runningCreateWithAgentView,
   waitingCreateWithAgentView,
@@ -34,7 +33,6 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       view={view}
       onComposerChange={noop}
       onSend={noop}
-      onAnswerSurvey={noop}
       onDraftTitleChange={noop}
       onDraftDescriptionChange={noop}
       onCreateDraft={noop}
@@ -80,21 +78,6 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.queryByTestId("create-with-agent-activity-starting")).not.toBeInTheDocument();
   });
 
-  it("shows a survey above the composer without chat bubbles", () => {
-    renderDialog(
-      runningCreateWithAgentView({
-        messages: [
-          { id: "user-1", kind: "text", role: "user", text: "Add a health check for refunds." },
-          createWithAgentSurveyMessage(),
-        ],
-      }),
-    );
-
-    expect(screen.getByTestId("work-order-survey-card")).toBeInTheDocument();
-    expect(screen.queryByTestId("create-with-agent-message-user-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent("Add a health check for refunds.");
-  });
-
   it("asks before the session ends", () => {
     const onConfirmEnd = vi.fn();
     render(
@@ -104,7 +87,6 @@ describe("CreateWithAgentDialog", () => {
         view={runningCreateWithAgentView({ endConfirmOpen: true })}
         onComposerChange={noop}
         onSend={noop}
-        onAnswerSurvey={noop}
         onDraftTitleChange={noop}
         onDraftDescriptionChange={noop}
         onCreateDraft={noop}

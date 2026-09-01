@@ -29,16 +29,17 @@ func TestMintAndParsePlanningSessionToken(t *testing.T) {
 	assert.Equal(t, scope, *parsed)
 }
 
-func TestParsePlanningSessionTokenRejectsWorkOrderPurpose(t *testing.T) {
+func TestParsePlanningSessionTokenRejectsWrongPurpose(t *testing.T) {
 	t.Parallel()
 
 	signer := jwt.NewSigner("planning-secret")
-	token, err := MintWorkOrderSurveyToken(signer, WorkOrderSurveyScope{
-		OrganizationID: uuid.New(),
-		FactoryID:      uuid.New(),
-		WorkOrderID:    uuid.New(),
-		CanvasRunID:    uuid.New(),
-	}, time.Hour)
+	token, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+		"purpose":       "other",
+		"org_id":        uuid.New().String(),
+		"factory_id":    uuid.New().String(),
+		"session_id":    uuid.New().String(),
+		"canvas_run_id": uuid.New().String(),
+	})
 	require.NoError(t, err)
 
 	_, err = ParsePlanningSessionToken(signer, token)

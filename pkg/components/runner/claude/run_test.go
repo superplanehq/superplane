@@ -20,31 +20,20 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__wait_for_user")
-	assert.Contains(t, tools, "mcp__superplane__ask")
 	assert.Contains(t, tools, "mcp__superplane__propose_draft")
 	assert.Contains(t, tools, "mcp__superplane__say")
-	assert.NotContains(t, tools, "mcp__superplane__ask_work_order")
+	assert.NotContains(t, tools, "mcp__superplane__ask")
 }
 
 func TestClaudePermissionModeBypassesPromptsWhenMCPIsAttached(t *testing.T) {
 	assert.Equal(t, "bypassPermissions", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	}))
-	assert.Equal(t, "bypassPermissions", claudePermissionModeFromScript(t, map[string]string{
+	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_RUN_TOKEN": "token",
 		"SUPERPLANE_BASE_URL":  "http://localhost:8000",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{}))
-}
-
-func TestAllowedClaudeToolsKeepsWorkOrderSurveyTool(t *testing.T) {
-	tools := allowedClaudeToolsFromScript(t, map[string]string{
-		"SUPERPLANE_RUN_TOKEN": "token",
-		"SUPERPLANE_BASE_URL":  "http://localhost:8000",
-	})
-
-	assert.Contains(t, tools, "mcp__superplane__ask_work_order")
-	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 }
 
 func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {

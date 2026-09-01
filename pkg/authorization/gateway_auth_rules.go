@@ -664,12 +664,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/survey/answer"}: {
-			Resource:                     "work_orders",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
-		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}: {
 			Resource:                     "work_orders",
 			Action:                       "create",
@@ -713,12 +707,6 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"}: {
-			Resource:                     "work_orders",
-			Action:                       "update",
-			DomainType:                   models.DomainTypeOrganization,
-			RequiredExperimentalFeatures: []string{features.FeatureFactories},
-		},
-		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/survey/answer"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

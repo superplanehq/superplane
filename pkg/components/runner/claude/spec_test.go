@@ -189,7 +189,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"acceptEdits"`)
 	assert.Contains(t, runScript, `"bypassPermissions"`)
 	assert.Contains(t, runScript, "--mcp-config")
-	assert.Contains(t, runScript, "ask_work_order")
+	assert.Contains(t, runScript, "planning_session_mcp.js")
 	assert.Contains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
 }

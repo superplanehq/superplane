@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { WorkOrderSurveyAnswerInput } from "../lib/workOrderSurvey";
-
 import {
-  answerCreateWithAgentSurvey,
   cancelCreateWithAgentEnd,
   createCreateWithAgentDraft,
   emptyCreateWithAgentView,
@@ -19,7 +16,6 @@ import {
 } from "./createWithAgentDemo";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createWithAgentTypes";
 import {
-  answerPlanningSessionSurvey,
   createPlanningSessionWorkOrder,
   describePlanningSession,
   endPlanningSession,
@@ -79,15 +75,6 @@ export function useCreateWithAgentSession(repository: string, organizationId = "
     close,
     onComposerChange: (value: string) => setView((current) => setCreateWithAgentComposer(current, value)),
     onSend: () => sendSessionMessage({ live, sessionId, organizationId, factoryId, view, setView, applySession }),
-    onAnswerSurvey: (surveyId: string, answers: WorkOrderSurveyAnswerInput[]) => {
-      if (!live || !sessionId) {
-        setView((current) => answerCreateWithAgentSurvey(current, surveyId, answers));
-        return;
-      }
-      void answerPlanningSessionSurvey(organizationId, factoryId, sessionId, answers)
-        .then(applySession)
-        .catch(() => undefined);
-    },
     onDraftTitleChange: (title: string) =>
       patchDraft({ live, sessionId, organizationId, factoryId, view, setView, title }),
     onDraftDescriptionChange: (description: string) =>

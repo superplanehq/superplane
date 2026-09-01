@@ -187,10 +187,10 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 	return strings.TrimSpace(spec.WorkingDirectory)
 }
 
-func claudeSurveyMCPFiles() []runner.BrokerTaskFile {
+func planningSessionMCPFiles() []runner.BrokerTaskFile {
 	return []runner.BrokerTaskFile{
-		{Path: "ask_work_order_mcp.js", Content: askWorkOrderMCPScript, Mode: "0644"},
-		{Path: "mcp.json", Content: askWorkOrderMCPConfig, Mode: "0644"},
+		{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"},
+		{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"},
 	}
 }
 

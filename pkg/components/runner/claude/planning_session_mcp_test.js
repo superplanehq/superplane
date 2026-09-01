@@ -4,38 +4,8 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { mapWaitStatus, normalizeQuestions, normalizeTimeout } = require("./ask_work_order_mcp.js");
 
-test("maps wait statuses for the tool result", () => {
-  assert.equal(mapWaitStatus("answered"), "answered");
-  assert.equal(mapWaitStatus("cancelled"), "cancelled");
-  assert.equal(mapWaitStatus("timed_out"), "no_answer");
-  assert.equal(mapWaitStatus("pending"), "no_answer");
-});
-
-test("normalizes questions and treats empty options as free text", () => {
-  const questions = normalizeQuestions([
-    { id: " scope ", prompt: " Where? ", options: ["A", "", "B"] },
-    { id: "notes", prompt: "Anything else?" },
-  ]);
-  assert.deepEqual(questions, [
-    { id: "scope", prompt: "Where?", options: ["A", "B"], allow_free_text: false },
-    { id: "notes", prompt: "Anything else?", options: [], allow_free_text: true },
-  ]);
-});
-
-test("rejects an empty question list", () => {
-  assert.throws(() => normalizeQuestions([]), /1–10/);
-});
-
-test("clamps timeout to the allowed range", () => {
-  assert.equal(normalizeTimeout(undefined), 3600);
-  assert.equal(normalizeTimeout(120), 120);
-  assert.throws(() => normalizeTimeout(10), /timeout_seconds/);
-  assert.throws(() => normalizeTimeout(70000), /timeout_seconds/);
-});
-
-test("lists ask_work_order over newline-delimited JSON-RPC", async () => {
+test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const replies = await exchangeMCP("ndjson", [
     {
       jsonrpc: "2.0",
@@ -47,41 +17,27 @@ test("lists ask_work_order over newline-delimited JSON-RPC", async () => {
   ]);
   assert.equal(replies[0].id, 1);
   assert.equal(replies[0].result.serverInfo.name, "superplane");
-  assert.equal(replies[1].result.tools[0].name, "ask_work_order");
+  assert.deepEqual(
+    replies[1].result.tools.map((tool) => tool.name),
+    ["wait_for_user", "propose_draft", "say"],
+  );
 });
 
-test("lists ask_work_order over Content-Length JSON-RPC", async () => {
+test("lists planning tools over Content-Length JSON-RPC", async () => {
   const replies = await exchangeMCP("lsp", [
     { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {} } },
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
   ]);
-  assert.equal(replies[1].result.tools[0].name, "ask_work_order");
-});
-
-test("lists planning tools when a planning session id is set", async () => {
-  const replies = await exchangeMCP(
-    "ndjson",
-    [
-      {
-        jsonrpc: "2.0",
-        id: 1,
-        method: "initialize",
-        params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "1" } },
-      },
-      { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
-    ],
-    { SUPERPLANE_PLANNING_SESSION_ID: "session-1" },
-  );
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["wait_for_user", "ask", "propose_draft", "say"],
+    ["wait_for_user", "propose_draft", "say"],
   );
 });
 
-async function exchangeMCP(format, messages, env = {}) {
-  const child = spawn(process.execPath, [path.join(__dirname, "ask_work_order_mcp.js")], {
+async function exchangeMCP(format, messages) {
+  const child = spawn(process.execPath, [path.join(__dirname, "planning_session_mcp.js")], {
     stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, ...env },
+    env: { ...process.env },
   });
   const replies = [];
   let buf = Buffer.alloc(0);

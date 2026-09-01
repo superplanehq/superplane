@@ -16,7 +16,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func TestRunnerPlanningSessionAskAndDraft(t *testing.T) {
+func TestRunnerPlanningSessionDraft(t *testing.T) {
 	r := support.Setup(t)
 	server, signer := mustRunnerLiveLogServer(t, r)
 	db := database.DB(t.Context())
@@ -40,14 +40,6 @@ func TestRunnerPlanningSessionAskAndDraft(t *testing.T) {
 	}, time.Hour)
 	require.NoError(t, err)
 
-	ask := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/ask", bytes.NewReader([]byte(
-		`{"questions":[{"id":"area","prompt":"Which area?","options":["Payments"]}]}`,
-	)))
-	ask.Header.Set("Authorization", "Bearer "+token)
-	askRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(askRec, ask)
-	require.Equal(t, http.StatusOK, askRec.Code, askRec.Body.String())
-
 	draft := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/drafts", bytes.NewReader([]byte(
 		`{"title":"Retry refunds","description":"Stop double charges."}`,
 	)))
@@ -61,15 +53,16 @@ func TestRunnerPlanningSessionAskAndDraft(t *testing.T) {
 	assert.Equal(t, "Retry refunds", reloaded.PendingDraft.Data().Title)
 }
 
-func TestRunnerPlanningSessionRejectsWorkOrderToken(t *testing.T) {
+func TestRunnerPlanningSessionRejectsOtherToken(t *testing.T) {
 	r := support.Setup(t)
 	server, signer := mustRunnerLiveLogServer(t, r)
-	token, err := runneraction.MintWorkOrderSurveyToken(signer, runneraction.WorkOrderSurveyScope{
-		OrganizationID: r.Organization.ID,
-		FactoryID:      uuid.New(),
-		WorkOrderID:    uuid.New(),
-		CanvasRunID:    uuid.New(),
-	}, time.Hour)
+	token, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+		"purpose":       "other",
+		"org_id":        r.Organization.ID.String(),
+		"factory_id":    uuid.New().String(),
+		"session_id":    uuid.New().String(),
+		"canvas_run_id": uuid.New().String(),
+	})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait", nil)

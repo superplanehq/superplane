@@ -2,7 +2,7 @@
   "mcpServers": {
     "superplane": {
       "command": "node",
-      "args": ["ask_work_order_mcp.js"]
+      "args": ["planning_session_mcp.js"]
     }
   }
 }

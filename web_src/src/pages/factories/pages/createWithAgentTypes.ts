@@ -1,5 +1,3 @@
-import type { WorkOrderSurveyView } from "../lib/workOrderSurvey";
-
 export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting";
 
 export type CreateWithAgentCreatedOrder = {
@@ -27,23 +25,13 @@ export type CreateWithAgentTextMessage = {
   text: string;
 };
 
-export type CreateWithAgentSurveyMessage = {
-  id: string;
-  kind: "survey";
-  survey: WorkOrderSurveyView;
-  answered?: boolean;
-};
-
 export type CreateWithAgentActivityMessage = {
   id: string;
   kind: "activity";
   text: string;
 };
 
-export type CreateWithAgentMessage =
-  | CreateWithAgentTextMessage
-  | CreateWithAgentSurveyMessage
-  | CreateWithAgentActivityMessage;
+export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentActivityMessage;
 
 export type CreateWithAgentView = {
   repository: string;

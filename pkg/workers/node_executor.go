@@ -426,13 +426,6 @@ func (w *NodeExecutor) executeActionNode(
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
 	}
-	if workOrderExecution, err := models.FindWorkOrderExecutionForRun(tx, execution.RunID); err == nil {
-		ctx.FactoryID = workOrderExecution.FactoryID
-		ctx.WorkOrderID = workOrderExecution.WorkOrderID
-	} else if workflow.FactoryID != nil {
-		ctx.FactoryID = *workflow.FactoryID
-	}
-
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {

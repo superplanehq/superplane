@@ -407,27 +407,6 @@ CREATE TABLE public.factory_llm_model_allowlists (
 
 
 --
--- Name: factory_planning_session_surveys; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.factory_planning_session_surveys (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
-    session_id uuid NOT NULL,
-    canvas_run_id uuid NOT NULL,
-    status text NOT NULL,
-    questions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    answers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    timeout_seconds integer NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    answered_at timestamp with time zone,
-    answered_by_user_id uuid
-);
-
-
---
 -- Name: factory_planning_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -699,28 +678,6 @@ CREATE TABLE public.factory_work_order_queue_items (
     step_index integer NOT NULL,
     step_name text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: factory_work_order_surveys; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.factory_work_order_surveys (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    factory_id uuid NOT NULL,
-    work_order_id uuid NOT NULL,
-    canvas_run_id uuid NOT NULL,
-    execution_id uuid,
-    status text NOT NULL,
-    questions jsonb DEFAULT '[]'::jsonb NOT NULL,
-    answers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    timeout_seconds integer NOT NULL,
-    expires_at timestamp with time zone NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    answered_at timestamp with time zone,
-    answered_by_user_id uuid
 );
 
 
@@ -1588,14 +1545,6 @@ ALTER TABLE ONLY public.factory_llm_model_allowlists
 
 
 --
--- Name: factory_planning_session_surveys factory_planning_session_surveys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_planning_session_surveys
-    ADD CONSTRAINT factory_planning_session_surveys_pkey PRIMARY KEY (id);
-
-
---
 -- Name: factory_planning_sessions factory_planning_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1729,14 +1678,6 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
     ADD CONSTRAINT factory_work_order_queue_items_pkey PRIMARY KEY (id);
-
-
---
--- Name: factory_work_order_surveys factory_work_order_surveys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_surveys
-    ADD CONSTRAINT factory_work_order_surveys_pkey PRIMARY KEY (id);
 
 
 --
@@ -2369,20 +2310,6 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
--- Name: idx_factory_planning_session_surveys_one_pending; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_factory_planning_session_surveys_one_pending ON public.factory_planning_session_surveys USING btree (session_id) WHERE (status = 'pending'::text);
-
-
---
--- Name: idx_factory_planning_session_surveys_session_created; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_planning_session_surveys_session_created ON public.factory_planning_session_surveys USING btree (session_id, created_at DESC);
-
-
---
 -- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2611,20 +2538,6 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
-
-
---
--- Name: idx_factory_work_order_surveys_one_pending; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_factory_work_order_surveys_one_pending ON public.factory_work_order_surveys USING btree (work_order_id) WHERE (status = 'pending'::text);
-
-
---
--- Name: idx_factory_work_order_surveys_work_order_created; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_work_order_surveys_work_order_created ON public.factory_work_order_surveys USING btree (work_order_id, created_at DESC);
 
 
 --
@@ -3222,30 +3135,6 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
--- Name: factory_planning_session_surveys factory_planning_session_surveys_answered_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_planning_session_surveys
-    ADD CONSTRAINT factory_planning_session_surveys_answered_by_user_id_fkey FOREIGN KEY (answered_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_planning_session_surveys factory_planning_session_surveys_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_planning_session_surveys
-    ADD CONSTRAINT factory_planning_session_surveys_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_planning_session_surveys factory_planning_session_surveys_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_planning_session_surveys
-    ADD CONSTRAINT factory_planning_session_surveys_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE RESTRICT;
-
-
---
 -- Name: factory_planning_sessions factory_planning_sessions_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3539,30 +3428,6 @@ ALTER TABLE ONLY public.factory_work_order_queue_items
 
 ALTER TABLE ONLY public.factory_work_order_queue_items
     ADD CONSTRAINT factory_work_order_queue_items_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_surveys factory_work_order_surveys_answered_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_surveys
-    ADD CONSTRAINT factory_work_order_surveys_answered_by_user_id_fkey FOREIGN KEY (answered_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_surveys factory_work_order_surveys_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_surveys
-    ADD CONSTRAINT factory_work_order_surveys_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE RESTRICT;
-
-
---
--- Name: factory_work_order_surveys factory_work_order_surveys_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.factory_work_order_surveys
-    ADD CONSTRAINT factory_work_order_surveys_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
 
 
 --

@@ -20,7 +20,6 @@ export const CREATE_WITH_AGENT_COPY = {
   workOnNew: "Work on new",
   openTask: "Open task",
   sessionListHeadline: "Created in this session",
-  surveyHelp: "Answer here. The agent waits until you continue.",
   greeting: "The repository is ready. What do you want to do?",
   afterCreate: "Created the draft task. Work on a new one, or tell me what is next.",
   afterSkip: "Skipped that draft. What should we do next?",

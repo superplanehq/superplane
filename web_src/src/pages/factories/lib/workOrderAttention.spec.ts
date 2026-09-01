@@ -21,28 +21,6 @@ describe("getWorkOrderAttentionReason", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_DRAFT" }))).toBeNull();
   });
 
-  it("labels a pending survey as Agent question while the run is in progress", () => {
-    expect(
-      getWorkOrderAttentionReason(
-        order({
-          pendingSurvey: {
-            id: "s-1",
-            status: "pending",
-            questions: [{ id: "q1", prompt: "Which option?" }],
-          },
-          lineDispatches: [
-            {
-              id: "d1",
-              state: "STATE_ACTIVE",
-              stepExecutions: [{ id: "e1", step: "plan", state: "STATE_STARTED" }],
-            },
-          ],
-        }),
-      ),
-    ).toBe("question");
-    expect(WORK_ORDER_ATTENTION_LABEL.question).toBe("Agent question");
-  });
-
   it("labels a closed failed task as Run failed", () => {
     expect(getWorkOrderAttentionReason(order({ state: "STATE_CLOSED", result: "RESULT_FAILED" }))).toBe("failed");
   });

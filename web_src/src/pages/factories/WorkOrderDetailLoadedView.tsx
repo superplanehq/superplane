@@ -22,8 +22,6 @@ import { WorkOrderDetailSidebar } from "./WorkOrderDetailSidebar";
 import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote";
 import { buildWorkOrderStatusActions } from "./lib/workOrderStatusActions";
 import { WorkOrderStatusNote } from "./WorkOrderStatusNote";
-import { WorkOrderSurveyCard } from "./WorkOrderSurveyCard";
-import { workOrderPendingSurvey, type WorkOrderSurveyAnswerInput } from "./lib/workOrderSurvey";
 
 interface WorkOrderDetailLoadedViewProps {
   organizationId: string;
@@ -73,8 +71,6 @@ interface WorkOrderDetailLoadedViewProps {
   onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onAddComment: (body: string, mentionedUserIds: string[]) => Promise<void>;
-  onAnswerSurvey?: (answers: WorkOrderSurveyAnswerInput[]) => Promise<void>;
-  isAnsweringSurvey?: boolean;
   /** Page chrome includes the back link. Dialog chrome is the card overlay. */
   chrome?: "page" | "dialog";
 }
@@ -151,8 +147,6 @@ function WorkOrderDetailMainColumn({
   canManage,
   isAddingComment,
   onAddComment,
-  onAnswerSurvey,
-  isAnsweringSurvey = false,
 }: WorkOrderDetailLoadedViewProps) {
   const hasChecksSection = Boolean(checks?.length) || Boolean(isChecksLoading) || Boolean(checksError);
   const notesToShow = statusNotes ?? [];
@@ -178,8 +172,6 @@ function WorkOrderDetailMainColumn({
         isUpdatingStatus={isUpdatingStatus}
         onClose={onClose}
         onStatusChange={onStatusChange}
-        onAnswerSurvey={onAnswerSurvey}
-        isAnsweringSurvey={isAnsweringSurvey}
       />
 
       {hasChecksSection ? (
@@ -244,8 +236,6 @@ function WorkOrderDetailWaitSections({
   isUpdatingStatus,
   onClose,
   onStatusChange,
-  onAnswerSurvey,
-  isAnsweringSurvey,
 }: Pick<
   WorkOrderDetailLoadedViewProps,
   | "order"
@@ -262,24 +252,11 @@ function WorkOrderDetailWaitSections({
   | "isUpdatingStatus"
   | "onClose"
   | "onStatusChange"
-  | "onAnswerSurvey"
-  | "isAnsweringSurvey"
 > & { statusNotes: NonNullable<WorkOrderDetailLoadedViewProps["statusNotes"]> }) {
-  const pendingSurvey = workOrderPendingSurvey(order);
   const spaced = Boolean(order.description);
 
   return (
     <>
-      {pendingSurvey ? (
-        <div className={spaced ? "mt-10" : undefined}>
-          <WorkOrderSurveyCard
-            survey={pendingSurvey}
-            canSubmit={canManage}
-            busy={isAnsweringSurvey}
-            onSubmit={onAnswerSurvey}
-          />
-        </div>
-      ) : null}
       {statusNotes.length > 0 ? (
         <div className={spaced ? "mt-10" : undefined}>
           <WorkOrderStatusNotesSection

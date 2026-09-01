@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 const (
 	PlanningSessionTokenPurpose = "planning_session"
 	EnvSuperplanePlanningID     = "SUPERPLANE_PLANNING_SESSION_ID"
+	EnvSuperplaneBaseURL        = "SUPERPLANE_BASE_URL"
+	EnvSuperplaneRunToken       = "SUPERPLANE_RUN_TOKEN"
 )
 
 type PlanningSessionScope struct {
@@ -58,19 +61,19 @@ func ParsePlanningSessionToken(signer *jwt.Signer, token string) (*PlanningSessi
 		return nil, fmt.Errorf("invalid planning session token purpose")
 	}
 	scope := PlanningSessionScope{}
-	scope.OrganizationID, err = parseSurveyClaimUUID(claims, "org_id")
+	scope.OrganizationID, err = parsePlanningClaimUUID(claims, "org_id")
 	if err != nil {
 		return nil, err
 	}
-	scope.FactoryID, err = parseSurveyClaimUUID(claims, "factory_id")
+	scope.FactoryID, err = parsePlanningClaimUUID(claims, "factory_id")
 	if err != nil {
 		return nil, err
 	}
-	scope.SessionID, err = parseSurveyClaimUUID(claims, "session_id")
+	scope.SessionID, err = parsePlanningClaimUUID(claims, "session_id")
 	if err != nil {
 		return nil, err
 	}
-	scope.CanvasRunID, err = parseSurveyClaimUUID(claims, "canvas_run_id")
+	scope.CanvasRunID, err = parsePlanningClaimUUID(claims, "canvas_run_id")
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +138,49 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	if ctx.Logger != nil {
 		ctx.Logger.WithField("planning_session_id", session.ID).Info("attached planning session token")
 	}
-	return append(append(environment, WorkOrderSurveyEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
+	return append(append(environment, planningSessionEnvVars(baseURL, token)...), BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningID,
 		Value: session.ID.String(),
 	})
+}
+
+func planningSessionEnvVars(baseURL, token string) []BrokerEnvironmentVariable {
+	return []BrokerEnvironmentVariable{
+		{Name: EnvSuperplaneBaseURL, Value: strings.TrimRight(strings.TrimSpace(baseURL), "/")},
+		{Name: EnvSuperplaneRunToken, Value: token},
+	}
+}
+
+func PublicSuperplaneBaseURL(fallback string) string {
+	candidates := []string{
+		os.Getenv("WEBHOOKS_BASE_URL"),
+		os.Getenv("BASE_URL"),
+		fallback,
+	}
+	for _, candidate := range candidates {
+		normalized := strings.TrimRight(strings.TrimSpace(candidate), "/")
+		if normalized == "" || isLoopbackBaseURL(normalized) {
+			continue
+		}
+		return normalized
+	}
+	return ""
+}
+
+func parsePlanningClaimUUID(claims map[string]interface{}, key string) (uuid.UUID, error) {
+	raw, _ := claims[key].(string)
+	id, err := uuid.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid %s", key)
+	}
+	return id, nil
+}
+
+func isLoopbackBaseURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return true
+	}
+	host := strings.ToLower(parsed.Hostname())
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }

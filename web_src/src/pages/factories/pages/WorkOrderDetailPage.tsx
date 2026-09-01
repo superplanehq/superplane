@@ -248,8 +248,6 @@ function LoadedWorkOrderDetail({
       onAssigneesSave={actions.handleAssigneesSave}
       onStatusChange={actions.handleStatusChange}
       onAddComment={actions.handleAddComment}
-      onAnswerSurvey={actions.handleAnswerSurvey}
-      isAnsweringSurvey={actions.isAnsweringSurvey}
     />
   );
 }

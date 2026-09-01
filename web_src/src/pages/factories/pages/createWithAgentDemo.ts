@@ -1,9 +1,5 @@
-import type { WorkOrderSurveyAnswerInput } from "../lib/workOrderSurvey";
-
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
-
-const DEMO_SURVEY_ID = "create-with-agent-area";
 
 export const CREATE_WITH_AGENT_DEMO_REPOSITORY = "acme/payments";
 
@@ -36,25 +32,6 @@ export function waitingCreateWithAgentView(overrides: Partial<CreateWithAgentVie
   return runningCreateWithAgentView({ machineStatus: "waiting", ...overrides });
 }
 
-export function createWithAgentSurveyMessage(id = DEMO_SURVEY_ID): CreateWithAgentMessage {
-  return {
-    id,
-    kind: "survey",
-    survey: {
-      id,
-      status: "pending",
-      questions: [
-        {
-          id: "area",
-          prompt: "Which area of the code should this task cover?",
-          options: ["Payments", "Checkout", "Skip for now"],
-          allowFreeText: true,
-        },
-      ],
-    },
-  };
-}
-
 export function markCreateWithAgentReady(view: CreateWithAgentView): CreateWithAgentView {
   if (view.machineStatus === "running" && view.messages.length > 0) {
     return view;
@@ -78,38 +55,7 @@ export function sendCreateWithAgentMessage(view: CreateWithAgentView): CreateWit
     role: "user",
     text,
   };
-  const nextMessages = [...view.messages, userMessage];
-  const hasOpenSurvey = nextMessages.some((message) => message.kind === "survey" && !message.answered);
-  if (hasOpenSurvey || view.right.kind === "draft") {
-    return { ...view, composer: "", messages: nextMessages };
-  }
-
-  return {
-    ...view,
-    composer: "",
-    messages: [...nextMessages, createWithAgentSurveyMessage(`survey-${nextMessages.length}`)],
-  };
-}
-
-export function answerCreateWithAgentSurvey(
-  view: CreateWithAgentView,
-  surveyId: string,
-  answers: WorkOrderSurveyAnswerInput[],
-): CreateWithAgentView {
-  const area = answers.find((answer) => answer.id === "area")?.value?.trim() || "General";
-  return {
-    ...view,
-    messages: view.messages.map((message) =>
-      message.kind === "survey" && message.survey.id === surveyId ? { ...message, answered: true } : message,
-    ),
-    right: {
-      kind: "draft",
-      draft: {
-        title: area === "Skip for now" || area === "skipped" ? "Follow-up task" : `Improve ${area.toLowerCase()}`,
-        description: `Draft from the agent session on ${view.repository}.`,
-      },
-    },
-  };
+  return { ...view, composer: "", messages: [...view.messages, userMessage] };
 }
 
 export function updateCreateWithAgentDraft(

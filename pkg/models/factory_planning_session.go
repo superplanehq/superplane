@@ -21,10 +21,9 @@ const (
 	PlanningSessionStateRunning  = "running"
 	PlanningSessionStateEnded    = "ended"
 
-	PlanningSessionMessageKindText   = "text"
-	PlanningSessionMessageKindSurvey = "survey"
-	PlanningSessionMessageRoleUser   = "user"
-	PlanningSessionMessageRoleAgent  = "agent"
+	PlanningSessionMessageKindText  = "text"
+	PlanningSessionMessageRoleUser  = "user"
+	PlanningSessionMessageRoleAgent = "agent"
 
 	PlanningWaitIdle     = ""
 	PlanningWaitPending  = "pending"
@@ -35,8 +34,7 @@ const (
 	PlanningWaitKindSkipped = "skipped"
 	PlanningWaitKindEnded   = "ended"
 
-	PlanningSessionHeartbeatStale    = 45 * time.Second
-	DefaultPlanningSurveyTimeoutSecs = 3600
+	PlanningSessionHeartbeatStale = 45 * time.Second
 )
 
 var (
@@ -57,8 +55,6 @@ type PlanningSessionMessage struct {
 	Kind      string    `json:"kind"`
 	Role      string    `json:"role"`
 	Text      string    `json:"text,omitempty"`
-	SurveyID  string    `json:"survey_id,omitempty"`
-	Answered  bool      `json:"answered,omitempty"`
 	Delivered bool      `json:"delivered,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -428,83 +424,6 @@ func (s *FactoryPlanningSession) CreateDraftWorkOrder(tx *gorm.DB, factoryModel 
 	return order, nil
 }
 
-func (s *FactoryPlanningSession) CreateSurvey(tx *gorm.DB, questions []WorkOrderSurveyQuestion) (*FactoryPlanningSessionSurvey, error) {
-	if err := s.guardOpen(); err != nil {
-		return nil, err
-	}
-	if s.CanvasRunID == nil {
-		return nil, fmt.Errorf("%w: canvas run is required", ErrFactoryPlanningSessionInvalid)
-	}
-
-	normalized, err := normalizeSurveyParams(FactoryWorkOrderSurveyParams{
-		CanvasRunID:    *s.CanvasRunID,
-		TimeoutSeconds: DefaultPlanningSurveyTimeoutSecs,
-		Questions:      questions,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	pending, err := s.PendingSurvey(tx)
-	if err == nil {
-		return pending, nil
-	}
-	if !errors.Is(err, ErrFactoryWorkOrderSurveyNotFound) {
-		return nil, err
-	}
-
-	now := time.Now()
-	survey := &FactoryPlanningSessionSurvey{
-		ID:             uuid.New(),
-		OrganizationID: s.OrganizationID,
-		FactoryID:      s.FactoryID,
-		SessionID:      s.ID,
-		CanvasRunID:    *s.CanvasRunID,
-		Status:         FactoryWorkOrderSurveyPending,
-		Questions:      normalized.Questions,
-		TimeoutSeconds: normalized.TimeoutSeconds,
-		ExpiresAt:      now.Add(time.Duration(normalized.TimeoutSeconds) * time.Second),
-		CreatedAt:      now,
-	}
-	if err := tx.Create(survey).Error; err != nil {
-		return nil, err
-	}
-	s.appendMessage(PlanningSessionMessage{
-		ID:        survey.ID.String(),
-		Kind:      PlanningSessionMessageKindSurvey,
-		Role:      PlanningSessionMessageRoleAgent,
-		SurveyID:  survey.ID.String(),
-		CreatedAt: now,
-	})
-	s.UpdatedAt = now
-	if err := tx.Model(s).Select("Messages", "UpdatedAt").Updates(s).Error; err != nil {
-		return nil, err
-	}
-	return survey, nil
-}
-
-func (s *FactoryPlanningSession) PendingSurvey(tx *gorm.DB) (*FactoryPlanningSessionSurvey, error) {
-	var survey FactoryPlanningSessionSurvey
-	err := tx.Where("session_id = ? AND status = ?", s.ID, FactoryWorkOrderSurveyPending).First(&survey).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrFactoryWorkOrderSurveyNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &survey, nil
-}
-
-func (s *FactoryPlanningSession) markSurveyAnswered(tx *gorm.DB, surveyID uuid.UUID) error {
-	for i := range s.Messages {
-		if s.Messages[i].Kind == PlanningSessionMessageKindSurvey && s.Messages[i].SurveyID == surveyID.String() {
-			s.Messages[i].Answered = true
-		}
-	}
-	s.UpdatedAt = time.Now()
-	return tx.Model(s).Select("Messages", "UpdatedAt").Updates(s).Error
-}
-
 func (s *FactoryPlanningSession) reload(tx *gorm.DB) error {
 	return tx.Where("id = ?", s.ID).First(s).Error
 }
@@ -583,59 +502,4 @@ func (s *FactoryPlanningSession) deliverUserText(text string) {
 func (s *FactoryPlanningSession) saveMessagesAndWait(tx *gorm.DB) error {
 	s.UpdatedAt = time.Now()
 	return tx.Model(s).Select("Messages", "PendingDraft", "CreatedWorkOrderIDs", "WaitState", "WaitResult", "UpdatedAt").Updates(s).Error
-}
-
-type FactoryPlanningSessionSurvey struct {
-	ID               uuid.UUID
-	OrganizationID   uuid.UUID
-	FactoryID        uuid.UUID
-	SessionID        uuid.UUID
-	CanvasRunID      uuid.UUID
-	Status           string
-	Questions        datatypes.JSONSlice[WorkOrderSurveyQuestion]
-	Answers          datatypes.JSONSlice[WorkOrderSurveyAnswer]
-	TimeoutSeconds   int
-	ExpiresAt        time.Time
-	CreatedAt        time.Time
-	AnsweredAt       *time.Time
-	AnsweredByUserID *uuid.UUID
-}
-
-func (FactoryPlanningSessionSurvey) TableName() string {
-	return "factory_planning_session_surveys"
-}
-
-func FindPlanningSessionSurvey(tx *gorm.DB, organizationID, id uuid.UUID) (*FactoryPlanningSessionSurvey, error) {
-	var survey FactoryPlanningSessionSurvey
-	err := tx.Where("organization_id = ? AND id = ?", organizationID, id).First(&survey).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrFactoryWorkOrderSurveyNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &survey, nil
-}
-
-func (survey *FactoryPlanningSessionSurvey) Answer(tx *gorm.DB, actor uuid.UUID, answers []WorkOrderSurveyAnswer) error {
-	if survey.Status != FactoryWorkOrderSurveyPending {
-		return ErrFactoryWorkOrderSurveyNotPending
-	}
-	resolved, err := resolveSurveyAnswers(survey.Questions, answers)
-	if err != nil {
-		return err
-	}
-	now := time.Now()
-	survey.Status = FactoryWorkOrderSurveyAnswered
-	survey.Answers = resolved
-	survey.AnsweredAt = &now
-	survey.AnsweredByUserID = &actor
-	if err := tx.Model(survey).Select("Status", "Answers", "AnsweredAt", "AnsweredByUserID").Updates(survey).Error; err != nil {
-		return err
-	}
-	session, err := FindPlanningSession(tx, survey.OrganizationID, survey.FactoryID, survey.SessionID)
-	if err != nil {
-		return err
-	}
-	return session.markSurveyAnswered(tx, survey.ID)
 }

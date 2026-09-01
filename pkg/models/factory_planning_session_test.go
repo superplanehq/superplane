@@ -196,25 +196,6 @@ func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	assert.NotEqual(t, fresh.ID, stale[0].ID)
 }
 
-func TestFactoryPlanningSession_AskAndAnswerSurvey(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-ask")
-	db := database.Conn()
-
-	survey, err := session.CreateSurvey(db, []WorkOrderSurveyQuestion{
-		{ID: "area", Prompt: "Which area?", Options: []string{"Payments", "Checkout"}},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, FactoryWorkOrderSurveyPending, survey.Status)
-	require.True(t, hasSurveyMessage(session, survey.ID.String(), false))
-
-	require.NoError(t, survey.Answer(db, session.CreatedByUserID, []WorkOrderSurveyAnswer{
-		{ID: "area", Value: "Payments"},
-	}))
-	require.NoError(t, session.reload(db))
-	assert.True(t, hasSurveyMessage(session, survey.ID.String(), true))
-}
-
 func startTestPlanningSession(t *testing.T, prefix string) *FactoryPlanningSession {
 	t.Helper()
 	org, userID, factoryModel := setupFactoryWithUser(t, prefix)
@@ -290,13 +271,4 @@ func lastTextMessage(session *FactoryPlanningSession, role string) string {
 		}
 	}
 	return ""
-}
-
-func hasSurveyMessage(session *FactoryPlanningSession, surveyID string, answered bool) bool {
-	for _, message := range session.Messages {
-		if message.Kind == PlanningSessionMessageKindSurvey && message.SurveyID == surveyID && message.Answered == answered {
-			return true
-		}
-	}
-	return false
 }

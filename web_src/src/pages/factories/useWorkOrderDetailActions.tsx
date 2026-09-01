@@ -1,7 +1,6 @@
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import {
   useAddWorkOrderComment,
-  useAnswerWorkOrderSurvey,
   useCloseWorkOrder,
   useDispatchWorkOrder,
   useUpdateWorkOrderAssignees,
@@ -9,7 +8,6 @@ import {
 } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import type { WorkOrderSurveyAnswerInput } from "./lib/workOrderSurvey";
 import { formatWorkOrderResult, formatWorkOrderState } from "./lib/workOrderPresentation";
 
 export function useWorkOrderDetailActions(organizationId: string, factoryId: string, orderId: string) {
@@ -18,7 +16,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
   const updateStatus = useUpdateWorkOrderStatus(organizationId, factoryId);
   const addComment = useAddWorkOrderComment(organizationId, factoryId);
-  const answerSurvey = useAnswerWorkOrderSurvey(organizationId, factoryId);
 
   const handleAssigneesSave = async (nextAssigneeIds: string[]) => {
     try {
@@ -64,16 +61,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     }
   };
 
-  const handleAnswerSurvey = async (answers: WorkOrderSurveyAnswerInput[]) => {
-    try {
-      await answerSurvey.mutateAsync({ orderId, answers });
-      showSuccessToast("Answers sent to the agent.");
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to submit the survey"));
-      throw error;
-    }
-  };
-
   const isCompleting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_COMPLETED";
   const isRejecting = closeWorkOrder.isPending && closeWorkOrder.variables?.result === "RESULT_REJECTED";
 
@@ -83,7 +70,6 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     handleClose,
     handleStatusChange,
     handleAddComment,
-    handleAnswerSurvey,
     isDispatching: dispatchWorkOrder.isPending,
     isCompleting,
     isRejecting,
@@ -91,6 +77,5 @@ export function useWorkOrderDetailActions(organizationId: string, factoryId: str
     isAssigneesSaving: updateAssignees.isPending,
     isUpdatingStatus: updateStatus.isPending,
     isAddingComment: addComment.isPending,
-    isAnsweringSurvey: answerSurvey.isPending,
   };
 }

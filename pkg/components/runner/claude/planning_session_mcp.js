@@ -2,15 +2,12 @@
 "use strict";
 
 /**
- * Stdio MCP server that exposes ask_work_order to Claude Code.
+ * Stdio MCP server for Create with an Agent.
  * Talks to SuperPlane with SUPERPLANE_BASE_URL + SUPERPLANE_RUN_TOKEN.
  */
 
-const TOOL_NAME = "ask_work_order";
-const DEFAULT_TIMEOUT_SECONDS = 3600;
-const MIN_TIMEOUT_SECONDS = 60;
-const MAX_TIMEOUT_SECONDS = 64800;
 const HOLD_SECONDS = 45;
+const MAX_WAIT_SECONDS = 64800;
 
 function readEnv(name) {
   const value = String(process.env[name] || "").trim();
@@ -18,52 +15,6 @@ function readEnv(name) {
     throw new Error(`${name} is required`);
   }
   return value;
-}
-
-function mapWaitStatus(status) {
-  if (status === "answered") {
-    return "answered";
-  }
-  if (status === "cancelled") {
-    return "cancelled";
-  }
-  return "no_answer";
-}
-
-function normalizeQuestions(raw) {
-  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 10) {
-    throw new Error("questions must contain 1–10 items");
-  }
-  return raw.map((question, index) => {
-    if (!question || typeof question !== "object") {
-      throw new Error(`question ${index} is invalid`);
-    }
-    const id = String(question.id || "").trim();
-    const prompt = String(question.prompt || "").trim();
-    if (!id || !prompt) {
-      throw new Error(`question ${index} needs an id and a prompt`);
-    }
-    const options = Array.isArray(question.options)
-      ? question.options.map((option) => String(option).trim()).filter(Boolean)
-      : [];
-    return {
-      id,
-      prompt,
-      options,
-      allow_free_text: Boolean(question.allow_free_text) || options.length === 0,
-    };
-  });
-}
-
-function normalizeTimeout(raw) {
-  if (raw == null || raw === "") {
-    return DEFAULT_TIMEOUT_SECONDS;
-  }
-  const timeout = Number(raw);
-  if (!Number.isFinite(timeout) || timeout < MIN_TIMEOUT_SECONDS || timeout > MAX_TIMEOUT_SECONDS) {
-    throw new Error(`timeout_seconds must be between ${MIN_TIMEOUT_SECONDS} and ${MAX_TIMEOUT_SECONDS}`);
-  }
-  return Math.trunc(timeout);
 }
 
 async function requestJSON(method, path, body) {
@@ -97,50 +48,8 @@ async function requestJSON(method, path, body) {
   return parsed;
 }
 
-async function createSurvey(input) {
-  return requestJSON("POST", "/api/v1/runner/work-order-surveys", {
-    timeout_seconds: normalizeTimeout(input.timeout_seconds),
-    questions: normalizeQuestions(input.questions),
-  });
-}
-
-async function waitForSurvey(id) {
-  const deadline = Date.now() + MAX_TIMEOUT_SECONDS * 1000;
-  while (Date.now() < deadline) {
-    const result = await requestJSON(
-      "GET",
-      `/api/v1/runner/work-order-surveys/${encodeURIComponent(id)}/wait?hold_seconds=${HOLD_SECONDS}`,
-    );
-    if (result.status && result.status !== "pending") {
-      return {
-        status: mapWaitStatus(result.status),
-        answers: Array.isArray(result.answers) ? result.answers : [],
-      };
-    }
-  }
-  return { status: "no_answer", answers: [] };
-}
-
-async function askWorkOrder(input) {
-  const created = await createSurvey(input || {});
-  if (!created.id) {
-    throw new Error("create survey did not return an id");
-  }
-  if (created.status && created.status !== "pending") {
-    return {
-      status: mapWaitStatus(created.status),
-      answers: Array.isArray(created.answers) ? created.answers : [],
-    };
-  }
-  return waitForSurvey(created.id);
-}
-
-function isPlanningSession() {
-  return Boolean(String(process.env.SUPERPLANE_PLANNING_SESSION_ID || "").trim());
-}
-
 async function waitForUser() {
-  const deadline = Date.now() + MAX_TIMEOUT_SECONDS * 1000;
+  const deadline = Date.now() + MAX_WAIT_SECONDS * 1000;
   while (Date.now() < deadline) {
     const result = await requestJSON(
       "GET",
@@ -151,27 +60,6 @@ async function waitForUser() {
     }
   }
   return { status: "no_answer" };
-}
-
-async function askPlanningSession(input) {
-  const created = await requestJSON("POST", "/api/v1/runner/planning-sessions/ask", {
-    timeout_seconds: normalizeTimeout(input.timeout_seconds),
-    questions: normalizeQuestions(input.questions),
-  });
-  if (created.status && created.status !== "pending") {
-    return created;
-  }
-  const deadline = Date.now() + MAX_TIMEOUT_SECONDS * 1000;
-  while (Date.now() < deadline) {
-    const result = await requestJSON(
-      "GET",
-      `/api/v1/runner/planning-sessions/surveys/${encodeURIComponent(created.id)}/wait?hold_seconds=${HOLD_SECONDS}`,
-    );
-    if (result.status && result.status !== "pending") {
-      return result;
-    }
-  }
-  return { status: "no_answer", answers: [] };
 }
 
 async function proposeDraft(input) {
@@ -187,37 +75,11 @@ async function say(input) {
   });
 }
 
-const PLANNING_TOOLS = [
+const TOOLS = [
   {
     name: "wait_for_user",
     description: "Wait until the user sends a message, creates a draft, skips a draft, or ends the session.",
     inputSchema: { type: "object", properties: {} },
-  },
-  {
-    name: "ask",
-    description: "Ask the user a structured survey and wait for the answer. Do not print a survey in markdown.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        timeout_seconds: { type: "number" },
-        questions: {
-          type: "array",
-          minItems: 1,
-          maxItems: 10,
-          items: {
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              prompt: { type: "string" },
-              options: { type: "array", items: { type: "string" } },
-              allow_free_text: { type: "boolean" },
-            },
-            required: ["id", "prompt"],
-          },
-        },
-      },
-      required: ["questions"],
-    },
   },
   {
     name: "propose_draft",
@@ -238,41 +100,6 @@ const PLANNING_TOOLS = [
       type: "object",
       properties: { text: { type: "string" } },
       required: ["text"],
-    },
-  },
-];
-
-const TOOLS = isPlanningSession()
-  ? PLANNING_TOOLS
-  : [
-  {
-    name: TOOL_NAME,
-    description:
-      "Ask the work-order owner a structured survey and wait for the answer. Use this for human decisions. Do not print a survey in markdown.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        timeout_seconds: {
-          type: "number",
-          description: "How long to wait for an answer, in seconds. Default 3600. Minimum 60. Maximum 64800.",
-        },
-        questions: {
-          type: "array",
-          minItems: 1,
-          maxItems: 10,
-          items: {
-            type: "object",
-            properties: {
-              id: { type: "string" },
-              prompt: { type: "string" },
-              options: { type: "array", items: { type: "string" } },
-              allow_free_text: { type: "boolean" },
-            },
-            required: ["id", "prompt"],
-          },
-        },
-      },
-      required: ["questions"],
     },
   },
 ];
@@ -324,21 +151,12 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (isPlanningSession()) {
-        if (name === "wait_for_user") {
-          result = await waitForUser();
-        } else if (name === "ask") {
-          result = await askPlanningSession(args);
-        } else if (name === "propose_draft") {
-          result = await proposeDraft(args);
-        } else if (name === "say") {
-          result = await say(args);
-        } else {
-          sendError(id, -32601, `Unknown tool: ${name}`);
-          return;
-        }
-      } else if (name === TOOL_NAME) {
-        result = await askWorkOrder(args);
+      if (name === "wait_for_user") {
+        result = await waitForUser();
+      } else if (name === "propose_draft") {
+        result = await proposeDraft(args);
+      } else if (name === "say") {
+        result = await say(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;
@@ -463,12 +281,3 @@ async function main() {
 if (require.main === module) {
   main();
 }
-
-module.exports = {
-  mapWaitStatus,
-  normalizeQuestions,
-  normalizeTimeout,
-  askWorkOrder,
-  createSurvey,
-  waitForSurvey,
-};

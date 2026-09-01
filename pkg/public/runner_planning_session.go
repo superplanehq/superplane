@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -15,10 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type planningAskRequest struct {
-	TimeoutSeconds int                              `json:"timeout_seconds"`
-	Questions      []models.WorkOrderSurveyQuestion `json:"questions"`
-}
+const (
+	minPlanningHoldSeconds = 1
+	maxPlanningHoldSeconds = 60
+)
 
 type planningDraftRequest struct {
 	Title       string `json:"title"`
@@ -60,7 +60,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	hold := clampWorkOrderSurveyHoldSeconds(r.URL.Query().Get("hold_seconds"))
+	hold := clampPlanningHoldSeconds(r.URL.Query().Get("hold_seconds"))
 	deadline := time.Now().Add(time.Duration(hold) * time.Second)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -95,82 +95,6 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		}
 		if !time.Now().Before(deadline) {
 			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
-			return
-		}
-		select {
-		case <-r.Context().Done():
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func (s *Server) handleRunnerPlanningAsk(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
-	if !ok {
-		return
-	}
-	var req planningAskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-	session, err := s.loadPlanningSessionForRunner(r, scope)
-	if err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	survey, err := session.CreateSurvey(database.DB(r.Context()), req.Questions)
-	if err != nil {
-		writeRunnerPlanningError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id":      survey.ID.String(),
-		"status":  survey.Status,
-		"answers": survey.Answers,
-	})
-}
-
-func (s *Server) handleRunnerPlanningSurveyWait(w http.ResponseWriter, r *http.Request) {
-	scope, ok := s.authenticatePlanningSessionRunner(w, r)
-	if !ok {
-		return
-	}
-	surveyID, err := uuid.Parse(mux.Vars(r)["id"])
-	if err != nil {
-		http.Error(w, "Invalid survey id", http.StatusBadRequest)
-		return
-	}
-	hold := clampWorkOrderSurveyHoldSeconds(r.URL.Query().Get("hold_seconds"))
-	deadline := time.Now().Add(time.Duration(hold) * time.Second)
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		db := database.DB(r.Context())
-		survey, err := models.FindPlanningSessionSurvey(db, scope.OrganizationID, surveyID)
-		if err != nil {
-			writeRunnerPlanningError(w, err)
-			return
-		}
-		if survey.SessionID != scope.SessionID {
-			writeRunnerPlanningError(w, models.ErrFactoryWorkOrderSurveyNotFound)
-			return
-		}
-		if survey.Status != models.FactoryWorkOrderSurveyPending {
-			writeJSON(w, http.StatusOK, map[string]any{
-				"id":      survey.ID.String(),
-				"status":  survey.Status,
-				"answers": survey.Answers,
-			})
-			return
-		}
-		if !time.Now().Before(deadline) {
-			writeJSON(w, http.StatusOK, map[string]any{
-				"id":     survey.ID.String(),
-				"status": survey.Status,
-			})
 			return
 		}
 		select {
@@ -239,11 +163,9 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func writeRunnerPlanningError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid),
-		errors.Is(err, models.ErrFactoryWorkOrderSurveyInvalid):
+	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
-		errors.Is(err, models.ErrFactoryWorkOrderSurveyNotFound),
 		errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, "planning session not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
@@ -252,4 +174,29 @@ func writeRunnerPlanningError(w http.ResponseWriter, err error) {
 		log.WithError(err).Error("runner planning session failed")
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
 	}
+}
+
+func clampPlanningHoldSeconds(raw string) int {
+	hold := 45
+	if raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err == nil {
+			hold = parsed
+		}
+	}
+	if hold < minPlanningHoldSeconds {
+		return minPlanningHoldSeconds
+	}
+	if hold > maxPlanningHoldSeconds {
+		return maxPlanningHoldSeconds
+	}
+	return hold
+}
+
+func bearerToken(header string) string {
+	const prefix = "Bearer "
+	if !strings.HasPrefix(header, prefix) {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(header, prefix))
 }

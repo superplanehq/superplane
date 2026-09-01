@@ -298,7 +298,6 @@ func serializeWorkOrder(
 	dispatches []models.FactoryWorkOrderLineDispatchRecord,
 	createdByAutomation *factory.AutomationRef,
 	usage models.UsageTotals,
-	pendingSurvey *models.FactoryWorkOrderSurvey,
 ) (*pb.WorkOrder, error) {
 	serializedDispatches := serializeWorkOrderLineDispatches(dispatches)
 
@@ -330,39 +329,7 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
-		PendingSurvey:        serializeWorkOrderSurvey(pendingSurvey),
 	}, nil
-}
-
-func serializeWorkOrderSurvey(survey *models.FactoryWorkOrderSurvey) *pb.WorkOrderSurvey {
-	if survey == nil {
-		return nil
-	}
-
-	questions := make([]*pb.WorkOrderSurveyQuestion, 0, len(survey.Questions))
-	for _, question := range survey.Questions {
-		questions = append(questions, &pb.WorkOrderSurveyQuestion{
-			Id:            question.ID,
-			Prompt:        question.Prompt,
-			Options:       question.Options,
-			AllowFreeText: question.AllowFreeText,
-		})
-	}
-	answers := make([]*pb.WorkOrderSurveyAnswer, 0, len(survey.Answers))
-	for _, answer := range survey.Answers {
-		answers = append(answers, &pb.WorkOrderSurveyAnswer{Id: answer.ID, Value: answer.Value})
-	}
-
-	return &pb.WorkOrderSurvey{
-		Id:             survey.ID.String(),
-		Status:         survey.Status,
-		CanvasRunId:    survey.CanvasRunID.String(),
-		Questions:      questions,
-		Answers:        answers,
-		TimeoutSeconds: int32(survey.TimeoutSeconds),
-		ExpiresAt:      timestamppb.New(survey.ExpiresAt),
-		CreatedAt:      timestamppb.New(survey.CreatedAt),
-	}
 }
 
 func serializeWorkOrderOrigin(order *models.FactoryWorkOrder) *pb.WorkOrderOrigin {

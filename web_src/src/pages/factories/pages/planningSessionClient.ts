@@ -90,19 +90,3 @@ export function skipPlanningSessionDraft(organizationId: string, factoryId: stri
     body: "{}",
   });
 }
-
-export function answerPlanningSessionSurvey(
-  organizationId: string,
-  factoryId: string,
-  sessionId: string,
-  answers: Array<{ id: string; value: string }>,
-) {
-  return planningSessionRequest(
-    organizationId,
-    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/survey/answer`,
-    {
-      method: "POST",
-      body: JSON.stringify({ answers }),
-    },
-  );
-}
