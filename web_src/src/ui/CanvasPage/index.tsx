@@ -80,6 +80,7 @@ import {
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
+  resolveInitialCanvasFitViewOptions,
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useTheme } from "@/contexts/useTheme";
@@ -107,6 +108,7 @@ import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
 import { enrichCanvasNodes, type EnrichedCanvasNodeCacheEntry } from "./enrichCanvasNodes";
 import { buildStyledCanvasEdges } from "./factoryCanvasEdgeStyle";
 import { shouldRefitOnInit, stampFittedContentKey } from "./fitView";
+import { shouldUseFactoryRunLeafLayout } from "./factoryRunLeafLayoutGate";
 import { useFactoryConfigureFitView } from "./useFactoryConfigureFitView";
 import { publishBuildingBlocksSidebarChanged, useBuildingBlocksSidebarRequest } from "./buildingBlocksSidebarRequest";
 import { RightSideControls } from "./RightSideControls";
@@ -447,6 +449,16 @@ export interface CanvasPageProps {
    * selected, and chrome is Close-only (no newer/older/copy link).
    */
   factoryEmbed?: boolean;
+  /**
+   * Frame the graph at 100% zoom on first load. Do not shrink to fit the
+   * viewport. Used by settings automation previews.
+   */
+  lockNativeZoom?: boolean;
+  /**
+   * Apply the same ephemeral leaf-right layout as factory run inspection.
+   * Used by settings automation previews so the graph matches Automations.
+   */
+  factoryDisplayLayout?: boolean;
   /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
   factoryConfigure?: boolean;
   /** Factory-shell edit workspace. Enables factory agent sidebar and edit-grid dots. */
@@ -1595,6 +1607,8 @@ function CanvasPage(props: CanvasPageProps) {
                   state={state}
                   factoryId={props.factoryId}
                   factoryEmbed={props.factoryEmbed}
+                  lockNativeZoom={props.lockNativeZoom}
+                  factoryDisplayLayout={props.factoryDisplayLayout}
                   factoryConfigure={props.factoryConfigure}
                   factoryEditWorkspace={props.factoryEditWorkspace}
                   layoutMode={props.layoutMode}
@@ -2240,6 +2254,8 @@ function CanvasContent({
   state,
   factoryId,
   factoryEmbed = false,
+  lockNativeZoom = false,
+  factoryDisplayLayout = false,
   factoryConfigure = false,
   factoryEditWorkspace = false,
   layoutMode,
@@ -2296,6 +2312,8 @@ function CanvasContent({
   state: CanvasPageState;
   factoryId?: string;
   factoryEmbed?: boolean;
+  lockNativeZoom?: boolean;
+  factoryDisplayLayout?: boolean;
   factoryConfigure?: boolean;
   factoryEditWorkspace?: boolean;
   layoutMode?: CanvasLayoutMode;
@@ -2799,10 +2817,11 @@ function CanvasContent({
             ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
             : null;
 
+        const fitDuration = factoryDisplayLayout ? 0 : 500;
         if (focusNode) {
-          fitView({ nodes: [focusNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
+          fitView({ nodes: [focusNode], duration: fitDuration, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
-          fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 500 });
+          fitView({ ...resolveInitialCanvasFitViewOptions(lockNativeZoom), duration: fitDuration });
         }
 
         if (hasNodes) {
@@ -2841,6 +2860,8 @@ function CanvasContent({
       initialFocusNodeId,
       fitViewContentKey,
       lastFittedContentKeyRef,
+      lockNativeZoom,
+      factoryDisplayLayout,
     ],
   );
 
@@ -2881,6 +2902,23 @@ function CanvasContent({
     }
     return getNodes().find((node) => node.id === nodeId) ?? stateRef.current.nodes.find((node) => node.id === nodeId);
   }, [getNodes, initialFocusNodeId]);
+  useEffect(() => {
+    if (!factoryDisplayLayout || !hasReactFlowInitialized) {
+      return;
+    }
+    if ((stateRef.current.nodes?.length ?? 0) === 0) {
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      void fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 0 }).then(() => {
+        const nextViewport = getViewport();
+        viewportRef.current = nextViewport;
+        reportZoom(nextViewport.zoom);
+      });
+    }, 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, reportZoom, viewportRef]);
+
   useFactoryConfigureFitView({
     factoryConfigure,
     isEditing,
@@ -3012,13 +3050,19 @@ function CanvasContent({
     return status === "running" || status === "cancelling";
   }, [runNodeDetailRun]);
 
-  // Ephemeral leaf-right layout while inspecting a factory run (does not persist).
+  // Ephemeral leaf-right layout for factory run inspection and display previews.
+  // Does not persist to the saved workflow.
   const factoryRunLeafLayout = useMemo(() => {
-    if (!factoryEmbed || !isRunInspectionMode) {
+    if (!shouldUseFactoryRunLeafLayout({ factoryEmbed, isRunInspectionMode, factoryDisplayLayout })) {
       return null;
     }
     return layoutFactoryRunLeafGraph(
-      state.nodes.map((node) => ({ id: node.id, position: node.position })),
+      state.nodes.map((node) => ({
+        id: node.id,
+        position: node.position,
+        width: node.measured?.width ?? node.width,
+        height: node.measured?.height ?? node.height,
+      })),
       (state.edges ?? []).map((edge) => ({
         id: edge.id,
         source: edge.source,
@@ -3026,7 +3070,7 @@ function CanvasContent({
         sourceHandle: edge.sourceHandle,
       })),
     );
-  }, [factoryEmbed, isRunInspectionMode, state.nodes, state.edges]);
+  }, [factoryDisplayLayout, factoryEmbed, isRunInspectionMode, state.nodes, state.edges]);
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
