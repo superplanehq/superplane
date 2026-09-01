@@ -4,7 +4,7 @@ import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
@@ -162,7 +162,7 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 }
 
 function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
-  const spend = useOrganizationLLMSpend(organizationId);
+  const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
   return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
 }

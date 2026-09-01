@@ -21,11 +21,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/git"
 	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
@@ -557,6 +559,10 @@ func Start() {
 
 	telemetry.InitSentry()
 	telemetry.StartBeacon()
+
+	if err := models.LoadCurrentPriceBook(database.Conn()); err != nil {
+		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
+	}
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {

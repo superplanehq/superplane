@@ -78,6 +78,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
+	_ = models.LoadCurrentPriceBook(database.Conn())
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
