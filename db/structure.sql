@@ -460,6 +460,43 @@ CREATE TABLE public.factory_pull_requests (
 
 
 --
+-- Name: factory_velocity_repository_merges; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_velocity_repository_merges (
+    id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    repository text NOT NULL,
+    number bigint NOT NULL,
+    author_login text NOT NULL,
+    author_name text DEFAULT ''::text NOT NULL,
+    author_avatar_url text DEFAULT ''::text NOT NULL,
+    merged_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source text DEFAULT 'people'::text NOT NULL,
+    CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
+    CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
+);
+
+
+--
+-- Name: factory_velocity_syncs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_velocity_syncs (
+    factory_id uuid NOT NULL,
+    repository text DEFAULT ''::text NOT NULL,
+    synced_at timestamp with time zone,
+    backfilled_from timestamp with time zone,
+    error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_work_order_artifacts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1481,6 +1518,22 @@ ALTER TABLE ONLY public.factory_pull_requests
 
 
 --
+-- Name: factory_velocity_repository_merges factory_velocity_people_merges_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_velocity_repository_merges
+    ADD CONSTRAINT factory_velocity_people_merges_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_velocity_syncs factory_velocity_syncs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_velocity_syncs
+    ADD CONSTRAINT factory_velocity_syncs_pkey PRIMARY KEY (factory_id);
+
+
+--
 -- Name: factory_work_order_artifacts factory_work_order_artifacts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2242,6 +2295,27 @@ CREATE UNIQUE INDEX idx_factory_pull_requests_factory_url ON public.factory_pull
 --
 
 CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_requests USING btree (work_order_id, created_at);
+
+
+--
+-- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
+
+
+--
+-- Name: idx_factory_velocity_repository_merges_factory_repo_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_velocity_repository_merges_factory_repo_number ON public.factory_velocity_repository_merges USING btree (factory_id, repository, number);
+
+
+--
+-- Name: idx_factory_velocity_syncs_synced_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_velocity_syncs_synced_at ON public.factory_velocity_syncs USING btree (synced_at NULLS FIRST);
 
 
 --
@@ -3014,6 +3088,30 @@ ALTER TABLE ONLY public.factory_pull_requests
 
 
 --
+-- Name: factory_velocity_repository_merges factory_velocity_people_merges_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_velocity_repository_merges
+    ADD CONSTRAINT factory_velocity_people_merges_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_velocity_repository_merges factory_velocity_people_merges_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_velocity_repository_merges
+    ADD CONSTRAINT factory_velocity_people_merges_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_velocity_syncs factory_velocity_syncs_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_velocity_syncs
+    ADD CONSTRAINT factory_velocity_syncs_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
 -- Name: factory_work_order_artifacts factory_work_order_artifacts_created_by_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3709,7 +3807,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260829133423	f
+20260831153702	f
 \.
 
 

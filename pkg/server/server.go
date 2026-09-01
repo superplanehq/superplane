@@ -285,6 +285,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_FACTORY_VELOCITY_SYNC_WORKER") == "yes" {
+		log.Println("Starting Factory Velocity Sync Worker")
+
+		w := workers.NewFactoryVelocitySyncWorker(rabbitMQURL, encryptor, registry)
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{

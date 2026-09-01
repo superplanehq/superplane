@@ -1,4 +1,5 @@
 import type {
+  FactoriesDescribeFactoryVelocityResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -16,6 +17,7 @@ import type {
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_LINE_ID,
@@ -282,6 +284,11 @@ export interface FactoriesFixture {
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
+  /**
+   * Velocity reports keyed by factory, then by requested period in days. A
+   * period without an entry falls back to the empty report.
+   */
+  velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
   organizationLlmSpend?: StorybookUsageReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
@@ -326,6 +333,9 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_USAGE,
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
     [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
+  },
+  velocityByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
   },
   organizationLlmSpend: DEFAULT_FACTORY_USAGE,
 };
