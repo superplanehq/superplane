@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestParseRunnerLLMUsageFromClaudeCodeResult(t *testing.T) {
@@ -134,4 +135,30 @@ func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	assert.Equal(t, models.UsageProviderAnthropic, recorder.records[0].Provider)
 	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
 	assert.Equal(t, models.UsageIdempotencyKeyRunner, recorder.records[0].IdempotencyKey)
+}
+
+func TestProcessBrokerTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	state := &contexts.ExecutionStateContext{Finished: true}
+	exit := 0
+	task := &Task{
+		Status:   "succeeded",
+		ExitCode: &exit,
+		Result:   json.RawMessage(`{"usage":{"input_tokens":1200,"output_tokens":80},"model":"claude-sonnet-4-6"}`),
+	}
+
+	require.NoError(t, processBrokerTaskStatus(
+		state,
+		task,
+		"runnerClaudeCode.finished",
+		"",
+		nil,
+		recorder,
+		map[string]any{"credentials": map[string]any{"source": "hosted"}},
+	))
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, int64(1280), recorder.records[0].TotalTokens)
+	assert.Empty(t, state.Payloads)
 }
