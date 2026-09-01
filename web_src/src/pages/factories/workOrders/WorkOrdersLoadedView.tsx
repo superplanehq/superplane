@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrder,
 } from "@/api-client";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -45,6 +45,7 @@ interface WorkOrdersLoadedViewProps {
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  hostedCreditEmptyBanner?: ReactNode;
 }
 
 /**
@@ -138,6 +139,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
+          hostedCreditEmptyBanner={props.hostedCreditEmptyBanner}
         />
       </div>
 
