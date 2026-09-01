@@ -175,6 +175,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Factories",
               description: "Software factories for tasks",
             },
+            {
+              id: "workspace_models",
+              label: "Workspace Models",
+              description: "Show the in-progress workspace Models settings page",
+            },
           ],
         },
       }),

@@ -32,6 +32,10 @@ const FeatureFactoryVelocity = "factory_velocity"
 // in the Backlog column menu until the flow is generally available.
 const FeatureFactorySentryIntake = "factory_sentry_intake"
 
+// FeatureWorkspaceModels gates the in-progress workspace Models settings
+// page until it is ready for general use.
+const FeatureWorkspaceModels = "workspace_models"
+
 func released() *bool {
 	v := true
 	return &v
@@ -43,6 +47,7 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryVelocity, Label: "Factory Velocity", Description: "Show the Velocity view for a factory organization"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
+	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 }
 
 func All() []Feature {
