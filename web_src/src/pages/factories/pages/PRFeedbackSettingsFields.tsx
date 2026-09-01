@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
+import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -288,10 +289,11 @@ function PRFeedbackIntegrationsField({
 }) {
   const integrationsQuery = useConnectedIntegrations(organizationId ?? "", { enabled: Boolean(organizationId) });
   const options = useMemo(() => {
-    return (integrationsQuery.data ?? []).filter((integration) => {
+    const filtered = (integrationsQuery.data ?? []).filter((integration) => {
       const type = integration.metadata?.integrationName?.toLowerCase();
       return type !== "github" && integration.status?.state === "ready" && integration.metadata?.id;
     });
+    return sortConnectedIntegrationsByType(filtered);
   }, [integrationsQuery.data]);
 
   return (
