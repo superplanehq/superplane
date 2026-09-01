@@ -15,7 +15,7 @@ export function useFactoryConfigureInitialLayout({
   editBootstrapReady,
   activeCanvasVersionId,
   applyLayout,
-}: UseFactoryConfigureInitialLayoutOptions): { ready: boolean } {
+}: UseFactoryConfigureInitialLayoutOptions): { ready: boolean; holdCanvas: boolean } {
   const [ready, setReady] = useState(!factoryAutoLayout);
   const layoutAppliedRef = useRef(false);
   const applyLayoutRef = useRef(applyLayout);
@@ -51,5 +51,5 @@ export function useFactoryConfigureInitialLayout({
     });
   }, [activeCanvasVersionId, editBootstrapReady, factoryAutoLayout, isEditing]);
 
-  return { ready };
+  return { ready, holdCanvas: factoryAutoLayout && !ready };
 }

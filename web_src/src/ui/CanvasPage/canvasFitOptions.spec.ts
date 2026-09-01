@@ -7,6 +7,7 @@ import {
   NATIVE_ZOOM_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
   resolveInitialCanvasFitViewOptions,
+  resolveInitialFitViewDuration,
 } from "./canvasFitOptions";
 
 describe("canvasFitOptions", () => {
@@ -31,5 +32,11 @@ describe("canvasFitOptions", () => {
   it("locks the first-load fit to 100% zoom when the preview asks for native zoom", () => {
     expect(resolveInitialCanvasFitViewOptions(true)).toBe(NATIVE_ZOOM_FIT_VIEW_OPTIONS);
     expect(resolveInitialCanvasFitViewOptions(false)).toBe(LIVE_CANVAS_FIT_VIEW_OPTIONS);
+  });
+
+  it("skips fit animation for factory display and Configure enter", () => {
+    expect(resolveInitialFitViewDuration(true, false)).toBe(0);
+    expect(resolveInitialFitViewDuration(false, true)).toBe(0);
+    expect(resolveInitialFitViewDuration(false, false)).toBe(500);
   });
 });

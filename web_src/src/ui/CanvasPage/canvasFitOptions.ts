@@ -26,6 +26,19 @@ export function resolveInitialCanvasFitViewOptions(lockNativeZoom: boolean) {
   return lockNativeZoom ? NATIVE_ZOOM_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
 }
 
+const DEFAULT_FIT_VIEW_DURATION_MS = 500;
+
+/** Factory display and Configure enter skip the fit animation so nodes do not slide. */
+export function resolveInitialFitViewDuration(factoryDisplayLayout: boolean, factoryConfigure: boolean): number {
+  if (factoryDisplayLayout) {
+    return 0;
+  }
+  if (factoryConfigure) {
+    return 0;
+  }
+  return DEFAULT_FIT_VIEW_DURATION_MS;
+}
+
 /** Fit options when framing run participant nodes during run inspection. */
 export const RUN_CANVAS_FIT_VIEW_OPTIONS = {
   ...CANVAS_FIT_VIEW_INCLUDE_HIDDEN,

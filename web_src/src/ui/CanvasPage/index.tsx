@@ -81,6 +81,7 @@ import {
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
   resolveInitialCanvasFitViewOptions,
+  resolveInitialFitViewDuration,
 } from "@/ui/CanvasPage/canvasFitOptions";
 import { Sentry } from "@/sentry";
 import { useTheme } from "@/contexts/useTheme";
@@ -2818,7 +2819,7 @@ function CanvasContent({
             ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
             : null;
 
-        const fitDuration = factoryDisplayLayout || factoryConfigure ? 0 : 500;
+        const fitDuration = resolveInitialFitViewDuration(factoryDisplayLayout, factoryConfigure);
         if (focusNode) {
           fitView({ nodes: [focusNode], duration: fitDuration, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
