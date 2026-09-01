@@ -801,7 +801,8 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    slug text NOT NULL
 );
 
 
@@ -2826,6 +2827,13 @@ CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_eve
 
 
 --
+-- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3773,7 +3781,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260901010349	f
+20260901015647	f
 \.
 
 
