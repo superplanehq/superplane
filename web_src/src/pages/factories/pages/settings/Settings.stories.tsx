@@ -43,6 +43,7 @@ export const Automations: Story = {
   ),
 };
 
+/** Live Account General page. Redesign mockup: Factories/Pages/Account Profile Redesign. */
 export const AccountGeneral: Story = {
   render: () => (
     <FactoriesHarness
