@@ -308,6 +308,15 @@ func (t UsageTotals) CostCents() int64 {
 	return pricebook.MicrosToCents(t.CostMicros)
 }
 
+// Add returns the field-wise sum of two ledger totals.
+func (t UsageTotals) Add(other UsageTotals) UsageTotals {
+	return UsageTotals{
+		TotalTokens:     t.TotalTokens + other.TotalTokens,
+		DurationSeconds: t.DurationSeconds + other.DurationSeconds,
+		CostMicros:      t.CostMicros + other.CostMicros,
+	}
+}
+
 func (r UsageByModel) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
 }

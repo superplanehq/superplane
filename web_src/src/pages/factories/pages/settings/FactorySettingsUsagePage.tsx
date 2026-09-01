@@ -20,6 +20,7 @@ import {
 } from "./WorkspaceUsageBreakdown";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useEffect, useState } from "react";
+import type { FactoriesDescribeFactoryUsageResponse } from "@/api-client";
 
 export function FactorySettingsUsagePage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
@@ -27,45 +28,56 @@ export function FactorySettingsUsagePage() {
 
   usePageTitle(["Spending", "Settings", factory.name ?? "Workspace"]);
 
-  const totalTokens = parseWorkOrderMetric(data?.totalTokens);
-  const totalCostCents = parseWorkOrderMetric(data?.totalCostCents);
-  const totalDurationSeconds = parseWorkOrderMetric(data?.totalDurationSeconds);
-  const periodDays = data?.periodDays ?? 30;
-  const byModel = data?.byModel ?? [];
-  const byMachineType = data?.byMachineType ?? [];
-
   return (
     <>
-      <WorkspacePageHeader title="Spending" subtitle="LLM tokens, VM seconds, and estimated spend for this workspace." />
+      <WorkspacePageHeader
+        title="Spending"
+        subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
+      />
       <div className={factoryContentBodyClassName}>
-        {isLoading ? (
-          <p className="text-[13px] text-muted-foreground">Loading usage...</p>
-        ) : error ? (
-          <p className="text-[13px] text-destructive">Unable to load usage.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <WorkspaceUsageTotals
-              periodDays={periodDays}
-              totalTokens={totalTokens}
-              totalCostCents={totalCostCents}
-              totalDurationSeconds={totalDurationSeconds}
-            />
-            <HostedSpendLimitCard />
-            <HostedCreditSummary
-              remainingCreditCents={data?.remainingCreditCents}
-              grantTotalCents={data?.grantTotalCents}
-              hostedBilledCents={data?.hostedBilledCents}
-              remainingCreditWarning={data?.remainingCreditWarning}
-              cardClassName={`${factoryCardClassName} p-4`}
-              labelClassName="workspace-section-label"
-              valueClassName="workspace-page-title mt-1"
-            />
-            <WorkspaceUsageByModelTable byModel={byModel} />
-            <WorkspaceUsageByMachineTypeTable byMachineType={byMachineType} />
-          </div>
-        )}
+        <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
       </div>
     </>
+  );
+}
+
+function FactorySettingsUsageBody({
+  data,
+  error,
+  isLoading,
+}: {
+  data: FactoriesDescribeFactoryUsageResponse | undefined;
+  error: unknown;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return <p className="text-[13px] text-muted-foreground">Loading usage...</p>;
+  }
+  if (error || !data) {
+    return <p className="text-[13px] text-destructive">Unable to load usage.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <WorkspaceUsageTotals
+        periodDays={data.periodDays ?? 30}
+        totalTokens={parseWorkOrderMetric(data.totalTokens)}
+        totalCostCents={parseWorkOrderMetric(data.totalCostCents)}
+        totalDurationSeconds={parseWorkOrderMetric(data.totalDurationSeconds)}
+      />
+      <HostedSpendLimitCard />
+      <HostedCreditSummary
+        remainingCreditCents={data.remainingCreditCents}
+        grantTotalCents={data.grantTotalCents}
+        hostedBilledCents={data.hostedBilledCents}
+        remainingCreditWarning={data.remainingCreditWarning}
+        cardClassName={`${factoryCardClassName} p-4`}
+        labelClassName="workspace-section-label"
+        valueClassName="workspace-page-title mt-1"
+      />
+      <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
+      <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
+    </div>
   );
 }
 

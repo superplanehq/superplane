@@ -67,9 +67,10 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
+	ledger := totals.Add(computeTotals)
 	resp := &pb.DescribeFactoryUsageResponse{
-		TotalTokens:                   totals.TotalTokens,
-		TotalCostCents:                totals.CostCents(),
+		TotalTokens:                   ledger.TotalTokens,
+		TotalCostCents:                ledger.CostCents(),
 		PeriodDays:                    int32(period),
 		ByModel:                       serializeUsageByModel(byModel),
 		RemainingCreditCents:          pricebook.MicrosToCents(credit.RemainingMicros),
@@ -79,7 +80,7 @@ func DescribeFactoryUsage(
 		FactoryHostedBilledCents:      pricebook.MicrosToCents(budget.BilledMicros),
 		FactoryRemainingCreditCents:   pricebook.MicrosToCents(budget.RemainingMicros),
 		FactoryRemainingCreditWarning: budget.Warning,
-		TotalDurationSeconds:          computeTotals.DurationSeconds,
+		TotalDurationSeconds:          ledger.DurationSeconds,
 		ByMachineType:                 serializeUsageByMachineType(byMachine),
 	}
 	if budget.BudgetCents != nil {

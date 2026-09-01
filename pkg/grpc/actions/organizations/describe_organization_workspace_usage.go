@@ -54,10 +54,11 @@ func DescribeOrganizationWorkspaceUsage(
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+	ledger := totals.Add(computeTotals)
 
 	return &pb.DescribeOrganizationWorkspaceUsageResponse{
-		TotalTokens:            totals.TotalTokens,
-		TotalCostCents:         totals.CostCents(),
+		TotalTokens:            ledger.TotalTokens,
+		TotalCostCents:         ledger.CostCents(),
 		PeriodDays:             int32(period),
 		ByModel:                serializeUsageByModel(byModel),
 		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
@@ -69,7 +70,7 @@ func DescribeOrganizationWorkspaceUsage(
 		SuperplaneGrantCents:   pricebook.MicrosToCents(credit.SuperPlaneGrantMicros),
 		PurchasedCreditCents:   pricebook.MicrosToCents(credit.PurchasedCreditMicros),
 		Invoices:               listHostedCreditInvoices(ctx, organizationID, billingEnabled, hasCustomer),
-		TotalDurationSeconds:   computeTotals.DurationSeconds,
+		TotalDurationSeconds:   ledger.DurationSeconds,
 		ByMachineType:          serializeUsageByMachineType(byMachine),
 	}, nil
 }

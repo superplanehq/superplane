@@ -20,6 +20,16 @@ func Test__WorkspaceUsageEvent__TableName(t *testing.T) {
 	assert.Equal(t, "workspace_usage_events", models.WorkspaceUsageEvent{}.TableName())
 }
 
+func Test__UsageTotalsAdd(t *testing.T) {
+	combined := models.UsageTotals{TotalTokens: 10, CostMicros: 30_000}.Add(
+		models.UsageTotals{DurationSeconds: 90, CostMicros: 50_040},
+	)
+	assert.Equal(t, int64(10), combined.TotalTokens)
+	assert.Equal(t, int64(90), combined.DurationSeconds)
+	assert.Equal(t, int64(80_040), combined.CostMicros)
+	assert.Equal(t, int64(8), combined.CostCents())
+}
+
 func Test__RecordUsage__FactoryLinkedRunPersistsAndRollsUp(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
