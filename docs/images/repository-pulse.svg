@@ -1,0 +1,63 @@
+<svg width="1200" height="360" viewBox="0 0 1200 360" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title description">
+  <title id="title">SuperPlane repository pulse</title>
+  <desc id="description">A dark yellow-accented dashboard showing open work moving through contributions and verification to releases.</desc>
+  <rect x="1" y="1" width="1198" height="358" rx="18" fill="#11110E" stroke="#34342B" stroke-width="2"/>
+  <rect x="34" y="30" width="1132" height="64" rx="12" fill="#191915" stroke="#34342B"/>
+  <circle cx="66" cy="62" r="10" fill="#F4D35E"/>
+  <path d="M61 62H71M66 57V67" stroke="#11110E" stroke-width="2" stroke-linecap="round"/>
+  <text x="88" y="58" fill="#F7F5E9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" font-weight="700">Repository pulse</text>
+  <text x="88" y="78" fill="#99998E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13">Open work moving through the SuperPlane factory</text>
+  <text x="1080" y="67" fill="#F4D35E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" font-weight="700" letter-spacing="1.4">LIVE ON GITHUB</text>
+
+  <path d="M268 202H322" stroke="#4A493C" stroke-width="2" stroke-dasharray="5 6"/>
+  <path d="M576 202H630" stroke="#4A493C" stroke-width="2" stroke-dasharray="5 6"/>
+  <path d="M884 202H938" stroke="#4A493C" stroke-width="2" stroke-dasharray="5 6"/>
+  <path d="M312 196L322 202L312 208" stroke="#F4D35E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M620 196L630 202L620 208" stroke="#F4D35E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M928 196L938 202L928 208" stroke="#F4D35E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="34" y="122" width="234" height="160" rx="14" fill="#181814" stroke="#34342B"/>
+  <text x="58" y="153" fill="#F4D35E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="700" letter-spacing="1.3">DISCOVER</text>
+  <text x="58" y="181" fill="#F7F5E9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="19" font-weight="700">Open work</text>
+  <text x="58" y="204" fill="#99998E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13">Issues and backlog signals</text>
+  <rect x="58" y="230" width="148" height="8" rx="4" fill="#292921"/>
+  <rect x="58" y="230" width="102" height="8" rx="4" fill="#F4D35E"/>
+  <circle cx="226" cy="234" r="4" fill="#F4D35E"/>
+  <rect x="58" y="250" width="118" height="6" rx="3" fill="#34342B"/>
+  <rect x="182" y="250" width="22" height="6" rx="3" fill="#5F5E4E"/>
+
+  <rect x="342" y="122" width="234" height="160" rx="14" fill="#181814" stroke="#34342B"/>
+  <text x="366" y="153" fill="#F4D35E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="700" letter-spacing="1.3">CONTROL</text>
+  <text x="366" y="181" fill="#F7F5E9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="19" font-weight="700">Contributions</text>
+  <text x="366" y="204" fill="#99998E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13">Commits and pull requests</text>
+  <rect x="366" y="248" width="12" height="12" rx="2" fill="#6C622E"/>
+  <rect x="384" y="232" width="12" height="28" rx="2" fill="#95863B"/>
+  <rect x="402" y="240" width="12" height="20" rx="2" fill="#C2AA48"/>
+  <rect x="420" y="218" width="12" height="42" rx="2" fill="#F4D35E"/>
+  <rect x="438" y="228" width="12" height="32" rx="2" fill="#BDA744"/>
+  <rect x="456" y="210" width="12" height="50" rx="2" fill="#F4D35E"/>
+  <rect x="474" y="238" width="12" height="22" rx="2" fill="#8A7D38"/>
+  <rect x="492" y="224" width="12" height="36" rx="2" fill="#D4B94D"/>
+  <rect x="510" y="242" width="12" height="18" rx="2" fill="#6C622E"/>
+  <rect x="528" y="214" width="12" height="46" rx="2" fill="#F4D35E"/>
+
+  <rect x="650" y="122" width="234" height="160" rx="14" fill="#181814" stroke="#34342B"/>
+  <text x="674" y="153" fill="#F4D35E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="700" letter-spacing="1.3">VERIFY</text>
+  <text x="674" y="181" fill="#F7F5E9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="19" font-weight="700">Checks and review</text>
+  <text x="674" y="204" fill="#99998E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13">CI, feedback and approvals</text>
+  <circle cx="692" cy="239" r="12" fill="#25251F" stroke="#F4D35E"/>
+  <path d="M687 239L691 243L698 235" stroke="#F4D35E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="716" y="232" width="116" height="7" rx="3.5" fill="#F4D35E"/>
+  <rect x="716" y="247" width="82" height="6" rx="3" fill="#454538"/>
+
+  <rect x="958" y="122" width="208" height="160" rx="14" fill="#F4D35E"/>
+  <text x="982" y="153" fill="#11110E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="800" letter-spacing="1.3">DELIVER</text>
+  <text x="982" y="181" fill="#11110E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="19" font-weight="800">Release</text>
+  <text x="982" y="204" fill="#4C451E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13">Review-ready changes</text>
+  <rect x="982" y="228" width="160" height="32" rx="8" fill="#11110E"/>
+  <circle cx="1002" cy="244" r="6" fill="#6EE7A2"/>
+  <text x="1016" y="249" fill="#F7F5E9" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="13" font-weight="700">Ready to merge</text>
+
+  <text x="34" y="322" fill="#77776D" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12">Click to open the complete GitHub activity view</text>
+  <text x="1051" y="322" fill="#F4D35E" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" font-weight="700">superplanehq/superplane ↗</text>
+</svg>
