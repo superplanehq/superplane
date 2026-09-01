@@ -21,14 +21,10 @@ const SYSTEM_PROMPT =
   "Prefer plain paths, shell commands, and simple indentation.";
 
 const PLANNING_SYSTEM_PROMPT =
-  " This is a SuperPlane planning session. Call mcp__superplane__wait_for_user, mcp__superplane__propose_draft, and mcp__superplane__say. Do not create work orders yourself.";
+  " This is a SuperPlane planning session. Call mcp__superplane__propose_draft and mcp__superplane__say. SuperPlane waits after you stop. Do not create work orders yourself.";
 
 const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
-const PLANNING_ALLOWED_TOOLS = [
-  "mcp__superplane__wait_for_user",
-  "mcp__superplane__propose_draft",
-  "mcp__superplane__say",
-];
+const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__say"];
 
 function envFlag(env, name) {
   return Boolean(String((env && env[name]) || "").trim());

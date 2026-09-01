@@ -6,9 +6,6 @@
  * Talks to SuperPlane with SUPERPLANE_BASE_URL + SUPERPLANE_RUN_TOKEN.
  */
 
-const HOLD_SECONDS = 45;
-const MAX_WAIT_SECONDS = 64800;
-
 function readEnv(name) {
   const value = String(process.env[name] || "").trim();
   if (!value) {
@@ -48,20 +45,6 @@ async function requestJSON(method, path, body) {
   return parsed;
 }
 
-async function waitForUser() {
-  const deadline = Date.now() + MAX_WAIT_SECONDS * 1000;
-  while (Date.now() < deadline) {
-    const result = await requestJSON(
-      "GET",
-      `/api/v1/runner/planning-sessions/wait?hold_seconds=${HOLD_SECONDS}`,
-    );
-    if (result.status && result.status !== "pending") {
-      return result;
-    }
-  }
-  return { status: "no_answer" };
-}
-
 async function proposeDraft(input) {
   return requestJSON("POST", "/api/v1/runner/planning-sessions/drafts", {
     title: String((input && input.title) || "").trim(),
@@ -76,11 +59,6 @@ async function say(input) {
 }
 
 const TOOLS = [
-  {
-    name: "wait_for_user",
-    description: "Wait until the user sends a message, creates a draft, skips a draft, or ends the session.",
-    inputSchema: { type: "object", properties: {} },
-  },
   {
     name: "propose_draft",
     description: "Show a draft work order on the right. The user confirms or skips. Do not create the work order.",
@@ -151,9 +129,7 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "wait_for_user") {
-        result = await waitForUser();
-      } else if (name === "propose_draft") {
+      if (name === "propose_draft") {
         result = await proposeDraft(args);
       } else if (name === "say") {
         result = await say(args);

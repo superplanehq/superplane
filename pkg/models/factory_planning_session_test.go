@@ -40,18 +40,6 @@ func TestFactory_StartPlanningSession(t *testing.T) {
 	assert.Equal(t, CanvasRunStatePending, run.State)
 }
 
-func TestFindPlanningCanvas_FindsLegacyName(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "plan-legacy")
-	db := database.Conn()
-	canvas, _ := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
-	require.NoError(t, db.Model(canvas).Update("name", PlanningCanvasLegacyName).Error)
-
-	found, err := FindPlanningCanvas(db, org.ID, factoryModel.ID)
-	require.NoError(t, err)
-	assert.Equal(t, canvas.ID, found.ID)
-}
-
 func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-repo")

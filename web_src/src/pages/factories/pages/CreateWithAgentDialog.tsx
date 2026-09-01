@@ -31,10 +31,7 @@ export type CreateWithAgentDialogProps = {
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
-  onWorkOnNew: () => void;
-  onSelectCreated: (orderId: string) => void;
   onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
-  onBackToList: () => void;
   onRequestClose: () => void;
   onCancelEnd: () => void;
   onConfirmEnd: () => void;
@@ -51,10 +48,7 @@ export function CreateWithAgentDialog({
   onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
-  onWorkOnNew,
-  onSelectCreated,
   onOpenCreated,
-  onBackToList,
   onRequestClose,
   onCancelEnd,
   onConfirmEnd,
@@ -73,7 +67,6 @@ export function CreateWithAgentDialog({
             repository={view.repository}
             machineStatus={view.machineStatus}
             onEndSession={onRequestClose}
-            onClose={onRequestClose}
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
             <CreateWithAgentStream
@@ -88,10 +81,7 @@ export function CreateWithAgentDialog({
               onDraftDescriptionChange={onDraftDescriptionChange}
               onCreateDraft={onCreateDraft}
               onSkipDraft={onSkipDraft}
-              onWorkOnNew={onWorkOnNew}
-              onSelectCreated={onSelectCreated}
               onOpenCreated={onOpenCreated}
-              onBackToList={onBackToList}
             />
           </div>
         </DialogContent>
@@ -117,13 +107,11 @@ function CreateWithAgentHeader({
   repository,
   machineStatus,
   onEndSession,
-  onClose,
 }: {
   workspaceName: string;
   repository: string;
   machineStatus: CreateWithAgentView["machineStatus"];
   onEndSession: () => void;
-  onClose: () => void;
 }) {
   const starting = machineStatus === "starting";
   return (
@@ -159,16 +147,6 @@ function CreateWithAgentHeader({
           onClick={onEndSession}
         >
           {CREATE_WITH_AGENT_COPY.endSession}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2.5 text-[12px]"
-          data-testid="create-with-agent-close"
-          onClick={onClose}
-        >
-          {CREATE_WITH_AGENT_COPY.close}
         </Button>
       </div>
     </div>
@@ -249,20 +227,14 @@ function CreateWithAgentWorkPane({
   onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
-  onWorkOnNew,
-  onSelectCreated,
   onOpenCreated,
-  onBackToList,
 }: {
   view: CreateWithAgentView;
   onDraftTitleChange: (title: string) => void;
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
-  onWorkOnNew: () => void;
-  onSelectCreated: (orderId: string) => void;
   onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
-  onBackToList: () => void;
 }) {
   return (
     <section className="flex min-h-0 flex-col bg-muted/20" data-testid="create-with-agent-work">
@@ -277,17 +249,8 @@ function CreateWithAgentWorkPane({
           onSkip={onSkipDraft}
         />
       ) : null}
-      {view.right.kind === "list" ? (
-        <ListWorkPane created={view.created} onWorkOnNew={onWorkOnNew} onSelectCreated={onSelectCreated} />
-      ) : null}
       {view.right.kind === "preview" ? (
-        <PreviewWorkPane
-          order={view.right.order}
-          showList={view.created.length > 0}
-          onBackToList={onBackToList}
-          onOpenCreated={onOpenCreated}
-          onWorkOnNew={onWorkOnNew}
-        />
+        <PreviewWorkPane order={view.right.order} onOpenCreated={onOpenCreated} />
       ) : null}
     </section>
   );
@@ -351,54 +314,12 @@ function DraftWorkPane({
   );
 }
 
-function ListWorkPane({
-  created,
-  onWorkOnNew,
-  onSelectCreated,
-}: {
-  created: CreateWithAgentCreatedOrder[];
-  onWorkOnNew: () => void;
-  onSelectCreated: (orderId: string) => void;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-list">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[13px] font-medium text-foreground">{CREATE_WITH_AGENT_COPY.sessionListHeadline}</p>
-        <Button type="button" size="sm" data-testid="create-with-agent-work-on-new" onClick={onWorkOnNew}>
-          {CREATE_WITH_AGENT_COPY.workOnNew}
-        </Button>
-      </div>
-      <ul className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto">
-        {created.map((order) => (
-          <li key={order.id}>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-accent"
-              data-testid={`create-with-agent-created-${order.id}`}
-              onClick={() => onSelectCreated(order.id)}
-            >
-              <span className="shrink-0 text-[12px] text-muted-foreground">{order.key}</span>
-              <span className="min-w-0 flex-1 truncate text-[13px]">{order.title}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 function PreviewWorkPane({
   order,
-  showList,
-  onBackToList,
   onOpenCreated,
-  onWorkOnNew,
 }: {
   order: CreateWithAgentCreatedOrder;
-  showList: boolean;
-  onBackToList: () => void;
   onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
-  onWorkOnNew: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-preview">
@@ -407,17 +328,9 @@ function PreviewWorkPane({
       <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-relaxed text-muted-foreground">
         {order.description}
       </p>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        {showList ? (
-          <Button type="button" variant="ghost" onClick={onBackToList}>
-            {CREATE_WITH_AGENT_COPY.sessionListHeadline}
-          </Button>
-        ) : null}
+      <div className="mt-4 flex justify-end">
         <Button type="button" variant="outline" onClick={() => onOpenCreated(order)}>
           {CREATE_WITH_AGENT_COPY.openTask}
-        </Button>
-        <Button type="button" onClick={onWorkOnNew}>
-          {CREATE_WITH_AGENT_COPY.workOnNew}
         </Button>
       </div>
     </div>

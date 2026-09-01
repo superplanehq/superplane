@@ -23,25 +23,20 @@ func TestOnRun_HandleHook_RequiresAppWorkOrderOrPlanningSession(t *testing.T) {
 	assert.Empty(t, events.Payloads)
 }
 
-func TestOnRun_HandleHook_EmitsPlanningSession(t *testing.T) {
+func TestOnRun_HandleHook_AcceptsPlanningSessionWithoutEvent(t *testing.T) {
 	trigger := &OnRun{}
 	events := &contexts.EventContext{}
-	planning := map[string]any{
-		"factory_id": "factory-1",
-		"repository": "acme/payments",
-	}
 
 	_, err := trigger.HandleHook(core.TriggerHookContext{
 		Name: "onMessage",
 		Parameters: map[string]any{
-			"planning_session": planning,
+			"planning_session": map[string]any{
+				"factory_id": "factory-1",
+				"repository": "acme/payments",
+			},
 		},
 		Events: events,
 	})
 	require.NoError(t, err)
-	require.Len(t, events.Payloads, 1)
-	assert.Equal(t, "factory.planning_session", events.Payloads[0].Type)
-	payload, ok := events.Payloads[0].Data.(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, planning, payload["planning_session"])
+	assert.Empty(t, events.Payloads)
 }

@@ -21,9 +21,6 @@ const (
 func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
 	canvas, err := models.FindPlanningCanvas(tx, factoryModel.OrganizationID, factoryModel.ID)
 	if err == nil {
-		if err := revealPlanningCanvas(tx, canvas); err != nil {
-			return nil, "", err
-		}
 		if err := ensurePlanningAgentNode(tx, factoryModel, canvas); err != nil {
 			return nil, "", err
 		}
@@ -34,24 +31,6 @@ func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid
 		return nil, "", err
 	}
 	return createPlanningCanvas(tx, factoryModel, userID)
-}
-
-func revealPlanningCanvas(tx *gorm.DB, canvas *models.Canvas) error {
-	now := time.Now()
-	changed := false
-	if canvas.Name != models.PlanningCanvasName {
-		canvas.Name = models.PlanningCanvasName
-		changed = true
-	}
-	if canvas.Description != models.PlanningCanvasDescription {
-		canvas.Description = models.PlanningCanvasDescription
-		changed = true
-	}
-	if !changed {
-		return nil
-	}
-	canvas.UpdatedAt = &now
-	return tx.Model(canvas).Select("Name", "Description", "UpdatedAt").Updates(canvas).Error
 }
 
 func createPlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
@@ -341,7 +320,6 @@ func planningCanvasPrompt() string {
 
 Use the tools:
 - say: post a short message the user can see
-- ask: ask a structured question
 - propose_draft: show a draft work order. The user creates or skips it.
 
 Do not create work orders yourself.

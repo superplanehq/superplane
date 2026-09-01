@@ -596,18 +596,6 @@ service Factories {
     };
   }
 
-  rpc HeartbeatPlanningSession(HeartbeatPlanningSessionRequest) returns (HeartbeatPlanningSessionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/heartbeat"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Heartbeat planning session";
-      description: "Keeps the planning session machine alive";
-      tags: "Factory";
-    };
-  }
-
   rpc EndPlanningSession(EndPlanningSessionRequest) returns (EndPlanningSessionResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"
@@ -1971,15 +1959,6 @@ message DescribePlanningSessionRequest {
 }
 
 message DescribePlanningSessionResponse {
-  PlanningSession session = 1;
-}
-
-message HeartbeatPlanningSessionRequest {
-  string factory_id = 1;
-  string session_id = 2;
-}
-
-message HeartbeatPlanningSessionResponse {
   PlanningSession session = 1;
 }
 

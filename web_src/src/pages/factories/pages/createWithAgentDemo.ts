@@ -32,13 +32,6 @@ export function waitingCreateWithAgentView(overrides: Partial<CreateWithAgentVie
   return runningCreateWithAgentView({ machineStatus: "waiting", ...overrides });
 }
 
-export function markCreateWithAgentReady(view: CreateWithAgentView): CreateWithAgentView {
-  if (view.machineStatus === "running" && view.messages.length > 0) {
-    return view;
-  }
-  return runningCreateWithAgentView({ composer: view.composer, created: view.created, right: view.right });
-}
-
 export function setCreateWithAgentComposer(view: CreateWithAgentView, composer: string): CreateWithAgentView {
   return { ...view, composer };
 }
@@ -90,7 +83,7 @@ export function createCreateWithAgentDraft(view: CreateWithAgentView): CreateWit
   return {
     ...view,
     created: [...view.created, order],
-    right: { kind: "list" },
+    right: { kind: "preview", order },
     messages: [
       ...view.messages,
       { id: `created-${order.id}`, kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.afterCreate },
@@ -102,37 +95,15 @@ export function skipCreateWithAgentDraft(view: CreateWithAgentView): CreateWithA
   if (view.right.kind !== "draft") {
     return view;
   }
+  const last = view.created[view.created.length - 1];
   return {
     ...view,
-    right: view.created.length > 0 ? { kind: "list" } : { kind: "empty" },
+    right: last ? { kind: "preview", order: last } : { kind: "empty" },
     messages: [
       ...view.messages,
       { id: `skipped-${view.messages.length}`, kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.afterSkip },
     ],
   };
-}
-
-export function workOnNewCreateWithAgent(view: CreateWithAgentView): CreateWithAgentView {
-  return {
-    ...view,
-    right: { kind: "empty" },
-    messages: [
-      ...view.messages,
-      { id: `next-${view.messages.length}`, kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.nextPrompt },
-    ],
-  };
-}
-
-export function selectCreateWithAgentCreated(view: CreateWithAgentView, orderId: string): CreateWithAgentView {
-  const order = view.created.find((item) => item.id === orderId);
-  if (!order) {
-    return view;
-  }
-  return { ...view, right: { kind: "preview", order } };
-}
-
-export function showCreateWithAgentList(view: CreateWithAgentView): CreateWithAgentView {
-  return { ...view, right: view.created.length > 0 ? { kind: "list" } : { kind: "empty" } };
 }
 
 export function requestCreateWithAgentEnd(view: CreateWithAgentView): CreateWithAgentView {

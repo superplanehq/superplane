@@ -19,7 +19,7 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   assert.equal(replies[0].result.serverInfo.name, "superplane");
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["wait_for_user", "propose_draft", "say"],
+    ["propose_draft", "say"],
   );
 });
 
@@ -30,7 +30,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["wait_for_user", "propose_draft", "say"],
+    ["propose_draft", "say"],
   );
 });
 

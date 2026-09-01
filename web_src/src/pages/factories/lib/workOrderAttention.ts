@@ -1,4 +1,4 @@
-import { CircleCheck, CircleX, LoaderCircle, MessageCircleQuestion, Timer, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleX, LoaderCircle, Timer, type LucideIcon } from "lucide-react";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 
@@ -6,12 +6,11 @@ import { getWorkOrderDisplayStatus } from "./workOrderProgress";
 import { presentWorkOrderStatusNotes } from "./workOrderStatusNote";
 
 /** Why a waiting task needs a person, or why it is addressing feedback. */
-export type WorkOrderAttentionReason = "approval" | "feedback" | "question" | "failed" | "stopped" | "stalled";
+export type WorkOrderAttentionReason = "approval" | "feedback" | "failed" | "stopped" | "stalled";
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
   approval: "Waiting for user review",
   feedback: "Addressing user feedback",
-  question: "Agent question",
   failed: "Run failed",
   stopped: "Stopped",
   stalled: "Needs attention",
@@ -20,7 +19,6 @@ export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string
 export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReason, string> = {
   approval: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   feedback: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  question: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   failed: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   stopped: "border-slate-500/40 bg-slate-500/15 text-slate-800 dark:text-slate-300",
   stalled: "border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-400",
@@ -29,7 +27,6 @@ export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReaso
 export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideIcon> = {
   approval: CircleCheck,
   feedback: LoaderCircle,
-  question: MessageCircleQuestion,
   failed: CircleX,
   stopped: CircleX,
   stalled: Timer,

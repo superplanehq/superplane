@@ -1,8 +1,6 @@
 package factories
 
 import (
-	"strings"
-
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -112,14 +110,11 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 	result := make([]*pb.Factory_App, 0, len(canvases))
 	for _, canvas := range canvases {
+		if models.IsPlanningCanvasName(canvas.Name) {
+			continue
+		}
 		name := canvas.Name
 		description := canvas.Description
-		if models.IsPlanningCanvasName(canvas.Name) {
-			name = models.PlanningCanvasName
-			if strings.TrimSpace(description) == "" {
-				description = models.PlanningCanvasDescription
-			}
-		}
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
 			Name:        name,

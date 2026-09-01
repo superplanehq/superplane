@@ -75,26 +75,17 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 	if err != nil {
 		return nil, err
 	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
+	db := database.DB(ctx)
+	if session.State != models.PlanningSessionStateEnded {
+		if err := session.Heartbeat(db); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to describe planning session")
+		}
+	}
+	serialized, err := serializePlanningSession(db, factoryModel, session)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe planning session")
 	}
 	return &pb.DescribePlanningSessionResponse{Session: serialized}, nil
-}
-
-func HeartbeatPlanningSession(ctx context.Context, organizationID string, req *pb.HeartbeatPlanningSessionRequest) (*pb.HeartbeatPlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
-	if err != nil {
-		return nil, err
-	}
-	if err := session.Heartbeat(database.DB(ctx)); err != nil {
-		return nil, factoryErrorToStatus(err, "failed to heartbeat planning session")
-	}
-	serialized, err := serializePlanningSession(database.DB(ctx), factoryModel, session)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to heartbeat planning session")
-	}
-	return &pb.HeartbeatPlanningSessionResponse{Session: serialized}, nil
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {

@@ -15,23 +15,14 @@ export type CreateWithAgentDraft = {
 export type CreateWithAgentRightPane =
   | { kind: "empty" }
   | { kind: "draft"; draft: CreateWithAgentDraft }
-  | { kind: "list" }
   | { kind: "preview"; order: CreateWithAgentCreatedOrder };
 
-export type CreateWithAgentTextMessage = {
+export type CreateWithAgentMessage = {
   id: string;
   kind: "text";
   role: "user" | "agent";
   text: string;
 };
-
-export type CreateWithAgentActivityMessage = {
-  id: string;
-  kind: "activity";
-  text: string;
-};
-
-export type CreateWithAgentMessage = CreateWithAgentTextMessage | CreateWithAgentActivityMessage;
 
 export type CreateWithAgentView = {
   repository: string;

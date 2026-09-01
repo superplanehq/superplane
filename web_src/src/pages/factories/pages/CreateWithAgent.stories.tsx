@@ -53,10 +53,7 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         }
         onCreateDraft={() => undefined}
         onSkipDraft={() => undefined}
-        onWorkOnNew={() => undefined}
-        onSelectCreated={() => undefined}
         onOpenCreated={() => undefined}
-        onBackToList={() => undefined}
         onRequestClose={() => setView((current) => ({ ...current, endConfirmOpen: true }))}
         onCancelEnd={() => setView((current) => ({ ...current, endConfirmOpen: false }))}
         onConfirmEnd={() => undefined}
@@ -94,18 +91,6 @@ export const Draft: Story = {
   ),
 };
 
-export const SessionList: Story = {
-  name: "Session list",
-  render: () => (
-    <StaticSession
-      initial={runningCreateWithAgentView({
-        created: [createdOrder],
-        right: { kind: "list" },
-      })}
-    />
-  ),
-};
-
 export const Preview: Story = {
   name: "Read-only preview",
   render: () => (
@@ -125,7 +110,7 @@ export const EndConfirm: Story = {
       initial={runningCreateWithAgentView({
         repository: CREATE_WITH_AGENT_DEMO_REPOSITORY,
         created: [createdOrder],
-        right: { kind: "list" },
+        right: { kind: "preview", order: createdOrder },
         endConfirmOpen: true,
       })}
     />

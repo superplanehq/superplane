@@ -43,14 +43,14 @@ export function createWithAgentViewFromSession(
     }));
 
   const draftTitle = session.draft?.title?.trim() ?? "";
-  const right =
-    extras.right.kind === "list" || extras.right.kind === "preview"
+  const lastCreated = created[created.length - 1];
+  const right = draftTitle
+    ? { kind: "draft" as const, draft: { title: draftTitle, description: session.draft?.description ?? "" } }
+    : extras.right.kind === "preview"
       ? extras.right
-      : draftTitle
-        ? { kind: "draft" as const, draft: { title: draftTitle, description: session.draft?.description ?? "" } }
-        : created.length > 0
-          ? { kind: "list" as const }
-          : { kind: "empty" as const };
+      : lastCreated
+        ? { kind: "preview" as const, order: lastCreated }
+        : { kind: "empty" as const };
 
   return {
     repository: session.repository ?? "",

@@ -17,9 +17,8 @@ const (
 	PlanningCanvasLegacyName  = "__planning_session"
 	PlanningCanvasDescription = "Starts the machine when you create a task with an agent."
 
-	PlanningSessionStateStarting = "starting"
-	PlanningSessionStateRunning  = "running"
-	PlanningSessionStateEnded    = "ended"
+	PlanningSessionStateRunning = "running"
+	PlanningSessionStateEnded   = "ended"
 
 	PlanningSessionMessageKindText  = "text"
 	PlanningSessionMessageRoleUser  = "user"
@@ -206,14 +205,7 @@ func IsPlanningCanvasName(name string) bool {
 }
 
 func FindPlanningCanvas(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Canvas, error) {
-	canvas, err := findPlanningCanvasByName(tx, organizationID, factoryID, PlanningCanvasName)
-	if err == nil {
-		return canvas, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-	return findPlanningCanvasByName(tx, organizationID, factoryID, PlanningCanvasLegacyName)
+	return findPlanningCanvasByName(tx, organizationID, factoryID, PlanningCanvasName)
 }
 
 func findPlanningCanvasByName(tx *gorm.DB, organizationID, factoryID uuid.UUID, name string) (*Canvas, error) {

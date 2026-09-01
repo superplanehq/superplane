@@ -38,13 +38,6 @@ export function describePlanningSession(organizationId: string, factoryId: strin
   });
 }
 
-export function heartbeatPlanningSession(organizationId: string, factoryId: string, sessionId: string) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/heartbeat`, {
-    method: "POST",
-    body: "{}",
-  });
-}
-
 export function endPlanningSession(
   organizationId: string,
   factoryId: string,

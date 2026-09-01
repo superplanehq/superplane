@@ -168,13 +168,10 @@ export function BacklogColumn({
         onDraftDescriptionChange={agentSession.onDraftDescriptionChange}
         onCreateDraft={agentSession.onCreateDraft}
         onSkipDraft={agentSession.onSkipDraft}
-        onWorkOnNew={agentSession.onWorkOnNew}
-        onSelectCreated={agentSession.onSelectCreated}
         onOpenCreated={(order) => {
           agentSession.close();
           onOpenWorkOrder(order.id);
         }}
-        onBackToList={agentSession.onBackToList}
         onRequestClose={agentSession.onRequestClose}
         onCancelEnd={agentSession.onCancelEnd}
         onConfirmEnd={agentSession.onConfirmEnd}

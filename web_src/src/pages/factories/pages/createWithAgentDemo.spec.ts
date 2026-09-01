@@ -27,7 +27,7 @@ describe("createWithAgentDemo", () => {
     });
 
     view = createCreateWithAgentDraft(view);
-    expect(view.right.kind).toBe("list");
+    expect(view.right.kind).toBe("preview");
     expect(view.created).toHaveLength(1);
     expect(view.created[0]?.key).toBe("NEW-1");
     expect(view.messages.at(-1)).toMatchObject({ kind: "text", text: CREATE_WITH_AGENT_COPY.afterCreate });

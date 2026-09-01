@@ -176,18 +176,12 @@ func (c *OnRun) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) 
 func (c *OnRun) handleMessage(ctx core.TriggerHookContext) (map[string]any, error) {
 	workOrder, hasWorkOrder := ctx.Parameters["work_order"].(map[string]any)
 	sourceApp, hasApp := ctx.Parameters["app"].(map[string]any)
-	planningSession, hasPlanningSession := ctx.Parameters["planning_session"].(map[string]any)
+	_, hasPlanningSession := ctx.Parameters["planning_session"].(map[string]any)
 	if !hasWorkOrder && !hasApp && !hasPlanningSession {
 		return nil, fmt.Errorf("on run: app, work_order, or planning_session is required")
 	}
 
 	if hasPlanningSession {
-		err := ctx.Events.Emit("factory.planning_session", map[string]any{
-			"planning_session": planningSession,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("on run: emit event: %w", err)
-		}
 		return nil, nil
 	}
 
