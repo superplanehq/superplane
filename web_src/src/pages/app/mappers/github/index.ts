@@ -14,6 +14,10 @@ import { onCommitStatusTriggerRenderer } from "./on_commit_status";
 import { onCheckRunTriggerRenderer } from "./on_check_run";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
+import {
+  WAIT_FOR_PULL_REQUEST_CHECKS_STATE_REGISTRY,
+  waitForPullRequestChecksMapper,
+} from "./wait_for_pull_request_checks";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
@@ -39,6 +43,7 @@ import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
+  waitForPullRequestChecks: WAIT_FOR_PULL_REQUEST_CHECKS_STATE_REGISTRY,
   createIssue: buildActionStateRegistry("created"),
   createIssueComment: buildActionStateRegistry("created"),
   updateIssueComment: buildActionStateRegistry("updated"),
@@ -81,6 +86,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   addPullRequestReviewers: addPullRequestReviewersMapper,
   updatePullRequest: updatePullRequestMapper,
   runWorkflow: runWorkflowMapper,
+  waitForPullRequestChecks: waitForPullRequestChecksMapper,
   publishCommitStatus: publishCommitStatusMapper,
   createDeployment: createDeploymentMapper,
   createDeploymentStatus: createDeploymentStatusMapper,
