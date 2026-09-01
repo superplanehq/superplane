@@ -1,4 +1,4 @@
-import { useWorkOrderArtifacts } from "@/hooks/useFactoryData";
+import { useFactoryPullRequests, useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useEffect, useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,8 +19,10 @@ import {
 } from "./splitRunMocks";
 import {
   collectSplitRunArtifacts,
+  collectSplitRunPullRequests,
   defaultSplitRunPopupTab,
   resolveSplitRunPopupArtifacts,
+  resolveSplitRunPopupPullRequests,
   type SplitRunPopupTab,
   splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
@@ -209,11 +211,22 @@ export function WorkOrderSplitRunPopup({
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const fixtureArtifacts = collectSplitRunArtifacts(fixture);
+  const fixturePullRequests = collectSplitRunPullRequests(fixture);
   const useLiveArtifacts = hasLiveWorkOrder(organizationId, factoryId, orderId);
   const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
+  const livePullRequestsQuery = useFactoryPullRequests(
+    organizationId ?? "",
+    factoryId ?? "",
+    orderId ? { workOrderIds: [orderId] } : undefined,
+  );
   const artifacts = resolveSplitRunPopupArtifacts({
     fixtureArtifacts,
     liveArtifacts: liveArtifactsQuery.data,
+    useLive: useLiveArtifacts,
+  });
+  const pullRequests = resolveSplitRunPopupPullRequests({
+    fixturePullRequests,
+    livePullRequests: livePullRequestsQuery.data,
     useLive: useLiveArtifacts,
   });
   const artifactDescription = splitRunDescriptionMarkdown(artifacts) || splitRunDescriptionMarkdown(fixtureArtifacts);
@@ -257,6 +270,9 @@ export function WorkOrderSplitRunPopup({
         edits={edits}
         artifacts={artifacts}
         artifactsLoading={useLiveArtifacts && liveArtifactsQuery.isLoading}
+        pullRequests={pullRequests}
+        pullRequestsLoading={useLiveArtifacts && livePullRequestsQuery.isLoading}
+        pullRequestsError={useLiveArtifacts ? (livePullRequestsQuery.error ?? null) : null}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
@@ -325,6 +341,9 @@ function SplitRunPopupTabs({
   edits,
   artifacts,
   artifactsLoading,
+  pullRequests,
+  pullRequestsLoading,
+  pullRequestsError,
   organizationId,
   factoryId,
   factoryKey,
@@ -340,6 +359,9 @@ function SplitRunPopupTabs({
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
   artifacts: ReturnType<typeof collectSplitRunArtifacts>;
   artifactsLoading: boolean;
+  pullRequests: ReturnType<typeof collectSplitRunPullRequests>;
+  pullRequestsLoading: boolean;
+  pullRequestsError: Error | null;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -389,6 +411,9 @@ function SplitRunPopupTabs({
           artifacts={artifacts}
           checks={fixture.checks}
           artifactsLoading={artifactsLoading}
+          pullRequests={pullRequests}
+          pullRequestsLoading={pullRequestsLoading}
+          pullRequestsError={pullRequestsError}
           organizationId={organizationId}
           factoryKey={factoryKey}
           orderNumber={orderNumber}
