@@ -51,7 +51,6 @@ const REFUND_INTAKE_SEARCH = {
 
 async function importRefundIssue(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("lines-backlog-create"));
-  await user.click(screen.getByPlaceholderText("Import from GitHub issue"));
   await user.click(screen.getByTestId("lines-backlog-create-item-12"));
 }
 
