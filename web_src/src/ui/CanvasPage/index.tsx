@@ -102,6 +102,7 @@ import { getRunStatus } from "../Runs/runPresentation";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
+import { CanvasPageLoadingOverlay } from "./CanvasPageLoadingOverlay";
 import { Header } from "./Header";
 import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { isComponentSidebarVisibleMode } from "./canvasTabHeaderMode";
@@ -2817,7 +2818,7 @@ function CanvasContent({
             ? stateRef.current.nodes?.find((node) => node.id === initialFocusNodeId)
             : null;
 
-        const fitDuration = factoryDisplayLayout ? 0 : 500;
+        const fitDuration = factoryDisplayLayout || factoryConfigure ? 0 : 500;
         if (focusNode) {
           fitView({ nodes: [focusNode], duration: fitDuration, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS });
         } else if (hasNodes) {
@@ -2862,6 +2863,7 @@ function CanvasContent({
       lastFittedContentKeyRef,
       lockNativeZoom,
       factoryDisplayLayout,
+      factoryConfigure,
     ],
   );
 
@@ -2919,7 +2921,7 @@ function CanvasContent({
     return () => window.clearTimeout(timeoutId);
   }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, reportZoom, viewportRef]);
 
-  useFactoryConfigureFitView({
+  const { ready: factoryConfigureEnterReady } = useFactoryConfigureFitView({
     factoryConfigure,
     isEditing,
     hasReactFlowInitialized,
@@ -2931,6 +2933,7 @@ function CanvasContent({
     viewportRef,
     reportZoom,
   });
+  const hideFactoryConfigureEnter = factoryConfigure && !factoryConfigureEnterReady;
 
   // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
   // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching
@@ -3392,7 +3395,10 @@ function CanvasContent({
     [handleOpenCommandPalette],
   );
   const zoomSliderContent = useMemo(() => <>{commandPaletteSearchControl}</>, [commandPaletteSearchControl]);
-  const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
+  const reactFlowStyle = useMemo(
+    () => ({ opacity: isInitialized && !hideFactoryConfigureEnter ? 1 : 0 }),
+    [hideFactoryConfigureEnter, isInitialized],
+  );
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
     const selected = (stateRef.current.nodes || []).filter((n) => n.selected).map((n) => n.id);
@@ -3688,6 +3694,9 @@ function CanvasContent({
           onRunExecutionSelect={onRunExecutionSelect}
           onAcknowledgeErrors={onAcknowledgeErrors}
         />
+      ) : null}
+      {hideFactoryConfigureEnter ? (
+        <CanvasPageLoadingOverlay message="Loading canvas..." opaque testId="factory-configure-enter-loading" />
       ) : null}
     </div>
   );

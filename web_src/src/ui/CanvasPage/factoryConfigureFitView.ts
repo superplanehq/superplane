@@ -1,8 +1,7 @@
 import { FACTORY_CONFIGURE_FIT_VIEW_OPTIONS } from "./canvasFitOptions";
-import { FACTORY_LAYOUT_ANIMATION_DURATION_MS } from "./nodePositionAnimation";
 
-/** Wait for configure layout + rank expansion to finish, then frame at 100% zoom. */
-export const FACTORY_CONFIGURE_FIT_SETTLE_MS = FACTORY_LAYOUT_ANIMATION_DURATION_MS + 50;
+/** Wait one frame for node measure after Configure layout snaps, then frame at 100% zoom. */
+export const FACTORY_CONFIGURE_FIT_SETTLE_MS = 50;
 
 /** Frame the Configure enter fit. Center a deep-linked node when one is present. */
 export function factoryConfigureEnterFitViewOptions(focusNode?: { id: string } | null) {
@@ -10,13 +9,13 @@ export function factoryConfigureEnterFitViewOptions(focusNode?: { id: string } |
     return {
       ...FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
       nodes: [focusNode],
-      duration: 500,
+      duration: 0,
     };
   }
 
   return {
     ...FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
-    duration: 500,
+    duration: 0,
   };
 }
 

@@ -1974,7 +1974,7 @@ export function AppPage({
     () => commitTopologyMutation((workflow) => workflow),
     [commitTopologyMutation],
   );
-  useFactoryConfigureInitialLayout({
+  const { ready: factoryConfigureLayoutReady } = useFactoryConfigureInitialLayout({
     factoryAutoLayout,
     isEditing,
     editBootstrapReady: isEditBootstrapReady,
@@ -4008,7 +4008,9 @@ export function AppPage({
           toolSidebarVersionsContent={toolSidebarVersionsContent}
           focusRequest={focusRequest}
         />
-        {showDraftCanvasLoadingOverlay ? <CanvasPageLoadingOverlay message="Loading canvas..." /> : null}
+        {showDraftCanvasLoadingOverlay || (factoryAutoLayout && !factoryConfigureLayoutReady) ? (
+          <CanvasPageLoadingOverlay message="Loading canvas..." />
+        ) : null}
         {versionCanvasLoading && !runInspectionChromeActive ? (
           <CanvasPageLoadingOverlay message="Loading version..." testId="canvas-version-loading" />
         ) : null}

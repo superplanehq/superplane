@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type UseFactoryConfigureInitialLayoutOptions = {
   factoryAutoLayout: boolean;
@@ -15,20 +15,30 @@ export function useFactoryConfigureInitialLayout({
   editBootstrapReady,
   activeCanvasVersionId,
   applyLayout,
-}: UseFactoryConfigureInitialLayoutOptions) {
+}: UseFactoryConfigureInitialLayoutOptions): { ready: boolean } {
+  const [ready, setReady] = useState(!factoryAutoLayout);
   const layoutAppliedRef = useRef(false);
   const applyLayoutRef = useRef(applyLayout);
   applyLayoutRef.current = applyLayout;
 
   useEffect(() => {
     if (factoryAutoLayout) {
+      setReady(false);
       return;
     }
     layoutAppliedRef.current = false;
+    setReady(true);
   }, [factoryAutoLayout]);
 
   useEffect(() => {
-    if (!factoryAutoLayout || !isEditing || !editBootstrapReady || !activeCanvasVersionId) {
+    if (!factoryAutoLayout) {
+      return;
+    }
+    if (!isEditing || !editBootstrapReady) {
+      return;
+    }
+    if (!activeCanvasVersionId) {
+      setReady(true);
       return;
     }
     if (layoutAppliedRef.current) {
@@ -36,6 +46,10 @@ export function useFactoryConfigureInitialLayout({
     }
 
     layoutAppliedRef.current = true;
-    void applyLayoutRef.current();
+    void Promise.resolve(applyLayoutRef.current()).finally(() => {
+      setReady(true);
+    });
   }, [activeCanvasVersionId, editBootstrapReady, factoryAutoLayout, isEditing]);
+
+  return { ready };
 }
