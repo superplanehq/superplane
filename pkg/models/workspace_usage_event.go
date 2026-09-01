@@ -189,10 +189,7 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 		CreatedAt:            now,
 	}
 
-	if err := persistUsageEvent(tx, event, scope.execution); err != nil {
-		return err
-	}
-	return ReleaseHostedCreditHold(tx, in.NodeExecutionID)
+	return persistUsageEvent(tx, event, scope.execution)
 }
 
 // RecordComputeUsage inserts one factory-linked runner-fleet row. Cost comes

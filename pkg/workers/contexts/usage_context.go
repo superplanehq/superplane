@@ -57,10 +57,6 @@ func (c *UsageContext) RecordCompute(record core.ComputeUsageRecord) error {
 	})
 }
 
-func (c *UsageContext) ReleaseHostedCreditHold() error {
-	return models.ReleaseHostedCreditHold(database.Conn(), c.execution.ID)
-}
-
 func usageIdempotencyKey(key string, executionID uuid.UUID) string {
 	if key == "" {
 		return ""
