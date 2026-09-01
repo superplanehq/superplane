@@ -14,8 +14,13 @@ import (
 )
 
 type Organization struct {
-	ID                          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                        string    `gorm:"uniqueIndex"`
+	ID   uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name string    `gorm:"uniqueIndex"`
+	// Slug is the URL-friendly identifier used to route to this organization
+	// in the frontend. Uniqueness among non-deleted organizations is enforced
+	// by a partial unique index added in the add-organization-slug migration,
+	// not by a gorm tag.
+	Slug                        string
 	Description                 string
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
@@ -175,9 +180,15 @@ func CreateOrganization(name, description string) (*Organization, error) {
 }
 
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
+	slug, err := GenerateUniqueOrganizationSlug(tx, name, uuid.Nil)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	organization := Organization{
 		Name:                        name,
+		Slug:                        slug,
 		Description:                 description,
 		AllowedProviders:            datatypes.JSONSlice[string]{ProviderGitHub},
 		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureFactories},
@@ -185,7 +196,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		UpdatedAt:                   &now,
 	}
 
-	err := tx.
+	err = tx.
 		Clauses(clause.Returning{}).
 		Create(&organization).
 		Error
@@ -200,6 +211,10 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 		}
 
 		return &organization, nil
+	}
+
+	if strings.Contains(err.Error(), "organizations_slug_active_key") {
+		return nil, ErrSlugAlreadyUsed
 	}
 
 	if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {

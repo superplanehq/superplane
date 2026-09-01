@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -69,9 +68,9 @@ func UpdateBYOKLLMModels(
 	orgID string,
 	req *pb.UpdateBYOKLLMModelsRequest,
 ) (*pb.UpdateBYOKLLMModelsResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 
 	saved, err := models.UpsertOrganizationBYOKModelAllowlist(
