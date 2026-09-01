@@ -76,7 +76,7 @@ const STREAM_LINE_WRAP_ROW = cn(
 
 function StreamLineTitle({ children, wrap = false }: { children: string; wrap?: boolean }) {
   if (wrap) {
-    return <span className="min-w-0 flex-1 whitespace-normal break-words text-muted-foreground">{children}</span>;
+    return <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-muted-foreground">{children}</span>;
   }
   return (
     <span className="min-w-0 w-0 flex-1 overflow-hidden">

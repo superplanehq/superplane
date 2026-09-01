@@ -53,7 +53,7 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model,
 				Name:    AgentStepLabel(step.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 				Kind:    LiveLogKindBash,
-				Preview: LiveLogPreview(command),
+				Preview: LiveLogText(command),
 			}
 	default:
 		prompt := ""
@@ -69,7 +69,7 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model,
 				Name:    AgentStepLabel(step.Name, promptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
-				Preview: LiveLogPreview(prompt),
+				Preview: LiveLogText(prompt),
 			}
 	}
 }
