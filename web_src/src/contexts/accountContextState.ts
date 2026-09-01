@@ -5,6 +5,14 @@ interface AccountImpersonation {
   user_name?: string;
 }
 
+export interface ConnectedAccountProvider {
+  provider: string;
+  username: string;
+  display_name: string;
+  email: string;
+  avatar_url: string;
+}
+
 interface Account {
   id: string;
   name: string;
@@ -12,6 +20,7 @@ interface Account {
   avatar_url: string;
   installation_admin: boolean;
   has_password: boolean;
+  providers?: ConnectedAccountProvider[];
   roles?: string[];
   groups?: string[];
   impersonation?: AccountImpersonation;
