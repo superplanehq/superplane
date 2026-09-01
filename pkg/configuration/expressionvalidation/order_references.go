@@ -6,15 +6,15 @@ import (
 )
 
 // ExpressionUsesOrderArtifacts reports whether the expression accesses
-// order().artifacts (dot or bracket), including nested uses like
-// none(order().artifacts, …). Used to lazy-load artifacts only when needed.
+// order().artifacts or task().artifacts (dot or bracket), including nested
+// uses like none(order().artifacts, …). Used to lazy-load artifacts only when needed.
 func ExpressionUsesOrderArtifacts(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "artifacts")
 }
 
 // ExpressionUsesOrderComments reports whether the expression accesses
-// order().comments (dot or bracket), including nested uses like
-// len(order().comments). Used to lazy-load comments only when needed.
+// order().comments or task().comments (dot or bracket), including nested uses
+// like len(order().comments). Used to lazy-load comments only when needed.
 func ExpressionUsesOrderComments(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "comments")
 }
@@ -28,15 +28,16 @@ func ExpressionUsesOrderAssignees(expression string) (bool, error) {
 }
 
 // ExpressionUsesOrderURL reports whether the expression accesses order().url
-// (dot or bracket). Used to resolve the work order permalink only when needed,
-// since it costs an extra lookup of the factory that owns the order.
+// or task().url (dot or bracket). Used to resolve the work order permalink
+// only when needed, since it costs an extra lookup of the factory that owns
+// the order.
 func ExpressionUsesOrderURL(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "url")
 }
 
 // expressionReferencesOrderProperty reports whether the expression accesses
-// order().<property> (dot or bracket), including nested uses such as
-// len(order().<property>) or none(order().<property>, …).
+// order().<property> or task().<property> (dot or bracket), including nested
+// uses such as len(order().<property>) or none(task().<property>, …).
 func expressionReferencesOrderProperty(expression, property string) (bool, error) {
 	tree, err := parser.Parse(expression)
 	if err != nil {
@@ -91,5 +92,5 @@ func isOrderCall(node ast.Node) bool {
 	}
 
 	ident, ok := call.Callee.(*ast.IdentifierNode)
-	return ok && ident.Value == "order"
+	return ok && (ident.Value == "order" || ident.Value == "task")
 }
