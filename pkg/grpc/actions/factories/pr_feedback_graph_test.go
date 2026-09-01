@@ -135,7 +135,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, checkout, `git checkout "${PR_HEAD}"`)
 		assert.NotContains(t, checkout, "pr-feedback")
 
-		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "order().assignees")
+		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "task().assignees")
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, `${COAUTHORS:-}`)
 
