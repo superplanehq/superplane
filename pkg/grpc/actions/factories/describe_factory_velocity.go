@@ -99,7 +99,7 @@ func DescribeFactoryVelocity(
 	for i := range buckets {
 		b := &buckets[i]
 		points = append(points, &pb.DescribeFactoryVelocityDay{
-			Day:              dayLabel(b.start, period, i),
+			Day:              dayLabel(b.start),
 			Date:             timestamppb.New(b.start),
 			SuperplaneMerged: int32(b.superplaneMerged),
 			PeopleMerged:     int32(b.peopleMerged),
@@ -314,30 +314,20 @@ type dayBucket struct {
 // because a quiet Saturday reads as a weekend rather than as an outage. The date
 // tells the reader which day it was, which a "day 9 of 14" number cannot.
 //
-// The month appears only where the window crosses into a new one. Naming it on
-// the first tick as well would make that tick the odd one out for no gain: the
-// heading above the chart already says which window this is.
+// The month appears only where the window crosses into a new one, compared
+// against the day immediately before it. Naming it on every tick would make
+// no tick stand out; naming it nowhere would leave a reader unsure which
+// month a mid-window tick belongs to.
 //
-// A month-long window labels every fifth day so the ticks stay legible at the
-// width the chart has.
-func dayLabel(start time.Time, periodDays, index int) string {
-	step := 1
-	if periodDays > 14 {
-		step = velocityMonthLabelStep
-		if index != 0 && index%step != 0 && index != periodDays-1 {
-			return ""
-		}
-	}
-
-	if start.Month() != start.AddDate(0, 0, -step).Month() {
+// Every day gets a full label. How many of them a chart has room to draw is
+// the chart's decision (see pickVelocityAxisTicks on the frontend), not this
+// producer's: it only names days.
+func dayLabel(start time.Time) string {
+	if start.Month() != start.AddDate(0, 0, -1).Month() {
 		return start.Format("Mon Jan 2")
 	}
 	return start.Format("Mon 2")
 }
-
-// velocityMonthLabelStep is how many days separate labelled ticks on a
-// month-long window.
-const velocityMonthLabelStep = 5
 
 func buildDayBuckets(now time.Time, periodDays int) []dayBucket {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

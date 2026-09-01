@@ -285,12 +285,16 @@ describe("aggregateFactoryVelocityFlow", () => {
     expect(flow.timeTrend[10].day).toBe("Mon 2");
   });
 
-  it("labels every fifth day on a month so the ticks stay legible", () => {
+  it("labels every day on a month-long window, letting the chart pick which ticks to show", () => {
     const flow = aggregateFactoryVelocityFlow([], 30, NOW);
 
-    const labelled = flow.timeTrend.filter((point) => point.day !== "");
+    expect(flow.timeTrend.every((point) => point.day !== "")).toBe(true);
 
-    expect(labelled).toHaveLength(7);
+    // NOW is Thursday 15 January 2026, so a month starts on Wednesday 17 December.
+    // The window's first day does not itself start a new month, so it stays bare.
+    expect(flow.timeTrend[0].day).toBe("Wed 17");
+    const januaryFirst = flow.timeTrend.find((point) => point.day === "Thu Jan 1");
+    expect(januaryFirst).toBeDefined();
   });
 
   it("supports the 30-day period label", () => {
