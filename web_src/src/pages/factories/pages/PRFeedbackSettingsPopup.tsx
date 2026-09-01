@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { CanvasPage } from "@/ui/CanvasPage";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { Settings, Workflow, X } from "lucide-react";
@@ -446,7 +447,23 @@ function PRFeedbackIntegrationsField({
       <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">
         {PR_FEEDBACK_SETTINGS_COPY.integrationsLabel}
       </h3>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.integrationsHelper}</p>
+      <p className="workspace-body-text mt-1 text-muted-foreground">
+        {PR_FEEDBACK_SETTINGS_COPY.integrationsHelper} {PR_FEEDBACK_SETTINGS_COPY.integrationsMissingBefore}
+        {organizationId ? (
+          <Link
+            href={organizationIntegrationsPath(organizationId)}
+            target="_blank"
+            rel="noreferrer"
+            className="text-gray-800 underline underline-offset-2 dark:text-gray-100"
+            data-testid="pr-feedback-integrations-page"
+          >
+            {PR_FEEDBACK_SETTINGS_COPY.integrationsMissingLink}
+          </Link>
+        ) : (
+          PR_FEEDBACK_SETTINGS_COPY.integrationsMissingLink
+        )}
+        {PR_FEEDBACK_SETTINGS_COPY.integrationsMissingAfter}
+      </p>
       {options.length === 0 ? (
         <p className="workspace-body-text mt-2 text-muted-foreground" data-testid="pr-feedback-integrations-empty">
           {PR_FEEDBACK_SETTINGS_COPY.integrationsEmpty}

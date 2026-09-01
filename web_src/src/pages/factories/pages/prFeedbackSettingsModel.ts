@@ -107,6 +107,9 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
   integrationsLabel: "Additional integration access",
   integrationsHelper: "Give the agent access to CI logs from other connected integrations.",
+  integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
+  integrationsMissingLink: "Integrations page",
+  integrationsMissingAfter: " and connect it.",
   integrationsEmpty: "No other connected integrations are available.",
   healthReady: "Ready",
   healthNeedsRepair: "Needs repair",
@@ -347,13 +350,35 @@ export function isChecksPassedActivity(activity: FactoriesFactoryPullRequestActi
 export function checksPassedWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
   const waiting = waitingOnChecksWorkOrderIds(pullRequests);
   const addressing = addressingFeedbackWorkOrderIds(pullRequests);
+  const paused = fixesPausedWorkOrderIds(pullRequests);
+  const ids = new Set<string>();
+  for (const pullRequest of pullRequests) {
+    const workOrderId = pullRequest.workOrderId?.trim();
+    if (!workOrderId || waiting.has(workOrderId) || addressing.has(workOrderId) || paused.has(workOrderId)) {
+      continue;
+    }
+    if (isChecksPassedActivity(latestCheckActivity(pullRequest.activities ?? []))) {
+      ids.add(workOrderId);
+    }
+  }
+  return ids;
+}
+
+export function isFixesPausedActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
+  return activity?.state === "limit_reached";
+}
+
+/** Latest check activity stopped because the attempt limit was reached. */
+export function fixesPausedWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
+  const waiting = waitingOnChecksWorkOrderIds(pullRequests);
+  const addressing = addressingFeedbackWorkOrderIds(pullRequests);
   const ids = new Set<string>();
   for (const pullRequest of pullRequests) {
     const workOrderId = pullRequest.workOrderId?.trim();
     if (!workOrderId || waiting.has(workOrderId) || addressing.has(workOrderId)) {
       continue;
     }
-    if (isChecksPassedActivity(latestCheckActivity(pullRequest.activities ?? []))) {
+    if (isFixesPausedActivity(latestCheckActivity(pullRequest.activities ?? []))) {
       ids.add(workOrderId);
     }
   }
@@ -373,7 +398,7 @@ function latestCheckActivity(
 }
 
 function isCheckRelatedActivity(activity: FactoriesFactoryPullRequestActivity): boolean {
-  if (activity.revision) {
+  if (activity.state === "limit_reached" || activity.revision) {
     return true;
   }
   const description = activity.description ?? "";
@@ -420,7 +445,9 @@ function prFeedbackWorkOrderIds(
 export function prFeedbackActivityLabel(activity: FactoriesFactoryPullRequestActivity): string {
   if (activity.state === "limit_reached") {
     const limit = activity.attemptLimit ?? activity.attempt ?? 3;
-    return activity.description?.trim() || `Automatic fixes paused after ${limit} attempts`;
+    return (
+      activity.description?.trim() || `Automatic fixes paused after ${limit} ${limit === 1 ? "attempt" : "attempts"}`
+    );
   }
   if (activity.access === "waiting") {
     return PR_FEEDBACK_SETTINGS_COPY.waitingForAccess;
@@ -436,7 +463,7 @@ export function prFeedbackActivityAttemptLabel(activity: FactoriesFactoryPullReq
   return `Attempt ${activity.attempt} of ${limit}`;
 }
 
-export type PRFeedbackActivityKind = "checks-wait" | "addressing";
+export type PRFeedbackActivityKind = "checks-wait" | "addressing" | "fixes-paused";
 
 export type PRFeedbackLogRun = {
   canvasId: string;
@@ -451,6 +478,9 @@ export type PRFeedbackLogRun = {
 };
 
 export function prFeedbackActivityKind(activity: FactoriesFactoryPullRequestActivity): PRFeedbackActivityKind {
+  if (isFixesPausedActivity(activity)) {
+    return "fixes-paused";
+  }
   return isWaitingOnChecksActivity(activity) ? "checks-wait" : "addressing";
 }
 

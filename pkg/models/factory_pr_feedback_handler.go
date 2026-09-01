@@ -39,15 +39,15 @@ var factoryPRFeedbackHandlerSources = []string{
 // FactoryPRFeedbackHandler declares that a factory canvas addresses pull
 // request feedback. The row owns identity; the canvas graph owns behavior.
 type FactoryPRFeedbackHandler struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	CanvasID       uuid.UUID
-	Subject          string
-	Source           string
-	MaximumAttempts  *int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID              uuid.UUID
+	OrganizationID  uuid.UUID
+	FactoryID       uuid.UUID
+	CanvasID        uuid.UUID
+	Subject         string
+	Source          string
+	MaximumAttempts *int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 
 	Canvas *Canvas `gorm:"foreignKey:CanvasID"`
 }

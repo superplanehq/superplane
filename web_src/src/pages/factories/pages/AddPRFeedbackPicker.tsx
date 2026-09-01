@@ -15,12 +15,7 @@ interface AddPRFeedbackPickerProps {
   takenSourceIds?: readonly PRFeedbackSourceId[];
 }
 
-export function AddPRFeedbackPicker({
-  open,
-  onClose,
-  onSelect,
-  takenSourceIds = [],
-}: AddPRFeedbackPickerProps) {
+export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = [] }: AddPRFeedbackPickerProps) {
   return (
     <Dialog
       open={open}
@@ -57,9 +52,7 @@ export function AddPRFeedbackPicker({
                   data-testid={`add-pr-feedback-template-${source.id}`}
                   className={cn(
                     "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
-                    taken
-                      ? "cursor-not-allowed opacity-60"
-                      : "hover:border-foreground/20 hover:bg-accent/40",
+                    taken ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
                   )}
                 >
                   <img src={source.iconSrc} alt="" className="size-5 shrink-0" />

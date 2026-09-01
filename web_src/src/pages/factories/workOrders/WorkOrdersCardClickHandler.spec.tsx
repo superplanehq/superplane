@@ -423,7 +423,7 @@ describe("WorkOrderCard attention", () => {
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
   });
 
-  it("shows Waiting on CI checks when a check wait is active", () => {
+  it("shows Waiting on status checks when a check wait is active", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
@@ -437,7 +437,7 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
-    expect(screen.getByText("Waiting on CI checks")).toBeInTheDocument();
+    expect(screen.getByText("Waiting on status checks")).toBeInTheDocument();
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
   });
 
@@ -456,7 +456,25 @@ describe("WorkOrderCard attention", () => {
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
     expect(screen.getByText("Status checks passed")).toBeInTheDocument();
-    expect(screen.queryByText("Waiting on CI checks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
+  });
+
+  it("shows Automatic fixes paused after the check handler hits the attempt limit", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            fixesPausedOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Automatic fixes paused")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
   });
 
   it("shows Addressing user feedback when a PR-feedback run is active", () => {

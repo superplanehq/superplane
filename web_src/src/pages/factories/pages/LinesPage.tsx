@@ -185,8 +185,13 @@ export function LinesPage() {
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const { addressingFeedbackOrderIds, addressingFeedbackLabels, waitingOnChecksOrderIds, checksPassedOrderIds } =
-    usePRFeedbackWorkOrderAttention(pullRequests);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
@@ -420,6 +425,7 @@ export function LinesPage() {
               addressingFeedbackLabels,
               waitingOnChecksOrderIds,
               checksPassedOrderIds,
+              fixesPausedOrderIds,
               ...cardActions,
             }}
             peekOrder={peekOrder ?? undefined}

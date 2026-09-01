@@ -309,6 +309,8 @@ func Test__FactoryPullRequestActivityCoordination(t *testing.T) {
 		assert.Equal(t, models.FactoryPullRequestActivityOutcomeLimitReached, limited.Outcome)
 		assert.Equal(t, models.FactoryPullRequestActivityStateLimitReached, limited.Activity.State)
 		assert.Nil(t, limited.Activity.Attempt)
+		require.NotNil(t, limited.Activity.AttemptLimit)
+		assert.Equal(t, 3, *limited.Activity.AttemptLimit)
 		assert.Nil(t, reloadPullRequest(t, db, pullRequest).ActiveMutationRunID)
 	})
 

@@ -8,19 +8,20 @@ import (
 )
 
 type prFeedbackGraph struct {
-	CommentTriggerNodeID      string
-	ReviewTriggerNodeID       string
-	ReplyTriggerNodeID        string
-	PullRequestTriggerNodeID  string
-	FindNodeID                string
-	ActivityNodeID            string
-	WaitChecksNodeID          string
-	MarkPassedNodeID          string
-	StartRepairNodeID         string
-	PauseFixesNodeID          string
-	StopWaitingNodeID         string
-	RecordTimeoutNodeID       string
-	RunnerNodeID              string
+	CommentTriggerNodeID     string
+	ReviewTriggerNodeID      string
+	ReplyTriggerNodeID       string
+	PullRequestTriggerNodeID string
+	FindNodeID               string
+	ActivityNodeID           string
+	WaitChecksNodeID         string
+	MarkPassedNodeID         string
+	StartRepairNodeID        string
+	PauseFixesNodeID         string
+	AnnounceLimitNodeID      string
+	StopWaitingNodeID        string
+	RecordTimeoutNodeID      string
+	RunnerNodeID             string
 }
 
 func (g prFeedbackGraph) isChecks() bool {
@@ -85,6 +86,9 @@ func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
 	if g.MarkPassedNodeID == "" || g.PauseFixesNodeID == "" || g.StopWaitingNodeID == "" || g.RecordTimeoutNodeID == "" {
 		return false
 	}
+	if g.AnnounceLimitNodeID == "" {
+		return false
+	}
 
 	if !hasCanvasPath(spec.Edges, g.PullRequestTriggerNodeID, g.FindNodeID) {
 		return false
@@ -108,6 +112,9 @@ func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
 		return false
 	}
 	if !hasCanvasPath(spec.Edges, g.StartRepairNodeID, g.PauseFixesNodeID) {
+		return false
+	}
+	if !hasCanvasPath(spec.Edges, g.PauseFixesNodeID, g.AnnounceLimitNodeID) {
 		return false
 	}
 	if !hasCanvasPath(spec.Edges, g.StopWaitingNodeID, g.RecordTimeoutNodeID) {
@@ -161,6 +168,9 @@ func resolvePRFeedbackGraph(spec models.LiveCanvasSpec) prFeedbackGraph {
 		}),
 		PauseFixesNodeID: resolveIntakeNode(nodes, prFeedbackPauseFixesNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackUpdateActivityComponent
+		}),
+		AnnounceLimitNodeID: resolveIntakeNode(nodes, prFeedbackAnnounceLimitNodeID, func(node *models.Node) bool {
+			return node.ComponentName() == prFeedbackSetStatusNoteComponent
 		}),
 		StopWaitingNodeID: resolveIntakeNode(nodes, prFeedbackStopWaitingNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackUpdateActivityComponent

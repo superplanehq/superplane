@@ -1,7 +1,9 @@
 package factory
 
 import (
+	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -24,11 +26,17 @@ func pullRequestActivityChannels() []core.OutputChannel {
 func finishPullRequestActivity(
 	state core.ExecutionStateContext,
 	requests core.RequestContext,
+	runs core.RunExecutionContext,
 	eventType string,
 	result *core.PullRequestActivityResult,
+	requestedAccess string,
 ) error {
 	if result.Outcome == core.PullRequestActivityOutcomeWaiting {
 		return scheduleAcquireAccess(requests)
+	}
+
+	if err := recordExclusiveLimitReachedError(runs, requestedAccess, result); err != nil {
+		return err
 	}
 
 	channel := core.DefaultOutputChannel.Name
@@ -37,6 +45,37 @@ func finishPullRequestActivity(
 	}
 
 	return state.Emit(channel, eventType, []any{activityPayload(result)})
+}
+
+func recordExclusiveLimitReachedError(
+	runs core.RunExecutionContext,
+	requestedAccess string,
+	result *core.PullRequestActivityResult,
+) error {
+	if runs == nil || result == nil {
+		return nil
+	}
+	if result.Outcome != core.PullRequestActivityOutcomeLimitReached {
+		return nil
+	}
+	if strings.TrimSpace(requestedAccess) != core.PullRequestActivityAccessExclusive {
+		return nil
+	}
+	return runs.AddError(limitReachedErrorMessage(result))
+}
+
+func limitReachedErrorMessage(result *core.PullRequestActivityResult) string {
+	if result.Activity != nil && result.Activity.AttemptLimit != nil && *result.Activity.AttemptLimit > 0 {
+		return "Automatic fixes paused after " + attemptCountLabel(*result.Activity.AttemptLimit)
+	}
+	return "Automatic fixes paused after the attempt limit"
+}
+
+func attemptCountLabel(count int) string {
+	if count == 1 {
+		return "1 attempt"
+	}
+	return fmt.Sprintf("%d attempts", count)
 }
 
 func scheduleAcquireAccess(requests core.RequestContext) error {

@@ -378,13 +378,15 @@ func (p *FactoryPullRequest) reserveAttempt(tx *gorm.DB, activity *FactoryPullRe
 		now := time.Now()
 		activity.State = FactoryPullRequestActivityStateLimitReached
 		activity.Access = FactoryPullRequestAccessReleased
+		activity.AttemptLimit = &maximumAttempts
 		activity.UpdatedAt = now
 		if err := tx.Model(activity).
 			Where("pull_request_id = ? AND run_id = ?", activity.PullRequestID, activity.RunID).
 			Updates(map[string]any{
-				"state":      FactoryPullRequestActivityStateLimitReached,
-				"access":     FactoryPullRequestAccessReleased,
-				"updated_at": now,
+				"state":         FactoryPullRequestActivityStateLimitReached,
+				"access":        FactoryPullRequestAccessReleased,
+				"attempt_limit": maximumAttempts,
+				"updated_at":    now,
 			}).Error; err != nil {
 			return false, err
 		}

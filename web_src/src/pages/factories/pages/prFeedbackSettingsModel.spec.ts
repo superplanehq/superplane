@@ -9,6 +9,7 @@ import {
   addressingFeedbackLabelsByWorkOrder,
   addressingFeedbackWorkOrderIds,
   checksPassedWorkOrderIds,
+  fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
   hasAvailablePRFeedbackSource,
@@ -251,6 +252,7 @@ describe("activePRFeedbackWorkOrderIds", () => {
     expect(waitingOnChecksWorkOrderIds(pullRequests)).toEqual(new Set(["wo-checks"]));
     expect(addressingFeedbackWorkOrderIds(pullRequests)).toEqual(new Set(["wo-repair"]));
     expect(checksPassedWorkOrderIds(pullRequests)).toEqual(new Set());
+    expect(fixesPausedWorkOrderIds(pullRequests)).toEqual(new Set());
     expect(activePRFeedbackWorkOrderIds(pullRequests)).toEqual(new Set(["wo-repair"]));
     expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-repair")).toBe("Fixing failed checks on a82fd91");
   });
@@ -293,6 +295,50 @@ describe("activePRFeedbackWorkOrderIds", () => {
         },
       ]),
     ).toEqual(new Set(["wo-passed"]));
+  });
+
+  it("treats a limit-reached check activity as fixes paused", () => {
+    const pullRequests = [
+      {
+        workOrderId: "wo-paused",
+        activities: [
+          {
+            access: "released",
+            state: "limit_reached",
+            description: "Automatic fixes paused after 3 attempts",
+            revision: { sha: "a82fd91" },
+            run: { id: "r-paused", state: "STATE_FINISHED", result: "RESULT_FAILED" },
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-waiting",
+        activities: [
+          {
+            access: "released",
+            state: "limit_reached",
+            description: "Automatic fixes paused after 3 attempts",
+            revision: { sha: "a82fd91" },
+            run: {
+              id: "r-old",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-08-31T11:00:00Z",
+            },
+          },
+          {
+            access: "concurrent",
+            state: "active",
+            description: "Waiting for checks on b91ce02",
+            run: { id: "r-new", state: "STATE_STARTED", createdAt: "2026-08-31T12:00:00Z" },
+          },
+        ],
+      },
+    ];
+
+    expect(fixesPausedWorkOrderIds(pullRequests)).toEqual(new Set(["wo-paused"]));
+    expect(checksPassedWorkOrderIds(pullRequests)).toEqual(new Set());
+    expect(waitingOnChecksWorkOrderIds(pullRequests)).toEqual(new Set(["wo-waiting"]));
   });
 
   it("keeps the generic addressing label for discussion runs", () => {

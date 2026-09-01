@@ -5,6 +5,7 @@ import { firstPositiveWorkOrderMetric } from "../lib/workOrderUsage";
 import {
   addressingFeedbackLabelsByWorkOrder,
   checksPassedWorkOrderIds,
+  fixesPausedWorkOrderIds,
   prFeedbackActivityAttemptLabel,
   prFeedbackActivityKind,
   prFeedbackActivityLabel,
@@ -18,6 +19,7 @@ export function usePRFeedbackWorkOrderAttention(pullRequests: FactoriesFactoryPu
   addressingFeedbackLabels: ReadonlyMap<string, string>;
   waitingOnChecksOrderIds: ReadonlySet<string>;
   checksPassedOrderIds: ReadonlySet<string>;
+  fixesPausedOrderIds: ReadonlySet<string>;
 } {
   return useMemo(() => {
     const addressingFeedbackLabels = addressingFeedbackLabelsByWorkOrder(pullRequests);
@@ -26,6 +28,7 @@ export function usePRFeedbackWorkOrderAttention(pullRequests: FactoriesFactoryPu
       addressingFeedbackLabels,
       waitingOnChecksOrderIds: waitingOnChecksWorkOrderIds(pullRequests),
       checksPassedOrderIds: checksPassedWorkOrderIds(pullRequests),
+      fixesPausedOrderIds: fixesPausedWorkOrderIds(pullRequests),
     };
   }, [pullRequests]);
 }

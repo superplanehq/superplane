@@ -67,6 +67,7 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 		assert.Equal(t, prFeedbackPullRequestTriggerNodeID, graph.PullRequestTriggerNodeID)
 		assert.Equal(t, prFeedbackWaitChecksNodeID, graph.WaitChecksNodeID)
 		assert.Equal(t, prFeedbackStartRepairNodeID, graph.StartRepairNodeID)
+		assert.Equal(t, prFeedbackAnnounceLimitNodeID, graph.AnnounceLimitNodeID)
 		assert.True(t, graph.isChecks())
 		assert.True(t, graph.Healthy(spec))
 	})
@@ -172,6 +173,51 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 	})
 }
 
+func Test__EnsureChecksAnnounceLimitNode(t *testing.T) {
+	t.Run("adds the status note node when a checks graph is missing it", func(t *testing.T) {
+		nodes := []models.Node{
+			componentNode(prFeedbackPauseFixesNodeID, prFeedbackUpdateActivityComponent),
+		}
+		edges := []models.Edge{}
+		graph := prFeedbackGraph{
+			PullRequestTriggerNodeID: prFeedbackPullRequestTriggerNodeID,
+			PauseFixesNodeID:         prFeedbackPauseFixesNodeID,
+		}
+
+		nodes, edges = ensureChecksAnnounceLimitNode(nodes, edges, graph, 2)
+
+		require.Len(t, nodes, 2)
+		assert.Equal(t, prFeedbackAnnounceLimitNodeID, nodes[1].ID)
+		assert.Equal(t, prFeedbackSetStatusNoteComponent, nodes[1].ComponentName())
+		assert.Equal(t, prFeedbackChecksLimitStatusNoteBody(2), nodes[1].Configuration["body"])
+		require.Len(t, edges, 1)
+		assert.Equal(t, prFeedbackPauseFixesNodeID, edges[0].SourceID)
+		assert.Equal(t, prFeedbackAnnounceLimitNodeID, edges[0].TargetID)
+	})
+
+	t.Run("does not duplicate the status note node", func(t *testing.T) {
+		nodes := []models.Node{
+			componentNode(prFeedbackPauseFixesNodeID, prFeedbackUpdateActivityComponent),
+			componentNode(prFeedbackAnnounceLimitNodeID, prFeedbackSetStatusNoteComponent),
+		}
+		edges := []models.Edge{{
+			Channel:  "default",
+			SourceID: prFeedbackPauseFixesNodeID,
+			TargetID: prFeedbackAnnounceLimitNodeID,
+		}}
+		graph := prFeedbackGraph{
+			PullRequestTriggerNodeID: prFeedbackPullRequestTriggerNodeID,
+			PauseFixesNodeID:         prFeedbackPauseFixesNodeID,
+			AnnounceLimitNodeID:      prFeedbackAnnounceLimitNodeID,
+		}
+
+		nextNodes, nextEdges := ensureChecksAnnounceLimitNode(nodes, edges, graph, 3)
+
+		assert.Len(t, nextNodes, 2)
+		assert.Len(t, nextEdges, 1)
+	})
+}
+
 func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 	t.Run("opened, reopened, and synchronize start one wait then one repair", func(t *testing.T) {
 		canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
@@ -189,6 +235,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 			"timedOut:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackStopWaitingNodeID,
 			"default:" + prFeedbackStartRepairNodeID + "->" + prFeedbackRunnerNodeID,
 			"limitReached:" + prFeedbackStartRepairNodeID + "->" + prFeedbackPauseFixesNodeID,
+			"default:" + prFeedbackPauseFixesNodeID + "->" + prFeedbackAnnounceLimitNodeID,
 			"default:" + prFeedbackStopWaitingNodeID + "->" + prFeedbackRecordTimeoutNodeID,
 		}, yamlEdgeChannels(canvas))
 
@@ -201,6 +248,14 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 
 		pause := findSpecNode(t, canvas, prFeedbackPauseFixesNodeID)
 		assert.Equal(t, "Automatic fixes paused after 3 attempts", pause.Configuration["description"])
+
+		note := findSpecNode(t, canvas, prFeedbackAnnounceLimitNodeID)
+		assert.Equal(t, prFeedbackSetStatusNoteComponent, note.Component)
+		assert.Equal(t, prFeedbackStatusNoteKey, note.Configuration["noteKey"])
+		assert.Equal(t, prFeedbackWorkOrderIDExpression(), note.Configuration["orderId"])
+		assert.Equal(t, "Automatic fixes did not succeed", note.Configuration["headline"])
+		assert.Equal(t, prFeedbackChecksLimitStatusNoteBody(3), note.Configuration["body"])
+		assert.Equal(t, true, note.Configuration["showOnlyWhenWaiting"])
 	})
 
 	t.Run("the runner verifies the remote head before it pushes", func(t *testing.T) {

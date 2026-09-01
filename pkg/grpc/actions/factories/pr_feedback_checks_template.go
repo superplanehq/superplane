@@ -13,12 +13,15 @@ const (
 	prFeedbackMarkPassedNodeID         = "mark-checks-passed"
 	prFeedbackStartRepairNodeID        = "start-check-repair"
 	prFeedbackPauseFixesNodeID         = "pause-automatic-fixes"
+	prFeedbackAnnounceLimitNodeID      = "set-fixes-paused-note"
 	prFeedbackStopWaitingNodeID        = "stop-waiting-for-checks"
 	prFeedbackRecordTimeoutNodeID      = "record-check-timeout"
 
 	prFeedbackWaitChecksComponent     = "github.waitForPullRequestChecks"
 	prFeedbackUpdateActivityComponent = "updatePullRequestActivity"
 	prFeedbackAddRunErrorComponent    = "addRunError"
+	prFeedbackSetStatusNoteComponent  = "setWorkOrderStatusNote"
+	prFeedbackStatusNoteKey           = "pr-closure"
 
 	prFeedbackChecksDefaultName        = "Fix pull request checks"
 	prFeedbackChecksDefaultDescription = "Wait for pull request checks and start one agent run when selected checks fail."
@@ -45,6 +48,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 				{Channel: "timedOut", SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackStopWaitingNodeID},
 				{Channel: "default", SourceID: prFeedbackStartRepairNodeID, TargetID: prFeedbackRunnerNodeID},
 				{Channel: "limitReached", SourceID: prFeedbackStartRepairNodeID, TargetID: prFeedbackPauseFixesNodeID},
+				{Channel: "default", SourceID: prFeedbackPauseFixesNodeID, TargetID: prFeedbackAnnounceLimitNodeID},
 				{Channel: "default", SourceID: prFeedbackStopWaitingNodeID, TargetID: prFeedbackRecordTimeoutNodeID},
 			},
 			Nodes: []yaml.Node{
@@ -133,6 +137,14 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 						"description": prFeedbackChecksLimitDescriptionExpression(request.MaximumAttempts),
 					},
 					Position: yaml.Position{X: 1000, Y: 400},
+				},
+				{
+					ID:            prFeedbackAnnounceLimitNodeID,
+					Name:          "Set Fixes Paused Note",
+					Type:          yaml.NodeTypeAction,
+					Component:     prFeedbackSetStatusNoteComponent,
+					Configuration: prFeedbackChecksLimitStatusNoteConfiguration(request.MaximumAttempts),
+					Position:      yaml.Position{X: 1180, Y: 400},
 				},
 				{
 					ID:        prFeedbackStopWaitingNodeID,
@@ -347,7 +359,46 @@ func prFeedbackChecksLimitDescriptionExpression(maximumAttempts int) string {
 	if maximumAttempts < 1 {
 		maximumAttempts = prFeedbackDefaultMaximumAttempts
 	}
-	return fmt.Sprintf("Automatic fixes paused after %d attempts", maximumAttempts)
+	return "Automatic fixes paused after " + attemptCountLabel(maximumAttempts)
+}
+
+func prFeedbackChecksLimitStatusNoteConfiguration(maximumAttempts int) map[string]any {
+	return map[string]any{
+		"orderId":             prFeedbackWorkOrderIDExpression(),
+		"noteKey":             prFeedbackStatusNoteKey,
+		"headline":            "Automatic fixes did not succeed",
+		"body":                prFeedbackChecksLimitStatusNoteBody(maximumAttempts),
+		"ctaLabel":            prFeedbackReviewPRCtaLabelExpression(),
+		"ctaUrl":              prFeedbackReviewPRCtaURLExpression(),
+		"showOnlyWhenWaiting": true,
+	}
+}
+
+func prFeedbackChecksLimitStatusNoteBody(maximumAttempts int) string {
+	if maximumAttempts < 1 {
+		maximumAttempts = prFeedbackDefaultMaximumAttempts
+	}
+	return "SuperPlane paused automatic fixes after " + attemptCountLabel(maximumAttempts) +
+		". Review the pull request and fix the remaining checks."
+}
+
+func prFeedbackWorkOrderIDExpression() string {
+	return `{{ $["Find Pull Request"].data.workOrder.id }}`
+}
+
+func prFeedbackReviewPRCtaLabelExpression() string {
+	return "Review PR #{{ root().data.pull_request.number }}"
+}
+
+func prFeedbackReviewPRCtaURLExpression() string {
+	return "{{ root().data.pull_request.html_url }}"
+}
+
+func attemptCountLabel(count int) string {
+	if count == 1 {
+		return "1 attempt"
+	}
+	return fmt.Sprintf("%d attempts", count)
 }
 
 func prFeedbackFailedChecksExpression() string {

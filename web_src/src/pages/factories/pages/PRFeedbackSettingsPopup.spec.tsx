@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
@@ -45,16 +47,18 @@ function renderChecksPopup(
   organizationId?: string,
 ) {
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <PRFeedbackSettingsPopup
-        organizationId={organizationId}
-        settings={settings}
-        healthy
-        onSave={onSave}
-        onClose={vi.fn()}
-        fixed={false}
-      />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <PRFeedbackSettingsPopup
+          organizationId={organizationId}
+          settings={settings}
+          healthy
+          onSave={onSave}
+          onClose={vi.fn()}
+          fixed={false}
+        />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
   return { onSave };
 }
@@ -135,5 +139,38 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
     expect(within(row).getByTestId("integration-icon-circleci")).toBeInTheDocument();
     expect(row).toHaveTextContent("circleci-prod");
     expect(within(row).getByRole("listitem").className).toContain("items-center");
+  });
+
+  it("links to the organization Integrations page", () => {
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1");
+
+    expect(
+      screen.getByText(/Give the agent access to CI logs from other connected integrations/, { exact: false }),
+    ).toHaveTextContent(
+      "Give the agent access to CI logs from other connected integrations. If this list does not include the integration you need, go to the Integrations page and connect it.",
+    );
+    const link = screen.getByRole("link", { name: "Integrations page" });
+    expect(link).toHaveAttribute("href", organizationIntegrationsPath("org-1"));
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noreferrer");
+  });
+
+  it("hides the Integrations link when the organization id is missing", () => {
+    renderChecksPopup();
+
+    expect(screen.queryByTestId("pr-feedback-integrations-page")).not.toBeInTheDocument();
+  });
+
+  it("keeps the Integrations link when no extra integrations are connected", () => {
+    vi.mocked(useConnectedIntegrations).mockReturnValue({
+      data: [],
+    } as ReturnType<typeof useConnectedIntegrations>);
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1");
+
+    expect(screen.getByTestId("pr-feedback-integrations-empty")).toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-integrations-page")).toHaveAttribute(
+      "href",
+      organizationIntegrationsPath("org-1"),
+    );
   });
 });

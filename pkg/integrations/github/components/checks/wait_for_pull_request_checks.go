@@ -42,17 +42,17 @@ type WaitForPullRequestChecksConfiguration struct {
 }
 
 type WaitForPullRequestChecksMetadata struct {
-	Repository     string              `json:"repository" mapstructure:"repository"`
-	SHA            string              `json:"sha" mapstructure:"sha"`
-	StartedAt      time.Time           `json:"startedAt" mapstructure:"startedAt"`
-	LastChangeAt   time.Time           `json:"lastChangeAt" mapstructure:"lastChangeAt"`
-	TimeoutAt      time.Time           `json:"timeoutAt" mapstructure:"timeoutAt"`
-	CompletedAt    *time.Time          `json:"completedAt,omitempty" mapstructure:"completedAt"`
-	Fingerprint    string              `json:"fingerprint" mapstructure:"fingerprint"`
-	Outcome        string              `json:"outcome" mapstructure:"outcome"`
-	Checks         []PullRequestCheck  `json:"checks" mapstructure:"checks"`
-	SelectedChecks []PullRequestCheck  `json:"selectedChecks" mapstructure:"selectedChecks"`
-	FailedChecks   []PullRequestCheck  `json:"failedChecks" mapstructure:"failedChecks"`
+	Repository     string             `json:"repository" mapstructure:"repository"`
+	SHA            string             `json:"sha" mapstructure:"sha"`
+	StartedAt      time.Time          `json:"startedAt" mapstructure:"startedAt"`
+	LastChangeAt   time.Time          `json:"lastChangeAt" mapstructure:"lastChangeAt"`
+	TimeoutAt      time.Time          `json:"timeoutAt" mapstructure:"timeoutAt"`
+	CompletedAt    *time.Time         `json:"completedAt,omitempty" mapstructure:"completedAt"`
+	Fingerprint    string             `json:"fingerprint" mapstructure:"fingerprint"`
+	Outcome        string             `json:"outcome" mapstructure:"outcome"`
+	Checks         []PullRequestCheck `json:"checks" mapstructure:"checks"`
+	SelectedChecks []PullRequestCheck `json:"selectedChecks" mapstructure:"selectedChecks"`
+	FailedChecks   []PullRequestCheck `json:"failedChecks" mapstructure:"failedChecks"`
 }
 
 type WaitForPullRequestChecksOutput struct {

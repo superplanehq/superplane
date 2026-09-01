@@ -187,15 +187,20 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 10)
-		var foundWait bool
+		assert.Len(t, liveVersion.Nodes, 11)
+		var foundWait, foundAnnounce bool
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackWaitChecksNodeID {
 				foundWait = true
 				assert.Equal(t, prFeedbackWaitChecksComponent, node.ComponentName())
 			}
+			if node.ID == prFeedbackAnnounceLimitNodeID {
+				foundAnnounce = true
+				assert.Equal(t, prFeedbackSetStatusNoteComponent, node.ComponentName())
+			}
 		}
 		assert.True(t, foundWait)
+		assert.True(t, foundAnnounce)
 	})
 
 	t.Run("checks creation rejects an invalid attempt limit", func(t *testing.T) {
@@ -280,6 +285,10 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 			}
 			if node.ID == prFeedbackPauseFixesNodeID {
 				assert.Equal(t, "Automatic fixes paused after 5 attempts", node.Configuration["description"])
+			}
+			if node.ID == prFeedbackAnnounceLimitNodeID {
+				assert.Equal(t, prFeedbackChecksLimitStatusNoteBody(5), node.Configuration["body"])
+				assert.Equal(t, "Automatic fixes did not succeed", node.Configuration["headline"])
 			}
 		}
 	})

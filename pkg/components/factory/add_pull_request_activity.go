@@ -138,7 +138,7 @@ func (c *AddPullRequestActivity) Execute(ctx core.ExecutionContext) error {
 		Revision:      config.Revision,
 		Access:        config.Access,
 	})
-	return finishAddedPullRequestActivity(ctx.ExecutionState, ctx.Requests, result, err)
+	return finishAddedPullRequestActivity(ctx.ExecutionState, ctx.Requests, ctx.Runs, config.Access, result, err)
 }
 
 func (c *AddPullRequestActivity) Setup(ctx core.SetupContext) error {
@@ -175,12 +175,14 @@ func (c *AddPullRequestActivity) HandleHook(ctx core.ActionHookContext) error {
 		Revision:      hookString(ctx.Configuration, "revision"),
 		Access:        hookString(ctx.Configuration, "access"),
 	})
-	return finishAddedPullRequestActivity(ctx.ExecutionState, ctx.Requests, result, err)
+	return finishAddedPullRequestActivity(ctx.ExecutionState, ctx.Requests, ctx.Runs, hookString(ctx.Configuration, "access"), result, err)
 }
 
 func finishAddedPullRequestActivity(
 	state core.ExecutionStateContext,
 	requests core.RequestContext,
+	runs core.RunExecutionContext,
+	requestedAccess string,
 	result *core.PullRequestActivityResult,
 	err error,
 ) error {
@@ -190,7 +192,7 @@ func finishAddedPullRequestActivity(
 	if err != nil {
 		return err
 	}
-	return finishPullRequestActivity(state, requests, addPullRequestActivityEventType, result)
+	return finishPullRequestActivity(state, requests, runs, addPullRequestActivityEventType, result, requestedAccess)
 }
 
 func hookPullRequestID(configuration any) string {

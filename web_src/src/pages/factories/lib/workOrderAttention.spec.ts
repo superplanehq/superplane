@@ -92,7 +92,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
   });
 
-  it("labels an active check wait as Waiting on CI checks without user review", () => {
+  it("labels an active check wait as Waiting on status checks without user review", () => {
     const waitingOnReview = order({
       statusNotes: [
         {
@@ -104,7 +104,21 @@ describe("getWorkOrderAttentionReason", () => {
     });
     expect(getWorkOrderAttentionReasons(waitingOnReview, { waitingOnChecks: true })).toEqual(["checks"]);
     expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
-    expect(WORK_ORDER_ATTENTION_LABEL.checks).toBe("Waiting on CI checks");
+    expect(WORK_ORDER_ATTENTION_LABEL.checks).toBe("Waiting on status checks");
+  });
+
+  it("labels a paused fixer as Automatic fixes paused without user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { fixesPaused: true })).toEqual(["fixesPaused"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.fixesPaused).toBe("Automatic fixes paused");
   });
 
   it("labels passed checks and keeps user review", () => {

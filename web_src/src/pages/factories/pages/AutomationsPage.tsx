@@ -17,8 +17,13 @@ export function AutomationsPage() {
   const model = useAutomationsPageModel();
   const cardActions = useWorkOrderCardActions(model.organizationId, model.factoryId);
   const { data: pullRequests = [] } = useFactoryPullRequests(model.organizationId, model.factoryId);
-  const { addressingFeedbackOrderIds, addressingFeedbackLabels, waitingOnChecksOrderIds, checksPassedOrderIds } =
-    usePRFeedbackWorkOrderAttention(pullRequests);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
 
   // Above the list/detail branching below (hooks can't be conditional): this
   // single call covers both the Automations list and the in-page detail view
@@ -49,6 +54,7 @@ export function AutomationsPage() {
     addressingFeedbackLabels,
     waitingOnChecksOrderIds,
     checksPassedOrderIds,
+    fixesPausedOrderIds,
     ...cardActions,
   };
 

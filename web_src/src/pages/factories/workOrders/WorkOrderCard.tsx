@@ -20,6 +20,7 @@ const EMPTY_ADDRESSING_FEEDBACK_IDS: ReadonlySet<string> = new Set();
 const EMPTY_ADDRESSING_FEEDBACK_LABELS: ReadonlyMap<string, string> = new Map();
 const EMPTY_WAITING_ON_CHECKS_IDS: ReadonlySet<string> = new Set();
 const EMPTY_CHECKS_PASSED_IDS: ReadonlySet<string> = new Set();
+const EMPTY_FIXES_PAUSED_IDS: ReadonlySet<string> = new Set();
 
 export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   organizationId: string;
@@ -41,6 +42,8 @@ export interface WorkOrderCardContext extends WorkOrderRowCallbacks {
   waitingOnChecksOrderIds?: ReadonlySet<string>;
   /** Tasks whose latest check wait finished with passing checks. */
   checksPassedOrderIds?: ReadonlySet<string>;
+  /** Tasks whose check handler stopped at the attempt limit. */
+  fixesPausedOrderIds?: ReadonlySet<string>;
 }
 
 export interface WorkOrderCardProps extends WorkOrderCardContext {
@@ -83,6 +86,7 @@ export function WorkOrderCard({
   addressingFeedbackLabels = EMPTY_ADDRESSING_FEEDBACK_LABELS,
   waitingOnChecksOrderIds = EMPTY_WAITING_ON_CHECKS_IDS,
   checksPassedOrderIds = EMPTY_CHECKS_PASSED_IDS,
+  fixesPausedOrderIds = EMPTY_FIXES_PAUSED_IDS,
   onDispatch,
   href,
   onOpen,
@@ -98,6 +102,7 @@ export function WorkOrderCard({
     addressingFeedback: addressingFeedbackOrderIds.has(entry.id),
     waitingOnChecks: waitingOnChecksOrderIds.has(entry.id),
     checksPassed: checksPassedOrderIds.has(entry.id),
+    fixesPaused: fixesPausedOrderIds.has(entry.id),
   });
 
   return (

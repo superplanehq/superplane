@@ -796,20 +796,45 @@ func TestUpdatePullRequestActivity_Execute(t *testing.T) {
 	})
 
 	t.Run("emits limitReached when the handler is at the attempt limit", func(t *testing.T) {
+		limit := 3
+		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
+			PullRequest: &core.PullRequest{ID: "pr-1"},
+			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
+			Activity:    &core.PullRequestActivity{AttemptLimit: &limit},
+			Outcome:     core.PullRequestActivityOutcomeLimitReached,
+		}}
+		stateCtx := &contexts.ExecutionStateContext{}
+		runs := &contexts.RunExecutionContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  map[string]any{"access": "exclusive"},
+			ExecutionState: stateCtx,
+			Factory:        factoryCtx,
+			Runs:           runs,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, core.PullRequestActivityOutcomeLimitReached, stateCtx.Channel)
+		assert.Equal(t, []string{"Automatic fixes paused after 3 attempts"}, runs.AddErrorCalls)
+	})
+
+	t.Run("does not record a run error when only the description is updated after the limit", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
 			PullRequest: &core.PullRequest{ID: "pr-1"},
 			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
 			Outcome:     core.PullRequestActivityOutcomeLimitReached,
 		}}
 		stateCtx := &contexts.ExecutionStateContext{}
+		runs := &contexts.RunExecutionContext{}
 
 		err := component.Execute(core.ExecutionContext{
-			Configuration:  map[string]any{"access": "exclusive"},
+			Configuration:  map[string]any{"description": "Automatic fixes paused after 3 attempts"},
 			ExecutionState: stateCtx,
 			Factory:        factoryCtx,
+			Runs:           runs,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, core.PullRequestActivityOutcomeLimitReached, stateCtx.Channel)
+		assert.Empty(t, runs.AddErrorCalls)
 	})
 }
 

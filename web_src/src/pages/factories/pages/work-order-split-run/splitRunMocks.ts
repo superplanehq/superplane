@@ -197,6 +197,14 @@ const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   text: SPLIT_RUN_WAITING_NOTE.text ?? "",
 };
 
+const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
+
+const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
+  key: "check-fixes-paused",
+  headline: FIXES_PAUSED_HEADLINE,
+  text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
+};
+
 /**
  * The footer note for a draft. A scored review candidate keeps the plan
  * and confidence. Other drafts tell the person to review the details and
@@ -338,7 +346,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
-      hideWaitingDecision: hasActivePRFeedbackRun(options?.prFeedbackRuns),
+      hideWaitingDecision: shouldHideWaitingDecision(options?.prFeedbackRuns),
+      fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
     }),
@@ -358,6 +367,7 @@ function reviewSurfaces(
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
     hideWaitingDecision?: boolean;
+    fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
   },
@@ -385,7 +395,7 @@ function reviewSurfaces(
     return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision);
+    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -443,11 +453,24 @@ function waitingReviewSurface(
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
   hideWaitingDecision?: boolean,
+  fixesPaused?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   if (hideWaitingDecision) {
     return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
   }
   const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  if (fixesPaused) {
+    const note = pauseFooterNote(notes);
+    return surfaces(
+      buildSplitRunFooter({
+        kind: "waiting",
+        note,
+        status: displayStatus,
+      }),
+      [note],
+      checks,
+    );
+  }
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
@@ -457,6 +480,18 @@ function waitingReviewSurface(
     notes,
     checks,
   );
+}
+
+function pauseFooterNote(notes: WorkOrderStatusNotePresentation[]): WorkOrderStatusNotePresentation {
+  const written = notes.find((note) => note.headline === FIXES_PAUSED_HEADLINE);
+  if (written) {
+    return written;
+  }
+  const review = notes[0];
+  if (!review?.cta) {
+    return FIXES_PAUSED_FALLBACK_NOTE;
+  }
+  return { ...FIXES_PAUSED_FALLBACK_NOTE, cta: review.cta };
 }
 
 function overviewChecks(
@@ -607,6 +642,19 @@ function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | und
 
 function hasActivePRFeedbackRun(runs?: PRFeedbackLogRun[]): boolean {
   return (runs ?? []).some((entry) => isActiveCanvasRun(entry.run));
+}
+
+function shouldHideWaitingDecision(runs?: PRFeedbackLogRun[]): boolean {
+  return hasActivePRFeedbackRun(runs);
+}
+
+function latestPRFeedbackRun(runs?: PRFeedbackLogRun[]): PRFeedbackLogRun | undefined {
+  if (!runs || runs.length === 0) {
+    return undefined;
+  }
+  return [...runs].sort(
+    (left, right) => Date.parse(right.run.createdAt ?? "") - Date.parse(left.run.createdAt ?? ""),
+  )[0];
 }
 
 /**

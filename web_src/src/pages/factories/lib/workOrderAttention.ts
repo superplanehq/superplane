@@ -11,6 +11,7 @@ export type WorkOrderAttentionReason =
   | "feedback"
   | "checks"
   | "checksPassed"
+  | "fixesPaused"
   | "question"
   | "failed"
   | "stopped"
@@ -19,8 +20,9 @@ export type WorkOrderAttentionReason =
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
   approval: "Waiting for user review",
   feedback: "Addressing user feedback",
-  checks: "Waiting on CI checks",
+  checks: "Waiting on status checks",
   checksPassed: "Status checks passed",
+  fixesPaused: "Automatic fixes paused",
   question: "Agent question",
   failed: "Run failed",
   stopped: "Stopped",
@@ -32,6 +34,7 @@ export const WORK_ORDER_ATTENTION_CHIP_CLASSNAME: Record<WorkOrderAttentionReaso
   feedback: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   checks: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   checksPassed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  fixesPaused: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   question: "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-400",
   failed: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400",
   stopped: "border-slate-500/40 bg-slate-500/15 text-slate-800 dark:text-slate-300",
@@ -43,6 +46,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
   feedback: LoaderCircle,
   checks: LoaderCircle,
   checksPassed: CircleCheck,
+  fixesPaused: CircleX,
   question: MessageCircleQuestion,
   failed: CircleX,
   stopped: CircleX,
@@ -54,14 +58,21 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
  * orders with a failed latest step are Run failed. A cancelled latest
  * step is Stopped. An exclusive or discussion PR-feedback run is
  * Addressing user feedback. An active concurrent check wait is Waiting
- * on CI checks and hides user review. A finished passed check wait is
- * Status checks passed. A visible status note is Waiting for user review.
+ * on status checks and hides user review. A check handler at its attempt
+ * limit is Automatic fixes paused and hides user review. A finished
+ * passed check wait is Status checks passed. A visible status note is
+ * Waiting for user review.
  * Waiting with no note is Needs attention. Other statuses return none.
  * The note body is not classified.
  */
 export function getWorkOrderAttentionReasons(
   order: FactoriesWorkOrder,
-  options: { addressingFeedback?: boolean; waitingOnChecks?: boolean; checksPassed?: boolean } = {},
+  options: {
+    addressingFeedback?: boolean;
+    waitingOnChecks?: boolean;
+    checksPassed?: boolean;
+    fixesPaused?: boolean;
+  } = {},
 ): WorkOrderAttentionReason[] {
   const status = getWorkOrderDisplayStatus(order);
   if (status === "failed") {
@@ -84,6 +95,9 @@ export function getWorkOrderAttentionReasons(
   if (options.waitingOnChecks) {
     return ["checks"];
   }
+  if (options.fixesPaused) {
+    return ["fixesPaused"];
+  }
 
   const reasons: WorkOrderAttentionReason[] = [];
   const notes = presentWorkOrderStatusNotes(order.statusNotes, status);
@@ -101,7 +115,12 @@ export function getWorkOrderAttentionReasons(
 
 export function getWorkOrderAttentionReason(
   order: FactoriesWorkOrder,
-  options: { addressingFeedback?: boolean; waitingOnChecks?: boolean; checksPassed?: boolean } = {},
+  options: {
+    addressingFeedback?: boolean;
+    waitingOnChecks?: boolean;
+    checksPassed?: boolean;
+    fixesPaused?: boolean;
+  } = {},
 ): WorkOrderAttentionReason | null {
   return getWorkOrderAttentionReasons(order, options)[0] ?? null;
 }

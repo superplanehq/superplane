@@ -55,8 +55,13 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
-  const { addressingFeedbackOrderIds, addressingFeedbackLabels, waitingOnChecksOrderIds, checksPassedOrderIds } =
-    usePRFeedbackWorkOrderAttention(pullRequests);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -113,6 +118,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           addressingFeedbackLabels={addressingFeedbackLabels}
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}
           checksPassedOrderIds={checksPassedOrderIds}
+          fixesPausedOrderIds={fixesPausedOrderIds}
         />
       );
     }

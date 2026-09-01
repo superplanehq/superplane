@@ -40,7 +40,7 @@ func (c *UpdatePullRequestActivity) Documentation() string {
 
 Use ` + "`description`" + ` to replace the displayed activity text. Use ` + "`access`" + ` to keep the current access or request exclusive access. If exclusive access is not available, the component waits and retries.
 
-The component emits ` + "`limitReached`" + ` when a check handler reaches its attempt limit. You can still update the description after the attempt limit. A newer pull request head does not stop this activity.
+The component emits ` + "`limitReached`" + ` when a check handler reaches its attempt limit. An exclusive request that hits the limit also records a run error, so the canvas run fails. You can still update the description after the attempt limit. A newer pull request head does not stop this activity.
 
 This component can only be used in factory-owned apps.`
 }
@@ -102,7 +102,7 @@ func (c *UpdatePullRequestActivity) Configuration() []configuration.Field {
 }
 
 func (c *UpdatePullRequestActivity) Execute(ctx core.ExecutionContext) error {
-	return c.apply(ctx.Configuration, ctx.Factory, ctx.ExecutionState, ctx.Requests)
+	return c.apply(ctx.Configuration, ctx.Factory, ctx.ExecutionState, ctx.Requests, ctx.Runs)
 }
 
 func (c *UpdatePullRequestActivity) Setup(ctx core.SetupContext) error {
@@ -132,7 +132,7 @@ func (c *UpdatePullRequestActivity) HandleHook(ctx core.ActionHookContext) error
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
-	return c.apply(ctx.Configuration, ctx.Factory, ctx.ExecutionState, ctx.Requests)
+	return c.apply(ctx.Configuration, ctx.Factory, ctx.ExecutionState, ctx.Requests, ctx.Runs)
 }
 
 func (c *UpdatePullRequestActivity) apply(
@@ -140,6 +140,7 @@ func (c *UpdatePullRequestActivity) apply(
 	factory core.FactoryContext,
 	state core.ExecutionStateContext,
 	requests core.RequestContext,
+	runs core.RunExecutionContext,
 ) error {
 	config := UpdatePullRequestActivityConfiguration{}
 	if err := mapstructure.Decode(configuration, &config); err != nil {
@@ -156,5 +157,5 @@ func (c *UpdatePullRequestActivity) apply(
 		return err
 	}
 
-	return finishPullRequestActivity(state, requests, updatePullRequestActivityEventType, result)
+	return finishPullRequestActivity(state, requests, runs, updatePullRequestActivityEventType, result, config.Access)
 }
