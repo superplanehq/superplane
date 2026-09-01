@@ -3,7 +3,6 @@ package factories
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -71,7 +70,7 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 }
 
 func DescribePlanningSession(ctx context.Context, organizationID string, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), true)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +88,7 @@ func DescribePlanningSession(ctx context.Context, organizationID string, req *pb
 }
 
 func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +105,7 @@ func EndPlanningSession(ctx context.Context, organizationID string, req *pb.EndP
 }
 
 func SendPlanningSessionMessage(ctx context.Context, organizationID string, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +120,7 @@ func SendPlanningSessionMessage(ctx context.Context, organizationID string, req 
 }
 
 func UpdatePlanningSessionDraft(ctx context.Context, organizationID string, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +138,7 @@ func UpdatePlanningSessionDraft(ctx context.Context, organizationID string, req 
 }
 
 func CreatePlanningSessionWorkOrder(ctx context.Context, organizationID string, req *pb.CreatePlanningSessionWorkOrderRequest) (*pb.CreatePlanningSessionWorkOrderResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +159,7 @@ func CreatePlanningSessionWorkOrder(ctx context.Context, organizationID string, 
 }
 
 func SkipPlanningSessionDraft(ctx context.Context, organizationID string, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
-	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId(), false)
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +204,6 @@ func parseSessionID(sessionID string) (uuid.UUID, error) {
 func loadPlanningSession(
 	ctx context.Context,
 	organizationID, factoryID, sessionID string,
-	expireStale bool,
 ) (*models.FactoryPlanningSession, *models.Factory, error) {
 	orgID, parsedFactoryID, _, err := planningSessionActor(ctx, organizationID, factoryID)
 	if err != nil {
@@ -223,14 +221,6 @@ func loadPlanningSession(
 	session, err := models.FindPlanningSession(db, orgID, parsedFactoryID, parsedSessionID)
 	if err != nil {
 		return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
-	}
-	if expireStale {
-		if _, err := session.EndIfStale(db, time.Now()); err != nil {
-			return nil, nil, factoryErrorToStatus(err, "failed to load planning session")
-		}
-		if session.State == models.PlanningSessionStateEnded {
-			cancelPlanningSessionRun(ctx, db, session)
-		}
 	}
 	return session, factoryModel, nil
 }

@@ -187,16 +187,23 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 	}
 }
 
-func serializeFactoryPRFeedbackHandlers(handlers []models.FactoryPRFeedbackHandler, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryPRFeedbackHandler {
+func serializeFactoryPRFeedbackHandlers(tx *gorm.DB, orgID uuid.UUID, handlers []models.FactoryPRFeedbackHandler, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryPRFeedbackHandler {
 	result := make([]*pb.FactoryPRFeedbackHandler, len(handlers))
 	for i := range handlers {
-		result[i] = serializeFactoryPRFeedbackHandler(&handlers[i], specs[handlers[i].CanvasID])
+		result[i] = serializeFactoryPRFeedbackHandler(tx, orgID, &handlers[i], specs[handlers[i].CanvasID])
 	}
 	return result
 }
 
-func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
+func serializeFactoryPRFeedbackHandler(tx *gorm.DB, orgID uuid.UUID, handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
 	graph := resolvePRFeedbackGraph(spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec)
+	if handler.MaximumAttempts != nil {
+		settings.MaximumAttempts = *handler.MaximumAttempts
+	}
+	if tx != nil && orgID != uuid.Nil {
+		_ = resolveRunnerIntegrationIDs(tx, orgID, &settings)
+	}
 
 	serialized := &pb.FactoryPRFeedbackHandler{
 		Id:        handler.ID.String(),
@@ -205,7 +212,7 @@ func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler,
 		Name:      handler.Name(),
 		Subject:   serializeFactoryPRFeedbackHandlerSubject(handler.Subject),
 		Source:    serializeFactoryPRFeedbackHandlerSource(handler.Source),
-		Settings:  serializePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec)),
+		Settings:  serializePRFeedbackSettings(settings),
 		Healthy:   graph.Healthy(spec),
 		CreatedAt: timestamppb.New(handler.CreatedAt),
 		UpdatedAt: timestamppb.New(handler.UpdatedAt),
@@ -231,6 +238,8 @@ func serializeFactoryPRFeedbackHandlerSource(source string) pb.FactoryPRFeedback
 	switch source {
 	case models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion:
 		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION
+	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
+		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS
 	default:
 		return pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED
 	}
@@ -249,6 +258,8 @@ func parseFactoryPRFeedbackHandlerSource(source pb.FactoryPRFeedbackHandler_Sour
 	switch source {
 	case pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION:
 		return models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, nil
+	case pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS:
+		return models.FactoryPRFeedbackHandlerSourcePullRequestChecks, nil
 	default:
 		return "", invalidArgument("PR feedback handler source is not supported")
 	}

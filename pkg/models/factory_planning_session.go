@@ -33,7 +33,7 @@ const (
 	PlanningWaitKindSkipped = "skipped"
 	PlanningWaitKindEnded   = "ended"
 
-	PlanningSessionHeartbeatStale = 45 * time.Second
+	PlanningSessionHeartbeatStale = 5 * time.Minute
 )
 
 var (
@@ -256,7 +256,7 @@ func (s *FactoryPlanningSession) BeginWait(tx *gorm.DB) error {
 	if err := s.guardOpen(); err != nil {
 		return err
 	}
-	if s.WaitState == PlanningWaitPending {
+	if s.WaitState == PlanningWaitPending || s.WaitState == PlanningWaitResolved {
 		return nil
 	}
 	if text := s.nextUndeliveredUserText(); text != "" {
@@ -366,9 +366,7 @@ func (s *FactoryPlanningSession) SkipDraft(tx *gorm.DB) error {
 		return ErrFactoryPlanningSessionNoDraft
 	}
 	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
-	if s.WaitState == PlanningWaitPending {
-		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindSkipped})
-	}
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindSkipped})
 	s.appendMessage(PlanningSessionMessage{
 		ID:        uuid.NewString(),
 		Kind:      PlanningSessionMessageKindText,
@@ -395,14 +393,12 @@ func (s *FactoryPlanningSession) CreateDraftWorkOrder(tx *gorm.DB, factoryModel 
 
 	s.CreatedWorkOrderIDs = append(s.CreatedWorkOrderIDs, order.ID.String())
 	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
-	if s.WaitState == PlanningWaitPending {
-		s.resolveWait(PlanningWaitResult{
-			Kind:         PlanningWaitKindCreated,
-			WorkOrderID:  order.ID.String(),
-			WorkOrderKey: factoryModel.WorkOrderKey(order.Number),
-			Text:         order.Title,
-		})
-	}
+	s.resolveWait(PlanningWaitResult{
+		Kind:         PlanningWaitKindCreated,
+		WorkOrderID:  order.ID.String(),
+		WorkOrderKey: factoryModel.WorkOrderKey(order.Number),
+		Text:         order.Title,
+	})
 	s.appendMessage(PlanningSessionMessage{
 		ID:        uuid.NewString(),
 		Kind:      PlanningSessionMessageKindText,

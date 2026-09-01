@@ -78,13 +78,27 @@ func TestFactoryPlanningSession_EndIfStale(t *testing.T) {
 	session := startTestPlanningSession(t, "plan-stale")
 	db := database.Conn()
 
-	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-2*time.Minute)).Error)
+	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-6*time.Minute)).Error)
 	require.NoError(t, db.First(session, "id = ?", session.ID).Error)
 
 	ended, err := session.EndIfStale(db, time.Now())
 	require.NoError(t, err)
 	assert.True(t, ended)
 	assert.Equal(t, PlanningSessionStateEnded, session.State)
+}
+
+func TestFactoryPlanningSession_EndIfStale_KeepsRecentHeartbeat(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-fresh-hb")
+	db := database.Conn()
+
+	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-2*time.Minute)).Error)
+	require.NoError(t, db.First(session, "id = ?", session.ID).Error)
+
+	ended, err := session.EndIfStale(db, time.Now())
+	require.NoError(t, err)
+	assert.False(t, ended)
+	assert.Equal(t, PlanningSessionStateRunning, session.State)
 }
 
 func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
@@ -122,6 +136,49 @@ func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
 	assert.Equal(t, "Add a puppy color field", result.Text)
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+}
+
+func TestFactoryPlanningSession_CreateDraftBeforeWaitIsKept(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-create-early")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds",
+		Description: "Stop double charges.",
+	}))
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningWaitKindCreated, session.WaitResult.Data().Kind)
+	assert.Equal(t, order.ID.String(), session.WaitResult.Data().WorkOrderID)
+
+	require.NoError(t, session.BeginWait(db))
+	result, err := session.ConsumeWait(db)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningWaitKindCreated, result.Kind)
+	assert.Equal(t, order.ID.String(), result.WorkOrderID)
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+}
+
+func TestFactoryPlanningSession_SkipDraftBeforeWaitIsKept(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-skip-early")
+	db := database.Conn()
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds",
+		Description: "Stop double charges.",
+	}))
+	require.NoError(t, session.SkipDraft(db))
+	assert.Equal(t, PlanningWaitKindSkipped, session.WaitResult.Data().Kind)
+
+	require.NoError(t, session.BeginWait(db))
+	result, err := session.ConsumeWait(db)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningWaitKindSkipped, result.Kind)
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
 }
 
@@ -175,7 +232,7 @@ func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	fresh := startTestPlanningSession(t, "plan-list-fresh")
 	db := database.Conn()
 
-	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-2*time.Minute)).Error)
+	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-6*time.Minute)).Error)
 
 	stale, err := ListStaleOpenPlanningSessions(db, time.Now(), 10)
 	require.NoError(t, err)
