@@ -49,6 +49,12 @@ export const FIRST_RUN_COPY = {
   agent: {
     headline: "Connect agent",
   },
+  // Shared by every screen that provisions the workspace. Hosted credentials
+  // move that action from the agent screen to the ticket screen.
+  finish: {
+    action: "Finish setup",
+    saving: "Finishing setup...",
+  },
   analysis: {
     headline: "Analyzing your backlog",
     body: "SuperPlane reads your code and your tickets. This takes a few minutes.",
