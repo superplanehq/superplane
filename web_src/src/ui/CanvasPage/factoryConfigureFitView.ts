@@ -26,11 +26,13 @@ export function shouldFitFactoryConfigureEnter(input: {
   hasReactFlowInitialized: boolean;
   hasFittedThisVisit: boolean;
   nodeCount: number;
+  layoutReady: boolean;
 }): boolean {
   return (
     input.factoryConfigure &&
     input.isEditing &&
     input.hasReactFlowInitialized &&
+    input.layoutReady &&
     !input.hasFittedThisVisit &&
     input.nodeCount > 0
   );

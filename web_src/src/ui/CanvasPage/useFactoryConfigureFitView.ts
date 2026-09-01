@@ -12,6 +12,7 @@ type UseFactoryConfigureFitViewInput = {
   isEditing: boolean;
   hasReactFlowInitialized: boolean;
   nodeCount: number;
+  layoutReady: boolean;
   getNodeCount: () => number;
   getFocusNode: () => { id: string } | undefined;
   fitView: (options: Record<string, unknown>) => Promise<unknown>;
@@ -26,6 +27,7 @@ export function useFactoryConfigureFitView({
   isEditing,
   hasReactFlowInitialized,
   nodeCount,
+  layoutReady,
   getNodeCount,
   getFocusNode,
   fitView,
@@ -51,9 +53,10 @@ export function useFactoryConfigureFitView({
         hasReactFlowInitialized,
         hasFittedThisVisit: fittedThisVisitRef.current,
         nodeCount,
+        layoutReady,
       })
     ) {
-      if (factoryConfigure && isEditing && hasReactFlowInitialized && nodeCount === 0) {
+      if (factoryConfigure && isEditing && hasReactFlowInitialized && layoutReady && nodeCount === 0) {
         fittedThisVisitRef.current = true;
         setReady(true);
       }
@@ -87,6 +90,7 @@ export function useFactoryConfigureFitView({
     getViewport,
     hasReactFlowInitialized,
     isEditing,
+    layoutReady,
     nodeCount,
     reportZoom,
     viewportRef,

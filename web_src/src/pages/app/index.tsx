@@ -1974,7 +1974,7 @@ export function AppPage({
     () => commitTopologyMutation((workflow) => workflow),
     [commitTopologyMutation],
   );
-  const { holdCanvas } = useFactoryConfigureInitialLayout({
+  const { ready: factoryConfigureLayoutReady, holdCanvas } = useFactoryConfigureInitialLayout({
     factoryAutoLayout,
     isEditing,
     editBootstrapReady: isEditBootstrapReady,
@@ -3912,6 +3912,7 @@ export function AppPage({
           buildingBlocks={buildingBlocks}
           isEditing={isEditing}
           factoryConfigure={factoryConfigure}
+          factoryConfigureLayoutReady={factoryConfigureLayoutReady}
           factoryEditWorkspace={factoryEditWorkspace}
           activeCanvasVersionId={activeCanvasVersionId}
           liveCanvasVersionId={liveCanvasVersionId}

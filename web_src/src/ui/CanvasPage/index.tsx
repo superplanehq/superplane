@@ -463,6 +463,11 @@ export interface CanvasPageProps {
   factoryDisplayLayout?: boolean;
   /** Factory-shell Configure. Drives edit-grid dots before the draft session is ready. */
   factoryConfigure?: boolean;
+  /**
+   * True after the mandatory Factory Configure layout snap. Fit waits on this
+   * so the enter cover does not lift on live positions.
+   */
+  factoryConfigureLayoutReady?: boolean;
   /** Factory-shell edit workspace. Enables factory agent sidebar and edit-grid dots. */
   factoryEditWorkspace?: boolean;
 }
@@ -1612,6 +1617,7 @@ function CanvasPage(props: CanvasPageProps) {
                   lockNativeZoom={props.lockNativeZoom}
                   factoryDisplayLayout={props.factoryDisplayLayout}
                   factoryConfigure={props.factoryConfigure}
+                  factoryConfigureLayoutReady={props.factoryConfigureLayoutReady}
                   factoryEditWorkspace={props.factoryEditWorkspace}
                   layoutMode={props.layoutMode}
                   onNodeDelete={handleNodeDelete}
@@ -2259,6 +2265,7 @@ function CanvasContent({
   lockNativeZoom = false,
   factoryDisplayLayout = false,
   factoryConfigure = false,
+  factoryConfigureLayoutReady = true,
   factoryEditWorkspace = false,
   layoutMode,
   onNodeDelete,
@@ -2317,6 +2324,7 @@ function CanvasContent({
   lockNativeZoom?: boolean;
   factoryDisplayLayout?: boolean;
   factoryConfigure?: boolean;
+  factoryConfigureLayoutReady?: boolean;
   factoryEditWorkspace?: boolean;
   layoutMode?: CanvasLayoutMode;
   onNodeDelete?: (nodeId: string) => void;
@@ -2927,6 +2935,7 @@ function CanvasContent({
     isEditing,
     hasReactFlowInitialized,
     nodeCount: state.nodes?.length ?? 0,
+    layoutReady: factoryConfigureLayoutReady,
     getNodeCount: getFactoryConfigureNodeCount,
     getFocusNode: getFactoryConfigureFocusNode,
     fitView,

@@ -12,6 +12,7 @@ describe("shouldFitFactoryConfigureEnter", () => {
     hasReactFlowInitialized: true,
     hasFittedThisVisit: false,
     nodeCount: 2,
+    layoutReady: true,
   };
 
   it("fits once when Configure edit is ready and nodes exist", () => {
@@ -36,6 +37,10 @@ describe("shouldFitFactoryConfigureEnter", () => {
 
   it("does not fit an empty canvas", () => {
     expect(shouldFitFactoryConfigureEnter({ ...ready, nodeCount: 0 })).toBe(false);
+  });
+
+  it("does not fit before the Configure layout snaps", () => {
+    expect(shouldFitFactoryConfigureEnter({ ...ready, layoutReady: false })).toBe(false);
   });
 });
 
