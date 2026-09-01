@@ -245,7 +245,12 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeFactoryVelocity(ctx, s.registry, organizationID, req)
+	return actions.DescribeFactoryVelocity(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SyncFactoryVelocity(ctx context.Context, req *pb.SyncFactoryVelocityRequest) (*pb.SyncFactoryVelocityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SyncFactoryVelocity(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
