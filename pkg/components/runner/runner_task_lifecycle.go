@@ -121,17 +121,23 @@ func processBrokerTaskStatus(
 	usage core.UsageRecorder,
 	configuration any,
 ) error {
-	if state.IsFinished() {
-		return nil
-	}
-
 	if !task.IsInTerminalState() {
+		if state.IsFinished() {
+			return nil
+		}
 		return fmt.Errorf("task is not in terminal state")
 	}
 
+	// Persist spend even when SuperPlane already cancelled the node.
+	// Check-fix runs are cancelled when a new revision arrives; the broker
+	// webhook still carries the tokens the agent already billed.
 	publishRunnerUsage(organizationID, task, logger)
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
 	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
+
+	if state.IsFinished() {
+		return nil
+	}
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
@@ -186,10 +192,10 @@ func billableSeconds(duration time.Duration) int64 {
 }
 
 func cancelBrokerTask(ctx core.ExecutionContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
+	return cancelBrokerTaskWithUsage(ctx, "")
+}
 
+func cancelBrokerTaskWithUsage(ctx core.ExecutionContext, finishedEventType string) error {
 	taskID, err := ctx.ExecutionState.GetKV("task_id")
 	if err != nil {
 		if errors.Is(err, core.ErrExecutionKVNotFound) {
@@ -203,8 +209,27 @@ func cancelBrokerTask(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	if finishedEventType != "" {
+		recordUsageFromBrokerTask(ctx, broker, taskID, finishedEventType)
+	}
+
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
 	if err := broker.CancelTask(taskID); err != nil {
 		return fmt.Errorf("cancel task: %w", err)
 	}
 	return nil
+}
+
+func recordUsageFromBrokerTask(ctx core.ExecutionContext, broker *BrokerClient, taskID, finishedEventType string) {
+	task, err := broker.FetchTaskStatus(taskID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.WithError(err).Warn("runner: failed to fetch task status before cancel")
+		}
+		return
+	}
+	RecordRunnerLLMUsage(ctx.Usage, ctx.Logger, finishedEventType, ctx.Configuration, task.Result)
 }

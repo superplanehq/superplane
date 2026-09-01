@@ -109,6 +109,7 @@ func (g *GitHub) Actions() []core.Action {
 	return []core.Action{
 		&admin.GetWorkflowUsage{},
 		&checks.ListCheckRunsForRef{},
+		&checks.WaitForPullRequestChecks{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
 		&contents.GetRelease{},

@@ -952,6 +952,7 @@ message FactoryPRFeedbackHandler {
   enum Source {
     SOURCE_UNSPECIFIED = 0;
     SOURCE_PULL_REQUEST_DISCUSSION = 1;
+    SOURCE_PULL_REQUEST_CHECKS = 2;
   }
 
   message SubjectSettings {
@@ -965,11 +966,18 @@ message FactoryPRFeedbackHandler {
     repeated string allowed_bots = 3;
   }
 
+  message CheckSettings {
+    repeated string names = 1;
+    optional int32 maximum_attempts = 2;
+    repeated string runner_integration_ids = 3;
+  }
+
   // Settings stored in the canvas graph. This block is a read/write facade
   // over that graph.
   message Settings {
     SubjectSettings subject = 1;
     DiscussionSettings discussion = 2;
+    CheckSettings checks = 3;
   }
 
   string id = 1;
@@ -1034,6 +1042,24 @@ message FactoryPullRequestRun {
   Superplane.Canvases.CanvasRunRef run = 4;
 }
 
+message FactoryPullRequestRevision {
+  string id = 1;
+  string sha = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message FactoryPullRequestActivity {
+  Superplane.Canvases.CanvasRunRef run = 1;
+  string description = 2;
+  optional FactoryPullRequestRevision revision = 3;
+  string access = 4;
+  string state = 5;
+  optional int32 attempt = 6;
+  optional int32 attempt_limit = 7;
+  int64 total_tokens = 8;
+  int64 cost_cents = 9;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -1065,6 +1091,8 @@ message FactoryPullRequest {
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
   repeated FactoryPullRequestRun runs = 16;
+  optional FactoryPullRequestRevision current_revision = 17;
+  repeated FactoryPullRequestActivity activities = 18;
 }
 
 message ListFactoryPullRequestsRequest {

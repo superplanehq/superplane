@@ -55,6 +55,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
+  <LinkCard title="Wait For Pull Request Checks" href="#wait-for-pull-request-checks" description="Wait until GitHub Checks and Commit Statuses on a commit become complete" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
@@ -4743,4 +4744,40 @@ Returns the updated release object with all current information.
   "type": "github.release"
 }
 ```
+
+<a id="wait-for-pull-request-checks"></a>
+
+## Wait For Pull Request Checks
+
+**Component key:** `github.waitForPullRequestChecks`
+
+The Wait For Pull Request Checks component watches GitHub Checks and Commit Statuses for one commit.
+
+It combines both GitHub status systems into one snapshot. It then waits until the selected checks become terminal.
+
+GitHub does not report the expected total number of checks. When you leave the check name list empty, the component waits for a quiet period after the last change. That quiet period is the completeness signal. When you specify check names, the component finishes as soon as every named check is terminal.
+
+The pull request trigger and this wait action create separate managed webhooks. The wait action listens to `check_run`, `check_suite`, and `status` events. It uses a five-minute poll only as a fallback.
+
+### Use Cases
+
+- **Factory quality gates**: Wait for pull request checks before an agent starts a fix
+- **Release gates**: Continue only when selected checks pass
+- **Failure summaries**: Collect every selected failed check in one payload
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Full commit SHA to watch
+- **Check Names** *(optional)*: Exact check or status names to require. An empty list waits for all observed checks.
+- **Quiet Period Seconds**: Seconds to wait after the last check change when the name list is empty. Default: 60. Named checks skip this wait.
+- **Timeout Seconds**: Maximum wait time. Default: 3600.
+
+### Output Channels
+
+- **Passed**: No selected check failed. For an empty name list, this is after the quiet period.
+- **Failed**: A selected check has a failing conclusion
+- **Timed Out**: The timeout expired, or a selected check never appeared
+
+Each output includes the repository, SHA, all observed checks, selected checks, failed checks, and timestamps.
 
