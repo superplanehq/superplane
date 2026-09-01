@@ -13,7 +13,11 @@ import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
 import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
-import { LLMUsageByModelTable, LLMUsageTotals } from "./LLMUsageBreakdown";
+import {
+  WorkspaceUsageByMachineTypeTable,
+  WorkspaceUsageByModelTable,
+  WorkspaceUsageTotals,
+} from "./WorkspaceUsageBreakdown";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useEffect, useState } from "react";
 
@@ -25,12 +29,14 @@ export function FactorySettingsUsagePage() {
 
   const totalTokens = parseWorkOrderMetric(data?.totalTokens);
   const totalCostCents = parseWorkOrderMetric(data?.totalCostCents);
+  const totalDurationSeconds = parseWorkOrderMetric(data?.totalDurationSeconds);
   const periodDays = data?.periodDays ?? 30;
   const byModel = data?.byModel ?? [];
+  const byMachineType = data?.byMachineType ?? [];
 
   return (
     <>
-      <WorkspacePageHeader title="Spending" subtitle="LLM tokens and estimated spend for this workspace." />
+      <WorkspacePageHeader title="Spending" subtitle="LLM tokens, VM seconds, and estimated spend for this workspace." />
       <div className={factoryContentBodyClassName}>
         {isLoading ? (
           <p className="text-[13px] text-muted-foreground">Loading usage...</p>
@@ -38,7 +44,12 @@ export function FactorySettingsUsagePage() {
           <p className="text-[13px] text-destructive">Unable to load usage.</p>
         ) : (
           <div className="flex flex-col gap-4">
-            <LLMUsageTotals periodDays={periodDays} totalTokens={totalTokens} totalCostCents={totalCostCents} />
+            <WorkspaceUsageTotals
+              periodDays={periodDays}
+              totalTokens={totalTokens}
+              totalCostCents={totalCostCents}
+              totalDurationSeconds={totalDurationSeconds}
+            />
             <HostedSpendLimitCard />
             <HostedCreditSummary
               remainingCreditCents={data?.remainingCreditCents}
@@ -49,7 +60,8 @@ export function FactorySettingsUsagePage() {
               labelClassName="workspace-section-label"
               valueClassName="workspace-page-title mt-1"
             />
-            <LLMUsageByModelTable byModel={byModel} />
+            <WorkspaceUsageByModelTable byModel={byModel} />
+            <WorkspaceUsageByMachineTypeTable byMachineType={byMachineType} />
           </div>
         )}
       </div>

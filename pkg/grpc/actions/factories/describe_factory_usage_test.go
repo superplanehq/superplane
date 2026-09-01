@@ -44,7 +44,7 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 	}))
 
 	require.NotNil(t, execution.RunID)
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
@@ -53,6 +53,16 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 		Model:           "claude-sonnet-4-6",
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
+	}))
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     *execution.RunID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 90,
+		IdempotencyKey:  "runner:compute:factory-usage",
 	}))
 
 	resp, err := DescribeFactoryUsage(context.Background(), r.Organization.ID.String(), &pb.DescribeFactoryUsageRequest{
@@ -65,4 +75,8 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 	require.Len(t, resp.ByModel, 1)
 	assert.Equal(t, "anthropic", resp.ByModel[0].Provider)
 	assert.Equal(t, "claude-sonnet-4-6", resp.ByModel[0].Model)
+	assert.Equal(t, int64(90), resp.TotalDurationSeconds)
+	require.Len(t, resp.ByMachineType, 1)
+	assert.Equal(t, "e1-large-amd64", resp.ByMachineType[0].MachineType)
+	assert.Equal(t, int64(90), resp.ByMachineType[0].DurationSeconds)
 }

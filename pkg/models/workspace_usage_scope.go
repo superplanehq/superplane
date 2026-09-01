@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// usageScope is the factory billing context for one LLM call.
+// usageScope is the factory billing context for one usage event.
 type usageScope struct {
 	OrganizationID       uuid.UUID
 	FactoryID            uuid.UUID

@@ -71,7 +71,7 @@ import {
   OrganizationIntegrationSetupPage,
 } from "./pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
 import { OrganizationSettingsIntegrationsPage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
-import { OrganizationSettingsLLMSpendPage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsLLMSpendPage";
+import { OrganizationSettingsWorkspaceUsagePage } from "./pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
@@ -397,7 +397,7 @@ const factorySettingsSectionRoutes = [
     path="organization/spending"
     element={
       <RequirePermission resource="org" action="read">
-        <OrganizationSettingsLLMSpendPage />
+        <OrganizationSettingsWorkspaceUsagePage />
       </RequirePermission>
     }
   />,
