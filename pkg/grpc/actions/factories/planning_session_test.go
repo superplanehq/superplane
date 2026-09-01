@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
@@ -42,6 +43,10 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	for _, node := range nodes {
 		if node.Type == models.NodeTypeComponent {
 			hasAgent = true
+			prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
+			assert.Contains(t, prompt, "Greet the user with say")
+			assert.Contains(t, prompt, "Do not call wait_for_user")
+			assert.NotContains(t, prompt, "Start by calling wait_for_user")
 		}
 	}
 	assert.True(t, hasAgent)
@@ -67,6 +72,64 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, resp.Session.Id, described.Session.Id)
+}
+
+func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+
+	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
+	require.NoError(t, err)
+	stale := false
+	for i := range nodes {
+		if nodes[i].Type != models.NodeTypeComponent {
+			continue
+		}
+		config := nodes[i].Configuration.Data()
+		rewrote := false
+		for _, step := range planningCanvasConfigSteps(config["steps"]) {
+			if _, ok := step["prompt"]; ok {
+				step["prompt"] = "Start by calling wait_for_user."
+				rewrote = true
+			}
+		}
+		require.True(t, rewrote)
+		nodes[i].Configuration = datatypes.NewJSONType(config)
+		require.NoError(t, database.DB(t.Context()).Model(&nodes[i]).Select("Configuration").Updates(&nodes[i]).Error)
+		stale = true
+	}
+	require.True(t, stale)
+	require.Equal(t, "Start by calling wait_for_user.", planningAgentPrompt(t, r.Organization.ID, factoryModel.ID))
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+
+	nodes, err = models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
+	require.NoError(t, err)
+	refreshed := false
+	for _, node := range nodes {
+		if node.Type != models.NodeTypeComponent {
+			continue
+		}
+		prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
+		assert.Contains(t, prompt, "Greet the user with say")
+		assert.NotContains(t, prompt, "Start by calling wait_for_user")
+		refreshed = true
+	}
+	assert.True(t, refreshed)
 }
 
 func Test__StartPlanningSession__RequiresRepository(t *testing.T) {
@@ -125,4 +188,19 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, ended.Session.State)
+}
+
+func planningAgentPrompt(t *testing.T, organizationID, factoryID uuid.UUID) string {
+	t.Helper()
+	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), organizationID, factoryID)
+	require.NoError(t, err)
+	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
+	require.NoError(t, err)
+	for _, node := range nodes {
+		if node.Type == models.NodeTypeComponent {
+			return planningCanvasPromptFromConfig(node.Configuration.Data())
+		}
+	}
+	t.Fatal("missing planning agent")
+	return ""
 }

@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import { createWithAgentSurveyMessage, emptyCreateWithAgentView, runningCreateWithAgentView } from "./createWithAgentDemo";
+import {
+  createWithAgentSurveyMessage,
+  emptyCreateWithAgentView,
+  runningCreateWithAgentView,
+  waitingCreateWithAgentView,
+} from "./createWithAgentDemo";
 import { CreateWithAgentDialog, type CreateWithAgentDialogProps } from "./CreateWithAgentDialog";
 import { PLANNING_SESSION_PHASE_ID } from "./planningSessionActivity";
 
@@ -54,9 +59,16 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.menu);
     expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent("Agent");
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.emptyHeadline)).toBeInTheDocument();
-    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.greeting)).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.greeting);
     expect(screen.queryByTestId("create-with-agent-message-greet")).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-chat")).not.toBeInTheDocument();
+  });
+
+  it("shows Waiting for you when the machine is on and SuperPlane waits", () => {
+    renderDialog(waitingCreateWithAgentView());
+
+    expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineWaiting);
+    expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent("acme/payments");
   });
 
   it("shows the Automations stream while the machine is starting", () => {
@@ -80,7 +92,7 @@ describe("CreateWithAgentDialog", () => {
 
     expect(screen.getByTestId("work-order-survey-card")).toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-message-user-1")).not.toBeInTheDocument();
-    expect(screen.queryByText("Add a health check for refunds.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent("Add a health check for refunds.");
   });
 
   it("asks before the session ends", () => {

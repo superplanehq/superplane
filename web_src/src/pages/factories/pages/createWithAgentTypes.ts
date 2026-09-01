@@ -1,6 +1,6 @@
 import type { WorkOrderSurveyView } from "../lib/workOrderSurvey";
 
-export type CreateWithAgentMachineStatus = "starting" | "running";
+export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting";
 
 export type CreateWithAgentCreatedOrder = {
   id: string;

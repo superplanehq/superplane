@@ -51,4 +51,19 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.machineStatus).toBe("running");
     expect(view.executionId).toBe("exec-1");
   });
+
+  it("marks the machine waiting when SuperPlane holds for the next message", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+        waitState: "pending",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("waiting");
+  });
 });

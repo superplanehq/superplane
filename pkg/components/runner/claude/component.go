@@ -166,6 +166,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 
 	// command_list tasks only accept commands (+ optional files).
 	task := buildClaudeCodeBrokerTask(spec)
+	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) || runner.HasWorkOrderSurveyToken(environment) {
 		task.Files = append(task.Files, claudeSurveyMCPFiles()...)
 	}

@@ -134,7 +134,7 @@ function CreateWithAgentHeader({
   onEndSession: () => void;
   onClose: () => void;
 }) {
-  const running = machineStatus === "running";
+  const starting = machineStatus === "starting";
   return (
     <div
       className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5"
@@ -156,10 +156,8 @@ function CreateWithAgentHeader({
           className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:flex"
           data-testid="create-with-agent-machine"
         >
-          {running ? null : <Loader2 className="size-3 animate-spin" aria-hidden />}
-          {running
-            ? `${repository} · ${CREATE_WITH_AGENT_COPY.machineRunning}`
-            : CREATE_WITH_AGENT_COPY.machineStarting}
+          {starting ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {machineStatusLabel(repository, machineStatus)}
         </span>
         <Button
           type="button"
@@ -255,6 +253,15 @@ function CreateWithAgentStream({
       </form>
     </section>
   );
+}
+
+function machineStatusLabel(repository: string, machineStatus: CreateWithAgentView["machineStatus"]): string {
+  if (machineStatus === "starting") {
+    return CREATE_WITH_AGENT_COPY.machineStarting;
+  }
+  const label =
+    machineStatus === "waiting" ? CREATE_WITH_AGENT_COPY.machineWaiting : CREATE_WITH_AGENT_COPY.machineRunning;
+  return repository ? `${repository} · ${label}` : label;
 }
 
 function isOpenSurvey(message: CreateWithAgentView["messages"][number]): message is CreateWithAgentSurveyMessage {

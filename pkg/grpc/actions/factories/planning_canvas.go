@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -143,9 +144,11 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 	if err != nil {
 		return err
 	}
-	for _, node := range nodes {
-		if node.Type == models.NodeTypeComponent {
-			return nil
+	agent := planningCanvasAgent(tx, factoryModel)
+	agentConfig := planningCanvasAgentConfiguration(tx, factoryModel, agent)
+	for i := range nodes {
+		if nodes[i].Type == models.NodeTypeComponent {
+			return refreshPlanningAgentNode(tx, canvas, &nodes[i], agentConfig)
 		}
 	}
 
@@ -159,8 +162,6 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 	}
 
 	now := time.Now()
-	agent := planningCanvasAgent(tx, factoryModel)
-	agentConfig := planningCanvasAgentConfiguration(tx, factoryModel, agent)
 	agentNode := models.CanvasNode{
 		WorkflowID:    canvas.ID,
 		NodeID:        planningCanvasAgentNodeID,
@@ -280,16 +281,71 @@ func planningCanvasCloneCommand() string {
 git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`
 }
 
+func refreshPlanningAgentNode(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, agentConfig map[string]any) error {
+	if planningCanvasPromptFromConfig(node.Configuration.Data()) == planningCanvasPrompt() {
+		return nil
+	}
+	now := time.Now()
+	node.Configuration = datatypes.NewJSONType(agentConfig)
+	node.UpdatedAt = &now
+	if err := tx.Model(node).Select("Configuration", "UpdatedAt").Updates(node).Error; err != nil {
+		return err
+	}
+	version, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	if err != nil {
+		return err
+	}
+	nodes := append([]models.Node{}, version.Nodes...)
+	for i := range nodes {
+		if nodes[i].ID == node.NodeID {
+			nodes[i].Configuration = agentConfig
+		}
+	}
+	version.Nodes = nodes
+	version.UpdatedAt = &now
+	return tx.Model(version).Select("Nodes", "UpdatedAt").Updates(version).Error
+}
+
+func planningCanvasPromptFromConfig(config map[string]any) string {
+	if config == nil {
+		return ""
+	}
+	for _, step := range planningCanvasConfigSteps(config["steps"]) {
+		prompt, _ := step["prompt"].(string)
+		if strings.TrimSpace(prompt) != "" {
+			return prompt
+		}
+	}
+	return ""
+}
+
+func planningCanvasConfigSteps(raw any) []map[string]any {
+	switch steps := raw.(type) {
+	case []any:
+		out := make([]map[string]any, 0, len(steps))
+		for _, step := range steps {
+			if item, ok := step.(map[string]any); ok {
+				out = append(out, item)
+			}
+		}
+		return out
+	case []map[string]any:
+		return steps
+	default:
+		return nil
+	}
+}
+
 func planningCanvasPrompt() string {
 	return `You are in a SuperPlane planning session. The repository is cloned in the working directory.
 
 Use the tools:
-- wait_for_user: wait for a chat message, a created draft, a skip, or the end of the session
+- say: post a short message the user can see
 - ask: ask a structured question
 - propose_draft: show a draft work order. The user creates or skips it.
-- say: post a chat message
 
-Do not create work orders yourself. Propose a draft and wait.
+Do not create work orders yourself.
+Do not call wait_for_user. SuperPlane waits after you stop.
 
-Start by calling wait_for_user.`
+Greet the user with say. Then stop.`
 }

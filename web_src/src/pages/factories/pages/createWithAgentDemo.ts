@@ -32,6 +32,10 @@ export function runningCreateWithAgentView(overrides: Partial<CreateWithAgentVie
   };
 }
 
+export function waitingCreateWithAgentView(overrides: Partial<CreateWithAgentView> = {}): CreateWithAgentView {
+  return runningCreateWithAgentView({ machineStatus: "waiting", ...overrides });
+}
+
 export function createWithAgentSurveyMessage(id = DEMO_SURVEY_ID): CreateWithAgentMessage {
   return {
     id,

@@ -133,7 +133,7 @@ function useDemoMachineReady(
   setView: (update: (current: CreateWithAgentView) => CreateWithAgentView) => void,
 ) {
   useEffect(() => {
-    if (!open || live || machineStatus === "running") {
+    if (!open || live || machineStatus !== "starting") {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -198,7 +198,10 @@ function sendSessionMessage(args: {
   if (!text) {
     return;
   }
-  args.setView((current) => setCreateWithAgentComposer(current, ""));
+  args.setView((current) => ({
+    ...setCreateWithAgentComposer(current, ""),
+    messages: [...current.messages, { id: `local-${current.messages.length + 1}`, kind: "text", role: "user", text }],
+  }));
   void sendPlanningSessionMessage(args.organizationId, args.factoryId, args.sessionId, text)
     .then(args.applySession)
     .catch(() => undefined);

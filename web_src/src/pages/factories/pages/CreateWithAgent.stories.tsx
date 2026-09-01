@@ -7,6 +7,7 @@ import {
   createWithAgentSurveyMessage,
   emptyCreateWithAgentView,
   runningCreateWithAgentView,
+  waitingCreateWithAgentView,
 } from "./createWithAgentDemo";
 import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
 import type { CreateWithAgentView } from "./createWithAgentTypes";
@@ -74,6 +75,11 @@ export const Starting: Story = {
 export const EmptyRight: Story = {
   name: "Empty right pane",
   render: () => <StaticSession initial={runningCreateWithAgentView()} />,
+};
+
+export const Waiting: Story = {
+  name: "Waiting for you",
+  render: () => <StaticSession initial={waitingCreateWithAgentView()} />,
 };
 
 export const Survey: Story = {

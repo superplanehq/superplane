@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
-import { notesFromLiveLogSections } from "./streamNotesFromLiveLog";
+import { mergeLiveStreamNotes, notesFromLiveLogSections } from "./streamNotesFromLiveLog";
+import type { SplitRunStreamLine } from "./splitRunMocks";
 
 function bashSection(): CommandSection {
   return {
@@ -120,5 +121,75 @@ describe("notesFromLiveLogSections", () => {
       "Claude Code started",
     ]);
     expect(notes.some((note) => note.componentType === "bash" && note.componentName === "echo a")).toBe(true);
+  });
+});
+
+function talkLine(id: string, text: string, componentType: "prompt" | "note"): SplitRunStreamLine {
+  return {
+    id,
+    nodeId: "agent",
+    at: "",
+    note: true,
+    componentName: text,
+    componentType,
+    status: "passed",
+  };
+}
+
+describe("mergeLiveStreamNotes", () => {
+  it("inserts a Send before the open follow-up prompt and skips a say already in the log", () => {
+    const live: SplitRunStreamLine[] = [
+      {
+        id: "hello",
+        nodeId: "agent",
+        at: "",
+        note: true,
+        componentType: "prompt",
+        componentName: "Greet the user with say. Then stop.",
+        status: "passed",
+      },
+      {
+        id: "hi",
+        nodeId: "agent",
+        at: "",
+        note: true,
+        noteParentId: "hello",
+        componentType: "note",
+        componentName: "Hi! I'm ready to help you plan work in this repo. Tell me what you want to do.",
+        status: "passed",
+      },
+      {
+        id: "wait",
+        nodeId: "agent",
+        at: "",
+        note: true,
+        componentType: "prompt",
+        componentName: "Wait for the next user message",
+        status: "running",
+      },
+      {
+        id: "picture",
+        nodeId: "agent",
+        at: "",
+        note: true,
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "I've got a clear picture. It's a simple puppy CRUD app.",
+        status: "passed",
+      },
+    ];
+
+    const merged = mergeLiveStreamNotes(live, [
+      talkLine("greet", "Hi! I'm ready to help you plan work in this repo. Tell me what you want to do.", "note"),
+      talkLine("user", "I want to add a new puppy field - color", "prompt"),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["hello", "hi", "user", "wait", "picture"]);
+  });
+
+  it("keeps extras when the live log is empty", () => {
+    const extra = [talkLine("user", "Add a Size field", "prompt")];
+    expect(mergeLiveStreamNotes(undefined, extra)).toEqual(extra);
+    expect(mergeLiveStreamNotes([], extra)).toEqual(extra);
   });
 });

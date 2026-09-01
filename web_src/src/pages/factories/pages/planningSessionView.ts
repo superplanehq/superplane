@@ -64,7 +64,7 @@ export function createWithAgentViewFromSession(
 
   return {
     repository: session.repository ?? "",
-    machineStatus: session.executionId ? "running" : "starting",
+    machineStatus: createWithAgentMachineStatus(session),
     canvasId: session.canvasId ?? "",
     executionId: session.executionId ?? "",
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
@@ -73,6 +73,16 @@ export function createWithAgentViewFromSession(
     right,
     endConfirmOpen: extras.endConfirmOpen,
   };
+}
+
+function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
+  if (!session.executionId) {
+    return "starting";
+  }
+  if (session.waitState === "pending") {
+    return "waiting";
+  }
+  return "running";
 }
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {

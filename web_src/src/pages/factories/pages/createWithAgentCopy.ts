@@ -11,6 +11,7 @@ export const CREATE_WITH_AGENT_COPY = {
   composerPlaceholder: "Tell the agent what you want to do",
   machineStarting: "The machine is starting",
   machineRunning: "Machine is running",
+  machineWaiting: "Waiting for you",
   emptyHeadline: "Waiting for your first work order.",
   emptyBody: "The agent will draft a task here.",
   draftLabel: "Draft task",

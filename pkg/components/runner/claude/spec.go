@@ -146,6 +146,47 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 	}
 }
 
+// applyPlanningFollowUp keeps the machine on after canvas steps when this run
+// is a planning session. Line apps never attach a planning token, so they
+// keep the default step list and finish.
+func applyPlanningFollowUp(task ClaudeCodeBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
+	if !runner.HasPlanningSessionToken(environment) {
+		return task
+	}
+	task.Files = append(task.Files, runner.BrokerTaskFile{
+		Path:    "follow_up_loop.js",
+		Content: followUpLoopScript,
+		Mode:    "0644",
+	})
+	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
+	return task
+}
+
+func planningFollowUpCommand(spec RunClaudeCodeSpec) runner.BrokerCommand {
+	workdir := planningFollowUpWorkingDirectory(spec)
+	model := strings.TrimSpace(spec.Model)
+	return runner.BrokerCommand{
+		Name: "Wait for the next message",
+		Command: runner.WrapAgentStepCommand(
+			runner.WrapCommandInWorkingDirectory(
+				workdir,
+				fmt.Sprintf(`node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" %s`, runner.ShellSingleQuote(model)),
+			),
+		),
+		Kind:    runner.LiveLogKindPrompt,
+		Preview: "Wait for the next user message",
+	}
+}
+
+func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
+	for i := len(spec.Steps) - 1; i >= 0; i-- {
+		if runner.NormalizeAgentStepType(spec.Steps[i].Type) == runner.AgentStepPrompt {
+			return runner.EffectiveWorkingDirectory(spec.WorkingDirectory, spec.Steps[i].WorkingDirectory)
+		}
+	}
+	return strings.TrimSpace(spec.WorkingDirectory)
+}
+
 func claudeSurveyMCPFiles() []runner.BrokerTaskFile {
 	return []runner.BrokerTaskFile{
 		{Path: "ask_work_order_mcp.js", Content: askWorkOrderMCPScript, Mode: "0644"},
