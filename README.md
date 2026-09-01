@@ -1,23 +1,23 @@
-<div align="center">
-
+<p align="center">
 <a href="https://superplane.com/">
   <img src="./docs/images/superplane-hero.png" alt="SuperPlane software factory moving routine engineering work from backlog to a reviewed pull request" width="100%">
 </a>
+</p>
 
-<br>
+<p align="center">
+  <a href="https://github.com/superplanehq/superplane"><img src="https://img.shields.io/badge/status-beta-F4D35E?style=flat-square&amp;labelColor=171714" alt="Beta"></a>
+  <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="Build"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-F4D35E?style=flat-square&amp;labelColor=171714" alt="Apache 2.0"></a>
+  <a href="https://discord.superplane.com"><img src="https://img.shields.io/discord/1409914582239023200?label=Discord&amp;style=flat-square&amp;labelColor=171714&amp;color=F4D35E" alt="Discord"></a>
+</p>
 
-[![Beta](https://img.shields.io/badge/status-beta-F4D35E?style=flat-square&labelColor=171714)](https://github.com/superplanehq/superplane)
-[![Build](https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields)](https://superplanehq.semaphoreci.com/projects/superplane)
-[![Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-F4D35E?style=flat-square&labelColor=171714)](LICENSE)
-[![Discord](https://img.shields.io/discord/1409914582239023200?label=Discord&style=flat-square&labelColor=171714&color=F4D35E)](https://discord.superplane.com)
-
-[Website](https://superplane.com/) ·
-[Docs](https://docs.superplane.com/) ·
-[Discord](https://discord.superplane.com/) ·
-[Blog](https://superplane.com/blog/) ·
-[Event](https://luma.com/superplane)
-
-</div>
+<p align="center">
+  <a href="https://superplane.com/">Website</a> ·
+  <a href="https://docs.superplane.com/">Docs</a> ·
+  <a href="https://discord.superplane.com/">Discord</a> ·
+  <a href="https://superplane.com/blog/">Blog</a> ·
+  <a href="https://luma.com/superplane">Event</a>
+</p>
 
 > [!NOTE]
 > SuperPlane is in beta. We are building the **AI software factory for one-shot
