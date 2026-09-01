@@ -18,17 +18,22 @@ import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 export function FactorySettingsAccountNotificationsPage() {
   const { organizationId } = useFactorySettingsLayout();
   const { account } = useAccount();
-  const { data: settings, isPending, isError } = useNotificationSettings(organizationId);
+  const { data: settings, isPending } = useNotificationSettings(organizationId);
 
   if (!account || isPending) {
     return <p className="text-[13px] text-muted-foreground">Loading notifications…</p>;
   }
-  if (isError || settings === undefined) {
+  if (settings === undefined) {
     return <p className="text-[13px] text-muted-foreground">Failed to load notification settings.</p>;
   }
 
   return (
-    <LoadedAccountNotifications accountEmail={account.email} organizationId={organizationId} settings={settings} />
+    <LoadedAccountNotifications
+      key={organizationId}
+      accountEmail={account.email}
+      organizationId={organizationId}
+      settings={settings}
+    />
   );
 }
 
