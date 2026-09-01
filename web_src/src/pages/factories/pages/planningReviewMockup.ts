@@ -28,20 +28,11 @@ export interface PlanningReviewDraft {
 }
 
 const implementationSteps: PlanningReviewStep[] = [
-  { name: "Set Up Git User", type: "bash", command: 'git config --global user.email "agent@superplane.com"' },
-  {
-    name: "Provide order",
-    type: "bash",
-    command: "echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md\ncat /tmp/ORDER.md",
-    workingDirectory: "repo",
-  },
-  { name: "Provide Plan", type: "bash", command: "echo $PLAN | base64 -d > /tmp/PLAN.md" },
-  { name: "Checkout Branch", type: "bash", command: "git checkout $BRANCH", workingDirectory: "repo" },
-  { name: "Set Up DCO Signing", type: "bash", command: "git config commit.gpgsign false", workingDirectory: "repo" },
+  { name: "Clone Repo", type: "bash", command: 'git clone --depth 1 "$REPO_URL" repo' },
   {
     name: "Implementation",
     type: "prompt",
-    prompt: "Implement the approved plan. Make the smallest complete change and update the tests.",
+    prompt: "Create a working branch and implement the approved plan.",
     workingDirectory: "repo",
   },
   { name: "Commit and Push", type: "bash", command: "git push origin HEAD", workingDirectory: "repo" },
