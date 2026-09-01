@@ -78,3 +78,16 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   hostedBilledCents: "876",
   remainingCreditWarning: false,
 };
+
+/** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
+export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "0",
+  grantTotalCents: "5000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "0",
+  hostedBilledCents: "5000",
+  remainingCreditWarning: true,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};
