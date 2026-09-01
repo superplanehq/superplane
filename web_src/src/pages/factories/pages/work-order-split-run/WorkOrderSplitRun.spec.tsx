@@ -794,6 +794,18 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(coverage).toHaveAttribute("open");
   });
 
+  it("shows the full check summary without a one-line clamp", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
+    expect(summary.tagName).toBe("P");
+    expect(summary).not.toHaveClass("truncate");
+    expect(summary).toHaveClass("break-words");
+  });
+
   it("keeps description checks collapsed when the task is not a draft", async () => {
     const user = userEvent.setup();
     renderPopup({
