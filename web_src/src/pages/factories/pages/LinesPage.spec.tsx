@@ -581,12 +581,12 @@ describe("LinesPage board", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
+    expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue("Clone Repo");
-    expect(screen.getByTestId("planning-review-step-body-0")).toHaveValue("git clone $REPO repo");
+    expect(screen.getByTestId("planning-review-step-body-0-editor")).toBeInTheDocument();
   });
 
   it("hides Edit Agent when the column canvas has no agent", async () => {
@@ -605,6 +605,7 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
     await user.type(stepName, "Clone repository");
