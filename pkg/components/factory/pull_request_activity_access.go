@@ -39,12 +39,15 @@ func finishPullRequestActivity(
 		return err
 	}
 
-	channel := core.DefaultOutputChannel.Name
-	if result.Outcome != core.PullRequestActivityOutcomeReady {
-		channel = result.Outcome
-	}
+	return state.Emit(activityOutputChannel(requestedAccess, result.Outcome), eventType, []any{activityPayload(result)})
+}
 
-	return state.Emit(channel, eventType, []any{activityPayload(result)})
+func activityOutputChannel(requestedAccess, outcome string) string {
+	if outcome == core.PullRequestActivityOutcomeLimitReached &&
+		strings.TrimSpace(requestedAccess) == core.PullRequestActivityAccessExclusive {
+		return outcome
+	}
+	return core.DefaultOutputChannel.Name
 }
 
 func recordExclusiveLimitReachedError(

@@ -2087,7 +2087,7 @@ The Update Pull Request Activity component updates the activity that belongs to 
 
 Use `description` to replace the displayed activity text. Use `access` to keep the current access or request exclusive access. If exclusive access is not available, the component waits and retries.
 
-The component emits `limitReached` when a check handler reaches its attempt limit. An exclusive request that hits the limit also records a run error, so the canvas run fails. You can still update the description after the attempt limit. A newer pull request head does not stop this activity.
+The component emits `limitReached` when an exclusive request hits the attempt limit. That exclusive request also records a run error, so the canvas run fails. A description-only update after the limit emits `default`. A newer pull request head does not stop this activity.
 
 This component can only be used in factory-owned apps.
 

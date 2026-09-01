@@ -817,7 +817,7 @@ func TestUpdatePullRequestActivity_Execute(t *testing.T) {
 		assert.Equal(t, []string{"Automatic fixes paused after 3 attempts"}, runs.AddErrorCalls)
 	})
 
-	t.Run("does not record a run error when only the description is updated after the limit", func(t *testing.T) {
+	t.Run("emits default when only the description is updated after the limit", func(t *testing.T) {
 		factoryCtx := &fakeFactoryContext{updateResult: &core.PullRequestActivityResult{
 			PullRequest: &core.PullRequest{ID: "pr-1"},
 			WorkOrder:   &core.WorkOrder{ID: "wo-1"},
@@ -833,7 +833,7 @@ func TestUpdatePullRequestActivity_Execute(t *testing.T) {
 			Runs:           runs,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, core.PullRequestActivityOutcomeLimitReached, stateCtx.Channel)
+		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 		assert.Empty(t, runs.AddErrorCalls)
 	})
 }
