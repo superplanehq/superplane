@@ -20,15 +20,15 @@
 </p>
 
 > [!NOTE]
-> SuperPlane is in beta. We are building the **AI software factory for one-shot
-> routine engineering work**. Follow the
+> SuperPlane is in beta. We are building the **Open source factory for one-shot
+> engineering**. Follow the
 > [latest releases](https://github.com/superplanehq/superplane/releases),
 > explore [open issues](https://github.com/superplanehq/superplane/issues) and
 > see [how you can contribute](#contributing) as the SuperPlane matures.
 
 ## About
 
-**AI software factory for one-shot routine engineering work.**
+**Open source factory for one-shot engineering.**
 
 SuperPlane turns high-confidence backlog issues into verified, review-ready
 pull requests so engineers can focus on work that needs judgment.
@@ -109,7 +109,3 @@ Contributor setup is Docker-based. Start with the repository instructions in
 ## License
 
 SuperPlane is available under the [Apache License 2.0](./LICENSE).
-
-<p align="center">
-  <strong>Agents should not need you to hold their hand.</strong>
-</p>
