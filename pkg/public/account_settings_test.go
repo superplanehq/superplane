@@ -160,6 +160,40 @@ func TestDisconnectAccountProvider_MovesEmailToRemainingProvider(t *testing.T) {
 	assert.Equal(t, "ada-google@example.com", reloaded.Email)
 }
 
+func TestDisconnectAccountProvider_KeepsEmailWhenNextEmailIsTaken(t *testing.T) {
+	r := support.Setup(t)
+	hash, err := crypto.HashPassword("current-pass-123")
+	require.NoError(t, err)
+	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
+	require.NoError(t, err)
+
+	other, err := models.CreateAccount("Other", "ada-google@example.com")
+	require.NoError(t, err)
+	require.NotEmpty(t, other.ID)
+	require.NoError(t, database.Conn().Create(&models.AccountProvider{
+		AccountID:  r.Account.ID,
+		Provider:   models.ProviderGoogle,
+		ProviderID: "google-ada",
+		Email:      "ada-google@example.com",
+		Username:   "ada",
+		Name:       r.Account.Name,
+	}).Error)
+
+	originalEmail := r.Account.Email
+	server, account, token := setupTestServer(r, t)
+	req, _ := http.NewRequest(http.MethodDelete, "/account/providers/github", nil)
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+	reloaded, err := models.FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, originalEmail, reloaded.Email)
+	_, err = account.GetAccountProvider(models.ProviderGitHub)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
 func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)

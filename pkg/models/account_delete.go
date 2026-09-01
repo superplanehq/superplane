@@ -92,9 +92,14 @@ func (a *Account) reassignEmailAfterDisconnect(tx *gorm.DB, disconnectedEmail st
 	current := utils.NormalizeEmail(a.Email)
 	for _, provider := range remaining {
 		next := utils.NormalizeEmail(provider.Email)
-		if next != "" && next != current {
-			return a.SetEmailInTransaction(tx, next)
+		if next == "" || next == current {
+			continue
 		}
+		err := a.SetEmailInTransaction(tx, next)
+		if errors.Is(err, ErrAccountEmailInUse) {
+			continue
+		}
+		return err
 	}
 	return nil
 }

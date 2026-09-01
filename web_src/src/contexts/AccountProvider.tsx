@@ -13,7 +13,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
   const [loading, setLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
 
-  const loadAccount = useCallback(async (identify: boolean) => {
+  const loadAccount = useCallback(async (identify: boolean, keepAccountOnError = false) => {
     const response = await fetch("/account", {
       method: "GET",
       credentials: "include",
@@ -27,7 +27,9 @@ export function AccountProvider({ children }: AccountProviderProps) {
     }
 
     if (response.status !== 200) {
-      setAccount(null);
+      if (!keepAccountOnError || response.status === 401) {
+        setAccount(null);
+      }
       return;
     }
 
@@ -74,7 +76,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
   }, [loadAccount]);
 
   const refreshAccount = useCallback(async () => {
-    await loadAccount(false);
+    await loadAccount(false, true);
   }, [loadAccount]);
 
   return (

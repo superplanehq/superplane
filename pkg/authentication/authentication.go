@@ -145,7 +145,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
-		a.completeProviderAuth(w, r, gothUser)
+		a.finishProviderAuth(w, r, gothUser)
 		return
 	}
 
@@ -209,6 +209,31 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a.completeProviderAuth(w, r, mockUser)
+}
+
+func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	if !isLinkIntent(r) {
+		a.completeProviderAuth(w, r, gothUser)
+		return
+	}
+
+	account, err := a.sessionAccountFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	signed, err := a.signLinkState(account.ID.String(), mux.Vars(r)["provider"], getRedirectURL(r))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	state, err := a.parseLinkState(signed)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	a.completeProviderLink(w, r, gothUser, state)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
