@@ -843,6 +843,7 @@ function PhaseBoard({
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           automationHref={backlogAutomationHref}
+          automationAppId={backlogAutomationApp?.id}
         />
       </div>
       {columns.map((column, index) => {
