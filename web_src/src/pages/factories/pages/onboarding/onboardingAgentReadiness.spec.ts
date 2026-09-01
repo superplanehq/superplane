@@ -6,8 +6,10 @@ import {
   hostedCreditGrantCopy,
   hostedModelsQueriesLoading,
   isAgentStepReady,
+  isHostedAgentReady,
   resolveOnboardingAgent,
   shouldShowHostedCreditGrant,
+  type OnboardingAgentPlan,
 } from "./onboardingAgentReadiness";
 
 function connected(...ids: IntegrationId[]): Set<IntegrationId> {
@@ -152,6 +154,36 @@ describe("hostedModelsQueriesLoading", () => {
 
   it("does not wait when hosted models are not required", () => {
     expect(hostedModelsQueriesLoading(false, [{ isFetched: false }])).toBe(false);
+  });
+});
+
+describe("isHostedAgentReady", () => {
+  function plan(credentialsSource: OnboardingAgentPlan["credentialsSource"]): OnboardingAgentPlan {
+    return {
+      providerId: "openrouter",
+      component: "runnerOpenRouter",
+      credentialsSource,
+      integrationName: "openrouter",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "openai/gpt-4.1",
+      planningModel: "openai/gpt-4.1",
+    };
+  }
+
+  it("is ready when the plan runs on hosted credentials", () => {
+    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: plan("hosted") })).toBe(true);
+  });
+
+  it("is not ready when the plan needs a connected provider", () => {
+    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: plan("integration") })).toBe(false);
+  });
+
+  it("is not ready without a plan", () => {
+    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: undefined })).toBe(false);
+  });
+
+  it("is not ready while hosted models load, because the plan can still change", () => {
+    expect(isHostedAgentReady({ hostedModelsLoading: true, plan: plan("hosted") })).toBe(false);
   });
 });
 

@@ -14,6 +14,12 @@ export type FactoryConfigureActions = {
   busy: boolean;
   /** True when Configure has graph/console/files changes to stage+commit. */
   hasUncommittedChanges: boolean;
+  /**
+   * Loads `spec` into the current edit session as an unsaved draft (merged
+   * onto the live canvas snapshot). Leaves the session dirty — the caller
+   * still needs Save to persist it.
+   */
+  applyDraftSpec: (spec: NonNullable<CanvasesCanvas["spec"]>) => void;
 };
 
 type UpdateCanvasVersionMutation = {
@@ -59,6 +65,7 @@ type UseFactoryConfigureSessionOptions = {
   handleExitEditSession: () => void;
   hasStagingChanges: boolean;
   hasUncommittedCanvasDraftChanges: boolean;
+  applyLocalWorkflowUpdate: (updatedWorkflow: CanvasesCanvas) => void;
 };
 
 /**
@@ -90,6 +97,7 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
     handleExitEditSession,
     hasStagingChanges,
     hasUncommittedCanvasDraftChanges,
+    applyLocalWorkflowUpdate,
   } = options;
 
   const onFactoryConfigureDoneRef = useRef(onFactoryConfigureDone);
@@ -150,6 +158,13 @@ export function useFactoryConfigureSession(options: UseFactoryConfigureSessionOp
               handleExitEditSession,
               onDone: () => onFactoryConfigureDoneRef.current?.(),
             });
+          },
+          applyDraftSpec: (spec) => {
+            const current = getCurrentWorkflowSnapshot();
+            if (!current) {
+              return;
+            }
+            applyLocalWorkflowUpdate({ ...current, spec });
           },
         };
   }

@@ -37,6 +37,8 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Configure link for the factory Backlog automation, when one exists. */
   automationHref?: string | null;
+  /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
+  onAddIntake?: () => void;
 };
 
 export type BacklogIntakePanel = {
@@ -69,6 +71,7 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   automationHref,
+  onAddIntake,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -115,6 +118,7 @@ export function BacklogColumn({
               testId="lines-backlog-menu"
               automationHref={automationHref}
               onEdit={onOpenSettings}
+              onAddIntake={onAddIntake}
               colorId={colorId}
               onColorChange={onColorChange}
             />

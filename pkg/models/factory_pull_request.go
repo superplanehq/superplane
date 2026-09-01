@@ -590,6 +590,29 @@ func ListFactoryPullRequests(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPul
 	return pullRequests, nil
 }
 
+// ListFactoryPullRequestNumbers returns the numbers of every pull request
+// SuperPlane opened in a repository, whatever state it reached.
+//
+// The velocity sync uses it to exclude SuperPlane work from the people merges
+// it stores. State is deliberately not filtered: a pull request whose merge
+// webhook has not arrived yet is still SuperPlane's, and must not be counted as
+// people output in the meantime.
+func ListFactoryPullRequestNumbers(tx *gorm.DB, factoryID uuid.UUID, repository string) ([]int64, error) {
+	repository = strings.ToLower(strings.TrimSpace(repository))
+	if repository == "" {
+		return nil, nil
+	}
+
+	var numbers []int64
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("factory_id = ? AND LOWER(repository) = ?", factoryID, repository).
+		Pluck("number", &numbers).Error
+	if err != nil {
+		return nil, err
+	}
+	return numbers, nil
+}
+
 type normalizedPullRequestParams struct {
 	Provider   string
 	ExternalID *string

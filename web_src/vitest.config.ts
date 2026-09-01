@@ -4,6 +4,11 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    fs: {
+      allow: [import.meta.dirname, path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates")],
+    },
+  },
   test: {
     globals: true,
     environment: "jsdom",
@@ -15,6 +20,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "@factory-templates": path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates"),
       "@": path.resolve(import.meta.dirname, "./src"),
     },
   },

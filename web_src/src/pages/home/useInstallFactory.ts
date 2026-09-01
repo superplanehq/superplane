@@ -147,6 +147,8 @@ export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
         pendingCanvasRef.current = await prepareFactoryCanvas({ canvasId, canvasName }, input.onCanvasReady);
 
         await materializeAndCommitFactoryTemplate({
+          organizationId,
+          workspaceFactoryId: input.workspaceFactoryId,
           canvasId,
           canvasName,
           definition,

@@ -130,6 +130,16 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "storybook-user" } }),
 }));
 
+const enabledExperimentalFeatures = new Set<string>();
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
+
 const useWorkOrderChecks = vi.hoisted(() =>
   vi.fn((_organizationId: string, _factoryId: string, _orderId: string, _options?: { enabled?: boolean }) => ({
     data: [] as unknown[],
@@ -173,6 +183,7 @@ describe("LinesPage board", () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
     searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
     importFactoryIntakeItem.mockReset();
+    enabledExperimentalFeatures.clear();
     useWorkOrderChecks.mockReset();
     useWorkOrderChecks.mockImplementation(
       (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
@@ -440,6 +451,40 @@ describe("LinesPage board", () => {
     });
   });
 
+  it("hides the overflow-menu Add intake entry when the feature is off", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
+  });
+
+  it("creates a Sentry intake from the overflow menu when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_sentry_intake");
+    createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
+
+    await waitFor(() => {
+      expect(createFactoryIntakeMutateAsync).toHaveBeenCalledWith({ source: "SOURCE_SENTRY_EXCEPTIONS" });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/apps/canvas-new`,
+      );
+    });
+  });
+
   it("shows only declared intakes", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
@@ -589,12 +634,12 @@ describe("LinesPage board", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
+    expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue("Clone Repo");
-    expect(screen.getByTestId("planning-review-step-body-0")).toHaveValue("git clone $REPO repo");
+    expect(screen.getByTestId("planning-review-step-body-0-editor")).toBeInTheDocument();
   });
 
   it("hides Edit Agent when the column canvas has no agent", async () => {
@@ -613,6 +658,7 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
     await user.type(stepName, "Clone repository");

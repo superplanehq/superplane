@@ -9,6 +9,7 @@ import {
 } from "@/hooks/useFactoryData";
 import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -17,6 +18,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
+import { FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
@@ -110,6 +112,7 @@ import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
+  ADD_INTAKE_TEMPLATES,
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
   isLineIntakeSourceId,
@@ -181,6 +184,11 @@ export function LinesPage() {
   const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
+  const canAddSentryIntake = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_SENTRY_INTAKE);
+  const addIntakeTemplates = useMemo(() => {
+    const allowedIds = new Set(canAddSentryIntake ? ["github-issues", "sentry-exceptions"] : ["github-issues"]);
+    return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
+  }, [canAddSentryIntake]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
@@ -362,6 +370,7 @@ export function LinesPage() {
         open={addIntakeOpen}
         onClose={() => setAddIntakeOpen(false)}
         onSelect={createIntakeFromTemplate}
+        templates={addIntakeTemplates}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
@@ -411,6 +420,7 @@ export function LinesPage() {
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
+            onAddIntake={canAddSentryIntake ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={verifyListeners}
             onAddPRFeedback={canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined}
             workOrderCardContext={{
@@ -530,6 +540,7 @@ function LineDetail({
   canUpdate,
   onCreateWorkOrder,
   intakePanel,
+  onAddIntake,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -547,6 +558,7 @@ function LineDetail({
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
   intakePanel: BacklogIntakePanel;
+  onAddIntake?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -585,6 +597,7 @@ function LineDetail({
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
+          onAddIntake={onAddIntake}
           verifyListeners={verifyListeners}
           onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
@@ -795,6 +808,7 @@ function PhaseBoard({
   canRename,
   onCreateWorkOrder,
   intakePanel,
+  onAddIntake,
   verifyListeners,
   onAddPRFeedback,
   workOrderCardContext,
@@ -814,6 +828,7 @@ function PhaseBoard({
   canRename: boolean;
   onCreateWorkOrder: () => void;
   intakePanel: BacklogIntakePanel;
+  onAddIntake?: () => void;
   verifyListeners: LaneListener[];
   onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
@@ -895,6 +910,7 @@ function PhaseBoard({
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
+          onAddIntake={onAddIntake}
           automationHref={backlogAutomationHref}
         />
       </div>

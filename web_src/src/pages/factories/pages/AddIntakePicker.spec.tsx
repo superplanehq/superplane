@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { AddIntakePicker } from "./AddIntakePicker";
+import { ADD_INTAKE_TEMPLATES } from "./lineIntakeModel";
 
 function renderPicker(onSelect = vi.fn(), onClose = vi.fn()) {
   render(<AddIntakePicker open onClose={onClose} onSelect={onSelect} />);
@@ -39,5 +40,19 @@ describe("AddIntakePicker", () => {
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
 
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: "github-issues" }));
+  });
+
+  it("restricts the list to the supplied templates", () => {
+    const restricted = ADD_INTAKE_TEMPLATES.filter((template) =>
+      ["github-issues", "sentry-exceptions"].includes(template.id),
+    );
+    render(<AddIntakePicker open onClose={vi.fn()} onSelect={vi.fn()} templates={restricted} />);
+
+    const picker = screen.getByTestId("add-intake-picker");
+    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(2);
+    expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
+    expect(within(picker).queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+    expect(within(picker).queryByTestId("add-intake-template-improve-ci-runtime")).not.toBeInTheDocument();
   });
 });

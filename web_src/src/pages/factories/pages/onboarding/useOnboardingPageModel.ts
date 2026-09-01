@@ -4,7 +4,7 @@ import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -162,7 +162,7 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 }
 
 function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
-  const spend = useOrganizationLLMSpend(organizationId);
+  const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
   return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
 }
@@ -285,6 +285,9 @@ export function useOnboardingPageModel(args: {
 
   return {
     setup,
+    // True when hosted credentials cover the agent, so setup can skip the
+    // agent screen and provision from the ticket screen.
+    hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,

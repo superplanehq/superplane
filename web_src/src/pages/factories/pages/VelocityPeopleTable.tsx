@@ -5,22 +5,8 @@ import { Avatar } from "@/components/Avatar/avatar";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 
-export interface VelocityPerson {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string;
-  /** Pull requests the person authored and merged themselves. */
-  authoredMerged: number;
-  /** Merged pull requests produced by Factory tasks this person started. */
-  factoryMerged: number;
-  /** Factory tasks this person started that closed without a merge. */
-  factoryWaste: number;
-  /** Median hours from task start to close, for their Factory tasks. */
-  medianCycleHours: number;
-  /** Tracked model and compute cost for their Factory tasks. */
-  costUsd: number;
-}
+import { formatDurationHours } from "../lib/factoryVelocityFlow";
+import type { VelocityPerson } from "../lib/factoryVelocityReport";
 
 type SortKey = "total" | "authoredMerged" | "factoryMerged" | "factoryWaste" | "medianCycleHours" | "costUsd";
 
@@ -58,32 +44,32 @@ const COLUMNS: Column[] = [
   },
   {
     key: "factoryMerged",
-    label: "Factory merged",
-    hint: "Merged pull requests from tasks this person started",
+    label: "SuperPlane merged",
+    hint: "Merged pull requests from tasks this person opened",
     format: (person) => String(person.factoryMerged),
   },
   {
     key: "factoryWaste",
-    label: "Factory waste",
-    hint: "Tasks this person started that closed without a merge",
+    label: "SuperPlane waste",
+    hint: "Tasks this person opened that closed without a merge",
     format: (person) => String(person.factoryWaste),
   },
   {
     key: "medianCycleHours",
     label: "Median cycle",
     hint: "Median time from task start to close",
-    format: (person) => `${Math.round(person.medianCycleHours)}h`,
+    format: (person) => (person.medianCycleHours > 0 ? formatDurationHours(person.medianCycleHours) : "—"),
   },
   {
     key: "costUsd",
     label: "Tracked cost",
-    hint: "Model tokens and execution compute",
+    hint: "Tracked model spend of their tasks",
     format: (person) => `$${person.costUsd.toFixed(0)}`,
   },
   {
     key: "total",
     label: "Merged PRs",
-    hint: "Authored plus Factory merged",
+    hint: "Authored plus SuperPlane merged",
     format: (person) => String(totalMerged(person)),
   },
 ];
@@ -97,7 +83,16 @@ function sortValue(person: VelocityPerson, key: SortKey): number {
   return person[key];
 }
 
-export function VelocityPeopleTable({ people, periodLabel }: { people: VelocityPerson[]; periodLabel: string }) {
+export function VelocityPeopleTable({
+  people,
+  periodLabel,
+  emptyAuthorship,
+}: {
+  people: VelocityPerson[];
+  periodLabel: string;
+  /** Names why the Authored column is empty, when the cohort is unavailable. */
+  emptyAuthorship?: string;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
 
   const sorted = useMemo(
@@ -106,12 +101,15 @@ export function VelocityPeopleTable({ people, periodLabel }: { people: VelocityP
   );
 
   return (
-    <section className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5">
+    <section
+      className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
+      data-testid="velocity-people"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">People</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            What each member merged directly and through the Factory. Select a column to sort.
+            What each member merged directly and through SuperPlane. Select a column to sort.
           </p>
         </div>
         <p className="text-[12px] text-muted-foreground">{periodLabel}</p>
@@ -173,8 +171,9 @@ export function VelocityPeopleTable({ people, periodLabel }: { people: VelocityP
       </div>
 
       <p className="mt-4 text-[12px] text-muted-foreground">
-        {people.length} {people.length === 1 ? "member" : "members"} with activity in this period
+        {people.length} {people.length === 1 ? "person" : "people"} with activity in this period
       </p>
+      {emptyAuthorship ? <p className="mt-1 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
     </section>
   );
 }

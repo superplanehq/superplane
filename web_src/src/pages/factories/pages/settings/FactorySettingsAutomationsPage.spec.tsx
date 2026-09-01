@@ -13,13 +13,16 @@ describe("FactorySettingsAutomationsPage", () => {
   it("opens the automations list under workspace settings", async () => {
     render(
       <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/automations`}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/automations`}
         factoriesFixture={defaultFactoriesFixture}
       />,
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-nav-automations")).toHaveAttribute("aria-current", "page");
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-automations")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Automations" })).toBeInTheDocument();
   }, 10000);
