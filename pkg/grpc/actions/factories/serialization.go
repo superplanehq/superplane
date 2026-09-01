@@ -302,22 +302,23 @@ func serializeWorkOrder(
 	}
 
 	return &pb.WorkOrder{
-		Id:             order.ID.String(),
-		Title:          order.Title,
-		Description:    order.Description,
-		Number:         order.Number,
-		Key:            displayKey,
-		State:          serializeWorkOrderState(order.State),
-		Result:         serializeWorkOrderResult(order.Result),
-		CreatedAt:      timestamppb.New(order.CreatedAt),
-		UpdatedAt:      timestamppb.New(order.UpdatedAt),
-		Assignees:      serializeWorkOrderAssignees(order.Assignees),
-		LineDispatches: serializedDispatches,
-		CreatedBy:      serializeWorkOrderCreator(order, createdByAutomation),
-		TotalTokens:    usage.TotalTokens,
-		TotalCostCents: usage.CostCents(),
-		StatusNotes:    statusNotes,
-		Origin:         serializeWorkOrderOrigin(order),
+		Id:                   order.ID.String(),
+		Title:                order.Title,
+		Description:          order.Description,
+		Number:               order.Number,
+		Key:                  displayKey,
+		State:                serializeWorkOrderState(order.State),
+		Result:               serializeWorkOrderResult(order.Result),
+		CreatedAt:            timestamppb.New(order.CreatedAt),
+		UpdatedAt:            timestamppb.New(order.UpdatedAt),
+		Assignees:            serializeWorkOrderAssignees(order.Assignees),
+		LineDispatches:       serializedDispatches,
+		CreatedBy:            serializeWorkOrderCreator(order, createdByAutomation),
+		TotalTokens:          usage.TotalTokens,
+		TotalCostCents:       usage.CostCents(),
+		TotalDurationSeconds: usage.DurationSeconds,
+		StatusNotes:          statusNotes,
+		Origin:               serializeWorkOrderOrigin(order),
 	}, nil
 }
 
@@ -493,15 +494,16 @@ func serializeWorkOrderExecutions(executions []models.FactoryWorkOrderExecutionR
 
 func serializeWorkOrderExecution(execution models.FactoryWorkOrderExecutionRecord) *pb.WorkOrderExecution {
 	item := &pb.WorkOrderExecution{
-		Id:          execution.ID.String(),
-		Step:        execution.StepName,
-		StepIndex:   int32(execution.StepIndex),
-		State:       serializeWorkOrderExecutionState(execution.Status, execution.RunState),
-		Result:      serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
-		CreatedAt:   timestamppb.New(execution.CreatedAt),
-		UpdatedAt:   timestamppb.New(execution.UpdatedAt),
-		TotalTokens: execution.TotalTokens,
-		CostCents:   execution.CostCents,
+		Id:              execution.ID.String(),
+		Step:            execution.StepName,
+		StepIndex:       int32(execution.StepIndex),
+		State:           serializeWorkOrderExecutionState(execution.Status, execution.RunState),
+		Result:          serializeWorkOrderExecutionResult(execution.Result, execution.RunResult),
+		CreatedAt:       timestamppb.New(execution.CreatedAt),
+		UpdatedAt:       timestamppb.New(execution.UpdatedAt),
+		TotalTokens:     execution.TotalTokens,
+		CostCents:       execution.CostCents,
+		DurationSeconds: execution.DurationSeconds,
 	}
 	if execution.RunID != nil {
 		runRef := &pb.WorkOrderExecution_RunRef{

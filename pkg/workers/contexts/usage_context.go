@@ -8,10 +8,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-// UsageContext records LLM spend for the current node execution.
+// UsageContext records workspace spend for the current node execution.
 // Inserts use a committed connection, not the node-executor transaction.
-// The provider already billed the tokens; a later Emit/Fail/rollback must
-// not drop the ledger row.
+// The provider already billed the tokens or VM seconds; a later
+// Emit/Fail/rollback must not drop the ledger row.
 type UsageContext struct {
 	organizationID uuid.UUID
 	execution      *models.CanvasNodeExecution
@@ -25,7 +25,7 @@ func NewUsageContext(organizationID uuid.UUID, execution *models.CanvasNodeExecu
 }
 
 func (c *UsageContext) Record(record core.UsageRecord) error {
-	return models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
+	return models.RecordUsage(database.Conn(), models.WorkspaceUsageEventInput{
 		OrganizationID:   c.organizationID,
 		CanvasRunID:      c.execution.RunID,
 		NodeExecutionID:  c.execution.ID,
@@ -41,6 +41,19 @@ func (c *UsageContext) Record(record core.UsageRecord) error {
 		CostMicros:       record.CostMicros,
 		FundingSource:    record.FundingSource,
 		IdempotencyKey:   usageIdempotencyKey(record.IdempotencyKey, c.execution.ID),
+	})
+}
+
+func (c *UsageContext) RecordCompute(record core.ComputeUsageRecord) error {
+	return models.RecordComputeUsage(database.Conn(), models.ComputeUsageEventInput{
+		OrganizationID:  c.organizationID,
+		CanvasRunID:     c.execution.RunID,
+		NodeExecutionID: c.execution.ID,
+		NodeID:          c.execution.NodeID,
+		MachineType:     record.MachineType,
+		FleetID:         record.FleetID,
+		DurationSeconds: record.DurationSeconds,
+		IdempotencyKey:  usageIdempotencyKey(record.IdempotencyKey, c.execution.ID),
 	})
 }
 

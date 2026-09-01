@@ -14,43 +14,53 @@ import (
 )
 
 const (
-	llmSpendPeriodDaysDefault = 30
-	llmSpendPeriodDaysMax     = 90
+	workspaceUsagePeriodDaysDefault = 30
+	workspaceUsagePeriodDaysMax     = 90
 )
 
-func DescribeOrganizationLLMSpend(
+func DescribeOrganizationWorkspaceUsage(
 	ctx context.Context,
 	orgID string,
-	req *pb.DescribeOrganizationLLMSpendRequest,
-) (*pb.DescribeOrganizationLLMSpendResponse, error) {
+	req *pb.DescribeOrganizationWorkspaceUsageRequest,
+) (*pb.DescribeOrganizationWorkspaceUsageResponse, error) {
 	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 
-	period := clampLLMSpendPeriodDays(int(req.GetPeriodDays()))
+	period := clampWorkspaceUsagePeriodDays(int(req.GetPeriodDays()))
 	since := time.Now().AddDate(0, 0, -period)
 
-	totals, byModel, err := models.SummarizeUsage(database.DB(ctx), models.UsageReportFilter{
+	db := database.DB(ctx)
+	totals, byModel, err := models.SummarizeUsage(db, models.UsageReportFilter{
 		OrganizationID: organizationID,
 		Since:          since,
 	})
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to describe organization LLM spend")
+		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
 	}
 
-	credit, err := models.DescribeOrganizationLLMCredit(database.DB(ctx), organizationID)
+	computeTotals, byMachine, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+		OrganizationID: organizationID,
+		Since:          since,
+	})
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to describe organization LLM credit")
+		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
+	}
+
+	credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
 	}
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+	ledger := totals.Add(computeTotals)
 
-	return &pb.DescribeOrganizationLLMSpendResponse{
-		TotalTokens:            totals.TotalTokens,
-		TotalCostCents:         totals.CostCents(),
+	return &pb.DescribeOrganizationWorkspaceUsageResponse{
+		TotalTokens:            ledger.TotalTokens,
+		TotalCostCents:         ledger.CostCents(),
 		PeriodDays:             int32(period),
-		ByModel:                serializeLLMSpendByModel(byModel),
+		ByModel:                serializeUsageByModel(byModel),
 		RemainingCreditCents:   pricebook.MicrosToCents(credit.RemainingMicros),
 		GrantTotalCents:        pricebook.MicrosToCents(credit.GrantMicros),
 		HostedBilledCents:      pricebook.MicrosToCents(credit.BilledMicros),
@@ -60,27 +70,41 @@ func DescribeOrganizationLLMSpend(
 		SuperplaneGrantCents:   pricebook.MicrosToCents(credit.SuperPlaneGrantMicros),
 		PurchasedCreditCents:   pricebook.MicrosToCents(credit.PurchasedCreditMicros),
 		Invoices:               listHostedCreditInvoices(ctx, organizationID, billingEnabled, hasCustomer),
+		TotalDurationSeconds:   ledger.DurationSeconds,
+		ByMachineType:          serializeUsageByMachineType(byMachine),
 	}, nil
 }
 
-func clampLLMSpendPeriodDays(period int) int {
+func clampWorkspaceUsagePeriodDays(period int) int {
 	if period <= 0 {
-		return llmSpendPeriodDaysDefault
+		return workspaceUsagePeriodDaysDefault
 	}
-	if period > llmSpendPeriodDaysMax {
-		return llmSpendPeriodDaysMax
+	if period > workspaceUsagePeriodDaysMax {
+		return workspaceUsagePeriodDaysMax
 	}
 	return period
 }
 
-func serializeLLMSpendByModel(rows []models.UsageByModel) []*pb.LLMSpendByModel {
-	out := make([]*pb.LLMSpendByModel, 0, len(rows))
+func serializeUsageByModel(rows []models.UsageByModel) []*pb.UsageByModel {
+	out := make([]*pb.UsageByModel, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, &pb.LLMSpendByModel{
+		out = append(out, &pb.UsageByModel{
 			Provider:    row.Provider,
 			Model:       row.Model,
 			TotalTokens: row.TotalTokens,
 			CostCents:   row.CostCents(),
+		})
+	}
+	return out
+}
+
+func serializeUsageByMachineType(rows []models.UsageByMachineType) []*pb.UsageByMachineType {
+	out := make([]*pb.UsageByMachineType, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       row.CostCents(),
 		})
 	}
 	return out

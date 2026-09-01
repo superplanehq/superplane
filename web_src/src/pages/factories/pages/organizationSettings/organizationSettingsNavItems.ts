@@ -9,7 +9,7 @@ export type OrganizationSettingsSection =
   | "groups"
   | "roles"
   | "integrations"
-  | "llm-spend"
+  | "workspace-usage"
   | "usage"
   | "secrets";
 
@@ -27,7 +27,7 @@ export const ORGANIZATION_SETTINGS_NAV_ITEMS: OrganizationSettingsNavItem[] = [
   { id: "groups", label: "Groups", Icon: Users },
   { id: "roles", label: "Roles", Icon: Shield },
   { id: "integrations", label: "Integrations", Icon: Plug },
-  { id: "llm-spend", label: "LLM spend", Icon: CircleDollarSign },
+  { id: "workspace-usage", label: "Workspace usage", Icon: CircleDollarSign },
   { id: "usage", label: "Usage", Icon: Gauge },
   { id: "secrets", label: "Secrets", Icon: Key },
 ];
@@ -36,7 +36,7 @@ const IMPLEMENTED_ORGANIZATION_SETTINGS_SECTIONS = new Set<OrganizationSettingsS
   "general",
   "workspaces",
   "integrations",
-  "llm-spend",
+  "workspace-usage",
 ]);
 
 export function isOrganizationSettingsComingSoon(item: OrganizationSettingsNavItem) {

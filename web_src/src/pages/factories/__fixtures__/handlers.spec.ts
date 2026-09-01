@@ -36,7 +36,7 @@ describe("matchFactoryPageFixture", () => {
     expect(ids).toEqual(expect.arrayContaining([OPEN_WORK_ORDER.id, RUNNING_WORK_ORDER.id, CLOSED_WORK_ORDER.id]));
   });
 
-  it("serves factory usage and organization LLM spend reports", async () => {
+  it("serves factory usage and organization workspace usage reports", async () => {
     const usage = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/usage`);
     await expect(usage.json()).resolves.toMatchObject({
       totalTokens: "25600",
@@ -44,7 +44,7 @@ describe("matchFactoryPageFixture", () => {
       byModel: expect.arrayContaining([expect.objectContaining({ provider: "anthropic" })]),
     });
 
-    const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/llm-spend`);
+    const spend = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/workspace-usage`);
     await expect(spend.json()).resolves.toMatchObject({
       totalTokens: "25600",
       totalCostCents: "876",

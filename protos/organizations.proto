@@ -117,13 +117,13 @@ service Organizations {
     };
   }
 
-  rpc DescribeOrganizationLLMSpend(DescribeOrganizationLLMSpendRequest) returns (DescribeOrganizationLLMSpendResponse) {
+  rpc DescribeOrganizationWorkspaceUsage(DescribeOrganizationWorkspaceUsageRequest) returns (DescribeOrganizationWorkspaceUsageResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/llm-spend"
+      get: "/api/v1/organizations/{id}/workspace-usage"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe organization LLM spend";
-      description: "Returns token and estimated dollar spend for factory LLM calls, grouped by model";
+      summary: "Describe organization workspace usage";
+      description: "Returns token, VM seconds, and estimated dollar spend for factory runs, grouped by model and machine type";
       tags: "Organization";
     };
   }
@@ -453,17 +453,17 @@ message DescribeUsageResponse {
   OrganizationUsage usage = 4;
 }
 
-message DescribeOrganizationLLMSpendRequest {
+message DescribeOrganizationWorkspaceUsageRequest {
   string id = 1;
   // Period window in days. Defaults to 30. Maximum is 90.
   int32 period_days = 2;
 }
 
-message DescribeOrganizationLLMSpendResponse {
+message DescribeOrganizationWorkspaceUsageResponse {
   int64 total_tokens = 1;
   int64 total_cost_cents = 2;
   int32 period_days = 3;
-  repeated LLMSpendByModel by_model = 4;
+  repeated UsageByModel by_model = 4;
   int64 remaining_credit_cents = 5;
   int64 grant_total_cents = 6;
   int64 hosted_billed_cents = 7;
@@ -473,6 +473,8 @@ message DescribeOrganizationLLMSpendResponse {
   int64 superplane_grant_cents = 11;
   int64 purchased_credit_cents = 12;
   repeated HostedCreditInvoice invoices = 13;
+  int64 total_duration_seconds = 14;
+  repeated UsageByMachineType by_machine_type = 15;
 }
 
 message HostedCreditInvoice {
@@ -556,11 +558,17 @@ message CreateBillingPortalSessionResponse {
   string portal_url = 1;
 }
 
-message LLMSpendByModel {
+message UsageByModel {
   string provider = 1;
   string model = 2;
   int64 total_tokens = 3;
   int64 cost_cents = 4;
+}
+
+message UsageByMachineType {
+  string machine_type = 1;
+  int64 duration_seconds = 2;
+  int64 cost_cents = 3;
 }
 
 message RemoveUserRequest {

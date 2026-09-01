@@ -17,6 +17,9 @@ func afterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
 	if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
+	if err := storeRunnerFleetKV(ctx, ""); err != nil {
+		return fmt.Errorf("set runner fleet kv: %w", err)
+	}
 	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
@@ -128,6 +131,7 @@ func processBrokerTaskStatus(
 
 	publishRunnerUsage(organizationID, task, logger)
 	RecordRunnerLLMUsage(usage, logger, finishedEventType, configuration, task.Result)
+	RecordRunnerComputeUsage(usage, logger, state, configuration, task)
 
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {

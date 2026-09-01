@@ -260,7 +260,7 @@ func hostedCreditCheckoutSuccessURL(baseURL string, organizationID uuid.UUID) st
 	if origin == "" {
 		origin = strings.TrimRight(strings.TrimSpace(os.Getenv("BASE_URL")), "/")
 	}
-	return origin + "/" + organizationID.String() + "/organization/llm-spend?credit=added&checkout_id={CHECKOUT_ID}"
+	return origin + "/" + organizationID.String() + "/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}"
 }
 
 func clientIPFromContext(ctx context.Context) string {

@@ -82,7 +82,7 @@ func requireFactoryExecutionRunID(t *testing.T, execution *models.FactoryWorkOrd
 
 func recordFactoryLLMUsage(t *testing.T, organizationID, runID uuid.UUID) {
 	t.Helper()
-	require.NoError(t, models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(database.Conn(), models.WorkspaceUsageEventInput{
 		OrganizationID:  organizationID,
 		CanvasRunID:     runID,
 		NodeExecutionID: uuid.New(),

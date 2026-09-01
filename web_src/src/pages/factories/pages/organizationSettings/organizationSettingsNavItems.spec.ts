@@ -13,7 +13,7 @@ describe("ORGANIZATION_SETTINGS_NAV_ITEMS", () => {
       "Groups",
       "Roles",
       "Integrations",
-      "LLM spend",
+      "Workspace usage",
       "Usage",
       "Secrets",
     ]);
@@ -26,13 +26,13 @@ describe("ORGANIZATION_SETTINGS_NAV_ITEMS", () => {
 });
 
 describe("isOrganizationSettingsComingSoon", () => {
-  it("is false for General, Workspaces, Integrations, and LLM spend", () => {
+  it("is false for General, Workspaces, Integrations, and Workspace usage", () => {
     expect(isOrganizationSettingsComingSoon(ORGANIZATION_SETTINGS_NAV_ITEMS[0])).toBe(false);
     expect(isOrganizationSettingsComingSoon(ORGANIZATION_SETTINGS_NAV_ITEMS[1])).toBe(false);
     expect(
-      ORGANIZATION_SETTINGS_NAV_ITEMS.filter((item) => item.id === "integrations" || item.id === "llm-spend").every(
-        (item) => !isOrganizationSettingsComingSoon(item),
-      ),
+      ORGANIZATION_SETTINGS_NAV_ITEMS.filter(
+        (item) => item.id === "integrations" || item.id === "workspace-usage",
+      ).every((item) => !isOrganizationSettingsComingSoon(item)),
     ).toBe(true);
   });
 
