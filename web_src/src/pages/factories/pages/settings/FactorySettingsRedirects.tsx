@@ -24,7 +24,7 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   spending: { scope: "workspace", section: "spending" },
   repositories: { scope: "workspace", section: "repository" },
   repository: { scope: "workspace", section: "repository" },
-  profile: { scope: "account", section: "general" },
+  profile: { scope: "account", section: "profile" },
   notifications: { scope: "account", section: "notifications" },
   members: { scope: "organization", section: "members" },
   integrations: { scope: "organization", section: "integrations" },

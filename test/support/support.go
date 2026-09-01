@@ -138,6 +138,12 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
+	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
 	err = tx.Commit().Error
 	if !assert.NoError(t, err) {
 		t.FailNow()
