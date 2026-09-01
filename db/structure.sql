@@ -98,7 +98,8 @@ CREATE TABLE public.accounts (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
-    blocked_at timestamp with time zone
+    blocked_at timestamp with time zone,
+    deleted_at timestamp with time zone
 );
 
 
@@ -868,7 +869,8 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_by_account_id uuid
 );
 
 
@@ -2980,6 +2982,20 @@ CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_eve
 
 
 --
+-- Name: index_accounts_on_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (deleted_at);
+
+
+--
+-- Name: index_organizations_on_created_by_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organizations_on_created_by_account_id ON public.organizations USING btree (created_by_account_id);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3584,6 +3600,14 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_created_by_account_id_fkey FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+
+--
 -- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3991,7 +4015,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260901143615	f
+20260901223216	f
 \.
 
 
