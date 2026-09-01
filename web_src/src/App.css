@@ -869,6 +869,31 @@
   animation: sp-ai-thinking-shimmer 1.4s linear infinite;
 }
 
+/*
+ * An indeterminate bar for work whose length is unknown. The segment is a
+ * quarter of the track, so it travels four track widths to cross once.
+ */
+@keyframes sp-indeterminate-bar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.sp-indeterminate-bar {
+  animation: sp-indeterminate-bar 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-indeterminate-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
 @keyframes sp-tool-enter {
   from {
     opacity: 0;

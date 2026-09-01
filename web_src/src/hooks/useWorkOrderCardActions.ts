@@ -17,6 +17,10 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
     async (orderId: string, input: { lineName: string }) => {
       setDispatchingOrderIds((current) => withOrderId(current, orderId));
       try {
+        // mutateAsync runs the mutation's onMutate before the request
+        // resolves, which patches the work-orders cache so the card moves
+        // to the line's first phase column right away — see
+        // useDispatchWorkOrder.
         await dispatchWorkOrder.mutateAsync({ orderId, lineName: input.lineName });
         showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {

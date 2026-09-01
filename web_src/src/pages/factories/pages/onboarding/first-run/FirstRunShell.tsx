@@ -21,6 +21,7 @@ export function FirstRunShell({
   useFactoriesThemeClass();
   const copy = FIRST_RUN_COPY.chrome;
   const identity = chrome?.email ?? chrome?.displayName;
+  const stepCount = chrome?.stepCount ?? FIRST_RUN_STEP_COUNT;
 
   return (
     <div className="fixed inset-0 bg-background text-foreground" data-testid={testId}>
@@ -48,10 +49,10 @@ export function FirstRunShell({
       {chrome ? (
         <nav
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-6"
-          aria-label={copy.stepLabel(chrome.stepIndex + 1, FIRST_RUN_STEP_COUNT)}
+          aria-label={copy.stepLabel(chrome.stepIndex + 1, stepCount)}
         >
           <ol className="flex items-center gap-1.5">
-            {Array.from({ length: FIRST_RUN_STEP_COUNT }, (_, index) => (
+            {Array.from({ length: stepCount }, (_, index) => (
               <li
                 key={index}
                 className={cn(

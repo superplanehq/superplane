@@ -516,6 +516,18 @@ service Factories {
     };
   }
 
+  rpc SyncFactoryVelocity(SyncFactoryVelocityRequest) returns (SyncFactoryVelocityResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/velocity/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync factory velocity";
+      description: "Starts a repository merge sync for a factory and returns before it finishes";
+      tags: "Factory";
+    };
+  }
+
   rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
@@ -1579,18 +1591,39 @@ message FactoryWorkOrderUpdatedMessage {
   google.protobuf.Timestamp timestamp = 4;
 }
 
+// Internal AMQP message that asks the velocity sync worker to read a workspace
+// now. The API process does not run the worker, so a user asking for a fresh
+// report hands the work over instead of doing it on the request path.
+message FactoryVelocitySyncRequestedMessage {
+  string factory_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
 // Velocity
+
+// SyncFactoryVelocityRequest asks for a fresh read of the repository merges of
+// a workspace. The report is served from stored rows a background sync collects,
+// so a user who just merged something needs a way to ask for it now instead of
+// waiting for the next scheduled run.
+message SyncFactoryVelocityRequest {
+  string factory_id = 1;
+}
+
+message SyncFactoryVelocityResponse {
+  // False when the workspace has no repository to sync, so the UI can explain
+  // that instead of showing progress that never finishes.
+  bool started = 1;
+}
 
 message DescribeFactoryVelocityRequest {
   string factory_id = 1;
-  // Period window in days. Only 7 and 30 are supported by the UI today; any
+  // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
   int32 period_days = 2;
-  // Optional GitHub integration and `owner/repo` to include the People cohort.
-  // When either is empty the response returns SuperPlane data only and sets
-  // `has_people_cohort = false` so the UI can hide the People series.
-  string integration_id = 3;
-  string repository = 4;
+  // Optional `owner/repo` the report is limited to. When it is empty the
+  // response returns SuperPlane data only and sets `has_people_cohort = false`
+  // so the UI can hide the People series.
+  string repository = 3;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1600,11 +1633,30 @@ message DescribeFactoryVelocityResponse {
   // Repository the People cohort was computed for (`owner/repo`), or empty when
   // no repository was selected.
   string repository = 4;
-  // True when GitHub search succeeded for the selected repository.
+  // True when the repository merges of the workspace are stored, so the People
+  // series is comparable with SuperPlane output.
   bool has_people_cohort = 5;
-  // True when a repository was selected and GitHub search failed.
-  // SuperPlane counts are still present; the People series is omitted.
-  bool people_search_failed = 6;
+  // When the background sync last stored repository merges. Unset when the
+  // workspace has never completed a sync.
+  google.protobuf.Timestamp people_synced_at = 6;
+  // Totals for the window of equal length that ends where the reported window
+  // starts. The UI shows deltas against these numbers.
+  DescribeFactoryVelocityTotals previous_totals = 7;
+  // True when the previous window holds output, so its totals are comparable.
+  // A workspace younger than two windows reports false and the UI drops the
+  // comparison instead of showing growth from an empty baseline.
+  bool has_previous_window = 8;
+  // Intake sources that produced merged SuperPlane pull requests in the
+  // window, ordered by merge count. These are the series of the intake
+  // breakdown; `points[].intake` holds their per-day counts.
+  repeated DescribeFactoryVelocityIntakeSource intake_sources = 9;
+  // One row per person with merged pull requests or SuperPlane work in the
+  // window, ordered by total merged pull requests.
+  repeated DescribeFactoryVelocityPerson people = 10;
+  // True when a repository is selected but its first sync has not stored any
+  // merges yet. SuperPlane counts are still present; the People series is
+  // omitted until the sync finishes.
+  bool people_sync_pending = 11;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1615,6 +1667,51 @@ message DescribeFactoryVelocityDay {
   int32 people_merged = 4;
   // Waste = SuperPlane PRs closed without merging on that day.
   int32 waste = 5;
+  // Merged SuperPlane pull requests grouped by intake source.
+  repeated DescribeFactoryVelocityIntakeCount intake = 6;
+  // Tracked model spend of the work orders that closed on this day. A work
+  // order counts on the day its pull request merged, or on the day its last
+  // pull request closed when none merged.
+  int64 cost_cents = 7;
+  int64 tokens = 8;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 9;
+}
+
+// DescribeFactoryVelocityIntakeSource names one intake series and its total.
+message DescribeFactoryVelocityIntakeSource {
+  // Stable key that `DescribeFactoryVelocityIntakeCount.key` refers to.
+  string key = 1;
+  // Display label, for example "GitHub issue".
+  string label = 2;
+  int32 merged = 3;
+}
+
+message DescribeFactoryVelocityIntakeCount {
+  string key = 1;
+  int32 merged = 2;
+}
+
+// DescribeFactoryVelocityPerson is one row of the People table: what a person
+// merged directly and what the SuperPlane work orders they opened produced.
+message DescribeFactoryVelocityPerson {
+  // SuperPlane user id for a member, or `github:<login>` for a repository
+  // author who is not a member of the organization.
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string avatar_url = 4;
+  // Merged pull requests the person authored outside SuperPlane.
+  int32 authored_merged = 5;
+  // Merged pull requests from SuperPlane work orders this person opened.
+  int32 factory_merged = 6;
+  // Work orders this person opened whose pull requests closed without a merge.
+  int32 factory_waste = 7;
+  // Tracked model spend of the work orders this person opened.
+  int64 cost_cents = 8;
+  // Median hours from first execution to close for those work orders. Zero
+  // when none of them closed inside the window.
+  double median_cycle_hours = 9;
 }
 
 message DescribeFactoryVelocityYesterday {
@@ -1632,6 +1729,11 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+  // Tracked model spend of the work orders that closed in the window.
+  int64 cost_cents = 6;
+  int64 tokens = 7;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 8;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
