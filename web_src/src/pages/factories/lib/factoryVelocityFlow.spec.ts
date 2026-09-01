@@ -48,17 +48,17 @@ function closedOrder(overrides: ClosedOrderOverrides): FactoriesWorkOrder {
 
 describe("aggregateFactoryVelocityFlow", () => {
   it("returns zeroed medians when no closed orders exist", () => {
-    const flow = aggregateFactoryVelocityFlow([], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([], 14, NOW);
 
-    expect(flow.days).toBe(7);
-    expect(flow.label).toBe("Last 7 days");
+    expect(flow.days).toBe(14);
+    expect(flow.label).toBe("Last 14 days");
     expect(flow.sampleSize).toBe(0);
     expect(flow.medianCycleHours).toBe(0);
     expect(flow.medianRunningHours).toBe(0);
     expect(flow.medianWaitingHours).toBe(0);
     expect(flow.runningShareOfCyclePct).toBe(0);
     expect(flow.waitingShareOfCyclePct).toBe(0);
-    expect(flow.timeTrend).toHaveLength(7);
+    expect(flow.timeTrend).toHaveLength(14);
   });
 
   it("skips draft/open orders and orders without executions", () => {
@@ -68,7 +68,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       { ...closedOrder({ id: "open" }), state: "STATE_OPEN" },
     ];
 
-    const flow = aggregateFactoryVelocityFlow(orders, 7, NOW);
+    const flow = aggregateFactoryVelocityFlow(orders, 14, NOW);
 
     expect(flow.sampleSize).toBe(0);
   });
@@ -94,7 +94,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([order], 14, NOW);
 
     expect(flow.sampleSize).toBe(1);
     expect(flow.medianCycleHours).toBeCloseTo(14, 5);
@@ -116,7 +116,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([order], 14, NOW);
 
     expect(flow.sampleSize).toBe(1);
     expect(flow.medianCycleHours).toBeCloseTo(10, 5);
@@ -139,7 +139,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([order], 14, NOW);
 
     expect(flow.sampleSize).toBe(1);
     expect(flow.medianCycleHours).toBeCloseTo(10, 5);
@@ -166,26 +166,26 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([order], 14, NOW);
 
     expect(flow.medianRunningHours).toBeCloseTo(4, 5);
   });
 
   it("includes a closed order whose last run finished before the period", () => {
-    // Last run finished 10 days ago; the task closed yesterday.
+    // Last run finished 20 days ago; the task closed yesterday.
     // Windowing must use the close instant, not the last run finish.
     const order = closedOrder({
       id: "closed-later",
       updatedAt: iso(-1 * DAY),
       executions: [
         execution({
-          createdAt: iso(-10 * DAY - 4 * HOUR),
-          finishedAt: iso(-10 * DAY),
+          createdAt: iso(-20 * DAY - 4 * HOUR),
+          finishedAt: iso(-20 * DAY),
         }),
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, NOW);
+    const flow = aggregateFactoryVelocityFlow([order], 14, NOW);
 
     expect(flow.sampleSize).toBe(1);
   });
@@ -204,7 +204,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, now);
+    const flow = aggregateFactoryVelocityFlow([order], 14, now);
 
     expect(flow.sampleSize).toBe(1);
     const lastBucket = flow.timeTrend[flow.timeTrend.length - 1];
@@ -217,11 +217,11 @@ describe("aggregateFactoryVelocityFlow", () => {
     const orders: FactoriesWorkOrder[] = [
       closedOrder({
         id: "too-old",
-        updatedAt: iso(-10 * DAY),
+        updatedAt: iso(-20 * DAY),
         executions: [
           execution({
-            createdAt: iso(-10 * DAY - 4 * HOUR),
-            finishedAt: iso(-10 * DAY),
+            createdAt: iso(-20 * DAY - 4 * HOUR),
+            finishedAt: iso(-20 * DAY),
           }),
         ],
       }),
@@ -237,7 +237,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       }),
     ];
 
-    const flow = aggregateFactoryVelocityFlow(orders, 7, NOW);
+    const flow = aggregateFactoryVelocityFlow(orders, 14, NOW);
 
     expect(flow.sampleSize).toBe(1);
   });
@@ -256,13 +256,41 @@ describe("aggregateFactoryVelocityFlow", () => {
       }),
     ];
 
-    const flow = aggregateFactoryVelocityFlow(orders, 7, NOW);
+    const flow = aggregateFactoryVelocityFlow(orders, 14, NOW);
 
-    expect(flow.timeTrend).toHaveLength(7);
+    expect(flow.timeTrend).toHaveLength(14);
     // Two samples on the same day = one bucket with two entries;
     // other buckets stay at 0.
     const nonZeroBuckets = flow.timeTrend.filter((point) => point.runningHours > 0 || point.waitingHours > 0);
     expect(nonZeroBuckets).toHaveLength(1);
+  });
+
+  it("names the weekday and the date instead of numbering the days", () => {
+    // NOW is Thursday 15 January 2026, so a fortnight starts on Friday 2 January.
+    const flow = aggregateFactoryVelocityFlow([], 14, NOW);
+
+    expect(flow.timeTrend[0].day).toBe("Fri 2");
+    expect(flow.timeTrend[1].day).toBe("Sat 3");
+    expect(flow.timeTrend[13].day).toBe("Thu 15");
+  });
+
+  it("repeats the month when the window crosses into a new one", () => {
+    // A fortnight to 5 February 2026 starts on 23 January.
+    const now = new Date(2026, 1, 5, 12, 0, 0).getTime();
+
+    const flow = aggregateFactoryVelocityFlow([], 14, now);
+
+    expect(flow.timeTrend[0].day).toBe("Fri 23");
+    expect(flow.timeTrend[9].day).toBe("Sun Feb 1");
+    expect(flow.timeTrend[10].day).toBe("Mon 2");
+  });
+
+  it("labels every fifth day on a month so the ticks stay legible", () => {
+    const flow = aggregateFactoryVelocityFlow([], 30, NOW);
+
+    const labelled = flow.timeTrend.filter((point) => point.day !== "");
+
+    expect(labelled).toHaveLength(7);
   });
 
   it("supports the 30-day period label", () => {
@@ -290,7 +318,7 @@ describe("aggregateFactoryVelocityFlow", () => {
       ],
     });
 
-    const flow = aggregateFactoryVelocityFlow([order], 7, now);
+    const flow = aggregateFactoryVelocityFlow([order], 14, now);
 
     expect(flow.sampleSize).toBe(1);
     const nonZeroBuckets = flow.timeTrend.filter((point) => point.runningHours > 0 || point.waitingHours > 0);
