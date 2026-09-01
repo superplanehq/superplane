@@ -1,6 +1,24 @@
-import type { ThemePreference } from "@/lib/themePreference";
+import { defaultNotificationTypeToggles, type NotificationTypeToggles } from "@/lib/notificationSettings";
 
-export type AccountRedesignPageId = "profile" | "security" | "notifications" | "preferences";
+export type AccountRedesignPageId = "profile" | "security";
+
+export type AccountRedesignWorkspaceScope = "all" | "selected";
+
+export interface AccountRedesignNotifications {
+  emailEnabled: boolean;
+  workspaceScope: AccountRedesignWorkspaceScope;
+  workspaceIds: string[];
+  events: NotificationTypeToggles;
+}
+
+export const ACCOUNT_REDESIGN_NOTIFICATIONS: AccountRedesignNotifications = {
+  emailEnabled: true,
+  workspaceScope: "all",
+  workspaceIds: [],
+  events: defaultNotificationTypeToggles(true),
+};
+
+export type AccountRedesignSsoProvider = "github" | "google";
 
 export interface AccountRedesignToken {
   id: string;
@@ -9,58 +27,41 @@ export interface AccountRedesignToken {
   lastUsedAt?: string;
 }
 
-export interface AccountRedesignSession {
-  id: string;
-  device: string;
-  location: string;
-  lastSeen: string;
-  isCurrent: boolean;
+export interface AccountRedesignSsoAccount {
+  provider: AccountRedesignSsoProvider;
+  identity: string | null;
+  email?: string | null;
 }
 
 export interface AccountRedesignProfile {
   name: string;
   email: string;
   userId: string;
-  avatarUrl: string | null;
   passwordSet: boolean;
-  twoFactorEnabled: boolean;
-  theme: ThemePreference;
-  timezone: "auto" | "America/New_York" | "Europe/London" | "Asia/Tokyo";
   tokens: AccountRedesignToken[];
-  sessions: AccountRedesignSession[];
+  ssoAccounts: AccountRedesignSsoAccount[];
+  notifications: AccountRedesignNotifications;
 }
 
 export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
   name: "Ada Lovelace",
   email: "ada@example.com",
   userId: "5f76536d-bc02-4f99-81e6-e159ac40ebbb",
-  avatarUrl: null,
   passwordSet: true,
-  twoFactorEnabled: false,
-  theme: "system",
-  timezone: "auto",
   tokens: [],
-  sessions: [
-    {
-      id: "session-current",
-      device: "Chrome on macOS",
-      location: "São Paulo, BR",
-      lastSeen: "Now",
-      isCurrent: true,
-    },
-    {
-      id: "session-other",
-      device: "Safari on macOS",
-      location: "São Paulo, BR",
-      lastSeen: "2 hours ago",
-      isCurrent: false,
-    },
+  ssoAccounts: [
+    { provider: "github", identity: "ada", email: "ada@example.com" },
+    { provider: "google", identity: null, email: null },
   ],
+  notifications: ACCOUNT_REDESIGN_NOTIFICATIONS,
 };
 
 export const ACCOUNT_REDESIGN_SECURE_PROFILE: AccountRedesignProfile = {
   ...ACCOUNT_REDESIGN_PROFILE,
-  twoFactorEnabled: true,
+  ssoAccounts: [
+    { provider: "github", identity: "ada", email: "ada@users.noreply.github.com" },
+    { provider: "google", identity: "ada@example.com", email: "ada@example.com" },
+  ],
   tokens: [
     {
       id: "token-1",

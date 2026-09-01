@@ -1,49 +1,37 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { ComponentStoryShell } from "../../../__fixtures__/ComponentStoryShell";
-import { withFactoriesTheme } from "../../../__fixtures__/factoriesStoryTheme";
-import { ACCOUNT_REDESIGN_SECURE_PROFILE } from "./accountProfileRedesignMocks";
-import { AccountProfileRedesignPlayground } from "./AccountProfileRedesignPlayground";
-
+import { FactoriesHarness } from "../../../__fixtures__/FactoriesHarness";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../../__fixtures__/factoryPageResponses";
 /**
- * Account settings redesign. Storybook-only. The live
- * `/settings/account/general` page is unchanged.
- *
- * Profile is editable. Tokens, password, 2FA, and sessions live on Security.
- * Theme and timezone live on Preferences.
+ * Factory Account settings. Mounted through the live factory settings
+ * chrome and the live Profile, Security, and Notifications pages.
  */
 const meta = {
   title: "Factories/Pages/Account Profile Redesign",
   parameters: { layout: "fullscreen" },
-  decorators: [
-    withFactoriesTheme,
-    (Story) => (
-      <ComponentStoryShell className="h-svh bg-background p-0">
-        <Story />
-      </ComponentStoryShell>
-    ),
-  ],
 } satisfies Meta;
 
 export default meta;
 
 type Story = StoryObj;
 
+const accountPath = (section: string) => `workspaces/${PRIMARY_FACTORY_KEY}/settings/account/${section}`;
+
 export const Profile: Story = {
-  render: () => <AccountProfileRedesignPlayground />,
+  render: () => <FactoriesHarness pathSuffix={accountPath("profile")} factoriesFixture={defaultFactoriesFixture} />,
 };
 
 export const Security: Story = {
-  render: () => <AccountProfileRedesignPlayground initialPage="security" />,
+  render: () => <FactoriesHarness pathSuffix={accountPath("security")} factoriesFixture={defaultFactoriesFixture} />,
 };
 
 export const SecurityReady: Story = {
-  name: "Security — 2FA and tokens",
-  render: () => (
-    <AccountProfileRedesignPlayground initialPage="security" initialProfile={ACCOUNT_REDESIGN_SECURE_PROFILE} />
-  ),
+  name: "Security — SSO and tokens",
+  render: () => <FactoriesHarness pathSuffix={accountPath("security")} factoriesFixture={defaultFactoriesFixture} />,
 };
 
-export const Preferences: Story = {
-  render: () => <AccountProfileRedesignPlayground initialPage="preferences" />,
+export const Notifications: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={accountPath("notifications")} factoriesFixture={defaultFactoriesFixture} />
+  ),
 };

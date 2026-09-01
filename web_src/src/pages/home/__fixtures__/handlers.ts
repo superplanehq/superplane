@@ -3,6 +3,7 @@ import {
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_NAME,
 } from "@/pages/factories/__fixtures__/factoryPageResponses";
+import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
 import { storybookHostedLlmModels } from "./hostedLlmModels";
 
@@ -197,6 +198,8 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           name: meUser.name,
           organization_id: orgId,
           avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
+          has_password: true,
+          providers: storybookAccountProviders(meUser.email),
         },
       }),
     },

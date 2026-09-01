@@ -19,7 +19,8 @@ import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { FACTORY_SETTINGS_NAV_GROUPS, type FactorySettingsNavItem } from "./settingsNavItems";
+import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
+import { type FactorySettingsNavItem } from "./settingsNavItems";
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -77,6 +78,7 @@ function FactorySettingsLayoutContent({
   factoryKey: string;
 }) {
   useFactoriesThemeClass();
+  const settingsNavGroups = useFactorySettingsNavGroups();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
@@ -130,7 +132,7 @@ function FactorySettingsLayoutContent({
                 </NavLink>
               </div>
               <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
-                {FACTORY_SETTINGS_NAV_GROUPS.map((group) => (
+                {settingsNavGroups.map((group) => (
                   <SettingsNavGroup
                     key={group.id}
                     organizationId={organizationId}

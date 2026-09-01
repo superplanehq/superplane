@@ -3,7 +3,6 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   BarChart3,
-  Bell,
   Blocks,
   CircleUser,
   Cpu,
@@ -13,7 +12,6 @@ import {
   Plug,
   Settings,
   Shield,
-  SunMoon,
   Users,
   Workflow,
 } from "lucide-react";
@@ -42,8 +40,6 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     items: [
       { id: "account-profile", label: "Profile", Icon: CircleUser, page: "profile" },
       { id: "account-security", label: "Security", Icon: Shield, page: "security" },
-      { id: "account-notifications", label: "Notifications", Icon: Bell, page: "notifications" },
-      { id: "account-preferences", label: "Preferences", Icon: SunMoon, page: "preferences" },
     ],
   },
   {
@@ -87,9 +83,12 @@ export function AccountProfileRedesignShell({
   const query = navQuery.trim().toLowerCase();
 
   return (
-    <div className="flex h-full min-h-0 w-full bg-background text-foreground" data-testid="account-redesign-layout">
+    <div
+      className="flex h-svh min-h-0 w-full overflow-hidden bg-background text-foreground"
+      data-testid="account-redesign-layout"
+    >
       <aside
-        className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+        className="flex h-full w-[240px] shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
         data-testid="account-redesign-sidebar"
       >
         <div className="border-b border-sidebar-border px-3 py-3">
@@ -155,7 +154,7 @@ export function AccountProfileRedesignShell({
           })}
         </nav>
       </aside>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background">{children}</main>
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children}</main>
     </div>
   );
 }
