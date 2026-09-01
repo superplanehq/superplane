@@ -345,6 +345,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
 		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
@@ -370,6 +371,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		payload, ok := result.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
 	})
 
@@ -390,6 +392,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		payload, ok := result.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, currentRepository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+currentRepository+".git", payload["repository_url"])
 		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
 	})
 
@@ -401,6 +404,10 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		title, err := builder.ResolveExpression(`order().title`)
 		require.NoError(t, err)
 		assert.Equal(t, "Ship feature", title)
+
+		repositoryURL, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/acme/current-service.git", repositoryURL)
 
 		issueNumber, err := builder.ResolveExpression(`order().source.issue.number`)
 		require.NoError(t, err)

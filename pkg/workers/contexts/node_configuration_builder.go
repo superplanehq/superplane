@@ -1087,6 +1087,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
+		"repository_url": githubRepositoryURL(repository),
 		"default_branch": defaultBranch,
 	}
 
@@ -1212,6 +1213,10 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 	}
 
 	return repository, defaultBranch, nil
+}
+
+func githubRepositoryURL(repository string) string {
+	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {

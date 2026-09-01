@@ -49,7 +49,9 @@ linked source run (`source_run_id` on the work order record).
 Expressions on a dispatched run should prefer `order()` over
 `root().data.work_order`. `order()` resolves the live work order for the
 current run (`id`, `title`, `description`, `factory_id`, `state`, `result`,
-`source`) and returns `nil` when the run is not attached to a work order.
+`repository`, `repository_url`, `default_branch`, `source`) and returns `nil`
+when the run is not attached to a work order. `repository_url` is the
+canonical HTTPS Git URL without credentials.
 `order().url` is the work order permalink
 (`{BASE_URL}/{orgId}/workspaces/{factoryKey}/work-order/{number}`), resolved
 lazily only when the expression references it, because the factory that owns
