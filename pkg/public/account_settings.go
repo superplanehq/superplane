@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const maxAccountNameLength = 80
@@ -182,23 +183,23 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.refuseAccountDeleteGuards(r, account); err != nil {
-		if errors.Is(err, models.ErrAccountDeleteLastUncreatedOwner) {
-			http.Error(w, "Transfer ownership of organizations you did not create before you delete this account.", http.StatusConflict)
-			return
-		}
-		if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
-			http.Error(w, "Promote another installation admin before you delete this account.", http.StatusConflict)
-			return
-		}
-		log.Errorf("Error checking account delete guards for %s: %v", account.ID, err)
-		http.Error(w, "Failed to delete account", http.StatusInternalServerError)
-		return
-	}
-
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
+			return err
+		}
+		if err := s.refuseAccountDeleteGuards(r, tx, account); err != nil {
+			return err
+		}
 		return account.SoftDelete(tx, time.Now())
 	})
+	if errors.Is(err, models.ErrAccountDeleteLastUncreatedOwner) {
+		http.Error(w, "Transfer ownership of organizations you did not create before you delete this account.", http.StatusConflict)
+		return
+	}
+	if errors.Is(err, models.ErrAccountDeleteLastInstallationAdmin) {
+		http.Error(w, "Promote another installation admin before you delete this account.", http.StatusConflict)
+		return
+	}
 	if err != nil {
 		log.Errorf("Error deleting account %s: %v", account.ID, err)
 		http.Error(w, "Failed to delete account", http.StatusInternalServerError)
@@ -209,9 +210,9 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) refuseAccountDeleteGuards(r *http.Request, account *models.Account) error {
+func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account *models.Account) error {
 	if account.IsInstallationAdmin() {
-		count, err := models.CountActiveInstallationAdmins(database.Conn())
+		count, err := models.CountActiveInstallationAdmins(tx)
 		if err != nil {
 			return err
 		}
@@ -220,7 +221,7 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, account *models.Acco
 		}
 	}
 
-	users, err := models.ListActiveHumanUsersForAccount(database.Conn(), account.ID)
+	users, err := models.ListActiveHumanUsersForAccount(tx, account.ID)
 	if err != nil {
 		return err
 	}
