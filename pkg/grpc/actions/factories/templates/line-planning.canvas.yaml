@@ -22,7 +22,7 @@ spec:
         'y': 888
       isCollapsed: true
     - id: planner-agent-no-issue
-      name: Agent - No GH Issue Plan
+      name: Draft Implementation Plan
       type: TYPE_ACTION
       component: runnerClaudeCode
       concurrency:

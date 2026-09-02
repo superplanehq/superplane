@@ -642,9 +642,7 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
     expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");

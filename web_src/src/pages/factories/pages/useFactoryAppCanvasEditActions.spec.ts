@@ -55,7 +55,7 @@ function implementCanvas(): CanvasesCanvas {
         { id: "onrun-implement", name: "Start", type: "TYPE_TRIGGER", component: "onRun", configuration: {} },
         {
           id: "implementation-agent-no-issue",
-          name: "Agent - Implement from order description",
+          name: "Implement From Task Description",
           type: "TYPE_ACTION",
           component: "runnerClaudeCode",
           configuration: {

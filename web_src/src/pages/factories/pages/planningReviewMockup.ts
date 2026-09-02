@@ -60,7 +60,7 @@ export const PLANNING_REVIEW_DRAFT: PlanningReviewDraft = {
   components: [
     {
       id: "implementation-agent",
-      title: "Agent - Implement from order description",
+      title: "Implement From Task Description",
       description: "Implement the approved plan and prepare the branch for review.",
       expanded: true,
       configuration: implementationConfiguration,

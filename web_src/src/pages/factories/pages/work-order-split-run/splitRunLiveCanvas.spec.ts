@@ -181,7 +181,7 @@ describe("resolveSplitRunVisual", () => {
     });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
     expect(visual.stream?.some((line) => line.nodeId === "run-workflow")).toBe(false);
   });
 
@@ -231,7 +231,7 @@ describe("resolveSplitRunVisual", () => {
           id: "live-implementation-agent",
           nodeId: "implementation-agent-no-issue",
           at: "00:00:01",
-          componentName: "Agent - Implement from order description",
+          componentName: "Implement From Task Description",
           status: "passed",
         },
       ],
@@ -286,7 +286,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: false, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
   });
 
   it("shows the line automation while the live canvas loads", () => {
@@ -294,7 +294,7 @@ describe("resolveSplitRunVisual", () => {
     const visual = resolveSplitRunVisual(implement!, { enabled: true, stream: [] });
 
     expect(visual.canvas.title).toBe("Implement");
-    expect(visual.stream?.some((line) => line.componentName === "Agent - Implement from order description")).toBe(true);
+    expect(visual.stream?.some((line) => line.componentName === "Implement From Task Description")).toBe(true);
   });
 
   it("does not keep YAML logs when the live canvas fails", () => {
