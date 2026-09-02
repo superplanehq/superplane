@@ -39,6 +39,7 @@ import {
   FactorySettingsLayout,
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
+  FactorySettingsAccountLinkedAccountsPage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
@@ -305,6 +306,11 @@ const factorySettingsSectionRoutes = [
     key="factory-settings-account-profile"
     path="account/profile"
     element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-linked-accounts"
+    path="account/linked-accounts"
+    element={<FactorySettingsAccountLinkedAccountsPage />}
   />,
   <Route
     key="factory-settings-account-security"

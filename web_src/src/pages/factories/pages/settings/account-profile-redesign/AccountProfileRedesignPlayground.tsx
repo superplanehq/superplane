@@ -8,6 +8,7 @@ import {
 } from "./accountProfileRedesignMocks";
 import { AccountProfileRedesignShell } from "./AccountProfileRedesignShell";
 import {
+  AccountLinkedAccountsRedesignRoutePage,
   AccountProfileRedesignProvider,
   AccountProfileRedesignRoutePage,
   AccountSecurityRedesignRoutePage,
@@ -36,6 +37,7 @@ export function AccountProfileRedesignPlayground({
         onSelectPage={setPage}
       >
         {page === "profile" ? <AccountProfileRedesignRoutePage /> : null}
+        {page === "linked-accounts" ? <AccountLinkedAccountsRedesignRoutePage /> : null}
         {page === "security" ? <AccountSecurityRedesignRoutePage /> : null}
       </AccountProfileRedesignShell>
       <Toaster position="bottom-center" closeButton />
