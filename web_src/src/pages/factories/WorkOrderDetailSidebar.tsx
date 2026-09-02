@@ -87,13 +87,13 @@ export function WorkOrderDetailSidebar({
         onDispatch={onDispatch}
       />
 
+      <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+
       <WorkOrderPullRequestsList
         pullRequests={pullRequests}
         isLoading={isPullRequestsLoading}
         error={pullRequestsError}
       />
-
-      <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
     </div>
   );
 }

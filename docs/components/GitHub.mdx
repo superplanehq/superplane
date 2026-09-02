@@ -55,6 +55,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Issue Comment" href="#update-issue-comment" description="Update an existing comment on a GitHub issue or pull request" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
+  <LinkCard title="Wait For Pull Request Checks" href="#wait-for-pull-request-checks" description="Wait until pull request checks on a commit become complete" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
@@ -4741,6 +4742,82 @@ Returns the updated release object with all current information.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="wait-for-pull-request-checks"></a>
+
+## Wait For Pull Request Checks
+
+**Component key:** `github.waitForPullRequestChecks`
+
+The Wait For Pull Request Checks component watches GitHub Checks and Commit Statuses for one commit.
+
+It combines both GitHub status systems into one snapshot. It then waits until the selected checks become terminal.
+
+GitHub does not report the expected total number of checks. When you leave the check name list empty, the component waits for a quiet period after the last change. That quiet period is the completeness signal. When you specify check names, the component finishes as soon as every named check is terminal.
+
+### Use Cases
+
+- **Factory quality gates**: Wait for pull request checks before an agent starts a fix
+- **Release gates**: Continue only when selected checks pass
+- **Failure summaries**: Collect every selected failed check in one payload
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Full commit SHA to watch
+- **Check Names** *(optional)*: Exact check or status names to require. An empty list waits for all observed checks.
+- **Quiet Period Seconds**: Seconds to wait after the last check change when the name list is empty. Default: 60. Named checks skip this wait.
+- **Timeout Seconds**: Maximum wait time. Default: 3600.
+
+### Output Channels
+
+- **Passed**: No selected check failed. For an empty name list, this is after the quiet period.
+- **Failed**: A selected check has a failing conclusion
+- **Timed Out**: The timeout expired, or a selected check never appeared
+
+Each output includes the repository, SHA, all observed checks, selected checks, failed checks, and timestamps.
+
+### Notes
+
+- The component listens for check_run, check_suite, and status webhooks
+- A five-minute poll runs only when a webhook does not arrive
+- Unknown non-terminal conclusions stay pending
+
+### Example Output
+
+```json
+{
+  "data": {
+    "checks": [
+      {
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/testhq/hello/runs/1",
+        "key": "check-run:github-actions:DCO",
+        "kind": "check_run",
+        "name": "DCO",
+        "status": "completed"
+      }
+    ],
+    "completedAt": "2026-08-31T12:01:05Z",
+    "failedChecks": [],
+    "repository": "hello",
+    "selectedChecks": [
+      {
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/testhq/hello/runs/1",
+        "key": "check-run:github-actions:DCO",
+        "kind": "check_run",
+        "name": "DCO",
+        "status": "completed"
+      }
+    ],
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "startedAt": "2026-08-31T12:00:00Z"
+  },
+  "timestamp": "2026-08-31T12:01:05Z",
+  "type": "github.pullRequestChecks"
 }
 ```
 

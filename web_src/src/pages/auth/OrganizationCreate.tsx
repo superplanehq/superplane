@@ -39,9 +39,9 @@ const OrganizationCreate: React.FC = () => {
       });
 
       if (response.ok) {
-        const org = await response.json();
+        const org: { id: string; slug: string } = await response.json();
         analytics.orgCreate(org.id);
-        window.location.href = newOrganizationLandingPath(org.id);
+        window.location.href = newOrganizationLandingPath(org.slug);
       } else {
         const fallbackMessage =
           response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";

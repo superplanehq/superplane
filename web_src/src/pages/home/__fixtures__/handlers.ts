@@ -133,7 +133,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           organization: {
-            metadata: { id: orgId, name: fixture.organizationName },
+            metadata: { id: orgId, name: fixture.organizationName, slug: fixture.organizationSlug ?? "" },
             spec: {
               enabledExperimentalFeatures: fixture.enabledExperimentalFeatures ?? [],
             },
@@ -174,6 +174,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               id: "factories",
               label: "Factories",
               description: "Software factories for tasks",
+            },
+            {
+              id: "workspace_models",
+              label: "Workspace Models",
+              description: "Show the in-progress workspace Models settings page",
             },
           ],
         },

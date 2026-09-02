@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { client } from "@/api-client/client.gen";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 
@@ -84,5 +85,59 @@ describe("FactorySettingsLayout sidebar", () => {
       "aria-current",
       "page",
     );
+  });
+
+  describe("workspace-models experimental feature", () => {
+    it("hides the Models nav item when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("shows the Models nav item when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-models")).toHaveTextContent("Models");
+    }, 10000);
+
+    it("redirects away from the Models route when the feature is off", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+      });
+      expect(screen.queryByTestId("workspace-page-header-title")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("renders the Models page when the feature is on", async () => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
+        />,
+      );
+
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(await screen.findByTestId("workspace-page-header-title")).toHaveTextContent("Models");
+    }, 10000);
   });
 });
