@@ -2,10 +2,13 @@ import { Label } from "@/components/ui/label";
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/ui/switch";
-import { Maximize2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+import { ChevronsDown, Maximize2 } from "lucide-react";
 import { useId } from "react";
 
 import { SectionTitle } from "../work-order-popup-redesign/popupShared";
+
+const FOLLOW_TOOLTIP_TEXT = "Auto-scroll the log to the newest output.";
 
 export function SplitRunFollowSwitch({
   following,
@@ -19,12 +22,18 @@ export function SplitRunFollowSwitch({
   const followId = useId();
 
   return (
-    <div className={cn("ml-auto flex items-center gap-1.5", className)} data-testid="split-run-follow">
-      <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
-        Follow
-      </Label>
-      <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className={cn("ml-auto flex items-center gap-1.5", className)} data-testid="split-run-follow">
+          <ChevronsDown className="size-3.5 text-muted-foreground" aria-hidden />
+          <Label htmlFor={followId} className="text-xs font-medium text-muted-foreground">
+            Follow
+          </Label>
+          <Switch id={followId} checked={following} onCheckedChange={onFollowingChange} />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top">{FOLLOW_TOOLTIP_TEXT}</TooltipContent>
+    </Tooltip>
   );
 }
 
