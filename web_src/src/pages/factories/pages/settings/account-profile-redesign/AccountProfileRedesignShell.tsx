@@ -154,7 +154,7 @@ export function AccountProfileRedesignShell({
           })}
         </nav>
       </aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children}</main>
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-sidebar dark:bg-background">{children}</main>
     </div>
   );
 }

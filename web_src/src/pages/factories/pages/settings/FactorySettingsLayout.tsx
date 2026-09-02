@@ -175,8 +175,13 @@ function FactorySettingsLayoutContent({
                 ))}
               </nav>
             </aside>
+            {/*
+              Gray canvas behind white panels, like the Velocity report. Dark
+              mode keeps the darker page, because the factories theme paints
+              the sidebar and the panels the same color.
+            */}
             <main
-              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-sidebar dark:bg-background"
               data-testid="factory-settings-main"
             >
               <Outlet />

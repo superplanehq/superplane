@@ -10,8 +10,8 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { centsToDollarInput, parseDollarInputToCents } from "@/lib/hostedCredit";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { factoryCardClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
 import {
   WorkspaceUsageByMachineTypeTable,
@@ -29,15 +29,12 @@ export function FactorySettingsUsagePage() {
   usePageTitle(["Spending", "Settings", factory.name ?? "Workspace"]);
 
   return (
-    <>
-      <WorkspacePageHeader
-        title="Spending"
-        subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
-      />
-      <div className={factoryContentBodyClassName}>
-        <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
-      </div>
-    </>
+    <FactorySettingsPageFrame
+      title="Spending"
+      subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
+    >
+      <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
+    </FactorySettingsPageFrame>
   );
 }
 
