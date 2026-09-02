@@ -73,7 +73,8 @@ func TestHostExecutorUsesTaskWorkDirCommands(t *testing.T) {
 	if err != nil || exit != 0 {
 		t.Fatalf("host commands pwd: exit=%d err=%v output=%q", exit, err, output)
 	}
-	if got := strings.TrimSpace(output); got != workDir {
-		t.Fatalf("pwd = %q, want %q", got, workDir)
+	// Pipe path emits cmd_start/cmd_end markers around command stdout.
+	if !strings.Contains(output, workDir) {
+		t.Fatalf("output = %q, want workdir %q", output, workDir)
 	}
 }
