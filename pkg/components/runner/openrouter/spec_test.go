@@ -149,7 +149,7 @@ func TestBuildOpenRouterBrokerTaskPassesMaxTurns(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	commands, _ := buildOpenRouterBrokerTask(spec)
+	commands, _ := buildOpenRouterBrokerTask(spec, "", nil)
 	require.GreaterOrEqual(t, len(commands), 2)
 	require.Contains(t, commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6' 64`)
 }
@@ -160,7 +160,7 @@ func TestBuildOpenRouterBrokerTaskDefaultsMaxTurns(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 0
-	commands, _ := buildOpenRouterBrokerTask(spec)
+	commands, _ := buildOpenRouterBrokerTask(spec, "", nil)
 	require.GreaterOrEqual(t, len(commands), 2)
 	require.Contains(t, commands[1].Command, fmt.Sprintf("'anthropic/claude-sonnet-4-6' %d", DefaultMaxTurns))
 }
