@@ -214,10 +214,11 @@ func TestClient_CreateMessage(t *testing.T) {
 
 func TestClient_ErrorHandling(t *testing.T) {
 	tests := []struct {
-		name             string
-		responseBody     string
-		statusCode       int
-		expectedErrorMsg string
+		name               string
+		responseBody       string
+		statusCode         int
+		expectedErrorMsg   string
+		expectedStatusCode int
 	}{
 		{
 			name: "Structured Anthropic Error",
@@ -227,14 +228,16 @@ func TestClient_ErrorHandling(t *testing.T) {
 					"message": "max_tokens is too large"
 				}
 			}`,
-			statusCode:       400,
-			expectedErrorMsg: "request failed (400): max_tokens is too large",
+			statusCode:         400,
+			expectedErrorMsg:   "request failed (400): max_tokens is too large",
+			expectedStatusCode: 400,
 		},
 		{
-			name:             "Unstructured Plain Text Error",
-			responseBody:     `Bad Gateway`,
-			statusCode:       502,
-			expectedErrorMsg: "request failed (502): Bad Gateway",
+			name:               "Unstructured Plain Text Error",
+			responseBody:       `Bad Gateway`,
+			statusCode:         502,
+			expectedErrorMsg:   "request failed (502): Bad Gateway",
+			expectedStatusCode: 502,
 		},
 		{
 			name: "Auth Error (401)",
@@ -244,8 +247,21 @@ func TestClient_ErrorHandling(t *testing.T) {
 					"message": "invalid x-api-key"
 				}
 			}`,
-			statusCode:       401,
-			expectedErrorMsg: "Claude credentials are invalid or expired: invalid x-api-key",
+			statusCode:         401,
+			expectedErrorMsg:   "Claude credentials are invalid or expired: invalid x-api-key",
+			expectedStatusCode: 401,
+		},
+		{
+			name: "Rate Limited (429)",
+			responseBody: `{
+				"error": {
+					"type": "rate_limit_error",
+					"message": "rate limit exceeded"
+				}
+			}`,
+			statusCode:         429,
+			expectedErrorMsg:   "request failed (429): rate limit exceeded",
+			expectedStatusCode: 429,
 		},
 	}
 
@@ -272,8 +288,28 @@ func TestClient_ErrorHandling(t *testing.T) {
 			if err.Error() != tt.expectedErrorMsg {
 				t.Errorf("expected error message '%s', got '%s'", tt.expectedErrorMsg, err.Error())
 			}
+
+			var providerErr *core.ProviderAPIError
+			require.ErrorAs(t, err, &providerErr)
+			assert.Equal(t, tt.expectedStatusCode, providerErr.StatusCode)
 		})
 	}
+}
+
+func TestClient_ErrorHandling_TransportFailure(t *testing.T) {
+	// An empty Responses queue makes HTTPContext.Do return a transport-level
+	// error, simulating a network failure before any response is received.
+	httpCtx := &contexts.HTTPContext{}
+
+	client := &Client{http: httpCtx, BaseURL: defaultBaseURL}
+
+	_, err := client.ListModels()
+	require.Error(t, err)
+
+	var providerErr *core.ProviderAPIError
+	require.ErrorAs(t, err, &providerErr)
+	assert.True(t, providerErr.IsTransport())
+	assert.Equal(t, 0, providerErr.StatusCode)
 }
 
 func Test__Client__CreateMessageBatch(t *testing.T) {
