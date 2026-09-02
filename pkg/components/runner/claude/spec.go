@@ -118,7 +118,7 @@ func validateRunClaudeCodeSpec(spec RunClaudeCodeSpec) error {
 // Static helpers ship via `files` (materialized under SUPERPLANE_TASK_DIR).
 // Node and per-step workingDirectory cds from the task launch directory so
 // each broker command starts in the configured workspace.
-func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
+func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []runner.IntegrationSetup) ClaudeCodeBrokerTask {
 	model := strings.TrimSpace(spec.Model)
 	workdir := strings.TrimSpace(spec.WorkingDirectory)
 
@@ -128,20 +128,24 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec) ClaudeCodeBrokerTask {
 		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
 
+	setupCommands, setupFiles := runner.BuildIntegrationSetupCommands(setups)
+	files = append(files, setupFiles...)
+
 	stepCommands := make([]runner.BrokerCommand, 0, len(spec.Steps))
 	for i, step := range spec.Steps {
-		file, command := buildClaudeCodeStep(i+1, step, model, workdir)
+		file, command := buildClaudeCodeStep(i+1, step, usage, model, workdir)
 		files = append(files, file)
 		stepCommands = append(stepCommands, command)
 	}
 
 	prepareCommand := runner.BrokerCommand{
 		Name:    "Prepare Claude Code",
-		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
+		Command: runner.WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    runner.LiveLogKindSetup,
 	}
+	commands := append([]runner.BrokerCommand{prepareCommand}, setupCommands...)
 	return ClaudeCodeBrokerTask{
-		Commands: append([]runner.BrokerCommand{prepareCommand}, stepCommands...),
+		Commands: append(commands, stepCommands...),
 		Files:    files,
 	}
 }
@@ -194,7 +198,7 @@ func planningSessionMCPFiles() []runner.BrokerTaskFile {
 	}
 }
 
-func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
+func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, usage, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
 	stepSlug := runner.AgentStepSlug(stepNumber, step.Name)
 	workingDirectory := runner.EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
 	switch runner.NormalizeAgentStepType(step.Type) {
@@ -217,7 +221,7 @@ func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, model, nodeWorking
 		promptName := stepSlug + ".txt"
 		return runner.BrokerTaskFile{
 			Path:    "prompts/" + promptName,
-			Content: prompt,
+			Content: runner.ApplyIntegrationUsage(prompt, usage),
 			Mode:    "0644",
 		}, claudePromptStepBrokerCommand(step.Name, promptName, prompt, model, workingDirectory)
 	}
