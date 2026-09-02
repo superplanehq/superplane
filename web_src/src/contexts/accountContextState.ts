@@ -11,6 +11,18 @@ export interface AccountProviderMethod {
   username?: string;
 }
 
+/**
+ * An identity the account owns on another service. A linked account is not a
+ * sign-in method: it tells SuperPlane which activity on that service belongs to
+ * this account.
+ */
+export interface AccountLinkedAccount {
+  provider: string;
+  username: string;
+  name?: string;
+  avatar_url?: string;
+}
+
 interface Account {
   id: string;
   name: string;
@@ -19,6 +31,7 @@ interface Account {
   installation_admin: boolean;
   has_password: boolean;
   providers?: AccountProviderMethod[];
+  linked_accounts?: AccountLinkedAccount[];
   roles?: string[];
   groups?: string[];
   impersonation?: AccountImpersonation;
