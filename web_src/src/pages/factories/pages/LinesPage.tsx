@@ -107,9 +107,9 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
+import { ColumnAgentEditorPopup } from "./ColumnAgentEditorPopup";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
-import { PlanningReviewPopup } from "./PlanningReviewPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   ADD_INTAKE_TEMPLATES,
@@ -1244,17 +1244,7 @@ function PhaseColumn({
         }}
         onClose={() => setParallelismOpen(false)}
       />
-      {agentEditor.editorOpen ? (
-        <PlanningReviewPopup
-          key={agentEditor.agentNode?.id ?? "agent"}
-          onClose={agentEditor.closeEditor}
-          organizationId={organizationId}
-          automationHref={configureHref ?? undefined}
-          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
-          isLoading={agentEditor.isLoading || !agentEditor.draft}
-          onSave={agentEditor.save}
-        />
-      ) : null}
+      <ColumnAgentEditorPopup editor={agentEditor} organizationId={organizationId} automationHref={configureHref} />
     </>
   );
 }

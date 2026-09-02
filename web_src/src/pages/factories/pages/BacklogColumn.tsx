@@ -3,12 +3,12 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
+import { ColumnAgentEditorPopup } from "./ColumnAgentEditorPopup";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { PlanningReviewPopup } from "./PlanningReviewPopup";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
@@ -168,17 +168,7 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
-      {agentEditor.editorOpen ? (
-        <PlanningReviewPopup
-          key={agentEditor.agentNode?.id ?? "agent"}
-          onClose={agentEditor.closeEditor}
-          organizationId={organizationId}
-          automationHref={automationHref ?? undefined}
-          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
-          isLoading={agentEditor.isLoading || !agentEditor.draft}
-          onSave={agentEditor.save}
-        />
-      ) : null}
+      <ColumnAgentEditorPopup editor={agentEditor} organizationId={organizationId} automationHref={automationHref} />
     </>
   );
 }

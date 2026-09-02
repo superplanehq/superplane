@@ -714,42 +714,6 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("hides Edit Agent on the Backlog menu when its automation canvas has no agent", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.getByTestId("lines-backlog-menu-edit-automation")).toBeInTheDocument();
-    expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
-  });
-
-  it("shows Edit Agent on the Backlog menu when its automation canvas has an agent, and opens it", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
-    useCanvasMock.mockImplementation((_organizationId: string, _canvasId: string, options?: { enabled?: boolean }) => {
-      if (options?.enabled === false) {
-        return { data: undefined, isPending: false, isError: false };
-      }
-      return canvasQuery(implementerCanvas);
-    });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    const editAutomation = screen.getByTestId("lines-backlog-menu-edit-automation");
-    const editAgent = screen.getByTestId("lines-backlog-menu-edit-agent");
-    const edit = screen.getByTestId("lines-backlog-menu-edit");
-    expect(editAgent).toHaveTextContent("Edit Agent");
-    // Edit automation, then Edit Agent, then Edit, then Set color.
-    expect(editAutomation.compareDocumentPosition(editAgent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(editAgent.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(editAgent);
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
-  });
-
   it("opens Set parallelism and saves a new cap", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
     const user = userEvent.setup();
@@ -830,5 +794,47 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       editFactoryLinePath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID),
     );
+  });
+});
+
+describe("LinesPage Backlog agent editor", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  it("hides Edit Agent on the Backlog menu when its automation canvas has no agent", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.getByTestId("lines-backlog-menu-edit-automation")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
+  });
+
+  it("shows Edit Agent on the Backlog menu when its automation canvas has an agent, and opens it", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    useCanvasMock.mockImplementation((_organizationId: string, _canvasId: string, options?: { enabled?: boolean }) => {
+      if (options?.enabled === false) {
+        return { data: undefined, isPending: false, isError: false };
+      }
+      return canvasQuery(implementerCanvas);
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const editAutomation = screen.getByTestId("lines-backlog-menu-edit-automation");
+    const editAgent = screen.getByTestId("lines-backlog-menu-edit-agent");
+    const edit = screen.getByTestId("lines-backlog-menu-edit");
+    expect(editAgent).toHaveTextContent("Edit Agent");
+    // Edit automation, then Edit Agent, then Edit, then Set color.
+    expect(editAutomation.compareDocumentPosition(editAgent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(editAgent.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(editAgent);
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
+    ).toBeInTheDocument();
   });
 });
