@@ -84,6 +84,8 @@ export interface SplitRunStreamLine {
   kind?: SplitRunStreamKind;
   /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
   componentType?: string;
+  /** Compact session log: user talk vs a survey answer. */
+  userTalk?: "message" | "survey";
   action?: string;
   iconSlug?: string;
   iconSrc?: string;

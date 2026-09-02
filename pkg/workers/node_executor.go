@@ -400,6 +400,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		CanvasName:     workflow.Name,
@@ -430,7 +431,6 @@ func (w *NodeExecutor) executeActionNode(
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
 	}
-
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {

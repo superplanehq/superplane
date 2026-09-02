@@ -23,6 +23,7 @@ var (
  */
 type ExecutionContext struct {
 	ID             uuid.UUID
+	RunID          uuid.UUID
 	WorkflowID     string
 	OrganizationID string
 	CanvasName     string

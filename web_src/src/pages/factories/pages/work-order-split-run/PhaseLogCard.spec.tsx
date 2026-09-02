@@ -283,6 +283,162 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
   });
 
+  it("collapses session setup and bash when compactSessionLog is on", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 1,
+          text: "Clone Repo",
+          kind: "bash",
+          preview: "git clone repo",
+          lines: ["Cloning into 'repo'..."],
+          events: [],
+          status: "passed",
+          duration_ms: 20,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 5,
+          text: "Plan with the user",
+          kind: "prompt",
+          preview: "You are in a SuperPlane planning session",
+          lines: [],
+          events: [
+            { kind: "note", text: "Planning session tools enabled" },
+            { kind: "note", text: "permission mode: bypassPermissions" },
+            { kind: "note", text: "The repository is ready. What do you want to do?" },
+            { kind: "note", text: '{"message":"Hi! I am ready to help you plan work in this repository."}' },
+            {
+              kind: "tools",
+              id: "5-tools-0",
+              tools: [
+                {
+                  id: "5-tool-0",
+                  kind: "read",
+                  text: "README.md",
+                  lines: ["# Store"],
+                  status: "passed",
+                  duration_ms: 80,
+                },
+              ],
+            },
+          ],
+          status: "passed",
+          duration_ms: 900,
+          started_at: 1,
+          collapsed: true,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("git clone repo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Planning session tools enabled")).not.toBeInTheDocument();
+    expect(screen.queryByText("permission mode: bypassPermissions")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ran 1 command" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Setup" })).not.toBeInTheDocument();
+    expect(screen.queryByText("You are in a SuperPlane planning session")).not.toBeInTheDocument();
+    expect(screen.queryByText("prompt")).not.toBeInTheDocument();
+    expect(screen.queryByText(/"message":"Hi! I am ready/)).not.toBeInTheDocument();
+    expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file, ran 1 command" })).toBeInTheDocument();
+  });
+
+  it("marks user replies in the compact session log", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "user-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            componentName: "Add a Size field",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "I can draft that.",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You");
+    expect(userNote).toHaveTextContent("Add a Size field");
+    expect(screen.getByText("I can draft that.")).toBeInTheDocument();
+    expect(screen.getByText("I can draft that.").closest("[data-testid='split-run-user-note']")).toBeNull();
+  });
+
+  it("labels a survey reply as You (survey response)", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "user-survey",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            userTalk: "survey",
+            componentName: "What is the priority? High",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You (survey response)");
+    expect(userNote).toHaveTextContent("What is the priority? High");
+  });
+
   it("keeps yaml notes when live sections are only setup", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [
@@ -328,6 +484,41 @@ describe("PhaseLogCard collapsed stream", () => {
 
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
+  });
+
+  it("shows orphan live-log lines instead of Waiting for logs", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [],
+      orphanLines: ["Claude Code ready", "Cloning into 'repo'..."],
+      error: null,
+      isStreaming: true,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Claude Code ready")).toBeInTheDocument();
+    expect(screen.getByText("Cloning into 'repo'...")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
   });
 
   it("shows a live log error on an expanded runner node", () => {
