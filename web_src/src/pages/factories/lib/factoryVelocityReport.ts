@@ -57,12 +57,21 @@ export interface VelocityTotals {
   peopleMerged: number;
   superplaneMerged: number;
   waste: number;
-  /** Waste as a share of SuperPlane closes, 0-100. */
-  wasteRate: number;
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
-  costPerMerge: number;
+  /**
+   * Tasks that closed in the window, with or without a merge. A task counts
+   * once, however many pull requests it opened, so this differs from the pull
+   * request counts above.
+   */
+  tasksClosed: number;
+  /** Part of `tasksClosed` that closed without a merge. */
+  tasksWaste: number;
+  /** Waste as a share of closed tasks, 0-100. */
+  taskWasteRate: number;
+  /** Tracked model spend divided by the tasks that closed. */
+  costPerTask: number;
 }
 
 export interface VelocityIntakeSeries {
@@ -106,10 +115,10 @@ function centsToUsd(value: string | number | undefined): number {
   return parseWorkOrderMetric(value) / 100;
 }
 
-function wasteRate(superplaneMerged: number, waste: number): number {
-  const closes = superplaneMerged + waste;
-  if (closes <= 0) return 0;
-  return Math.round((waste / closes) * 100);
+/** Rounded share of `whole` that `part` holds, 0-100. */
+function sharePct(part: number, whole: number): number {
+  if (whole <= 0) return 0;
+  return Math.round((part / whole) * 100);
 }
 
 function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): VelocityTotals {
@@ -117,17 +126,21 @@ function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): V
   const peopleMerged = totals?.peopleMerged ?? 0;
   const waste = totals?.waste ?? 0;
   const costUsd = centsToUsd(totals?.costCents);
+  const tasksClosed = totals?.tasksClosed ?? 0;
+  const tasksWaste = totals?.tasksWaste ?? 0;
 
   return {
     merged: peopleMerged + superplaneMerged,
     peopleMerged,
     superplaneMerged,
     waste,
-    wasteRate: totals?.wastePct ?? wasteRate(superplaneMerged, waste),
     costUsd,
     wasteCostUsd: centsToUsd(totals?.wasteCostCents),
     tokens: parseWorkOrderMetric(totals?.tokens),
-    costPerMerge: superplaneMerged > 0 ? costUsd / superplaneMerged : 0,
+    tasksClosed,
+    tasksWaste,
+    taskWasteRate: sharePct(tasksWaste, tasksClosed),
+    costPerTask: tasksClosed > 0 ? costUsd / tasksClosed : 0,
   };
 }
 

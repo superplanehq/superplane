@@ -10,8 +10,8 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { centsToDollarInput, parseDollarInputToCents } from "@/lib/hostedCredit";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { factoryCardClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
 import {
   WorkspaceUsageByMachineTypeTable,
@@ -29,15 +29,12 @@ export function FactorySettingsUsagePage() {
   usePageTitle(["Spending", "Settings", factory.name ?? "Workspace"]);
 
   return (
-    <>
-      <WorkspacePageHeader
-        title="Spending"
-        subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
-      />
-      <div className={factoryContentBodyClassName}>
-        <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
-      </div>
-    </>
+    <FactorySettingsPageFrame
+      title="Spending"
+      subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
+    >
+      <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
+    </FactorySettingsPageFrame>
   );
 }
 
@@ -92,7 +89,7 @@ function HostedSpendLimitCard() {
   const [noLimit, setNoLimit] = useState(!hasLimit);
   const [dollars, setDollars] = useState(hasLimit ? centsToDollarInput(Number(currentBudget)) : "");
   const limitCents = parseDollarInputToCents(dollars);
-  const canSaveLimit = noLimit || limitCents !== null;
+  const canSaveLimit = limitCents !== null;
 
   useEffect(() => {
     const nextHasLimit = currentBudget !== undefined && currentBudget !== null;
@@ -101,17 +98,33 @@ function HostedSpendLimitCard() {
   }, [currentBudget]);
 
   const save = async () => {
-    if (!noLimit && limitCents === null) {
+    if (limitCents === null) {
       showErrorToast("Enter a valid spend limit in USD.");
       return;
     }
     try {
       await updateFactory.mutateAsync({
-        hostedSpendBudgetCents: noLimit ? null : limitCents,
+        hostedSpendBudgetCents: limitCents,
       });
       showSuccessToast("Hosted spend limit saved.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const clearLimit = async () => {
+    try {
+      await updateFactory.mutateAsync({ hostedSpendBudgetCents: null });
+      showSuccessToast("Hosted spend limit saved.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const handleNoLimitChange = (checked: boolean) => {
+    setNoLimit(checked);
+    if (checked && hasLimit) {
+      void clearLimit();
     }
   };
 
@@ -126,7 +139,7 @@ function HostedSpendLimitCard() {
           id="hosted-spend-no-limit"
           checked={noLimit}
           disabled={!canUpdate || updateFactory.isPending}
-          onCheckedChange={setNoLimit}
+          onCheckedChange={handleNoLimitChange}
         />
       </div>
       {!noLimit ? (
@@ -162,7 +175,7 @@ function HostedSpendLimitCard() {
           {formatUsdCents(parseWorkOrderMetric(data.hostedSpendBudgetCents))}.
         </p>
       ) : null}
-      {canUpdate ? (
+      {canUpdate && !noLimit ? (
         <Button
           className="mt-3"
           type="button"

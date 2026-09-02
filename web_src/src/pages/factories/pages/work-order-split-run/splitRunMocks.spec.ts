@@ -1342,7 +1342,7 @@ describe("line board work-order examples", () => {
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
       ["19:52:39", "Add Pull Request", "Attach PR to Task", "passed"],
-      ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
+      ["19:52:39", "setWorkOrderStatusNote", "Set Closure Note", "passed"],
     ]);
     expect(prStream.find((line) => line.componentName === "Attach PR to Task")?.pullRequest).toMatchObject({
       number: "6837",

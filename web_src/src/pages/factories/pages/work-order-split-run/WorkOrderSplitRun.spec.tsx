@@ -200,7 +200,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start Implementation").length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
@@ -799,6 +799,18 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
     expect(coverage).toHaveAttribute("open");
+  });
+
+  it("shows the full check summary without a one-line clamp", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
+    expect(summary.tagName).toBe("P");
+    expect(summary).not.toHaveClass("truncate");
+    expect(summary).toHaveClass("break-words");
   });
 
   it("keeps description checks collapsed when the task is not a draft", async () => {

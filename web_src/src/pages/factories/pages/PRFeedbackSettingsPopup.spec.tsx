@@ -233,6 +233,34 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
     expect(within(row).getByRole("listitem").className).toContain("items-center");
   });
 
+  it("groups integrations of the same type next to each other", () => {
+    vi.mocked(useConnectedIntegrations).mockReturnValue(
+      mockConnectedIntegrations([
+        { metadata: { id: "int-slack-2", name: "slack-eng", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-circleci-2", name: "circleci-staging", integrationName: "circleci" },
+          status: { state: "ready" },
+        },
+        { metadata: { id: "int-slack-1", name: "slack-alerts", integrationName: "slack" }, status: { state: "ready" } },
+        {
+          metadata: { id: "int-circleci-1", name: "circleci-prod", integrationName: "circleci" },
+          status: { state: "ready" },
+        },
+      ]),
+    );
+
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1");
+
+    const list = screen.getByTestId("pr-feedback-integrations");
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "circleci-prod",
+      "circleci-staging",
+      "slack-alerts",
+      "slack-eng",
+    ]);
+  });
+
   it("links to the organization Integrations page", () => {
     renderChecksPopup(vi.fn(), checksDraft(), "org-1");
 

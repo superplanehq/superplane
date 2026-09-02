@@ -116,7 +116,7 @@ func (s *invitationSteps) acceptInvite(token string) {
 }
 
 func (s *invitationSteps) waitForOrganizationRedirect() {
-	waitErr := s.session.Page().WaitForURL("**/"+s.session.OrgID.String()+"*", pw.PageWaitForURLOptions{
+	waitErr := s.session.Page().WaitForURL("**/"+s.session.OrgSlug+"*", pw.PageWaitForURLOptions{
 		Timeout: pw.Float(30000),
 	})
 	require.NoError(s.t, waitErr)

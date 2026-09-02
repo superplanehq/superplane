@@ -8,8 +8,10 @@ import {
   Grid3x3,
   Key,
   KeyRound,
+  Link2,
   Plug,
   Settings,
+  Shield,
   Users,
   Workflow,
 } from "lucide-react";
@@ -18,6 +20,9 @@ import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
 
 export type FactorySettingsSection =
   | "general"
+  | "profile"
+  | "linked-accounts"
+  | "security"
   | "notifications"
   | "repository"
   | "automations"
@@ -47,7 +52,15 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
     id: "account",
     label: "Account",
     items: [
-      { id: "account-general", label: "General", Icon: CircleUser, scope: "account", section: "general" },
+      { id: "account-profile", label: "Profile", Icon: CircleUser, scope: "account", section: "profile" },
+      {
+        id: "account-linked-accounts",
+        label: "Linked accounts",
+        Icon: Link2,
+        scope: "account",
+        section: "linked-accounts",
+      },
+      { id: "account-security", label: "Security", Icon: Shield, scope: "account", section: "security" },
       { id: "account-notifications", label: "Notifications", Icon: Bell, scope: "account", section: "notifications" },
     ],
   },

@@ -134,7 +134,12 @@ import {
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
-import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
+import {
+  normalizeColumnColors,
+  serializeColumnColors,
+  lineBoardColumnLaneClassName,
+  type LineBoardColumnColorId,
+} from "./lineBoardColumnColors";
 
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
@@ -835,7 +840,10 @@ function PhaseBoard({
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
 }) {
-  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
+  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
+    normalizeColumnColors(line.columnColors),
+  );
+  const columnColorsRef = useRef(columnColors);
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
@@ -851,9 +859,50 @@ function PhaseBoard({
         })
       : undefined;
 
-  const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
-    setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
-  }, []);
+  // The line query is the source of truth for persisted colors. Resync when
+  // it changes, but skip while a color save is in flight so a stale refetch
+  // cannot wipe the optimistic lane color. Do not depend on isPending here:
+  // when a save finishes, isPending flips before the factory query refetch
+  // lands and would briefly restore the previous color.
+  useEffect(() => {
+    if (updateLine.isPending) {
+      return;
+    }
+    const next = normalizeColumnColors(line.columnColors);
+    if (serializeColumnColors(next) === serializeColumnColors(columnColorsRef.current)) {
+      return;
+    }
+    columnColorsRef.current = next;
+    setColumnColors(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPending must not trigger resync; see comment above
+  }, [line.columnColors]);
+
+  const setColumnColor = useCallback(
+    async (columnKey: string, colorId: LineBoardColumnColorId | null) => {
+      const previousColors = columnColorsRef.current;
+      const nextColors = { ...previousColors, [columnKey]: colorId };
+      columnColorsRef.current = nextColors;
+      setColumnColors(nextColors);
+
+      if (!lineId) {
+        return;
+      }
+      try {
+        const updatedLine = await updateLine.mutateAsync({
+          lineId,
+          columnColors: serializeColumnColors(nextColors),
+        });
+        const persisted = normalizeColumnColors(updatedLine.columnColors);
+        columnColorsRef.current = persisted;
+        setColumnColors(persisted);
+      } catch (error) {
+        columnColorsRef.current = previousColors;
+        setColumnColors(previousColors);
+        showErrorToast(getApiErrorMessage(error, "Failed to update column color"));
+      }
+    },
+    [lineId, updateLine],
+  );
 
   const setColumnTitle = useCallback((columnKey: string, title: string) => {
     setColumnTitles((current) => ({ ...current, [columnKey]: title }));
@@ -901,7 +950,7 @@ function PhaseBoard({
             setBacklogSettingsOpen(false);
           }}
           colorId={columnColors.backlog ?? null}
-          onColorChange={(colorId) => setColumnColor("backlog", colorId)}
+          onColorChange={(colorId) => void setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
@@ -933,7 +982,7 @@ function PhaseBoard({
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
-              onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
+              onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
               onRename={(title) => setColumnTitle(columnKey, title)}
               workOrderCardContext={workOrderCardContext}
@@ -950,7 +999,7 @@ function PhaseBoard({
           listeners={verifyListeners}
           onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
-          onColorChange={(colorId) => setColumnColor("verify", colorId)}
+          onColorChange={(colorId) => void setColumnColor("verify", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("verify", title)}
           workOrderCardContext={workOrderCardContext}
@@ -963,7 +1012,7 @@ function PhaseBoard({
           orders={doneOrders}
           title={columnTitles.done ?? "Done"}
           colorId={columnColors.done ?? null}
-          onColorChange={(colorId) => setColumnColor("done", colorId)}
+          onColorChange={(colorId) => void setColumnColor("done", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
           workOrderCardContext={workOrderCardContext}

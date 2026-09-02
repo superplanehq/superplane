@@ -1,6 +1,6 @@
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
+import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
@@ -268,6 +268,7 @@ export function useOnboardingPageModel(args: {
     createIntake: createIntake.mutateAsync,
     listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
     createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
+    listApps: () => fetchFactoryApps(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
     remainingCreditCents: agent.remainingCreditCents,

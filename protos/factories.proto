@@ -818,6 +818,10 @@ message FactoryLine {
   google.protobuf.Timestamp updated_at = 5;
   // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
   optional FactoryLineMetrics metrics = 6;
+  // Board column colors, keyed by column key ("backlog", "phase-<step
+  // index>", "verify", "done"). Value is a color id. Missing keys use the
+  // default color.
+  map<string, string> column_colors = 7;
 }
 
 message CreateFactoryLineRequest {
@@ -835,6 +839,9 @@ message UpdateFactoryLineRequest {
   string line_id = 2;
   optional string name = 3;
   repeated FactoryLine.Step steps = 4;
+  // Full replacement of the board column colors. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, string> column_colors = 5;
 }
 
 message UpdateFactoryLineResponse {
@@ -1845,6 +1852,12 @@ message DescribeFactoryVelocityTotals {
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 8;
+  // Work orders (tasks) that closed in the window. A work order counts once,
+  // even when it opened several pull requests, which is why this differs from
+  // the pull request counts above.
+  int32 tasks_closed = 9;
+  // Part of `tasks_closed` whose pull requests all closed without a merge.
+  int32 tasks_waste = 10;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.

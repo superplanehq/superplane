@@ -31,9 +31,20 @@ func Test__DescribeOrganization(t *testing.T) {
 		require.NotNil(t, response.Organization.Metadata)
 		assert.Equal(t, r.Organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, r.Organization.Name, response.Organization.Metadata.Name)
+		assert.Equal(t, r.Organization.Slug, response.Organization.Metadata.Slug)
 		assert.Equal(t, r.Organization.Description, response.Organization.Metadata.Description)
 		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
 		require.NotNil(t, response.Organization.Spec)
+	})
+
+	t.Run("describe organization by slug", func(t *testing.T) {
+		response, err := DescribeOrganization(context.Background(), r.Organization.Slug)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Organization)
+		require.NotNil(t, response.Organization.Metadata)
+		assert.Equal(t, r.Organization.ID.String(), response.Organization.Metadata.Id)
+		assert.Equal(t, r.Organization.Slug, response.Organization.Metadata.Slug)
 	})
 }

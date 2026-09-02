@@ -213,6 +213,70 @@ func TestDescribeFactoryVelocity_CountsAgentMergesAsSuperPlaneOutput(t *testing.
 	}
 }
 
+// TestDescribeFactoryVelocity_JoinsLinkedGitHubAccount covers the reason linked
+// accounts exist: a member whose GitHub login differs from their sign-in
+// identity shows up twice in the People table until they link the account.
+func TestDescribeFactoryVelocity_JoinsLinkedGitHubAccount(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		repositoryMergeSeed{number: 70, login: "shiroyasha", name: "Igor", mergedAt: now.Add(-1 * time.Hour)},
+		repositoryMergeSeed{number: 71, login: "shiroyasha", name: "Igor", mergedAt: now.Add(-2 * time.Hour)},
+	)
+
+	request := &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	}
+
+	// The fixture signs in with the GitHub login "testuser", so the author is a
+	// stranger and earns a row of their own.
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	require.NotNil(t, findVelocityPerson(resp.People, "Igor"),
+		"without a link the author is a separate person")
+	assert.Nil(t, findVelocityPersonByID(resp.People, r.User.String()),
+		"the member has no repository activity of their own yet")
+
+	require.NoError(t, models.SaveAccountLinkedAccount(db, models.NewAccountLinkedAccount(
+		r.Account.ID, models.ProviderGitHub, "42", "shiroyasha", "Igor", "https://avatar",
+	)))
+
+	resp, err = DescribeFactoryVelocity(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+
+	member := findVelocityPersonByID(resp.People, r.User.String())
+	require.NotNil(t, member, "the linked account makes the author the member")
+	assert.Equal(t, int32(2), member.AuthoredMerged)
+	assert.Nil(t, findVelocityPerson(resp.People, "Igor"),
+		"the author must not keep a second row after linking")
+}
+
+func findVelocityPerson(people []*pb.DescribeFactoryVelocityPerson, name string) *pb.DescribeFactoryVelocityPerson {
+	for _, person := range people {
+		if person.Name == name {
+			return person
+		}
+	}
+	return nil
+}
+
+func findVelocityPersonByID(people []*pb.DescribeFactoryVelocityPerson, id string) *pb.DescribeFactoryVelocityPerson {
+	for _, person := range people {
+		if person.Id == id {
+			return person
+		}
+	}
+	return nil
+}
+
 type repositoryMergeSeed struct {
 	number int64
 	login  string
@@ -347,6 +411,8 @@ func TestFillBuckets_CountsIntakeAndChargesOrdersOnce(t *testing.T) {
 	assert.Equal(t, 2, last.intake[models.FactoryIntakeSourceGitHubIssues])
 	assert.Equal(t, int64(250), last.costCents, "the order is charged once")
 	assert.Equal(t, int64(1200), last.tokens)
+	assert.Equal(t, 1, last.tasksClosed, "two pull requests of one order are one task")
+	assert.Zero(t, last.tasksWaste)
 	assert.Zero(t, last.wasteCostCents)
 }
 
@@ -372,12 +438,14 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 	last := buckets[len(buckets)-1]
 	assert.Equal(t, int64(180), last.costCents)
 	assert.Equal(t, int64(180), last.wasteCostCents, "spend on an unmerged close is waste")
+	assert.Equal(t, 1, last.tasksClosed)
+	assert.Equal(t, 1, last.tasksWaste, "a task that closed without a merge is waste")
 }
 
 func TestAggregateTotals(t *testing.T) {
 	buckets := []dayBucket{
-		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100},
-		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300},
+		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
+		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300, tasksClosed: 1},
 	}
 	got := aggregateTotals(buckets, true)
 	assert.Equal(t, int32(4), got.SuperplaneMerged)
@@ -388,6 +456,8 @@ func TestAggregateTotals(t *testing.T) {
 	assert.Equal(t, int64(600), got.CostCents)
 	assert.Equal(t, int64(1200), got.Tokens)
 	assert.Equal(t, int64(100), got.WasteCostCents)
+	assert.Equal(t, int32(4), got.TasksClosed)
+	assert.Equal(t, int32(1), got.TasksWaste)
 
 	gotNoPeople := aggregateTotals(buckets, false)
 	assert.Equal(t, int32(0), gotNoPeople.PeopleMerged)
@@ -498,6 +568,52 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.People[0].Id)
 	assert.Equal(t, int32(1), resp.People[0].FactoryMerged)
 	assert.Equal(t, int32(0), resp.People[0].AuthoredMerged)
+}
+
+func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	mergedAt := now.Add(-3 * time.Hour)
+	merged, err := factoryModel.CreateWorkOrder(db, "Merged order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	for _, url := range []string{
+		"https://github.com/example/repo/pull/1",
+		"https://github.com/example/repo/pull/2",
+	} {
+		_, err = merged.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:      url,
+			State:    models.FactoryPullRequestStateMerged,
+			MergedAt: &mergedAt,
+		})
+		require.NoError(t, err)
+	}
+
+	closedAt := now.Add(-2 * time.Hour)
+	wasted, err := factoryModel.CreateWorkOrder(db, "Closed order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = wasted.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/3",
+		State:    models.FactoryPullRequestStateClosed,
+		ClosedAt: &closedAt,
+	})
+	require.NoError(t, err)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), resp.Totals.SuperplaneMerged, "both pull requests of the merged order count")
+	assert.Equal(t, int32(1), resp.Totals.Waste)
+	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
+	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
 }
 
 func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryPullRequest {

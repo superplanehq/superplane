@@ -38,6 +38,27 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_linked_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_linked_accounts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    account_id uuid NOT NULL,
+    provider character varying(50) NOT NULL,
+    provider_id character varying(255) NOT NULL,
+    username character varying(255) NOT NULL,
+    name character varying(255),
+    avatar_url text,
+    linked_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT account_linked_accounts_provider_id_present CHECK ((btrim((provider_id)::text) <> ''::text)),
+    CONSTRAINT account_linked_accounts_provider_present CHECK ((btrim((provider)::text) <> ''::text)),
+    CONSTRAINT account_linked_accounts_username_present CHECK ((btrim((username)::text) <> ''::text))
+);
+
+
+--
 -- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -98,7 +119,8 @@ CREATE TABLE public.accounts (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
-    blocked_at timestamp with time zone
+    blocked_at timestamp with time zone,
+    deleted_at timestamp with time zone
 );
 
 
@@ -387,7 +409,8 @@ CREATE TABLE public.factory_lines (
     name text NOT NULL,
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -893,7 +916,9 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    slug text NOT NULL,
+    created_by_account_id uuid
 );
 
 
@@ -1332,6 +1357,14 @@ CREATE TABLE public.workspace_usage_events (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_linked_accounts account_linked_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_linked_accounts
+    ADD CONSTRAINT account_linked_accounts_pkey PRIMARY KEY (id);
 
 
 --
@@ -2142,6 +2175,27 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factory_work_orders_factory_id_number_key ON public.factory_work_orders USING btree (factory_id, number);
+
+
+--
+-- Name: idx_account_linked_accounts_account_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_linked_accounts_account_provider ON public.account_linked_accounts USING btree (account_id, provider);
+
+
+--
+-- Name: idx_account_linked_accounts_provider_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_linked_accounts_provider_identity ON public.account_linked_accounts USING btree (provider, provider_id);
+
+
+--
+-- Name: idx_account_linked_accounts_provider_username; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_linked_accounts_provider_username ON public.account_linked_accounts USING btree (provider, lower((username)::text));
 
 
 --
@@ -3027,6 +3081,27 @@ CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_eve
 
 
 --
+-- Name: index_accounts_on_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (deleted_at);
+
+
+--
+-- Name: index_organizations_on_created_by_account_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_organizations_on_created_by_account_id ON public.organizations USING btree (created_by_account_id);
+
+
+--
+-- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3052,6 +3127,14 @@ CREATE UNIQUE INDEX workflows_factory_id_name_active_key ON public.workflows USI
 --
 
 CREATE UNIQUE INDEX workflows_organization_id_name_active_key ON public.workflows USING btree (organization_id, name) WHERE ((factory_id IS NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: account_linked_accounts account_linked_accounts_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_linked_accounts
+    ADD CONSTRAINT account_linked_accounts_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE CASCADE;
 
 
 --
@@ -3647,6 +3730,14 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organizations organizations_created_by_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_created_by_account_id_fkey FOREIGN KEY (created_by_account_id) REFERENCES public.accounts(id);
+
+
+--
 -- Name: repositories repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4054,7 +4145,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260901143615	f
+20260902092740	f
 \.
 
 

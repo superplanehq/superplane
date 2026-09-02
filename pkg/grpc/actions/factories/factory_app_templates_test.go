@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -49,9 +50,14 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	}, agent.Configuration["credentials"])
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
-	assert.Equal(t, "{{ order().repository }}", createPR.Configuration["repository"])
-	assert.Equal(t, "{{ order().default_branch }}", createPR.Configuration["base"])
+	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
+	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
+
+	body, ok := createPR.Configuration["body"].(string)
+	require.True(t, ok, "expected create-pr body to be a string")
+	assert.True(t, strings.HasPrefix(body, "[{{ task().key }}]({{ task().url }})"), "body: %s", body)
+	assert.NotContains(t, body, "[Task](")
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)

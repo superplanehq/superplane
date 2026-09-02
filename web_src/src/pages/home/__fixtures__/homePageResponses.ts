@@ -159,6 +159,8 @@ const folders: CanvasFoldersCanvasFolder[] = [
 export interface HomePageFixture {
   organizationId: string;
   organizationName: string;
+  /** Organization slug shown on the org General settings tabs. Defaults to a slugified organizationName. */
+  organizationSlug?: string;
   canvases: CanvasesCanvasSummary[];
   folders: CanvasFoldersCanvasFolder[];
   enabledExperimentalFeatures?: string[];
@@ -168,6 +170,7 @@ export interface HomePageFixture {
 export const defaultHomePageFixture: HomePageFixture = {
   organizationId: HOME_ORGANIZATION_ID,
   organizationName: "SuperPlane",
+  organizationSlug: "superplane",
   canvases,
   folders,
 };
@@ -176,6 +179,7 @@ export const defaultHomePageFixture: HomePageFixture = {
 export const emptyHomePageFixture: HomePageFixture = {
   organizationId: HOME_ORGANIZATION_ID,
   organizationName: "Acme",
+  organizationSlug: "acme",
   canvases: [],
   folders: [],
 };

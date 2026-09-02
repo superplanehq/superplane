@@ -6,7 +6,7 @@ import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator, ConfidenceMeter } from "./ConfidenceMeter";
-import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
+import { WorkOrderAttentionChip, WorkOrderChecksPassedMark } from "./WorkOrderAttentionChip";
 import { CardOwnerMark, StartDraftButton, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
 import { WorkOrderStatusDot } from "./WorkOrderStatusDot";
 
@@ -211,14 +211,18 @@ function WorkOrderCardMetaRow({
         </div>
       ) : null}
       {attentionReasons.length > 0 ? (
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          {attentionReasons.map((reason) => (
-            <WorkOrderAttentionChip
-              key={reason}
-              reason={reason}
-              label={reason === "feedback" ? feedbackLabel : undefined}
-            />
-          ))}
+        <div className="flex shrink-0 justify-end gap-1">
+          {attentionReasons.map((reason) =>
+            reason === "checksPassed" ? (
+              <WorkOrderChecksPassedMark key={reason} />
+            ) : (
+              <WorkOrderAttentionChip
+                key={reason}
+                reason={reason}
+                label={reason === "feedback" ? feedbackLabel : undefined}
+              />
+            ),
+          )}
         </div>
       ) : null}
     </div>

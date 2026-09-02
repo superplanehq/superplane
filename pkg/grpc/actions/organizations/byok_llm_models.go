@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -57,7 +56,7 @@ func ListBYOKLLMModels(
 	resp.IntegrationId = integration.ID.String()
 	candidates, err := listBYOKCandidateModels(tx, reg, integration)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list byok models")
+		return nil, classifyBYOKListError(err)
 	}
 	resp.Candidates = candidates
 	resp.Selected = namedHostedLLMModels(selected, candidates)
@@ -69,9 +68,9 @@ func UpdateBYOKLLMModels(
 	orgID string,
 	req *pb.UpdateBYOKLLMModelsRequest,
 ) (*pb.UpdateBYOKLLMModelsResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 
 	saved, err := models.UpsertOrganizationBYOKModelAllowlist(
@@ -144,6 +143,23 @@ func listBYOKCandidateModels(tx *gorm.DB, reg *registry.Registry, instance *mode
 		out = append(out, &pb.HostedLLMModel{Id: id, Name: name})
 	}
 	return out, nil
+}
+
+// classifyBYOKListError maps a failure from listBYOKCandidateModels to a
+// client-safe gRPC error. Provider auth failures, transport errors, timeouts,
+// and provider outages are user-fixable or transient, so they are reported as
+// FailedPrecondition rather than Internal. Rate-limited requests are reported
+// as ResourceExhausted. Anything else keeps the safe Internal default so real
+// bugs still surface as a 500 and page the on-call.
+func classifyBYOKListError(err error) error {
+	switch {
+	case core.IsProviderRateLimited(err):
+		return grpcerrors.ResourceExhausted(err, "The model provider rate limited the request. Try again shortly.")
+	case core.IsProviderAuthOrNetworkError(err):
+		return grpcerrors.FailedPrecondition(err, "Could not reach the model provider to list models. Check the connected API key and try again.")
+	default:
+		return grpcerrors.Internal(err, "failed to list byok models")
+	}
 }
 
 func namedHostedLLMModels(ids []string, candidates []*pb.HostedLLMModel) []*pb.HostedLLMModel {

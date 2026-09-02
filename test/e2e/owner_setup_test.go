@@ -45,7 +45,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 type ownerSetupSteps struct {
 	t       *testing.T
 	session *session.TestSession
-	orgID   string
+	orgSlug string
 }
 
 func (s *ownerSetupSteps) start() {
@@ -128,12 +128,12 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 	org, err := models.FindOrganizationByName("Demo")
 	assert.NoError(s.t, err, "find organization Demo")
 
-	s.orgID = org.ID.String()
+	s.orgSlug = org.Slug
 }
 
 func (s *ownerSetupSteps) assertRedirectedToOrganization() {
 	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.orgID, "expected to be redirected into the organization")
+	assert.Contains(s.t, currentURL, "/"+s.orgSlug, "expected to be redirected into the organization")
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {

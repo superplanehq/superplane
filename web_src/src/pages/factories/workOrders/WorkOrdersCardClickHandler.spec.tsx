@@ -455,7 +455,8 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
-    expect(screen.getByText("Status checks passed")).toBeInTheDocument();
+    expect(screen.getByLabelText("Status checks passed")).toBeInTheDocument();
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
   });
 
