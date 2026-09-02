@@ -231,7 +231,9 @@ function CatalogInstanceRow({
   return (
     <div className={styles.instanceRow}>
       <Plug className={`size-4 shrink-0 ${instancePlugClass(state, styles)}`} />
-      <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
+      <div className={styles.statusLabelWrap}>
+        <span className={instanceStatusLabelClass(appearance, state, styles)}>{integrationStatusLabel(state)}</span>
+      </div>
       <p className={styles.instanceName}>{integration.metadata?.name}</p>
       <div className="ml-auto">
         <PermissionTooltip
