@@ -79,7 +79,7 @@ describe("splitRunCanvasForPhase", () => {
 
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Agent - Implement from order description");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Implement From Task Description");
     expect(canvas.nodes.map((node) => node.name)).toContain("Add Branch Artifact");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Task");
@@ -268,7 +268,7 @@ describe("splitRunCanvasForPhase", () => {
     });
     expect(stream.find((line) => line.id === "planner-agent-no-issue")).toMatchObject({
       componentType: "Run Claude Code",
-      componentName: "Agent - No GH Issue Plan",
+      componentName: "Draft Implementation Plan",
     });
     const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent-no-issue" && line.note);
     expect(

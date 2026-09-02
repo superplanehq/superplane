@@ -25,7 +25,7 @@ spec:
       targetId: add-run-error
   nodes:
     - id: onrun-implement
-      name: Start
+      name: Start Implementation
       type: TYPE_TRIGGER
       component: onRun
       configuration: {}
@@ -34,7 +34,7 @@ spec:
         'y': 144
       isCollapsed: true
     - id: implementation-agent-no-issue
-      name: Agent - Implement from order description
+      name: Implement From Task Description
       type: TYPE_ACTION
       component: runnerClaudeCode
       concurrency:
@@ -182,7 +182,7 @@ spec:
         max: 100
       configuration:
         artifactType: branch
-        name: '{{ $["Agent - Implement from order description"].data.result.branch }}'
+        name: '{{ $["Implement From Task Description"].data.result.branch }}'
         orderId: '{{ task().id }}'
         repository: '{{ task().repository }}'
       position:
@@ -200,15 +200,15 @@ spec:
         body: |-
           [Task]({{ task().url }}).
 
-          {{ fromBase64($["Agent - Implement from order description"].data.result.description) }}
+          {{ fromBase64($["Implement From Task Description"].data.result.description) }}
 
           <hr>
 
           Created via [SuperPlane](https://superplane.com).
         draft: false
-        head: '{{ $["Agent - Implement from order description"].data.result.branch }}'
+        head: '{{ $["Implement From Task Description"].data.result.branch }}'
         repository: '{{ task().repository }}'
-        title: '{{ fromBase64($["Agent - Implement from order description"].data.result.title) }}'
+        title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
       position:
         x: 1442
         'y': 816
@@ -233,7 +233,7 @@ spec:
         'y': 984
       isCollapsed: true
     - id: set-pr-closure-note
-      name: Set PR closure note
+      name: Set Closure Note
       type: TYPE_ACTION
       component: setWorkOrderStatusNote
       configuration:
