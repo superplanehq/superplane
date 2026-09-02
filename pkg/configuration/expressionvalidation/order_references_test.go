@@ -66,6 +66,34 @@ func TestExpressionUsesOrderURL(t *testing.T) {
 	}
 }
 
+func TestExpressionUsesOrderKey(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "dot key", raw: `order().key`, want: true},
+		{name: "bracket key", raw: `order()["key"]`, want: true},
+		{name: "concatenated", raw: `"[" + order().key + "](" + order().url + ")"`, want: true},
+		{name: "task alias", raw: `task().key`, want: true},
+		{name: "unrelated", raw: `app().key`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderKey(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpressionUsesOrderAssignees(t *testing.T) {
 	cases := []struct {
 		name string
