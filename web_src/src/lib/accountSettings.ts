@@ -109,3 +109,24 @@ export function ssoLinkHref(provider: "github" | "google", redirectPath: string)
   const redirect = encodeURIComponent(redirectPath);
   return `/auth/${provider}?intent=link&redirect=${redirect}`;
 }
+
+export type LinkableProvider = "github";
+
+export async function disconnectLinkedAccount(provider: LinkableProvider): Promise<void> {
+  const response = await fetch(`/account/linked-accounts/${provider}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    throw new Error(await readResponseError(response, "Failed to remove the linked account."));
+  }
+}
+
+/**
+ * Starts the flow that proves the member owns the account on the other service.
+ * The flow grants no session, so it never adds a way to sign in.
+ */
+export function linkedAccountConnectHref(provider: LinkableProvider, redirectPath: string): string {
+  const redirect = encodeURIComponent(redirectPath);
+  return `/auth/${provider}?intent=connect&redirect=${redirect}`;
+}

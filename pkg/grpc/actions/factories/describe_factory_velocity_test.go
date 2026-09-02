@@ -213,6 +213,70 @@ func TestDescribeFactoryVelocity_CountsAgentMergesAsSuperPlaneOutput(t *testing.
 	}
 }
 
+// TestDescribeFactoryVelocity_JoinsLinkedGitHubAccount covers the reason linked
+// accounts exist: a member whose GitHub login differs from their sign-in
+// identity shows up twice in the People table until they link the account.
+func TestDescribeFactoryVelocity_JoinsLinkedGitHubAccount(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		repositoryMergeSeed{number: 70, login: "shiroyasha", name: "Igor", mergedAt: now.Add(-1 * time.Hour)},
+		repositoryMergeSeed{number: 71, login: "shiroyasha", name: "Igor", mergedAt: now.Add(-2 * time.Hour)},
+	)
+
+	request := &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	}
+
+	// The fixture signs in with the GitHub login "testuser", so the author is a
+	// stranger and earns a row of their own.
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+	require.NotNil(t, findVelocityPerson(resp.People, "Igor"),
+		"without a link the author is a separate person")
+	assert.Nil(t, findVelocityPersonByID(resp.People, r.User.String()),
+		"the member has no repository activity of their own yet")
+
+	require.NoError(t, models.SaveAccountLinkedAccount(db, models.NewAccountLinkedAccount(
+		r.Account.ID, models.ProviderGitHub, "42", "shiroyasha", "Igor", "https://avatar",
+	)))
+
+	resp, err = DescribeFactoryVelocity(ctx, r.Organization.ID.String(), request)
+	require.NoError(t, err)
+
+	member := findVelocityPersonByID(resp.People, r.User.String())
+	require.NotNil(t, member, "the linked account makes the author the member")
+	assert.Equal(t, int32(2), member.AuthoredMerged)
+	assert.Nil(t, findVelocityPerson(resp.People, "Igor"),
+		"the author must not keep a second row after linking")
+}
+
+func findVelocityPerson(people []*pb.DescribeFactoryVelocityPerson, name string) *pb.DescribeFactoryVelocityPerson {
+	for _, person := range people {
+		if person.Name == name {
+			return person
+		}
+	}
+	return nil
+}
+
+func findVelocityPersonByID(people []*pb.DescribeFactoryVelocityPerson, id string) *pb.DescribeFactoryVelocityPerson {
+	for _, person := range people {
+		if person.Id == id {
+			return person
+		}
+	}
+	return nil
+}
+
 type repositoryMergeSeed struct {
 	number int64
 	login  string

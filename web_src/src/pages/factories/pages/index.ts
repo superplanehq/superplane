@@ -22,6 +22,7 @@ export { FactorySettingsGeneralPage } from "./settings/FactorySettingsGeneralPag
 export { FactorySettingsAccountNotificationsPage } from "./settings/FactorySettingsAccountNotificationsPage";
 export { FactorySettingsAccountProfilePage } from "./settings/FactorySettingsAccountProfilePage";
 export { FactorySettingsAccountSecurityPage } from "./settings/FactorySettingsAccountSecurityPage";
+export { FactorySettingsLinkedAccountsPage } from "./settings/FactorySettingsLinkedAccountsPage";
 export { FactorySettingsNotificationsPage } from "./settings/FactorySettingsNotificationsPage";
 export { FactorySettingsProfilePage } from "./settings/FactorySettingsProfilePage";
 export { FactorySettingsSoonPage } from "./settings/FactorySettingsSoonPage";

@@ -185,6 +185,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
+	if isConnectIntent(r) {
+		a.finishAccountConnection(w, r, mockUser)
+		return
+	}
+
 	if isLinkIntent(r) {
 		state, err := a.parseLinkState(linkStateFromRequest(r))
 		if err != nil {
@@ -212,6 +217,11 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	if isConnectIntent(r) {
+		a.finishAccountConnection(w, r, gothUser)
+		return
+	}
+
 	if !isLinkIntent(r) {
 		a.completeProviderAuth(w, r, gothUser)
 		return
@@ -248,6 +258,16 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 
 func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
 	rawState := linkStateFromRequest(r)
+	if strings.HasPrefix(rawState, authConnectStatePrefix) {
+		state, err := a.parseConnectState(rawState)
+		if err != nil {
+			http.Error(w, "Failed to link account", http.StatusBadRequest)
+			return
+		}
+		a.completeAccountConnection(w, r, gothUser, state)
+		return
+	}
+
 	if strings.HasPrefix(rawState, authLinkStatePrefix) {
 		state, err := a.parseLinkState(rawState)
 		if err != nil {
@@ -1069,6 +1089,27 @@ func isSignupIntentFromRequest(r *http.Request) bool {
 }
 
 func (a *Handler) authStateForRequest(w http.ResponseWriter, r *http.Request) (string, error) {
+	if isConnectIntent(r) {
+		provider := mux.Vars(r)["provider"]
+		if !isConnectableProvider(provider) {
+			http.Error(w, "Provider does not support linked accounts", http.StatusBadRequest)
+			return "", errors.New("provider does not support linked accounts")
+		}
+
+		account, err := a.sessionAccountFromCookie(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return "", err
+		}
+
+		state, err := a.signConnectState(account.ID.String(), provider, getRedirectURL(r))
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return "", err
+		}
+		return state, nil
+	}
+
 	if isLinkIntent(r) {
 		account, err := a.sessionAccountFromCookie(r)
 		if err != nil {
