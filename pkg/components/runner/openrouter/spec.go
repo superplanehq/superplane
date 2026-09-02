@@ -78,17 +78,19 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	return nil
 }
 
-func buildOpenRouterBrokerTask(spec RunOpenRouterSpec) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
+func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
 	maxTurns := effectiveMaxTurns(spec.MaxTurns)
-	return runner.BuildAgentBrokerTask(
-		"Prepare OpenRouter agent",
-		runner.NodePrepareScript("", "", spec.WorkingDirectory),
-		"run.js",
-		runScript,
-		spec.WorkingDirectory,
-		spec.Steps,
-		strings.TrimSpace(spec.Model),
-		func(promptName, model string) string {
+	return runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
+		PrepareName:      "Prepare OpenRouter agent",
+		PrepareScript:    runner.NodePrepareScript("", "", spec.WorkingDirectory),
+		RunScriptName:    "run.js",
+		RunScript:        runScript,
+		WorkingDirectory: spec.WorkingDirectory,
+		Steps:            spec.Steps,
+		Usage:            usage,
+		Setups:           setups,
+		Model:            strings.TrimSpace(spec.Model),
+		PromptCommand: func(promptName, model string) string {
 			return fmt.Sprintf(
 				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s %d`,
 				promptName,
@@ -96,7 +98,7 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec) ([]runner.BrokerCommand, 
 				maxTurns,
 			)
 		},
-	)
+	})
 }
 
 func effectiveMaxTurns(maxTurns int) int {
