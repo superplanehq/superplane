@@ -3,6 +3,7 @@ package models
 import (
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -50,6 +51,28 @@ func OriginLabelFromURL(rawURL string) string {
 	}
 
 	return lastPathSegment(parsed)
+}
+
+// GitHubIssueReference extracts the repository ("owner/repo") and issue
+// number from a GitHub issue URL. It returns ok=false for non-GitHub,
+// malformed, or non-issue (e.g. pull request) URLs.
+func GitHubIssueReference(rawURL string) (repository string, number int, ok bool) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Hostname() != "github.com" {
+		return "", 0, false
+	}
+
+	owner, repo, kind, numberPart, ok := splitGitHubIssuePath(parsed)
+	if !ok || kind != "issues" {
+		return "", 0, false
+	}
+
+	number, err = strconv.Atoi(numberPart)
+	if err != nil {
+		return "", 0, false
+	}
+
+	return owner + "/" + repo, number, true
 }
 
 func applyWorkOrderOrigin(order *FactoryWorkOrder, origin *WorkOrderOrigin) {
@@ -127,20 +150,28 @@ func githubOriginLabel(parsed *url.URL) string {
 		return ""
 	}
 
-	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
-	if len(parts) < 4 {
-		return ""
-	}
-
-	owner, repo, kind, number := parts[0], parts[1], parts[2], parts[3]
-	if owner == "" || repo == "" || number == "" {
-		return ""
-	}
-	if kind != "issues" && kind != "pull" {
+	owner, repo, kind, number, ok := splitGitHubIssuePath(parsed)
+	if !ok || (kind != "issues" && kind != "pull") {
 		return ""
 	}
 
 	return owner + "/" + repo + "#" + number
+}
+
+// splitGitHubIssuePath splits a GitHub URL path shaped like
+// "/owner/repo/issues/123" (or "/owner/repo/pull/123") into its parts.
+func splitGitHubIssuePath(parsed *url.URL) (owner, repo, kind, number string, ok bool) {
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	if len(parts) < 4 {
+		return "", "", "", "", false
+	}
+
+	owner, repo, kind, number = parts[0], parts[1], parts[2], parts[3]
+	if owner == "" || repo == "" || number == "" {
+		return "", "", "", "", false
+	}
+
+	return owner, repo, kind, number, true
 }
 
 func lastPathSegment(parsed *url.URL) string {

@@ -1091,6 +1091,16 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"default_branch": defaultBranch,
 	}
 
+	if origin := order.Origin(); origin != nil {
+		originPayload := map[string]any{"url": origin.URL, "label": origin.Label}
+		if repository, number, ok := models.GitHubIssueReference(origin.URL); ok {
+			originPayload["provider"] = "github"
+			originPayload["repository"] = repository
+			originPayload["number"] = number
+		}
+		payload["origin"] = originPayload
+	}
+
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
 	}
