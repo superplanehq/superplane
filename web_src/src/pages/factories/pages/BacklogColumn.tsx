@@ -8,7 +8,9 @@ import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { PlanningReviewPopup } from "./PlanningReviewPopup";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 
@@ -37,6 +39,8 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Configure link for the factory Backlog automation, when one exists. */
   automationHref?: string | null;
+  /** App id of the factory Backlog automation, when one exists. Used to load its agent. */
+  automationAppId?: string | null;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
 };
@@ -71,12 +75,14 @@ export function BacklogColumn({
   analyzingOrderIds,
   intakePanel,
   automationHref,
+  automationAppId,
   onAddIntake,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
+  const agentEditor = useColumnCanvasAgentEditor(organizationId, automationAppId ?? undefined);
   const createPopover = {
     canAdd,
     atCapacity,
@@ -118,6 +124,7 @@ export function BacklogColumn({
               testId="lines-backlog-menu"
               automationHref={automationHref}
               onEdit={onOpenSettings}
+              onEditAgent={agentEditor.openEditor}
               onAddIntake={onAddIntake}
               colorId={colorId}
               onColorChange={onColorChange}
@@ -161,6 +168,17 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
+      {agentEditor.editorOpen ? (
+        <PlanningReviewPopup
+          key={agentEditor.agentNode?.id ?? "agent"}
+          onClose={agentEditor.closeEditor}
+          organizationId={organizationId}
+          automationHref={automationHref ?? undefined}
+          initialDraft={agentEditor.draft ?? { title: "Editing Agent", components: [] }}
+          isLoading={agentEditor.isLoading || !agentEditor.draft}
+          onSave={agentEditor.save}
+        />
+      ) : null}
     </>
   );
 }
