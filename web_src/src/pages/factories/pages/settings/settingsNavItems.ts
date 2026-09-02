@@ -10,6 +10,7 @@ import {
   KeyRound,
   Plug,
   Settings,
+  Shield,
   Users,
   Workflow,
 } from "lucide-react";
@@ -18,6 +19,8 @@ import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
 
 export type FactorySettingsSection =
   | "general"
+  | "profile"
+  | "security"
   | "notifications"
   | "repository"
   | "automations"
@@ -47,7 +50,8 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
     id: "account",
     label: "Account",
     items: [
-      { id: "account-general", label: "General", Icon: CircleUser, scope: "account", section: "general" },
+      { id: "account-profile", label: "Profile", Icon: CircleUser, scope: "account", section: "profile" },
+      { id: "account-security", label: "Security", Icon: Shield, scope: "account", section: "security" },
       { id: "account-notifications", label: "Notifications", Icon: Bell, scope: "account", section: "notifications" },
     ],
   },
