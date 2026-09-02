@@ -735,6 +735,10 @@ message FactoryLine {
   google.protobuf.Timestamp updated_at = 5;
   // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
   optional FactoryLineMetrics metrics = 6;
+  // Board column colors, keyed by column key ("backlog", "phase-<step
+  // index>", "verify", "done"). Value is a color id. Missing keys use the
+  // default color.
+  map<string, string> column_colors = 7;
 }
 
 message CreateFactoryLineRequest {
@@ -752,6 +756,9 @@ message UpdateFactoryLineRequest {
   string line_id = 2;
   optional string name = 3;
   repeated FactoryLine.Step steps = 4;
+  // Full replacement of the board column colors. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, string> column_colors = 5;
 }
 
 message UpdateFactoryLineResponse {
