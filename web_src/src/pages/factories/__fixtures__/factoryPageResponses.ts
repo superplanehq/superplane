@@ -21,15 +21,19 @@ import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_LINE_ID,
+  ARNOLD_USER,
   GITHUB_ISSUES_INTAKE_APP_ID,
   EMPTY_FACTORY_ID,
   FACTORIES_ORGANIZATION_ID,
   LAST_WEEK,
+  ORGANIZATION_USERS,
+  OPERATOR_USER,
   PRIMARY_FACTORY_ID,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
+  REVIEWER_USER,
+  STORYBOOK_ME_USER_ID,
   YESTERDAY,
-  type ORGANIZATION_USERS,
 } from "./factoryPageIds";
 import {
   APPROVAL_WORK_ORDER,
@@ -57,6 +61,35 @@ export function toStorybookOrganizationUser(user: (typeof ORGANIZATION_USERS)[nu
     spec: { displayName: user.name },
     ...(avatarUrl ? { status: { accountProviders: [{ avatarUrl }] } } : {}),
   };
+}
+
+const STORYBOOK_USER_ROLES: Record<string, { roleName: string; roleDisplayName: string }> = {
+  [STORYBOOK_ME_USER_ID]: { roleName: "org_owner", roleDisplayName: "Owner" },
+  [ARNOLD_USER.id]: { roleName: "org_admin", roleDisplayName: "Admin" },
+  [REVIEWER_USER.id]: { roleName: "org_admin", roleDisplayName: "Admin" },
+  [OPERATOR_USER.id]: { roleName: "org_member", roleDisplayName: "Member" },
+};
+
+export const STORYBOOK_ORGANIZATION_ROLES = [
+  { metadata: { name: "org_owner" }, spec: { displayName: "Owner" } },
+  { metadata: { name: "org_admin" }, spec: { displayName: "Admin" } },
+  { metadata: { name: "org_member" }, spec: { displayName: "Member" } },
+];
+
+export const DEFAULT_STORYBOOK_INVITE_LINK = { token: "storybook-token", enabled: true };
+
+export function defaultStorybookOrganizationUsers(): SuperplaneUsersUser[] {
+  return ORGANIZATION_USERS.map((user) => {
+    const base = toStorybookOrganizationUser(user);
+    const role = STORYBOOK_USER_ROLES[user.id] ?? { roleName: "org_member", roleDisplayName: "Member" };
+    return {
+      ...base,
+      status: {
+        ...base.status,
+        roles: [{ roleName: role.roleName, roleDisplayName: role.roleDisplayName }],
+      },
+    };
+  });
 }
 
 export const GITHUB_ISSUES_INTAKE_APP: FactoryApp = {
@@ -306,7 +339,62 @@ export interface FactoriesFixture {
   checksByOrderId?: Record<string, FactoriesWorkOrderCheck[]>;
   /** Storybook-only intake items for the Backlog create search. */
   intakeItemCatalog?: BacklogIntakeItemCatalog;
+  /** Organization API keys for factory settings. */
+  apiKeys?: StorybookApiKey[];
+  /** Organization secrets for factory settings. */
+  secrets?: StorybookSecret[];
+  /** Mutable Storybook organization members. */
+  organizationUsers?: SuperplaneUsersUser[];
+  inviteLink?: { token: string; enabled: boolean };
+  organizationName?: string;
+  organizationSlug?: string;
+  organizationDescription?: string;
 }
+
+export interface StorybookApiKey {
+  id: string;
+  name: string;
+  description: string;
+  canvasIds: string[];
+  createdByName: string;
+  hasToken: boolean;
+  expiresAt?: string;
+}
+
+export interface StorybookSecret {
+  metadata: { id: string; name: string };
+  spec: { local: { data: Record<string, string> } };
+}
+
+export const DEFAULT_STORYBOOK_SECRETS: StorybookSecret[] = [
+  {
+    metadata: { id: "secret-openai", name: "openai" },
+    spec: { local: { data: { API_KEY: "sk-storybook" } } },
+  },
+  {
+    metadata: { id: "secret-github", name: "github-app" },
+    spec: { local: { data: { APP_ID: "1", PRIVATE_KEY: "x" } } },
+  },
+];
+
+export const DEFAULT_STORYBOOK_API_KEYS: StorybookApiKey[] = [
+  {
+    id: "api-key-ci",
+    name: "CI pipeline",
+    description: "Creates work from CI.",
+    canvasIds: [],
+    createdByName: "Leonardo DiCaprio",
+    hasToken: true,
+  },
+  {
+    id: "api-key-cli",
+    name: "Local CLI",
+    description: "Personal CLI access.",
+    canvasIds: [],
+    createdByName: "Alex Smith",
+    hasToken: true,
+  },
+];
 
 export const defaultFactoriesFixture: FactoriesFixture = {
   organizationId: FACTORIES_ORGANIZATION_ID,
@@ -338,4 +426,9 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
   },
   organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
+  apiKeys: DEFAULT_STORYBOOK_API_KEYS,
+  secrets: DEFAULT_STORYBOOK_SECRETS,
+  organizationName: "SuperPlane",
+  organizationSlug: "superplane",
+  organizationDescription: "AI-driven engineering automations.",
 };

@@ -5,6 +5,7 @@ import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__
 import { EMPTY_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
+/** Redesigned organization settings. Same chrome as workspace settings. */
 const meta = {
   title: "Factories/Pages/Settings/Organization",
   component: FactorySettingsLayout,

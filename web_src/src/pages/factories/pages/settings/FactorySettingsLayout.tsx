@@ -1,10 +1,12 @@
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
@@ -105,12 +107,14 @@ function FactorySettingsLayoutContent({
 }) {
   useFactoriesThemeClass();
   const settingsNavGroups = useFactorySettingsNavGroups();
+  const [navQuery, setNavQuery] = useState("");
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const navGroups = visibleFactorySettingsNavGroups(
     settingsNavGroups,
     hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
   );
+  const filteredNavGroups = filterSettingsNavGroups(navGroups, navQuery);
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
   // the `<Outlet/>` below mounts a leaf settings page that owns the full
@@ -162,8 +166,21 @@ function FactorySettingsLayoutContent({
                   Back to workspace
                 </NavLink>
               </div>
+              <div className="px-3 pt-3">
+                <Label className="sr-only" htmlFor="factory-settings-find">
+                  Find settings
+                </Label>
+                <Input
+                  id="factory-settings-find"
+                  data-testid="factory-settings-find"
+                  value={navQuery}
+                  onChange={(event) => setNavQuery(event.target.value)}
+                  placeholder="Find settings"
+                  className="h-8"
+                />
+              </div>
               <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
-                {navGroups.map((group) => (
+                {filteredNavGroups.map((group) => (
                   <SettingsNavGroup
                     key={group.id}
                     organizationId={organizationId}
@@ -186,6 +203,22 @@ function FactorySettingsLayoutContent({
       </OrganizationSettingsPathsProvider>
     </FactorySettingsLayoutContext.Provider>
   );
+}
+
+function filterSettingsNavGroups(groups: FactorySettingsNavGroup[], query: string): FactorySettingsNavGroup[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.label.toLowerCase().includes(normalized) || group.label.toLowerCase().includes(normalized),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 function SettingsNavGroup({

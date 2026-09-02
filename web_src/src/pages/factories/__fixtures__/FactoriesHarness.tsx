@@ -45,6 +45,11 @@ interface FactoriesHarnessProps {
   orgIntegrations?: StorybookOrgIntegration[];
   /** Extra organization experimental features to enable on top of the defaults (factories, managed agents). */
   experimentalFeatures?: string[];
+  /**
+   * Storybook default: redesigned workspace and organization settings.
+   * Specs that assert the live pages pass `false`.
+   */
+  settingsRedesign?: boolean;
 }
 
 function DefaultWikiWireframe() {
@@ -71,6 +76,7 @@ export function FactoriesHarness({
   openAgentSidebar = false,
   orgIntegrations,
   experimentalFeatures = [],
+  settingsRedesign = true,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
@@ -97,6 +103,7 @@ export function FactoriesHarness({
       appFixture={appFixture}
       openAgentSidebar={openAgentSidebar}
       orgIntegrations={orgIntegrations}
+      settingsRedesign={settingsRedesign}
       pageOverrides={
         enableOnboarding
           ? {
