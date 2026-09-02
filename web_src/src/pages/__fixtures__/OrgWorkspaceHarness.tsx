@@ -76,6 +76,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
 import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
 import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
+import { FactorySettingsLinkedAccountsPage } from "@/pages/factories/pages/settings/FactorySettingsLinkedAccountsPage";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -249,6 +250,11 @@ const factorySettingsStorybookRoutes = [
     key="factory-settings-account-profile"
     path="account/profile"
     element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-linked-accounts"
+    path="account/linked-accounts"
+    element={<FactorySettingsLinkedAccountsPage />}
   />,
   <Route
     key="factory-settings-account-security"

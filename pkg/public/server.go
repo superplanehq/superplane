@@ -682,6 +682,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account", s.updateAccount).Methods("PATCH")
 	accountRoute.HandleFunc("/account", s.deleteAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
+	accountRoute.HandleFunc("/account/linked-accounts/{provider}", s.disconnectLinkedAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
@@ -1109,15 +1110,25 @@ type AccountProviderResponse struct {
 	Username string `json:"username,omitempty"`
 }
 
+// AccountLinkedAccountResponse describes an identity the member owns on another
+// service. It is not a sign-in method, so it carries no email or token.
+type AccountLinkedAccountResponse struct {
+	Provider  string `json:"provider"`
+	Username  string `json:"username"`
+	Name      string `json:"name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+}
+
 type AccountResponse struct {
-	ID                string                    `json:"id"`
-	Name              string                    `json:"name"`
-	Email             string                    `json:"email"`
-	AvatarURL         string                    `json:"avatar_url"`
-	InstallationAdmin bool                      `json:"installation_admin"`
-	HasPassword       bool                      `json:"has_password"`
-	Providers         []AccountProviderResponse `json:"providers"`
-	Impersonation     *AccountImpersonation     `json:"impersonation,omitempty"`
+	ID                string                         `json:"id"`
+	Name              string                         `json:"name"`
+	Email             string                         `json:"email"`
+	AvatarURL         string                         `json:"avatar_url"`
+	InstallationAdmin bool                           `json:"installation_admin"`
+	HasPassword       bool                           `json:"has_password"`
+	Providers         []AccountProviderResponse      `json:"providers"`
+	LinkedAccounts    []AccountLinkedAccountResponse `json:"linked_accounts"`
+	Impersonation     *AccountImpersonation          `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1149,6 +1160,13 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	linkedAccounts, err := models.ListAccountLinkedAccounts(database.DB(r.Context()), account.ID)
+	if err != nil {
+		log.Errorf("Error getting linked accounts for %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                account.ID.String(),
 		Name:              account.Name,
@@ -1157,6 +1175,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		InstallationAdmin: account.IsInstallationAdmin(),
 		HasPassword:       hasPassword,
 		Providers:         accountProviderResponses(providers),
+		LinkedAccounts:    accountLinkedAccountResponses(linkedAccounts),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
