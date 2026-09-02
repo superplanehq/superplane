@@ -185,6 +185,32 @@ describe("groupPlanningSessionLog", () => {
     ]);
   });
 
+  it("keeps user follow-up text and survey answers visible when the live log hides the prompt header", () => {
+    const groups = groupPlanningSessionLog([
+      note({
+        id: "agent-step-7",
+        componentType: "prompt",
+        componentName: "Add a Size field to Puppy",
+      }),
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "Priority: High\nScope: One file",
+      }),
+      note({
+        id: "agent-step-9",
+        componentType: "prompt",
+        componentName: "The user created the draft task (NEWWO-12). Acknowledge that in one short friendly sentence.",
+      }),
+    ]);
+
+    const notes = groups.flatMap((group) =>
+      group.events.filter((event) => event.kind === "note").map((event) => event.line.componentName),
+    );
+    expect(notes).toEqual(["Add a Size field to Puppy", "Priority: High\nScope: One file"]);
+    expect(notes.join("\n")).not.toContain("The user created the draft task");
+  });
+
   it("hides setup and collapses truncated draft tool JSON", () => {
     const groups = groupPlanningSessionLog([
       note({

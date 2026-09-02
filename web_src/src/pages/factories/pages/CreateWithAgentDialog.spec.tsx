@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
@@ -38,7 +39,8 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       onDraftDescriptionChange={noop}
       onCreateDraft={noop}
       onSkipDraft={noop}
-      onOpenCreated={noop}
+      onSelectCreated={noop}
+      onRefineCreated={noop}
       onRequestClose={noop}
       onCancelEnd={noop}
       onConfirmEnd={noop}
@@ -90,7 +92,8 @@ describe("CreateWithAgentDialog", () => {
         onDraftDescriptionChange={noop}
         onCreateDraft={noop}
         onSkipDraft={noop}
-        onOpenCreated={noop}
+        onSelectCreated={noop}
+        onRefineCreated={noop}
         onRequestClose={noop}
         onCancelEnd={noop}
         onConfirmEnd={onConfirmEnd}
@@ -113,5 +116,114 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-survey")).toBeInTheDocument();
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
+  });
+
+  it("hides the session list until a task exists", () => {
+    renderDialog(runningCreateWithAgentView());
+
+    expect(screen.queryByTestId("create-with-agent-created")).not.toBeInTheDocument();
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.emptyHeadline)).toBeInTheDocument();
+    expect(screen.queryByText(/work order/i)).not.toBeInTheDocument();
+  });
+
+  it("lists created tasks and opens one read-only from the title", () => {
+    const onSelectCreated = vi.fn();
+    const order = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Retry refunds",
+      description: "Stop double charges.",
+    };
+    render(
+      <CreateWithAgentDialog
+        open
+        workspaceName="Refunds"
+        view={runningCreateWithAgentView({ created: [order] })}
+        onComposerChange={noop}
+        onSend={noop}
+        onSubmitSurvey={noop}
+        onDraftTitleChange={noop}
+        onDraftDescriptionChange={noop}
+        onCreateDraft={noop}
+        onSkipDraft={noop}
+        onSelectCreated={onSelectCreated}
+        onRefineCreated={noop}
+        onRequestClose={noop}
+        onCancelEnd={noop}
+        onConfirmEnd={noop}
+      />,
+    );
+
+    expect(screen.getByTestId("create-with-agent-created")).toBeInTheDocument();
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.sessionList)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "NEW-1 Retry refunds" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: CREATE_WITH_AGENT_COPY.refineFurther })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.openTask })).not.toBeInTheDocument();
+
+    screen.getByRole("button", { name: "NEW-1 Retry refunds" }).click();
+    expect(onSelectCreated).toHaveBeenCalledWith(order);
+  });
+
+  it("shows a read-only task without edit fields", () => {
+    const order = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Retry refunds",
+      description: "Stop double charges.",
+    };
+    renderDialog(
+      runningCreateWithAgentView({
+        created: [order],
+        right: { kind: "preview", order },
+      }),
+    );
+
+    expect(screen.getByTestId("create-with-agent-preview")).toBeInTheDocument();
+    expect(screen.getByText("Stop double charges.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Task title")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: CREATE_WITH_AGENT_COPY.refineFurther }).length).toBeGreaterThan(0);
+  });
+
+  it("hides the older-messages bar while the log follows the latest line", () => {
+    renderDialog(runningCreateWithAgentView());
+
+    expect(screen.getByTestId("create-with-agent-log")).toBeInTheDocument();
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+  });
+
+  it("shows jump to latest after the user scrolls up, then hides it at the bottom", async () => {
+    const user = userEvent.setup();
+    renderDialog(runningCreateWithAgentView());
+    const scroller = screen.getByTestId("create-with-agent-log");
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 100 });
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest }));
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+  });
+
+  it("turns following back on when the user scrolls to the latest line", async () => {
+    renderDialog(runningCreateWithAgentView());
+    const scroller = screen.getByTestId("create-with-agent-log");
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, get: () => 400 });
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, get: () => 100 });
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
+
+    scroller.scrollTop = 300;
+    fireEvent.scroll(scroller);
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 });

@@ -14,18 +14,22 @@ export const CREATE_WITH_AGENT_COPY = {
   otherAnswer: "Or write your own answer",
   surveySkipped: "Skipped the survey.",
   composerPlaceholder: "Tell the agent what you want to do",
+  viewingOlder: "You are viewing older messages.",
+  jumpToLatest: "Jump to latest",
   machineStarting: "The machine is starting",
   machineRunning: "Machine is running",
   machineWaiting: "Waiting for you",
-  emptyHeadline: "Waiting for your first work order.",
+  emptyHeadline: "Waiting for your first task.",
   emptyBody: "The agent will draft a task here.",
   draftLabel: "Draft task",
+  sessionList: "This session",
   create: "Create",
   skip: "Skip",
+  refineFurther: "Refine further",
   openTask: "Open task",
   greeting: "The repository is ready. What do you want to do?",
-  afterCreate: "Created the draft task. Work on a new one, or tell me what is next.",
-  afterSkip: "Skipped that draft. What should we do next?",
+  afterCreate: "The task is created. Tell me if you want to do something else.",
+  afterSkip: "Skipped that draft. Tell me if you want to do something else.",
   failedStart: "Failed to start the session.",
   failedSend: "Failed to send the message.",
   failedSurvey: "Failed to send the answers.",
@@ -33,3 +37,7 @@ export const CREATE_WITH_AGENT_COPY = {
   failedCreate: "Failed to create the task.",
   failedSkip: "Failed to skip the draft.",
 } as const;
+
+export function planningRefineNote(key: string, title: string) {
+  return `Refine ${key}: ${title}.`;
+}

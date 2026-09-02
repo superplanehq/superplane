@@ -54,7 +54,8 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         }
         onCreateDraft={() => undefined}
         onSkipDraft={() => undefined}
-        onOpenCreated={() => undefined}
+        onSelectCreated={(order) => setView((current) => ({ ...current, right: { kind: "preview", order } }))}
+        onRefineCreated={() => undefined}
         onRequestClose={() => setView((current) => ({ ...current, endConfirmOpen: true }))}
         onCancelEnd={() => setView((current) => ({ ...current, endConfirmOpen: false }))}
         onConfirmEnd={() => undefined}
@@ -78,6 +79,25 @@ export const Waiting: Story = {
   render: () => <StaticSession initial={waitingCreateWithAgentView()} />,
 };
 
+export const OlderMessages: Story = {
+  name: "Older messages",
+  render: () => (
+    <StaticSession
+      initial={runningCreateWithAgentView({
+        messages: Array.from({ length: 24 }, (_, index) => ({
+          id: `line-${index}`,
+          kind: "text" as const,
+          role: index % 2 === 0 ? ("agent" as const) : ("user" as const),
+          text:
+            index % 2 === 0
+              ? `Agent note ${index + 1}. The repository is ready.`
+              : `User note ${index + 1}. Add a Size field to the checkout form.`,
+        })),
+      })}
+    />
+  ),
+};
+
 export const Survey: Story = {
   name: "Survey above the chat",
   render: () => (
@@ -92,6 +112,11 @@ export const Survey: Story = {
       })}
     />
   ),
+};
+
+export const SessionTasks: Story = {
+  name: "Tasks in this session",
+  render: () => <StaticSession initial={runningCreateWithAgentView({ created: [createdOrder] })} />,
 };
 
 export const Draft: Story = {

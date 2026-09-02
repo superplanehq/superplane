@@ -30,13 +30,13 @@ function nextAction(result) {
     const label = key ? ` (${key})` : "";
     return {
       type: "prompt",
-      text: `The user created the draft work order${label}. Propose the next draft or say what is next. Then stop.`,
+      text: `The user created the draft task${label}. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.`,
     };
   }
   if (status === "skipped") {
     return {
       type: "prompt",
-      text: "The user skipped that draft. Propose another draft or say what is next. Then stop.",
+      text: "The user skipped that draft. Acknowledge that in one short friendly sentence. Ask what they want to do next. Do not call propose_draft. Do not start a new draft. Then stop.",
     };
   }
   return { type: "wait" };

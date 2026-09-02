@@ -83,7 +83,7 @@ export function createCreateWithAgentDraft(view: CreateWithAgentView): CreateWit
   return {
     ...view,
     created: [...view.created, order],
-    right: { kind: "preview", order },
+    right: { kind: "empty" },
     messages: [
       ...view.messages,
       { id: `created-${order.id}`, kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.afterCreate },
@@ -95,10 +95,9 @@ export function skipCreateWithAgentDraft(view: CreateWithAgentView): CreateWithA
   if (view.right.kind !== "draft") {
     return view;
   }
-  const last = view.created[view.created.length - 1];
   return {
     ...view,
-    right: last ? { kind: "preview", order: last } : { kind: "empty" },
+    right: { kind: "empty" },
     messages: [
       ...view.messages,
       { id: `skipped-${view.messages.length}`, kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.afterSkip },

@@ -101,6 +101,14 @@ export function groupPlanningSessionLog(notes: SplitRunStreamLine[]): ClaudeStep
       },
       events: [],
     });
+    if (isPlanningSessionUserTalk(line.componentName)) {
+      attachNote({
+        ...line,
+        id: `${line.id}-talk`,
+        componentType: "note",
+        detail: undefined,
+      });
+    }
   };
 
   const attachNote = (line: SplitRunStreamLine) => {
@@ -177,11 +185,25 @@ function isPlanningSessionPromptStep(line: SplitRunStreamLine): boolean {
   if (/step-\d+$/.test(line.id)) {
     return true;
   }
-  const name = line.componentName.trim();
+  return isPlanningSessionSystemPrompt(line.componentName);
+}
+
+function isPlanningSessionUserTalk(text: string): boolean {
+  const name = text.trim();
+  return Boolean(name) && !isPlanningSessionSystemPrompt(name);
+}
+
+function isPlanningSessionSystemPrompt(text: string): boolean {
+  const name = text.trim();
   return (
     name === "Plan with the user" ||
     name === "Wait for the next user message" ||
-    name.startsWith("You are in a SuperPlane planning session")
+    name.startsWith("You are in a SuperPlane planning session") ||
+    name.startsWith("This is a SuperPlane planning session") ||
+    name.startsWith("Greet the user") ||
+    name.startsWith("The user created the draft task") ||
+    name.startsWith("The user skipped that draft") ||
+    name.startsWith("The user started refining")
   );
 }
 

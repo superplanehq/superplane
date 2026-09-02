@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -52,6 +53,7 @@ var (
 type PlanningSessionDraft struct {
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
+	WorkOrderID string `json:"work_order_id,omitempty"`
 }
 
 type PlanningSessionSurveyQuestion struct {
@@ -322,6 +324,40 @@ func (s *FactoryPlanningSession) ConsumeWait(tx *gorm.DB) (PlanningWaitResult, e
 	return result, nil
 }
 
+func PlanningRefineNote(key, title string) string {
+	return fmt.Sprintf("Refine %s: %s.", strings.TrimSpace(key), strings.TrimSpace(title))
+}
+
+func planningRefinePrompt(text string, draft PlanningSessionDraft) string {
+	key := planningRefineKey(text)
+	if key == "" {
+		return text
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "The user started refining task %s.\n\n", key)
+	if title := strings.TrimSpace(draft.Title); title != "" {
+		fmt.Fprintf(&b, "Current title: %s\n", title)
+	}
+	if description := strings.TrimSpace(draft.Description); description != "" {
+		fmt.Fprintf(&b, "Current description:\n%s\n", description)
+	}
+	b.WriteString("\nRead this task. Tell the user you are ready to refine it. Ask what they want to change. Do not call propose_draft. Do not change the draft. Then stop.")
+	return b.String()
+}
+
+func planningRefineKey(text string) string {
+	body := strings.TrimSpace(text)
+	rest, ok := strings.CutPrefix(body, "Refine ")
+	if !ok {
+		return ""
+	}
+	key, remainder, ok := strings.Cut(rest, ": ")
+	if !ok || !strings.HasSuffix(remainder, ".") {
+		return ""
+	}
+	return strings.TrimSpace(key)
+}
+
 func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error {
 	if err := s.guardOpen(); err != nil {
 		return err
@@ -338,6 +374,9 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 		CreatedAt: time.Now(),
 	})
 	s.clearPendingSurvey()
+	if err := s.applyRefineNote(tx, body); err != nil {
+		return err
+	}
 	if s.WaitState == PlanningWaitPending {
 		s.deliverUserText(body)
 	}
@@ -393,6 +432,7 @@ func (s *FactoryPlanningSession) ProposeDraft(tx *gorm.DB, draft PlanningSession
 	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
 		Title:       title,
 		Description: strings.TrimSpace(draft.Description),
+		WorkOrderID: s.PendingDraft.Data().WorkOrderID,
 	})
 	s.UpdatedAt = time.Now()
 	return tx.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
@@ -412,6 +452,7 @@ func (s *FactoryPlanningSession) UpdateDraft(tx *gorm.DB, draft PlanningSessionD
 	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
 		Title:       title,
 		Description: strings.TrimSpace(draft.Description),
+		WorkOrderID: s.PendingDraft.Data().WorkOrderID,
 	})
 	s.UpdatedAt = time.Now()
 	return tx.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
@@ -426,13 +467,6 @@ func (s *FactoryPlanningSession) SkipDraft(tx *gorm.DB) error {
 	}
 	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
 	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindSkipped})
-	s.appendMessage(PlanningSessionMessage{
-		ID:        uuid.NewString(),
-		Kind:      PlanningSessionMessageKindText,
-		Role:      PlanningSessionMessageRoleAgent,
-		Text:      "Skipped that draft. What should we do next?",
-		CreatedAt: time.Now(),
-	})
 	return s.saveMessagesAndWait(tx)
 }
 
@@ -443,6 +477,9 @@ func (s *FactoryPlanningSession) CreateDraftWorkOrder(tx *gorm.DB, factoryModel 
 	draft := s.PendingDraft.Data()
 	if strings.TrimSpace(draft.Title) == "" {
 		return nil, ErrFactoryPlanningSessionNoDraft
+	}
+	if strings.TrimSpace(draft.WorkOrderID) != "" {
+		return s.updateCreatedWorkOrder(tx, factoryModel, draft)
 	}
 
 	order, err := factoryModel.CreateWorkOrder(tx, draft.Title, draft.Description, &createdBy, []uuid.UUID{createdBy}, nil)
@@ -458,12 +495,66 @@ func (s *FactoryPlanningSession) CreateDraftWorkOrder(tx *gorm.DB, factoryModel 
 		WorkOrderKey: factoryModel.WorkOrderKey(order.Number),
 		Text:         order.Title,
 	})
-	s.appendMessage(PlanningSessionMessage{
-		ID:        uuid.NewString(),
-		Kind:      PlanningSessionMessageKindText,
-		Role:      PlanningSessionMessageRoleAgent,
-		Text:      "Created the draft task. Work on a new one, or tell me what is next.",
-		CreatedAt: time.Now(),
+	if err := s.saveMessagesAndWait(tx); err != nil {
+		return nil, err
+	}
+	return order, nil
+}
+
+func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) error {
+	key := planningRefineKey(text)
+	if key == "" {
+		return nil
+	}
+	factoryModel, err := FindFactory(tx, s.OrganizationID, s.FactoryID)
+	if err != nil {
+		return err
+	}
+	orders, err := s.CreatedOrders(tx)
+	if err != nil {
+		return err
+	}
+	for i := range orders {
+		if factoryModel.WorkOrderKey(orders[i].Number) != key {
+			continue
+		}
+		s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
+			Title:       orders[i].Title,
+			Description: orders[i].Description,
+			WorkOrderID: orders[i].ID.String(),
+		})
+		return nil
+	}
+	return nil
+}
+
+func (s *FactoryPlanningSession) updateCreatedWorkOrder(
+	tx *gorm.DB,
+	factoryModel *Factory,
+	draft PlanningSessionDraft,
+) (*FactoryWorkOrder, error) {
+	if !slices.Contains(s.CreatedWorkOrderIDs, draft.WorkOrderID) {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
+	orderID, err := uuid.Parse(draft.WorkOrderID)
+	if err != nil {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
+	order, err := factoryModel.FindWorkOrder(tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	title := strings.TrimSpace(draft.Title)
+	description := strings.TrimSpace(draft.Description)
+	if err := order.UpdateContent(tx, &title, &description); err != nil {
+		return nil, err
+	}
+	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
+	s.resolveWait(PlanningWaitResult{
+		Kind:         PlanningWaitKindCreated,
+		WorkOrderID:  order.ID.String(),
+		WorkOrderKey: factoryModel.WorkOrderKey(order.Number),
+		Text:         order.Title,
 	})
 	if err := s.saveMessagesAndWait(tx); err != nil {
 		return nil, err
@@ -554,7 +645,7 @@ func (s *FactoryPlanningSession) deliverUserText(text string) {
 		s.Messages[i].Delivered = true
 		break
 	}
-	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: text})
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningRefinePrompt(text, s.PendingDraft.Data())})
 }
 
 func (s *FactoryPlanningSession) saveMessagesAndWait(tx *gorm.DB) error {

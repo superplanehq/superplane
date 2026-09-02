@@ -95,4 +95,41 @@ describe("createWithAgentViewFromSession", () => {
       { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
     ]);
   });
+
+  it("keeps the work area empty after create so the session list can sit above it", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        created: [{ id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.created).toEqual([
+      { id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." },
+    ]);
+    expect(view.right).toEqual({ kind: "empty" });
+  });
+
+  it("keeps a read-only task when the user selected it and there is no new draft", () => {
+    const selected = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Retry refunds",
+      description: "Stop double charges.",
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        created: [selected],
+      },
+      { composer: "", right: { kind: "preview", order: selected }, endConfirmOpen: false },
+    );
+
+    expect(view.right).toEqual({ kind: "preview", order: selected });
+  });
 });

@@ -304,6 +304,99 @@ func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
 	assert.Equal(t, "", session.PendingDraft.Data().Title)
 }
 
+func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-ready")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds",
+		Description: "Stop double charges.",
+	}))
+	require.NoError(t, session.BeginWait(db))
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+	_, err = session.ConsumeWait(db)
+	require.NoError(t, err)
+
+	require.NoError(t, session.BeginWait(db))
+	note := PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)
+	require.NoError(t, session.SendUserMessage(db, note))
+	assert.Equal(t, note, lastTextMessage(session, PlanningSessionMessageRoleUser))
+	result := session.WaitResult.Data()
+	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
+	assert.Contains(t, result.Text, factoryModel.WorkOrderKey(order.Number))
+	assert.Contains(t, result.Text, "Retry refunds")
+	assert.Contains(t, result.Text, "Stop double charges.")
+	assert.Contains(t, result.Text, "ready to refine")
+	assert.Contains(t, result.Text, "Do not call propose_draft")
+	assert.NotEqual(t, note, result.Text)
+}
+
+func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds",
+		Description: "Stop double charges.",
+	}))
+	require.NoError(t, session.BeginWait(db))
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)))
+	assert.Equal(t, order.Title, session.PendingDraft.Data().Title)
+	assert.Equal(t, order.ID.String(), session.PendingDraft.Data().WorkOrderID)
+
+	require.NoError(t, session.UpdateDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds once",
+		Description: "One retry only.",
+	}))
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds once",
+		Description: "Agent edit.",
+	}))
+	assert.Equal(t, order.ID.String(), session.PendingDraft.Data().WorkOrderID)
+
+	updated, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, updated.ID)
+	assert.Equal(t, "Retry refunds once", updated.Title)
+	assert.Equal(t, "Agent edit.", updated.Description)
+	require.Len(t, session.CreatedWorkOrderIDs, 1)
+}
+
+func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-skip")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds",
+		Description: "Stop double charges.",
+	}))
+	require.NoError(t, session.BeginWait(db))
+	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)))
+	require.NoError(t, session.SkipDraft(db))
+	assert.Equal(t, "", session.PendingDraft.Data().Title)
+	assert.Equal(t, "", session.PendingDraft.Data().WorkOrderID)
+	require.Len(t, session.CreatedWorkOrderIDs, 1)
+	assert.Equal(t, order.ID.String(), session.CreatedWorkOrderIDs[0])
+}
+
 func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-list-stale")

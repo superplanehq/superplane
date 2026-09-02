@@ -21,7 +21,7 @@ const SYSTEM_PROMPT =
   "Prefer plain paths, shell commands, and simple indentation.";
 
 const PLANNING_SYSTEM_PROMPT =
-  " This is a SuperPlane planning session. Call mcp__superplane__propose_draft when you have a draft. Call mcp__superplane__survey to ask one or more multiple-choice questions. SuperPlane waits after you stop. Do not create work orders yourself. Write to the user in plain text.";
+  " This is a SuperPlane planning session. Call mcp__superplane__propose_draft only when the user asked for a task in this turn. Call mcp__superplane__survey to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain text.";
 
 const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__survey"];

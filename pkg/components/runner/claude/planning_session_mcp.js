@@ -71,7 +71,7 @@ async function proposeSurvey(input) {
 const TOOLS = [
   {
     name: "propose_draft",
-    description: "Show a draft work order on the right. The user confirms or skips. Do not create the work order.",
+    description: "Show a draft task on the right only when the user asked for a task in this turn. The user confirms or skips. Do not create the task. Do not propose another draft unless the user asks.",
     inputSchema: {
       type: "object",
       properties: {

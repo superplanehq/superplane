@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
+import { CREATE_WITH_AGENT_COPY, planningRefineNote } from "./createWithAgentCopy";
 import {
   cancelCreateWithAgentEnd,
   emptyCreateWithAgentView,
@@ -229,6 +229,12 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
         .catch((error: unknown) => {
           showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSkip));
         });
+    },
+    onSelectCreated: (order) => {
+      setView((current) => ({ ...current, right: { kind: "preview", order } }));
+    },
+    onRefineCreated: (order) => {
+      sendSessionText(planningRefineNote(order.key, order.title), CREATE_WITH_AGENT_COPY.failedSend);
     },
     onRequestClose: () => setView((current) => requestCreateWithAgentEnd(current)),
     onCancelEnd: () => setView((current) => cancelCreateWithAgentEnd(current)),

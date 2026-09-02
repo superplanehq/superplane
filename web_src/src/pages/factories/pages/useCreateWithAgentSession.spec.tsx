@@ -107,4 +107,58 @@ describe("useCreateWithAgentSession", () => {
       expect(endPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "session-1", { keepalive: true });
     });
   });
+
+  it("tells the agent when Refine further runs", async () => {
+    startPlanningSession.mockResolvedValue({
+      ...session("session-1"),
+      created: [{ id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." }],
+    });
+    sendPlanningSessionMessage.mockResolvedValue(session("session-1"));
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await waitFor(() => {
+      expect(result.current.view.created).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.onRefineCreated(result.current.view.created[0]);
+    });
+
+    await waitFor(() => {
+      expect(sendPlanningSessionMessage).toHaveBeenCalledWith(
+        "org-1",
+        "factory-1",
+        "session-1",
+        "Refine NEW-1: Retry refunds.",
+      );
+    });
+  });
+
+  it("does not tell the agent when the title opens read-only", async () => {
+    startPlanningSession.mockResolvedValue({
+      ...session("session-1"),
+      created: [{ id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." }],
+    });
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await waitFor(() => {
+      expect(result.current.view.created).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.onSelectCreated(result.current.view.created[0]);
+    });
+
+    expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
+    expect(result.current.view.right).toEqual({
+      kind: "preview",
+      order: { id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." },
+    });
+  });
 });

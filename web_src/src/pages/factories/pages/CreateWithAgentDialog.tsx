@@ -20,6 +20,7 @@ import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createW
 import { planningSessionPhase } from "./planningSessionActivity";
 import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
+import { useFollowLogScroll } from "./work-order-split-run/useFollowLogScroll";
 
 export type CreateWithAgentDialogProps = {
   open: boolean;
@@ -33,7 +34,8 @@ export type CreateWithAgentDialogProps = {
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
-  onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
+  onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
+  onRefineCreated: (order: CreateWithAgentCreatedOrder) => void;
   onRequestClose: () => void;
   onCancelEnd: () => void;
   onConfirmEnd: () => void;
@@ -51,7 +53,8 @@ export function CreateWithAgentDialog({
   onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
-  onOpenCreated,
+  onSelectCreated,
+  onRefineCreated,
   onRequestClose,
   onCancelEnd,
   onConfirmEnd,
@@ -85,7 +88,8 @@ export function CreateWithAgentDialog({
               onDraftDescriptionChange={onDraftDescriptionChange}
               onCreateDraft={onCreateDraft}
               onSkipDraft={onSkipDraft}
-              onOpenCreated={onOpenCreated}
+              onSelectCreated={onSelectCreated}
+              onRefineCreated={onRefineCreated}
             />
           </div>
         </DialogContent>
@@ -170,6 +174,9 @@ function CreateWithAgentStream({
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
 }) {
+  const follow = useFollowLogScroll(view.executionId || view.canvasId || "session", view.messages.length, {
+    resumeOnBottom: true,
+  });
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSend();
@@ -180,15 +187,23 @@ function CreateWithAgentStream({
       className="flex min-h-0 flex-col border-b border-border bg-muted/25 md:border-r md:border-b-0"
       data-testid="create-with-agent-stream"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <PhaseLogCard
-          phase={planningSessionPhase(view)}
-          expanded
-          collapsible={false}
-          organizationId={organizationId}
-          canvasId={view.canvasId}
-          compactSessionLog
-        />
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={follow.scrollRef}
+          onScroll={follow.onScroll}
+          className="absolute inset-0 overflow-y-auto px-3 py-3"
+          data-testid="create-with-agent-log"
+        >
+          <PhaseLogCard
+            phase={planningSessionPhase(view)}
+            expanded
+            collapsible={false}
+            organizationId={organizationId}
+            canvasId={view.canvasId}
+            compactSessionLog
+          />
+        </div>
+        {follow.following ? null : <OlderMessagesBar onJumpToLatest={() => follow.setFollowing(true)} />}
       </div>
       {view.survey ? <PlanningSessionSurveyForm survey={view.survey} onSubmit={onSubmitSurvey} /> : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
@@ -220,6 +235,22 @@ function CreateWithAgentStream({
   );
 }
 
+function OlderMessagesBar({ onJumpToLatest }: { onJumpToLatest: () => void }) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center"
+      data-testid="create-with-agent-older"
+    >
+      <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-zinc-900 py-1 pl-3 pr-1 text-[12px] text-white shadow-md">
+        <span>{CREATE_WITH_AGENT_COPY.viewingOlder}</span>
+        <Button type="button" size="sm" className="h-7 rounded-md px-2.5 text-[12px]" onClick={onJumpToLatest}>
+          {CREATE_WITH_AGENT_COPY.jumpToLatest}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function machineStatusLabel(repository: string, machineStatus: CreateWithAgentView["machineStatus"]): string {
   if (machineStatus === "starting") {
     return CREATE_WITH_AGENT_COPY.machineStarting;
@@ -235,17 +266,22 @@ function CreateWithAgentWorkPane({
   onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
-  onOpenCreated,
+  onSelectCreated,
+  onRefineCreated,
 }: {
   view: CreateWithAgentView;
   onDraftTitleChange: (title: string) => void;
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
-  onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
+  onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
+  onRefineCreated: (order: CreateWithAgentCreatedOrder) => void;
 }) {
   return (
     <section className="flex min-h-0 flex-col bg-muted/20" data-testid="create-with-agent-work">
+      {view.created.length > 0 ? (
+        <CreatedTaskList created={view.created} onSelect={onSelectCreated} onRefine={onRefineCreated} />
+      ) : null}
       {view.right.kind === "empty" ? <EmptyWorkPane /> : null}
       {view.right.kind === "draft" ? (
         <DraftWorkPane
@@ -257,10 +293,46 @@ function CreateWithAgentWorkPane({
           onSkip={onSkipDraft}
         />
       ) : null}
-      {view.right.kind === "preview" ? (
-        <PreviewWorkPane order={view.right.order} onOpenCreated={onOpenCreated} />
-      ) : null}
+      {view.right.kind === "preview" ? <PreviewWorkPane order={view.right.order} onRefine={onRefineCreated} /> : null}
     </section>
+  );
+}
+
+function CreatedTaskList({
+  created,
+  onSelect,
+  onRefine,
+}: {
+  created: CreateWithAgentCreatedOrder[];
+  onSelect: (order: CreateWithAgentCreatedOrder) => void;
+  onRefine: (order: CreateWithAgentCreatedOrder) => void;
+}) {
+  return (
+    <div className="border-b border-border px-5 py-3" data-testid="create-with-agent-created">
+      <p className="text-[12px] font-medium text-muted-foreground">{CREATE_WITH_AGENT_COPY.sessionList}</p>
+      <ul className="mt-2 space-y-1.5">
+        {created.map((order) => (
+          <li key={order.id} className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="min-w-0 truncate text-left text-[13px] text-foreground hover:underline"
+              onClick={() => onSelect(order)}
+            >
+              {order.key} {order.title}
+            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 shrink-0 px-2 text-[12px]"
+              onClick={() => onRefine(order)}
+            >
+              {CREATE_WITH_AGENT_COPY.refineFurther}
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -324,10 +396,10 @@ function DraftWorkPane({
 
 function PreviewWorkPane({
   order,
-  onOpenCreated,
+  onRefine,
 }: {
   order: CreateWithAgentCreatedOrder;
-  onOpenCreated: (order: CreateWithAgentCreatedOrder) => void;
+  onRefine: (order: CreateWithAgentCreatedOrder) => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-preview">
@@ -337,8 +409,8 @@ function PreviewWorkPane({
         {order.description}
       </p>
       <div className="mt-4 flex justify-end">
-        <Button type="button" variant="outline" onClick={() => onOpenCreated(order)}>
-          {CREATE_WITH_AGENT_COPY.openTask}
+        <Button type="button" variant="outline" onClick={() => onRefine(order)}>
+          {CREATE_WITH_AGENT_COPY.refineFurther}
         </Button>
       </div>
     </div>

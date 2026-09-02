@@ -44,14 +44,11 @@ export function createWithAgentViewFromSession(
     }));
 
   const draftTitle = session.draft?.title?.trim() ?? "";
-  const lastCreated = created[created.length - 1];
   const right = draftTitle
     ? { kind: "draft" as const, draft: { title: draftTitle, description: session.draft?.description ?? "" } }
     : extras.right.kind === "preview"
       ? extras.right
-      : lastCreated
-        ? { kind: "preview" as const, order: lastCreated }
-        : { kind: "empty" as const };
+      : { kind: "empty" as const };
 
   return {
     repository: session.repository ?? "",

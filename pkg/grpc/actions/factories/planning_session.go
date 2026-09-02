@@ -152,11 +152,14 @@ func CreatePlanningSessionWorkOrder(ctx context.Context, organizationID string, 
 		return nil, err
 	}
 	db := database.DB(ctx)
+	updating := strings.TrimSpace(session.PendingDraft.Data().WorkOrderID) != ""
 	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create planning session work order")
 	}
-	workersctx.EmitWorkOrderCreated(db, factoryModel, order)
+	if !updating {
+		workersctx.EmitWorkOrderCreated(db, factoryModel, order)
+	}
 	if err := messages.PublishFactoryWorkOrderUpdated(factoryModel.ID.String(), order.ID.String(), factoryevents.EventTypeOrderStatusUpdated); err != nil {
 		log.WithError(err).Warnf("Failed to publish work order created from planning session %s", session.ID)
 	}

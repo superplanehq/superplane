@@ -49,6 +49,8 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 			assert.NotContains(t, prompt, "say:")
 			assert.NotContains(t, prompt, "with say")
 			assert.Contains(t, prompt, "Do not call wait_for_user")
+			assert.Contains(t, prompt, "When the user creates or skips a draft")
+			assert.Contains(t, prompt, "When the user starts a refine")
 			assert.NotContains(t, prompt, "Start by calling wait_for_user")
 		}
 	}
@@ -244,6 +246,31 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, created.Session.Created, 1)
 	assert.Equal(t, "Retry refunds", created.Session.Created[0].Title)
+
+	refined, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: sessionID,
+		Text:      models.PlanningRefineNote(created.Session.Created[0].Key, created.Session.Created[0].Title),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, refined.Session.Draft)
+	assert.Equal(t, "Retry refunds", refined.Session.Draft.Title)
+
+	session, err = models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(sessionID))
+	require.NoError(t, err)
+	require.NoError(t, session.UpdateDraft(db, models.PlanningSessionDraft{
+		Title:       "Retry refunds once",
+		Description: "One retry only.",
+	}))
+
+	updated, err := CreatePlanningSessionWorkOrder(ctx, r.Organization.ID.String(), &pb.CreatePlanningSessionWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: sessionID,
+	})
+	require.NoError(t, err)
+	require.Len(t, updated.Session.Created, 1)
+	assert.Equal(t, created.Session.Created[0].Id, updated.Session.Created[0].Id)
+	assert.Equal(t, "Retry refunds once", updated.Session.Created[0].Title)
 
 	ended, err := EndPlanningSession(ctx, r.Organization.ID.String(), &pb.EndPlanningSessionRequest{
 		FactoryId: factoryModel.ID.String(),

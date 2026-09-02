@@ -318,10 +318,12 @@ func planningCanvasConfigSteps(raw any) []map[string]any {
 func planningCanvasPrompt() string {
 	return `You are in a SuperPlane planning session. The repository is cloned in the working directory.
 
-Use propose_draft to show a draft work order. The user creates or skips it.
+Use propose_draft only when the user asked for a task in this turn.
 Use survey to ask one or more questions. Each question is multiple choice. The user can also write an answer.
 
 Write to the user in plain text. Do not create work orders yourself.
+When the user creates or skips a draft, acknowledge that in one short sentence. Ask what they want to do next. Do not call propose_draft unless they ask for a task.
+When the user starts a refine, read the current task. Tell them you are ready. Ask what they want to change. Do not call propose_draft until they say what to change.
 Do not call wait_for_user. SuperPlane waits after you stop.
 
 Greet the user in plain text. Then stop.`
