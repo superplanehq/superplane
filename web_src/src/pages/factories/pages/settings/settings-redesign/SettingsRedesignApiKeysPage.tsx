@@ -11,6 +11,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { CopyButton } from "@/ui/CopyButton";
 import { KeyRound, Plus } from "lucide-react";
 
 import { FactorySettingsPageFrame } from "../FactorySettingsCard";
@@ -28,21 +29,23 @@ export function SettingsRedesignApiKeysPage() {
   const canDelete = canAct("api_keys", "delete");
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [createdToken, setCreatedToken] = useState("");
 
   usePageTitle(["API keys"]);
 
   const handleCreate = async () => {
     if (!canCreate || !newName.trim()) return;
     try {
-      await createMutation.mutateAsync({
+      const result = await createMutation.mutateAsync({
         name: newName.trim(),
         description: "",
         role: "org_viewer",
         canvasIds: [],
       });
-      showSuccessToast("API key created.");
       setCreateOpen(false);
       setNewName("");
+      setCreatedToken(result.data?.token ?? "");
+      showSuccessToast("API key created.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to create API key"));
     }
@@ -83,6 +86,7 @@ export function SettingsRedesignApiKeysPage() {
         </PermissionTooltip>
       }
     >
+      {createdToken ? <ApiKeyCreatedToken token={createdToken} onDone={() => setCreatedToken("")} /> : null}
       {createOpen ? (
         <ApiKeyCreateForm
           name={newName}
@@ -102,6 +106,28 @@ export function SettingsRedesignApiKeysPage() {
         onDelete={handleDelete}
       />
     </FactorySettingsPageFrame>
+  );
+}
+
+function ApiKeyCreatedToken({ token, onDone }: { token: string; onDone: () => void }) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border p-4" data-testid="settings-redesign-api-key-token">
+      <p className="text-[13px] text-foreground">Copy this token now. You cannot see it again.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input readOnly value={token} className="min-w-0 flex-1 font-mono" data-testid="api-key-token-display" />
+        <CopyButton
+          variant="button"
+          text={token}
+          data-testid="api-key-token-copy"
+          onCopyError={() => showErrorToast("Failed to copy token")}
+        >
+          Copy
+        </CopyButton>
+        <Button type="button" size="sm" onClick={onDone} data-testid="api-key-token-done">
+          Done
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -119,12 +119,16 @@ export function useSettingsRedesignOrganizationMembers() {
   };
 }
 
+function organizationMemberRole(roles: Array<{ roleName?: string; roleDisplayName?: string }> | undefined) {
+  return roles?.find((item) => item.roleName === "org_owner") ?? roles?.[0];
+}
+
 function toSettingsMember(user: {
   metadata?: { id?: string; email?: string };
   spec?: { displayName?: string };
   status?: { roles?: Array<{ roleName?: string; roleDisplayName?: string }> };
 }): SettingsRedesignMember {
-  const role = user.status?.roles?.[0];
+  const role = organizationMemberRole(user.status?.roles);
   return {
     id: user.metadata?.id || "",
     name: user.spec?.displayName || "Unknown user",

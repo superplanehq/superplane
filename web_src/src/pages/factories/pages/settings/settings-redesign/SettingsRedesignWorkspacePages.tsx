@@ -13,6 +13,7 @@ import { parseWorkOrderMetric } from "../../../lib/workOrderUsage";
 import { RepositoryPicker } from "../../onboarding/onboardingSteps";
 import { FactorySettingsPageFrame } from "../FactorySettingsCard";
 import { useFactorySettingsLayout } from "../factorySettingsLayoutContext";
+import { HostedSpendLimitCard } from "../FactorySettingsUsagePage";
 import { WorkspaceUsageByMachineTypeTable, WorkspaceUsageByModelTable } from "../WorkspaceUsageBreakdown";
 import { WorkspaceDangerSection, WorkspaceIdentityForm } from "./SettingsRedesignWorkspaceGeneralCards";
 import { SettingsIdentityHero } from "./settingsRedesignParts";
@@ -171,6 +172,7 @@ export function SettingsRedesignWorkspaceSpendingPage() {
             labelClassName="text-[12px] text-muted-foreground"
             valueClassName="mt-1 text-[26px] font-medium tracking-tight"
           />
+          <HostedSpendLimitCard />
           <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
           <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
         </>

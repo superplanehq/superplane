@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -151,5 +151,86 @@ describe("Settings redesign chrome", () => {
     await user.click(screen.getByRole("option", { name: "Member" }));
     expect(roleSelect).toHaveTextContent("Member");
     expect(screen.getByTestId(`settings-redesign-member-role-${STORYBOOK_ME_USER_ID}`)).toBeDisabled();
+  }, 10000);
+
+  it("shows the one-time API key token after create", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/api-keys`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("api-key-create-btn", {}, { timeout: 8000 }));
+    await user.type(screen.getByLabelText("Name"), "Deploy key");
+    await user.click(screen.getByRole("button", { name: "Create" }));
+    expect(await screen.findByTestId("api-key-token-display")).toHaveValue("sp_live_storybook_new");
+  }, 10000);
+
+  it("resets the organization invite link", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/members`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          inviteLink: { token: "storybook-token-reset", enabled: true },
+        }}
+      />,
+    );
+
+    const section = await screen.findByTestId("settings-redesign-invite-link", {}, { timeout: 8000 });
+    const input = await within(section).findByRole("textbox");
+    const before = (input as HTMLInputElement).value;
+    await user.click(within(section).getByTestId("settings-redesign-invite-reset"));
+    await waitFor(() => {
+      expect((within(section).getByRole("textbox") as HTMLInputElement).value).not.toBe(before);
+    });
+  }, 10000);
+
+  it("shows the hosted spend limit on workspace spending", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/spending`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    expect(await screen.findByLabelText("No limit", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
+  it("blocks remove when the last owner also has another role", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/members`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationUsers: [
+            {
+              metadata: { id: "only-owner", email: "owner@example.com" },
+              spec: { displayName: "Only Owner" },
+              status: {
+                roles: [
+                  { roleName: "org_admin", roleDisplayName: "Admin" },
+                  { roleName: "org_owner", roleDisplayName: "Owner" },
+                ],
+              },
+            },
+            {
+              metadata: { id: STORYBOOK_ME_USER_ID, email: "me@example.com" },
+              spec: { displayName: "Me" },
+              status: { roles: [{ roleName: "org_member", roleDisplayName: "Member" }] },
+            },
+          ],
+        }}
+      />,
+    );
+
+    const role = await screen.findByTestId("settings-redesign-member-role-only-owner", {}, { timeout: 8000 });
+    expect(role).toHaveTextContent("Owner");
+    const ownerRow = role.closest("li");
+    expect(ownerRow).not.toBeNull();
+    expect(within(ownerRow as HTMLElement).getByRole("button", { name: "Remove" })).toBeDisabled();
   }, 10000);
 });

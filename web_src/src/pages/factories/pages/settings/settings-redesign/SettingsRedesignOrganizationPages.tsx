@@ -65,6 +65,16 @@ function InviteLinkSection({ members }: { members: ReturnType<typeof useSettings
           >
             Copy link
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!members.canManageInvite || members.inviteBusy}
+            onClick={() => void members.resetInviteLink()}
+            data-testid="settings-redesign-invite-reset"
+          >
+            Reset link
+          </Button>
         </div>
       ) : (
         <p className="text-[13px] text-muted-foreground">Invite link is off.</p>
