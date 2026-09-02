@@ -146,10 +146,10 @@ export function useVelocityPageModel(
 }
 
 /**
- * Deltas are reported per metric, because their baselines differ: merges and
- * spend need the previous API window, while cycle time needs closed tasks in
- * that window. A metric with no baseline shows no chip at all, which is
- * honest about a workspace that only started last week.
+ * Deltas are reported per metric, because their baselines differ: task counts
+ * and spend need the previous API window, while cycle time is measured from the
+ * work orders themselves. A metric with no baseline shows no chip at all, which
+ * is honest about a workspace that only started last week.
  */
 function buildComparison(
   report: VelocityReport | undefined,
@@ -161,9 +161,9 @@ function buildComparison(
 
   const previous = report.previous;
   if (previous) {
-    comparison.merged = report.totals.merged - previous.merged;
-    comparison.wasteRate = report.totals.wasteRate - previous.wasteRate;
-    comparison.costPerMerge = round(report.totals.costPerMerge - previous.costPerMerge, 2);
+    comparison.tasksClosed = report.totals.tasksClosed - previous.tasksClosed;
+    comparison.taskWasteRate = report.totals.taskWasteRate - previous.taskWasteRate;
+    comparison.costPerTask = round(report.totals.costPerTask - previous.costPerTask, 2);
   }
 
   if (flow && previousFlow && flow.sampleSize > 0 && previousFlow.sampleSize > 0) {

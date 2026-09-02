@@ -306,6 +306,10 @@ type dayBucket struct {
 	costCents      int64
 	tokens         int64
 	wasteCostCents int64
+	// Work orders reported on the day. A work order counts once here, however
+	// many pull requests it opened.
+	tasksClosed int
+	tasksWaste  int
 }
 
 // dayLabel names the axis tick of a day, as a weekday and a date.
@@ -463,7 +467,9 @@ func fillBuckets(
 		}
 		buckets[idx].costCents += order.costCents
 		buckets[idx].tokens += order.tokens
+		buckets[idx].tasksClosed++
 		if !order.merged {
+			buckets[idx].tasksWaste++
 			buckets[idx].wasteCostCents += order.costCents
 		}
 	}
@@ -489,6 +495,7 @@ func fillBuckets(
 
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
 	sp, people, waste := 0, 0, 0
+	tasksClosed, tasksWaste := 0, 0
 	var costCents, tokens, wasteCostCents int64
 	for _, b := range buckets {
 		sp += b.superplaneMerged
@@ -499,6 +506,8 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		costCents += b.costCents
 		tokens += b.tokens
 		wasteCostCents += b.wasteCostCents
+		tasksClosed += b.tasksClosed
+		tasksWaste += b.tasksWaste
 	}
 
 	totals := &pb.DescribeFactoryVelocityTotals{
@@ -508,6 +517,8 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		CostCents:        costCents,
 		Tokens:           tokens,
 		WasteCostCents:   wasteCostCents,
+		TasksClosed:      int32(tasksClosed),
+		TasksWaste:       int32(tasksWaste),
 	}
 	totalMerged := sp + people
 	if totalMerged > 0 && hasPeople {

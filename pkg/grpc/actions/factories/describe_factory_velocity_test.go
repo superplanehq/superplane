@@ -411,6 +411,8 @@ func TestFillBuckets_CountsIntakeAndChargesOrdersOnce(t *testing.T) {
 	assert.Equal(t, 2, last.intake[models.FactoryIntakeSourceGitHubIssues])
 	assert.Equal(t, int64(250), last.costCents, "the order is charged once")
 	assert.Equal(t, int64(1200), last.tokens)
+	assert.Equal(t, 1, last.tasksClosed, "two pull requests of one order are one task")
+	assert.Zero(t, last.tasksWaste)
 	assert.Zero(t, last.wasteCostCents)
 }
 
@@ -436,12 +438,14 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 	last := buckets[len(buckets)-1]
 	assert.Equal(t, int64(180), last.costCents)
 	assert.Equal(t, int64(180), last.wasteCostCents, "spend on an unmerged close is waste")
+	assert.Equal(t, 1, last.tasksClosed)
+	assert.Equal(t, 1, last.tasksWaste, "a task that closed without a merge is waste")
 }
 
 func TestAggregateTotals(t *testing.T) {
 	buckets := []dayBucket{
-		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100},
-		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300},
+		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
+		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300, tasksClosed: 1},
 	}
 	got := aggregateTotals(buckets, true)
 	assert.Equal(t, int32(4), got.SuperplaneMerged)
@@ -452,6 +456,8 @@ func TestAggregateTotals(t *testing.T) {
 	assert.Equal(t, int64(600), got.CostCents)
 	assert.Equal(t, int64(1200), got.Tokens)
 	assert.Equal(t, int64(100), got.WasteCostCents)
+	assert.Equal(t, int32(4), got.TasksClosed)
+	assert.Equal(t, int32(1), got.TasksWaste)
 
 	gotNoPeople := aggregateTotals(buckets, false)
 	assert.Equal(t, int32(0), gotNoPeople.PeopleMerged)
@@ -562,6 +568,52 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.People[0].Id)
 	assert.Equal(t, int32(1), resp.People[0].FactoryMerged)
 	assert.Equal(t, int32(0), resp.People[0].AuthoredMerged)
+}
+
+func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	mergedAt := now.Add(-3 * time.Hour)
+	merged, err := factoryModel.CreateWorkOrder(db, "Merged order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	for _, url := range []string{
+		"https://github.com/example/repo/pull/1",
+		"https://github.com/example/repo/pull/2",
+	} {
+		_, err = merged.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL:      url,
+			State:    models.FactoryPullRequestStateMerged,
+			MergedAt: &mergedAt,
+		})
+		require.NoError(t, err)
+	}
+
+	closedAt := now.Add(-2 * time.Hour)
+	wasted, err := factoryModel.CreateWorkOrder(db, "Closed order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = wasted.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/3",
+		State:    models.FactoryPullRequestStateClosed,
+		ClosedAt: &closedAt,
+	})
+	require.NoError(t, err)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int32(2), resp.Totals.SuperplaneMerged, "both pull requests of the merged order count")
+	assert.Equal(t, int32(1), resp.Totals.Waste)
+	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
+	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
 }
 
 func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryPullRequest {
