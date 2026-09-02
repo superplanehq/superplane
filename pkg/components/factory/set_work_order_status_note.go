@@ -32,26 +32,26 @@ func (c *SetWorkOrderStatusNote) Name() string {
 }
 
 func (c *SetWorkOrderStatusNote) Label() string {
-	return "Set Work Order Status Note"
+	return "Set Task Status Note"
 }
 
 func (c *SetWorkOrderStatusNote) Description() string {
-	return "Announce what a waiting work order is blocked on and what resolves it"
+	return "Announce what a waiting task is blocked on and what resolves it"
 }
 
 func (c *SetWorkOrderStatusNote) Documentation() string {
-	return `The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+	return `The Set Task Status Note component announces what a waiting task is blocked on and what resolves it. The note shows as a "next step" panel on the task page — for example, a PR watcher can announce "Review the pull request: when it merges, this task completes automatically."
 
-Each note is identified by its ` + "`noteKey`" + ` (for example ` + "`pr-closure`" + `). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
+Each note is identified by its ` + "`noteKey`" + ` (for example ` + "`pr-closure`" + `). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one task can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The task must be open.
 
 - ` + "`headline`" + ` is the short instruction shown as the panel title (e.g. "Review the pull request").
 - ` + "`body`" + ` is an optional markdown paragraph with the details — what happens on each outcome.
 - ` + "`ctaLabel`" + ` and ` + "`ctaUrl`" + ` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
 - ` + "`showOnlyWhenWaiting`" + ` hides the note while a line is running. The default is off, so the note stays visible during a run.
 
-` + "`orderId`" + ` explicitly targets the work order — it defaults to ` + "`{{ order().id }}`" + `, the work order driving the current run. This component can only be used in factory-owned apps.
+` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run. This component can only be used in factory-owned apps.
 
-Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.`
+Setting a note also emails the task's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other task emails.`
 }
 
 func (c *SetWorkOrderStatusNote) Icon() string {
@@ -71,7 +71,7 @@ func (c *SetWorkOrderStatusNote) ExampleOutput() map[string]any {
 				"key":      "pr-closure",
 				"kind":     "info",
 				"headline": "Review the pull request",
-				"body":     "When PR #42 merges, this work order completes automatically.",
+				"body":     "When PR #42 merges, this task completes automatically.",
 				"ctaLabel": "Review PR #42",
 				"ctaUrl":   "https://github.com/acme/app/pull/42",
 			},
@@ -87,8 +87,8 @@ func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "orderId",
-			Label:       "Work Order ID",
-			Description: "Work order to target. Defaults to the work order driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
+			Label:       "Task ID",
+			Description: "Task to target. Defaults to the task driving the current run (only resolves when this flow was dispatched from a factory line). Replace it with e.g. {{ previous().data.workOrder.id }} otherwise.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "{{ order().id }}",
@@ -96,7 +96,7 @@ func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
 		{
 			Name:        "noteKey",
 			Label:       "Note Key",
-			Description: "Stable identifier for this note on the work order (e.g. pr-closure). Sets with the same key update the same note.",
+			Description: "Stable identifier for this note on the task (e.g. pr-closure). Sets with the same key update the same note.",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 		},
@@ -110,7 +110,7 @@ func (c *SetWorkOrderStatusNote) Configuration() []configuration.Field {
 		{
 			Name:        "body",
 			Label:       "Body",
-			Description: "Optional markdown paragraph with the details — what the order waits on and what happens on each outcome",
+			Description: "Optional markdown paragraph with the details — what the task waits on and what happens on each outcome",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
 		},

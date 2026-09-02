@@ -31,27 +31,27 @@ func (c *FindWorkOrder) Name() string {
 }
 
 func (c *FindWorkOrder) Label() string {
-	return "Find Work Order"
+	return "Find Task"
 }
 
 func (c *FindWorkOrder) Description() string {
-	return "Look up a work order by id or by an artifact's key"
+	return "Look up a task by id or by an artifact's key"
 }
 
 func (c *FindWorkOrder) Documentation() string {
-	return `The Find Work Order component resolves a work order without requiring the current run to be attached to one — the missing piece for flows that don't start on a factory line, e.g. a ` + "`github.onPullRequest`" + ` merged event that needs to close the order a pull request belongs to.
+	return `The Find Task component resolves a task without requiring the current run to be attached to one — the missing piece for flows that don't start on a factory line, e.g. a ` + "`github.onPullRequest`" + ` merged event that needs to close the task a pull request belongs to.
 
 Lookup modes:
 
-- **Work Order ID** (` + "`by: id`" + `): resolves ` + "`orderId`" + ` directly.
-- **Artifact Key** (` + "`by: artifactKey`" + `): resolves the work order that owns the artifact tagged with ` + "`artifactKey`" + ` (set via ` + "`addWorkOrderArtifact`" + `'s ` + "`artifactKey`" + ` field — e.g. the pull request's URL).
+- **Task ID** (` + "`by: id`" + `): resolves ` + "`orderId`" + ` directly.
+- **Artifact Key** (` + "`by: artifactKey`" + `): resolves the task that owns the artifact tagged with ` + "`artifactKey`" + ` (set via ` + "`addWorkOrderArtifact`" + `'s ` + "`artifactKey`" + ` field — e.g. the pull request's URL).
 
-On a match, emits ` + "`workOrder.found`" + ` with ` + "`{ workOrder }`" + ` on the ` + "`found`" + ` channel, so downstream components can target it with ` + "`orderId: {{ previous().data.workOrder.id }}`" + `. When nothing matches, emits on the ` + "`notFound`" + ` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the ` + "`notFound`" + ` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+On a match, emits ` + "`workOrder.found`" + ` with ` + "`{ workOrder }`" + ` on the ` + "`found`" + ` channel, so downstream components can target it with ` + "`orderId: {{ previous().data.workOrder.id }}`" + `. When nothing matches, emits on the ` + "`notFound`" + ` channel instead of failing the run — a PR merge unrelated to any tracked task shouldn't red a flow, and downstream components can wire the ` + "`notFound`" + ` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
 
 ## Output Channels
 
-- **Found**: A work order matched the lookup
-- **Not Found**: No work order matched the lookup`
+- **Found**: A task matched the lookup
+- **Not Found**: No task matched the lookup`
 }
 
 func (c *FindWorkOrder) Icon() string {
@@ -69,7 +69,7 @@ func (c *FindWorkOrder) ExampleOutput() map[string]any {
 		"data": map[string]any{
 			"workOrder": map[string]any{
 				"id":    "wo-123",
-				"title": "Work Order 1",
+				"title": "Task 1",
 				"state": "open",
 			},
 		},
@@ -91,14 +91,14 @@ func (c *FindWorkOrder) Configuration() []configuration.Field {
 		{
 			Name:        "by",
 			Label:       "Find by",
-			Description: "How to look the work order up",
+			Description: "How to look the task up",
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
 			Default:     "id",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
-						{Label: "Work Order ID", Value: "id"},
+						{Label: "Task ID", Value: "id"},
 						{Label: "Artifact Key", Value: "artifactKey"},
 					},
 				},
@@ -106,8 +106,8 @@ func (c *FindWorkOrder) Configuration() []configuration.Field {
 		},
 		{
 			Name:                 "orderId",
-			Label:                "Work Order ID",
-			Description:          "The id of the work order to find",
+			Label:                "Task ID",
+			Description:          "The id of the task to find",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: byID,
@@ -118,7 +118,7 @@ func (c *FindWorkOrder) Configuration() []configuration.Field {
 		{
 			Name:                 "artifactKey",
 			Label:                "Artifact Key",
-			Description:          "The key of an artifact attached to the work order (e.g. a pull request's URL)",
+			Description:          "The key of an artifact attached to the task (e.g. a pull request's URL)",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: byArtifactKey,
