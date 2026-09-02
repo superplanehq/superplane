@@ -2,17 +2,26 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { followAfterRunningPhaseChange, isNearLogBottom } from "./followLogScroll";
 
+export type FollowLogScrollOptions = {
+  resumeOnBottom?: boolean;
+};
+
 /**
  * Follow pins the log scroller to the bottom. Live runner notes grow
  * inside the phase card, so the hook watches the scroller DOM rather
  * than only a parent stream-length tick.
  */
-export function useFollowLogScroll(runningPhaseId: string | null, contentTick: unknown) {
+export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
+  runningPhaseId: string | null,
+  contentTick: unknown,
+  options?: FollowLogScrollOptions,
+) {
+  const resumeOnBottom = options?.resumeOnBottom === true;
   const [following, setFollowing] = useState(() => runningPhaseId != null);
   const followingRef = useRef(following);
   followingRef.current = following;
   const previousRunningPhaseIdRef = useRef(runningPhaseId);
-  const scrollRef = useRef<HTMLOListElement>(null);
+  const scrollRef = useRef<T>(null);
   const ignoreScrollRef = useRef(false);
 
   useEffect(() => {
@@ -86,8 +95,12 @@ export function useFollowLogScroll(runningPhaseId: string | null, contentTick: u
     }
     if (!isNearLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
       setFollowing(false);
+      return;
     }
-  }, []);
+    if (resumeOnBottom) {
+      setFollowing(true);
+    }
+  }, [resumeOnBottom]);
 
   return { following, setFollowing: setFollow, scrollRef, onScroll };
 }
