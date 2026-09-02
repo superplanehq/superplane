@@ -27,6 +27,28 @@ describe("duration", () => {
     expect(format).toHaveBeenCalledWith({ seconds: 1, milliseconds: 500 });
   });
 
+  it("never hands a non-finite duration to Intl.DurationFormat", () => {
+    const format = vi.fn((duration: Record<string, number>) => {
+      // Matches the runtime: Intl.DurationFormat rejects non-finite values.
+      for (const value of Object.values(duration)) {
+        if (!Number.isFinite(value)) throw new RangeError("Expected finite integer");
+      }
+      return "formatted-by-intl";
+    });
+    const DurationFormat = vi.fn().mockImplementation(function () {
+      return { format };
+    });
+
+    vi.stubGlobal("Intl", {
+      ...Intl,
+      DurationFormat,
+    });
+
+    expect(formatDuration(Number.NaN)).toBe("");
+    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("");
+    expect(format).not.toHaveBeenCalled();
+  });
+
   it("formats milliseconds-only durations", () => {
     expect(formatDuration(250)).toBe("250ms");
   });
@@ -59,6 +81,12 @@ describe("duration", () => {
     expect(formatDuration(125_000)).toBe("2m 5s");
     expect(formatDuration(5_400_000)).toBe("1h 30m");
     expect(formatDuration(0)).toBe("");
+  });
+
+  it("returns an empty string for non-finite minute and second durations", () => {
+    expect(formatMinutesSecondsDuration(Number.NaN)).toBe("");
+    expect(formatMinutesSecondsDuration(Number.POSITIVE_INFINITY)).toBe("");
+    expect(formatMinutesSecondsDuration(Number.NEGATIVE_INFINITY)).toBe("");
   });
 
   it("formats minutes and seconds without milliseconds", () => {
