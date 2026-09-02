@@ -67,4 +67,18 @@ describe("WorkOrderSplitRunPopup Follow", () => {
 
     expect(screen.getByRole("switch", { name: "Follow" })).not.toBeChecked();
   });
+
+  it("explains what Follow does via an accessible description and a tooltip", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: SPLIT_RUN_RUNNING });
+
+    const toggle = screen.getByRole("switch", { name: "Follow" });
+    const describedById = toggle.getAttribute("aria-describedby");
+    expect(describedById).toBeTruthy();
+    expect(document.getElementById(describedById!)).toHaveTextContent("Auto-scroll the log to the newest output.");
+
+    await user.hover(screen.getByTestId("split-run-follow"));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Auto-scroll the log to the newest output.");
+  });
 });
