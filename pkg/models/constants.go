@@ -3,8 +3,9 @@ package models
 import "fmt"
 
 const (
-	ProviderGitHub = "github"
-	ProviderGoogle = "google"
+	ProviderGitHub   = "github"
+	ProviderGoogle   = "google"
+	ProviderPassword = "password"
 
 	DomainTypeOrganization = "org"
 
