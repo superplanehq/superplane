@@ -53,6 +53,9 @@ type Config struct {
 	CloudWatchLogStreamPrefix string // optional prefix for log stream name (must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on task-broker for callers)
 	// TaskWorkDir is the initial working directory for host-mode tasks (runner user's $HOME).
 	TaskWorkDir string
+	// ResetTaskHome gives each host task a fresh HOME and cwd, then deletes it.
+	// Local compose sets RUNNER_RESET_TASK_HOME. Off for EC2.
+	ResetTaskHome bool
 }
 
 // DefaultConfig returns safe defaults.
@@ -485,6 +488,7 @@ func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {
 		return &HostExecutor{
 			MaxOutputBytes: a.Config.MaxOutputBytes,
 			TaskWorkDir:    a.Config.TaskWorkDir,
+			ResetTaskHome:  a.Config.ResetTaskHome,
 		}, nil
 	case models.ExecutionDocker:
 		return &DockerExecutor{

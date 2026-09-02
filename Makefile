@@ -127,6 +127,7 @@ runner: build
 	    RUNNER_FLEET_ID="$(LOCAL_FLEET_ID)" \
 	    RUNNER_TRANSPORT="$(LOCAL_RUNNER_TRANSPORT)" \
 	    RUNNER_SHELL_USE_PIPE="$(LOCAL_RUNNER_SHELL_USE_PIPE)" \
+	    RUNNER_RESET_TASK_HOME="1" \
 	    RUNNER_ID="runner-$$i" \
 	    RUNNER_REGISTRATION_TOKEN="$$reg" \
 	    exec ./bin/runner ) & \

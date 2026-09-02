@@ -48,7 +48,9 @@ Do not run two brokers at the same time.
 3. Run the canvas. The local worker claims the task.
 
 Live logs in the UI stream from `http://localhost:8091`. The local worker does
-not use CloudWatch.
+not use CloudWatch. Host-mode tasks get a fresh `HOME` each run
+(`RUNNER_RESET_TASK_HOME`). Leftover `repo/` dirs from a prior factory
+clone cannot leak into the next task.
 
 ## Tools on the local worker
 

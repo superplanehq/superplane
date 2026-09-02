@@ -206,6 +206,7 @@ Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, *
 | `POLL_EMPTY_MS`        | Sleep when no work (default ~1000 ms)                                                                  |
 | `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change broker `lease_until`, which uses `execution_timeout_seconds` from the task (or the 1h default) plus buffer. |
 | `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit after **one** successful task (off by default locally; **on** for EC2 user-data unless disabled). **`runner_id`** should be the EC2 instance id (`i-…`) so fleet-manager can terminate the VM after the process exits. |
+| `RUNNER_RESET_TASK_HOME` | If `true`/`1`/`yes`, each host-mode task gets a fresh `HOME` and cwd under `.superplane/homes/<task-id>`, then that tree is deleted. Local `make dev` / `make runner` turn this on so leftover `repo/` dirs cannot leak. Off for EC2. |
 | `RUNNER_CLOUDWATCH_LOG_GROUP` | When set, task stdout/stderr stream to **CloudWatch Logs** (`PutLogEvents`) per task (see `shared/cwstream`). |
 | `RUNNER_CLOUDWATCH_REGION` | Optional AWS region for the CloudWatch Logs client. |
 | `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` | Optional; must match **`TASK_CLOUDWATCH_LOG_STREAM_PREFIX`** on task-broker. |

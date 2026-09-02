@@ -45,6 +45,25 @@ func processEnvironment(environment []api.EnvironmentVariable) ([]string, error)
 	return append(out, pairs...), nil
 }
 
+func withHomeEnv(env []string, home string) []string {
+	home = strings.TrimSpace(home)
+	if home == "" {
+		return env
+	}
+	if env == nil {
+		env = append([]string{}, os.Environ()...)
+	}
+	out := make([]string, 0, len(env)+1)
+	for _, pair := range env {
+		name, _, _ := strings.Cut(pair, "=")
+		if name == "HOME" {
+			continue
+		}
+		out = append(out, pair)
+	}
+	return append(out, "HOME="+home)
+}
+
 func dockerExecEnvironmentArgs(environment []api.EnvironmentVariable) ([]string, error) {
 	pairs, err := environmentPairs(environment)
 	if err != nil {

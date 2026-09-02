@@ -25,3 +25,30 @@ func ResolveTaskWorkDir() (string, error) {
 	}
 	return dir, nil
 }
+
+func isolatedTaskHome(parent, taskID string) string {
+	parent = strings.TrimSpace(parent)
+	if parent == "" {
+		parent = "."
+	}
+	id := strings.TrimSpace(taskID)
+	if id == "" {
+		id = "unknown"
+	}
+	return filepath.Join(parent, ".superplane", "homes", id)
+}
+
+func createIsolatedTaskHome(parent, taskID string) (string, error) {
+	dir := isolatedTaskHome(parent, taskID)
+	if err := os.RemoveAll(dir); err != nil {
+		return "", fmt.Errorf("reset task home %q: %w", dir, err)
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", fmt.Errorf("create task home %q: %w", dir, err)
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("task home %q: %w", dir, err)
+	}
+	return abs, nil
+}

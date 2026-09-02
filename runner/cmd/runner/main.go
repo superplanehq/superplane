@@ -35,6 +35,7 @@ func main() {
 	}
 
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
+	cfg.ResetTaskHome = envTruthy("RUNNER_RESET_TASK_HOME")
 	if v := strings.TrimSpace(os.Getenv("RUNNER_MAX_EXECUTION_SECONDS")); v != "" {
 		sec, err := strconv.Atoi(v)
 		switch {
@@ -77,6 +78,7 @@ func main() {
 		slog.String("transport", transportLabel(cfg)),
 		slog.String("health_addr", healthAddr),
 		slog.String("task_work_dir", cfg.TaskWorkDir),
+		slog.Bool("reset_task_home", cfg.ResetTaskHome),
 		slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
 
 	if removed, err := agent.SweepDockerOrphans(ctx, cfg.RunnerID); err != nil {
