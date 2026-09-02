@@ -12,6 +12,7 @@ export {
   FactorySettingsLayout,
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
+  FactorySettingsAccountLinkedAccountsPage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsNotificationsPage,
   FactorySettingsProfilePage,

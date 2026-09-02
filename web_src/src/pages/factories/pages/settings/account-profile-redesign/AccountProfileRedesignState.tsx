@@ -17,6 +17,7 @@ import {
   type AccountRedesignProfile,
   type AccountRedesignSsoProvider,
 } from "./accountProfileRedesignMocks";
+import { AccountLinkedAccountsRedesignPage } from "./AccountLinkedAccountsRedesignPage";
 import { AccountNotificationsRedesignPage } from "./AccountNotificationsRedesignPage";
 import { AccountProfileRedesignPage } from "./AccountProfileRedesignPage";
 import { AccountSecurityRedesignPage } from "./AccountSecurityRedesignPage";
@@ -149,16 +150,25 @@ export function AccountNotificationsRedesignRoutePage() {
   );
 }
 
+export function AccountLinkedAccountsRedesignRoutePage() {
+  const { profile, connectSso, disconnectSso } = useAccountProfileRedesign();
+  return (
+    <AccountLinkedAccountsRedesignPage
+      ssoAccounts={profile.ssoAccounts}
+      passwordSet={profile.passwordSet}
+      onConnect={connectSso}
+      onDisconnect={disconnectSso}
+    />
+  );
+}
+
 export function AccountSecurityRedesignRoutePage() {
-  const { profile, changePassword, connectSso, disconnectSso, createToken, revokeToken } = useAccountProfileRedesign();
+  const { profile, changePassword, createToken, revokeToken } = useAccountProfileRedesign();
   return (
     <AccountSecurityRedesignPage
       passwordSet={profile.passwordSet}
       tokens={profile.tokens}
-      ssoAccounts={profile.ssoAccounts}
       onChangePassword={changePassword}
-      onConnectSso={connectSso}
-      onDisconnectSso={disconnectSso}
       onCreateToken={createToken}
       onRevokeToken={revokeToken}
     />

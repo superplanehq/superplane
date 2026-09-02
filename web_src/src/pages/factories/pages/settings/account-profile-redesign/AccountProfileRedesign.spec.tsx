@@ -44,6 +44,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByText("Manage how your name appears in SuperPlane.")).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Profile");
+    expect(screen.getByTestId("account-redesign-nav-account-linked-accounts")).toHaveTextContent("Linked accounts");
     expect(screen.getByTestId("account-redesign-nav-account-security")).toHaveTextContent("Security");
     expect(screen.queryByTestId("account-redesign-nav-account-notifications")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-nav-account-preferences")).not.toBeInTheDocument();
@@ -93,7 +94,10 @@ describe("AccountProfileRedesignPlayground", () => {
   it("moves the profile email to the remaining sign-in method after disconnect", async () => {
     const user = userEvent.setup();
     render(
-      <AccountProfileRedesignPlayground initialPage="security" initialProfile={ACCOUNT_REDESIGN_SECURE_PROFILE} />,
+      <AccountProfileRedesignPlayground
+        initialPage="linked-accounts"
+        initialProfile={ACCOUNT_REDESIGN_SECURE_PROFILE}
+      />,
     );
 
     await user.click(
@@ -115,13 +119,12 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.queryByTestId("account-redesign-password-card")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-sso")).toBeInTheDocument();
   });
 
   it("disables last SSO disconnect when no password is set", () => {
     render(
       <AccountProfileRedesignPlayground
-        initialPage="security"
+        initialPage="linked-accounts"
         initialProfile={{
           ...ACCOUNT_REDESIGN_SECURE_PROFILE,
           passwordSet: false,
@@ -139,25 +142,36 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByText("Keep at least one sign-in method.")).toBeInTheDocument();
   });
 
-  it("opens Security with password, SSO methods, and tokens", async () => {
+  it("opens Security with password and tokens but no linked accounts", async () => {
     const user = userEvent.setup();
     renderPlayground();
 
     await user.click(screen.getByTestId("account-redesign-nav-account-security"));
     expect(screen.getByRole("heading", { name: "Security" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
-    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
     expect(
       screen.getByText("This token acts as you. Organization API keys act as the organization."),
     ).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-sso")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
   });
 
+  it("opens Linked accounts with each provider and its connection state", async () => {
+    const user = userEvent.setup();
+    renderPlayground();
+
+    await user.click(screen.getByTestId("account-redesign-nav-account-linked-accounts"));
+    expect(screen.getByRole("heading", { name: "Linked accounts" })).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
+    expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
+    expect(screen.getByText(/match your repository activity to you in Velocity reports/)).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-password-card")).not.toBeInTheDocument();
+  });
+
   it("connects Google and disconnects GitHub on the same account", async () => {
     const user = userEvent.setup();
-    render(<AccountProfileRedesignPlayground initialPage="security" />);
+    render(<AccountProfileRedesignPlayground initialPage="linked-accounts" />);
 
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
