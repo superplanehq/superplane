@@ -180,7 +180,7 @@ function WorkspaceDetailsSection({
   onSave,
 }: WorkspaceDetailsSectionProps) {
   return (
-    <section className="space-y-4" data-testid="factory-settings-general-form">
+    <section className="space-y-4 scroll-mt-8" data-testid="factory-settings-general-form" id="factory-settings-general-form">
       <div className="space-y-2">
         <Label htmlFor="factory-settings-name">Name</Label>
         <Input
@@ -197,10 +197,10 @@ function WorkspaceDetailsSection({
         />
         {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="factory-settings-key">Workspace key</Label>
+      <div className="space-y-2 scroll-mt-8" id="factory-settings-key">
+        <Label htmlFor="factory-settings-key-input">Workspace key</Label>
         <Input
-          id="factory-settings-key"
+          id="factory-settings-key-input"
           data-testid="factory-settings-key"
           value={factoryKey}
           onChange={(event) => onKeyChange(event.target.value)}
