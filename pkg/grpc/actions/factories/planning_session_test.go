@@ -55,9 +55,9 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 		FactoryId: factoryModel.ID.String(),
 	})
 	require.NoError(t, err)
-	for _, app := range apps.Apps {
-		assert.NotEqual(t, canvas.ID.String(), app.Id)
-	}
+	require.Len(t, apps.Apps, 1)
+	assert.Equal(t, canvas.ID.String(), apps.Apps[0].Id)
+	assert.Equal(t, models.PlanningCanvasName, apps.Apps[0].Name)
 
 	described, err := DescribePlanningSession(ctx, r.Organization.ID.String(), &pb.DescribePlanningSessionRequest{
 		FactoryId: factoryModel.ID.String(),

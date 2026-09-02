@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	planningCanvasEntrypointID = "start"
-	planningCanvasAgentNodeID  = "agent"
+	planningCanvasEntrypointID = "onrun-create-with-agent"
+	planningCanvasAgentNodeID  = "planning-agent"
 	planningCanvasTimeoutSecs  = 3600
 )
 

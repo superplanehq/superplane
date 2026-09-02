@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Create with an Agent
+  description: Starts the machine when you create a task with an agent.
+spec:
+  edges:
+    - channel: default
+      sourceId: onrun-create-with-agent
+      targetId: planning-agent
+  nodes:
+    - id: onrun-create-with-agent
+      name: Planning
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 400
+        'y': 880
+      isCollapsed: true
+    - id: planning-agent
+      name: Planning Agent
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ root().data.planning_session.repository }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: opus
+        steps:
+          - name: Clone Repo
+            type: bash
+            command: |-
+              rm -rf repo
+              git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+          - name: Plan with the user
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are in a SuperPlane planning session. The repository is cloned in the working directory.
+
+              Use the tools:
+              - say: post a short message the user can see
+              - propose_draft: show a draft work order. The user creates or skips it.
+
+              Do not create work orders yourself.
+              Do not call wait_for_user. SuperPlane waits after you stop.
+
+              Greet the user with say. Then stop.
+      position:
+        x: 720
+        'y': 880
+      isCollapsed: true

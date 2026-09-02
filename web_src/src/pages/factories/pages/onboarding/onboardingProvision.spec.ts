@@ -91,7 +91,7 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs PR closure for the workspace", async () => {
+  it("installs PR closure and Create with an Agent for the workspace", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
@@ -106,7 +106,7 @@ describe("provisionEventApps", () => {
       installFactory,
     });
 
-    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
     expect(installFactory).toHaveBeenCalledWith(
       expect.objectContaining({
         factoryId: "pr-closure",

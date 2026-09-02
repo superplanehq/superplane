@@ -110,9 +110,6 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 	result := make([]*pb.Factory_App, 0, len(canvases))
 	for _, canvas := range canvases {
-		if models.IsPlanningCanvasName(canvas.Name) {
-			continue
-		}
 		name := canvas.Name
 		description := canvas.Description
 		app := &pb.Factory_App{
