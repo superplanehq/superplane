@@ -247,7 +247,13 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
-	if state, err := a.parseLinkState(linkStateFromRequest(r)); err == nil {
+	rawState := linkStateFromRequest(r)
+	if strings.HasPrefix(rawState, authLinkStatePrefix) {
+		state, err := a.parseLinkState(rawState)
+		if err != nil {
+			http.Error(w, "Failed to connect sign-in method", http.StatusBadRequest)
+			return
+		}
 		a.completeProviderLink(w, r, gothUser, state)
 		return
 	}

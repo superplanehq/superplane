@@ -227,7 +227,10 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account
 	}
 
 	for _, user := range users {
-		organization, err := models.FindOrganizationByID(user.OrganizationID.String())
+		organization, err := models.FindOrganizationByIDInTransaction(tx, user.OrganizationID.String())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			continue
+		}
 		if err != nil {
 			return err
 		}

@@ -29,7 +29,7 @@ export function FactorySettingsAccountProfilePage() {
 
   return (
     <AccountProfileRedesignPage
-      name={name || account.name}
+      name={name}
       email={account.email}
       emailOptions={accountEmailOptions({
         email: account.email,

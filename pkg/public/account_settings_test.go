@@ -273,6 +273,22 @@ func TestDeleteAccount_RefusesLastInstallationAdmin(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDeleteAccount_SkipsDeletedOrganizationMembership(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	server, _, token := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": r.Account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusNoContent, res.Code)
+}
+
 func TestDeleteAccount_RequiresEmailConfirmation(t *testing.T) {
 	r := support.Setup(t)
 	server, _, token := setupTestServer(r, t)
