@@ -1,14 +1,21 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccountLinkedAccount } from "@/contexts/accountContextState";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
+import type * as AccountSettings from "@/lib/accountSettings";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { FactorySettingsLinkedAccountsPage } from "./FactorySettingsLinkedAccountsPage";
+import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfilePage";
 
-const accountState: { linked: AccountLinkedAccount[] } = { linked: [] };
+const accountState: {
+  linked: AccountLinkedAccount[];
+} = {
+  linked: [],
+};
 const refreshAccount = vi.fn(async () => undefined);
 const disconnectLinkedAccount = vi.fn(async (_provider: string) => undefined);
 const assign = vi.fn();
@@ -24,57 +31,73 @@ vi.mock("@/contexts/useAccount", () => ({
       avatar_url: "",
       installation_admin: false,
       has_password: true,
+      providers: [],
       linked_accounts: accountState.linked,
     },
     refreshAccount,
   }),
 }));
 
-vi.mock("@/lib/accountSettings", () => ({
-  disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),
-  linkedAccountConnectHref: (provider: string, redirect: string) =>
-    `/auth/${provider}?intent=connect&redirect=${encodeURIComponent(redirect)}`,
+vi.mock("./DeleteAccountDangerZone", () => ({
+  DeleteAccountDangerZone: () => null,
 }));
+
+vi.mock("@/lib/accountSettings", async (importOriginal) => {
+  const actual = await importOriginal<typeof AccountSettings>();
+  return {
+    ...actual,
+    disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),
+    linkedAccountConnectHref: (provider: string, redirect: string) =>
+      `/auth/${provider}?intent=connect&redirect=${encodeURIComponent(redirect)}`,
+  };
+});
 
 vi.mock("@/lib/toast", () => ({
   showSuccessToast: (message: string) => showSuccessToast(message),
   showErrorToast: (message: string) => showErrorToast(message),
 }));
 
-function renderPage(path = "/settings/account/linked-accounts") {
+function renderPage(path = "/settings/account/profile") {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <TooltipProvider>
-        <FactorySettingsLinkedAccountsPage />
-      </TooltipProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[path]}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <FactorySettingsAccountProfilePage />
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
-describe("FactorySettingsLinkedAccountsPage", () => {
+describe("FactorySettingsAccountProfilePage velocity GitHub", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     accountState.linked = [];
     Object.defineProperty(window, "location", {
       configurable: true,
-      value: { assign, pathname: "/settings/account/linked-accounts", search: "" },
+      value: { assign, pathname: "/settings/account/profile", search: "" },
     });
   });
 
   it("sends a member who linked nothing to the connect flow", async () => {
     renderPage();
 
-    expect(screen.getByText("Not linked.")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent(
+      "This link does not change how you sign in",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Link GitHub" }));
 
-    expect(assign).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fsettings%2Faccount%2Flinked-accounts");
+    expect(assign).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fsettings%2Faccount%2Fprofile");
   });
 
   it("shows the linked login", () => {
     accountState.linked = [{ provider: "github", username: "shiroyasha" }];
     renderPage();
 
-    expect(screen.getByText("Linked as shiroyasha.")).toBeInTheDocument();
+    expect(screen.getByText(/Linked as shiroyasha/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Link GitHub" })).not.toBeInTheDocument();
   });
 
@@ -103,7 +126,7 @@ describe("FactorySettingsLinkedAccountsPage", () => {
   });
 
   it("reports an identity another account already uses", async () => {
-    renderPage("/settings/account/linked-accounts?auth_error=linked_account_in_use");
+    renderPage("/settings/account/profile?auth_error=linked_account_in_use");
 
     await waitFor(() => {
       expect(showErrorToast).toHaveBeenCalledWith("Another SuperPlane account already uses this GitHub account.");
@@ -111,7 +134,7 @@ describe("FactorySettingsLinkedAccountsPage", () => {
   });
 
   it("confirms a completed link and reloads the account", async () => {
-    renderPage("/settings/account/linked-accounts?linked_account=linked");
+    renderPage("/settings/account/profile?linked_account=linked");
 
     await waitFor(() => {
       expect(showSuccessToast).toHaveBeenCalledWith("GitHub account linked.");
