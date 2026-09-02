@@ -31,7 +31,7 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}))
+	}, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

@@ -19,6 +19,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
+import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
@@ -546,6 +547,12 @@ describe("LinesPage board", () => {
     expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
   });
+});
+
+describe("LinesPage board editing", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
 
   it("renames the board title on Enter", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
@@ -736,6 +743,55 @@ describe("LinesPage board", () => {
         }),
       );
     });
+  });
+
+  it("hydrates a persisted column color on mount", async () => {
+    renderLinesBoard();
+
+    const backlogLane = screen.getByTestId("lines-backlog-column");
+    for (const className of lineBoardColumnLaneClassName("lime")!.split(" ")) {
+      expect(backlogLane).toHaveClass(className);
+    }
+  });
+
+  it("picking a color saves it on the line and updates the lane immediately", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnColors: { backlog: "lime", "phase-0": "sky" },
+      });
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).toHaveClass(className);
+    }
+  });
+
+  it("rolls back the color and shows an error toast when saving fails", async () => {
+    const { showErrorToast } = await import("@/lib/toast");
+    updateFactoryLineMutateAsync.mockRejectedValueOnce(new Error("network error"));
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(showErrorToast).toHaveBeenCalled();
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).not.toHaveClass(className);
+    }
   });
 
   it("hides Edit on the Done column", async () => {

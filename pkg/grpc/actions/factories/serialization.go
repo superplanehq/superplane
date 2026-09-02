@@ -277,11 +277,12 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 
 	return &pb.FactoryLine{
-		Id:        line.ID.String(),
-		Name:      line.Name,
-		Steps:     steps,
-		CreatedAt: timestamppb.New(line.CreatedAt),
-		UpdatedAt: timestamppb.New(line.UpdatedAt),
+		Id:           line.ID.String(),
+		Name:         line.Name,
+		Steps:        steps,
+		CreatedAt:    timestamppb.New(line.CreatedAt),
+		UpdatedAt:    timestamppb.New(line.UpdatedAt),
+		ColumnColors: line.ColumnColorsValue(),
 	}
 }
 

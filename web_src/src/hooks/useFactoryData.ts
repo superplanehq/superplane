@@ -650,7 +650,12 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { lineId: string; name?: string; steps?: FactoryLineStep[] }) => {
+    mutationFn: async (input: {
+      lineId: string;
+      name?: string;
+      steps?: FactoryLineStep[];
+      columnColors?: Record<string, string>;
+    }) => {
       const response = await factoriesUpdateFactoryLine(
         withOrganizationHeader({
           organizationId,
@@ -658,6 +663,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
           body: {
             name: input.name,
             steps: input.steps,
+            columnColors: input.columnColors,
           },
         }),
       );
