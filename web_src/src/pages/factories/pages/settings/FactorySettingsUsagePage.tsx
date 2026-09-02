@@ -92,7 +92,7 @@ function HostedSpendLimitCard() {
   const [noLimit, setNoLimit] = useState(!hasLimit);
   const [dollars, setDollars] = useState(hasLimit ? centsToDollarInput(Number(currentBudget)) : "");
   const limitCents = parseDollarInputToCents(dollars);
-  const canSaveLimit = noLimit || limitCents !== null;
+  const canSaveLimit = limitCents !== null;
 
   useEffect(() => {
     const nextHasLimit = currentBudget !== undefined && currentBudget !== null;
@@ -101,17 +101,33 @@ function HostedSpendLimitCard() {
   }, [currentBudget]);
 
   const save = async () => {
-    if (!noLimit && limitCents === null) {
+    if (limitCents === null) {
       showErrorToast("Enter a valid spend limit in USD.");
       return;
     }
     try {
       await updateFactory.mutateAsync({
-        hostedSpendBudgetCents: noLimit ? null : limitCents,
+        hostedSpendBudgetCents: limitCents,
       });
       showSuccessToast("Hosted spend limit saved.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const clearLimit = async () => {
+    try {
+      await updateFactory.mutateAsync({ hostedSpendBudgetCents: null });
+      showSuccessToast("Hosted spend limit saved.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const handleNoLimitChange = (checked: boolean) => {
+    setNoLimit(checked);
+    if (checked && hasLimit) {
+      void clearLimit();
     }
   };
 
@@ -126,7 +142,7 @@ function HostedSpendLimitCard() {
           id="hosted-spend-no-limit"
           checked={noLimit}
           disabled={!canUpdate || updateFactory.isPending}
-          onCheckedChange={setNoLimit}
+          onCheckedChange={handleNoLimitChange}
         />
       </div>
       {!noLimit ? (
@@ -162,7 +178,7 @@ function HostedSpendLimitCard() {
           {formatUsdCents(parseWorkOrderMetric(data.hostedSpendBudgetCents))}.
         </p>
       ) : null}
-      {canUpdate ? (
+      {canUpdate && !noLimit ? (
         <Button
           className="mt-3"
           type="button"
