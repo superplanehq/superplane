@@ -11,7 +11,7 @@ export type FollowLogScrollOptions = {
  * inside the phase card, so the hook watches the scroller DOM rather
  * than only a parent stream-length tick.
  */
-export function useFollowLogScroll(
+export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   runningPhaseId: string | null,
   contentTick: unknown,
   options?: FollowLogScrollOptions,
@@ -21,7 +21,7 @@ export function useFollowLogScroll(
   const followingRef = useRef(following);
   followingRef.current = following;
   const previousRunningPhaseIdRef = useRef(runningPhaseId);
-  const scrollRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<T>(null);
   const ignoreScrollRef = useRef(false);
 
   useEffect(() => {

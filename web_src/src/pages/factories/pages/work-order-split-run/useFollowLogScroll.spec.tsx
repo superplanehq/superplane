@@ -18,7 +18,7 @@ function FollowLog({
   running?: string | null;
   resumeOnBottom?: boolean;
 }) {
-  const follow = useFollowLogScroll(running, tick, { resumeOnBottom });
+  const follow = useFollowLogScroll<HTMLOListElement>(running, tick, { resumeOnBottom });
   return (
     <>
       <span data-testid="following">{follow.following ? "on" : "off"}</span>

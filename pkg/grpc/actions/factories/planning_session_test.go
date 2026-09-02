@@ -103,12 +103,13 @@ func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
 		SessionId: started.Session.Id,
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, described.Session.Messages)
-	assert.Equal(t, "survey", described.Session.Messages[0].Kind)
-	assert.Contains(t, described.Session.Messages[0].Text, "What is the priority?")
+	require.Empty(t, described.Session.Messages)
+	require.NotNil(t, described.Session.Survey)
+	require.Len(t, described.Session.Survey.Questions, 1)
+	assert.Equal(t, "What is the priority?", described.Session.Survey.Questions[0].Prompt)
 }
 
-func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing.T) {
+func Test__StartPlanningSession__KeepsExistingCanvasPrompt(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
@@ -125,48 +126,29 @@ func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing
 	require.NoError(t, err)
 	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
 	require.NoError(t, err)
-	stale := false
+	rewrote := false
 	for i := range nodes {
 		if nodes[i].Type != models.NodeTypeComponent {
 			continue
 		}
 		config := nodes[i].Configuration.Data()
-		rewrote := false
 		for _, step := range planningCanvasConfigSteps(config["steps"]) {
 			if _, ok := step["prompt"]; ok {
-				step["prompt"] = "Start by calling wait_for_user."
+				step["prompt"] = "Custom planning prompt."
 				rewrote = true
 			}
 		}
-		require.True(t, rewrote)
 		nodes[i].Configuration = datatypes.NewJSONType(config)
 		require.NoError(t, database.DB(t.Context()).Model(&nodes[i]).Select("Configuration").Updates(&nodes[i]).Error)
-		stale = true
 	}
-	require.True(t, stale)
-	require.Equal(t, "Start by calling wait_for_user.", planningAgentPrompt(t, r.Organization.ID, factoryModel.ID))
+	require.True(t, rewrote)
 
 	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
 		FactoryId:  factoryModel.ID.String(),
 		Repository: "acme/payments",
 	})
 	require.NoError(t, err)
-
-	nodes, err = models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
-	require.NoError(t, err)
-	refreshed := false
-	for _, node := range nodes {
-		if node.Type != models.NodeTypeComponent {
-			continue
-		}
-		prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
-		assert.Contains(t, prompt, "Greet the user in plain text")
-		assert.NotContains(t, prompt, "say:")
-		assert.NotContains(t, prompt, "with say")
-		assert.NotContains(t, prompt, "Start by calling wait_for_user")
-		refreshed = true
-	}
-	assert.True(t, refreshed)
+	assert.Equal(t, "Custom planning prompt.", planningAgentPrompt(t, r.Organization.ID, factoryModel.ID))
 }
 
 func Test__StartPlanningSession__KeepsPreviousSessionForSameUser(t *testing.T) {
@@ -286,49 +268,6 @@ func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
 		}
 	}
 	assert.True(t, foundClaude)
-}
-
-func Test__StartPlanningSession__SwitchesExistingCodexNodeToClaude(t *testing.T) {
-	r := support.Setup(t)
-	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	db := database.DB(t.Context())
-	upsertHostedOnboardingProvider(t, db)
-	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-
-	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
-		FactoryId:  factoryModel.ID.String(),
-		Repository: "acme/payments",
-	})
-	require.NoError(t, err)
-
-	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
-	require.NoError(t, err)
-	node, err := models.FindCanvasNode(db, canvas.ID, planningCanvasAgentNodeID)
-	require.NoError(t, err)
-	node.Ref = datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}})
-	require.NoError(t, db.Model(node).Select("Ref").Updates(node).Error)
-
-	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
-		FactoryId:  factoryModel.ID.String(),
-		Repository: "acme/payments",
-	})
-	require.NoError(t, err)
-
-	node, err = models.FindCanvasNode(db, canvas.ID, planningCanvasAgentNodeID)
-	require.NoError(t, err)
-	assert.Equal(t, "runnerClaudeCode", node.ComponentName())
-	assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration.Data()), "Greet the user in plain text")
-
-	version, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
-	require.NoError(t, err)
-	for _, live := range version.Nodes {
-		if live.ID == planningCanvasAgentNodeID {
-			assert.Equal(t, "runnerClaudeCode", live.ComponentName())
-			return
-		}
-	}
-	t.Fatal("missing planning agent on live version")
 }
 
 func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {

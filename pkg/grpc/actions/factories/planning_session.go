@@ -150,7 +150,7 @@ func CreatePlanningSessionWorkOrder(ctx context.Context, organizationID string, 
 		return nil, err
 	}
 	db := database.DB(ctx)
-	updating := strings.TrimSpace(session.PendingDraft.Data().WorkOrderID) != ""
+	updating := strings.TrimSpace(session.Draft().WorkOrderID) != ""
 	order, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create planning session work order")
@@ -293,11 +293,14 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		})
 	}
 
-	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(session.Messages))
-	for _, message := range session.Messages {
+	messages, err := models.ListPlanningSessionMessages(tx, session.ID)
+	if err != nil {
+		return nil, err
+	}
+	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(messages))
+	for _, message := range messages {
 		messagesOut = append(messagesOut, &pb.PlanningSessionMessage{
-			Id:   message.ID,
-			Kind: message.Kind,
+			Id:   message.ID.String(),
 			Role: message.Role,
 			Text: message.Text,
 		})
@@ -323,10 +326,27 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		return nil, err
 	}
 	out.ExecutionId = executionID
-	if draft := session.PendingDraft.Data(); strings.TrimSpace(draft.Title) != "" {
+	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{Title: draft.Title, Description: draft.Description}
 	}
+	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
+		out.Survey = &pb.PlanningSessionSurvey{
+			Id:        session.SurveyID.String(),
+			Questions: planningSessionSurveyQuestions(survey),
+		}
+	}
 	return out, nil
+}
+
+func planningSessionSurveyQuestions(survey models.PlanningSessionSurvey) []*pb.PlanningSessionSurveyQuestion {
+	questions := make([]*pb.PlanningSessionSurveyQuestion, 0, len(survey.Questions))
+	for _, question := range survey.Questions {
+		questions = append(questions, &pb.PlanningSessionSurveyQuestion{
+			Prompt:  question.Prompt,
+			Options: question.Options,
+		})
+	}
+	return questions
 }
 
 func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSession) (string, error) {

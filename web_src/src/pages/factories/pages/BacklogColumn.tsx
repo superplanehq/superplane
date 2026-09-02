@@ -157,25 +157,39 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
-      <CreateWithAgentDialog
-        open={agentSession.open}
-        workspaceName={factoryKey}
-        organizationId={organizationId}
-        view={agentSession.view}
-        onComposerChange={agentSession.onComposerChange}
-        onSend={agentSession.onSend}
-        onSubmitSurvey={agentSession.onSubmitSurvey}
-        onDraftTitleChange={agentSession.onDraftTitleChange}
-        onDraftDescriptionChange={agentSession.onDraftDescriptionChange}
-        onCreateDraft={agentSession.onCreateDraft}
-        onSkipDraft={agentSession.onSkipDraft}
-        onSelectCreated={agentSession.onSelectCreated}
-        onRefineCreated={agentSession.onRefineCreated}
-        onRequestClose={agentSession.onRequestClose}
-        onCancelEnd={agentSession.onCancelEnd}
-        onConfirmEnd={agentSession.onConfirmEnd}
-      />
+      <BacklogCreateWithAgentDialog factoryKey={factoryKey} organizationId={organizationId} session={agentSession} />
     </>
+  );
+}
+
+function BacklogCreateWithAgentDialog({
+  factoryKey,
+  organizationId,
+  session,
+}: {
+  factoryKey: string;
+  organizationId: string;
+  session: ReturnType<typeof useCreateWithAgentSession>;
+}) {
+  return (
+    <CreateWithAgentDialog
+      open={session.open}
+      workspaceName={factoryKey}
+      organizationId={organizationId}
+      view={session.view}
+      onComposerChange={session.onComposerChange}
+      onSend={session.onSend}
+      onSubmitSurvey={session.onSubmitSurvey}
+      onDraftTitleChange={session.onDraftTitleChange}
+      onDraftDescriptionChange={session.onDraftDescriptionChange}
+      onCreateDraft={session.onCreateDraft}
+      onSkipDraft={session.onSkipDraft}
+      onSelectCreated={session.onSelectCreated}
+      onRefineCreated={session.onRefineCreated}
+      onRequestClose={session.onRequestClose}
+      onCancelEnd={session.onCancelEnd}
+      onConfirmEnd={session.onConfirmEnd}
+    />
   );
 }
 

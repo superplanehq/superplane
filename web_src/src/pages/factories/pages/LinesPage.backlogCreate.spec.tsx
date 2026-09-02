@@ -190,12 +190,28 @@ describe("LinesPage backlog create", () => {
 
   it("opens the agent session from the backlog plus menu", async () => {
     Element.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          session: {
+            id: "session-1",
+            repository: "acme/payments",
+            canvasRunId: "run-1",
+            messages: [],
+          },
+        }),
+      }),
+    );
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-create"));
     await user.click(screen.getByRole("button", { name: "Create with an Agent" }));
-    expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
+    });
   });
 
   it("starts the session with the workspace repository, not the demo repo", async () => {

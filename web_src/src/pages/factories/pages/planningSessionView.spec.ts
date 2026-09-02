@@ -21,7 +21,7 @@ describe("createWithAgentViewFromSession", () => {
         repository: "acme/payments",
         canvasId: "canvas-1",
         canvasRunId: "run-1",
-        messages: [{ id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
         draft: { title: "Retry refunds", description: "Stop double charges." },
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
@@ -73,17 +73,11 @@ describe("createWithAgentViewFromSession", () => {
         repository: "acme/payments",
         canvasId: "canvas-1",
         executionId: "exec-1",
-        messages: [
-          {
-            id: "pending-survey",
-            kind: "survey",
-            role: "agent",
-            text: JSON.stringify({
-              questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
-            }),
-          },
-          { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
-        ],
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+        survey: {
+          id: "pending-survey",
+          questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+        },
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );
@@ -97,23 +91,30 @@ describe("createWithAgentViewFromSession", () => {
     ]);
   });
 
+  it("clears the survey after a reply so the next poll cannot restore it", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "What is the priority? High" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.survey).toBeUndefined();
+    expect(view.messages).toEqual([
+      { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
   it("marks the user text after a survey as a survey reply", () => {
     const view = createWithAgentViewFromSession(
       {
         repository: "acme/payments",
         canvasId: "canvas-1",
         executionId: "exec-1",
-        messages: [
-          {
-            id: "pending-survey",
-            kind: "survey",
-            role: "agent",
-            text: JSON.stringify({
-              questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
-            }),
-          },
-          { id: "reply", kind: "text", role: "user", text: "What is the priority? High" },
-        ],
+        messages: [{ id: "reply", role: "user", text: "What is the priority? High" }],
       },
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );

@@ -89,11 +89,7 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
   const live = Boolean(organizationId && factoryId && orderId);
   const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
 
-  const busy =
-    cancelRun.isPending ||
-    closeWorkOrder.isPending ||
-    updateStatus.isPending ||
-    dispatchWorkOrder.isPending;
+  const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 
   const handleBackToDraft = useCallback(async () => {
     if (!live || !orderId || busy) {

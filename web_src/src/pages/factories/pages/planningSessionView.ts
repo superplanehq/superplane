@@ -1,5 +1,5 @@
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
-import { isPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
+import { isPlanningSurveyReply } from "./planningSessionSurvey";
 
 export function workspacePlanningRepository(
   factory: { onboarding?: { appRepository?: string | null } } | null | undefined,
@@ -19,13 +19,18 @@ export type PlanningSessionPayload = {
   messages?: PlanningSessionMessagePayload[];
   draft?: { title?: string; description?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
+  survey?: PlanningSessionSurveyPayload | null;
 };
 
 export type PlanningSessionMessagePayload = {
   id?: string;
-  kind?: string;
   role?: string;
   text?: string;
+};
+
+export type PlanningSessionSurveyPayload = {
+  id?: string;
+  questions?: Array<{ prompt?: string; options?: string[] }>;
 };
 
 export function createWithAgentViewFromSession(
@@ -56,7 +61,7 @@ export function createWithAgentViewFromSession(
     canvasId: session.canvasId ?? "",
     executionId: session.executionId ?? "",
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
-    survey: planningSessionSurveyFromMessages(session.messages ?? []),
+    survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created,
     right,
@@ -64,19 +69,21 @@ export function createWithAgentViewFromSession(
   };
 }
 
-function planningSessionSurveyFromMessages(messages: PlanningSessionMessagePayload[]): CreateWithAgentView["survey"] {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message.kind !== "survey") {
-      continue;
+function planningSessionSurveyFromPayload(
+  survey: PlanningSessionSurveyPayload | null | undefined,
+): CreateWithAgentView["survey"] {
+  const questions = (survey?.questions ?? []).flatMap((question) => {
+    const prompt = question.prompt?.trim() ?? "";
+    const options = (question.options ?? []).map((option) => option.trim()).filter(Boolean);
+    if (!prompt || !options.length) {
+      return [];
     }
-    const survey = parsePlanningSurvey(message.text);
-    if (!survey) {
-      return undefined;
-    }
-    return { ...survey, id: message.id ?? `survey-${index}` };
+    return [{ prompt, options }];
+  });
+  if (!questions.length) {
+    return undefined;
   }
-  return undefined;
+  return { id: survey?.id, questions };
 }
 
 function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
@@ -90,7 +97,7 @@ function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWi
 }
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
-  if (message.kind === "text" && message.text && (message.role === "user" || message.role === "agent")) {
+  if (message.text && (message.role === "user" || message.role === "agent")) {
     return [
       {
         id: message.id ?? message.text,

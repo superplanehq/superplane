@@ -174,9 +174,13 @@ function CreateWithAgentStream({
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
 }) {
-  const follow = useFollowLogScroll(view.executionId || view.canvasId || "session", view.messages.length, {
-    resumeOnBottom: true,
-  });
+  const follow = useFollowLogScroll<HTMLDivElement>(
+    view.executionId || view.canvasId || "session",
+    view.messages.length,
+    {
+      resumeOnBottom: true,
+    },
+  );
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     onSend();

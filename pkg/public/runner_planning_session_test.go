@@ -50,7 +50,7 @@ func TestRunnerPlanningSessionDraft(t *testing.T) {
 
 	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "Retry refunds", reloaded.PendingDraft.Data().Title)
+	assert.Equal(t, "Retry refunds", reloaded.Draft().Title)
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {

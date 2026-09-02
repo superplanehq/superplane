@@ -260,4 +260,3 @@ type CheckRef struct {
 	Level         string    `json:"level"`
 	PreviousScore *float64  `json:"previousScore,omitempty"`
 }
-

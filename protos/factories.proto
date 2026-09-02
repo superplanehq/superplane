@@ -1966,9 +1966,18 @@ message PlanningSessionCreatedOrder {
 
 message PlanningSessionMessage {
   string id = 1;
-  string kind = 2;
-  string role = 3;
-  string text = 4;
+  string role = 2;
+  string text = 3;
+}
+
+message PlanningSessionSurveyQuestion {
+  string prompt = 1;
+  repeated string options = 2;
+}
+
+message PlanningSessionSurvey {
+  string id = 1;
+  repeated PlanningSessionSurveyQuestion questions = 2;
 }
 
 message PlanningSession {
@@ -1983,6 +1992,7 @@ message PlanningSession {
   repeated PlanningSessionCreatedOrder created = 9;
   string wait_state = 10;
   string execution_id = 11;
+  PlanningSessionSurvey survey = 12;
 }
 
 message StartPlanningSessionRequest {

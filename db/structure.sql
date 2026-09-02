@@ -430,6 +430,31 @@ CREATE TABLE public.factory_llm_model_allowlists (
 
 
 --
+-- Name: factory_planning_session_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_messages (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    session_id uuid NOT NULL,
+    role text NOT NULL,
+    text text NOT NULL,
+    delivered boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: factory_planning_session_work_orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_planning_session_work_orders (
+    session_id uuid NOT NULL,
+    work_order_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: factory_planning_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -442,11 +467,16 @@ CREATE TABLE public.factory_planning_sessions (
     state text NOT NULL,
     canvas_id uuid,
     canvas_run_id uuid,
-    messages jsonb DEFAULT '[]'::jsonb NOT NULL,
-    pending_draft jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_work_order_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    draft_title text DEFAULT ''::text NOT NULL,
+    draft_description text DEFAULT ''::text NOT NULL,
+    draft_work_order_id uuid,
     wait_state text DEFAULT ''::text NOT NULL,
-    wait_result jsonb DEFAULT '{}'::jsonb NOT NULL,
+    wait_kind text DEFAULT ''::text NOT NULL,
+    wait_text text DEFAULT ''::text NOT NULL,
+    wait_work_order_id uuid,
+    wait_work_order_key text DEFAULT ''::text NOT NULL,
+    survey_id uuid,
+    survey jsonb,
     heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
     ended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -1608,6 +1638,22 @@ ALTER TABLE ONLY public.factory_llm_model_allowlists
 
 
 --
+-- Name: factory_planning_session_messages factory_planning_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_pkey PRIMARY KEY (session_id, work_order_id);
+
+
+--
 -- Name: factory_planning_sessions factory_planning_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2402,17 +2448,31 @@ CREATE INDEX idx_factory_lines_factory_id ON public.factory_lines USING btree (f
 
 
 --
+-- Name: idx_factory_planning_session_messages_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_session_messages_session ON public.factory_planning_session_messages USING btree (session_id, created_at);
+
+
+--
 -- Name: idx_factory_planning_sessions_canvas_run; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_planning_sessions_canvas_run ON public.factory_planning_sessions USING btree (canvas_run_id) WHERE (canvas_run_id IS NOT NULL);
+CREATE UNIQUE INDEX idx_factory_planning_sessions_canvas_run ON public.factory_planning_sessions USING btree (canvas_run_id) WHERE (canvas_run_id IS NOT NULL);
 
 
 --
--- Name: idx_factory_planning_sessions_factory_created; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_factory_planning_sessions_factory_open; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_factory_planning_sessions_factory_created ON public.factory_planning_sessions USING btree (factory_id, created_at DESC);
+CREATE INDEX idx_factory_planning_sessions_factory_open ON public.factory_planning_sessions USING btree (organization_id, factory_id) WHERE (state <> 'ended'::text);
+
+
+--
+-- Name: idx_factory_planning_sessions_open_heartbeat; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_open_heartbeat ON public.factory_planning_sessions USING btree (heartbeat_at) WHERE (state <> 'ended'::text);
 
 
 --
@@ -3298,11 +3358,43 @@ ALTER TABLE ONLY public.factory_lines
 
 
 --
+-- Name: factory_planning_session_messages factory_planning_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_messages
+    ADD CONSTRAINT factory_planning_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.factory_planning_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_planning_session_work_orders factory_planning_session_work_orders_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_session_work_orders
+    ADD CONSTRAINT factory_planning_session_work_orders_work_order_id_fkey FOREIGN KEY (work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_planning_sessions factory_planning_sessions_created_by_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.factory_planning_sessions
     ADD CONSTRAINT factory_planning_sessions_created_by_user_id_fkey FOREIGN KEY (created_by_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: factory_planning_sessions factory_planning_sessions_draft_work_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_planning_sessions
+    ADD CONSTRAINT factory_planning_sessions_draft_work_order_id_fkey FOREIGN KEY (draft_work_order_id) REFERENCES public.factory_work_orders(id) ON DELETE SET NULL;
 
 
 --
@@ -4145,7 +4237,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902092740	f
+20260902175657	f
 \.
 
 
