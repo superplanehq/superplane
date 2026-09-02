@@ -21,6 +21,7 @@ import type {
   FactoriesFactoryLine,
   FactoriesFactoryOnboarding,
   FactoriesFactoryPullRequest,
+  FactoriesUpdateFactoryAgentBody,
   FactoriesUpdateFactoryOnboardingBody,
   FactoriesWorkOrder,
   FactoriesWorkOrderEvent,
@@ -268,6 +269,9 @@ function mergedOnboarding(
   if (request.defaultBranch) next.defaultBranch = request.defaultBranch;
   if (request.issuesSource) next.issuesSource = request.issuesSource;
   if (request.agentHarness) next.agentHarness = request.agentHarness;
+  if (request.agentProvider) next.agentProvider = request.agentProvider;
+  if (request.agentModel) next.agentModel = request.agentModel;
+  if (request.agentPlanningModel) next.agentPlanningModel = request.agentPlanningModel;
   if (request.provisionedAppId) next.provisionedAppId = request.provisionedAppId;
   if (request.provisionedLineId) next.provisionedLineId = request.provisionedLineId;
   if (request.complete) next.completedAt = new Date().toISOString();
@@ -286,6 +290,27 @@ function factoryRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
         appRepository: request.repository,
         backlogRepository: request.repository,
         defaultBranch: request.defaultBranch,
+      });
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
+}
+
+function factoryAgentRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent"),
+    resolve: (match, method, body) => {
+      if (method !== "PATCH") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      const request = (body ?? {}) as FactoriesUpdateFactoryAgentBody;
+      const integrationId =
+        request.credentialSource === "AGENT_CREDENTIAL_SOURCE_INTEGRATION" ? request.integrationId : "";
+      factory.onboarding = mergedOnboarding(factory.onboarding, {
+        agentIntegrationId: integrationId,
+        agentProvider: request.provider,
+        agentHarness:
+          request.provider === "AGENT_PROVIDER_OPENAI" ? "AGENT_HARNESS_CODEX" : "AGENT_HARNESS_CLAUDE_CODE",
       });
       return { json: { factory: factoryWithLineMetrics(factory) } };
     },
@@ -718,6 +743,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
+    factoryAgentRoute(fixture),
     ...factoryLinesRoutes(fixture),
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
