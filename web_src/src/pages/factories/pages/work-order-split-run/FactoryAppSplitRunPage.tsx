@@ -66,7 +66,10 @@ function SplitRunMissingPage({
 }
 
 function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppSplitRunPage> }) {
-  const follow = useFollowLogScroll(runningSplitRunPhaseId(model.fixture?.phases ?? []), model.stream?.length ?? 0);
+  const follow = useFollowLogScroll<HTMLOListElement>(
+    runningSplitRunPhaseId(model.fixture?.phases ?? []),
+    model.stream?.length ?? 0,
+  );
   return (
     <div className="absolute inset-0 flex flex-col bg-background" data-testid="factory-app-split-run-page">
       <FactoryAppCanvasHeader

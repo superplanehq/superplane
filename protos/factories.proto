@@ -573,6 +573,89 @@ service Factories {
     };
   }
 
+  rpc StartPlanningSession(StartPlanningSessionRequest) returns (StartPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start planning session";
+      description: "Starts a new Create with an Agent planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe planning session";
+      description: "Returns a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc EndPlanningSession(EndPlanningSessionRequest) returns (EndPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "End planning session";
+      description: "Stops the planning session machine";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendPlanningSessionMessage(SendPlanningSessionMessageRequest) returns (SendPlanningSessionMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send planning session message";
+      description: "Sends a user message in a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdatePlanningSessionDraft(UpdatePlanningSessionDraftRequest) returns (UpdatePlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update planning session draft";
+      description: "Edits the pending draft on a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreatePlanningSessionWorkOrder(CreatePlanningSessionWorkOrderRequest) returns (CreatePlanningSessionWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create planning session work order";
+      description: "Creates a draft work order from the planning session draft";
+      tags: "Factory";
+    };
+  }
+
+  rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Skip planning session draft";
+      description: "Throws away the pending planning session draft";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -1867,4 +1950,113 @@ message UsageByMachineType {
   string machine_type = 1;
   int64 duration_seconds = 2;
   int64 cost_cents = 3;
+}
+
+message PlanningSessionDraft {
+  string title = 1;
+  string description = 2;
+}
+
+message PlanningSessionCreatedOrder {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message PlanningSessionMessage {
+  string id = 1;
+  string role = 2;
+  string text = 3;
+}
+
+message PlanningSessionSurveyQuestion {
+  string prompt = 1;
+  repeated string options = 2;
+}
+
+message PlanningSessionSurvey {
+  string id = 1;
+  repeated PlanningSessionSurveyQuestion questions = 2;
+}
+
+message PlanningSession {
+  string id = 1;
+  string factory_id = 2;
+  string repository = 3;
+  string state = 4;
+  string canvas_id = 5;
+  string canvas_run_id = 6;
+  repeated PlanningSessionMessage messages = 7;
+  PlanningSessionDraft draft = 8;
+  repeated PlanningSessionCreatedOrder created = 9;
+  string wait_state = 10;
+  string execution_id = 11;
+  PlanningSessionSurvey survey = 12;
+}
+
+message StartPlanningSessionRequest {
+  string factory_id = 1;
+  string repository = 2;
+}
+
+message StartPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message DescribePlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message DescribePlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message EndPlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message EndPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message SendPlanningSessionMessageRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string text = 3;
+}
+
+message SendPlanningSessionMessageResponse {
+  PlanningSession session = 1;
+}
+
+message UpdatePlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message UpdatePlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message CreatePlanningSessionWorkOrderRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message CreatePlanningSessionWorkOrderResponse {
+  PlanningSession session = 1;
+}
+
+message SkipPlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
 }
