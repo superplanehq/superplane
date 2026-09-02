@@ -413,3 +413,29 @@ func TestHostShellPipeBundleEmitsCommandMarkers(t *testing.T) {
 		t.Fatalf("expected hello in output: %q", out)
 	}
 }
+
+func TestHostShellPipeResetsCwdBeforeEachCommand(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	t.Setenv("RUNNER_SHELL_USE_PIPE", "1")
+
+	workDir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(workDir, "repo"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	code, out, err := runHostShellDirectives(ctx, 128*1024, workDir, []string{
+		`cd repo`,
+		`test -d repo && echo found`,
+	}, nil, nil, "")
+	if err != nil || code != 0 {
+		t.Fatalf("pipe cwd reset: code=%d err=%v out=%q", code, err, out)
+	}
+	if !strings.Contains(out, "found") {
+		t.Fatalf("output = %q, want repo visible from launch dir", out)
+	}
+}

@@ -20,6 +20,10 @@ import (
 type HostExecutor struct {
 	MaxOutputBytes int
 	TaskWorkDir    string
+	// ResetTaskHome gives each host task a fresh HOME and cwd under
+	// TaskWorkDir/.superplane/homes/<task-id>, then deletes that tree.
+	// Local long-lived workers set this so leftover clone dirs cannot leak.
+	ResetTaskHome bool
 }
 
 func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (int, string, error) {
@@ -31,7 +35,17 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	if err != nil {
 		return 1, "", err
 	}
-	taskDir, err := materializeTaskFiles(hostTaskFilesRoot(h.TaskWorkDir, task.ID), task.Files)
+	workDir := h.TaskWorkDir
+	if h.ResetTaskHome {
+		isolated, err := createIsolatedTaskHome(h.TaskWorkDir, task.ID)
+		if err != nil {
+			return 1, "", err
+		}
+		defer os.RemoveAll(isolated)
+		workDir = isolated
+		env = withHomeEnv(env, isolated)
+	}
+	taskDir, err := materializeTaskFiles(hostTaskFilesRoot(workDir, task.ID), task.Files)
 	if err != nil {
 		return 1, "", err
 	}
@@ -41,20 +55,20 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	}
 	switch api.RunModeForTask(task) {
 	case models.RunModeJavaScript:
-		return runJavaScriptHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
+		return runJavaScriptHost(ctx, max, workDir, task, env, live, resultHostPath)
 	case models.RunModePython:
-		return runPythonHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
+		return runPythonHost(ctx, max, workDir, task, env, live, resultHostPath)
 	case models.RunModeBash:
-		return runBashHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
+		return runBashHost(ctx, max, workDir, task, env, live, resultHostPath)
 	}
 	if len(task.Commands) > 0 {
-		return runHostShellDirectiveList(ctx, max, h.TaskWorkDir, directivesFromCommands(task.Commands), env, live, resultHostPath)
+		return runHostShellDirectiveList(ctx, max, workDir, directivesFromCommands(task.Commands), env, live, resultHostPath)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
-	cmd.Dir = h.TaskWorkDir
+	cmd.Dir = workDir
 	prepareTaskProcessGroup(cmd)
 	defer killTaskProcessGroup(cmd)
 	applyCmdEnv(cmd, env, resultHostPath)

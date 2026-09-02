@@ -80,7 +80,7 @@ func (w *cappedShellWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func writeDirectiveBundle(tmpRoot string, directives []shellDirective) (metaPath string, err error) {
+func writeDirectiveBundle(tmpRoot, workDir string, directives []shellDirective) (metaPath string, err error) {
 	var meta strings.Builder
 	writeLiveLogNowMsHelper(&meta)
 	meta.WriteString("set +u\nset -o pipefail\n")
@@ -89,7 +89,7 @@ func writeDirectiveBundle(tmpRoot string, directives []shellDirective) (metaPath
 		if err := os.WriteFile(hostPath, []byte(dir.Shell+"\n"), 0600); err != nil {
 			return "", err
 		}
-		writeLiveLogWrappedSource(&meta, i, dir, hostPath)
+		writeLiveLogWrappedSource(&meta, i, dir, hostPath, workDir)
 	}
 	metaPath = filepath.Join(tmpRoot, "_meta.sh")
 	if err := os.WriteFile(metaPath, []byte(meta.String()), 0600); err != nil {
@@ -108,10 +108,15 @@ func writeLiveLogNowMsHelper(script *strings.Builder) {
 	script.WriteString("}\n")
 }
 
-func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDirective, hostPath string) {
+func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDirective, hostPath, workDir string) {
 	script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
 	writeDockerCmdStart(script, index, dir)
 	script.WriteString("\n")
+	if wd := strings.TrimSpace(workDir); wd != "" {
+		script.WriteString("cd ")
+		script.WriteString(bashSingleQuotedPath(wd))
+		script.WriteString(" || exit 1\n")
+	}
 	script.WriteString("if source ")
 	script.WriteString(bashSingleQuotedPath(hostPath))
 	script.WriteString("; then\n")
@@ -130,8 +135,9 @@ func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDire
 	script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
 }
 
-// runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
-// semantics as the PTY path: cwd/env persist across sources).
+// runHostShellDirectivesPipe runs directives in one bash process without a PTY.
+// Env persists across sources. Cwd resets to workDir before each source so
+// relative paths like `git -C repo` match a fresh process (local compose).
 func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
 	if len(directives) == 0 {
 		return 1, "", errEmptyCommands()
@@ -142,7 +148,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	defer func() { _ = os.RemoveAll(tmpRoot) }()
 
-	metaPath, err := writeDirectiveBundle(tmpRoot, directives)
+	metaPath, err := writeDirectiveBundle(tmpRoot, workDir, directives)
 	if err != nil {
 		return 1, "", err
 	}
