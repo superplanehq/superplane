@@ -46,7 +46,10 @@ type FactoryVelocityMember struct {
 	Name        string
 	Email       string
 	AvatarURL   string
-	GitHubLogin string
+	// The column tag is required: the default naming strategy maps this field to
+	// "git_hub_login", so the query alias would not bind and every member would
+	// look like they have no GitHub identity.
+	GitHubLogin string `gorm:"column:github_login"`
 }
 
 // ListFactoryVelocityPullRequests returns every factory pull request that
