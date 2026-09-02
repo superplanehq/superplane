@@ -68,6 +68,12 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 			"github.onIssue": "github",
 		},
 	},
+	"create-with-agent": {
+		id:               "create-with-agent",
+		entrypointNodeID: "onrun-create-with-agent",
+		canvasFile:       "templates/create-with-agent.canvas.yaml",
+		consoleFile:      "templates/create-with-agent.console.yaml",
+	},
 }
 
 type factoryTemplateInput struct {
@@ -231,7 +237,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		}
 	}
 	model := agent.model
-	if node.ID == "planner-agent-no-issue" && agent.planningModel != "" {
+	if (node.ID == "planner-agent-no-issue" || node.ID == "planning-agent") && agent.planningModel != "" {
 		model = agent.planningModel
 	}
 	node.Configuration["model"] = model
