@@ -66,7 +66,7 @@ function WorkspacesBody({
       showSuccessToast("Workspace deleted.");
     } catch (deleteError) {
       showErrorToast(getApiErrorMessage(deleteError, "Failed to delete workspace."));
-      throw new Error("Failed to delete workspace");
+      throw new Error("Failed to delete workspace", { cause: deleteError });
     }
   };
 
