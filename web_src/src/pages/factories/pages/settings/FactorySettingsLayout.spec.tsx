@@ -53,12 +53,31 @@ describe("FactorySettingsLayout sidebar", () => {
     });
     expect(within(sidebar).getByTestId("factory-settings-nav-account-security")).toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-nav-account-notifications")).toBeInTheDocument();
+    expect(within(sidebar).queryByTestId("factory-settings-nav-account-linked-accounts")).not.toBeInTheDocument();
     expect(within(sidebar).queryByTestId("factory-settings-nav-account-general")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-general")).toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toBeInTheDocument();
 
     const profile = await screen.findByTestId("account-redesign-identity");
     expect(within(profile).getByText("Name")).toBeInTheDocument();
+  }, 10000);
+
+  it("redirects linked-accounts to Profile", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/linked-accounts`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-account-profile")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(await screen.findByTestId("account-redesign-velocity-github")).toBeInTheDocument();
   }, 10000);
 
   it("shows the shipped Notifications page from Account settings", async () => {

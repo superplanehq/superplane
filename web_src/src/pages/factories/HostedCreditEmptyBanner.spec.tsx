@@ -37,4 +37,22 @@ describe("HostedCreditEmptyBanner", () => {
       "/org/workspaces/RF/settings/organization/spending",
     );
   });
+
+  it("shows View spending instead of Add hosted credit for a non-owner when billing is on", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditEmptyBanner
+          billingEnabled
+          canManageBilling={false}
+          spendingHref="/org/workspaces/RF/settings/organization/spending"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "View spending" })).toHaveAttribute(
+      "href",
+      "/org/workspaces/RF/settings/organization/spending",
+    );
+    expect(screen.queryByRole("link", { name: "Add hosted credit" })).not.toBeInTheDocument();
+  });
 });

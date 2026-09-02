@@ -40,7 +40,6 @@ import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
-  FactorySettingsLinkedAccountsPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
@@ -59,6 +58,7 @@ import {
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import {
+  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
@@ -310,7 +310,7 @@ const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-account-linked-accounts"
     path="account/linked-accounts"
-    element={<FactorySettingsLinkedAccountsPage />}
+    element={<AccountLinkedAccountsRedirect />}
   />,
   <Route
     key="factory-settings-account-security"

@@ -8,12 +8,19 @@ import { hostedCreditEmptyBannerCopy } from "./lib/hostedCreditEmpty";
 
 interface HostedCreditEmptyBannerProps {
   billingEnabled: boolean;
+  /** Whether the signed-in user can start hosted credit checkout (`org:update`). Defaults to `true`. */
+  canManageBilling?: boolean;
   spendingHref: string;
   className?: string;
 }
 
-export function HostedCreditEmptyBanner({ billingEnabled, spendingHref, className }: HostedCreditEmptyBannerProps) {
-  const copy = hostedCreditEmptyBannerCopy(billingEnabled);
+export function HostedCreditEmptyBanner({
+  billingEnabled,
+  canManageBilling = true,
+  spendingHref,
+  className,
+}: HostedCreditEmptyBannerProps) {
+  const copy = hostedCreditEmptyBannerCopy(billingEnabled, canManageBilling);
 
   return (
     <div

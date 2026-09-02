@@ -28,6 +28,13 @@ type HostedCreditSummaryProps = {
   billingEnabled?: boolean;
   hasBillingCustomer?: boolean;
   canManageBilling?: boolean;
+  /**
+   * Sentence telling a non-owner who to contact to purchase hosted credit.
+   * Rendered in place of the checkout packs when `billingEnabled` is true
+   * and `canManageBilling` is false. Build it with
+   * `hostedCreditOwnerContactCopy` from `@/lib/hostedCreditOwnerContact`.
+   */
+  billingContactMessage?: string;
   products?: HostedCreditProduct[];
   invoices?: HostedCreditInvoice[];
   creditRefreshStatus?: HostedCreditRefreshStatus;
@@ -75,6 +82,7 @@ function HostedCreditSummaryCard({
   billingEnabled = false,
   hasBillingCustomer = false,
   canManageBilling = false,
+  billingContactMessage,
   products = [],
   invoices = [],
   creditRefreshStatus = "idle",
@@ -93,9 +101,15 @@ function HostedCreditSummaryCard({
   billed: number;
   showGrantBreakdown: boolean;
 }) {
-  const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled);
+  const warningMessage = hostedCreditWarning(remaining, remainingCreditWarning, billingEnabled, canManageBilling);
   const creditRefreshMessage = hostedCreditRefreshMessage(creditRefreshStatus);
-  const showBilling = showHostedBillingActions(billingEnabled, canManageBilling, products.length, hasBillingCustomer);
+  const billingSectionMode = hostedBillingSectionMode(
+    billingEnabled,
+    canManageBilling,
+    products.length,
+    hasBillingCustomer,
+    billingContactMessage,
+  );
 
   return (
     <div className={cardClassName}>
@@ -125,17 +139,17 @@ function HostedCreditSummaryCard({
         <p className={`mt-3 text-sm ${creditRefreshClassName(creditRefreshStatus)}`}>{creditRefreshMessage}</p>
       ) : null}
       {warningMessage ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warningMessage}</p> : null}
-      {showBilling ? (
-        <BillingActions
-          invoices={invoices}
-          products={products}
-          hasBillingCustomer={hasBillingCustomer}
-          checkoutPending={checkoutPending}
-          portalPending={portalPending}
-          onAddCredit={onAddCredit}
-          onManageInvoices={onManageInvoices}
-        />
-      ) : null}
+      <HostedBillingSection
+        mode={billingSectionMode}
+        billingContactMessage={billingContactMessage}
+        invoices={invoices}
+        products={products}
+        hasBillingCustomer={hasBillingCustomer}
+        checkoutPending={checkoutPending}
+        portalPending={portalPending}
+        onAddCredit={onAddCredit}
+        onManageInvoices={onManageInvoices}
+      />
     </div>
   );
 }
@@ -158,6 +172,70 @@ function showHostedBillingActions(
     return false;
   }
   return productCount > 0 || hasBillingCustomer;
+}
+
+type HostedBillingSectionMode = "actions" | "contact" | "none";
+
+/**
+ * Decides what to show where the checkout packs live: the owner-only
+ * checkout actions, a sentence naming an owner for a non-owner, or nothing.
+ * Do not wait for `productCount > 0` before showing the contact sentence —
+ * a non-owner cannot buy hosted credit either way.
+ */
+function hostedBillingSectionMode(
+  billingEnabled: boolean,
+  canManageBilling: boolean,
+  productCount: number,
+  hasBillingCustomer: boolean,
+  billingContactMessage: string | undefined,
+): HostedBillingSectionMode {
+  if (showHostedBillingActions(billingEnabled, canManageBilling, productCount, hasBillingCustomer)) {
+    return "actions";
+  }
+  if (billingEnabled && !canManageBilling && billingContactMessage) {
+    return "contact";
+  }
+  return "none";
+}
+
+function HostedBillingSection({
+  mode,
+  billingContactMessage,
+  products,
+  invoices,
+  hasBillingCustomer,
+  checkoutPending,
+  portalPending,
+  onAddCredit,
+  onManageInvoices,
+}: {
+  mode: HostedBillingSectionMode;
+  billingContactMessage?: string;
+  products: HostedCreditProduct[];
+  invoices: HostedCreditInvoice[];
+  hasBillingCustomer: boolean;
+  checkoutPending: boolean;
+  portalPending: boolean;
+  onAddCredit?: (productId: string) => void;
+  onManageInvoices?: () => void;
+}) {
+  if (mode === "actions") {
+    return (
+      <BillingActions
+        invoices={invoices}
+        products={products}
+        hasBillingCustomer={hasBillingCustomer}
+        checkoutPending={checkoutPending}
+        portalPending={portalPending}
+        onAddCredit={onAddCredit}
+        onManageInvoices={onManageInvoices}
+      />
+    );
+  }
+  if (mode === "contact") {
+    return <p className="mt-4 text-sm text-muted-foreground">{billingContactMessage}</p>;
+  }
+  return null;
 }
 
 function GrantBreakdownMetrics({
@@ -219,16 +297,22 @@ function hostedCreditWarning(
   remaining: number,
   remainingCreditWarning: boolean | undefined,
   billingEnabled: boolean,
+  canManageBilling: boolean,
 ): string | null {
+  // A non-owner cannot start checkout, so telling them to "Add hosted
+  // credit" is misleading. `billingContactMessage` names an owner instead;
+  // treat this case like the self-hosted branch so the two messages do not
+  // contradict each other.
+  const canAddCredit = billingEnabled && canManageBilling;
   if (remaining <= 0) {
-    return billingEnabled
+    return canAddCredit
       ? "Hosted credit is empty. Add hosted credit to start SuperPlane-hosted runs."
       : "Hosted credit is empty. SuperPlane-hosted runs cannot start until an installation admin adds credit.";
   }
   if (!remainingCreditWarning) {
     return null;
   }
-  return billingEnabled
+  return canAddCredit
     ? "Hosted credit is low. Add hosted credit to continue SuperPlane-hosted runs."
     : "Hosted credit is low. Ask an installation admin to add credit.";
 }
