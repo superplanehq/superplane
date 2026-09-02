@@ -15,7 +15,7 @@ import {
   factoriesFixtureWithSetupAnswers,
 } from "../../__fixtures__/setupStoryFixtures";
 
-/** Factory settings with Account, Workspace, and Organization navigation. */
+/** Redesigned factory settings. Find settings. One identity form per General page. */
 const meta = {
   title: "Factories/Pages/Settings",
   component: FactorySettingsLayout,
@@ -44,7 +44,7 @@ export const Automations: Story = {
   ),
 };
 
-/** Storybook Account settings use the Profile redesign. Live app stays on General. */
+/** Account settings use the live Profile redesign inside the new settings chrome. */
 export const AccountGeneral: Story = {
   render: () => (
     <FactoriesHarness
@@ -106,6 +106,16 @@ export const Models: Story = {
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
       factoriesFixture={defaultFactoriesFixture}
       experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
+    />
+  ),
+};
+
+export const ApiKeys: Story = {
+  name: "API keys",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/api-keys`}
+      factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };

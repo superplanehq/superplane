@@ -76,6 +76,8 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
 import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
 import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
+import { factorySettingsRedesignRoutes } from "@/pages/factories/pages/settings/settings-redesign/settingsRedesignRoutes";
+import { SettingsRedesignContext } from "@/pages/factories/pages/settings/settingsChromeContext";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -138,6 +140,8 @@ export interface OrgWorkspaceHarnessProps {
   orgIntegrations?: StorybookOrgIntegration[];
   /** Storybook-only: replace selected factory page elements (e.g. wiki wireframe). */
   pageOverrides?: OrgWorkspacePageOverrides;
+  /** Storybook-only: redesigned workspace and organization settings pages. */
+  settingsRedesign?: boolean;
 }
 
 interface FixtureFetchOptions {
@@ -371,13 +375,20 @@ const factorySettingsStorybookRoutes = [
   <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
 ];
 
-function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
+function OrgWorkspaceRoutes({
+  pageOverrides,
+  settingsRedesign = false,
+}: {
+  pageOverrides?: OrgWorkspacePageOverrides;
+  settingsRedesign?: boolean;
+}) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
   const OverviewRoutePage = pageOverrides?.overview ?? OverviewPage;
   const WorkOrdersRoutePage = pageOverrides?.workOrders ?? WorkOrdersPage;
   const VelocityRoutePage = pageOverrides?.velocity ?? VelocityPage;
   const OnboardingRoutePage = pageOverrides?.onboarding;
   const onboardingEnabled = Boolean(OnboardingRoutePage);
+  const settingsRoutes = settingsRedesign ? factorySettingsRedesignRoutes : factorySettingsStorybookRoutes;
 
   return (
     <Routes>
@@ -430,7 +441,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
-            {factorySettingsStorybookRoutes}
+            {settingsRoutes}
           </Route>
           <Route
             path=":factoryKey/organization/*"
@@ -464,6 +475,7 @@ export function OrgWorkspaceHarness({
   agentSuggestions,
   orgIntegrations,
   pageOverrides,
+  settingsRedesign = false,
 }: OrgWorkspaceHarnessProps) {
   const { orgId, canvasId } = resolveWorkspaceIds(homeFixture, appFixture, factoriesFixture);
   useOrgWorkspaceFixtureFetch({
@@ -496,9 +508,11 @@ export function OrgWorkspaceHarness({
         <TooltipProvider delayDuration={150}>
           <div className="h-dvh w-full overflow-auto">
             <MemoryRouter initialEntries={[initialPath]}>
-              <AccountProvider>
-                <OrgWorkspaceRoutes pageOverrides={pageOverrides} />
-              </AccountProvider>
+              <SettingsRedesignContext.Provider value={settingsRedesign}>
+                <AccountProvider>
+                  <OrgWorkspaceRoutes pageOverrides={pageOverrides} settingsRedesign={settingsRedesign} />
+                </AccountProvider>
+              </SettingsRedesignContext.Provider>
             </MemoryRouter>
           </div>
         </TooltipProvider>

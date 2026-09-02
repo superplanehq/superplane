@@ -81,7 +81,7 @@ function FactorySettingsUsageBody({
   );
 }
 
-function HostedSpendLimitCard() {
+export function HostedSpendLimitCard() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { data } = useFactoryUsage(organizationId, factoryId);
   const { canAct } = usePermissions();
