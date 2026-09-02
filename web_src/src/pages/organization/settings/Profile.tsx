@@ -2,7 +2,6 @@ import { useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Avatar } from "@/components/Avatar/avatar";
-import { GitHubAccountConnection } from "@/components/GitHubAccountConnection";
 import { Heading } from "@/components/Heading/heading";
 import { Icon } from "@/components/Icon";
 import { Text } from "@/components/Text/text";
@@ -116,23 +115,6 @@ export function Profile() {
             )}
           </div>
         </div>
-
-        <section className="space-y-3">
-          <div>
-            <Heading level={3} className="text-base font-medium text-gray-800 dark:text-white">
-              Connected accounts
-            </Heading>
-            <Text className="text-sm text-gray-500 dark:text-gray-400">
-              Connect your profiles to match your activity to your SuperPlane account.
-            </Text>
-          </div>
-          <div className={settingsCardClassName}>
-            <GitHubAccountConnection
-              providers={account?.providers ?? []}
-              impersonating={account?.impersonation?.active === true}
-            />
-          </div>
-        </section>
 
         <ProfileApiTokensSection organizationId={organizationId} />
       </div>
