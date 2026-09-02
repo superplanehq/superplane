@@ -15,6 +15,8 @@ export const FACTORY_APP_CANVAS_HEADER_SHELL_CLASS =
 type FactoryAppCanvasWorkspaceChrome = FactoryAppCanvasWorkspaceTogglesProps & {
   onViewYaml: () => void;
   onEditWithLocalAgent: () => void;
+  /** Omitted when no bundled template matches this app — hides the menu item. */
+  onResetToFactoryDefaults?: () => void;
 };
 
 type FactoryAppCanvasHeaderProps = {
@@ -137,6 +139,7 @@ function FactoryAppCanvasConfigureActions({
           <FactoryAppCanvasMoreOptions
             onViewYaml={workspace.onViewYaml}
             onEditWithLocalAgent={workspace.onEditWithLocalAgent}
+            onResetToFactoryDefaults={workspace.onResetToFactoryDefaults}
           />
         </div>
       ) : null}

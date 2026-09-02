@@ -6,9 +6,12 @@ const contentColumn = "mx-auto w-full max-w-[var(--workspace-content-max-width)]
  * Shell for the workspace page header: gutter, max width, vertical rhythm.
  * `WorkspacePageHeader` builds on this. Only reach for the class directly
  * when you cannot use the component (very rare — most pages should not).
+ *
+ * The header paints no background of its own, so it keeps the color of the
+ * page behind it. Pages on a gray canvas (Velocity, settings) need this.
  */
 export const factoryContentHeaderClassName = cn(
-  "bg-background px-[var(--workspace-page-gutter)] pt-10 pb-6",
+  "px-[var(--workspace-page-gutter)] pt-10 pb-6",
   contentColumn,
   "flex flex-col gap-3",
 );
@@ -32,6 +35,29 @@ export const factorySectionHeaderClassName = cn(
 
 /** Section list/body: same gutter as the header, no extra left inset. */
 export const factorySectionBodyClassName = cn("mx-0 max-w-none pt-0 pb-6 text-foreground", sectionPaneGutter);
+
+/**
+ * Centered variants for report pages such as Velocity. The section title style
+ * stays the same as the other workspace pages, but the header and the body
+ * share one centered column so charts keep a readable width on wide screens.
+ * The header uses a larger top inset than the full-width page header, because a
+ * centered column has no sidebar next to it to set the vertical rhythm.
+ */
+export const factoryCenteredSectionHeaderClassName = cn(factorySectionHeaderClassName, contentColumn, "pt-14");
+
+export const factoryCenteredSectionBodyClassName = cn(factorySectionBodyClassName, contentColumn);
+
+/**
+ * Settings variants. Same shape as the Velocity report — one centered column
+ * of white panels on a gray page — but a shorter column, because settings are
+ * forms: a label above a full-width input stays readable only at a short
+ * measure, while the report column is sized for charts.
+ */
+const settingsColumn = "mx-auto w-full max-w-3xl";
+
+export const factorySettingsSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsColumn, "pt-14");
+
+export const factorySettingsSectionBodyClassName = cn(factorySectionBodyClassName, settingsColumn, "pb-10");
 
 /** Tasks / Lines kanban body: same gutter, fills leftover height. */
 export const factoryWorkOrdersBodyClassName = cn(

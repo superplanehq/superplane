@@ -1,13 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type {
-  FactoriesDescribeFactoryVelocityResponse,
-  FactoriesWorkOrder,
-  OrganizationsIntegration,
-} from "@/api-client";
+import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -29,11 +27,15 @@ interface WorkOrdersHookState {
 
 const velocityHookState: VelocityHookState = {};
 const workOrdersHookState: WorkOrdersHookState = {};
-const integrationsHookState: { data: OrganizationsIntegration[] } = { data: [] };
-const repositoryResourcesHookState: { data: Array<{ name?: string }>; isLoading: boolean } = {
-  data: [],
-  isLoading: false,
+
+/** Workspace setup picks the GitHub integration and the app repository. */
+const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
+  ...REFUND_FACTORY,
+  onboarding: { ...REFUND_FACTORY.onboarding, vcsIntegrationId: "int-1", appRepository: "acme/api" },
 };
+
+const startSync = vi.fn();
+const syncHookState: { isPending?: boolean } = {};
 
 vi.mock("@/hooks/useFactoryVelocity", () => ({
   useFactoryVelocity: () => ({
@@ -42,6 +44,10 @@ vi.mock("@/hooks/useFactoryVelocity", () => ({
     isFetching: velocityHookState.isFetching ?? false,
     error: velocityHookState.error ?? null,
     refetch: vi.fn(),
+  }),
+  useSyncFactoryVelocity: () => ({
+    mutate: startSync,
+    isPending: syncHookState.isPending ?? false,
   }),
 }));
 
@@ -54,36 +60,59 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: () => ({ data: integrationsHookState.data }),
-  useIntegrationResources: () => ({
-    data: repositoryResourcesHookState.data,
-    isLoading: repositoryResourcesHookState.isLoading,
-  }),
-}));
+/** A window with output, so the page renders the report instead of a state card. */
+function populatedResponse(
+  overrides: Partial<FactoriesDescribeFactoryVelocityResponse> = {},
+): FactoriesDescribeFactoryVelocityResponse {
+  return {
+    yesterday: { superplaneMerged: 3, waste: 1 },
+    totals: {
+      superplaneMerged: 12,
+      peopleMerged: 8,
+      waste: 4,
+      superplaneSharePct: 60,
+      wastePct: 25,
+      costCents: "4200",
+      tokens: "185000",
+      wasteCostCents: "900",
+      tasksClosed: 16,
+      tasksWaste: 4,
+    },
+    points: [
+      { day: "1", superplaneMerged: 2, peopleMerged: 1, waste: 1, costCents: "800", tokens: "20000" },
+      { day: "2", superplaneMerged: 3, peopleMerged: 2, waste: 0, costCents: "1200", tokens: "30000" },
+    ],
+    hasPeopleCohort: true,
+    ...overrides,
+  };
+}
 
-function renderShell() {
+function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={["/velocity"]}>
-        <FactoriesLayoutContext.Provider
-          value={{
-            organizationId: "org-1",
-            factoryId: PRIMARY_FACTORY_ID,
-            factoryKey: PRIMARY_FACTORY_KEY,
-            factory: REFUND_FACTORY,
-            factories: [REFUND_FACTORY],
-            openCreateWorkOrder: vi.fn(),
-          }}
-        >
-          <VelocityPage />
-        </FactoriesLayoutContext.Provider>
-      </MemoryRouter>
+      <TooltipProvider delayDuration={0}>
+        <MemoryRouter initialEntries={["/velocity"]}>
+          <FactoriesLayoutContext.Provider
+            value={{
+              organizationId: "org-1",
+              factoryId: PRIMARY_FACTORY_ID,
+              factoryKey: PRIMARY_FACTORY_KEY,
+              factory,
+              factories: [factory],
+              openCreateWorkOrder: vi.fn(),
+            }}
+          >
+            <VelocityPage />
+          </FactoriesLayoutContext.Provider>
+        </MemoryRouter>
+      </TooltipProvider>
     </QueryClientProvider>,
   );
 }
 
 function resetState() {
+  startSync.mockClear();
+  syncHookState.isPending = false;
   velocityHookState.data = undefined;
   velocityHookState.isLoading = false;
   velocityHookState.isFetching = false;
@@ -92,9 +121,6 @@ function resetState() {
   workOrdersHookState.isLoading = false;
   workOrdersHookState.isFetching = false;
   workOrdersHookState.error = null;
-  integrationsHookState.data = [];
-  repositoryResourcesHookState.data = [];
-  repositoryResourcesHookState.isLoading = false;
 }
 
 describe("VelocityPage shell", () => {
@@ -112,7 +138,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.getByTestId("velocity-loading-state")).toBeInTheDocument();
-    expect(screen.queryByTestId("velocity-yesterday")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
   });
 
   it("shows an error state with retry when velocity fails to load", () => {
@@ -123,113 +149,244 @@ describe("VelocityPage shell", () => {
 
     expect(screen.getByTestId("velocity-error-state")).toBeInTheDocument();
     expect(screen.getByTestId("velocity-error-retry")).toBeInTheDocument();
-    expect(screen.queryByTestId("velocity-yesterday")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
   });
 
-  it("keeps the loaded view when a refetch fails and cached data remains", () => {
+  // Merge counts come from a background sync, so a user who just merged
+  // something needs a way to ask for a fresh read.
+  it("starts a sync when the workspace has a repository", async () => {
     resetState();
-    velocityHookState.data = {
-      yesterday: { superplaneMerged: 3, waste: 1 },
-      totals: {
-        superplaneMerged: 12,
-        peopleMerged: 0,
-        waste: 4,
-        superplaneSharePct: 0,
-        wastePct: 25,
-      },
-      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
-      hasPeopleCohort: false,
-    };
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+    await userEvent.click(screen.getByTestId("velocity-sync-button"));
+
+    expect(startSync).toHaveBeenCalledTimes(1);
+  });
+
+  // A sync rebuilds sixty days of history, which takes long enough that the
+  // page has to say the work is running.
+  it("shows progress while a sync runs, and keeps the report readable", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    syncHookState.isPending = true;
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.getByTestId("velocity-sync-progress")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+  });
+
+  it("shows no progress bar when no sync is running", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
+  });
+
+  it("hides the sync control when there is no repository to read", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    expect(screen.queryByTestId("velocity-sync-button")).not.toBeInTheDocument();
+  });
+
+  it("keeps the report when a refetch fails and cached data remains", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
     velocityHookState.error = new Error("network");
 
     renderShell();
 
-    expect(screen.getByTestId("velocity-yesterday")).toHaveTextContent("3");
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
     expect(screen.queryByTestId("velocity-error-state")).not.toBeInTheDocument();
   });
 
-  it("renders the loaded view and hides People cohort without a repo", () => {
+  it("shows the zero state when the window holds no output", () => {
     resetState();
     velocityHookState.data = {
-      yesterday: { superplaneMerged: 3, waste: 1 },
-      totals: {
-        superplaneMerged: 12,
-        peopleMerged: 0,
-        waste: 4,
-        superplaneSharePct: 0,
-        wastePct: 25,
-      },
-      points: [
-        { day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 },
-        { day: "Tue", superplaneMerged: 3, peopleMerged: 0, waste: 0 },
-      ],
+      yesterday: { superplaneMerged: 0, waste: 0 },
+      totals: { superplaneMerged: 0, peopleMerged: 0, waste: 0, superplaneSharePct: 0, wastePct: 0 },
+      points: [{ day: "1", superplaneMerged: 0, peopleMerged: 0, waste: 0 }],
       hasPeopleCohort: false,
     };
 
     renderShell();
 
-    const yesterday = screen.getByTestId("velocity-yesterday");
-    expect(yesterday).toHaveTextContent("Merged PRs");
-    expect(yesterday).toHaveTextContent("3");
-    expect(yesterday).not.toHaveTextContent("Cost");
-
-    const split = screen.getByTestId("velocity-source-split");
-    expect(split).toHaveTextContent("Connect GitHub to compare People and SuperPlane.");
-    expect(split).not.toHaveTextContent("SuperPlane authored");
+    expect(screen.getByTestId("velocity-zero-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
   });
 
-  it("explains when People merges could not be loaded", () => {
+  it("names the repository from workspace setup in the header", () => {
     resetState();
-    integrationsHookState.data = [
-      {
-        metadata: { id: "int-1", name: "GitHub", integrationName: "github" },
-        status: { state: "ready" },
-      },
-    ];
-    repositoryResourcesHookState.data = [{ name: "acme/api" }];
-    velocityHookState.data = {
-      yesterday: { superplaneMerged: 3, waste: 0 },
-      totals: {
-        superplaneMerged: 12,
-        peopleMerged: 0,
-        waste: 0,
-        superplaneSharePct: 0,
-        wastePct: 0,
-      },
-      points: [{ day: "Mon", superplaneMerged: 3, peopleMerged: 0, waste: 0 }],
-      hasPeopleCohort: false,
-      peopleSearchFailed: true,
-      repository: "acme/api",
-    };
+    velocityHookState.data = populatedResponse();
+
+    renderShell(FACTORY_WITH_SETUP_REPO);
+
+    expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("acme/api");
+  });
+
+  it("leads with the tasks that closed and the share of them that wasted", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
 
     renderShell();
 
-    const split = screen.getByTestId("velocity-source-split");
-    expect(split).toHaveTextContent("We could not load People merges. SuperPlane counts still show.");
-    expect(split).not.toHaveTextContent("No merged pull requests");
-    expect(split).not.toHaveTextContent("SuperPlane authored");
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Tasks closed");
+    expect(summary).toHaveTextContent("16");
+    expect(summary).toHaveTextContent("Task waste");
+    expect(summary).toHaveTextContent("25%");
+    expect(summary).not.toHaveTextContent("4 tasks closed without a merge");
+    expect(screen.getByRole("button", { name: "About Tasks closed" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Task waste" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Median cycle time" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Cost per task" })).toBeInTheDocument();
+  });
+
+  it("hides the metric explanations behind info tooltips", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    const user = userEvent.setup();
+
+    renderShell();
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByRole("button", { name: "About Task waste" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("4 tasks closed without a merge");
+  });
+
+  it("spreads tracked spend over the tasks that closed", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Cost per task");
+    // $42.00 of spend over 16 closed tasks.
+    expect(summary).toHaveTextContent("$2.63");
+  });
+
+  it("compares against the previous window when it holds output", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      hasPreviousWindow: true,
+      previousTotals: {
+        superplaneMerged: 6,
+        peopleMerged: 6,
+        waste: 6,
+        superplaneSharePct: 50,
+        wastePct: 50,
+        costCents: "3000",
+        tasksClosed: 12,
+        tasksWaste: 6,
+      },
+    });
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Compared with the previous 14 days");
+    // Waste fell from 50% to 25% of the tasks that closed.
+    expect(summary).toHaveTextContent("25 pp");
+  });
+
+  it("drops the comparison for a workspace without an earlier period", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({ hasPreviousWindow: false });
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("There is no earlier period to compare with yet.");
+    expect(summary).not.toHaveTextContent("No change");
+  });
+
+  it("lists people with their authored and SuperPlane merges", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      people: [
+        {
+          id: "user-1",
+          name: "Ada Lovelace",
+          email: "ada@example.com",
+          authoredMerged: 5,
+          factoryMerged: 3,
+          factoryWaste: 1,
+          medianCycleHours: 12,
+          costCents: "1500",
+        },
+      ],
+    });
+
+    renderShell();
+
+    const people = screen.getByTestId("velocity-people");
+    expect(people).toHaveTextContent("Ada Lovelace");
+    expect(people).toHaveTextContent("1 person with activity in this period");
+  });
+
+  it("explains an empty Authored column when GitHub is not connected", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      hasPeopleCohort: false,
+      people: [{ id: "user-1", name: "Ada Lovelace", factoryMerged: 3 }],
+    });
+
+    renderShell();
+
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent(
+      "Connect GitHub in workspace setup to count the pull requests people merged.",
+    );
+  });
+
+  it("hides the intake split when no intake source produced a merge", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({ intakeSources: [] });
+
+    renderShell();
+
+    expect(screen.queryByText("Intake source")).not.toBeInTheDocument();
+    expect(screen.getByText("Origin")).toBeInTheDocument();
+  });
+
+  it("offers the intake split when the response names its sources", () => {
+    resetState();
+    velocityHookState.data = populatedResponse({
+      intakeSources: [{ key: "github-issues", label: "GitHub issue", merged: 7 }],
+    });
+
+    renderShell();
+
+    expect(screen.getByText("Intake source")).toBeInTheDocument();
   });
 
   it("explains when task time could not be loaded", () => {
     resetState();
-    velocityHookState.data = {
-      yesterday: { superplaneMerged: 3, waste: 1 },
-      totals: {
-        superplaneMerged: 12,
-        peopleMerged: 0,
-        waste: 4,
-        superplaneSharePct: 0,
-        wastePct: 25,
-      },
-      points: [{ day: "Mon", superplaneMerged: 2, peopleMerged: 0, waste: 1 }],
-      hasPeopleCohort: false,
-    };
+    velocityHookState.data = populatedResponse();
     workOrdersHookState.error = new Error("network");
 
     renderShell();
 
-    const flow = screen.getByTestId("velocity-work-order-flow");
-    expect(flow).toHaveTextContent("We could not load task time.");
-    expect(flow).not.toHaveTextContent("No tasks closed in this period.");
+    const taskTime = screen.getByTestId("velocity-task-time");
+    expect(taskTime).toHaveTextContent("We could not load task time.");
+  });
+
+  it("reports tracked spend and the part of it that went to waste", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    const cost = screen.getByTestId("velocity-cost");
+    expect(cost).toHaveTextContent("$42.00");
+    expect(cost).toHaveTextContent("$9.00 of this went to tasks that closed without a merge.");
   });
 });

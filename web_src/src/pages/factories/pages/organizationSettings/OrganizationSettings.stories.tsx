@@ -1,51 +1,80 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import { defaultFactoriesFixture } from "../../__fixtures__/factoryPageResponses";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
-import { OrganizationSettingsLayout } from "./OrganizationSettingsLayout";
+import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
-  title: "Factories/Pages/OrganizationSettings",
-  component: OrganizationSettingsLayout,
+  title: "Factories/Pages/Settings/Organization",
+  component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
-} satisfies Meta<typeof OrganizationSettingsLayout>;
+} satisfies Meta<typeof FactorySettingsLayout>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const organizationSettingsPath = (page: string) => `workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${page}`;
+
 export const General: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/general" factoriesFixture={defaultFactoriesFixture} />,
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("general")} factoriesFixture={defaultFactoriesFixture} />
+  ),
 };
 
-export const Workspaces: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/workspaces" factoriesFixture={defaultFactoriesFixture} />,
+export const Members: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("members")} factoriesFixture={defaultFactoriesFixture} />
+  ),
 };
 
-export const LLMSpend: Story = {
-  name: "LLM spend",
-  render: () => <FactoriesHarness pathSuffix="organization/llm-spend" factoriesFixture={defaultFactoriesFixture} />,
-};
-
-export const LLMSpendEmpty: Story = {
-  name: "LLM spend (empty)",
+export const Integrations: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
-      factoriesFixture={{ ...defaultFactoriesFixture, organizationLlmSpend: EMPTY_USAGE_REPORT }}
+      pathSuffix={organizationSettingsPath("integrations")}
+      factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };
 
-export const LLMSpendBilling: Story = {
-  name: "LLM spend (add hosted credit)",
+export const ApiKeys: Story = {
+  name: "API keys",
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("api-keys")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Secrets: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("secrets")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const Spending: Story = {
+  render: () => (
+    <FactoriesHarness pathSuffix={organizationSettingsPath("spending")} factoriesFixture={defaultFactoriesFixture} />
+  ),
+};
+
+export const SpendingEmpty: Story = {
+  name: "Spending (empty)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
+      pathSuffix={organizationSettingsPath("spending")}
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationWorkspaceUsage: EMPTY_USAGE_REPORT }}
+    />
+  ),
+};
+
+export const SpendingBilling: Story = {
+  name: "Spending (add hosted credit)",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "0",
           grantTotalCents: "0",
@@ -64,14 +93,14 @@ export const LLMSpendBilling: Story = {
   ),
 };
 
-export const LLMSpendBillingInvoices: Story = {
-  name: "LLM spend (manage invoices)",
+export const SpendingBillingInvoices: Story = {
+  name: "Spending (manage invoices)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend"
+      pathSuffix={organizationSettingsPath("spending")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "14630",
           grantTotalCents: "15000",
@@ -101,14 +130,14 @@ export const LLMSpendBillingInvoices: Story = {
   ),
 };
 
-export const LLMSpendCreditAdded: Story = {
-  name: "LLM spend (credit added)",
+export const SpendingCreditAdded: Story = {
+  name: "Spending (credit added)",
   render: () => (
     <FactoriesHarness
-      pathSuffix="organization/llm-spend?credit=added"
+      pathSuffix={`${organizationSettingsPath("spending")}?credit=added`}
       factoriesFixture={{
         ...defaultFactoriesFixture,
-        organizationLlmSpend: {
+        organizationWorkspaceUsage: {
           ...EMPTY_USAGE_REPORT,
           remainingCreditCents: "2500",
           grantTotalCents: "2500",
@@ -121,8 +150,4 @@ export const LLMSpendCreditAdded: Story = {
       }}
     />
   ),
-};
-
-export const Integrations: Story = {
-  render: () => <FactoriesHarness pathSuffix="organization/integrations" factoriesFixture={defaultFactoriesFixture} />,
 };

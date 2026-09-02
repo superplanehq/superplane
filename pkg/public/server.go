@@ -679,6 +679,10 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account", s.updateAccount).Methods("PATCH")
+	accountRoute.HandleFunc("/account", s.deleteAccount).Methods("DELETE")
+	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
+	accountRoute.HandleFunc("/account/linked-accounts/{provider}", s.disconnectLinkedAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
@@ -1066,6 +1070,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Error setting creator for organization %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1082,6 +1094,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
+	response["slug"] = organization.Slug
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -1091,14 +1104,31 @@ type AccountImpersonation struct {
 	UserName string `json:"user_name,omitempty"`
 }
 
+type AccountProviderResponse struct {
+	Provider string `json:"provider"`
+	Email    string `json:"email,omitempty"`
+	Username string `json:"username,omitempty"`
+}
+
+// AccountLinkedAccountResponse describes an identity the member owns on another
+// service. It is not a sign-in method, so it carries no email or token.
+type AccountLinkedAccountResponse struct {
+	Provider  string `json:"provider"`
+	Username  string `json:"username"`
+	Name      string `json:"name,omitempty"`
+	AvatarURL string `json:"avatar_url,omitempty"`
+}
+
 type AccountResponse struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	Email             string                `json:"email"`
-	AvatarURL         string                `json:"avatar_url"`
-	InstallationAdmin bool                  `json:"installation_admin"`
-	HasPassword       bool                  `json:"has_password"`
-	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
+	ID                string                         `json:"id"`
+	Name              string                         `json:"name"`
+	Email             string                         `json:"email"`
+	AvatarURL         string                         `json:"avatar_url"`
+	InstallationAdmin bool                           `json:"installation_admin"`
+	HasPassword       bool                           `json:"has_password"`
+	Providers         []AccountProviderResponse      `json:"providers"`
+	LinkedAccounts    []AccountLinkedAccountResponse `json:"linked_accounts"`
+	Impersonation     *AccountImpersonation          `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1108,7 +1138,15 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providers, err := account.GetAccountProviders()
+	fresh, err := models.FindAccountByID(account.ID.String())
+	if err != nil {
+		log.Errorf("Error reloading account %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	account = fresh
+
+	providers, err := account.GetAccountProviders(database.DB(r.Context()))
 	if err != nil {
 		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
 		http.Error(w, "", http.StatusInternalServerError)
@@ -1122,6 +1160,13 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	linkedAccounts, err := models.ListAccountLinkedAccounts(database.DB(r.Context()), account.ID)
+	if err != nil {
+		log.Errorf("Error getting linked accounts for %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                account.ID.String(),
 		Name:              account.Name,
@@ -1129,6 +1174,8 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
 		HasPassword:       hasPassword,
+		Providers:         accountProviderResponses(providers),
+		LinkedAccounts:    accountLinkedAccountResponses(linkedAccounts),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1151,6 +1198,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 
 	type Organization struct {
 		ID          string `json:"id"`
+		Slug        string `json:"slug"`
 		Name        string `json:"name"`
 		Description string `json:"description"`
 		CanvasCount int64  `json:"canvasCount"`
@@ -1185,6 +1233,7 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		orgID := organization.ID.String()
 		response = append(response, Organization{
 			ID:          organization.ID.String(),
+			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],
@@ -1555,11 +1604,12 @@ func (s *Server) setupDevProxy(webBasePath string) {
 }
 
 func getAvatarURL(providers []models.AccountProvider) string {
-	if len(providers) == 0 {
-		return ""
+	for _, provider := range providers {
+		if provider.AvatarURL != "" {
+			return provider.AvatarURL
+		}
 	}
-
-	return providers[0].AvatarURL
+	return ""
 }
 
 func getBaseURL() string {

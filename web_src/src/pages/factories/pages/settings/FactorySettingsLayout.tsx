@@ -1,22 +1,52 @@
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
-import { factoryDetailPath, factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import {
+  factoryDetailPath,
+  factoryListPath,
+  factorySettingsSectionPath,
+  type FactorySettingsScope,
+} from "../../lib/factoryPagePaths";
+import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
+import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import {
-  FACTORY_SETTINGS_NAV_ITEMS,
-  isYouSettingsSection,
-  settingsSectionFromPathname,
-  type FactorySettingsNavItem,
-} from "./settingsNavItems";
+import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
+import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
+
+/** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
+const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
+
+/**
+ * Drops the Models nav item when the workspace-models experimental feature is
+ * off, and skips any group left with no items. The source groups stay static
+ * so other consumers (e.g. route lookups) keep seeing the full, approved list.
+ */
+function visibleFactorySettingsNavGroups(
+  groups: FactorySettingsNavGroup[],
+  modelsEnabled: boolean,
+): FactorySettingsNavGroup[] {
+  if (modelsEnabled) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.id !== WORKSPACE_MODELS_NAV_ITEM_ID),
+    }))
+    .filter((group) => group.items.length > 0);
+}
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -74,9 +104,13 @@ function FactorySettingsLayoutContent({
   factoryKey: string;
 }) {
   useFactoriesThemeClass();
-  const { pathname } = useLocation();
+  const settingsNavGroups = useFactorySettingsNavGroups();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
-  const isProfileSettings = isYouSettingsSection(settingsSectionFromPathname(pathname));
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const navGroups = visibleFactorySettingsNavGroups(
+    settingsNavGroups,
+    hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
+  );
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
   // the `<Outlet/>` below mounts a leaf settings page that owns the full
@@ -96,53 +130,65 @@ function FactorySettingsLayoutContent({
     );
   }
 
-  const workspaceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "workspace");
-  const governanceGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "governance");
-  const youGroup = FACTORY_SETTINGS_NAV_ITEMS.filter((item) => item.group === "you");
+  const organizationSettingsPaths = {
+    apiKeys: factorySettingsSectionPath(organizationId, factoryKey, "organization", "api-keys"),
+    apiKeyDetail: (apiKeyId: string) =>
+      factorySettingsSectionPath(organizationId, factoryKey, "organization", `api-keys/${apiKeyId}`),
+    secrets: factorySettingsSectionPath(organizationId, factoryKey, "organization", "secrets"),
+    secretDetail: (secretId: string) =>
+      factorySettingsSectionPath(organizationId, factoryKey, "organization", `secrets/${secretId}`),
+  };
+  const integrationsPath = factorySettingsSectionPath(organizationId, factoryKey, "organization", "integrations");
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
-      <div className="flex h-full min-h-0 w-full bg-background text-foreground" data-testid="factory-settings-layout">
-        <aside
-          className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-          data-testid="factory-settings-sidebar"
-        >
-          <div className="border-b border-sidebar-border px-3 py-3">
-            <NavLink
-              to={factoryDetailPath(organizationId, factoryKey)}
-              className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-              data-testid="factory-settings-back"
+      <OrganizationSettingsPathsProvider paths={organizationSettingsPaths}>
+        <IntegrationsBasePathProvider basePath={integrationsPath}>
+          <div
+            className="flex h-full min-h-0 w-full bg-background text-foreground"
+            data-testid="factory-settings-layout"
+          >
+            <aside
+              className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
+              data-testid="factory-settings-sidebar"
             >
-              <ArrowLeft className="size-3.5" aria-hidden />
-              Back to workspace
-            </NavLink>
-            {isProfileSettings ? (
-              <p
-                className="mt-2 truncate px-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground"
-                data-testid="factory-settings-profile-title"
-              >
-                Profile settings
-              </p>
-            ) : null}
-          </div>
-          <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-4">
-            {isProfileSettings ? (
-              <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={youGroup} />
-            ) : (
-              <div className="flex flex-col gap-4" data-testid="factory-settings-workspace-nav">
-                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={workspaceGroup} />
-                <SettingsNavGroup organizationId={organizationId} factoryKey={factoryKey} items={governanceGroup} />
+              <div className="border-b border-sidebar-border px-3 py-3">
+                <NavLink
+                  to={factoryDetailPath(organizationId, factoryKey)}
+                  className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                  data-testid="factory-settings-back"
+                >
+                  <ArrowLeft className="size-3.5" aria-hidden />
+                  Back to workspace
+                </NavLink>
               </div>
-            )}
-          </nav>
-        </aside>
-        <main
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-background"
-          data-testid="factory-settings-main"
-        >
-          <Outlet />
-        </main>
-      </div>
+              <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
+                {navGroups.map((group) => (
+                  <SettingsNavGroup
+                    key={group.id}
+                    organizationId={organizationId}
+                    factoryKey={factoryKey}
+                    scope={group.id}
+                    title={group.label}
+                    items={group.items}
+                  />
+                ))}
+              </nav>
+            </aside>
+            {/*
+              Gray canvas behind white panels, like the Velocity report. Dark
+              mode keeps the darker page, because the factories theme paints
+              the sidebar and the panels the same color.
+            */}
+            <main
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-sidebar dark:bg-background"
+              data-testid="factory-settings-main"
+            >
+              <Outlet />
+            </main>
+          </div>
+        </IntegrationsBasePathProvider>
+      </OrganizationSettingsPathsProvider>
     </FactorySettingsLayoutContext.Provider>
   );
 }
@@ -150,35 +196,50 @@ function FactorySettingsLayoutContent({
 function SettingsNavGroup({
   organizationId,
   factoryKey,
+  scope,
+  title,
   items,
 }: {
   organizationId: string;
   factoryKey: string;
+  scope: FactorySettingsScope;
+  title: string;
   items: FactorySettingsNavItem[];
 }) {
+  const { pathname } = useLocation();
+  const activeItem = items.find((item) => pathname.includes(`/settings/${item.scope}/${item.section}`));
+  const activeItemRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    activeItemRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [activeItem?.id]);
+
   return (
-    <ul className="flex flex-col gap-0.5">
-      {items.map((item) => {
-        const Icon = item.Icon;
-        return (
-          <li key={item.id}>
-            <NavLink
-              to={factorySettingsSectionPath(organizationId, factoryKey, item.id)}
-              className={({ isActive }) =>
-                cn(
-                  "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
-                  isActive && "bg-sidebar-accent font-medium text-foreground",
-                )
-              }
-              data-testid={`factory-settings-nav-${item.id}`}
-              aria-label={item.id === "profile" ? "Profile" : undefined}
-            >
-              <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
-              <span>{item.label}</span>
-            </NavLink>
-          </li>
-        );
-      })}
-    </ul>
+    <section data-testid={`factory-settings-${scope}-nav`}>
+      <h2 className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{title}</h2>
+      <ul className="flex flex-col gap-0.5">
+        {items.map((item) => {
+          const Icon = item.Icon;
+          return (
+            <li key={item.id}>
+              <NavLink
+                ref={item.id === activeItem?.id ? activeItemRef : undefined}
+                to={factorySettingsSectionPath(organizationId, factoryKey, item.scope, item.section)}
+                className={({ isActive }) =>
+                  cn(
+                    "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                    isActive && "bg-sidebar-accent font-medium text-foreground",
+                  )
+                }
+                data-testid={`factory-settings-nav-${item.id}`}
+              >
+                <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
+                <span>{item.label}</span>
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

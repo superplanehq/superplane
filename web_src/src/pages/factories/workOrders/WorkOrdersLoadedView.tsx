@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrder,
 } from "@/api-client";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   applyWorkOrderFilters,
   applyWorkOrderOrdering,
@@ -15,7 +15,7 @@ import {
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
-import { useActivePRFeedbackWorkOrderIds } from "../pages/useWorkOrderPRFeedbackRunHref";
+import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
 import {
   WorkOrdersFilteredEmptyState,
@@ -45,6 +45,7 @@ interface WorkOrdersLoadedViewProps {
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  hostedCreditEmptyBanner?: ReactNode;
 }
 
 /**
@@ -55,7 +56,13 @@ interface WorkOrdersLoadedViewProps {
  */
 export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
   const { workOrders, factory, state, currentUserId, pullRequests = [] } = props;
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
   const entries = useMemo(() => buildWorkOrderListEntries(workOrders, factory), [workOrders, factory]);
   const scoped = useMemo(
     () => applyWorkOrderScope(entries, state.scope, currentUserId),
@@ -109,6 +116,10 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           {...sharedProps}
           factoryId={factory.id}
           addressingFeedbackOrderIds={addressingFeedbackOrderIds}
+          addressingFeedbackLabels={addressingFeedbackLabels}
+          waitingOnChecksOrderIds={waitingOnChecksOrderIds}
+          checksPassedOrderIds={checksPassedOrderIds}
+          fixesPausedOrderIds={fixesPausedOrderIds}
         />
       );
     }
@@ -128,6 +139,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
           onCreateWorkOrder={props.onCreateWorkOrder}
           canCreate={props.canCreate}
           permissionsLoading={props.permissionsLoading}
+          hostedCreditEmptyBanner={props.hostedCreditEmptyBanner}
         />
       </div>
 

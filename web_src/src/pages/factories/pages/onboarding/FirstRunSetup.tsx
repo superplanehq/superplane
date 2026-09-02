@@ -1,16 +1,18 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
+import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
+import { factoryListPath } from "../../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
@@ -47,6 +49,15 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   tickets: 3,
   agent: 4,
 };
+
+/**
+ * Hosted credentials leave the agent screen with no question to ask, so the
+ * ticket screen becomes the last screen and provisions the workspace.
+ */
+function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): FirstRunScreen {
+  if (screen === "agent" && skipAgentScreen) return "tickets";
+  return screen;
+}
 
 /**
  * The first-run screens have no coding agent screen. This screen keeps the
@@ -132,11 +143,11 @@ function AgentScreen({
           className="w-full"
           disabled={!setup.agentReady}
           loading={saving}
-          loadingText="Finishing setup..."
+          loadingText={FIRST_RUN_COPY.finish.saving}
           onClick={onContinue}
           data-testid="first-run-finish-setup"
         >
-          Finish setup
+          {FIRST_RUN_COPY.finish.action}
         </LoadingButton>
       </div>
     </FirstRunShell>
@@ -152,11 +163,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const [searchParams] = useSearchParams();
   const setup = model.setup;
 
-  const [screen, setScreen] = useState<FirstRunScreen>(() => {
+  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => {
     const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
     return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
   });
   const openStep = useRef(model.openSection);
+  const skipAgentScreen = model.hostedAgentReady;
 
   useSingleGithubConnection(model);
   useRepositoryErrorToast(model.repositoriesError);
@@ -165,7 +177,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   useEffect(() => {
     if (model.openSection === openStep.current) return;
     openStep.current = model.openSection;
-    setScreen(SCREEN_FOR_STEP[model.openSection]);
+    setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
   const goToScreen = (next: FirstRunScreen) => {
@@ -175,7 +187,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       openStep.current = step;
       model.setOpenSection(step);
     }
-    setScreen(next);
+    setOpenedScreen(next);
   };
 
   const continueFromRepository = async () => {
@@ -190,6 +202,15 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
     setup.commitIssuesStep();
     if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
+    if (skipAgentScreen) {
+      // The issues choice was just set above, in this same click; the setup
+      // state captured when this render closed over `model.finish` still
+      // holds the answer from before the click. Passing the answer here
+      // keeps a single click from saving a stale, empty issues source over
+      // the one `saveIssues` already stored.
+      await model.finish(DEFAULT_ISSUES_CHOICE);
+      return;
+    }
     goToScreen("agent");
   };
 
@@ -201,7 +222,8 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   };
 
   return {
-    screen,
+    screen: screenWithoutAgent(openedScreen, skipAgentScreen),
+    skipAgentScreen,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -215,15 +237,31 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId } = useFactoriesLayout();
+  const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
+  const navigate = useNavigate();
+  const deleteFactory = useDeleteFactory(organizationId);
+
+  // The placeholder workspace under setup is itself in `factories`, so
+  // another workspace exists when any factory has a different id.
+  const hasOtherWorkspace = factories.some((existing) => existing.id !== factoryId);
+
+  const cancelSetup = async () => {
+    // Guards against a double delete from a second click while the mutation
+    // is already in flight.
+    if (deleteFactory.isPending) return;
+    await deleteFactory.mutateAsync(factoryId);
+    navigate(factoryListPath(organizationId));
+  };
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
     displayName: firstNameOf(account?.name),
     email: account?.email,
-    onLogOut: signOut,
+    onLogOut: hasOtherWorkspace ? undefined : signOut,
+    onCancel: hasOtherWorkspace ? () => void cancelSetup() : undefined,
     stepIndex: STEP_INDEX_FOR_SCREEN[target],
+    stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
   });
 
   if (flow.screen === "welcome") {
@@ -267,7 +305,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunTicketsScreen
         ticketSource={DEFAULT_TICKET_SOURCE}
         chrome={chromeFor("tickets")}
-        continueLabel={FIRST_RUN_COPY.tickets.continue}
+        continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+        saving={flow.skipAgentScreen && model.saving}
         onSelectTicketSource={flow.selectTicketSource}
         onAnalyzeTickets={() => void flow.continueFromTickets()}
       />

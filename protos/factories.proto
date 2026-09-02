@@ -85,6 +85,18 @@ service Factories {
     };
   }
 
+  rpc UpdateFactoryRepository(UpdateFactoryRepositoryRequest) returns (UpdateFactoryRepositoryResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{id}/repository"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update factory repository";
+      description: "Updates the repository used by a factory workspace";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactory(DeleteFactoryRequest) returns (DeleteFactoryResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{id}"
@@ -131,6 +143,30 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List factory apps";
       description: "Returns canvases owned by a factory";
+      tags: "Factory";
+    };
+  }
+
+  rpc MaterializeFactoryAppTemplate(MaterializeFactoryAppTemplateRequest) returns (MaterializeFactoryAppTemplateResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/app-templates/{template_id}:materialize"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize a factory app template";
+      description: "Builds a bundled factory app template with its installation settings";
+      tags: "Factory";
+    };
+  }
+
+  rpc MaterializeFactoryAppDefaults(MaterializeFactoryAppDefaultsRequest) returns (MaterializeFactoryAppDefaultsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/apps/{app_id}:defaults"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Materialize factory app defaults";
+      description: "Builds the bundled defaults for an installed factory app and preserves its connections";
       tags: "Factory";
     };
   }
@@ -480,6 +516,18 @@ service Factories {
     };
   }
 
+  rpc SyncFactoryVelocity(SyncFactoryVelocityRequest) returns (SyncFactoryVelocityResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/velocity/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync factory velocity";
+      description: "Starts a repository merge sync for a factory and returns before it finishes";
+      tags: "Factory";
+    };
+  }
+
   rpc ListWorkOrderChecks(ListWorkOrderChecksRequest) returns (ListWorkOrderChecksResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"
@@ -590,9 +638,23 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // Default branch of the app repository.
+  optional string default_branch = 11;
 }
 
 message UpdateFactoryOnboardingResponse {
+  Factory factory = 1;
+}
+
+message UpdateFactoryRepositoryRequest {
+  string id = 1;
+  // Repository slug in owner/name form.
+  string repository = 2;
+  // Default branch resolved from the selected repository.
+  string default_branch = 3;
+}
+
+message UpdateFactoryRepositoryResponse {
   Factory factory = 1;
 }
 
@@ -628,6 +690,7 @@ message FactoryOnboarding {
   AgentHarness agent_harness = 7;
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
+  string default_branch = 10;
 }
 
 message Factory {
@@ -672,6 +735,10 @@ message FactoryLine {
   google.protobuf.Timestamp updated_at = 5;
   // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
   optional FactoryLineMetrics metrics = 6;
+  // Board column colors, keyed by column key ("backlog", "phase-<step
+  // index>", "verify", "done"). Value is a color id. Missing keys use the
+  // default color.
+  map<string, string> column_colors = 7;
 }
 
 message CreateFactoryLineRequest {
@@ -689,6 +756,9 @@ message UpdateFactoryLineRequest {
   string line_id = 2;
   optional string name = 3;
   repeated FactoryLine.Step steps = 4;
+  // Full replacement of the board column colors. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, string> column_colors = 5;
 }
 
 message UpdateFactoryLineResponse {
@@ -701,6 +771,46 @@ message ListFactoryAppsRequest {
 
 message ListFactoryAppsResponse {
   repeated Factory.App apps = 1;
+}
+
+message FactoryAppTemplateIntegration {
+  string type = 1;
+  string id = 2;
+  string name = 3;
+}
+
+message FactoryAppTemplateAgent {
+  string component = 1;
+  string model = 2;
+  string planning_model = 3;
+  string credential_source = 4;
+  string credential_integration_name = 5;
+}
+
+message MaterializeFactoryAppTemplateRequest {
+  string factory_id = 1;
+  string template_id = 2;
+  string app_id = 3;
+  map<string, string> install_params = 4;
+  repeated FactoryAppTemplateIntegration integrations = 5;
+  FactoryAppTemplateAgent agent = 6;
+}
+
+message MaterializeFactoryAppTemplateResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
+}
+
+message MaterializeFactoryAppDefaultsRequest {
+  string factory_id = 1;
+  string app_id = 2;
+}
+
+message MaterializeFactoryAppDefaultsResponse {
+  string template_id = 1;
+  string canvas_yaml = 2;
+  string console_yaml = 3;
 }
 
 // Factory intakes
@@ -849,6 +959,7 @@ message FactoryPRFeedbackHandler {
   enum Source {
     SOURCE_UNSPECIFIED = 0;
     SOURCE_PULL_REQUEST_DISCUSSION = 1;
+    SOURCE_PULL_REQUEST_CHECKS = 2;
   }
 
   message SubjectSettings {
@@ -862,11 +973,18 @@ message FactoryPRFeedbackHandler {
     repeated string allowed_bots = 3;
   }
 
+  message CheckSettings {
+    repeated string names = 1;
+    optional int32 maximum_attempts = 2;
+    repeated string runner_integration_ids = 3;
+  }
+
   // Settings stored in the canvas graph. This block is a read/write facade
   // over that graph.
   message Settings {
     SubjectSettings subject = 1;
     DiscussionSettings discussion = 2;
+    CheckSettings checks = 3;
   }
 
   string id = 1;
@@ -931,6 +1049,24 @@ message FactoryPullRequestRun {
   Superplane.Canvases.CanvasRunRef run = 4;
 }
 
+message FactoryPullRequestRevision {
+  string id = 1;
+  string sha = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message FactoryPullRequestActivity {
+  Superplane.Canvases.CanvasRunRef run = 1;
+  string description = 2;
+  optional FactoryPullRequestRevision revision = 3;
+  string access = 4;
+  string state = 5;
+  optional int32 attempt = 6;
+  optional int32 attempt_limit = 7;
+  int64 total_tokens = 8;
+  int64 cost_cents = 9;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -962,6 +1098,8 @@ message FactoryPullRequest {
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
   repeated FactoryPullRequestRun runs = 16;
+  optional FactoryPullRequestRevision current_revision = 17;
+  repeated FactoryPullRequestActivity activities = 18;
 }
 
 message ListFactoryPullRequestsRequest {
@@ -1130,6 +1268,7 @@ message WorkOrder {
   repeated WorkOrderStatusNote status_notes = 15;
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
+  int64 total_duration_seconds = 17;
 }
 
 message WorkOrderOrigin {
@@ -1270,6 +1409,7 @@ message WorkOrderExecution {
   int64 cost_cents = 10;
   // When the execution finished (set for finished executions only).
   google.protobuf.Timestamp finished_at = 11;
+  int64 duration_seconds = 12;
 }
 
 message WorkOrderExecutionStep {
@@ -1486,18 +1626,39 @@ message FactoryWorkOrderUpdatedMessage {
   google.protobuf.Timestamp timestamp = 4;
 }
 
+// Internal AMQP message that asks the velocity sync worker to read a workspace
+// now. The API process does not run the worker, so a user asking for a fresh
+// report hands the work over instead of doing it on the request path.
+message FactoryVelocitySyncRequestedMessage {
+  string factory_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
 // Velocity
+
+// SyncFactoryVelocityRequest asks for a fresh read of the repository merges of
+// a workspace. The report is served from stored rows a background sync collects,
+// so a user who just merged something needs a way to ask for it now instead of
+// waiting for the next scheduled run.
+message SyncFactoryVelocityRequest {
+  string factory_id = 1;
+}
+
+message SyncFactoryVelocityResponse {
+  // False when the workspace has no repository to sync, so the UI can explain
+  // that instead of showing progress that never finishes.
+  bool started = 1;
+}
 
 message DescribeFactoryVelocityRequest {
   string factory_id = 1;
-  // Period window in days. Only 7 and 30 are supported by the UI today; any
+  // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
   int32 period_days = 2;
-  // Optional GitHub integration and `owner/repo` to include the People cohort.
-  // When either is empty the response returns SuperPlane data only and sets
-  // `has_people_cohort = false` so the UI can hide the People series.
-  string integration_id = 3;
-  string repository = 4;
+  // Optional `owner/repo` the report is limited to. When it is empty the
+  // response returns SuperPlane data only and sets `has_people_cohort = false`
+  // so the UI can hide the People series.
+  string repository = 3;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1507,11 +1668,30 @@ message DescribeFactoryVelocityResponse {
   // Repository the People cohort was computed for (`owner/repo`), or empty when
   // no repository was selected.
   string repository = 4;
-  // True when GitHub search succeeded for the selected repository.
+  // True when the repository merges of the workspace are stored, so the People
+  // series is comparable with SuperPlane output.
   bool has_people_cohort = 5;
-  // True when a repository was selected and GitHub search failed.
-  // SuperPlane counts are still present; the People series is omitted.
-  bool people_search_failed = 6;
+  // When the background sync last stored repository merges. Unset when the
+  // workspace has never completed a sync.
+  google.protobuf.Timestamp people_synced_at = 6;
+  // Totals for the window of equal length that ends where the reported window
+  // starts. The UI shows deltas against these numbers.
+  DescribeFactoryVelocityTotals previous_totals = 7;
+  // True when the previous window holds output, so its totals are comparable.
+  // A workspace younger than two windows reports false and the UI drops the
+  // comparison instead of showing growth from an empty baseline.
+  bool has_previous_window = 8;
+  // Intake sources that produced merged SuperPlane pull requests in the
+  // window, ordered by merge count. These are the series of the intake
+  // breakdown; `points[].intake` holds their per-day counts.
+  repeated DescribeFactoryVelocityIntakeSource intake_sources = 9;
+  // One row per person with merged pull requests or SuperPlane work in the
+  // window, ordered by total merged pull requests.
+  repeated DescribeFactoryVelocityPerson people = 10;
+  // True when a repository is selected but its first sync has not stored any
+  // merges yet. SuperPlane counts are still present; the People series is
+  // omitted until the sync finishes.
+  bool people_sync_pending = 11;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1522,6 +1702,51 @@ message DescribeFactoryVelocityDay {
   int32 people_merged = 4;
   // Waste = SuperPlane PRs closed without merging on that day.
   int32 waste = 5;
+  // Merged SuperPlane pull requests grouped by intake source.
+  repeated DescribeFactoryVelocityIntakeCount intake = 6;
+  // Tracked model spend of the work orders that closed on this day. A work
+  // order counts on the day its pull request merged, or on the day its last
+  // pull request closed when none merged.
+  int64 cost_cents = 7;
+  int64 tokens = 8;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 9;
+}
+
+// DescribeFactoryVelocityIntakeSource names one intake series and its total.
+message DescribeFactoryVelocityIntakeSource {
+  // Stable key that `DescribeFactoryVelocityIntakeCount.key` refers to.
+  string key = 1;
+  // Display label, for example "GitHub issue".
+  string label = 2;
+  int32 merged = 3;
+}
+
+message DescribeFactoryVelocityIntakeCount {
+  string key = 1;
+  int32 merged = 2;
+}
+
+// DescribeFactoryVelocityPerson is one row of the People table: what a person
+// merged directly and what the SuperPlane work orders they opened produced.
+message DescribeFactoryVelocityPerson {
+  // SuperPlane user id for a member, or `github:<login>` for a repository
+  // author who is not a member of the organization.
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string avatar_url = 4;
+  // Merged pull requests the person authored outside SuperPlane.
+  int32 authored_merged = 5;
+  // Merged pull requests from SuperPlane work orders this person opened.
+  int32 factory_merged = 6;
+  // Work orders this person opened whose pull requests closed without a merge.
+  int32 factory_waste = 7;
+  // Tracked model spend of the work orders this person opened.
+  int64 cost_cents = 8;
+  // Median hours from first execution to close for those work orders. Zero
+  // when none of them closed inside the window.
+  double median_cycle_hours = 9;
 }
 
 message DescribeFactoryVelocityYesterday {
@@ -1539,6 +1764,17 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
+  // Tracked model spend of the work orders that closed in the window.
+  int64 cost_cents = 6;
+  int64 tokens = 7;
+  // Part of `cost_cents` spent on work orders that closed without a merge.
+  int64 waste_cost_cents = 8;
+  // Work orders (tasks) that closed in the window. A work order counts once,
+  // even when it opened several pull requests, which is why this differs from
+  // the pull request counts above.
+  int32 tasks_closed = 9;
+  // Part of `tasks_closed` whose pull requests all closed without a merge.
+  int32 tasks_waste = 10;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
@@ -1566,7 +1802,7 @@ message FactoryLineMetrics {
   repeated int32 throughput_trend = 11;
 }
 
-// LLM spend
+// Factory workspace usage (LLM tokens and runner-fleet VM time)
 
 message DescribeFactoryUsageRequest {
   string factory_id = 1;
@@ -1587,6 +1823,8 @@ message DescribeFactoryUsageResponse {
   int64 factory_hosted_billed_cents = 10;
   int64 factory_remaining_credit_cents = 11;
   bool factory_remaining_credit_warning = 12;
+  int64 total_duration_seconds = 13;
+  repeated UsageByMachineType by_machine_type = 14;
 }
 
 message ListFactoryLLMModelsRequest {
@@ -1623,4 +1861,10 @@ message UsageByModel {
   string model = 2;
   int64 total_tokens = 3;
   int64 cost_cents = 4;
+}
+
+message UsageByMachineType {
+  string machine_type = 1;
+  int64 duration_seconds = 2;
+  int64 cost_cents = 3;
 }
