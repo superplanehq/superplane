@@ -1585,11 +1585,12 @@ func (s *Server) setupDevProxy(webBasePath string) {
 }
 
 func getAvatarURL(providers []models.AccountProvider) string {
-	if len(providers) == 0 {
-		return ""
+	for _, provider := range providers {
+		if provider.AvatarURL != "" {
+			return provider.AvatarURL
+		}
 	}
-
-	return providers[0].AvatarURL
+	return ""
 }
 
 func getBaseURL() string {

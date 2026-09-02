@@ -65,13 +65,17 @@ export function accountEmailOptions(input: {
     byEmail.set(normalized, { email: normalized, sources: [source] });
   };
 
-  if (input.hasPassword) {
-    add(input.email, "password");
-  }
+  let hasPasswordSource = false;
   for (const provider of input.providers ?? []) {
-    if (provider.provider === "github" || provider.provider === "google") {
+    if (provider.provider === "github" || provider.provider === "google" || provider.provider === "password") {
       add(provider.email ?? "", provider.provider);
+      if (provider.provider === "password") {
+        hasPasswordSource = true;
+      }
     }
+  }
+  if (input.hasPassword && !hasPasswordSource) {
+    add(input.email, "password");
   }
   if (byEmail.size === 0) {
     add(input.email, "password");

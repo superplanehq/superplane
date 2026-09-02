@@ -311,6 +311,10 @@ func (a *Account) SetEmail(tx *gorm.DB, email string) error {
 		return ErrAccountEmailNotFromSignInMethod
 	}
 
+	if err := a.ensurePasswordSignInEmail(tx); err != nil {
+		return err
+	}
+
 	allowed, err := a.SignInEmails(tx)
 	if err != nil {
 		return err
@@ -407,4 +411,33 @@ func (a *Account) UpdateEmailForProvider(newEmail, provider, providerID string) 
 	}
 
 	return err
+}
+
+func (a *Account) ensurePasswordSignInEmail(tx *gorm.DB) error {
+	hasPassword, err := AccountHasPassword(tx, a.ID)
+	if err != nil || !hasPassword {
+		return err
+	}
+
+	email := utils.NormalizeEmail(a.Email)
+	if email == "" {
+		return nil
+	}
+
+	var existing AccountProvider
+	err = tx.Where("account_id = ?", a.ID).Where("provider = ?", ProviderPassword).First(&existing).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	return tx.Create(&AccountProvider{
+		AccountID:  a.ID,
+		Provider:   ProviderPassword,
+		ProviderID: a.ID.String(),
+		Email:      email,
+		Name:       a.Name,
+	}).Error
 }

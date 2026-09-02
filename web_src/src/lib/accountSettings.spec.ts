@@ -14,10 +14,26 @@ describe("accountEmailOptions", () => {
         ],
       }),
     ).toEqual([
-      { email: "ada@example.com", sources: ["password", "google"] },
       { email: "ada@users.noreply.github.com", sources: ["github"] },
+      { email: "ada@example.com", sources: ["google", "password"] },
     ]);
     expect(accountEmailSourceLabel(["github", "google"])).toBe("GitHub · Google");
+  });
+
+  it("keeps the password email after the primary email moves", () => {
+    expect(
+      accountEmailOptions({
+        email: "ada@users.noreply.github.com",
+        hasPassword: true,
+        providers: [
+          { provider: "github", email: "ada@users.noreply.github.com" },
+          { provider: "password", email: "ada@example.com" },
+        ],
+      }),
+    ).toEqual([
+      { email: "ada@users.noreply.github.com", sources: ["github"] },
+      { email: "ada@example.com", sources: ["password"] },
+    ]);
   });
 });
 

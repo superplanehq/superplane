@@ -37,7 +37,13 @@ func AccountSignInMethodCount(tx *gorm.DB, account *Account) (int, error) {
 		return 0, err
 	}
 
-	count := len(providers)
+	count := 0
+	for _, provider := range providers {
+		if provider.Provider == ProviderPassword {
+			continue
+		}
+		count++
+	}
 	hasPassword, err := AccountHasPassword(tx, account.ID)
 	if err != nil {
 		return 0, err

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/markbates/goth"
@@ -97,6 +98,52 @@ func TestUpdateAccount_SwitchesEmailFromConnectedProvider(t *testing.T) {
 	reloaded, err := models.FindAccountByID(account.ID.String())
 	require.NoError(t, err)
 	assert.Equal(t, "ada-google@example.com", reloaded.Email)
+}
+
+func TestUpdateAccount_KeepsPasswordEmailAfterSwitch(t *testing.T) {
+	r := support.Setup(t)
+	hash, err := crypto.HashPassword("current-pass-123")
+	require.NoError(t, err)
+	_, err = models.CreateAccountPasswordAuth(r.Account.ID, hash)
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Create(&models.AccountProvider{
+		AccountID:  r.Account.ID,
+		Provider:   models.ProviderGoogle,
+		ProviderID: "google-ada",
+		Email:      "ada-google@example.com",
+		Username:   "ada",
+		Name:       r.Account.Name,
+	}).Error)
+
+	originalEmail := r.Account.Email
+	server, account, token := setupTestServer(r, t)
+
+	switchToGoogle, err := json.Marshal(map[string]string{"email": "ada-google@example.com"})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodPatch, "/account", bytes.NewReader(switchToGoogle))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusOK, res.Code)
+
+	switchBack, err := json.Marshal(map[string]string{"email": originalEmail})
+	require.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodPatch, "/account", bytes.NewReader(switchBack))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res = httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusOK, res.Code)
+
+	var resp AccountResponse
+	require.NoError(t, json.Unmarshal(res.Body.Bytes(), &resp))
+	assert.Equal(t, originalEmail, resp.Email)
+	require.True(t, slices.ContainsFunc(resp.Providers, func(provider AccountProviderResponse) bool {
+		return provider.Provider == models.ProviderPassword && provider.Email == originalEmail
+	}))
+
+	reloaded, err := models.FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, originalEmail, reloaded.Email)
 }
 
 func TestUpdateAccount_RefusesEmailNotFromSignInMethod(t *testing.T) {
