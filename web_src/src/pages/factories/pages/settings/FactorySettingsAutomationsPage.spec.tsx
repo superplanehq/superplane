@@ -23,7 +23,7 @@ describe("FactorySettingsAutomationsPage", () => {
       "aria-current",
       "page",
     );
-    expect(await screen.findByTestId("automations-list-page", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("settings-redesign-automations", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Automations" })).toBeInTheDocument();
   }, 10000);
 });

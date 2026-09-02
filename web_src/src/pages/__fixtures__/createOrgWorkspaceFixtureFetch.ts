@@ -130,7 +130,7 @@ function resolveFactoryFixtures(
     factoriesFixture,
   );
   const factoryUsersResolved =
-    url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse() : null;
+    url.pathname === "/api/v1/users" && method === "GET" ? factoriesOrganizationUsersResponse(factoriesFixture) : null;
   return { factoryPagesResolved, factoryUsersResolved };
 }
 
