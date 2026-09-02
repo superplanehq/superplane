@@ -80,17 +80,16 @@ func (w *cappedShellWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err error) {
+func writeDirectiveBundle(tmpRoot string, directives []shellDirective) (metaPath string, err error) {
 	var meta strings.Builder
-	meta.WriteString("set -e\nset +u\nset -o pipefail\n")
-	for i, dir := range parts {
+	writeLiveLogNowMsHelper(&meta)
+	meta.WriteString("set +u\nset -o pipefail\n")
+	for i, dir := range directives {
 		hostPath := filepath.Join(tmpRoot, fmt.Sprintf("d%d.sh", i))
-		if err := os.WriteFile(hostPath, []byte(dir+"\n"), 0600); err != nil {
+		if err := os.WriteFile(hostPath, []byte(dir.Shell+"\n"), 0600); err != nil {
 			return "", err
 		}
-		meta.WriteString("source ")
-		meta.WriteString(bashSingleQuotedPath(hostPath))
-		meta.WriteString("\n")
+		writeLiveLogWrappedSource(&meta, i, dir, hostPath)
 	}
 	metaPath = filepath.Join(tmpRoot, "_meta.sh")
 	if err := os.WriteFile(metaPath, []byte(meta.String()), 0600); err != nil {
@@ -99,15 +98,43 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 	return metaPath, nil
 }
 
+func writeLiveLogNowMsHelper(script *strings.Builder) {
+	script.WriteString("sp_now_ms() {\n")
+	script.WriteString("  __sp_now=\"$(date +%s%3N 2>/dev/null || true)\"\n")
+	script.WriteString("  case \"$__sp_now\" in\n")
+	script.WriteString("    ''|*[!0-9]*) __sp_now=\"$(date +%s)000\" ;;\n")
+	script.WriteString("  esac\n")
+	script.WriteString("  printf '%s\\n' \"$__sp_now\"\n")
+	script.WriteString("}\n")
+}
+
+func writeLiveLogWrappedSource(script *strings.Builder, index int, dir shellDirective, hostPath string) {
+	script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
+	writeDockerCmdStart(script, index, dir)
+	script.WriteString("\n")
+	script.WriteString("if source ")
+	script.WriteString(bashSingleQuotedPath(hostPath))
+	script.WriteString("; then\n")
+	script.WriteString("  __sp_cmd_exit=0\n")
+	script.WriteString("else\n")
+	script.WriteString("  __sp_cmd_exit=$?\n")
+	script.WriteString("fi\n")
+	script.WriteString("__sp_cmd_end=\"$(sp_now_ms)\"\n")
+	script.WriteString("__sp_cmd_duration=$((__sp_cmd_end - __sp_cmd_start))\n")
+	script.WriteString("if [ \"$__sp_cmd_duration\" -lt 0 ]; then __sp_cmd_duration=0; fi\n")
+	script.WriteString("if [ \"$__sp_cmd_exit\" -eq 0 ]; then __sp_cmd_status=passed; else __sp_cmd_status=failed; fi\n")
+	script.WriteString("printf '\\n'\n")
+	script.WriteString(`printf '{"type":"cmd_end","index":`)
+	script.WriteString(strconv.Itoa(index))
+	script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
+	script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
+}
+
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
 func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, directives []shellDirective, env []string, live io.Writer, resultHostPath string) (int, string, error) {
 	if len(directives) == 0 {
 		return 1, "", errEmptyCommands()
-	}
-	parts := make([]string, 0, len(directives))
-	for _, d := range directives {
-		parts = append(parts, d.Shell)
 	}
 	tmpRoot, err := os.MkdirTemp("", "runner-sh-*")
 	if err != nil {
@@ -115,7 +142,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string,
 	}
 	defer func() { _ = os.RemoveAll(tmpRoot) }()
 
-	metaPath, err := writeDirectiveBundle(tmpRoot, parts)
+	metaPath, err := writeDirectiveBundle(tmpRoot, directives)
 	if err != nil {
 		return 1, "", err
 	}

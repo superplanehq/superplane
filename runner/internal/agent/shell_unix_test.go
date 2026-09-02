@@ -382,3 +382,34 @@ func TestHostShellPipeBundleEcho(t *testing.T) {
 		t.Fatalf("expected hello in output: %q", out)
 	}
 }
+
+func TestHostShellPipeBundleEmitsCommandMarkers(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	t.Setenv("RUNNER_SHELL_USE_PIPE", "1")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var live bytes.Buffer
+	code, out, err := runHostShellDirectiveList(ctx, 128*1024, t.TempDir(), []shellDirective{{
+		Text:    "Say hello",
+		Shell:   `echo 'hello'`,
+		Kind:    "bash",
+		Preview: "echo hello",
+	}}, nil, &live, "")
+	if err != nil || code != 0 {
+		t.Fatalf("pipe bundle path failed: code=%d err=%v out=%q", code, err, out)
+	}
+	log := live.String()
+	if !strings.Contains(log, `"type":"cmd_start"`) || !strings.Contains(log, `"kind":"bash"`) {
+		t.Fatalf("expected cmd_start in live log; live=%q", log)
+	}
+	if !strings.Contains(log, `"type":"cmd_end"`) || !strings.Contains(log, `"status":"passed"`) {
+		t.Fatalf("expected passed cmd_end in live log; live=%q", log)
+	}
+	if !strings.Contains(out, "hello") {
+		t.Fatalf("expected hello in output: %q", out)
+	}
+}
