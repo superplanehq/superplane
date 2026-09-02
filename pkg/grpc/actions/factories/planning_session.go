@@ -362,8 +362,5 @@ func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSess
 			return executions[i].ID.String(), nil
 		}
 	}
-	if len(executions) == 0 {
-		return "", nil
-	}
-	return executions[len(executions)-1].ID.String(), nil
+	return "", nil
 }

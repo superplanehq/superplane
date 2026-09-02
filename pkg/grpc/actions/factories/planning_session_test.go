@@ -19,7 +19,7 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
-	upsertHostedOnboardingProvider(t, db)
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	appRepo := "acme/payments"
@@ -35,6 +35,7 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	assert.Equal(t, "acme/payments", resp.Session.Repository)
 	assert.Equal(t, models.PlanningSessionStateRunning, resp.Session.State)
 	assert.NotEmpty(t, resp.Session.CanvasRunId)
+	assert.Empty(t, resp.Session.ExecutionId)
 	assert.Empty(t, resp.Session.Messages)
 
 	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), r.Organization.ID, factoryModel.ID)
@@ -72,13 +73,14 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, resp.Session.Id, described.Session.Id)
+	assert.Empty(t, described.Session.ExecutionId)
 }
 
 func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
-	upsertHostedOnboardingProvider(t, db)
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	appRepo := "acme/payments"
@@ -112,7 +114,7 @@ func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
 func Test__StartPlanningSession__KeepsExistingCanvasPrompt(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -154,7 +156,7 @@ func Test__StartPlanningSession__KeepsExistingCanvasPrompt(t *testing.T) {
 func Test__StartPlanningSession__KeepsPreviousSessionForSameUser(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -188,7 +190,7 @@ func Test__StartPlanningSession__KeepsPreviousSessionForSameUser(t *testing.T) {
 func Test__StartPlanningSession__RejectsWhenParallelismCapIsReached(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -223,7 +225,7 @@ func Test__StartPlanningSession__RejectsWhenParallelismCapIsReached(t *testing.T
 func Test__StartPlanningSession__RejectsEleventhSessionAtDefaultCap(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -245,7 +247,7 @@ func Test__StartPlanningSession__RejectsEleventhSessionAtDefaultCap(t *testing.T
 func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -274,7 +276,7 @@ func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
-	upsertHostedOnboardingProvider(t, db)
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
@@ -305,6 +307,7 @@ func Test__StartPlanningSession__RequiresClaude(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.Conn()
 	require.NoError(t, db.Where("provider <> ?", "").Delete(&models.HostedLLMProvider{}).Error)
+	createReadyOnboardingIntegration(t, r.Organization.ID, intakeGitHubAppName)
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -314,6 +317,21 @@ func Test__StartPlanningSession__RequiresClaude(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "Connect Claude before you start Create with an Agent.")
+}
+
+func Test__StartPlanningSession__RequiresGitHub(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "Connect GitHub before you start Create with an Agent.")
 }
 
 func Test__StartPlanningSession__RequiresRepository(t *testing.T) {
@@ -331,7 +349,7 @@ func Test__StartPlanningSession__RequiresRepository(t *testing.T) {
 func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	setupPlanningStart(t, r.Organization.ID)
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -398,6 +416,12 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, ended.Session.State)
+}
+
+func setupPlanningStart(t *testing.T, organizationID uuid.UUID) {
+	t.Helper()
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	createReadyOnboardingIntegration(t, organizationID, intakeGitHubAppName)
 }
 
 func planningAgentPrompt(t *testing.T, organizationID, factoryID uuid.UUID) string {

@@ -20,9 +20,15 @@ const (
 	planningCanvasAgentNodeID  = "planning-agent"
 )
 
-var errPlanningClaudeRequired = errors.New("claude is not connected")
+var (
+	errPlanningClaudeRequired = errors.New("claude is not connected")
+	errPlanningGitHubRequired = errors.New("github is not connected")
+)
 
 func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
+	if err := requirePlanningGitHub(tx, factoryModel); err != nil {
+		return nil, "", err
+	}
 	canvas, err := models.FindPlanningCanvas(tx, factoryModel.OrganizationID, factoryModel.ID)
 	if err == nil {
 		entrypoint, entryErr := planningCanvasEntrypoint(tx, canvas.ID)
@@ -128,6 +134,22 @@ func planningCanvasEntrypoint(tx *gorm.DB, canvasID uuid.UUID) (string, error) {
 		}
 	}
 	return "", invalidArgument("planning canvas has no onRun entrypoint")
+}
+
+func requirePlanningGitHub(tx *gorm.DB, factoryModel *models.Factory) error {
+	integrations, err := models.ListIntegrations(tx, factoryModel.OrganizationID)
+	if err != nil {
+		return err
+	}
+	for i := range integrations {
+		if integrations[i].AppName != intakeGitHubAppName {
+			continue
+		}
+		if integrations[i].State == models.IntegrationStateReady {
+			return nil
+		}
+	}
+	return errPlanningGitHubRequired
 }
 
 func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) (*intakeAgent, error) {

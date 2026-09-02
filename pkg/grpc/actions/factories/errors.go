@@ -116,6 +116,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Too many Create with an Agent sessions are running.")
 	case errors.Is(err, errPlanningClaudeRequired):
 		return grpcerrors.FailedPrecondition(err, "Connect Claude before you start Create with an Agent.")
+	case errors.Is(err, errPlanningGitHubRequired):
+		return grpcerrors.FailedPrecondition(err, "Connect GitHub before you start Create with an Agent.")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):
