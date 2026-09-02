@@ -136,7 +136,7 @@ function VelocityHeader({ model }: { model: VelocityPageModel }) {
 function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
   return (
     <WorkspacePageHeader
-      className={cn(factoryCenteredSectionHeaderClassName, "bg-transparent")}
+      className={factoryCenteredSectionHeaderClassName}
       title="Velocity"
       subtitle={
         model.repository
