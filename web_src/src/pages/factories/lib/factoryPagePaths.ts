@@ -81,16 +81,24 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
 /** Opens PR feedback settings on a tab: general or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
 
 export function factoryPRFeedbackPath(
   organizationId: string,
   factoryKey: string,
   lineId?: string | null,
   settingsTab?: string,
+  handlerId?: string,
 ) {
-  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${PR_FEEDBACK_SEARCH_PARAM}=1`;
-  const settingsQuery = settingsTab ? `&${PR_FEEDBACK_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
-  return `${path}${settingsQuery}`;
+  const params = new URLSearchParams();
+  params.set(PR_FEEDBACK_SEARCH_PARAM, "1");
+  if (handlerId) {
+    params.set(PR_FEEDBACK_HANDLER_SEARCH_PARAM, handlerId);
+  }
+  if (settingsTab) {
+    params.set(PR_FEEDBACK_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
 }
 
 export function isPRFeedbackSearchOpen(search: string): boolean {
@@ -101,6 +109,11 @@ export function isPRFeedbackSearchOpen(search: string): boolean {
 export function prFeedbackSettingsTabFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
+}
+
+export function prFeedbackHandlerIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {
@@ -329,8 +342,19 @@ export function factorySettingsPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/settings`;
 }
 
-export function factorySettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
+export type FactorySettingsScope = "account" | "workspace" | "organization";
+
+export function factorySettingsSectionPath(
+  organizationId: string,
+  factoryKey: string,
+  scope: FactorySettingsScope,
+  section: string,
+) {
+  return `${factorySettingsPath(organizationId, factoryKey)}/${scope}/${section}`;
+}
+
+export function factorySettingsWorkspaceGeneralPath(organizationId: string, factoryKey: string) {
+  return factorySettingsSectionPath(organizationId, factoryKey, "workspace", "general");
 }
 
 export type OrganizationSettingsLocationState = {
@@ -361,7 +385,7 @@ export function factorySettingsGeneralPathAfterKeyChange(
   if (!nextKey || nextKey === previousKey) {
     return null;
   }
-  return factorySettingsSectionPath(organizationId, nextKey, "general");
+  return factorySettingsWorkspaceGeneralPath(organizationId, nextKey);
 }
 
 export function factoryMissionsPath(organizationId: string, factoryKey: string) {

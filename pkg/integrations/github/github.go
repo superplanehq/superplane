@@ -109,6 +109,7 @@ func (g *GitHub) Actions() []core.Action {
 	return []core.Action{
 		&admin.GetWorkflowUsage{},
 		&checks.ListCheckRunsForRef{},
+		&checks.WaitForPullRequestChecks{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
 		&contents.GetRelease{},
@@ -1183,13 +1184,16 @@ func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
 	return ctx.Secrets().Get(common.SecretAppPEM)
 }
 
-func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
+func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.IntegrationSecrets, error) {
 	token, err := resolveAccessToken(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil, err
+		return core.IntegrationSecrets{}, err
 	}
 
-	return map[string][]byte{
-		integrationSecretGitHubToken: []byte(token),
+	return core.IntegrationSecrets{
+		Values: map[string][]byte{
+			integrationSecretGitHubToken: []byte(token),
+		},
+		Usage: githubSecretUsage,
 	}, nil
 }

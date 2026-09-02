@@ -1,72 +1,101 @@
 import type { LucideIcon } from "lucide-react";
-import { BarChart3, Bell, Blocks, Box, CircleUser, Cpu, Grid3x3, Key, Plug, Users, Workflow } from "lucide-react";
+import {
+  BarChart3,
+  Bell,
+  Blocks,
+  CircleUser,
+  Cpu,
+  Grid3x3,
+  Key,
+  KeyRound,
+  Plug,
+  Settings,
+  Shield,
+  Users,
+  Workflow,
+} from "lucide-react";
+
+import type { FactorySettingsScope } from "../../lib/factoryPagePaths";
 
 export type FactorySettingsSection =
   | "general"
+  | "profile"
+  | "security"
+  | "notifications"
+  | "repository"
   | "automations"
-  | "repositories"
-  | "environments"
   | "models"
+  | "spending"
   | "members"
   | "integrations"
-  | "secrets"
-  | "usage"
-  | "profile"
-  | "notifications";
-
-export type FactorySettingsNavGroup = "workspace" | "governance" | "you";
+  | "api-keys"
+  | "secrets";
 
 export interface FactorySettingsNavItem {
-  id: FactorySettingsSection;
+  id: string;
   label: string;
   Icon: LucideIcon;
-  group: FactorySettingsNavGroup;
+  scope: FactorySettingsScope;
+  section: FactorySettingsSection;
 }
 
-export const FACTORY_SETTINGS_NAV_ITEMS: FactorySettingsNavItem[] = [
-  { id: "general", label: "General", Icon: Grid3x3, group: "workspace" },
-  { id: "automations", label: "Automations", Icon: Workflow, group: "workspace" },
-  { id: "repositories", label: "Repositories", Icon: Blocks, group: "workspace" },
-  { id: "environments", label: "Environments", Icon: Box, group: "workspace" },
-  { id: "models", label: "Models", Icon: Cpu, group: "workspace" },
-  { id: "members", label: "Members", Icon: Users, group: "governance" },
-  { id: "integrations", label: "Integrations", Icon: Plug, group: "governance" },
-  { id: "secrets", label: "Secrets", Icon: Key, group: "governance" },
-  { id: "usage", label: "Usage", Icon: BarChart3, group: "governance" },
-  { id: "profile", label: "General", Icon: CircleUser, group: "you" },
-  { id: "notifications", label: "Notifications", Icon: Bell, group: "you" },
+export interface FactorySettingsNavGroup {
+  id: FactorySettingsScope;
+  label: string;
+  items: FactorySettingsNavItem[];
+}
+
+export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
+  {
+    id: "account",
+    label: "Account",
+    items: [
+      { id: "account-profile", label: "Profile", Icon: CircleUser, scope: "account", section: "profile" },
+      { id: "account-security", label: "Security", Icon: Shield, scope: "account", section: "security" },
+      { id: "account-notifications", label: "Notifications", Icon: Bell, scope: "account", section: "notifications" },
+    ],
+  },
+  {
+    id: "workspace",
+    label: "Workspace",
+    items: [
+      { id: "workspace-general", label: "General", Icon: Grid3x3, scope: "workspace", section: "general" },
+      { id: "workspace-repository", label: "Repository", Icon: Blocks, scope: "workspace", section: "repository" },
+      { id: "workspace-automations", label: "Automations", Icon: Workflow, scope: "workspace", section: "automations" },
+      { id: "workspace-models", label: "Models", Icon: Cpu, scope: "workspace", section: "models" },
+      { id: "workspace-spending", label: "Spending", Icon: BarChart3, scope: "workspace", section: "spending" },
+    ],
+  },
+  {
+    id: "organization",
+    label: "Organization",
+    items: [
+      { id: "organization-general", label: "General", Icon: Settings, scope: "organization", section: "general" },
+      { id: "organization-members", label: "Members", Icon: Users, scope: "organization", section: "members" },
+      {
+        id: "organization-integrations",
+        label: "Integrations",
+        Icon: Plug,
+        scope: "organization",
+        section: "integrations",
+      },
+      { id: "organization-api-keys", label: "API keys", Icon: KeyRound, scope: "organization", section: "api-keys" },
+      { id: "organization-secrets", label: "Secrets", Icon: Key, scope: "organization", section: "secrets" },
+      { id: "organization-spending", label: "Spending", Icon: BarChart3, scope: "organization", section: "spending" },
+    ],
+  },
 ];
 
-const IMPLEMENTED_SETTINGS_SECTIONS = new Set<FactorySettingsSection>([
-  "general",
-  "automations",
-  "models",
-  "usage",
-  "profile",
-  "notifications",
-]);
-const SETTINGS_SECTIONS = new Set<string>(FACTORY_SETTINGS_NAV_ITEMS.map((item) => item.id));
+export const FACTORY_SETTINGS_NAV_ITEMS = FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
 
-export function isFactorySettingsComingSoon(item: FactorySettingsNavItem) {
-  return !IMPLEMENTED_SETTINGS_SECTIONS.has(item.id);
-}
-
-export function settingsSectionFromPathname(pathname: string): FactorySettingsSection | undefined {
+export function factorySettingsRouteFromPathname(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
   const settingsIndex = segments.lastIndexOf("settings");
   if (settingsIndex === -1) {
     return undefined;
   }
-  const section = segments[settingsIndex + 1];
-  if (!section || !SETTINGS_SECTIONS.has(section)) {
-    return undefined;
-  }
-  return section as FactorySettingsSection;
-}
 
-export function isYouSettingsSection(section: FactorySettingsSection | undefined): boolean {
-  if (!section) {
-    return false;
-  }
-  return FACTORY_SETTINGS_NAV_ITEMS.some((item) => item.group === "you" && item.id === section);
+  const scope = segments[settingsIndex + 1];
+  const section = segments[settingsIndex + 2];
+  return FACTORY_SETTINGS_NAV_ITEMS.find((item) => item.scope === scope && item.section === section);
 }

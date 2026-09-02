@@ -415,6 +415,10 @@ func (r *recordingUsage) Record(record core.UsageRecord) error {
 	return nil
 }
 
+func (r *recordingUsage) RecordCompute(core.ComputeUsageRecord) error {
+	return nil
+}
+
 func Test__RecordOpenAIUsage__IncludesCachedAndReasoningTokens(t *testing.T) {
 	recorder := &recordingUsage{}
 	ctx := core.ExecutionContext{Usage: recorder}

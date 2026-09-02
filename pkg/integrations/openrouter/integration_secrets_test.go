@@ -16,7 +16,10 @@ func TestResolveSecrets(t *testing.T) {
 		Integration: connectedIntegration(map[string]any{}),
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []byte("sk-or-v1-test"), secrets[integrationSecretOpenRouterAPIKey])
+	assert.Equal(t, []byte("sk-or-v1-test"), secrets.Values[integrationSecretOpenRouterAPIKey])
+	assert.Contains(t, secrets.Usage, "OPENROUTER_API_KEY")
+	assert.NotContains(t, secrets.Usage, "sk-or-v1-test")
+	assert.Empty(t, secrets.Setup)
 }
 
 func TestResolveSecretsRequiresAPIKey(t *testing.T) {

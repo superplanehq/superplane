@@ -13,8 +13,11 @@ import {
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
+  prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
+  factorySettingsSectionPath,
+  factorySettingsWorkspaceGeneralPath,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
@@ -95,6 +98,13 @@ describe("factoryPRFeedbackPath", () => {
     expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
     expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
   });
+
+  it("opens a specific handler", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", undefined, "handler-1")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackHandler=handler-1",
+    );
+    expect(prFeedbackHandlerIdFromSearch("?prFeedback=1&prFeedbackHandler=handler-1")).toBe("handler-1");
+  });
 });
 
 describe("firstFactoryLineId", () => {
@@ -165,11 +175,22 @@ describe("factoryAppPath", () => {
 
 describe("factorySettingsGeneralPathAfterKeyChange", () => {
   it("returns the General settings URL when the key changes", () => {
-    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe("/org-1/workspaces/AB/settings/general");
+    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe(
+      "/org-1/workspaces/AB/settings/workspace/general",
+    );
   });
 
   it("returns null when the key does not change", () => {
     expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "RF")).toBeNull();
+  });
+});
+
+describe("factorySettingsSectionPath", () => {
+  it("builds a scoped settings URL", () => {
+    expect(factorySettingsWorkspaceGeneralPath("org-1", "RF")).toBe("/org-1/workspaces/RF/settings/workspace/general");
+    expect(factorySettingsSectionPath("org-1", "RF", "organization", "api-keys")).toBe(
+      "/org-1/workspaces/RF/settings/organization/api-keys",
+    );
   });
 });
 

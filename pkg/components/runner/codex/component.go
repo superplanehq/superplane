@@ -122,11 +122,11 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
-	environment, err = injectCodexCredentials(ctx, environment, spec.Credentials, spec.Model)
+	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	commands, files := buildCodexBrokerTask(spec)
+	commands, files := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       commands,

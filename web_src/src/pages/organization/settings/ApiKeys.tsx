@@ -10,6 +10,7 @@ import { Textarea } from "@/components/Textarea/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { settingsModalClassName, settingsTableCardClassName } from "./settingsPageStyles";
@@ -33,7 +34,11 @@ function toApiTimestamp(localValue: string) {
   return new Date(localValue).toISOString();
 }
 
-function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
+function useCreateApiKeyForm(
+  organizationId: string,
+  canCreate: boolean,
+  apiKeyDetailPath: (apiKeyId: string) => string,
+) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -104,7 +109,7 @@ function useCreateApiKeyForm(organizationId: string, canCreate: boolean) {
     const apiKeyId = createMutation.data?.data?.apiKey?.id;
     handleCloseCreateModal();
     if (apiKeyId) {
-      navigate(`/${organizationId}/settings/api-keys/${apiKeyId}`);
+      navigate(apiKeyDetailPath(apiKeyId));
     }
   };
 
@@ -146,7 +151,8 @@ export function APIKeys({ organizationId }: APIKeysProps) {
   const { data: apiKeys = [], isLoading } = useAPIKeys(organizationId);
   const { data: canvases = [] } = useCanvases(organizationId);
   const deleteMutation = useDeleteAPIKey(organizationId);
-  const form = useCreateApiKeyForm(organizationId, canCreate);
+  const settingsPaths = useOrganizationSettingsPaths(organizationId);
+  const form = useCreateApiKeyForm(organizationId, canCreate, settingsPaths.apiKeyDetail);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -161,7 +167,7 @@ export function APIKeys({ organizationId }: APIKeysProps) {
     }
   };
 
-  const getDetailPath = (id: string) => `/${organizationId}/settings/api-keys/${id}`;
+  const getDetailPath = settingsPaths.apiKeyDetail;
   const canvasNamesById = new Map(canvases.map((canvas) => [canvas.id, canvas.name || "Unnamed"]));
   const scopeLabel = (canvasIds?: string[]) => {
     if (!canvasIds || canvasIds.length === 0) return "Organization-wide";

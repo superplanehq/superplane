@@ -3,6 +3,7 @@ import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
+    close: "Cancel setup",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
   },
@@ -48,6 +49,12 @@ export const FIRST_RUN_COPY = {
   },
   agent: {
     headline: "Connect agent",
+  },
+  // Shared by every screen that provisions the workspace. Hosted credentials
+  // move that action from the agent screen to the ticket screen.
+  finish: {
+    action: "Finish setup",
+    saving: "Finishing setup...",
   },
   analysis: {
     headline: "Analyzing your backlog",

@@ -1,12 +1,26 @@
 package pricebook
 
-import "strings"
+import (
+	"strings"
+	"sync"
+)
 
-// Version is stored on every usage event priced by this book.
-const Version = "2026-08-19.2"
+// FallbackVersion is stored on events when the process has not loaded a
+// database price book yet.
+const FallbackVersion = "2026-08-19.2"
 
-const tokensPerMillion = 1_000_000
-const microsPerCent = 10_000
+const (
+	tokensPerMillion = 1_000_000
+	microsPerCent    = 10_000
+	localFleetID     = "local"
+)
+
+// Catalog VM rates: tiny ≈ $0.50/hour, large ≈ $2.00/hour.
+// micros_per_second = cents_per_hour * 10_000 / 3600, rounded.
+const (
+	MicrosPerSecondE1Tiny  int64 = 139
+	MicrosPerSecondE1Large int64 = 556
+)
 
 // Rate is USD cents per million tokens for one token class.
 type Rate struct {
@@ -17,9 +31,32 @@ type Rate struct {
 	Reasoning  int64
 }
 
+type PrefixRate struct {
+	Prefix string
+	Rate   Rate
+}
+
+type FamilyRate struct {
+	Token string
+	Rate  Rate
+}
+
+// Book is one versioned catalog of model and compute rates.
+type Book struct {
+	Version      string
+	PrefixRates  []PrefixRate
+	FamilyRates  []FamilyRate
+	ComputeRates map[string]int64
+}
+
 type entry struct {
 	prefix string
 	rate   Rate
+}
+
+type familyEntry struct {
+	token string
+	rate  Rate
 }
 
 var (
@@ -28,29 +65,110 @@ var (
 	rateClaudeHaiku  = Rate{Input: 80, Output: 400, CacheRead: 8, CacheWrite: 100}
 )
 
-// Published approximate provider list prices. Longest prefix wins.
-// List cheaper siblings (mini/nano) as longer prefixes than the flagship id.
-// OpenAI cached input is billed at 0.1x the uncached input rate.
-var rates = []entry{
-	{prefix: "claude-opus", rate: rateClaudeOpus},
-	{prefix: "claude-sonnet", rate: rateClaudeSonnet},
-	{prefix: "claude-haiku", rate: rateClaudeHaiku},
-	{prefix: "gpt-4o-mini", rate: openAIRate(15, 60)},
-	{prefix: "gpt-4o", rate: openAIRate(250, 1000)},
-	{prefix: "gpt-5-mini", rate: openAIRate(25, 200)},
-	{prefix: "gpt-5", rate: openAIRate(125, 1000)},
-	{prefix: "o3-mini", rate: openAIRate(110, 440)},
-	{prefix: "o3", rate: openAIRate(2000, 8000)},
-	{prefix: "o4-mini", rate: openAIRate(110, 440)},
+var mu sync.RWMutex
+var current = defaultBook()
+
+// Version is stored on every usage event priced by this book.
+var Version = current.version
+
+func defaultPrefixRates() []entry {
+	return []entry{
+		{prefix: "claude-opus", rate: rateClaudeOpus},
+		{prefix: "claude-sonnet", rate: rateClaudeSonnet},
+		{prefix: "claude-haiku", rate: rateClaudeHaiku},
+		{prefix: "gpt-4o-mini", rate: openAIRate(15, 60)},
+		{prefix: "gpt-4o", rate: openAIRate(250, 1000)},
+		{prefix: "gpt-5-mini", rate: openAIRate(25, 200)},
+		{prefix: "gpt-5", rate: openAIRate(125, 1000)},
+		{prefix: "o3-mini", rate: openAIRate(110, 440)},
+		{prefix: "o3", rate: openAIRate(2000, 8000)},
+		{prefix: "o4-mini", rate: openAIRate(110, 440)},
+	}
 }
 
-var familyRates = []struct {
-	token string
-	rate  Rate
-}{
-	{token: "opus", rate: rateClaudeOpus},
-	{token: "sonnet", rate: rateClaudeSonnet},
-	{token: "haiku", rate: rateClaudeHaiku},
+func defaultFamilyRates() []familyEntry {
+	return []familyEntry{
+		{token: "opus", rate: rateClaudeOpus},
+		{token: "sonnet", rate: rateClaudeSonnet},
+		{token: "haiku", rate: rateClaudeHaiku},
+	}
+}
+
+func defaultComputeRates() map[string]int64 {
+	return map[string]int64{
+		"e1-large-amd64": MicrosPerSecondE1Large,
+		"e1-large-arm64": MicrosPerSecondE1Large,
+		"e1-tiny-amd64":  MicrosPerSecondE1Tiny,
+		"e1-tiny-arm64":  MicrosPerSecondE1Tiny,
+		"local":          0,
+	}
+}
+
+type bookState struct {
+	version      string
+	rates        []entry
+	familyRates  []familyEntry
+	computeRates map[string]int64
+}
+
+func defaultBook() bookState {
+	return bookState{
+		version:      FallbackVersion,
+		rates:        defaultPrefixRates(),
+		familyRates:  defaultFamilyRates(),
+		computeRates: defaultComputeRates(),
+	}
+}
+
+// Replace installs a database-backed book as the in-memory catalog.
+func Replace(book Book) {
+	next := bookState{
+		version:      strings.TrimSpace(book.Version),
+		computeRates: map[string]int64{},
+	}
+	if next.version == "" {
+		next.version = FallbackVersion
+	}
+	for _, item := range book.PrefixRates {
+		prefix := strings.ToLower(strings.TrimSpace(item.Prefix))
+		if prefix == "" {
+			continue
+		}
+		next.rates = append(next.rates, entry{prefix: prefix, rate: item.Rate})
+	}
+	for _, item := range book.FamilyRates {
+		token := strings.ToLower(strings.TrimSpace(item.Token))
+		if token == "" {
+			continue
+		}
+		next.familyRates = append(next.familyRates, familyEntry{token: token, rate: item.Rate})
+	}
+	for key, rate := range book.ComputeRates {
+		normalized := strings.ToLower(strings.TrimSpace(key))
+		if normalized == "" {
+			continue
+		}
+		next.computeRates[normalized] = rate
+	}
+	if len(next.rates) == 0 {
+		next.rates = defaultPrefixRates()
+	}
+	if len(next.familyRates) == 0 {
+		next.familyRates = defaultFamilyRates()
+	}
+
+	mu.Lock()
+	current = next
+	Version = next.version
+	mu.Unlock()
+}
+
+// Reset restores the compiled-in catalog. Tests use this after Replace or SetComputeRates.
+func Reset() {
+	mu.Lock()
+	current = defaultBook()
+	Version = current.version
+	mu.Unlock()
 }
 
 // EstimateMicros prices a call in millionths of a US dollar.
@@ -66,6 +184,51 @@ func EstimateMicros(provider, model string, input, output, cacheRead, cacheWrite
 		micros(cacheRead, rate.CacheRead) +
 		micros(cacheWrite, rate.CacheWrite) +
 		micros(reasoning, rate.Reasoning)
+}
+
+// EstimateComputeMicros prices runner-fleet seconds. Local and empty fleets are 0.
+func EstimateComputeMicros(machineType, fleetID string, seconds int64) int64 {
+	if seconds <= 0 {
+		return 0
+	}
+	if isUnbilledFleet(fleetID) {
+		return 0
+	}
+	rate := computeRate(machineType)
+	if rate <= 0 {
+		return 0
+	}
+	return seconds * rate
+}
+
+func isUnbilledFleet(fleetID string) bool {
+	id := strings.TrimSpace(fleetID)
+	return id == "" || strings.EqualFold(id, localFleetID)
+}
+
+func computeRate(machineType string) int64 {
+	key := strings.ToLower(strings.TrimSpace(machineType))
+	mu.RLock()
+	defer mu.RUnlock()
+	if rate, ok := current.computeRates[key]; ok {
+		return rate
+	}
+	return 0
+}
+
+// SetComputeRates replaces in-memory VM rates. Tests and the DB loader use this.
+func SetComputeRates(rates map[string]int64) {
+	next := make(map[string]int64, len(rates))
+	for key, rate := range rates {
+		normalized := strings.ToLower(strings.TrimSpace(key))
+		if normalized == "" {
+			continue
+		}
+		next[normalized] = rate
+	}
+	mu.Lock()
+	current.computeRates = next
+	mu.Unlock()
 }
 
 // IsPriced is true when the price book has a rate for the model id.
@@ -100,10 +263,12 @@ func normalizeModelID(model string) string {
 }
 
 func lookupPrefix(normalized string) (Rate, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
 	bestPrefix := ""
 	var best Rate
 	found := false
-	for _, item := range rates {
+	for _, item := range current.rates {
 		if !strings.HasPrefix(normalized, item.prefix) {
 			continue
 		}
@@ -117,8 +282,10 @@ func lookupPrefix(normalized string) (Rate, bool) {
 }
 
 func lookupFamilyToken(normalized string) (Rate, bool) {
+	mu.RLock()
+	defer mu.RUnlock()
 	parts := strings.Split(normalized, "-")
-	for _, family := range familyRates {
+	for _, family := range current.familyRates {
 		for _, part := range parts {
 			if part == family.token {
 				return family.rate, true
