@@ -386,6 +386,54 @@ func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) 
 	assert.Equal(t, "", session.Draft().WorkOrderID)
 }
 
+func TestEndPlanningSessionForFinishedRun(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-run-fail")
+	db := database.Conn()
+	require.NotNil(t, session.CanvasRunID)
+
+	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultPassed))
+	reloaded, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateRunning, reloaded.State)
+
+	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultFailed))
+	reloaded, err = FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, reloaded.State)
+	require.NotNil(t, reloaded.EndedAt)
+}
+
+func TestEndPlanningSessionForFinishedRun_Cancelled(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-run-cancel")
+	db := database.Conn()
+	require.NotNil(t, session.CanvasRunID)
+
+	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultCancelled))
+	reloaded, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, reloaded.State)
+}
+
+func TestEndPlanningSessionForFinishedRun_AlreadyEnded(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-run-ended")
+	db := database.Conn()
+	require.NoError(t, session.End(db))
+	require.NotNil(t, session.CanvasRunID)
+
+	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultFailed))
+	reloaded, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, reloaded.State)
+}
+
+func TestEndPlanningSessionForFinishedRun_NoSession(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	require.NoError(t, EndPlanningSessionForFinishedRun(database.Conn(), uuid.New(), CanvasRunResultFailed))
+}
+
 func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-list-stale")

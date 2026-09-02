@@ -13,7 +13,7 @@ export function planningSessionPhase(
   return {
     id: PLANNING_SESSION_PHASE_ID,
     name: CREATE_WITH_AGENT_COPY.menu,
-    status: view.machineStatus === "waiting" ? "waiting" : "running",
+    status: planningSessionPhaseStatus(view.machineStatus),
     duration: "",
     componentName: PLANNING_AGENT_NAME,
     artifacts: [],
@@ -23,7 +23,17 @@ export function planningSessionPhase(
   };
 }
 
-function planningAgentStreamLine(view: Pick<CreateWithAgentView, "executionId">): SplitRunStreamLine {
+function planningSessionPhaseStatus(machineStatus: CreateWithAgentView["machineStatus"]): SplitRunPhase["status"] {
+  if (machineStatus === "failed") {
+    return "failed";
+  }
+  if (machineStatus === "waiting") {
+    return "waiting";
+  }
+  return "running";
+}
+
+function planningAgentStreamLine(view: Pick<CreateWithAgentView, "executionId" | "machineStatus">): SplitRunStreamLine {
   return {
     id: PLANNING_SESSION_AGENT_LINE_ID,
     nodeId: PLANNING_SESSION_AGENT_LINE_ID,
@@ -34,7 +44,7 @@ function planningAgentStreamLine(view: Pick<CreateWithAgentView, "executionId">)
     executionId: view.executionId || undefined,
     // Stay running while the machine is on. A waiting status tears down the
     // live log stream and the full log flickers back as collapsed tool calls.
-    status: "running",
+    status: view.machineStatus === "failed" ? "failed" : "running",
   };
 }
 

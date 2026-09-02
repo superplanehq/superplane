@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import {
   CREATE_WITH_AGENT_DEMO_REPOSITORY,
   emptyCreateWithAgentView,
+  failedCreateWithAgentView,
   runningCreateWithAgentView,
   waitingCreateWithAgentView,
 } from "./createWithAgentDemo";
@@ -77,6 +78,11 @@ export const EmptyRight: Story = {
 export const Waiting: Story = {
   name: "Waiting for you",
   render: () => <StaticSession initial={waitingCreateWithAgentView()} />,
+};
+
+export const Failed: Story = {
+  name: "Machine stopped",
+  render: () => <StaticSession initial={failedCreateWithAgentView()} />,
 };
 
 export const OlderMessages: Story = {

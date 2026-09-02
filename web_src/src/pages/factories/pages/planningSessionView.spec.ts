@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import { createWithAgentViewFromSession, workspacePlanningRepository } from "./planningSessionView";
+import {
+  applyPlanningSessionLiveRun,
+  createWithAgentViewFromSession,
+  workspacePlanningRepository,
+} from "./planningSessionView";
 
 describe("workspacePlanningRepository", () => {
   it("uses the workspace app repository", () => {
@@ -50,6 +54,56 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.machineStatus).toBe("running");
     expect(view.executionId).toBe("exec-1");
+  });
+
+  it("marks the machine failed when the session has ended", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+    expect(view.canvasRunId).toBe("run-1");
+  });
+
+  it("marks the machine failed before starting when the live run failed", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_FAILED" },
+    );
+
+    expect(view.machineStatus).toBe("failed");
+  });
+
+  it("keeps waiting when the live run is still open", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+          waitState: "pending",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+    );
+
+    expect(view.machineStatus).toBe("waiting");
   });
 
   it("marks the machine waiting when SuperPlane holds for the next message", () => {

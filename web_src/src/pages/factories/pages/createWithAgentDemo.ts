@@ -9,6 +9,7 @@ export function emptyCreateWithAgentView(repository = CREATE_WITH_AGENT_DEMO_REP
     repository,
     machineStatus: "starting",
     canvasId: "",
+    canvasRunId: "",
     executionId: "",
     messages: [],
     composer: "",
@@ -23,6 +24,7 @@ export function runningCreateWithAgentView(overrides: Partial<CreateWithAgentVie
     ...emptyCreateWithAgentView(),
     machineStatus: "running",
     canvasId: "canvas-demo",
+    canvasRunId: "run-demo",
     executionId: "execution-demo",
     messages: [{ id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
     ...overrides,
@@ -31,6 +33,10 @@ export function runningCreateWithAgentView(overrides: Partial<CreateWithAgentVie
 
 export function waitingCreateWithAgentView(overrides: Partial<CreateWithAgentView> = {}): CreateWithAgentView {
   return runningCreateWithAgentView({ machineStatus: "waiting", ...overrides });
+}
+
+export function failedCreateWithAgentView(overrides: Partial<CreateWithAgentView> = {}): CreateWithAgentView {
+  return runningCreateWithAgentView({ machineStatus: "failed", ...overrides });
 }
 
 export function setCreateWithAgentComposer(view: CreateWithAgentView, composer: string): CreateWithAgentView {

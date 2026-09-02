@@ -1,4 +1,4 @@
-export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting";
+export type CreateWithAgentMachineStatus = "starting" | "running" | "waiting" | "failed";
 
 export type CreateWithAgentCreatedOrder = {
   id: string;
@@ -39,6 +39,7 @@ export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
   canvasId: string;
+  canvasRunId: string;
   executionId: string;
   messages: CreateWithAgentMessage[];
   survey?: CreateWithAgentSurvey;

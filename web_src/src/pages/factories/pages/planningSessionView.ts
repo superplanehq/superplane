@@ -59,6 +59,7 @@ export function createWithAgentViewFromSession(
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
     canvasId: session.canvasId ?? "",
+    canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
     survey: planningSessionSurveyFromPayload(session.survey),
@@ -86,7 +87,24 @@ function planningSessionSurveyFromPayload(
   return { id: survey?.id, questions };
 }
 
+export function isFailedPlanningCanvasRun(run: { result?: string } | null | undefined): boolean {
+  return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
+}
+
+export function applyPlanningSessionLiveRun(
+  view: CreateWithAgentView,
+  run: { result?: string } | null | undefined,
+): CreateWithAgentView {
+  if (view.machineStatus === "failed" || !isFailedPlanningCanvasRun(run)) {
+    return view;
+  }
+  return { ...view, machineStatus: "failed" };
+}
+
 function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {
+  if (session.state === "ended") {
+    return "failed";
+  }
   if (!session.executionId) {
     return "starting";
   }

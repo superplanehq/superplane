@@ -20,6 +20,7 @@ import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createW
 import { planningSessionPhase } from "./planningSessionActivity";
 import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
+import { SplitRunAttentionNote } from "./work-order-split-run/SplitRunAttentionNote";
 import { useFollowLogScroll } from "./work-order-split-run/useFollowLogScroll";
 
 export type CreateWithAgentDialogProps = {
@@ -84,6 +85,7 @@ export function CreateWithAgentDialog({
             />
             <CreateWithAgentWorkPane
               view={view}
+              failed={view.machineStatus === "failed"}
               onDraftTitleChange={onDraftTitleChange}
               onDraftDescriptionChange={onDraftDescriptionChange}
               onCreateDraft={onCreateDraft}
@@ -122,6 +124,7 @@ function CreateWithAgentHeader({
   onEndSession: () => void;
 }) {
   const starting = machineStatus === "starting";
+  const failed = machineStatus === "failed";
   return (
     <div
       className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5"
@@ -143,7 +146,7 @@ function CreateWithAgentHeader({
           className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:flex"
           data-testid="create-with-agent-machine"
         >
-          {starting ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {starting && !failed ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
           {machineStatusLabel(repository, machineStatus)}
         </span>
         <Button
@@ -181,8 +184,12 @@ function CreateWithAgentStream({
       resumeOnBottom: true,
     },
   );
+  const failed = view.machineStatus === "failed";
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+    if (failed) {
+      return;
+    }
     onSend();
   };
 
@@ -209,7 +216,16 @@ function CreateWithAgentStream({
         </div>
         {follow.following ? null : <OlderMessagesBar onJumpToLatest={() => follow.setFollowing(true)} />}
       </div>
-      {view.survey ? (
+      {failed ? (
+        <SplitRunAttentionNote
+          tone="failed"
+          note={{
+            headline: CREATE_WITH_AGENT_COPY.machineStopped,
+            text: CREATE_WITH_AGENT_COPY.machineFailedBody,
+          }}
+        />
+      ) : null}
+      {view.survey && !failed ? (
         <PlanningSessionSurveyForm
           key={view.survey.id ?? view.survey.questions[0]?.prompt ?? "survey"}
           survey={view.survey}
@@ -226,17 +242,20 @@ function CreateWithAgentStream({
             data-testid="create-with-agent-composer"
             value={view.composer}
             placeholder={CREATE_WITH_AGENT_COPY.composerPlaceholder}
+            disabled={failed}
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                onSend();
+                if (!failed) {
+                  onSend();
+                }
               }
             }}
             className="min-h-[44px] resize-none text-[13px]"
             rows={2}
           />
-          <Button type="submit" size="sm" disabled={!view.composer.trim()}>
+          <Button type="submit" size="sm" disabled={failed || !view.composer.trim()}>
             {CREATE_WITH_AGENT_COPY.send}
           </Button>
         </div>
@@ -265,6 +284,11 @@ function machineStatusLabel(repository: string, machineStatus: CreateWithAgentVi
   if (machineStatus === "starting") {
     return CREATE_WITH_AGENT_COPY.machineStarting;
   }
+  if (machineStatus === "failed") {
+    return repository
+      ? `${repository} · ${CREATE_WITH_AGENT_COPY.machineStopped}`
+      : CREATE_WITH_AGENT_COPY.machineStopped;
+  }
   const label =
     machineStatus === "waiting" ? CREATE_WITH_AGENT_COPY.machineWaiting : CREATE_WITH_AGENT_COPY.machineRunning;
   return repository ? `${repository} · ${label}` : label;
@@ -272,6 +296,7 @@ function machineStatusLabel(repository: string, machineStatus: CreateWithAgentVi
 
 function CreateWithAgentWorkPane({
   view,
+  failed,
   onDraftTitleChange,
   onDraftDescriptionChange,
   onCreateDraft,
@@ -280,6 +305,7 @@ function CreateWithAgentWorkPane({
   onRefineCreated,
 }: {
   view: CreateWithAgentView;
+  failed: boolean;
   onDraftTitleChange: (title: string) => void;
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
@@ -290,30 +316,35 @@ function CreateWithAgentWorkPane({
   return (
     <section className="flex min-h-0 flex-col bg-muted/20" data-testid="create-with-agent-work">
       {view.created.length > 0 ? (
-        <CreatedTaskList created={view.created} onSelect={onSelectCreated} onRefine={onRefineCreated} />
+        <CreatedTaskList created={view.created} failed={failed} onSelect={onSelectCreated} onRefine={onRefineCreated} />
       ) : null}
       {view.right.kind === "empty" ? <EmptyWorkPane /> : null}
       {view.right.kind === "draft" ? (
         <DraftWorkPane
           title={view.right.draft.title}
           description={view.right.draft.description}
+          failed={failed}
           onTitleChange={onDraftTitleChange}
           onDescriptionChange={onDraftDescriptionChange}
           onCreate={onCreateDraft}
           onSkip={onSkipDraft}
         />
       ) : null}
-      {view.right.kind === "preview" ? <PreviewWorkPane order={view.right.order} onRefine={onRefineCreated} /> : null}
+      {view.right.kind === "preview" ? (
+        <PreviewWorkPane order={view.right.order} failed={failed} onRefine={onRefineCreated} />
+      ) : null}
     </section>
   );
 }
 
 function CreatedTaskList({
   created,
+  failed,
   onSelect,
   onRefine,
 }: {
   created: CreateWithAgentCreatedOrder[];
+  failed: boolean;
   onSelect: (order: CreateWithAgentCreatedOrder) => void;
   onRefine: (order: CreateWithAgentCreatedOrder) => void;
 }) {
@@ -335,6 +366,7 @@ function CreatedTaskList({
               variant="ghost"
               size="sm"
               className="h-7 shrink-0 px-2 text-[12px]"
+              disabled={failed}
               onClick={() => onRefine(order)}
             >
               {CREATE_WITH_AGENT_COPY.refineFurther}
@@ -363,6 +395,7 @@ function EmptyWorkPane() {
 function DraftWorkPane({
   title,
   description,
+  failed,
   onTitleChange,
   onDescriptionChange,
   onCreate,
@@ -370,6 +403,7 @@ function DraftWorkPane({
 }: {
   title: string;
   description: string;
+  failed: boolean;
   onTitleChange: (title: string) => void;
   onDescriptionChange: (description: string) => void;
   onCreate: () => void;
@@ -381,6 +415,7 @@ function DraftWorkPane({
       <Input
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
+        disabled={failed}
         aria-label="Task title"
         data-testid="create-with-agent-draft-title"
         className="mt-3 h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
@@ -388,15 +423,21 @@ function DraftWorkPane({
       <Textarea
         value={description}
         onChange={(event) => onDescriptionChange(event.target.value)}
+        disabled={failed}
         aria-label="Task description"
         data-testid="create-with-agent-draft-description"
         className="mt-3 min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
       />
       <div className="mt-4 flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onSkip}>
+        <Button type="button" variant="ghost" disabled={failed} onClick={onSkip}>
           {CREATE_WITH_AGENT_COPY.skip}
         </Button>
-        <Button type="button" data-testid="create-with-agent-create" disabled={!title.trim()} onClick={onCreate}>
+        <Button
+          type="button"
+          data-testid="create-with-agent-create"
+          disabled={failed || !title.trim()}
+          onClick={onCreate}
+        >
           {CREATE_WITH_AGENT_COPY.create}
         </Button>
       </div>
@@ -406,9 +447,11 @@ function DraftWorkPane({
 
 function PreviewWorkPane({
   order,
+  failed,
   onRefine,
 }: {
   order: CreateWithAgentCreatedOrder;
+  failed: boolean;
   onRefine: (order: CreateWithAgentCreatedOrder) => void;
 }) {
   return (
@@ -419,7 +462,7 @@ function PreviewWorkPane({
         {order.description}
       </p>
       <div className="mt-4 flex justify-end">
-        <Button type="button" variant="outline" onClick={() => onRefine(order)}>
+        <Button type="button" variant="outline" disabled={failed} onClick={() => onRefine(order)}>
           {CREATE_WITH_AGENT_COPY.refineFurther}
         </Button>
       </div>

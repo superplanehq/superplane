@@ -236,6 +236,20 @@ func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlann
 	return &session, nil
 }
 
+func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, result string) error {
+	if result != CanvasRunResultFailed && result != CanvasRunResultCancelled {
+		return nil
+	}
+	session, err := FindPlanningSessionByRun(tx, canvasRunID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return session.End(tx)
+}
+
 func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]FactoryPlanningSession, error) {
 	if limit < 1 {
 		limit = 50

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
   emptyCreateWithAgentView,
+  failedCreateWithAgentView,
   runningCreateWithAgentView,
   waitingCreateWithAgentView,
 } from "./createWithAgentDemo";
@@ -60,6 +61,16 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.greeting);
     expect(screen.queryByTestId("create-with-agent-message-greet")).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-chat")).not.toBeInTheDocument();
+  });
+
+  it("shows that the machine stopped and turns the composer off", () => {
+    renderDialog(failedCreateWithAgentView({ composer: "hey" }));
+
+    expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineStopped);
+    expect(screen.getByTestId("split-run-attention-note")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineFailedBody);
+    expect(screen.getByTestId("create-with-agent-composer")).toBeDisabled();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.send })).toBeDisabled();
+    expect(screen.queryByText("Waiting for logs…")).not.toBeInTheDocument();
   });
 
   it("shows Waiting for you when the machine is on and SuperPlane waits", () => {

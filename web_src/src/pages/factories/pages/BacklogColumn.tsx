@@ -8,6 +8,7 @@ import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
+import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
@@ -171,12 +172,13 @@ function BacklogCreateWithAgentDialog({
   organizationId: string;
   session: ReturnType<typeof useCreateWithAgentSession>;
 }) {
+  const view = usePlanningSessionLiveRun(organizationId, session.view);
   return (
     <CreateWithAgentDialog
       open={session.open}
       workspaceName={factoryKey}
       organizationId={organizationId}
-      view={session.view}
+      view={view}
       onComposerChange={session.onComposerChange}
       onSend={session.onSend}
       onSubmitSurvey={session.onSubmitSurvey}

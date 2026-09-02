@@ -48,6 +48,18 @@ describe("planningSessionPhase", () => {
     expect(phase.stream[0]?.status).toBe("running");
   });
 
+  it("marks the agent line failed when the machine stopped", () => {
+    const phase = planningSessionPhase({
+      canvasId: "canvas-1",
+      executionId: "execution-1",
+      messages: [],
+      machineStatus: "failed",
+    });
+
+    expect(phase.status).toBe("failed");
+    expect(phase.stream[0]?.status).toBe("failed");
+  });
+
   it("keeps the agent line running while SuperPlane waits so the live log does not reset", () => {
     const phase = planningSessionPhase({
       canvasId: "canvas-1",

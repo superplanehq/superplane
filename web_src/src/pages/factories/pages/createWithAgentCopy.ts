@@ -21,6 +21,8 @@ export const CREATE_WITH_AGENT_COPY = {
   machineStarting: "The machine is starting",
   machineRunning: "Machine is running",
   machineWaiting: "Waiting for you",
+  machineStopped: "The machine stopped",
+  machineFailedBody: "The run failed. End this session and start again.",
   emptyHeadline: "Waiting for your first task.",
   emptyBody: "The agent will draft a task here.",
   draftLabel: "Draft task",
