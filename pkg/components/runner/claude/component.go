@@ -137,12 +137,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
 
-	environment, err = c.injectCredentials(ctx, environment, spec.Credentials, spec.Model)
+	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// command_list tasks only accept commands (+ optional files).
-	task := buildClaudeCodeBrokerTask(spec)
+	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups)
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
