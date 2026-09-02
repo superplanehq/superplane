@@ -113,7 +113,7 @@ function ApiKeyCreatedToken({ token, onDone }: { token: string; onDone: () => vo
   return (
     <div className="space-y-3 rounded-lg border border-border p-4" data-testid="settings-redesign-api-key-token">
       <p className="text-[13px] text-foreground">Copy this token now. You cannot see it again.</p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 ph-no-capture">
         <Input readOnly value={token} className="min-w-0 flex-1 font-mono" data-testid="api-key-token-display" />
         <CopyButton
           variant="button"
