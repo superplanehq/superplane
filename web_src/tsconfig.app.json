@@ -16,10 +16,9 @@
     "jsx": "react-jsx",
     
     /* Path Aliases */
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/canvas/*": ["src/pages/canvas/*"],
+      "@/*": ["./src/*"],
+      "@/canvas/*": ["./src/pages/canvas/*"],
     },
 
     /* Linting */
