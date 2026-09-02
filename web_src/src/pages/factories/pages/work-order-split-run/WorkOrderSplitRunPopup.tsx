@@ -61,7 +61,7 @@ type WorkOrderSplitRunBodyProps = {
   footerActions: SplitRunFooterActions;
 };
 
-type SplitRunFollow = ReturnType<typeof useFollowLogScroll>;
+type SplitRunFollow = ReturnType<typeof useFollowLogScroll<HTMLOListElement>>;
 
 /** Phase log for a work-order popup. The popup wraps this. */
 export function WorkOrderSplitRunBody({
@@ -340,7 +340,7 @@ function SplitRunPopupTabs({
   footerActions: SplitRunFooterActions;
 }) {
   const [streamTick, setStreamTick] = useState("");
-  const follow = useFollowLogScroll(runningSplitRunPhaseId(fixture.phases), streamTick);
+  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick);
 
   return (
     <Tabs
