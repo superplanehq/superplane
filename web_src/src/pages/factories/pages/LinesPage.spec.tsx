@@ -547,6 +547,12 @@ describe("LinesPage board", () => {
     expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
   });
+});
+
+describe("LinesPage board editing", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
 
   it("renames the board title on Enter", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
