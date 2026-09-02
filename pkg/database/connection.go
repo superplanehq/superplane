@@ -221,7 +221,10 @@ func TruncateTables() error {
 			workflow_node_requests,
 			webhooks,
 			agent_sessions,
-			agent_session_messages
+			agent_session_messages,
+			factory_planning_sessions,
+			factory_planning_session_messages,
+			factory_planning_session_work_orders
 		restart identity cascade;
 	`).Error
 }

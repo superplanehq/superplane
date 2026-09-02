@@ -109,6 +109,31 @@ func TestMaterializePlanningTemplateUsesPlanningModel(t *testing.T) {
 	assert.Equal(t, "claude-opus-4-6", findYAMLNode(t, canvas, "planner-agent-no-issue").Configuration["model"])
 }
 
+func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
+	result, err := materializeFactoryTemplate("create-with-agent", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "Create with an Agent",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+		},
+		agent: &factoryTemplateAgent{
+			component:        "runnerClaudeCode",
+			model:            "claude-sonnet-4-6",
+			planningModel:    "claude-opus-4-6",
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Create with an Agent", canvas.Metadata.Name)
+	agent := findYAMLNode(t, canvas, "planning-agent")
+	assert.Equal(t, "claude-opus-4-6", agent.Configuration["model"])
+	require.NotNil(t, agent.Concurrency)
+	require.NotNil(t, agent.Concurrency.Max)
+	assert.Equal(t, 10, *agent.Concurrency.Max)
+}
+
 func TestMaterializeIntakeDefaults(t *testing.T) {
 	source := models.FactoryIntakeSourceGitHubIssues
 	current, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})

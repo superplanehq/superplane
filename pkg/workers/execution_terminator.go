@@ -243,6 +243,7 @@ func (w *ExecutionTerminator) cancelComponent(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: orgUUID.String(),
 		CanvasName:     canvas.Name,
