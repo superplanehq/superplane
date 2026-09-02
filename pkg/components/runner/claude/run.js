@@ -20,6 +20,34 @@ const SYSTEM_PROMPT =
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
   "Prefer plain paths, shell commands, and simple indentation.";
 
+const PLANNING_SYSTEM_PROMPT =
+  " This is a SuperPlane planning session. Call mcp__superplane__propose_draft and mcp__superplane__say. SuperPlane waits after you stop. Do not create work orders yourself.";
+
+const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
+const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__say"];
+
+function envFlag(env, name) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function allowedClaudeTools(env = process.env) {
+  if (envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
+    return [BASE_ALLOWED_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
+  }
+  return BASE_ALLOWED_TOOLS;
+}
+
+function claudePermissionMode(env = process.env) {
+  if (mcpToolsEnabled(env)) {
+    return "bypassPermissions";
+  }
+  return "acceptEdits";
+}
+
+function mcpToolsEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -56,16 +84,37 @@ async function runPrompt(promptFile, model) {
     "--verbose",
     "--include-partial-messages",
     "--permission-mode",
-    "acceptEdits",
+    claudePermissionMode(),
     "--add-dir",
     ".",
     "--append-system-prompt",
     SYSTEM_PROMPT,
   ];
+  if (mcpToolsEnabled()) {
+    println("Planning session tools enabled");
+    println(`permission mode: ${claudePermissionMode()}`);
+    claudeArgs[claudeArgs.length - 1] = SYSTEM_PROMPT + PLANNING_SYSTEM_PROMPT;
+    const mcpConfigPath = path.join(sp, "mcp.runtime.json");
+    fs.writeFileSync(
+      mcpConfigPath,
+      `${JSON.stringify({
+        mcpServers: {
+          superplane: {
+            command: "node",
+            args: [path.join(sp, "planning_session_mcp.js")],
+          },
+        },
+      })}\n`,
+    );
+    claudeArgs.push("--mcp-config", mcpConfigPath);
+    claudeArgs.push("--allowedTools", allowedClaudeTools());
+    println(`allowed tools: ${allowedClaudeTools()}`);
+  } else {
+    claudeArgs.push("--allowedTools", allowedClaudeTools());
+  }
   if (model) {
     claudeArgs.push("--model", model);
   }
-  claudeArgs.push("--allowedTools", "Bash,Read,Edit,Write");
   if (promptCount > 0) {
     claudeArgs.push("--continue");
   }
@@ -317,6 +366,12 @@ function formatSystem(event) {
     parts.push(`cwd=${event.cwd}`);
   }
   println(parts.join(" · "));
+  const tools = Array.isArray(event.tools) ? event.tools.map((tool) => String(tool)) : [];
+  const planningTools = tools.filter((tool) => tool.includes("mcp__superplane"));
+  println(planningTools.length > 0 ? `planning tools: ${planningTools.join(", ")}` : "planning tools: none");
+  if (event.mcp_server_errors) {
+    println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
+  }
   println();
 }
 
@@ -575,4 +630,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { formatStreamJsonLines };
+module.exports = { allowedClaudeTools, claudePermissionMode, formatStreamJsonLines };
