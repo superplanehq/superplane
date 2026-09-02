@@ -184,21 +184,20 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var users []models.User
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
 			return err
 		}
-		users, err := models.ListActiveHumanUsersForAccount(tx, account.ID)
-		if err != nil {
-			return err
+		var listErr error
+		users, listErr = models.ListActiveHumanUsersForAccount(tx, account.ID)
+		if listErr != nil {
+			return listErr
 		}
 		if err := s.refuseAccountDeleteGuards(r, tx, account, users); err != nil {
 			return err
 		}
-		if err := account.SoftDelete(tx, time.Now()); err != nil {
-			return err
-		}
-		return s.removeAccountOrganizationRoles(r.Context(), users)
+		return account.SoftDelete(tx, time.Now())
 	})
 	if errors.Is(err, models.ErrAccountDeleteLastUncreatedOwner) {
 		http.Error(w, "Transfer ownership of organizations you did not create before you delete this account.", http.StatusConflict)
@@ -212,6 +211,10 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("Error deleting account %s: %v", account.ID, err)
 		http.Error(w, "Failed to delete account", http.StatusInternalServerError)
 		return
+	}
+
+	if err := s.removeAccountOrganizationRoles(r.Context(), users); err != nil {
+		log.Errorf("Error removing organization roles for deleted account %s: %v", account.ID, err)
 	}
 
 	authentication.ClearAccountCookie(w, r)
