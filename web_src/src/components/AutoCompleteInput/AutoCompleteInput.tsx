@@ -478,7 +478,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
       // Add remaining text
       if (lastIndex < text.length) {
-        parts.push(<span key={key++}>{text.slice(lastIndex)}</span>);
+        parts.push(<span key={key}>{text.slice(lastIndex)}</span>);
       }
 
       // Handle empty text - add a zero-width space to maintain height

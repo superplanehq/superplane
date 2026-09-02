@@ -187,7 +187,7 @@ function StatusBadge({ status }: { status: CommandSection["status"] }) {
     "bg-blue-500": status === "running",
   });
 
-  let label = "";
+  let label: string;
   switch (status) {
     case "passed":
       label = "Passed";
