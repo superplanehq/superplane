@@ -50,7 +50,6 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
-              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
               echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
