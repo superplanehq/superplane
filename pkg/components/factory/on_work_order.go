@@ -25,17 +25,17 @@ func (t *OnWorkOrder) Name() string {
 }
 
 func (t *OnWorkOrder) Label() string {
-	return "On Work Order"
+	return "On Task"
 }
 
 func (t *OnWorkOrder) Description() string {
-	return "Start when a work order is created in this factory"
+	return "Start when a task is created in this factory"
 }
 
 func (t *OnWorkOrder) Documentation() string {
-	return `The On Work Order trigger starts a workflow when a work order is created in the factory that owns this app.
+	return `The On Task trigger starts a workflow when a task is created in the factory that owns this app.
 
-Use it on a factory-owned app, such as the generated Backlog automation that scores new work orders.
+Use it on a factory-owned app, such as the generated Backlog automation that scores new tasks.
 
 ## Event Data
 
@@ -54,7 +54,7 @@ Each event has type ` + "`workOrder.created`" + `. The payload is:
 }
 ` + "```" + `
 
-` + "`origin`" + ` is present only when the work order was created from an intake item.`
+` + "`origin`" + ` is present only when the task was created from an intake item.`
 }
 
 func (t *OnWorkOrder) Icon() string {
