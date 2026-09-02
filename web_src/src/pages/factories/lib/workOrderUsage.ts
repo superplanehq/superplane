@@ -24,15 +24,24 @@ export function formatUsdCents(cents: number): string {
 }
 
 export function formatDurationSeconds(seconds: number): string {
-  if (seconds < 60) {
-    return `${seconds} s`;
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  if (safeSeconds < 60) {
+    return `${safeSeconds} s`;
   }
-  const minutes = Math.floor(seconds / 60);
-  const rest = seconds % 60;
-  if (rest === 0) {
-    return `${minutes} min`;
+  const totalMinutes = Math.floor(safeSeconds / 60);
+  if (totalMinutes < 60) {
+    const rest = safeSeconds % 60;
+    if (rest === 0) {
+      return `${totalMinutes} min`;
+    }
+    return `${totalMinutes} min ${rest} s`;
   }
-  return `${minutes} min ${rest} s`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours} h`;
+  }
+  return `${hours} h ${minutes} min`;
 }
 
 export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number, durationSeconds = 0): string | null {
