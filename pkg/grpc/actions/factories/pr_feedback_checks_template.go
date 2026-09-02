@@ -247,7 +247,6 @@ func prFeedbackChecksRunnerSteps() []any {
 			"type": "bash",
 			"command": strings.Join([]string{
 				"set -euo pipefail",
-				"rm -rf repo",
 				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
 				"cd repo",
 				`if [ -z "${PR_HEAD:-}" ]; then`,
