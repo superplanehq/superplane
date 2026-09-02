@@ -316,7 +316,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
   findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
-  createWorkOrder: { title: "Create Task Order", iconSlug: "factory" },
+  createWorkOrder: { title: "Create Task", iconSlug: "factory" },
   updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
 };
 

@@ -210,7 +210,7 @@ describe("popupFixtureForWorkOrder", () => {
         title: "Ingested job",
         description: "Issue body from GitHub.",
         state: "STATE_DRAFT",
-        createdBy: { automation: { appId: "app-ingest", appName: "Ingest", nodeName: "Create Task Order" } },
+        createdBy: { automation: { appId: "app-ingest", appName: "Ingest", nodeName: "Create Task" } },
         lineDispatches: [],
       }),
     );

@@ -12,7 +12,7 @@ const components = [
   { name: "broadcastMessage", label: "Broadcast Message" },
   { name: "runApp", label: "Run App" },
   { name: "addRunError", label: "Add Run Error" },
-  { name: "createWorkOrder", label: "Create Task Order" },
+  { name: "createWorkOrder", label: "Create Task" },
   { name: "addPullRequest", label: "Add Pull Request" },
   { name: "runnerJS", label: "Run JavaScript" },
   { name: "runnerBash", label: "Run Bash" },

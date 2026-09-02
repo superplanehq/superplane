@@ -77,7 +77,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "backlog-create",
           at: "12:24:02",
-          componentName: "Create Task Order",
+          componentName: "Create Task",
           status: "passed",
           duration: "2s",
           detail: "description.md",
@@ -87,7 +87,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
         {
           id: "create-work-order",
           title: "Create task",
-          componentName: "Create Task Order",
+          componentName: "Create Task",
           provider: "superplane",
           status: "passed",
           detail: "description.md",

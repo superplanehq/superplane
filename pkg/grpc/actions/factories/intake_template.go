@@ -27,7 +27,7 @@ const (
 	// The analysis node name is part of the generated backlog graph's contract:
 	// the report-check fields read the score by this name.
 	intakeAnalysisNodeName = "Analyze intake"
-	intakeCreateNodeName   = "Create Task Order"
+	intakeCreateNodeName   = "Create Task"
 
 	intakeFilterComponent           = "if"
 	intakeThresholdComponent        = intakeFilterComponent

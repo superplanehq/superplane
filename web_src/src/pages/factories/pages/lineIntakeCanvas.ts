@@ -51,7 +51,7 @@ export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasM
     },
     {
       id: createId,
-      name: "Create Task Order",
+      name: "Create Task",
       type: "TYPE_ACTION",
       component: "createWorkOrder",
       configuration: {

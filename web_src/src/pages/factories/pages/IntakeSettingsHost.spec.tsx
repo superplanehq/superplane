@@ -67,7 +67,7 @@ const GITHUB_INTAKE_CANVAS = {
         component: "if",
         configuration: { expression: "true" },
       },
-      { id: "github-issues-create", name: "Create Task Order", type: "TYPE_ACTION", component: "createWorkOrder" },
+      { id: "github-issues-create", name: "Create Task", type: "TYPE_ACTION", component: "createWorkOrder" },
     ],
     edges: [
       { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-filter" },
@@ -122,7 +122,7 @@ describe("IntakeSettingsHost", () => {
     useComponents.mockReturnValue({
       data: [
         { name: "if", label: "If" },
-        { name: "createWorkOrder", label: "Create Task Order" },
+        { name: "createWorkOrder", label: "Create Task" },
       ],
       isLoading: false,
     });

@@ -239,8 +239,8 @@ describe("splitRunCanvasForPhase", () => {
       iconSlug: "funnel",
     });
     expect(created).toMatchObject({
-      componentType: "Create Task Order",
-      componentName: "Create Task Order",
+      componentType: "Create Task",
+      componentName: "Create Task",
       action: "passed",
     });
     expect(idle).toMatchObject({
@@ -398,9 +398,9 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task Order"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
     expect(slack.title).toBe("Slack");
-    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task Order"]);
+    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });
 
   it("returns an empty canvas when a person created the task", () => {
