@@ -1,5 +1,6 @@
 import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type * as ReactRouterDom from "react-router";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,6 +14,7 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 let factory: FactoriesFactory;
+let factories: FactoriesFactory[];
 
 vi.mock("../../layout/factoriesLayoutContext", () => ({
   useFactoriesLayout: () => ({
@@ -20,6 +22,7 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
     factoryId: "factory-1",
     factoryKey: "PAY",
     factory,
+    factories,
   }),
 }));
 
@@ -28,6 +31,21 @@ vi.mock("@/contexts/useAccount", () => ({
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
+
+const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
+const navigateSpy = vi.fn();
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
+}));
+
+vi.mock("react-router", async () => {
+  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
+  return {
+    ...actual,
+    useNavigate: () => navigateSpy,
+  };
+});
 
 // The agent step reports organization spend, which this flow test does not use.
 vi.mock("./AgentStep", () => ({
@@ -78,6 +96,9 @@ function renderSetup(model: OnboardingPageModel) {
 describe("FirstRunSetup", () => {
   beforeEach(() => {
     factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
+    factories = [factory];
+    deleteFactoryMutateAsync.mockClear();
+    navigateSpy.mockClear();
   });
 
   it("finishes setup from the ticket screen when hosted credentials cover the agent", async () => {
@@ -154,5 +175,35 @@ describe("FirstRunSetup", () => {
     renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }));
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("shows the close control instead of Log out when another workspace exists", () => {
+    factories = [factory, { id: "factory-2" }];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+  });
+
+  it("deletes the placeholder workspace and returns to the workspace index on cancel", async () => {
+    factories = [factory, { id: "factory-2" }];
+    const user = userEvent.setup();
+
+    renderSetup(pageModel());
+
+    await user.click(screen.getByTestId("first-run-cancel"));
+
+    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
+    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
+  });
+
+  it("keeps Log out and hides the close control on the first ever workspace", () => {
+    factories = [factory];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
   });
 });
