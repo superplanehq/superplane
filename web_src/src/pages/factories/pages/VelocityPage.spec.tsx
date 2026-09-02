@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -74,6 +75,8 @@ function populatedResponse(
       costCents: "4200",
       tokens: "185000",
       wasteCostCents: "900",
+      tasksClosed: 16,
+      tasksWaste: 4,
     },
     points: [
       { day: "1", superplaneMerged: 2, peopleMerged: 1, waste: 1, costCents: "800", tokens: "20000" },
@@ -87,20 +90,22 @@ function populatedResponse(
 function renderShell(factory: FactoriesFactory = REFUND_FACTORY) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={["/velocity"]}>
-        <FactoriesLayoutContext.Provider
-          value={{
-            organizationId: "org-1",
-            factoryId: PRIMARY_FACTORY_ID,
-            factoryKey: PRIMARY_FACTORY_KEY,
-            factory,
-            factories: [factory],
-            openCreateWorkOrder: vi.fn(),
-          }}
-        >
-          <VelocityPage />
-        </FactoriesLayoutContext.Provider>
-      </MemoryRouter>
+      <TooltipProvider delayDuration={0}>
+        <MemoryRouter initialEntries={["/velocity"]}>
+          <FactoriesLayoutContext.Provider
+            value={{
+              organizationId: "org-1",
+              factoryId: PRIMARY_FACTORY_ID,
+              factoryKey: PRIMARY_FACTORY_KEY,
+              factory,
+              factories: [factory],
+              openCreateWorkOrder: vi.fn(),
+            }}
+          >
+            <VelocityPage />
+          </FactoriesLayoutContext.Provider>
+        </MemoryRouter>
+      </TooltipProvider>
     </QueryClientProvider>,
   );
 }
@@ -225,16 +230,48 @@ describe("VelocityPage shell", () => {
     expect(screen.getByTestId("workspace-page-header-subtitle")).toHaveTextContent("acme/api");
   });
 
-  it("sums people and SuperPlane merges into the headline number", () => {
+  it("leads with the tasks that closed and the share of them that wasted", () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
     renderShell();
 
     const summary = screen.getByTestId("velocity-summary");
-    expect(summary).toHaveTextContent("Merged PRs");
-    expect(summary).toHaveTextContent("20");
+    expect(summary).toHaveTextContent("Tasks closed");
+    expect(summary).toHaveTextContent("16");
+    expect(summary).toHaveTextContent("Task waste");
     expect(summary).toHaveTextContent("25%");
+    expect(summary).not.toHaveTextContent("4 tasks closed without a merge");
+    expect(screen.getByRole("button", { name: "About Tasks closed" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Task waste" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Median cycle time" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About Cost per task" })).toBeInTheDocument();
+  });
+
+  it("hides the metric explanations behind info tooltips", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    const user = userEvent.setup();
+
+    renderShell();
+
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByRole("button", { name: "About Task waste" }));
+
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("4 tasks closed without a merge");
+  });
+
+  it("spreads tracked spend over the tasks that closed", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+
+    renderShell();
+
+    const summary = screen.getByTestId("velocity-summary");
+    expect(summary).toHaveTextContent("Cost per task");
+    // $42.00 of spend over 16 closed tasks.
+    expect(summary).toHaveTextContent("$2.63");
   });
 
   it("compares against the previous window when it holds output", () => {
@@ -248,6 +285,8 @@ describe("VelocityPage shell", () => {
         superplaneSharePct: 50,
         wastePct: 50,
         costCents: "3000",
+        tasksClosed: 12,
+        tasksWaste: 6,
       },
     });
 
@@ -255,7 +294,7 @@ describe("VelocityPage shell", () => {
 
     const summary = screen.getByTestId("velocity-summary");
     expect(summary).toHaveTextContent("Compared with the previous 14 days");
-    // Waste fell from 50% to 25% of SuperPlane closes.
+    // Waste fell from 50% to 25% of the tasks that closed.
     expect(summary).toHaveTextContent("25 pp");
   });
 

@@ -1769,6 +1769,12 @@ message DescribeFactoryVelocityTotals {
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 8;
+  // Work orders (tasks) that closed in the window. A work order counts once,
+  // even when it opened several pull requests, which is why this differs from
+  // the pull request counts above.
+  int32 tasks_closed = 9;
+  // Part of `tasks_closed` whose pull requests all closed without a merge.
+  int32 tasks_waste = 10;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
