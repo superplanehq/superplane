@@ -31,6 +31,7 @@ export type CreateWithAgentSurveyQuestion = {
 };
 
 export type CreateWithAgentSurvey = {
+  id?: string;
   questions: CreateWithAgentSurveyQuestion[];
 };
 

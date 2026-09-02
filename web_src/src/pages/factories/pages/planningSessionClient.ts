@@ -11,7 +11,11 @@ async function planningSessionRequest(
 ): Promise<PlanningSessionPayload> {
   const headers = withOrganizationHeader({
     organizationId,
-    headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...init.headers,
+    },
   }).headers as Record<string, string>;
   const response = await fetch(path, { ...init, headers, credentials: "include", keepalive: init.keepalive });
   if (!response.ok) {
@@ -52,10 +56,14 @@ export function endPlanningSession(
 }
 
 export function sendPlanningSessionMessage(organizationId: string, factoryId: string, sessionId: string, text: string) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ text }),
-  });
+  return planningSessionRequest(
+    organizationId,
+    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    },
+  );
 }
 
 export function updatePlanningSessionDraft(
@@ -71,10 +79,14 @@ export function updatePlanningSessionDraft(
 }
 
 export function createPlanningSessionWorkOrder(organizationId: string, factoryId: string, sessionId: string) {
-  return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/create`, {
-    method: "POST",
-    body: "{}",
-  });
+  return planningSessionRequest(
+    organizationId,
+    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/create`,
+    {
+      method: "POST",
+      body: "{}",
+    },
+  );
 }
 
 export function skipPlanningSessionDraft(organizationId: string, factoryId: string, sessionId: string) {

@@ -70,7 +70,11 @@ function planningSessionSurveyFromMessages(messages: PlanningSessionMessagePaylo
     if (message.kind !== "survey") {
       continue;
     }
-    return parsePlanningSurvey(message.text);
+    const survey = parsePlanningSurvey(message.text);
+    if (!survey) {
+      return undefined;
+    }
+    return { ...survey, id: message.id ?? `survey-${index}` };
   }
   return undefined;
 }

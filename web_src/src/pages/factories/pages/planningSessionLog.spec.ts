@@ -35,6 +35,11 @@ describe("isPlanningSessionNoise", () => {
     expect(isPlanningSessionNoise("The repository is ready. What do you want to do?")).toBe(false);
   });
 
+  it("treats survey JSON as a tool payload", () => {
+    expect(isPlanningSessionToolPayload('{"questions":[{"prompt":"Priority?","options":["High"]}]}')).toBe(true);
+    expect(isPlanningSessionToolPayload('{"status":"shown"}')).toBe(true);
+  });
+
   it("treats say and draft JSON as tool payloads", () => {
     expect(isPlanningSessionToolPayload('{"message":"Hi! I am ready to help you plan work in this repository."}')).toBe(
       true,
@@ -362,6 +367,58 @@ describe("mergePlanningSessionNotes", () => {
     ]);
     expect(talk[1]?.userTalk).toBe("message");
     expect(talk[5]?.userTalk).toBe("survey");
+  });
+
+  it("keeps a later survey reply before a newer agent turn", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "wait",
+        componentType: "prompt",
+        componentName: "Wait for the next user message",
+        status: "running",
+      }),
+      note({
+        id: "asked",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "I've asked a few scoping questions above.",
+      }),
+      note({
+        id: "later-turn",
+        componentType: "prompt",
+        componentName: "Plan with the user",
+      }),
+      note({
+        id: "later-note",
+        noteParentId: "later-turn",
+        componentType: "note",
+        componentName: "I drafted a task.",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-1",
+        componentType: "prompt",
+        componentName: "Add color to puppies",
+        userTalk: "message",
+      }),
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: "Priority? High",
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual([
+      "wait",
+      "user-1",
+      "asked",
+      "user-survey",
+      "later-turn",
+      "later-note",
+    ]);
   });
 
   it("skips a user extra already in the live prompt and marks a matching survey reply", () => {

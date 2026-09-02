@@ -22,6 +22,8 @@ spec:
       name: Planning Agent
       type: TYPE_ACTION
       component: runnerClaudeCode
+      concurrency:
+        max: 10
       configuration:
         credentials:
           source: integration

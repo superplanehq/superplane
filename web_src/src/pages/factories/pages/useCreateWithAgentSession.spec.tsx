@@ -21,8 +21,10 @@ vi.mock("./planningSessionClient", () => ({
   skipPlanningSessionDraft: (...args: unknown[]) => skipPlanningSessionDraft(...args),
 }));
 
+const showErrorToast = vi.fn();
+
 vi.mock("@/lib/toast", () => ({
-  showErrorToast: vi.fn(),
+  showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
 const session = (id: string) => ({
@@ -46,6 +48,7 @@ describe("useCreateWithAgentSession", () => {
     skipPlanningSessionDraft.mockReset();
     endPlanningSession.mockResolvedValue(session("ended"));
     describePlanningSession.mockResolvedValue(session("session-1"));
+    showErrorToast.mockReset();
   });
 
   it("ends the session when the dialog closes after Open task", async () => {
@@ -160,5 +163,74 @@ describe("useCreateWithAgentSession", () => {
       kind: "preview",
       order: { id: "wo-1", key: "NEW-1", title: "Retry refunds", description: "Stop double charges." },
     });
+  });
+
+  it("warns before unload and ignores a persisted pagehide", async () => {
+    startPlanningSession.mockResolvedValue(session("session-1"));
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await waitFor(() => {
+      expect(result.current.view.canvasId).toBe("canvas-session-1");
+    });
+
+    const beforeUnload = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+    Object.defineProperty(beforeUnload, "returnValue", { writable: true, value: "" });
+    window.dispatchEvent(beforeUnload);
+    expect(beforeUnload.defaultPrevented).toBe(true);
+
+    endPlanningSession.mockClear();
+    window.dispatchEvent(Object.assign(new Event("pagehide"), { persisted: true }));
+    expect(endPlanningSession).not.toHaveBeenCalled();
+
+    window.dispatchEvent(Object.assign(new Event("pagehide"), { persisted: false }));
+    await waitFor(() => {
+      expect(endPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "session-1", { keepalive: true });
+    });
+  });
+
+  it("closes the dialog when start fails", async () => {
+    startPlanningSession.mockRejectedValue(new Error("no machines"));
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+
+    await waitFor(() => {
+      expect(result.current.open).toBe(false);
+    });
+    expect(result.current.view.canvasId).toBe("");
+    expect(showErrorToast).toHaveBeenCalled();
+  });
+
+  it("ends a session that arrives after close", async () => {
+    let resolveStart: ((value: ReturnType<typeof session>) => void) | undefined;
+    startPlanningSession.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStart = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      result.current.close();
+    });
+
+    await act(async () => {
+      resolveStart?.(session("late-1"));
+    });
+
+    await waitFor(() => {
+      expect(endPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "late-1");
+    });
+    expect(result.current.open).toBe(false);
+    expect(result.current.view.canvasId).toBe("");
   });
 });

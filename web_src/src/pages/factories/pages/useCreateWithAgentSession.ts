@@ -59,46 +59,40 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
   const draftSaveTimer = useRef<number | undefined>(undefined);
   const sessionIdRef = useRef("");
   const openRef = useRef(false);
+  const startGenerationRef = useRef(0);
   sessionIdRef.current = sessionId;
   openRef.current = open;
 
-  const applySession = useCallback((session: PlanningSessionPayload) => {
-    setSessionId(session.id ?? "");
-    setView((current) =>
-      createWithAgentViewFromSession(session, {
-        composer: current.composer,
-        right: current.right,
-        endConfirmOpen: current.endConfirmOpen,
-      }),
-    );
-  }, []);
+  const resetLocalSession = useCallback(() => {
+    setOpen(false);
+    setSessionId("");
+    setView(emptyCreateWithAgentView(repository));
+  }, [repository]);
 
-  useEffect(() => {
-    if (!open || !sessionId || !organizationId || !factoryId) {
-      return;
-    }
-    const poll = window.setInterval(() => {
-      void describePlanningSession(organizationId, factoryId, sessionId)
-        .then(applySession)
-        .catch(() => undefined);
-    }, POLL_MS);
-    const endOnLeave = () => {
-      void endPlanningSession(organizationId, factoryId, sessionId, { keepalive: true }).catch(() => undefined);
-    };
-    window.addEventListener("pagehide", endOnLeave);
-    return () => {
-      window.clearInterval(poll);
-      window.removeEventListener("pagehide", endOnLeave);
-    };
-  }, [applySession, factoryId, open, organizationId, sessionId]);
+  const applySession = useCallback(
+    (session: PlanningSessionPayload, generation: number) => {
+      applyPlanningSession({
+        session,
+        generation,
+        organizationId,
+        factoryId,
+        startGenerationRef,
+        openRef,
+        setSessionId,
+        setView,
+      });
+    },
+    [factoryId, organizationId],
+  );
 
-  useEffect(() => {
-    return () => {
-      if (draftSaveTimer.current !== undefined) {
-        window.clearTimeout(draftSaveTimer.current);
-      }
-    };
-  }, []);
+  usePlanningSessionPageLeave({
+    open,
+    sessionId,
+    organizationId,
+    factoryId,
+    startGenerationRef,
+    applySession,
+  });
 
   const stopSession = useCallback(
     (id: string, options?: { keepalive?: boolean }) => {
@@ -128,73 +122,287 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
   }, [factoryId, organizationId, stopSession]);
 
   const close = useCallback(() => {
+    startGenerationRef.current += 1;
     const id = sessionIdRef.current;
-    setOpen(false);
-    setSessionId("");
-    setView(emptyCreateWithAgentView(repository));
+    resetLocalSession();
     stopSession(id);
-  }, [repository, stopSession]);
+  }, [resetLocalSession, stopSession]);
 
   const start = useCallback(() => {
-    stopSession(sessionIdRef.current);
-    setView(emptyCreateWithAgentView(repository));
-    setSessionId("");
-    setOpen(true);
-    void startPlanningSession(organizationId, factoryId, repository)
-      .then(applySession)
-      .catch((error: unknown) => {
-        showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedStart));
-      });
-  }, [applySession, factoryId, organizationId, repository, stopSession]);
+    openPlanningSession({
+      repository,
+      organizationId,
+      factoryId,
+      sessionIdRef,
+      startGenerationRef,
+      stopSession,
+      applySession,
+      resetLocalSession,
+      setView,
+      setSessionId,
+      setOpen,
+    });
+  }, [applySession, factoryId, organizationId, repository, resetLocalSession, stopSession]);
 
-  const patchDraft = (title: string, description: string) => {
-    setView((current) => updateCreateWithAgentDraft(current, { title, description }));
-    if (!sessionId) {
-      return;
-    }
-    if (draftSaveTimer.current !== undefined) {
-      window.clearTimeout(draftSaveTimer.current);
-    }
-    draftSaveTimer.current = window.setTimeout(() => {
-      void updatePlanningSessionDraft(organizationId, factoryId, sessionId, { title, description }).catch(
-        (error: unknown) => {
-          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedDraft));
-        },
-      );
-    }, DRAFT_SAVE_MS);
-  };
-
-  const sendSessionText = (text: string, failedCopy: string) => {
-    const body = text.trim();
-    if (!body || !sessionId) {
-      return;
-    }
-    setView((current) => ({
-      ...setCreateWithAgentComposer(current, ""),
-      survey: undefined,
-      messages: [
-        ...current.messages,
-        {
-          id: `local-${current.messages.length + 1}`,
-          kind: "text",
-          role: "user",
-          text: body,
-          ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
-        },
-      ],
-    }));
-    void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)
-      .then(applySession)
-      .catch((error: unknown) => {
-        showErrorToast(getApiErrorMessage(error, failedCopy));
-      });
-  };
+  const patchDraft = (title: string, description: string) =>
+    savePlanningDraft({ title, description, sessionId, organizationId, factoryId, draftSaveTimer, setView });
+  const sendSessionText = (text: string, failedCopy: string) =>
+    sendPlanningText({
+      text,
+      failedCopy,
+      sessionId,
+      organizationId,
+      factoryId,
+      startGenerationRef,
+      setView,
+      applySession,
+    });
 
   return {
     open,
     view,
     start,
     close,
+    ...createWithAgentViewActions({
+      view,
+      sessionId,
+      organizationId,
+      factoryId,
+      startGenerationRef,
+      setView,
+      applySession,
+      patchDraft,
+      sendSessionText,
+      close,
+    }),
+  };
+}
+
+function applyPlanningSession({
+  session,
+  generation,
+  organizationId,
+  factoryId,
+  startGenerationRef,
+  openRef,
+  setSessionId,
+  setView,
+}: {
+  session: PlanningSessionPayload;
+  generation: number;
+  organizationId: string;
+  factoryId: string;
+  startGenerationRef: { current: number };
+  openRef: { current: boolean };
+  setSessionId: (id: string) => void;
+  setView: (updater: (current: CreateWithAgentView) => CreateWithAgentView) => void;
+}) {
+  if (generation !== startGenerationRef.current || !openRef.current) {
+    const id = session.id ?? "";
+    if (id && organizationId && factoryId) {
+      void endPlanningSession(organizationId, factoryId, id).catch(() => undefined);
+    }
+    return;
+  }
+  setSessionId(session.id ?? "");
+  setView((current) =>
+    createWithAgentViewFromSession(session, {
+      composer: current.composer,
+      right: current.right,
+      endConfirmOpen: current.endConfirmOpen,
+    }),
+  );
+}
+
+function openPlanningSession({
+  repository,
+  organizationId,
+  factoryId,
+  sessionIdRef,
+  startGenerationRef,
+  stopSession,
+  applySession,
+  resetLocalSession,
+  setView,
+  setSessionId,
+  setOpen,
+}: {
+  repository: string;
+  organizationId: string;
+  factoryId: string;
+  sessionIdRef: { current: string };
+  startGenerationRef: { current: number };
+  stopSession: (id: string) => void;
+  applySession: (session: PlanningSessionPayload, generation: number) => void;
+  resetLocalSession: () => void;
+  setView: (view: CreateWithAgentView) => void;
+  setSessionId: (id: string) => void;
+  setOpen: (open: boolean) => void;
+}) {
+  const generation = startGenerationRef.current + 1;
+  startGenerationRef.current = generation;
+  stopSession(sessionIdRef.current);
+  setView(emptyCreateWithAgentView(repository));
+  setSessionId("");
+  setOpen(true);
+  void startPlanningSession(organizationId, factoryId, repository)
+    .then((session) => applySession(session, generation))
+    .catch((error: unknown) => {
+      if (generation !== startGenerationRef.current) {
+        return;
+      }
+      resetLocalSession();
+      showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedStart));
+    });
+}
+
+function usePlanningSessionPageLeave({
+  open,
+  sessionId,
+  organizationId,
+  factoryId,
+  startGenerationRef,
+  applySession,
+}: {
+  open: boolean;
+  sessionId: string;
+  organizationId: string;
+  factoryId: string;
+  startGenerationRef: { current: number };
+  applySession: (session: PlanningSessionPayload, generation: number) => void;
+}) {
+  useEffect(() => {
+    if (!open || !sessionId || !organizationId || !factoryId) {
+      return;
+    }
+    const generation = startGenerationRef.current;
+    const poll = window.setInterval(() => {
+      void describePlanningSession(organizationId, factoryId, sessionId)
+        .then((session) => applySession(session, generation))
+        .catch(() => undefined);
+    }, POLL_MS);
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const endOnLeave = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        return;
+      }
+      void endPlanningSession(organizationId, factoryId, sessionId, { keepalive: true }).catch(() => undefined);
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    window.addEventListener("pagehide", endOnLeave);
+    return () => {
+      window.clearInterval(poll);
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+      window.removeEventListener("pagehide", endOnLeave);
+    };
+  }, [applySession, factoryId, open, organizationId, sessionId, startGenerationRef]);
+}
+
+function savePlanningDraft({
+  title,
+  description,
+  sessionId,
+  organizationId,
+  factoryId,
+  draftSaveTimer,
+  setView,
+}: {
+  title: string;
+  description: string;
+  sessionId: string;
+  organizationId: string;
+  factoryId: string;
+  draftSaveTimer: { current: number | undefined };
+  setView: (updater: (current: CreateWithAgentView) => CreateWithAgentView) => void;
+}) {
+  setView((current) => updateCreateWithAgentDraft(current, { title, description }));
+  if (!sessionId) {
+    return;
+  }
+  if (draftSaveTimer.current !== undefined) {
+    window.clearTimeout(draftSaveTimer.current);
+  }
+  draftSaveTimer.current = window.setTimeout(() => {
+    void updatePlanningSessionDraft(organizationId, factoryId, sessionId, { title, description }).catch(
+      (error: unknown) => {
+        showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedDraft));
+      },
+    );
+  }, DRAFT_SAVE_MS);
+}
+
+function sendPlanningText({
+  text,
+  failedCopy,
+  sessionId,
+  organizationId,
+  factoryId,
+  startGenerationRef,
+  setView,
+  applySession,
+}: {
+  text: string;
+  failedCopy: string;
+  sessionId: string;
+  organizationId: string;
+  factoryId: string;
+  startGenerationRef: { current: number };
+  setView: (updater: (current: CreateWithAgentView) => CreateWithAgentView) => void;
+  applySession: (session: PlanningSessionPayload, generation: number) => void;
+}) {
+  const body = text.trim();
+  if (!body || !sessionId) {
+    return;
+  }
+  const generation = startGenerationRef.current;
+  setView((current) => ({
+    ...setCreateWithAgentComposer(current, ""),
+    survey: undefined,
+    messages: [
+      ...current.messages,
+      {
+        id: `local-${current.messages.length + 1}`,
+        kind: "text",
+        role: "user",
+        text: body,
+        ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
+      },
+    ],
+  }));
+  void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)
+    .then((session) => applySession(session, generation))
+    .catch((error: unknown) => {
+      showErrorToast(getApiErrorMessage(error, failedCopy));
+    });
+}
+
+function createWithAgentViewActions({
+  view,
+  sessionId,
+  organizationId,
+  factoryId,
+  startGenerationRef,
+  setView,
+  applySession,
+  patchDraft,
+  sendSessionText,
+  close,
+}: {
+  view: CreateWithAgentView;
+  sessionId: string;
+  organizationId: string;
+  factoryId: string;
+  startGenerationRef: { current: number };
+  setView: (updater: (current: CreateWithAgentView) => CreateWithAgentView) => void;
+  applySession: (session: PlanningSessionPayload, generation: number) => void;
+  patchDraft: (title: string, description: string) => void;
+  sendSessionText: (text: string, failedCopy: string) => void;
+  close: () => void;
+}) {
+  return {
     onComposerChange: (value: string) => setView((current) => setCreateWithAgentComposer(current, value)),
     onSend: () => {
       const text = view.composer.trim();
@@ -221,8 +429,9 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       if (!sessionId) {
         return;
       }
+      const generation = startGenerationRef.current;
       void createPlanningSessionWorkOrder(organizationId, factoryId, sessionId)
-        .then(applySession)
+        .then((session) => applySession(session, generation))
         .catch((error: unknown) => {
           showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedCreate));
         });
@@ -231,16 +440,17 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       if (!sessionId) {
         return;
       }
+      const generation = startGenerationRef.current;
       void skipPlanningSessionDraft(organizationId, factoryId, sessionId)
-        .then(applySession)
+        .then((session) => applySession(session, generation))
         .catch((error: unknown) => {
           showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSkip));
         });
     },
-    onSelectCreated: (order) => {
+    onSelectCreated: (order: CreateWithAgentView["created"][number]) => {
       setView((current) => ({ ...current, right: { kind: "preview", order } }));
     },
-    onRefineCreated: (order) => {
+    onRefineCreated: (order: CreateWithAgentView["created"][number]) => {
       sendSessionText(planningRefineNote(order.key, order.title), CREATE_WITH_AGENT_COPY.failedSend);
     },
     onRequestClose: () => setView((current) => requestCreateWithAgentEnd(current)),

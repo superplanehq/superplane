@@ -18,10 +18,12 @@ import (
 func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	appRepo := "acme/payments"
-	require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		AppRepository: &appRepo,
 	}))
 
@@ -75,10 +77,12 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	appRepo := "acme/payments"
-	require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 		AppRepository: &appRepo,
 	}))
 
@@ -107,6 +111,7 @@ func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
 func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -164,9 +169,10 @@ func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing
 	assert.True(t, refreshed)
 }
 
-func Test__StartPlanningSession__EndsPreviousSessionForSameUser(t *testing.T) {
+func Test__StartPlanningSession__KeepsPreviousSessionForSameUser(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
@@ -188,13 +194,144 @@ func Test__StartPlanningSession__EndsPreviousSessionForSameUser(t *testing.T) {
 	db := database.DB(t.Context())
 	previous, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(first.Session.Id))
 	require.NoError(t, err)
-	assert.Equal(t, models.PlanningSessionStateEnded, previous.State)
+	assert.Equal(t, models.PlanningSessionStateRunning, previous.State)
 
 	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
 	require.NoError(t, err)
 	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, firstRunID)
 	require.NoError(t, err)
-	assert.NotEqual(t, models.CanvasRunStatePending, run.State)
+	assert.Equal(t, models.CanvasRunStatePending, run.State)
+}
+
+func Test__StartPlanningSession__RejectsWhenParallelismCapIsReached(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	first, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	node, err := models.FindCanvasNode(db, canvas.ID, planningCanvasAgentNodeID)
+	require.NoError(t, err)
+	limit := 2
+	node.SetConcurrencySpec(&models.ConcurrencySpec{Max: &limit})
+	require.NoError(t, db.Model(node).Select("ConcurrencyKey", "ConcurrencyMax").Updates(node).Error)
+
+	second, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Session.Id, second.Session.Id)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.Error(t, err)
+}
+
+func Test__StartPlanningSession__RejectsEleventhSessionAtDefaultCap(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	for i := 0; i < models.DefaultFactoryLineStepMaxParallelism; i++ {
+		_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+			FactoryId:  factoryModel.ID.String(),
+			Repository: "acme/payments",
+		})
+		require.NoError(t, err)
+	}
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.Error(t, err)
+}
+
+func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
+	require.NoError(t, err)
+	foundClaude := false
+	for _, node := range nodes {
+		if node.Type == models.NodeTypeComponent {
+			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			require.NotNil(t, node.ConcurrencyMax)
+			assert.Equal(t, models.DefaultFactoryLineStepMaxParallelism, *node.ConcurrencyMax)
+			foundClaude = true
+		}
+	}
+	assert.True(t, foundClaude)
+}
+
+func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "openai")
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		AgentIntegrationID: &agentID,
+	}))
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	nodes, err := models.FindCanvasNodesInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	for _, node := range nodes {
+		if node.Type == models.NodeTypeComponent {
+			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			return
+		}
+	}
+	t.Fatal("missing planning agent")
+}
+
+func Test__StartPlanningSession__RequiresClaude(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.Conn()
+	require.NoError(t, db.Where("provider <> ?", "").Delete(&models.HostedLLMProvider{}).Error)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "Connect Claude before you start Create with an Agent.")
 }
 
 func Test__StartPlanningSession__RequiresRepository(t *testing.T) {
@@ -212,6 +349,7 @@ func Test__StartPlanningSession__RequiresRepository(t *testing.T) {
 func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
 	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 

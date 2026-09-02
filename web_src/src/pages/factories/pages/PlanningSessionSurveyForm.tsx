@@ -34,6 +34,10 @@ export function PlanningSessionSurveyForm({
       data-testid="create-with-agent-survey"
       onSubmit={(event) => {
         event.preventDefault();
+        if (!isLast) {
+          setCurrentIndex((index) => index + 1);
+          return;
+        }
         onSubmit(formatPlanningSurveyReply(survey.questions, answers));
       }}
     >

@@ -205,7 +205,13 @@ function CreateWithAgentStream({
         </div>
         {follow.following ? null : <OlderMessagesBar onJumpToLatest={() => follow.setFollowing(true)} />}
       </div>
-      {view.survey ? <PlanningSessionSurveyForm survey={view.survey} onSubmit={onSubmitSurvey} /> : null}
+      {view.survey ? (
+        <PlanningSessionSurveyForm
+          key={view.survey.id ?? view.survey.questions[0]?.prompt ?? "survey"}
+          survey={view.survey}
+          onSubmit={onSubmitSurvey}
+        />
+      ) : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
           {CREATE_WITH_AGENT_COPY.composerPlaceholder}

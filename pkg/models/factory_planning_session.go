@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -47,6 +48,7 @@ var (
 	ErrFactoryPlanningSessionNotFound = errors.New("planning session not found")
 	ErrFactoryPlanningSessionEnded    = errors.New("planning session has ended")
 	ErrFactoryPlanningSessionNoDraft  = errors.New("planning session has no draft")
+	ErrFactoryPlanningSessionBusy     = errors.New("too many Create with an Agent sessions are running")
 	ErrFactoryPlanningWaitIdle        = errors.New("planning session is not waiting")
 )
 
@@ -203,6 +205,14 @@ func (f *Factory) EndOpenPlanningSessions(tx *gorm.DB, createdBy uuid.UUID) ([]F
 	return ended, nil
 }
 
+func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&FactoryPlanningSession{}).
+		Where("organization_id = ? AND factory_id = ? AND state <> ?", organizationID, factoryID, PlanningSessionStateEnded).
+		Count(&count).Error
+	return count, err
+}
+
 func FindPlanningSession(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*FactoryPlanningSession, error) {
 	var session FactoryPlanningSession
 	err := tx.Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, id).First(&session).Error
@@ -294,34 +304,41 @@ func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, e
 }
 
 func (s *FactoryPlanningSession) BeginWait(tx *gorm.DB) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	if s.WaitState == PlanningWaitPending || s.WaitState == PlanningWaitResolved {
-		return nil
-	}
-	if text := s.nextUndeliveredUserText(); text != "" {
-		s.deliverUserText(text)
-		return s.saveMessagesAndWait(tx)
-	}
-	s.WaitState = PlanningWaitPending
-	s.WaitResult = datatypes.NewJSONType(PlanningWaitResult{})
-	s.UpdatedAt = time.Now()
-	return tx.Model(s).Select("WaitState", "WaitResult", "UpdatedAt").Updates(s).Error
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		if s.WaitState == PlanningWaitPending || s.WaitState == PlanningWaitResolved {
+			return nil
+		}
+		if text := s.nextUndeliveredUserText(); text != "" {
+			refined, err := s.applyRefineNote(inner, text)
+			if err != nil {
+				return err
+			}
+			s.deliverUserText(text, refined)
+			return s.saveMessagesAndWait(inner)
+		}
+		s.WaitState = PlanningWaitPending
+		s.WaitResult = datatypes.NewJSONType(PlanningWaitResult{})
+		s.UpdatedAt = time.Now()
+		return inner.Model(s).Select("WaitState", "WaitResult", "UpdatedAt").Updates(s).Error
+	})
 }
 
 func (s *FactoryPlanningSession) ConsumeWait(tx *gorm.DB) (PlanningWaitResult, error) {
-	if s.WaitState != PlanningWaitResolved {
-		return PlanningWaitResult{}, ErrFactoryPlanningWaitIdle
-	}
-	result := s.WaitResult.Data()
-	s.WaitState = PlanningWaitIdle
-	s.WaitResult = datatypes.NewJSONType(PlanningWaitResult{})
-	s.UpdatedAt = time.Now()
-	if err := tx.Model(s).Select("WaitState", "WaitResult", "UpdatedAt").Updates(s).Error; err != nil {
-		return PlanningWaitResult{}, err
-	}
-	return result, nil
+	var result PlanningWaitResult
+	err := s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if s.WaitState != PlanningWaitResolved {
+			return ErrFactoryPlanningWaitIdle
+		}
+		result = s.WaitResult.Data()
+		s.WaitState = PlanningWaitIdle
+		s.WaitResult = datatypes.NewJSONType(PlanningWaitResult{})
+		s.UpdatedAt = time.Now()
+		return inner.Model(s).Select("WaitState", "WaitResult", "UpdatedAt").Updates(s).Error
+	})
+	return result, err
 }
 
 func PlanningRefineNote(key, title string) string {
@@ -359,52 +376,60 @@ func planningRefineKey(text string) string {
 }
 
 func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	body := strings.TrimSpace(text)
-	if body == "" {
-		return fmt.Errorf("%w: message is required", ErrFactoryPlanningSessionInvalid)
-	}
-	s.appendMessage(PlanningSessionMessage{
-		ID:        uuid.NewString(),
-		Kind:      PlanningSessionMessageKindText,
-		Role:      PlanningSessionMessageRoleUser,
-		Text:      body,
-		CreatedAt: time.Now(),
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := s.lockAndReload(inner); err != nil {
+			return err
+		}
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		body := strings.TrimSpace(text)
+		if body == "" {
+			return fmt.Errorf("%w: message is required", ErrFactoryPlanningSessionInvalid)
+		}
+		s.appendMessage(PlanningSessionMessage{
+			ID:        uuid.NewString(),
+			Kind:      PlanningSessionMessageKindText,
+			Role:      PlanningSessionMessageRoleUser,
+			Text:      body,
+			CreatedAt: time.Now(),
+		})
+		s.clearPendingSurvey()
+		refined, err := s.applyRefineNote(inner, body)
+		if err != nil {
+			return err
+		}
+		if s.WaitState == PlanningWaitPending {
+			s.deliverUserText(body, refined)
+		}
+		return s.saveMessagesAndWait(inner)
 	})
-	s.clearPendingSurvey()
-	if err := s.applyRefineNote(tx, body); err != nil {
-		return err
-	}
-	if s.WaitState == PlanningWaitPending {
-		s.deliverUserText(body)
-	}
-	return s.saveMessagesAndWait(tx)
 }
 
 func (s *FactoryPlanningSession) ProposeSurvey(tx *gorm.DB, survey PlanningSessionSurvey) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	normalized, err := normalizePlanningSurvey(survey)
-	if err != nil {
-		return err
-	}
-	payload, err := json.Marshal(normalized)
-	if err != nil {
-		return err
-	}
-	s.clearPendingSurvey()
-	s.appendMessage(PlanningSessionMessage{
-		ID:        uuid.NewString(),
-		Kind:      PlanningSessionMessageKindSurvey,
-		Role:      PlanningSessionMessageRoleAgent,
-		Text:      string(payload),
-		CreatedAt: time.Now(),
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		normalized, err := normalizePlanningSurvey(survey)
+		if err != nil {
+			return err
+		}
+		payload, err := json.Marshal(normalized)
+		if err != nil {
+			return err
+		}
+		s.clearPendingSurvey()
+		s.appendMessage(PlanningSessionMessage{
+			ID:        uuid.NewString(),
+			Kind:      PlanningSessionMessageKindSurvey,
+			Role:      PlanningSessionMessageRoleAgent,
+			Text:      string(payload),
+			CreatedAt: time.Now(),
+		})
+		s.UpdatedAt = time.Now()
+		return inner.Model(s).Select("Messages", "UpdatedAt").Updates(s).Error
 	})
-	s.UpdatedAt = time.Now()
-	return tx.Model(s).Select("Messages", "UpdatedAt").Updates(s).Error
 }
 
 func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
@@ -422,97 +447,112 @@ func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
 }
 
 func (s *FactoryPlanningSession) ProposeDraft(tx *gorm.DB, draft PlanningSessionDraft) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	title := strings.TrimSpace(draft.Title)
-	if title == "" {
-		return fmt.Errorf("%w: draft title is required", ErrFactoryPlanningSessionInvalid)
-	}
-	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
-		Title:       title,
-		Description: strings.TrimSpace(draft.Description),
-		WorkOrderID: s.PendingDraft.Data().WorkOrderID,
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		title := strings.TrimSpace(draft.Title)
+		if title == "" {
+			return fmt.Errorf("%w: draft title is required", ErrFactoryPlanningSessionInvalid)
+		}
+		s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
+			Title:       title,
+			Description: strings.TrimSpace(draft.Description),
+			WorkOrderID: s.PendingDraft.Data().WorkOrderID,
+		})
+		s.UpdatedAt = time.Now()
+		return inner.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
 	})
-	s.UpdatedAt = time.Now()
-	return tx.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
 }
 
 func (s *FactoryPlanningSession) UpdateDraft(tx *gorm.DB, draft PlanningSessionDraft) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	if strings.TrimSpace(s.PendingDraft.Data().Title) == "" {
-		return ErrFactoryPlanningSessionNoDraft
-	}
-	title := strings.TrimSpace(draft.Title)
-	if title == "" {
-		title = s.PendingDraft.Data().Title
-	}
-	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
-		Title:       title,
-		Description: strings.TrimSpace(draft.Description),
-		WorkOrderID: s.PendingDraft.Data().WorkOrderID,
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		if strings.TrimSpace(s.PendingDraft.Data().Title) == "" {
+			return ErrFactoryPlanningSessionNoDraft
+		}
+		title := strings.TrimSpace(draft.Title)
+		if title == "" {
+			title = s.PendingDraft.Data().Title
+		}
+		s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{
+			Title:       title,
+			Description: strings.TrimSpace(draft.Description),
+			WorkOrderID: s.PendingDraft.Data().WorkOrderID,
+		})
+		s.UpdatedAt = time.Now()
+		return inner.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
 	})
-	s.UpdatedAt = time.Now()
-	return tx.Model(s).Select("PendingDraft", "UpdatedAt").Updates(s).Error
 }
 
 func (s *FactoryPlanningSession) SkipDraft(tx *gorm.DB) error {
-	if err := s.guardOpen(); err != nil {
-		return err
-	}
-	if strings.TrimSpace(s.PendingDraft.Data().Title) == "" {
-		return ErrFactoryPlanningSessionNoDraft
-	}
-	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
-	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindSkipped})
-	return s.saveMessagesAndWait(tx)
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		if strings.TrimSpace(s.PendingDraft.Data().Title) == "" {
+			return ErrFactoryPlanningSessionNoDraft
+		}
+		s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
+		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindSkipped})
+		return s.saveMessagesAndWait(inner)
+	})
 }
 
 func (s *FactoryPlanningSession) CreateDraftWorkOrder(tx *gorm.DB, factoryModel *Factory, createdBy uuid.UUID) (*FactoryWorkOrder, error) {
-	if err := s.guardOpen(); err != nil {
-		return nil, err
-	}
-	draft := s.PendingDraft.Data()
-	if strings.TrimSpace(draft.Title) == "" {
-		return nil, ErrFactoryPlanningSessionNoDraft
-	}
-	if strings.TrimSpace(draft.WorkOrderID) != "" {
-		return s.updateCreatedWorkOrder(tx, factoryModel, draft)
-	}
+	var order *FactoryWorkOrder
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := s.lockAndReload(inner); err != nil {
+			return err
+		}
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		draft := s.PendingDraft.Data()
+		if strings.TrimSpace(draft.Title) == "" {
+			return ErrFactoryPlanningSessionNoDraft
+		}
+		if strings.TrimSpace(draft.WorkOrderID) != "" {
+			created, updateErr := s.updateCreatedWorkOrder(inner, factoryModel, draft)
+			order = created
+			return updateErr
+		}
 
-	order, err := factoryModel.CreateWorkOrder(tx, draft.Title, draft.Description, &createdBy, []uuid.UUID{createdBy}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	s.CreatedWorkOrderIDs = append(s.CreatedWorkOrderIDs, order.ID.String())
-	s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
-	s.resolveWait(PlanningWaitResult{
-		Kind:         PlanningWaitKindCreated,
-		WorkOrderID:  order.ID.String(),
-		WorkOrderKey: factoryModel.WorkOrderKey(order.Number),
-		Text:         order.Title,
+		created, createErr := factoryModel.CreateWorkOrder(inner, draft.Title, draft.Description, &createdBy, []uuid.UUID{createdBy}, nil)
+		if createErr != nil {
+			return createErr
+		}
+		s.CreatedWorkOrderIDs = append(s.CreatedWorkOrderIDs, created.ID.String())
+		s.PendingDraft = datatypes.NewJSONType(PlanningSessionDraft{})
+		s.resolveWait(PlanningWaitResult{
+			Kind:         PlanningWaitKindCreated,
+			WorkOrderID:  created.ID.String(),
+			WorkOrderKey: factoryModel.WorkOrderKey(created.Number),
+			Text:         created.Title,
+		})
+		if err := s.saveMessagesAndWait(inner); err != nil {
+			return err
+		}
+		order = created
+		return nil
 	})
-	if err := s.saveMessagesAndWait(tx); err != nil {
-		return nil, err
-	}
-	return order, nil
+	return order, err
 }
 
-func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) error {
+func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) (bool, error) {
 	key := planningRefineKey(text)
 	if key == "" {
-		return nil
+		return false, nil
 	}
 	factoryModel, err := FindFactory(tx, s.OrganizationID, s.FactoryID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	orders, err := s.CreatedOrders(tx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	for i := range orders {
 		if factoryModel.WorkOrderKey(orders[i].Number) != key {
@@ -523,9 +563,9 @@ func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) error
 			Description: orders[i].Description,
 			WorkOrderID: orders[i].ID.String(),
 		})
-		return nil
+		return true, nil
 	}
-	return nil
+	return false, nil
 }
 
 func (s *FactoryPlanningSession) updateCreatedWorkOrder(
@@ -564,6 +604,25 @@ func (s *FactoryPlanningSession) updateCreatedWorkOrder(
 
 func (s *FactoryPlanningSession) reload(tx *gorm.DB) error {
 	return tx.Where("id = ?", s.ID).First(s).Error
+}
+
+func (s *FactoryPlanningSession) lockAndReload(tx *gorm.DB) error {
+	var locked FactoryPlanningSession
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", s.ID).First(&locked).Error
+	if err != nil {
+		return err
+	}
+	*s = locked
+	return nil
+}
+
+func (s *FactoryPlanningSession) withLockedSession(tx *gorm.DB, run func(*gorm.DB) error) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := s.lockAndReload(inner); err != nil {
+			return err
+		}
+		return run(inner)
+	})
 }
 
 func (s *FactoryPlanningSession) CreatedOrders(tx *gorm.DB) ([]FactoryWorkOrder, error) {
@@ -634,7 +693,7 @@ func (s *FactoryPlanningSession) nextUndeliveredUserText() string {
 	return ""
 }
 
-func (s *FactoryPlanningSession) deliverUserText(text string) {
+func (s *FactoryPlanningSession) deliverUserText(text string, refined bool) {
 	for i := range s.Messages {
 		if s.Messages[i].Kind != PlanningSessionMessageKindText || s.Messages[i].Role != PlanningSessionMessageRoleUser {
 			continue
@@ -645,7 +704,11 @@ func (s *FactoryPlanningSession) deliverUserText(text string) {
 		s.Messages[i].Delivered = true
 		break
 	}
-	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: planningRefinePrompt(text, s.PendingDraft.Data())})
+	waitText := text
+	if refined {
+		waitText = planningRefinePrompt(text, s.PendingDraft.Data())
+	}
+	s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindMessage, Text: waitText})
 }
 
 func (s *FactoryPlanningSession) saveMessagesAndWait(tx *gorm.DB) error {

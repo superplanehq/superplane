@@ -2,6 +2,7 @@ package factories
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ const (
 	planningCanvasAgentNodeID  = "planning-agent"
 	planningCanvasTimeoutSecs  = 3600
 )
+
+var errPlanningClaudeRequired = errors.New("claude is not connected")
 
 func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
 	canvas, err := models.FindPlanningCanvas(tx, factoryModel.OrganizationID, factoryModel.ID)
@@ -36,7 +39,10 @@ func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid
 func createPlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
 	now := time.Now()
 	liveVersionID := uuid.New()
-	agent := planningCanvasAgent(tx, factoryModel)
+	agent, err := planningCanvasAgent(tx, factoryModel)
+	if err != nil {
+		return nil, "", err
+	}
 	agentConfig := planningCanvasAgentConfiguration(tx, factoryModel, agent)
 
 	canvas := &models.Canvas{
@@ -70,6 +76,7 @@ func createPlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid
 		return nil, "", err
 	}
 
+	concurrency := planningCanvasConcurrency()
 	agentNode := models.CanvasNode{
 		WorkflowID:    canvas.ID,
 		NodeID:        planningCanvasAgentNodeID,
@@ -81,6 +88,7 @@ func createPlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
+	agentNode.SetConcurrencySpec(concurrency)
 	if err := tx.Create(&agentNode).Error; err != nil {
 		return nil, "", err
 	}
@@ -102,6 +110,7 @@ func createPlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid
 				Type:          models.NodeTypeComponent,
 				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: agent.component()}},
 				Configuration: agentConfig,
+				Concurrency:   concurrency,
 			},
 		}),
 		Edges: datatypes.NewJSONSlice([]models.Edge{{
@@ -123,11 +132,17 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 	if err != nil {
 		return err
 	}
-	agent := planningCanvasAgent(tx, factoryModel)
+	agent, err := planningCanvasAgent(tx, factoryModel)
+	if err != nil {
+		return err
+	}
 	agentConfig := planningCanvasAgentConfiguration(tx, factoryModel, agent)
 	for i := range nodes {
 		if nodes[i].Type == models.NodeTypeComponent {
-			return refreshPlanningAgentNode(tx, canvas, &nodes[i], agentConfig)
+			if err := refreshPlanningAgentNode(tx, canvas, &nodes[i], agentConfig); err != nil {
+				return err
+			}
+			return ensurePlanningAgentConcurrency(tx, canvas, &nodes[i])
 		}
 	}
 
@@ -141,6 +156,7 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 	}
 
 	now := time.Now()
+	concurrency := planningCanvasConcurrency()
 	agentNode := models.CanvasNode{
 		WorkflowID:    canvas.ID,
 		NodeID:        planningCanvasAgentNodeID,
@@ -152,6 +168,7 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
+	agentNode.SetConcurrencySpec(concurrency)
 	if err := tx.Create(&agentNode).Error; err != nil {
 		return err
 	}
@@ -162,6 +179,7 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 		Type:          models.NodeTypeComponent,
 		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: agent.component()}},
 		Configuration: agentConfig,
+		Concurrency:   concurrency,
 	})
 	version.Edges = append(version.Edges, models.Edge{
 		SourceID: entrypoint,
@@ -185,18 +203,78 @@ func planningCanvasEntrypoint(tx *gorm.DB, canvasID uuid.UUID) (string, error) {
 	return "", invalidArgument("planning canvas has no onRun entrypoint")
 }
 
-func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) *intakeAgent {
-	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil {
-		return agent
+func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) (*intakeAgent, error) {
+	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil && agent.component() == "runnerClaudeCode" {
+		return agent, nil
+	}
+	if agent := resolveClaudePlanningAgent(tx, factoryModel); agent != nil {
+		return agent, nil
+	}
+	return nil, errPlanningClaudeRequired
+}
+
+func resolveClaudePlanningAgent(tx *gorm.DB, factoryModel *models.Factory) *intakeAgent {
+	integrations, err := models.ListIntegrations(tx, factoryModel.OrganizationID)
+	if err == nil {
+		for i := range integrations {
+			if integrations[i].AppName != "claude" {
+				continue
+			}
+			if agent := intakeAgentFromIntegration(&integrations[i]); agent != nil {
+				return agent
+			}
+		}
+	}
+	providers, err := models.ListHostedLLMProviders(tx)
+	if err != nil {
+		return nil
+	}
+	index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
+		return provider.Provider == models.UsageProviderAnthropic && provider.OffersHostedModels()
+	})
+	if index < 0 {
+		return nil
+	}
+	model := hostedIntakeModel(providers[index], "opus")
+	if model == "" {
+		return nil
 	}
 	return &intakeAgent{
-		Component: "runnerClaudeCode",
-		Credentials: map[string]any{
-			"source":      runner.CredentialsSourceIntegration,
-			"integration": map[string]any{"name": "claude"},
-		},
-		Model: "opus",
+		Component:   "runnerClaudeCode",
+		Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
+		Model:       model,
 	}
+}
+
+func planningCanvasConcurrency() *models.ConcurrencySpec {
+	max := models.DefaultFactoryLineStepMaxParallelism
+	return &models.ConcurrencySpec{Max: &max}
+}
+
+func ensurePlanningAgentConcurrency(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode) error {
+	if node.ConcurrencyMax != nil && *node.ConcurrencyMax >= 1 {
+		return nil
+	}
+	now := time.Now()
+	concurrency := planningCanvasConcurrency()
+	node.SetConcurrencySpec(concurrency)
+	node.UpdatedAt = &now
+	if err := tx.Model(node).Select("ConcurrencyKey", "ConcurrencyMax", "UpdatedAt").Updates(node).Error; err != nil {
+		return err
+	}
+	version, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+	if err != nil {
+		return err
+	}
+	nodes := append([]models.Node{}, version.Nodes...)
+	for i := range nodes {
+		if nodes[i].ID == node.NodeID {
+			nodes[i].Concurrency = concurrency
+		}
+	}
+	version.Nodes = nodes
+	version.UpdatedAt = &now
+	return tx.Model(version).Select("Nodes", "UpdatedAt").Updates(version).Error
 }
 
 func planningCanvasAgentConfiguration(tx *gorm.DB, factoryModel *models.Factory, agent *intakeAgent) map[string]any {

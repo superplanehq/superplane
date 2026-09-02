@@ -41,136 +41,141 @@ export function isPlanningSessionToolPayload(text: string): boolean {
       return false;
     }
     const record = value as Record<string, unknown>;
+    if (Array.isArray(record.questions) || record.status === "shown") {
+      return true;
+    }
     return ["message", "text", "title", "description"].some((key) => typeof record[key] === "string");
   } catch {
     return false;
   }
 }
 
+type PlanningLogState = {
+  notes: SplitRunStreamLine[];
+  steps: ClaudeStepGroup[];
+  pendingTools: SplitRunStreamLine[];
+  toolGroup: number;
+};
+
 export function groupPlanningSessionLog(notes: SplitRunStreamLine[]): ClaudeStepGroup[] {
-  const steps: ClaudeStepGroup[] = [];
-  let pendingTools: SplitRunStreamLine[] = [];
-  let toolGroup = 0;
-
-  const flushTools = (parent: ClaudeStepGroup) => {
-    if (pendingTools.length === 0) {
-      return;
-    }
-    parent.events.push({
-      kind: "tools",
-      id: `${parent.line.id}-tools-${toolGroup}`,
-      tools: pendingTools,
-    });
-    toolGroup += 1;
-    pendingTools = [];
-  };
-
-  const ensureStep = (): ClaudeStepGroup => {
-    const existing = steps.at(-1);
-    if (existing) {
-      return existing;
-    }
-    const preamble: ClaudeStepGroup = {
-      line: {
-        id: PREAMBLE_ID,
-        nodeId: notes[0]?.nodeId,
-        at: "",
-        note: true,
-        componentName: "",
-        status: "passed",
-      },
-      events: [],
-    };
-    steps.push(preamble);
-    return preamble;
-  };
-
-  const openHiddenPrompt = (line: SplitRunStreamLine) => {
-    const current = steps.at(-1);
-    if (current) {
-      flushTools(current);
-    } else if (pendingTools.length > 0) {
-      flushTools(ensureStep());
-    }
-    toolGroup = 0;
-    steps.push({
-      line: {
-        ...line,
-        componentName: "",
-        componentType: undefined,
-        detail: undefined,
-      },
-      events: [],
-    });
-    if (isPlanningSessionUserTalk(line.componentName)) {
-      attachNote({
-        ...line,
-        id: `${line.id}-talk`,
-        componentType: "prompt",
-        userTalk: line.userTalk ?? (isPlanningSurveyReply(line.componentName) ? "survey" : "message"),
-        detail: undefined,
-      });
-    }
-  };
-
-  const attachNote = (line: SplitRunStreamLine) => {
-    if (!line.componentName.trim()) {
-      return;
-    }
-    const parent = parentStep(steps, line) ?? ensureStep();
-    flushTools(parent);
-    parent.events.push({
-      kind: "note",
-      line: {
-        ...line,
-        componentType: line.componentType === "prompt" ? "prompt" : "note",
-        detail: undefined,
-      },
-    });
-  };
-
-  const attachTool = (line: SplitRunStreamLine) => {
-    const parent = parentStep(steps, line) ?? ensureStep();
-    pendingTools.push({ ...line, componentType: line.componentType || "tool" });
-  };
-
+  const state: PlanningLogState = { notes, steps: [], pendingTools: [], toolGroup: 0 };
   for (const line of notes) {
-    if (isPlanningSessionNoise(line.componentName)) {
-      continue;
-    }
-
-    if (isPlanningSessionToolPayload(line.componentName) || isCollapsedTool(line)) {
-      attachTool(line);
-      continue;
-    }
-
-    if (!line.noteParentId && line.componentType === "prompt") {
-      if (isPlanningSessionPromptStep(line)) {
-        openHiddenPrompt(line);
-        continue;
-      }
-      attachNote(line);
-      continue;
-    }
-
-    const parent = parentStep(steps, line);
-    if (parent) {
-      attachNote(line);
-      continue;
-    }
-
-    if (!line.noteParentId) {
-      attachNote(line);
-    }
+    consumePlanningLogLine(state, line);
   }
+  finishPlanningLog(state);
+  return state.steps;
+}
 
-  const last = steps.at(-1);
+function flushPlanningTools(state: PlanningLogState, parent: ClaudeStepGroup) {
+  if (state.pendingTools.length === 0) {
+    return;
+  }
+  parent.events.push({
+    kind: "tools",
+    id: `${parent.line.id}-tools-${state.toolGroup}`,
+    tools: state.pendingTools,
+  });
+  state.toolGroup += 1;
+  state.pendingTools = [];
+}
+
+function ensurePlanningStep(state: PlanningLogState): ClaudeStepGroup {
+  const existing = state.steps.at(-1);
+  if (existing) {
+    return existing;
+  }
+  const preamble: ClaudeStepGroup = {
+    line: {
+      id: PREAMBLE_ID,
+      nodeId: state.notes[0]?.nodeId,
+      at: "",
+      note: true,
+      componentName: "",
+      status: "passed",
+    },
+    events: [],
+  };
+  state.steps.push(preamble);
+  return preamble;
+}
+
+function openHiddenPlanningPrompt(state: PlanningLogState, line: SplitRunStreamLine) {
+  const current = state.steps.at(-1);
+  if (current) {
+    flushPlanningTools(state, current);
+  } else if (state.pendingTools.length > 0) {
+    flushPlanningTools(state, ensurePlanningStep(state));
+  }
+  state.toolGroup = 0;
+  state.steps.push({
+    line: { ...line, componentName: "", componentType: undefined, detail: undefined },
+    events: [],
+  });
+  if (!isPlanningSessionUserTalk(line.componentName)) {
+    return;
+  }
+  attachPlanningNote(state, {
+    ...line,
+    id: `${line.id}-talk`,
+    componentType: "prompt",
+    userTalk: line.userTalk ?? (isPlanningSurveyReply(line.componentName) ? "survey" : "message"),
+    detail: undefined,
+  });
+}
+
+function attachPlanningNote(state: PlanningLogState, line: SplitRunStreamLine) {
+  if (!line.componentName.trim()) {
+    return;
+  }
+  const parent = parentStep(state.steps, line) ?? ensurePlanningStep(state);
+  flushPlanningTools(state, parent);
+  parent.events.push({
+    kind: "note",
+    line: {
+      ...line,
+      componentType: line.componentType === "prompt" ? "prompt" : "note",
+      detail: undefined,
+    },
+  });
+}
+
+function attachPlanningTool(state: PlanningLogState, line: SplitRunStreamLine) {
+  if (!parentStep(state.steps, line)) {
+    ensurePlanningStep(state);
+  }
+  state.pendingTools.push({ ...line, componentType: line.componentType || "tool" });
+}
+
+function consumePlanningLogLine(state: PlanningLogState, line: SplitRunStreamLine) {
+  if (isPlanningSessionNoise(line.componentName)) {
+    return;
+  }
+  if (isPlanningSessionToolPayload(line.componentName) || isCollapsedTool(line)) {
+    attachPlanningTool(state, line);
+    return;
+  }
+  if (!line.noteParentId && line.componentType === "prompt") {
+    if (isPlanningSessionPromptStep(line)) {
+      openHiddenPlanningPrompt(state, line);
+      return;
+    }
+    attachPlanningNote(state, line);
+    return;
+  }
+  if (parentStep(state.steps, line) || !line.noteParentId) {
+    attachPlanningNote(state, line);
+  }
+}
+
+function finishPlanningLog(state: PlanningLogState) {
+  const last = state.steps.at(-1);
   if (last) {
-    flushTools(last);
-  } else if (pendingTools.length > 0) {
-    flushTools(ensureStep());
+    flushPlanningTools(state, last);
+    return;
   }
-  return steps;
+  if (state.pendingTools.length > 0) {
+    flushPlanningTools(state, ensurePlanningStep(state));
+  }
 }
 
 function isCollapsedTool(line: SplitRunStreamLine): boolean {
@@ -225,9 +230,26 @@ export function mergePlanningSessionNotes(
   }
 
   const merged = live.map((line) => ({ ...line }));
+  const { unmatchedUsers, unmatchedOthers } = partitionPlanningExtras(merged, extra);
+  const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
+  const slots = consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits);
+  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots);
+  placed.insertions.sort((left, right) => right.afterIndex - left.afterIndex || right.order - left.order);
+  for (const insertion of placed.insertions) {
+    merged.splice(insertion.afterIndex + 1, 0, insertion.line);
+  }
+  return [...merged, ...unmatchedOthers, ...placed.trailing];
+}
+
+type WaitSlot = { line: SplitRunStreamLine; index: number };
+type NoteInsertion = { afterIndex: number; order: number; line: SplitRunStreamLine };
+
+function partitionPlanningExtras(
+  merged: SplitRunStreamLine[],
+  extra: SplitRunStreamLine[],
+): { unmatchedUsers: SplitRunStreamLine[]; unmatchedOthers: SplitRunStreamLine[] } {
   const unmatchedUsers: SplitRunStreamLine[] = [];
   const unmatchedOthers: SplitRunStreamLine[] = [];
-
   for (const line of extra) {
     if (streamNoteHasText(merged, line.componentName)) {
       if (line.userTalk === "survey") {
@@ -241,37 +263,85 @@ export function mergePlanningSessionNotes(
     }
     unmatchedOthers.push(line);
   }
+  return { unmatchedUsers, unmatchedOthers };
+}
 
-  const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
-  const insertions: { afterIndex: number; line: SplitRunStreamLine }[] = [];
-  const trailing: SplitRunStreamLine[] = [];
-
-  for (const [index, line] of unmatchedUsers.entries()) {
-    const slot = emptyWaits[index];
-    if (!slot) {
-      trailing.push(line);
+function consumeMatchedWaitSlots(
+  extra: SplitRunStreamLine[],
+  unmatchedUsers: SplitRunStreamLine[],
+  emptyWaits: WaitSlot[],
+): { waitCursor: number; lastWait?: WaitSlot } {
+  let waitCursor = 0;
+  let lastWait: WaitSlot | undefined;
+  for (const line of extra) {
+    if (!isSessionUserExtra(line) || unmatchedUsers.includes(line)) {
       continue;
     }
-    insertions.push({
-      afterIndex: slot.index,
-      line: {
-        ...line,
-        noteParentId: slot.line.id,
-        noteDepth: 1,
-      },
-    });
+    if (waitCursor < emptyWaits.length) {
+      lastWait = emptyWaits[waitCursor];
+      waitCursor += 1;
+    }
   }
+  return { waitCursor, lastWait };
+}
 
-  insertions.sort((left, right) => right.afterIndex - left.afterIndex);
-  for (const insertion of insertions) {
-    merged.splice(insertion.afterIndex + 1, 0, insertion.line);
+function placeUnmatchedUserExtras(
+  merged: SplitRunStreamLine[],
+  unmatchedUsers: SplitRunStreamLine[],
+  emptyWaits: WaitSlot[],
+  slots: { waitCursor: number; lastWait?: WaitSlot },
+): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
+  const insertions: NoteInsertion[] = [];
+  const trailing: SplitRunStreamLine[] = [];
+  let waitCursor = slots.waitCursor;
+  let lastWait = slots.lastWait;
+  let insertOrder = 0;
+  for (const line of unmatchedUsers) {
+    const slot = emptyWaits[waitCursor];
+    if (slot) {
+      lastWait = slot;
+      waitCursor += 1;
+      insertions.push(userExtraInsertion(line, slot.index, insertOrder, slot.line.id));
+      insertOrder += 1;
+      continue;
+    }
+    if (lastWait) {
+      insertions.push(userExtraInsertion(line, lastWaitGroupEndIndex(merged, lastWait), insertOrder, lastWait.line.id));
+      insertOrder += 1;
+      continue;
+    }
+    trailing.push(line);
   }
+  return { insertions, trailing };
+}
 
-  return [...merged, ...unmatchedOthers, ...trailing];
+function userExtraInsertion(
+  line: SplitRunStreamLine,
+  afterIndex: number,
+  order: number,
+  parentId: string,
+): NoteInsertion {
+  return {
+    afterIndex,
+    order,
+    line: { ...line, noteParentId: parentId, noteDepth: 1 },
+  };
 }
 
 function isSessionUserExtra(line: SplitRunStreamLine): boolean {
   return !line.noteParentId && line.componentType === "prompt";
+}
+
+function lastWaitGroupEndIndex(notes: SplitRunStreamLine[], wait: { line: SplitRunStreamLine; index: number }): number {
+  let end = wait.index;
+  for (let index = wait.index + 1; index < notes.length; index += 1) {
+    if (notes[index]?.noteParentId === wait.line.id) {
+      end = index;
+      continue;
+    }
+    break;
+  }
+  return end;
 }
 
 function isEmptyWaitSlot(line: SplitRunStreamLine): boolean {

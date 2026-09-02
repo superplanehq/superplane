@@ -397,6 +397,18 @@ func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
 	assert.Equal(t, order.ID.String(), session.CreatedWorkOrderIDs[0])
 }
 
+func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-chat")
+	db := database.Conn()
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Refine checkout: please."))
+	assert.Equal(t, "Refine checkout: please.", lastTextMessage(session, PlanningSessionMessageRoleUser))
+	assert.Equal(t, "Refine checkout: please.", session.WaitResult.Data().Text)
+	assert.Equal(t, "", session.PendingDraft.Data().WorkOrderID)
+}
+
 func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-list-stale")

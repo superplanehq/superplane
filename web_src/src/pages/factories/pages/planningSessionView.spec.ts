@@ -9,7 +9,7 @@ describe("workspacePlanningRepository", () => {
   });
 
   it("returns empty when the workspace has no app repository", () => {
-    expect(workspacePlanningRepository({ onboarding: { completedAt: "2026-08-31T12:00:00Z" } })).toBe("");
+    expect(workspacePlanningRepository({ onboarding: {} })).toBe("");
     expect(workspacePlanningRepository(null)).toBe("");
   });
 });
@@ -89,6 +89,7 @@ describe("createWithAgentViewFromSession", () => {
     );
 
     expect(view.survey).toEqual({
+      id: "pending-survey",
       questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
     });
     expect(view.messages).toEqual([

@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -27,7 +28,6 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 	db := database.DB(ctx)
 	var session *models.FactoryPlanningSession
 	var factoryModel *models.Factory
-	var stopped []models.FactoryPlanningSession
 	err = db.Transaction(func(tx *gorm.DB) error {
 		var findErr error
 		factoryModel, findErr = models.FindFactory(tx, orgID, factoryID)
@@ -45,8 +45,10 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 		if findErr != nil {
 			return findErr
 		}
-		stopped, findErr = factoryModel.EndOpenPlanningSessions(tx, userID)
-		if findErr != nil {
+		if _, findErr = models.LockCanvasForUpdate(tx, orgID, canvas.ID); findErr != nil {
+			return findErr
+		}
+		if findErr = rejectIfPlanningSessionAtCap(tx, factoryModel, canvas.ID); findErr != nil {
 			return findErr
 		}
 		session, findErr = factoryModel.StartPlanningSession(tx, models.StartPlanningSessionParams{
@@ -59,10 +61,6 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start planning session")
-	}
-
-	for i := range stopped {
-		cancelPlanningSessionRun(ctx, db, &stopped[i])
 	}
 
 	if session.CanvasID != nil && session.CanvasRunID != nil {
@@ -183,6 +181,35 @@ func SkipPlanningSessionDraft(ctx context.Context, organizationID string, req *p
 		return nil, factoryErrorToStatus(err, "failed to skip planning session draft")
 	}
 	return &pb.SkipPlanningSessionDraftResponse{Session: serialized}, nil
+}
+
+func rejectIfPlanningSessionAtCap(tx *gorm.DB, factoryModel *models.Factory, canvasID uuid.UUID) error {
+	cap, err := planningSessionParallelismCap(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	open, err := models.CountOpenPlanningSessions(tx, factoryModel.OrganizationID, factoryModel.ID)
+	if err != nil {
+		return err
+	}
+	if open >= int64(cap) {
+		return models.ErrFactoryPlanningSessionBusy
+	}
+	return nil
+}
+
+func planningSessionParallelismCap(tx *gorm.DB, canvasID uuid.UUID) (int, error) {
+	node, err := models.FindCanvasNode(tx, canvasID, planningCanvasAgentNodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.DefaultFactoryLineStepMaxParallelism, nil
+		}
+		return 0, err
+	}
+	if max := node.ConcurrencyMax; max != nil && *max >= 1 {
+		return *max, nil
+	}
+	return models.DefaultFactoryLineStepMaxParallelism, nil
 }
 
 func planningSessionActor(ctx context.Context, organizationID, factoryID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
