@@ -52,6 +52,10 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
 	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
+	body, ok := createPR.Configuration["body"].(string)
+	require.True(t, ok)
+	assert.Contains(t, body, "task().origin")
+	assert.Contains(t, body, "Closes ")
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)

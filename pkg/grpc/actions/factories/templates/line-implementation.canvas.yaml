@@ -202,6 +202,8 @@ spec:
 
           {{ fromBase64($["Agent - Implement from order description"].data.result.description) }}
 
+          {{ task().origin?.provider == "github" ? (task().origin.repository == task().repository ? "Closes #" + string(task().origin.number) : "Closes " + task().origin.repository + "#" + string(task().origin.number)) : "" }}
+
           <hr>
 
           Created via [SuperPlane](https://superplane.com).

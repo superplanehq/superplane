@@ -56,6 +56,31 @@ func TestOriginFromIntakePayload_MissingURLReturnsNil(t *testing.T) {
 	}))
 }
 
+func TestGitHubIssueReference(t *testing.T) {
+	repository, number, ok := GitHubIssueReference("https://github.com/acme/service/issues/42")
+	assert.True(t, ok)
+	assert.Equal(t, "acme/service", repository)
+	assert.Equal(t, 42, number)
+}
+
+func TestGitHubIssueReference_PullRequestURLIsNotAnIssue(t *testing.T) {
+	_, _, ok := GitHubIssueReference("https://github.com/acme/service/pull/42")
+	assert.False(t, ok)
+}
+
+func TestGitHubIssueReference_NonGitHubURL(t *testing.T) {
+	_, _, ok := GitHubIssueReference("https://example.com/acme/service/issues/42")
+	assert.False(t, ok)
+}
+
+func TestGitHubIssueReference_MalformedURL(t *testing.T) {
+	_, _, ok := GitHubIssueReference("https://github.com/acme/service")
+	assert.False(t, ok)
+
+	_, _, ok = GitHubIssueReference("://not-a-url")
+	assert.False(t, ok)
+}
+
 func TestOriginLabelFromURL(t *testing.T) {
 	assert.Equal(t, "acme/payments#12", OriginLabelFromURL("https://github.com/acme/payments/issues/12"))
 	assert.Equal(t, "acme/payments#8", OriginLabelFromURL("https://github.com/acme/payments/pull/8"))

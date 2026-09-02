@@ -351,6 +351,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
 		assert.NotContains(t, payload, "assignees")
+		assert.NotContains(t, payload, "origin")
 
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
@@ -606,6 +607,58 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
+	})
+
+	t.Run("origin exposes the GitHub issue it was created from", func(t *testing.T) {
+		originOrder, err := factoryModel.CreateWorkOrderWithOrigin(
+			database.Conn(), "Fix login", "", &r.User, nil, nil,
+			models.WorkOrderOrigin{
+				URL:   "https://github.com/acme/service/issues/42",
+				Label: "acme/service#42",
+			},
+		)
+		require.NoError(t, err)
+
+		canvasOrigin, nodeExecutionOrigin, runOrigin := setupFactoryAppExecution(t, r, factoryModel.ID)
+		linkRunToWorkOrder(t, r, factoryModel, originOrder.ID, runOrigin.ID)
+		builderOrigin := NewNodeConfigurationBuilder(database.Conn(), canvasOrigin.ID).
+			WithRootEvent(&nodeExecutionOrigin.RootEventID)
+
+		provider, err := builderOrigin.ResolveExpression(`task().origin.provider`)
+		require.NoError(t, err)
+		assert.Equal(t, "github", provider)
+
+		repository, err := builderOrigin.ResolveExpression(`task().origin.repository`)
+		require.NoError(t, err)
+		assert.Equal(t, "acme/service", repository)
+
+		number, err := builderOrigin.ResolveExpression(`task().origin.number`)
+		require.NoError(t, err)
+		assert.Equal(t, 42, number)
+
+		url, err := builderOrigin.ResolveExpression(`task().origin.url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/acme/service/issues/42", url)
+
+		label, err := builderOrigin.ResolveExpression(`task().origin.label`)
+		require.NoError(t, err)
+		assert.Equal(t, "acme/service#42", label)
+	})
+
+	t.Run("orders created without an origin omit the origin key", func(t *testing.T) {
+		orderWithoutOrigin, err := factoryModel.CreateWorkOrder(database.Conn(), "No origin", "", &r.User, nil, nil)
+		require.NoError(t, err)
+
+		canvasNoOrigin, nodeExecutionNoOrigin, runNoOrigin := setupFactoryAppExecution(t, r, factoryModel.ID)
+		linkRunToWorkOrder(t, r, factoryModel, orderWithoutOrigin.ID, runNoOrigin.ID)
+		builderNoOrigin := NewNodeConfigurationBuilder(database.Conn(), canvasNoOrigin.ID).
+			WithRootEvent(&nodeExecutionNoOrigin.RootEventID)
+
+		result, err := builderNoOrigin.ResolveExpression(`order()`)
+		require.NoError(t, err)
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.NotContains(t, payload, "origin")
 	})
 }
 
