@@ -66,4 +66,33 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.machineStatus).toBe("waiting");
   });
+
+  it("exposes a pending survey and keeps it out of the chat messages", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          {
+            id: "pending-survey",
+            kind: "survey",
+            role: "agent",
+            text: JSON.stringify({
+              questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+            }),
+          },
+          { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.survey).toEqual({
+      questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+    });
+    expect(view.messages).toEqual([
+      { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+    ]);
+  });
 });

@@ -164,6 +164,7 @@ export function BacklogColumn({
         view={agentSession.view}
         onComposerChange={agentSession.onComposerChange}
         onSend={agentSession.onSend}
+        onSubmitSurvey={agentSession.onSubmitSurvey}
         onDraftTitleChange={agentSession.onDraftTitleChange}
         onDraftDescriptionChange={agentSession.onDraftDescriptionChange}
         onCreateDraft={agentSession.onCreateDraft}

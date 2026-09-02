@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,9 +21,10 @@ const (
 	PlanningSessionStateRunning = "running"
 	PlanningSessionStateEnded   = "ended"
 
-	PlanningSessionMessageKindText  = "text"
-	PlanningSessionMessageRoleUser  = "user"
-	PlanningSessionMessageRoleAgent = "agent"
+	PlanningSessionMessageKindText   = "text"
+	PlanningSessionMessageKindSurvey = "survey"
+	PlanningSessionMessageRoleUser   = "user"
+	PlanningSessionMessageRoleAgent  = "agent"
 
 	PlanningWaitIdle     = ""
 	PlanningWaitPending  = "pending"
@@ -34,6 +36,9 @@ const (
 	PlanningWaitKindEnded   = "ended"
 
 	PlanningSessionHeartbeatStale = 5 * time.Minute
+
+	maxPlanningSurveyQuestions = 5
+	maxPlanningSurveyOptions   = 6
 )
 
 var (
@@ -47,6 +52,15 @@ var (
 type PlanningSessionDraft struct {
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+type PlanningSessionSurveyQuestion struct {
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+}
+
+type PlanningSessionSurvey struct {
+	Questions []PlanningSessionSurveyQuestion `json:"questions,omitempty"`
 }
 
 type PlanningSessionMessage struct {
@@ -160,6 +174,31 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		return nil, err
 	}
 	return session, nil
+}
+
+func (f *Factory) EndOpenPlanningSessions(tx *gorm.DB, createdBy uuid.UUID) ([]FactoryPlanningSession, error) {
+	if createdBy == uuid.Nil {
+		return nil, ErrFactoryPlanningSessionInvalid
+	}
+	var sessions []FactoryPlanningSession
+	err := tx.Where(
+		"organization_id = ? AND factory_id = ? AND created_by_user_id = ? AND state <> ?",
+		f.OrganizationID,
+		f.ID,
+		createdBy,
+		PlanningSessionStateEnded,
+	).Find(&sessions).Error
+	if err != nil {
+		return nil, err
+	}
+	ended := make([]FactoryPlanningSession, 0, len(sessions))
+	for i := range sessions {
+		if err := sessions[i].End(tx); err != nil {
+			return nil, err
+		}
+		ended = append(ended, sessions[i])
+	}
+	return ended, nil
 }
 
 func FindPlanningSession(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*FactoryPlanningSession, error) {
@@ -298,29 +337,49 @@ func (s *FactoryPlanningSession) SendUserMessage(tx *gorm.DB, text string) error
 		Text:      body,
 		CreatedAt: time.Now(),
 	})
+	s.clearPendingSurvey()
 	if s.WaitState == PlanningWaitPending {
 		s.deliverUserText(body)
 	}
 	return s.saveMessagesAndWait(tx)
 }
 
-func (s *FactoryPlanningSession) AppendAgentMessage(tx *gorm.DB, text string) error {
+func (s *FactoryPlanningSession) ProposeSurvey(tx *gorm.DB, survey PlanningSessionSurvey) error {
 	if err := s.guardOpen(); err != nil {
 		return err
 	}
-	body := strings.TrimSpace(text)
-	if body == "" {
-		return fmt.Errorf("%w: message is required", ErrFactoryPlanningSessionInvalid)
+	normalized, err := normalizePlanningSurvey(survey)
+	if err != nil {
+		return err
 	}
+	payload, err := json.Marshal(normalized)
+	if err != nil {
+		return err
+	}
+	s.clearPendingSurvey()
 	s.appendMessage(PlanningSessionMessage{
 		ID:        uuid.NewString(),
-		Kind:      PlanningSessionMessageKindText,
+		Kind:      PlanningSessionMessageKindSurvey,
 		Role:      PlanningSessionMessageRoleAgent,
-		Text:      body,
+		Text:      string(payload),
 		CreatedAt: time.Now(),
 	})
 	s.UpdatedAt = time.Now()
 	return tx.Model(s).Select("Messages", "UpdatedAt").Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
+	for i := len(s.Messages) - 1; i >= 0; i-- {
+		if s.Messages[i].Kind != PlanningSessionMessageKindSurvey {
+			continue
+		}
+		var survey PlanningSessionSurvey
+		if err := json.Unmarshal([]byte(s.Messages[i].Text), &survey); err != nil {
+			return PlanningSessionSurvey{}
+		}
+		return survey
+	}
+	return PlanningSessionSurvey{}
 }
 
 func (s *FactoryPlanningSession) ProposeDraft(tx *gorm.DB, draft PlanningSessionDraft) error {
@@ -459,6 +518,17 @@ func (s *FactoryPlanningSession) appendMessage(message PlanningSessionMessage) {
 	s.Messages = append(s.Messages, message)
 }
 
+func (s *FactoryPlanningSession) clearPendingSurvey() {
+	kept := s.Messages[:0]
+	for _, message := range s.Messages {
+		if message.Kind == PlanningSessionMessageKindSurvey {
+			continue
+		}
+		kept = append(kept, message)
+	}
+	s.Messages = kept
+}
+
 func (s *FactoryPlanningSession) resolveWait(result PlanningWaitResult) {
 	s.WaitState = PlanningWaitResolved
 	s.WaitResult = datatypes.NewJSONType(result)
@@ -490,4 +560,36 @@ func (s *FactoryPlanningSession) deliverUserText(text string) {
 func (s *FactoryPlanningSession) saveMessagesAndWait(tx *gorm.DB) error {
 	s.UpdatedAt = time.Now()
 	return tx.Model(s).Select("Messages", "PendingDraft", "CreatedWorkOrderIDs", "WaitState", "WaitResult", "UpdatedAt").Updates(s).Error
+}
+
+func normalizePlanningSurvey(survey PlanningSessionSurvey) (PlanningSessionSurvey, error) {
+	if len(survey.Questions) == 0 {
+		return PlanningSessionSurvey{}, fmt.Errorf("%w: survey needs a question", ErrFactoryPlanningSessionInvalid)
+	}
+	if len(survey.Questions) > maxPlanningSurveyQuestions {
+		return PlanningSessionSurvey{}, fmt.Errorf("%w: survey has too many questions", ErrFactoryPlanningSessionInvalid)
+	}
+	questions := make([]PlanningSessionSurveyQuestion, 0, len(survey.Questions))
+	for _, question := range survey.Questions {
+		prompt := strings.TrimSpace(question.Prompt)
+		if prompt == "" {
+			return PlanningSessionSurvey{}, fmt.Errorf("%w: survey question is required", ErrFactoryPlanningSessionInvalid)
+		}
+		options := make([]string, 0, len(question.Options))
+		for _, option := range question.Options {
+			option = strings.TrimSpace(option)
+			if option == "" {
+				continue
+			}
+			options = append(options, option)
+			if len(options) == maxPlanningSurveyOptions {
+				break
+			}
+		}
+		if len(options) == 0 {
+			return PlanningSessionSurvey{}, fmt.Errorf("%w: survey question needs an option", ErrFactoryPlanningSessionInvalid)
+		}
+		questions = append(questions, PlanningSessionSurveyQuestion{Prompt: prompt, Options: options})
+	}
+	return PlanningSessionSurvey{Questions: questions}, nil
 }

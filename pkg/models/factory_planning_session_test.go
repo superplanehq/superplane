@@ -40,6 +40,35 @@ func TestFactory_StartPlanningSession(t *testing.T) {
 	assert.Equal(t, CanvasRunStatePending, run.State)
 }
 
+func TestFactory_EndOpenPlanningSessions(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-end-open")
+	db := database.Conn()
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	params := StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+	}
+
+	first, err := factoryModel.StartPlanningSession(db, params)
+	require.NoError(t, err)
+	second, err := factoryModel.StartPlanningSession(db, params)
+	require.NoError(t, err)
+
+	ended, err := factoryModel.EndOpenPlanningSessions(db, userID)
+	require.NoError(t, err)
+	require.Len(t, ended, 2)
+
+	reloadedFirst, err := FindPlanningSession(db, org.ID, factoryModel.ID, first.ID)
+	require.NoError(t, err)
+	reloadedSecond, err := FindPlanningSession(db, org.ID, factoryModel.ID, second.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, reloadedFirst.State)
+	assert.Equal(t, PlanningSessionStateEnded, reloadedSecond.State)
+}
+
 func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-repo")
@@ -180,6 +209,55 @@ func TestFactoryPlanningSession_SkipDraftBeforeWaitIsKept(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, PlanningWaitKindSkipped, result.Kind)
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+}
+
+func TestFactoryPlanningSession_ProposeSurveyAndSendClearsIt(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-survey")
+	db := database.Conn()
+
+	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{
+			{Prompt: "What is the priority?", Options: []string{"High", "Low"}},
+			{Prompt: "What is the scope?", Options: []string{"One file", "The service"}},
+		},
+	}))
+	assert.Equal(t, "What is the priority?", session.CurrentSurvey().Questions[0].Prompt)
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Priority: High\nScope: skipped"))
+	assert.Empty(t, session.CurrentSurvey().Questions)
+	assert.Equal(t, PlanningWaitKindMessage, session.WaitResult.Data().Kind)
+	assert.Equal(t, "Priority: High\nScope: skipped", session.WaitResult.Data().Text)
+}
+
+func TestFactoryPlanningSession_ProposeSurveyRejectsEmptyQuestions(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-survey-empty")
+	db := database.Conn()
+
+	err := session.ProposeSurvey(db, PlanningSessionSurvey{})
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Empty(t, session.CurrentSurvey().Questions)
+}
+
+func TestFactoryPlanningSession_ProposeSurveyReplacesPrevious(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-survey-replace")
+	db := database.Conn()
+
+	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{
+			{Prompt: "Old?", Options: []string{"A", "B"}},
+		},
+	}))
+	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
+		Questions: []PlanningSessionSurveyQuestion{
+			{Prompt: "New?", Options: []string{"Yes", "No"}},
+		},
+	}))
+	assert.Len(t, session.CurrentSurvey().Questions, 1)
+	assert.Equal(t, "New?", session.CurrentSurvey().Questions[0].Prompt)
 }
 
 func TestFactoryPlanningSession_ProposeAndSkipDraft(t *testing.T) {

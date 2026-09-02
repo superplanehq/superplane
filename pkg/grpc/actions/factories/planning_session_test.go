@@ -44,7 +44,10 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 		if node.Type == models.NodeTypeComponent {
 			hasAgent = true
 			prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
-			assert.Contains(t, prompt, "Greet the user with say")
+			assert.Contains(t, prompt, "Greet the user in plain text")
+			assert.Contains(t, prompt, "Use survey to ask one or more questions")
+			assert.NotContains(t, prompt, "say:")
+			assert.NotContains(t, prompt, "with say")
 			assert.Contains(t, prompt, "Do not call wait_for_user")
 			assert.NotContains(t, prompt, "Start by calling wait_for_user")
 		}
@@ -65,6 +68,38 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, resp.Session.Id, described.Session.Id)
+}
+
+func Test__DescribePlanningSession__IncludesPendingSurvey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	appRepo := "acme/payments"
+	require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+		AppRepository: &appRepo,
+	}))
+
+	started, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId: factoryModel.ID.String(),
+	})
+	require.NoError(t, err)
+	session, err := models.FindPlanningSession(database.DB(t.Context()), r.Organization.ID, factoryModel.ID, uuid.MustParse(started.Session.Id))
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeSurvey(database.DB(t.Context()), models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{
+			{Prompt: "What is the priority?", Options: []string{"High", "Low"}},
+		},
+	}))
+
+	described, err := DescribePlanningSession(ctx, r.Organization.ID.String(), &pb.DescribePlanningSessionRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: started.Session.Id,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, described.Session.Messages)
+	assert.Equal(t, "survey", described.Session.Messages[0].Kind)
+	assert.Contains(t, described.Session.Messages[0].Text, "What is the priority?")
 }
 
 func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing.T) {
@@ -118,11 +153,46 @@ func Test__StartPlanningSession__RefreshesHelloPromptOnExistingCanvas(t *testing
 			continue
 		}
 		prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
-		assert.Contains(t, prompt, "Greet the user with say")
+		assert.Contains(t, prompt, "Greet the user in plain text")
+		assert.NotContains(t, prompt, "say:")
+		assert.NotContains(t, prompt, "with say")
 		assert.NotContains(t, prompt, "Start by calling wait_for_user")
 		refreshed = true
 	}
 	assert.True(t, refreshed)
+}
+
+func Test__StartPlanningSession__EndsPreviousSessionForSameUser(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	first, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	firstRunID := uuid.MustParse(first.Session.CanvasRunId)
+
+	second, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Session.Id, second.Session.Id)
+	assert.Equal(t, models.PlanningSessionStateRunning, second.Session.State)
+
+	db := database.DB(t.Context())
+	previous, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(first.Session.Id))
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, previous.State)
+
+	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, firstRunID)
+	require.NoError(t, err)
+	assert.NotEqual(t, models.CanvasRunStatePending, run.State)
 }
 
 func Test__StartPlanningSession__RequiresRepository(t *testing.T) {

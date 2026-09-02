@@ -18,6 +18,7 @@ import type { FormEvent } from "react";
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createWithAgentTypes";
 import { planningSessionPhase } from "./planningSessionActivity";
+import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 
 export type CreateWithAgentDialogProps = {
@@ -27,6 +28,7 @@ export type CreateWithAgentDialogProps = {
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
+  onSubmitSurvey: (text: string) => void;
   onDraftTitleChange: (title: string) => void;
   onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
@@ -44,6 +46,7 @@ export function CreateWithAgentDialog({
   view,
   onComposerChange,
   onSend,
+  onSubmitSurvey,
   onDraftTitleChange,
   onDraftDescriptionChange,
   onCreateDraft,
@@ -74,6 +77,7 @@ export function CreateWithAgentDialog({
               view={view}
               onComposerChange={onComposerChange}
               onSend={onSend}
+              onSubmitSurvey={onSubmitSurvey}
             />
             <CreateWithAgentWorkPane
               view={view}
@@ -158,11 +162,13 @@ function CreateWithAgentStream({
   view,
   onComposerChange,
   onSend,
+  onSubmitSurvey,
 }: {
   organizationId: string;
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
+  onSubmitSurvey: (text: string) => void;
 }) {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -181,8 +187,10 @@ function CreateWithAgentStream({
           collapsible={false}
           organizationId={organizationId}
           canvasId={view.canvasId}
+          compactSessionLog
         />
       </div>
+      {view.survey ? <PlanningSessionSurveyForm survey={view.survey} onSubmit={onSubmitSurvey} /> : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
           {CREATE_WITH_AGENT_COPY.composerPlaceholder}

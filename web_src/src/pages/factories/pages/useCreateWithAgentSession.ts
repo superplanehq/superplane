@@ -24,12 +24,42 @@ import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./p
 
 const POLL_MS = 1500;
 const DRAFT_SAVE_MS = 400;
+const UNMOUNT_END_MS = 100;
+const pendingUnmountEnds = new Map<string, number>();
+
+function planningSessionHookKey(organizationId: string, factoryId: string) {
+  return `${organizationId}:${factoryId}`;
+}
+
+function cancelScheduledPlanningSessionEnd(key: string) {
+  const timer = pendingUnmountEnds.get(key);
+  if (timer === undefined) {
+    return;
+  }
+  window.clearTimeout(timer);
+  pendingUnmountEnds.delete(key);
+}
+
+function schedulePlanningSessionEnd(key: string, end: () => void) {
+  cancelScheduledPlanningSessionEnd(key);
+  pendingUnmountEnds.set(
+    key,
+    window.setTimeout(() => {
+      pendingUnmountEnds.delete(key);
+      end();
+    }, UNMOUNT_END_MS),
+  );
+}
 
 export function useCreateWithAgentSession(repository: string, organizationId: string, factoryId: string) {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState("");
   const [view, setView] = useState<CreateWithAgentView>(() => emptyCreateWithAgentView(repository));
   const draftSaveTimer = useRef<number | undefined>(undefined);
+  const sessionIdRef = useRef("");
+  const openRef = useRef(false);
+  sessionIdRef.current = sessionId;
+  openRef.current = open;
 
   const applySession = useCallback((session: PlanningSessionPayload) => {
     setSessionId(session.id ?? "");
@@ -69,13 +99,43 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     };
   }, []);
 
+  const stopSession = useCallback(
+    (id: string, options?: { keepalive?: boolean }) => {
+      if (!id || !organizationId || !factoryId) {
+        return;
+      }
+      const request = options
+        ? endPlanningSession(organizationId, factoryId, id, options)
+        : endPlanningSession(organizationId, factoryId, id);
+      void request.catch(() => undefined);
+    },
+    [factoryId, organizationId],
+  );
+
+  useEffect(() => {
+    const key = planningSessionHookKey(organizationId, factoryId);
+    cancelScheduledPlanningSessionEnd(key);
+    return () => {
+      const id = sessionIdRef.current;
+      if (!openRef.current || !id) {
+        return;
+      }
+      schedulePlanningSessionEnd(key, () => {
+        stopSession(id, { keepalive: true });
+      });
+    };
+  }, [factoryId, organizationId, stopSession]);
+
   const close = useCallback(() => {
+    const id = sessionIdRef.current;
     setOpen(false);
     setSessionId("");
     setView(emptyCreateWithAgentView(repository));
-  }, [repository]);
+    stopSession(id);
+  }, [repository, stopSession]);
 
   const start = useCallback(() => {
+    stopSession(sessionIdRef.current);
     setView(emptyCreateWithAgentView(repository));
     setSessionId("");
     setOpen(true);
@@ -84,7 +144,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       .catch((error: unknown) => {
         showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedStart));
       });
-  }, [applySession, factoryId, organizationId, repository]);
+  }, [applySession, factoryId, organizationId, repository, stopSession]);
 
   const patchDraft = (title: string, description: string) => {
     setView((current) => updateCreateWithAgentDraft(current, { title, description }));
@@ -103,6 +163,26 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     }, DRAFT_SAVE_MS);
   };
 
+  const sendSessionText = (text: string, failedCopy: string) => {
+    const body = text.trim();
+    if (!body || !sessionId) {
+      return;
+    }
+    setView((current) => ({
+      ...setCreateWithAgentComposer(current, ""),
+      survey: undefined,
+      messages: [
+        ...current.messages,
+        { id: `local-${current.messages.length + 1}`, kind: "text", role: "user", text: body },
+      ],
+    }));
+    void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)
+      .then(applySession)
+      .catch((error: unknown) => {
+        showErrorToast(getApiErrorMessage(error, failedCopy));
+      });
+  };
+
   return {
     open,
     view,
@@ -114,15 +194,13 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       if (!text || !sessionId) {
         return;
       }
-      setView((current) => ({
-        ...setCreateWithAgentComposer(current, ""),
-        messages: [...current.messages, { id: `local-${current.messages.length + 1}`, kind: "text", role: "user", text }],
-      }));
-      void sendPlanningSessionMessage(organizationId, factoryId, sessionId, text)
-        .then(applySession)
-        .catch((error: unknown) => {
-          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSend));
-        });
+      sendSessionText(text, CREATE_WITH_AGENT_COPY.failedSend);
+    },
+    onSubmitSurvey: (text: string) => {
+      if (!sessionId) {
+        return;
+      }
+      sendSessionText(text, CREATE_WITH_AGENT_COPY.failedSurvey);
     },
     onDraftTitleChange: (title: string) => {
       const description = view.right.kind === "draft" ? view.right.draft.description : "";
@@ -155,10 +233,6 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     onRequestClose: () => setView((current) => requestCreateWithAgentEnd(current)),
     onCancelEnd: () => setView((current) => cancelCreateWithAgentEnd(current)),
     onConfirmEnd: () => {
-      if (sessionId) {
-        void endPlanningSession(organizationId, factoryId, sessionId).finally(close);
-        return;
-      }
       close();
     },
   };

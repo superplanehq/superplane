@@ -53,6 +53,45 @@ func TestRunnerPlanningSessionDraft(t *testing.T) {
 	assert.Equal(t, "Retry refunds", reloaded.PendingDraft.Data().Title)
 }
 
+func TestRunnerPlanningSessionSurvey(t *testing.T) {
+	r := support.Setup(t)
+	server, signer := mustRunnerLiveLogServer(t, r)
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	session, err := factoryModel.StartPlanningSession(db, models.StartPlanningSessionParams{
+		CreatedByUserID: r.User,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+	})
+	require.NoError(t, err)
+
+	token, err := runneraction.MintPlanningSessionToken(signer, runneraction.PlanningSessionScope{
+		OrganizationID: session.OrganizationID,
+		FactoryID:      session.FactoryID,
+		SessionID:      session.ID,
+		CanvasRunID:    *session.CanvasRunID,
+	}, time.Hour)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/surveys", bytes.NewReader([]byte(
+		`{"questions":[{"prompt":"What is the priority?","options":["High","Low"]}]}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Len(t, reloaded.CurrentSurvey().Questions, 1)
+	assert.Equal(t, "What is the priority?", reloaded.CurrentSurvey().Questions[0].Prompt)
+	assert.Equal(t, []string{"High", "Low"}, reloaded.CurrentSurvey().Questions[0].Options)
+}
+
 func TestRunnerPlanningSessionRejectsOtherToken(t *testing.T) {
 	r := support.Setup(t)
 	server, signer := mustRunnerLiveLogServer(t, r)

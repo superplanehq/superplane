@@ -48,7 +48,7 @@ export function sendCreateWithAgentMessage(view: CreateWithAgentView): CreateWit
     role: "user",
     text,
   };
-  return { ...view, composer: "", messages: [...view.messages, userMessage] };
+  return { ...view, composer: "", survey: undefined, messages: [...view.messages, userMessage] };
 }
 
 export function updateCreateWithAgentDraft(

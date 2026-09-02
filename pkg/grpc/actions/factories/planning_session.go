@@ -27,6 +27,7 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 	db := database.DB(ctx)
 	var session *models.FactoryPlanningSession
 	var factoryModel *models.Factory
+	var stopped []models.FactoryPlanningSession
 	err = db.Transaction(func(tx *gorm.DB) error {
 		var findErr error
 		factoryModel, findErr = models.FindFactory(tx, orgID, factoryID)
@@ -44,6 +45,10 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 		if findErr != nil {
 			return findErr
 		}
+		stopped, findErr = factoryModel.EndOpenPlanningSessions(tx, userID)
+		if findErr != nil {
+			return findErr
+		}
 		session, findErr = factoryModel.StartPlanningSession(tx, models.StartPlanningSessionParams{
 			CreatedByUserID: userID,
 			Repository:      repository,
@@ -54,6 +59,10 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to start planning session")
+	}
+
+	for i := range stopped {
+		cancelPlanningSessionRun(ctx, db, &stopped[i])
 	}
 
 	if session.CanvasID != nil && session.CanvasRunID != nil {
@@ -299,7 +308,7 @@ func planningSessionExecutionID(tx *gorm.DB, session *models.FactoryPlanningSess
 		return "", err
 	}
 	for i := len(executions) - 1; i >= 0; i-- {
-		if executions[i].NodeID == "agent" {
+		if executions[i].NodeID == planningCanvasAgentNodeID {
 			return executions[i].ID.String(), nil
 		}
 	}

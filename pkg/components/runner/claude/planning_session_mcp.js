@@ -52,9 +52,19 @@ async function proposeDraft(input) {
   });
 }
 
-async function say(input) {
-  return requestJSON("POST", "/api/v1/runner/planning-sessions/messages", {
-    text: String((input && input.text) || "").trim(),
+function surveyQuestions(input) {
+  const raw = input && Array.isArray(input.questions) ? input.questions : [];
+  return raw.map((question) => ({
+    prompt: String((question && question.prompt) || "").trim(),
+    options: Array.isArray(question && question.options)
+      ? question.options.map((option) => String(option || "").trim()).filter(Boolean)
+      : [],
+  }));
+}
+
+async function proposeSurvey(input) {
+  return requestJSON("POST", "/api/v1/runner/planning-sessions/surveys", {
+    questions: surveyQuestions(input),
   });
 }
 
@@ -72,12 +82,24 @@ const TOOLS = [
     },
   },
   {
-    name: "say",
-    description: "Post a chat message to the user.",
+    name: "survey",
+    description: "Show one or more multiple-choice questions above the chat. The user picks one option or writes an answer. Then stop.",
     inputSchema: {
       type: "object",
-      properties: { text: { type: "string" } },
-      required: ["text"],
+      properties: {
+        questions: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              prompt: { type: "string" },
+              options: { type: "array", items: { type: "string" } },
+            },
+            required: ["prompt", "options"],
+          },
+        },
+      },
+      required: ["questions"],
     },
   },
 ];
@@ -131,8 +153,8 @@ async function handleRequest(message) {
       let result;
       if (name === "propose_draft") {
         result = await proposeDraft(args);
-      } else if (name === "say") {
-        result = await say(args);
+      } else if (name === "survey") {
+        result = await proposeSurvey(args);
       } else {
         sendError(id, -32601, `Unknown tool: ${name}`);
         return;

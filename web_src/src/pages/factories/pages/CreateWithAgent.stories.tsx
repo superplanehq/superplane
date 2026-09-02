@@ -37,6 +37,7 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         view={view}
         onComposerChange={(composer) => setView((current) => ({ ...current, composer }))}
         onSend={() => undefined}
+        onSubmitSurvey={() => undefined}
         onDraftTitleChange={(title) =>
           setView((current) =>
             current.right.kind === "draft"
@@ -75,6 +76,22 @@ export const EmptyRight: Story = {
 export const Waiting: Story = {
   name: "Waiting for you",
   render: () => <StaticSession initial={waitingCreateWithAgentView()} />,
+};
+
+export const Survey: Story = {
+  name: "Survey above the chat",
+  render: () => (
+    <StaticSession
+      initial={waitingCreateWithAgentView({
+        survey: {
+          questions: [
+            { prompt: "What is the priority?", options: ["High", "Low"] },
+            { prompt: "What is the scope?", options: ["One file", "The service"] },
+          ],
+        },
+      })}
+    />
+  ),
 };
 
 export const Draft: Story = {

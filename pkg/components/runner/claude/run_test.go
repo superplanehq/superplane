@@ -20,7 +20,8 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_draft")
-	assert.Contains(t, tools, "mcp__superplane__say")
+	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "mcp__superplane__say")
 	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, tools, "mcp__superplane__ask")
 }

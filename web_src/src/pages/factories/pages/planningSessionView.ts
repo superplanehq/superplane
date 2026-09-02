@@ -1,4 +1,5 @@
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
+import { parsePlanningSurvey } from "./planningSessionSurvey";
 
 export function workspacePlanningRepository(
   factory: { onboarding?: { appRepository?: string | null } } | null | undefined,
@@ -58,11 +59,23 @@ export function createWithAgentViewFromSession(
     canvasId: session.canvasId ?? "",
     executionId: session.executionId ?? "",
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
+    survey: planningSessionSurveyFromMessages(session.messages ?? []),
     composer: extras.composer,
     created,
     right,
     endConfirmOpen: extras.endConfirmOpen,
   };
+}
+
+function planningSessionSurveyFromMessages(messages: PlanningSessionMessagePayload[]): CreateWithAgentView["survey"] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.kind !== "survey") {
+      continue;
+    }
+    return parsePlanningSurvey(message.text);
+  }
+  return undefined;
 }
 
 function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWithAgentView["machineStatus"] {

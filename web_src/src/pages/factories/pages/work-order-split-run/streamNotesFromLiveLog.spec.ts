@@ -180,7 +180,7 @@ describe("mergeLiveStreamNotes", () => {
         at: "",
         note: true,
         componentType: "prompt",
-        componentName: "Greet the user with say. Then stop.",
+        componentName: "Greet the user in plain text. Then stop.",
         status: "passed",
       },
       {

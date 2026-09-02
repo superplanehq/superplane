@@ -33,6 +33,7 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       view={view}
       onComposerChange={noop}
       onSend={noop}
+      onSubmitSurvey={noop}
       onDraftTitleChange={noop}
       onDraftDescriptionChange={noop}
       onCreateDraft={noop}
@@ -84,6 +85,7 @@ describe("CreateWithAgentDialog", () => {
         view={runningCreateWithAgentView({ endConfirmOpen: true })}
         onComposerChange={noop}
         onSend={noop}
+        onSubmitSurvey={noop}
         onDraftTitleChange={noop}
         onDraftDescriptionChange={noop}
         onCreateDraft={noop}
@@ -97,5 +99,19 @@ describe("CreateWithAgentDialog", () => {
 
     expect(screen.getByTestId("create-with-agent-end-confirm")).toBeInTheDocument();
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.endSessionAsk)).toBeInTheDocument();
+  });
+
+  it("shows a survey form above the chat", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        survey: {
+          questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+        },
+      }),
+    );
+
+    expect(screen.getByTestId("create-with-agent-survey")).toBeInTheDocument();
+    expect(screen.getByText("What is the priority?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
   });
 });

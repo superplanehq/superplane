@@ -25,8 +25,8 @@ type planningDraftRequest struct {
 	Description string `json:"description"`
 }
 
-type planningSayRequest struct {
-	Text string `json:"text"`
+type planningSurveyRequest struct {
+	Questions []models.PlanningSessionSurveyQuestion `json:"questions"`
 }
 
 func (s *Server) authenticatePlanningSessionRunner(w http.ResponseWriter, r *http.Request) (*runneraction.PlanningSessionScope, bool) {
@@ -130,12 +130,12 @@ func (s *Server) handleRunnerPlanningDraft(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
-func (s *Server) handleRunnerPlanningSay(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {
 		return
 	}
-	var req planningSayRequest
+	var req planningSurveyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -145,11 +145,13 @@ func (s *Server) handleRunnerPlanningSay(w http.ResponseWriter, r *http.Request)
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	if err := session.AppendAgentMessage(database.DB(r.Context()), req.Text); err != nil {
+	if err := session.ProposeSurvey(database.DB(r.Context()), models.PlanningSessionSurvey{
+		Questions: req.Questions,
+	}); err != nil {
 		writeRunnerPlanningError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "sent"})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

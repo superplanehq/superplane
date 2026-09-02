@@ -24,12 +24,22 @@ export type CreateWithAgentMessage = {
   text: string;
 };
 
+export type CreateWithAgentSurveyQuestion = {
+  prompt: string;
+  options: string[];
+};
+
+export type CreateWithAgentSurvey = {
+  questions: CreateWithAgentSurveyQuestion[];
+};
+
 export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
   canvasId: string;
   executionId: string;
   messages: CreateWithAgentMessage[];
+  survey?: CreateWithAgentSurvey;
   composer: string;
   created: CreateWithAgentCreatedOrder[];
   right: CreateWithAgentRightPane;
