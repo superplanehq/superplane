@@ -45,6 +45,7 @@ import {
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import {
+  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
@@ -76,7 +77,6 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
 import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
 import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
-import { FactorySettingsLinkedAccountsPage } from "@/pages/factories/pages/settings/FactorySettingsLinkedAccountsPage";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -254,7 +254,7 @@ const factorySettingsStorybookRoutes = [
   <Route
     key="factory-settings-account-linked-accounts"
     path="account/linked-accounts"
-    element={<FactorySettingsLinkedAccountsPage />}
+    element={<AccountLinkedAccountsRedirect />}
   />,
   <Route
     key="factory-settings-account-security"
