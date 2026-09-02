@@ -843,6 +843,93 @@ describe("line board work-order examples", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
   });
 
+  it("shows a paused-fixes footer after automatic fixes pause", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-checks",
+          pullRequestNumber: "6812",
+          description: "Automatic fixes paused after 3 attempts",
+          kind: "fixes-paused",
+          run: {
+            id: "run-paused",
+            canvasId: "canvas-checks",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.footer.attentionCard).toBe(true);
+    expect(fixture.footer.note?.headline).toBe("Automatic fixes did not succeed");
+    expect(fixture.footer.note?.text).toContain("Review the pull request");
+    expect(fixture.footer.note?.cta?.label).toBe("Review PR #6812");
+    expect(fixture.waitingNotes[0]?.headline).toBe("Automatic fixes did not succeed");
+  });
+
+  it("uses the written status note after automatic fixes pause", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
+        statusNotes: [
+          {
+            key: "pr-closure",
+            kind: "info",
+            headline: "Automatic fixes did not succeed",
+            body: "SuperPlane paused automatic fixes after 3 attempts. Review the pull request and fix the remaining checks.",
+            ctaLabel: "Review PR #6812",
+            ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
+          },
+        ],
+      },
+      {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-checks",
+            pullRequestNumber: "6812",
+            description: "Automatic fixes paused after 3 attempts",
+            kind: "fixes-paused",
+            run: {
+              id: "run-paused",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+        ],
+      },
+    );
+    expect(fixture.footer.note?.text).toContain("after 3 attempts");
+    expect(fixture.footer.note?.cta?.label).toBe("Review PR #6812");
+  });
+
+  it("hides the waiting review footer while checks are still running", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-checks",
+          pullRequestNumber: "6812",
+          description: "Waiting for checks on a82fd91",
+          kind: "checks-wait",
+          run: {
+            id: "run-checks",
+            canvasId: "canvas-checks",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-checks")?.name).toBe(
+      "Waiting for checks on a82fd91",
+    );
+  });
+
   it("hides the waiting review note while a PR feedback run is active", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [

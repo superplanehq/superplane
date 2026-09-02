@@ -1,4 +1,4 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
@@ -114,6 +114,17 @@ export function resolveSplitRunPopupArtifacts(args: {
   return args.fixtureArtifacts;
 }
 
+export function resolveSplitRunPopupPullRequests(args: {
+  fixturePullRequests: FactoriesFactoryPullRequest[];
+  livePullRequests?: FactoriesFactoryPullRequest[];
+  useLive: boolean;
+}): FactoriesFactoryPullRequest[] {
+  if (args.useLive) {
+    return args.livePullRequests ?? [];
+  }
+  return args.fixturePullRequests;
+}
+
 export function collectSplitRunArtifacts(fixture: SplitRunFixture): FactoriesWorkOrderArtifact[] {
   const seen = new Set<string>();
   const artifacts: FactoriesWorkOrderArtifact[] = [];
@@ -128,6 +139,27 @@ export function collectSplitRunArtifacts(fixture: SplitRunFixture): FactoriesWor
     }
   }
   return artifacts;
+}
+
+/** Unique pull requests from every phase stream, first occurrence wins. */
+export function collectSplitRunPullRequests(fixture: SplitRunFixture): FactoriesFactoryPullRequest[] {
+  const seen = new Set<string>();
+  const pullRequests: FactoriesFactoryPullRequest[] = [];
+  for (const phase of fixture.phases) {
+    for (const line of phase.stream) {
+      const pullRequest = line.pullRequest;
+      if (!pullRequest) {
+        continue;
+      }
+      const key = pullRequest.id ?? pullRequest.url ?? String(pullRequest.number ?? "");
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      pullRequests.push(pullRequest);
+    }
+  }
+  return pullRequests;
 }
 
 export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {

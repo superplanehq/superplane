@@ -1,4 +1,3 @@
-import { useWorkOrderArtifacts } from "@/hooks/useFactoryData";
 import { useEffect, useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,16 +17,13 @@ import {
   type SplitRunPhaseId,
 } from "./splitRunMocks";
 import {
-  collectSplitRunArtifacts,
   defaultSplitRunPopupTab,
-  resolveSplitRunPopupArtifacts,
   type SplitRunPopupTab,
-  splitRunDescriptionMarkdown,
   splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
-  splitRunSourceDescription,
 } from "./splitRunPopupModel";
+import { useSplitRunPopupData } from "./useSplitRunPopupData";
 import { useSplitRunFooterActions, type SplitRunFooterActions } from "./useSplitRunFooterActions";
 import { useSplitRunWorkOrderEdits } from "./useSplitRunWorkOrderEdits";
 import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
@@ -208,27 +204,14 @@ export function WorkOrderSplitRunPopup({
 }) {
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
-  const fixtureArtifacts = collectSplitRunArtifacts(fixture);
-  const useLiveArtifacts = hasLiveWorkOrder(organizationId, factoryId, orderId);
-  const liveArtifactsQuery = useWorkOrderArtifacts(organizationId ?? "", factoryId ?? "", orderId ?? "");
-  const artifacts = resolveSplitRunPopupArtifacts({
-    fixtureArtifacts,
-    liveArtifacts: liveArtifactsQuery.data,
-    useLive: useLiveArtifacts,
-  });
-  const artifactDescription = splitRunDescriptionMarkdown(artifacts) || splitRunDescriptionMarkdown(fixtureArtifacts);
-  const sourceDescription = splitRunSourceDescription({
-    workOrderDescription: fixture.descriptionText,
-    artifactDescription,
-    preferWorkOrder: useLiveArtifacts,
-  });
+  const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
   const edits = useSplitRunWorkOrderEdits({
     organizationId,
     factoryId,
     orderId,
     canUpdate,
     title: fixture.title,
-    description: sourceDescription,
+    description: popupData.sourceDescription,
     owner: fixture.owner,
     assigneeIds: fixture.assigneeIds ?? [],
     footerKind: fixture.footer.kind,
@@ -255,8 +238,11 @@ export function WorkOrderSplitRunPopup({
       <SplitRunPopupTabs
         fixture={fixture}
         edits={edits}
-        artifacts={artifacts}
-        artifactsLoading={useLiveArtifacts && liveArtifactsQuery.isLoading}
+        artifacts={popupData.artifacts}
+        artifactsLoading={popupData.artifactsLoading}
+        pullRequests={popupData.pullRequests}
+        pullRequestsLoading={popupData.pullRequestsLoading}
+        pullRequestsError={popupData.pullRequestsError}
         organizationId={organizationId}
         factoryId={factoryId}
         factoryKey={factoryKey}
@@ -316,15 +302,14 @@ function returnToBacklogAction(
   };
 }
 
-function hasLiveWorkOrder(organizationId?: string, factoryId?: string, orderId?: string) {
-  return Boolean(organizationId && factoryId && orderId);
-}
-
 function SplitRunPopupTabs({
   fixture,
   edits,
   artifacts,
   artifactsLoading,
+  pullRequests,
+  pullRequestsLoading,
+  pullRequestsError,
   organizationId,
   factoryId,
   factoryKey,
@@ -338,8 +323,11 @@ function SplitRunPopupTabs({
 }: {
   fixture: SplitRunFixture;
   edits: ReturnType<typeof useSplitRunWorkOrderEdits>;
-  artifacts: ReturnType<typeof collectSplitRunArtifacts>;
+  artifacts: ReturnType<typeof useSplitRunPopupData>["artifacts"];
   artifactsLoading: boolean;
+  pullRequests: ReturnType<typeof useSplitRunPopupData>["pullRequests"];
+  pullRequestsLoading: boolean;
+  pullRequestsError: Error | null;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -389,6 +377,9 @@ function SplitRunPopupTabs({
           artifacts={artifacts}
           checks={fixture.checks}
           artifactsLoading={artifactsLoading}
+          pullRequests={pullRequests}
+          pullRequestsLoading={pullRequestsLoading}
+          pullRequestsError={pullRequestsError}
           organizationId={organizationId}
           factoryKey={factoryKey}
           orderNumber={orderNumber}

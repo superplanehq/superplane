@@ -20,10 +20,11 @@ type llmModelListScope struct {
 }
 
 func parseLLMModelListScope(tx *gorm.DB, orgID, provider, factoryID, internalMessage string) (llmModelListScope, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organization, err := models.FindOrganizationByIDOrSlug(tx, orgID)
 	if err != nil {
 		return llmModelListScope{}, grpcerrors.InvalidArgument(err, "invalid organization id")
 	}
+	organizationID := organization.ID
 	normalized, err := models.NormalizeHostedLLMProvider(provider)
 	if err != nil {
 		return llmModelListScope{}, grpcerrors.InvalidArgument(err, err.Error())

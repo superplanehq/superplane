@@ -141,6 +141,38 @@ describe("layoutFactoryRunLeafGraph", () => {
     expectNoOverlaps(result.positions);
   });
 
+  it("parks a terminal leaf one column right when extra roots merge into the spine", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "onComment" },
+        { id: "onReview" },
+        { id: "onReviewComment" },
+        { id: "findPr" },
+        { id: "addActivity" },
+        { id: "claude" },
+      ],
+      [
+        { source: "onComment", target: "findPr", sourceHandle: "default" },
+        { source: "onReview", target: "findPr", sourceHandle: "default" },
+        { source: "onReviewComment", target: "findPr", sourceHandle: "default" },
+        { source: "findPr", target: "addActivity", sourceHandle: "found" },
+        { source: "addActivity", target: "claude", sourceHandle: "default" },
+      ],
+    );
+
+    const findPr = result.positions.get("findPr")!;
+    const addActivity = result.positions.get("addActivity")!;
+    const claude = result.positions.get("claude")!;
+    const onReview = result.positions.get("onReview")!;
+    const onReviewComment = result.positions.get("onReviewComment")!;
+
+    expect(addActivity.x).toBe(findPr.x);
+    expect(claude.x).toBe(onReview.x);
+    expect(claude.x).toBeLessThan(onReviewComment.x);
+    expect(claude.y).toBe(addActivity.y);
+    expectNoOverlaps(result.positions);
+  });
+
   it("treats a terminal-only successor as a side leaf", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "a" }, { id: "b" }],

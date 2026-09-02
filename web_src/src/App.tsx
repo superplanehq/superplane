@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -37,8 +37,9 @@ import {
   FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsNotificationsPage,
-  FactorySettingsProfilePage,
+  FactorySettingsAccountNotificationsPage,
+  FactorySettingsAccountProfilePage,
+  FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
@@ -295,11 +296,25 @@ function FactoryLineEditPageGate() {
 
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route key="factory-settings-account-general" path="account/general" element={<FactorySettingsProfilePage />} />,
+  <Route
+    key="factory-settings-account-general"
+    path="account/general"
+    element={<Navigate to="../profile" replace />}
+  />,
+  <Route
+    key="factory-settings-account-profile"
+    path="account/profile"
+    element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-security"
+    path="account/security"
+    element={<FactorySettingsAccountSecurityPage />}
+  />,
   <Route
     key="factory-settings-account-notifications"
     path="account/notifications"
-    element={<FactorySettingsNotificationsPage />}
+    element={<FactorySettingsAccountNotificationsPage />}
   />,
   <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
   <Route
@@ -312,7 +327,15 @@ const factorySettingsSectionRoutes = [
     path="workspace/automations"
     element={<FactorySettingsAutomationsPage />}
   />,
-  <Route key="factory-settings-workspace-models" path="workspace/models" element={<FactorySettingsModelsPage />} />,
+  <Route
+    key="factory-settings-workspace-models"
+    path="workspace/models"
+    element={
+      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
+        <FactorySettingsModelsPage />
+      </RequireExperimentalFeature>
+    }
+  />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
   <Route
     key="factory-settings-organization-general"

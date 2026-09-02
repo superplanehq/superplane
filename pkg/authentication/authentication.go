@@ -28,8 +28,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/utils"
-	"golang.org/x/oauth2"
-	githubOAuth "golang.org/x/oauth2/github"
 	"gorm.io/gorm"
 )
 
@@ -50,15 +48,14 @@ const (
 )
 
 type Handler struct {
-	jwtSigner              *jwt.Signer
-	authService            authorization.Authorization
-	encryptor              crypto.Encryptor
-	isDev                  bool
-	templateDir            string
-	blockSignup            bool
-	passwordLoginEnabled   bool
-	magicCodeEnabled       bool
-	githubAccountLinkOAuth *oauth2.Config
+	jwtSigner            *jwt.Signer
+	authService          authorization.Authorization
+	encryptor            crypto.Encryptor
+	isDev                bool
+	templateDir          string
+	blockSignup          bool
+	passwordLoginEnabled bool
+	magicCodeEnabled     bool
 }
 
 type ProviderConfig struct {
@@ -100,13 +97,6 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		switch providerName {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
-			a.githubAccountLinkOAuth = &oauth2.Config{
-				ClientID:     config.Key,
-				ClientSecret: config.Secret,
-				Endpoint:     githubOAuth.Endpoint,
-				RedirectURL:  strings.TrimRight(config.CallbackURL, "/") + "/link",
-				Scopes:       []string{"user:email"},
-			}
 			log.Infof("GitHub OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
@@ -155,11 +145,14 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
-		a.completeProviderAuth(w, r, gothUser)
+		a.finishProviderAuth(w, r, gothUser)
 		return
 	}
 
-	authState := getAuthState(r)
+	authState, err := a.authStateForRequest(w, r)
+	if err != nil {
+		return
+	}
 	if authState != "" {
 		r2 := new(http.Request)
 		*r2 = *r
@@ -192,7 +185,55 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
+	if isLinkIntent(r) {
+		state, err := a.parseLinkState(linkStateFromRequest(r))
+		if err != nil {
+			account, sessionErr := a.sessionAccountFromCookie(r)
+			if sessionErr != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			signed, signErr := a.signLinkState(account.ID.String(), provider, getRedirectURL(r))
+			if signErr != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			state, err = a.parseLinkState(signed)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+		a.completeProviderLink(w, r, mockUser, state)
+		return
+	}
+
 	a.completeProviderAuth(w, r, mockUser)
+}
+
+func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	if !isLinkIntent(r) {
+		a.completeProviderAuth(w, r, gothUser)
+		return
+	}
+
+	account, err := a.sessionAccountFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	signed, err := a.signLinkState(account.ID.String(), mux.Vars(r)["provider"], getRedirectURL(r))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	state, err := a.parseLinkState(signed)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	a.completeProviderLink(w, r, gothUser, state)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -206,6 +247,17 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	rawState := linkStateFromRequest(r)
+	if strings.HasPrefix(rawState, authLinkStatePrefix) {
+		state, err := a.parseLinkState(rawState)
+		if err != nil {
+			http.Error(w, "Failed to connect sign-in method", http.StatusBadRequest)
+			return
+		}
+		a.completeProviderLink(w, r, gothUser, state)
+		return
+	}
+
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
@@ -1016,6 +1068,26 @@ func isSignupIntentFromRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Query().Get("state"), authSignupStatePrefix)
 }
 
+func (a *Handler) authStateForRequest(w http.ResponseWriter, r *http.Request) (string, error) {
+	if isLinkIntent(r) {
+		account, err := a.sessionAccountFromCookie(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return "", err
+		}
+
+		provider := mux.Vars(r)["provider"]
+		state, err := a.signLinkState(account.ID.String(), provider, getRedirectURL(r))
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return "", err
+		}
+		return state, nil
+	}
+
+	return getAuthState(r), nil
+}
+
 func getAuthState(r *http.Request) string {
 	redirectURL := getRedirectURL(r)
 	if isSignupIntentFromRequest(r) {
@@ -1089,6 +1161,10 @@ func getRedirectURL(r *http.Request) string {
 		if redirectParam == "" {
 			return "/"
 		}
+	}
+
+	if strings.HasPrefix(redirectParam, authLinkStatePrefix) {
+		return "/"
 	}
 
 	decodedURL, err := url.QueryUnescape(redirectParam)

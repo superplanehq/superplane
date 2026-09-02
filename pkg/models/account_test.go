@@ -83,6 +83,7 @@ func TestAccount_UpdateEmail(t *testing.T) {
 		organization := &Organization{
 			ID:   orgID,
 			Name: "Test Org",
+			Slug: "test-org-" + orgID.String(),
 		}
 		err := database.Conn().Create(organization).Error
 		require.NoError(t, err)
@@ -182,6 +183,7 @@ func TestAccount_UpdateEmailForProvider(t *testing.T) {
 		organization := &Organization{
 			ID:   orgID,
 			Name: "Test Org",
+			Slug: "test-org-" + orgID.String(),
 		}
 		err := database.Conn().Create(organization).Error
 		require.NoError(t, err)

@@ -345,6 +345,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
 		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
@@ -370,6 +371,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		payload, ok := result.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
 		assert.Equal(t, defaultBranch, payload["default_branch"])
 	})
 
@@ -390,6 +392,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		payload, ok := result.(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, currentRepository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+currentRepository+".git", payload["repository_url"])
 		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
 	})
 
@@ -402,6 +405,10 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Ship feature", title)
 
+		repositoryURL, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/acme/current-service.git", repositoryURL)
+
 		issueNumber, err := builder.ResolveExpression(`order().source.issue.number`)
 		require.NoError(t, err)
 		assert.Equal(t, float64(42), issueNumber)
@@ -413,6 +420,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), built["orderID"])
 		assert.Equal(t, "Ship feature", built["title"])
+	})
+
+	t.Run("task is an alias of order", func(t *testing.T) {
+		id, err := builder.ResolveExpression(`task().id`)
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), id)
+
+		title, err := builder.ResolveExpression(`task().title`)
+		require.NoError(t, err)
+		assert.Equal(t, "Ship feature", title)
+
+		count, err := builder.ResolveExpression(`len(task().artifacts)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		_, err = builder.ResolveExpression(`task(1)`)
+		require.ErrorContains(t, err, "task() takes no arguments")
 	})
 
 	t.Run("permalink back to the work order", func(t *testing.T) {

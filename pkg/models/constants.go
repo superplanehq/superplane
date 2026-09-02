@@ -3,8 +3,9 @@ package models
 import "fmt"
 
 const (
-	ProviderGitHub = "github"
-	ProviderGoogle = "google"
+	ProviderGitHub   = "github"
+	ProviderGoogle   = "google"
+	ProviderPassword = "password"
 
 	DomainTypeOrganization = "org"
 
@@ -33,6 +34,7 @@ const (
 
 var (
 	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
+	ErrSlugAlreadyUsed         = fmt.Errorf("slug already used")
 	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
 )
 

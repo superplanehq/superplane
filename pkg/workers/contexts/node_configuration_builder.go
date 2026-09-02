@@ -508,13 +508,12 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveAppPayload()
 		}),
-		expr.Function("order", func(params ...any) (any, error) {
-			if len(params) != 0 {
-				return nil, fmt.Errorf("order() takes no arguments")
-			}
-
+		expr.Function("order", noArgExpressionFunc("order", func() (any, error) {
 			return b.resolveOrderPayload(expression)
-		}),
+		})),
+		expr.Function("task", noArgExpressionFunc("task", func() (any, error) {
+			return b.resolveOrderPayload(expression)
+		})),
 		expr.Function("workspace", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("workspace() takes no arguments")
@@ -1045,10 +1044,11 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 	return payload, nil
 }
 
-// resolveOrderPayload exposes the work order driving this run via order().
-// Returns nil when the run is not attached to a factory work-order execution.
-// The url, artifacts, comments, and assignees are loaded only when the expression AST
-// references order().url / order().artifacts / order().comments / order().assignees.
+// resolveOrderPayload exposes the work order driving this run via order()
+// and its task() alias. Returns nil when the run is not attached to a
+// factory work-order execution. The url, artifacts, comments, and assignees
+// are loaded only when the expression AST references those fields on order()
+// or task().
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1087,6 +1087,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		"state":          order.State,
 		"result":         order.Result,
 		"repository":     repository,
+		"repository_url": githubRepositoryURL(repository),
 		"default_branch": defaultBranch,
 	}
 
@@ -1212,6 +1213,10 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 	}
 
 	return repository, defaultBranch, nil
+}
+
+func githubRepositoryURL(repository string) string {
+	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
@@ -1500,6 +1505,7 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 	"run":       {},
 	"app":       {},
 	"order":     {},
+	"task":      {},
 	"workspace": {},
 	"ctx":       {},
 }
@@ -1507,6 +1513,15 @@ var reservedExpressionIdentifiers = map[string]struct{}{
 func isReservedExpressionIdentifier(name string) bool {
 	_, ok := reservedExpressionIdentifiers[name]
 	return ok
+}
+
+func noArgExpressionFunc(name string, resolve func() (any, error)) func(params ...any) (any, error) {
+	return func(params ...any) (any, error) {
+		if len(params) != 0 {
+			return nil, fmt.Errorf("%s() takes no arguments", name)
+		}
+		return resolve()
+	}
 }
 
 func stringValue(value *string) string {
