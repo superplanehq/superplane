@@ -143,11 +143,11 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
-	environment, err = injectOpenRouterCredentials(ctx, environment, spec.Credentials, spec.Model)
+	environment, err := injectOpenRouterCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	commands, files := buildOpenRouterBrokerTask(spec)
+	commands, files := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups)
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       commands,
