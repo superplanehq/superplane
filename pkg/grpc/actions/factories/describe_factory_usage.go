@@ -48,6 +48,15 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
+	computeTotals, byMachine, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+		OrganizationID: orgID,
+		FactoryID:      &factoryID,
+		Since:          since,
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
+	}
+
 	credit, err := models.DescribeOrganizationLLMCredit(db, orgID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
@@ -58,9 +67,10 @@ func DescribeFactoryUsage(
 		return nil, factoryErrorToStatus(err, "failed to describe factory usage")
 	}
 
+	ledger := totals.Add(computeTotals)
 	resp := &pb.DescribeFactoryUsageResponse{
-		TotalTokens:                   totals.TotalTokens,
-		TotalCostCents:                totals.CostCents(),
+		TotalTokens:                   ledger.TotalTokens,
+		TotalCostCents:                ledger.CostCents(),
 		PeriodDays:                    int32(period),
 		ByModel:                       serializeUsageByModel(byModel),
 		RemainingCreditCents:          pricebook.MicrosToCents(credit.RemainingMicros),
@@ -70,6 +80,8 @@ func DescribeFactoryUsage(
 		FactoryHostedBilledCents:      pricebook.MicrosToCents(budget.BilledMicros),
 		FactoryRemainingCreditCents:   pricebook.MicrosToCents(budget.RemainingMicros),
 		FactoryRemainingCreditWarning: budget.Warning,
+		TotalDurationSeconds:          ledger.DurationSeconds,
+		ByMachineType:                 serializeUsageByMachineType(byMachine),
 	}
 	if budget.BudgetCents != nil {
 		resp.HostedSpendBudgetCents = budget.BudgetCents
@@ -95,6 +107,18 @@ func serializeUsageByModel(rows []models.UsageByModel) []*pb.UsageByModel {
 			Model:       row.Model,
 			TotalTokens: row.TotalTokens,
 			CostCents:   row.CostCents(),
+		})
+	}
+	return out
+}
+
+func serializeUsageByMachineType(rows []models.UsageByMachineType) []*pb.UsageByMachineType {
+	out := make([]*pb.UsageByMachineType, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &pb.UsageByMachineType{
+			MachineType:     row.MachineType,
+			DurationSeconds: row.DurationSeconds,
+			CostCents:       row.CostCents(),
 		})
 	}
 	return out

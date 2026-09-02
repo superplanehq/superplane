@@ -53,7 +53,7 @@ spec:
         'y': 258
       isCollapsed: false
     - id: assigned-to-agent
-      name: Assigned to agent?
+      name: Assigned To Agent?
       type: TYPE_ACTION
       component: filter
       configuration:

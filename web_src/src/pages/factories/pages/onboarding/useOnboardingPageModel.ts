@@ -1,10 +1,10 @@
 import type { FactoriesFactory } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
+import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
-import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -162,7 +162,7 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 }
 
 function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
-  const spend = useOrganizationLLMSpend(organizationId);
+  const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
   return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
 }
@@ -268,6 +268,7 @@ export function useOnboardingPageModel(args: {
     createIntake: createIntake.mutateAsync,
     listPRFeedbackHandlers: () => fetchFactoryPRFeedbackHandlers(args.organizationId, args.factoryId),
     createPRFeedbackHandler: createPRFeedbackHandler.mutateAsync,
+    listApps: () => fetchFactoryApps(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
       resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
     remainingCreditCents: agent.remainingCreditCents,
@@ -285,6 +286,9 @@ export function useOnboardingPageModel(args: {
 
   return {
     setup,
+    // True when hosted credentials cover the agent, so setup can skip the
+    // agent screen and provision from the ticket screen.
+    hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,

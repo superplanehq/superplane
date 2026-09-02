@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -378,7 +379,8 @@ func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.R
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		message := fmt.Sprintf("request failed: %v", err)
+		return nil, core.NewProviderTransportError(message, errors.New(message))
 	}
 	defer res.Body.Close()
 
@@ -400,10 +402,12 @@ func (c *Client) doRequestCtx(ctx context.Context, method, URL string, body io.R
 
 		// Handle 401 specifically
 		if res.StatusCode == http.StatusUnauthorized {
-			return nil, fmt.Errorf("Claude credentials are invalid or expired: %s", errorMessage)
+			message := fmt.Sprintf("Claude credentials are invalid or expired: %s", errorMessage)
+			return nil, core.NewProviderAPIError(res.StatusCode, message, errors.New(message))
 		}
 
-		return nil, fmt.Errorf("request failed (%d): %s", res.StatusCode, errorMessage)
+		message := fmt.Sprintf("request failed (%d): %s", res.StatusCode, errorMessage)
+		return nil, core.NewProviderAPIError(res.StatusCode, message, errors.New(message))
 	}
 	return responseBody, nil
 }

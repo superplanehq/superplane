@@ -34,7 +34,7 @@ func Test__FactoryLine__Dispatch__SnapshotsLineAndStartsStepZero(t *testing.T) {
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
 	}
-	require.NoError(t, line.Update(db, nil, steps))
+	require.NoError(t, line.Update(db, nil, steps, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -80,7 +80,7 @@ func Test__FactoryLine__DispatchFrom__StartsRequestedStep(t *testing.T) {
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var result *models.FactoryLineStepResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -237,7 +237,7 @@ func Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine(t *t
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}))
+	}, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -251,7 +251,7 @@ func Test__FactoryWorkOrderLineDispatch__StartStep__UsesSnapshotNotLiveLine(t *t
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: thirdApp.ID, Entrypoint: thirdEntry},
-	}))
+	}, nil))
 
 	var result *models.FactoryLineStepResult
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

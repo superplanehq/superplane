@@ -26,7 +26,8 @@ type SetupOwnerRequest struct {
 }
 
 type SetupOwnerResponse struct {
-	OrganizationID string `json:"organization_id"`
+	OrganizationID   string `json:"organization_id"`
+	OrganizationSlug string `json:"organization_slug"`
 }
 
 func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +104,8 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return nil
+
+		return models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
 	})
 
 	if err != nil {
@@ -135,6 +137,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(SetupOwnerResponse{
-		OrganizationID: organization.ID.String(),
+		OrganizationID:   organization.ID.String(),
+		OrganizationSlug: organization.Slug,
 	})
 }

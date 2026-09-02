@@ -238,7 +238,6 @@ export function findWeakComponents(
 export function computeComponentLayers(
   component: string[],
   componentSet: Set<string>,
-  rootsForComponent: string[],
   incoming: Map<string, FactoryRunLayoutEdge[]>,
 ): Map<string, number> {
   const layer = new Map<string, number>();
@@ -252,13 +251,8 @@ export function computeComponentLayers(
     changed = false;
     guard += 1;
     for (const id of component) {
-      let best = rootsForComponent.includes(id) ? 0 : 0;
       const parents = (incoming.get(id) ?? []).filter((e) => componentSet.has(e.source));
-      if (parents.length === 0) {
-        best = 0;
-      } else {
-        best = Math.max(...parents.map((e) => (layer.get(e.source) ?? 0) + 1));
-      }
+      const best = parents.length === 0 ? 0 : Math.max(...parents.map((e) => (layer.get(e.source) ?? 0) + 1));
       if ((layer.get(id) ?? 0) !== best) {
         layer.set(id, best);
         changed = true;
@@ -303,6 +297,17 @@ type AssignComponentColumnsOptions = {
   incoming: Map<string, FactoryRunLayoutEdge[]>;
   isMainSuccessor: SpinePickers["isMainSuccessor"];
 };
+
+/** Off-spine forks start after lanes that still have nodes below the roots. */
+export function firstSideColumnForComponent(spineColumns: Map<string, number>, layer: Map<string, number>): number {
+  let maxContinuingColumn = -1;
+  for (const [id, col] of spineColumns) {
+    if ((layer.get(id) ?? 0) > 0) {
+      maxContinuingColumn = Math.max(maxContinuingColumn, col);
+    }
+  }
+  return Math.max(maxContinuingColumn + 1, 1);
+}
 
 export function assignComponentColumns(options: AssignComponentColumnsOptions): Map<string, number> {
   const { component, componentSet, spineColumns, firstSideColumn, layer, incoming, isMainSuccessor } = options;

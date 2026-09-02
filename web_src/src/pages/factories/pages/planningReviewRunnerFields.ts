@@ -69,16 +69,6 @@ const environmentVariableSchema: ConfigurationField[] = [
   },
 ];
 
-export const PLANNING_REVIEW_ENVIRONMENT_MODEL_FIELDS = ["machineType", "model"];
-
-export const PLANNING_REVIEW_ADVANCED_FIELD_NAMES = [
-  "workingDirectory",
-  "credentials",
-  "environmentFrom",
-  "environment",
-  "executionTimeoutSeconds",
-];
-
 export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
   {
     name: "machineType",

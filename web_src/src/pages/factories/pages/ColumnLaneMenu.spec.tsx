@@ -192,6 +192,52 @@ describe("ColumnLaneMenu", () => {
     expect(onEdit).not.toHaveBeenCalled();
   });
 
+  it("offers Add intake ahead of the other actions when supplied", async () => {
+    const onAddIntake = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          onAddIntake={onAddIntake}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const addIntake = screen.getByTestId("lines-backlog-menu-add-intake");
+    expect(addIntake).toHaveTextContent("Add intake");
+    const edit = screen.getByTestId("lines-backlog-menu-edit");
+    expect(addIntake.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.click(addIntake);
+    expect(onAddIntake).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Add intake when it is not supplied", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
+  });
+
   it("hides Edit automation when no automation href is supplied", async () => {
     const user = userEvent.setup();
 

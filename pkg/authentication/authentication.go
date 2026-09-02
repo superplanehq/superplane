@@ -145,11 +145,14 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
-		a.completeProviderAuth(w, r, gothUser)
+		a.finishProviderAuth(w, r, gothUser)
 		return
 	}
 
-	authState := getAuthState(r)
+	authState, err := a.authStateForRequest(w, r)
+	if err != nil {
+		return
+	}
 	if authState != "" {
 		r2 := new(http.Request)
 		*r2 = *r
@@ -182,7 +185,65 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
+	if isConnectIntent(r) {
+		a.finishAccountConnection(w, r, mockUser)
+		return
+	}
+
+	if isLinkIntent(r) {
+		state, err := a.parseLinkState(linkStateFromRequest(r))
+		if err != nil {
+			account, sessionErr := a.sessionAccountFromCookie(r)
+			if sessionErr != nil {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+			signed, signErr := a.signLinkState(account.ID.String(), provider, getRedirectURL(r))
+			if signErr != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+			state, err = a.parseLinkState(signed)
+			if err != nil {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
+		a.completeProviderLink(w, r, mockUser, state)
+		return
+	}
+
 	a.completeProviderAuth(w, r, mockUser)
+}
+
+func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	if isConnectIntent(r) {
+		a.finishAccountConnection(w, r, gothUser)
+		return
+	}
+
+	if !isLinkIntent(r) {
+		a.completeProviderAuth(w, r, gothUser)
+		return
+	}
+
+	account, err := a.sessionAccountFromCookie(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	signed, err := a.signLinkState(account.ID.String(), mux.Vars(r)["provider"], getRedirectURL(r))
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	state, err := a.parseLinkState(signed)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	a.completeProviderLink(w, r, gothUser, state)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -196,6 +257,27 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	rawState := linkStateFromRequest(r)
+	if strings.HasPrefix(rawState, authConnectStatePrefix) {
+		state, err := a.parseConnectState(rawState)
+		if err != nil {
+			http.Error(w, "Failed to link account", http.StatusBadRequest)
+			return
+		}
+		a.completeAccountConnection(w, r, gothUser, state)
+		return
+	}
+
+	if strings.HasPrefix(rawState, authLinkStatePrefix) {
+		state, err := a.parseLinkState(rawState)
+		if err != nil {
+			http.Error(w, "Failed to connect sign-in method", http.StatusBadRequest)
+			return
+		}
+		a.completeProviderLink(w, r, gothUser, state)
+		return
+	}
+
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
@@ -1006,6 +1088,47 @@ func isSignupIntentFromRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Query().Get("state"), authSignupStatePrefix)
 }
 
+func (a *Handler) authStateForRequest(w http.ResponseWriter, r *http.Request) (string, error) {
+	if isConnectIntent(r) {
+		provider := mux.Vars(r)["provider"]
+		if !isConnectableProvider(provider) {
+			http.Error(w, "Provider does not support linked accounts", http.StatusBadRequest)
+			return "", errors.New("provider does not support linked accounts")
+		}
+
+		account, err := a.sessionAccountFromCookie(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return "", err
+		}
+
+		state, err := a.signConnectState(account.ID.String(), provider, getRedirectURL(r))
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return "", err
+		}
+		return state, nil
+	}
+
+	if isLinkIntent(r) {
+		account, err := a.sessionAccountFromCookie(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return "", err
+		}
+
+		provider := mux.Vars(r)["provider"]
+		state, err := a.signLinkState(account.ID.String(), provider, getRedirectURL(r))
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return "", err
+		}
+		return state, nil
+	}
+
+	return getAuthState(r), nil
+}
+
 func getAuthState(r *http.Request) string {
 	redirectURL := getRedirectURL(r)
 	if isSignupIntentFromRequest(r) {
@@ -1079,6 +1202,10 @@ func getRedirectURL(r *http.Request) string {
 		if redirectParam == "" {
 			return "/"
 		}
+	}
+
+	if strings.HasPrefix(redirectParam, authLinkStatePrefix) {
+		return "/"
 	}
 
 	decodedURL, err := url.QueryUnescape(redirectParam)

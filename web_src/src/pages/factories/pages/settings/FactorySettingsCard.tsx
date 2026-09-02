@@ -1,7 +1,11 @@
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factorySectionBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
+import {
+  factoryCardClassName,
+  factorySettingsSectionBodyClassName,
+  factorySettingsSectionHeaderClassName,
+} from "../factoryPageLayoutStyles";
 
 export function FactorySettingsPageFrame({
   title,
@@ -17,12 +21,12 @@ export function FactorySettingsPageFrame({
   return (
     <>
       <WorkspacePageHeader
-        className={factorySectionHeaderClassName}
+        className={factorySettingsSectionHeaderClassName}
         title={title}
         subtitle={subtitle}
         actions={actions}
       />
-      <div className={cn(factorySectionBodyClassName, "flex flex-col gap-8")}>{children}</div>
+      <div className={cn(factorySettingsSectionBodyClassName, "flex flex-col gap-5")}>{children}</div>
     </>
   );
 }
@@ -43,7 +47,7 @@ export function FactorySettingsCard({
   "data-testid"?: string;
 }) {
   return (
-    <section className={cn("rounded-lg border border-border p-4", className)} data-testid={testId}>
+    <section className={cn(factoryCardClassName, "p-4", className)} data-testid={testId}>
       {title || action ? (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title ? (

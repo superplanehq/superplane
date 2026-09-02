@@ -33,6 +33,7 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
+import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
 import {
   getWorkOrderEventsNextPageParam,
   WORK_ORDER_EVENTS_PAGE_LIMIT,
@@ -71,13 +72,11 @@ export const factoryQueryKeys = {
   pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
     ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
-  velocity: (
-    organizationId: string,
-    factoryId: string,
-    periodDays: number,
-    integrationId: string,
-    repository: string,
-  ) => ["factories", organizationId, factoryId, "velocity", periodDays, integrationId, repository] as const,
+  velocity: (organizationId: string, factoryId: string, periodDays: number, repository: string) =>
+    ["factories", organizationId, factoryId, "velocity", periodDays, repository] as const,
+  /** Every period and repository of one workspace, for refreshing after a sync. */
+  velocityAll: (organizationId: string, factoryId: string) =>
+    ["factories", organizationId, factoryId, "velocity"] as const,
 };
 
 function factoryListKey(organizationId: string) {
@@ -442,7 +441,47 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
+    // Dispatch is synchronous on the server, but the UI would otherwise wait
+    // for the whole-factory ListWorkOrders refetch triggered by onSuccess
+    // before the card leaves Backlog. Patch the cache immediately instead, so
+    // the card is already on the line's first phase column when this
+    // function returns, and roll the patch back if the request fails.
+    onMutate: async (variables) => {
+      const ordersKey = workOrdersKey(organizationId, factoryId);
+      await queryClient.cancelQueries({ queryKey: ordersKey });
+
+      const previousOrders = queryClient.getQueryData<FactoriesWorkOrder[]>(ordersKey);
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      const line = factory?.lines?.find((candidate) => candidate.name === variables.lineName);
+
+      // Placing the card needs the line's id (and its steps, for the phase
+      // label); skip the patch when the factory detail isn't cached yet.
+      // Dispatch still succeeds — the card just waits for the invalidated
+      // list below to move it, same as before this change.
+      if (line && previousOrders) {
+        const now = new Date().toISOString();
+        queryClient.setQueryData<FactoriesWorkOrder[]>(ordersKey, (current) =>
+          (current ?? []).map((order) =>
+            order.id === variables.orderId ? buildOptimisticDispatchedOrder(order, line, now) : order,
+          ),
+        );
+      }
+
+      return { previousOrders };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousOrders) {
+        queryClient.setQueryData(workOrdersKey(organizationId, factoryId), context.previousOrders);
+      }
+    },
+    onSuccess: (order, variables) => {
+      // Reconcile the optimistic placeholder with the real dispatch id,
+      // execution id, and run refs, so the card doesn't flicker back to
+      // Backlog before the invalidated queries below refetch.
+      queryClient.setQueryData<FactoriesWorkOrder[]>(workOrdersKey(organizationId, factoryId), (current) =>
+        (current ?? []).map((existing) => (existing.id === order.id ? order : existing)),
+      );
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({
         queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
@@ -565,18 +604,20 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
+export async function fetchFactoryApps(organizationId: string, factoryId: string): Promise<FactoryApp[]> {
+  const response = await factoriesListFactoryApps(
+    withOrganizationHeader({
+      organizationId,
+      path: { factoryId },
+    }),
+  );
+  return response.data?.apps ?? [];
+}
+
 export function useFactoryApps(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryAppsKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoryApp[]> => {
-      const response = await factoriesListFactoryApps(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.apps ?? [];
-    },
+    queryFn: () => fetchFactoryApps(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
   });
 }
@@ -611,7 +652,12 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { lineId: string; name?: string; steps?: FactoryLineStep[] }) => {
+    mutationFn: async (input: {
+      lineId: string;
+      name?: string;
+      steps?: FactoryLineStep[];
+      columnColors?: Record<string, string>;
+    }) => {
       const response = await factoriesUpdateFactoryLine(
         withOrganizationHeader({
           organizationId,
@@ -619,6 +665,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
           body: {
             name: input.name,
             steps: input.steps,
+            columnColors: input.columnColors,
           },
         }),
       );
@@ -627,7 +674,16 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       }
       return response.data.line;
     },
-    onSuccess: () => {
+    onSuccess: (line) => {
+      queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {
+        if (!current?.lines) {
+          return current;
+        }
+        return {
+          ...current,
+          lines: current.lines.map((existing) => (existing.id === line.id ? line : existing)),
+        };
+      });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
