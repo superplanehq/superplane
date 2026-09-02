@@ -604,18 +604,20 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
+export async function fetchFactoryApps(organizationId: string, factoryId: string): Promise<FactoryApp[]> {
+  const response = await factoriesListFactoryApps(
+    withOrganizationHeader({
+      organizationId,
+      path: { factoryId },
+    }),
+  );
+  return response.data?.apps ?? [];
+}
+
 export function useFactoryApps(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryAppsKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoryApp[]> => {
-      const response = await factoriesListFactoryApps(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.apps ?? [];
-    },
+    queryFn: () => fetchFactoryApps(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
   });
 }

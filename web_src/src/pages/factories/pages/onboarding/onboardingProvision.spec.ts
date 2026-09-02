@@ -91,11 +91,12 @@ describe("provisionLine", () => {
 });
 
 describe("provisionEventApps", () => {
-  it("installs PR closure for the workspace", async () => {
+  it("installs PR closure for the workspace that has none", async () => {
     const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
       canvasId: `canvas-${factoryId}`,
       canvasName: factoryId,
     }));
+    const listApps = vi.fn().mockResolvedValue([]);
 
     await provisionEventApps({
       factoryId: "factory-1",
@@ -104,6 +105,7 @@ describe("provisionEventApps", () => {
       backlogRepository: "acme/backlog",
       defaultBranch: "staging",
       installFactory,
+      listApps,
     });
 
     expect(installFactory).toHaveBeenCalledTimes(1);
@@ -118,6 +120,61 @@ describe("provisionEventApps", () => {
         },
       }),
     );
+  });
+
+  it("does not install PR closure when the workspace already has it", async () => {
+    const installFactory = vi.fn();
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "staging",
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory).not.toHaveBeenCalled();
+  });
+
+  it("does not install PR closure when it was renamed to PR Closure (2)", async () => {
+    const installFactory = vi.fn();
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "PR Closure (2)" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "staging",
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory).not.toHaveBeenCalled();
+  });
+
+  it("installs PR closure next to an app with an unrelated name", async () => {
+    const installFactory = vi.fn().mockImplementation(async ({ factoryId }: { factoryId: string }) => ({
+      canvasId: `canvas-${factoryId}`,
+      canvasName: factoryId,
+    }));
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "Backlog" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "staging",
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ factoryId: "pr-closure" }));
   });
 });
 
