@@ -35,6 +35,14 @@ func ExpressionUsesOrderURL(expression string) (bool, error) {
 	return expressionReferencesOrderProperty(expression, "url")
 }
 
+// ExpressionUsesOrderKey reports whether the expression accesses order().key
+// or task().key (dot or bracket). Used to resolve the work order display
+// key (e.g. "SUPER-70") only when needed, since it costs an extra lookup of
+// the factory that owns the order.
+func ExpressionUsesOrderKey(expression string) (bool, error) {
+	return expressionReferencesOrderProperty(expression, "key")
+}
+
 // expressionReferencesOrderProperty reports whether the expression accesses
 // order().<property> or task().<property> (dot or bracket), including nested
 // uses such as len(order().<property>) or none(task().<property>, …).

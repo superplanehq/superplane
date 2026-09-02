@@ -1046,9 +1046,9 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 
 // resolveOrderPayload exposes the work order driving this run via order()
 // and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, artifacts, comments, and assignees
-// are loaded only when the expression AST references those fields on order()
-// or task().
+// factory work-order execution. The url, key, artifacts, comments, and
+// assignees are loaded only when the expression AST references those fields
+// on order() or task().
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1099,12 +1099,21 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
-	if usesURL {
-		url, err := b.buildWorkOrderURL(order)
+	usesKey, err := expressionvalidation.ExpressionUsesOrderKey(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL || usesKey {
+		owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
 		}
-		payload["url"] = url
+		if usesURL {
+			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.Key)
+		}
+		if usesKey {
+			payload["key"] = owningFactory.WorkOrderKey(order.Number)
+		}
 	}
 
 	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
@@ -1341,17 +1350,6 @@ func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[
 	}
 
 	return authorPayload
-}
-
-// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
-// The factory key is part of that path, so the owning factory has to be loaded.
-func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
-	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
-	if err != nil {
-		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
-	}
-
-	return uiBaseURL() + order.URLPath(owner.Key), nil
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
