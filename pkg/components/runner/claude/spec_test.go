@@ -138,11 +138,12 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec)
+	task := buildClaudeCodeBrokerTask(spec, "", nil)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
+	assert.Contains(t, task.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
+	assert.Contains(t, task.Commands[0].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
 	assert.Equal(t, runner.LiveLogKindBash, task.Commands[1].Kind)
@@ -188,6 +189,33 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
 	assert.NotContains(t, runScript, "workdir")
+}
+
+func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix the failing tests")},
+		},
+	}
+
+	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
+		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
+	})
+	require.Len(t, task.Commands, 3)
+	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.Equal(t, "Set up Semaphore", task.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[1].Kind)
+	assert.Equal(t, "Fix tests", task.Commands[2].Name)
+	assert.Equal(t, "Fix the failing tests", task.Commands[2].Preview)
+	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, task.Files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
+		requireTaskFile(t, task.Files, "prompts/01-fix-tests.txt").Content,
+	)
 }
 
 func TestClaudeStepSlug(t *testing.T) {

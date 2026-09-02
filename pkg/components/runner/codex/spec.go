@@ -63,21 +63,23 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	return nil
 }
 
-func buildCodexBrokerTask(spec RunCodexSpec) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
-	return runner.BuildAgentBrokerTask(
-		"Prepare Codex",
-		runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
-		"run.js",
-		runScript,
-		spec.WorkingDirectory,
-		spec.Steps,
-		strings.TrimSpace(spec.Model),
-		func(promptName, model string) string {
+func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.IntegrationSetup) ([]runner.BrokerCommand, []runner.BrokerTaskFile) {
+	return runner.BuildAgentBrokerTask(runner.AgentBrokerTaskInput{
+		PrepareName:      "Prepare Codex",
+		PrepareScript:    runner.NodePrepareScript("codex", "codex CLI not found on PATH; install Codex on the runner", spec.WorkingDirectory),
+		RunScriptName:    "run.js",
+		RunScript:        runScript,
+		WorkingDirectory: spec.WorkingDirectory,
+		Steps:            spec.Steps,
+		Usage:            usage,
+		Setups:           setups,
+		Model:            strings.TrimSpace(spec.Model),
+		PromptCommand: func(promptName, model string) string {
 			return fmt.Sprintf(
 				`node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/%s" %s`,
 				promptName,
 				runner.ShellSingleQuote(model),
 			)
 		},
-	)
+	})
 }
