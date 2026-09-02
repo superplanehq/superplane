@@ -85,12 +85,12 @@ func (s *Server) updateAccount(w http.ResponseWriter, r *http.Request) {
 			if utf8.RuneCountInString(name) > maxAccountNameLength {
 				return errAccountNameTooLong
 			}
-			if err := account.UpdateNameInTransaction(tx, name); err != nil {
+			if err := account.UpdateName(tx, name); err != nil {
 				return err
 			}
 		}
 		if req.Email != nil {
-			return account.SetEmailInTransaction(tx, *req.Email)
+			return account.SetEmail(tx, *req.Email)
 		}
 		return nil
 	})

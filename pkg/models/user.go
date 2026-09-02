@@ -51,10 +51,10 @@ func (u *User) GetEmail() string {
 }
 
 func (u *User) Delete() error {
-	return u.DeleteInTransaction(database.Conn(), time.Now(), "")
+	return u.SoftDelete(database.Conn(), time.Now(), "")
 }
 
-func (u *User) DeleteInTransaction(tx *gorm.DB, now time.Time, tombstoneEmail string) error {
+func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) error {
 	updates := map[string]any{
 		"deleted_at": now,
 		"updated_at": now,

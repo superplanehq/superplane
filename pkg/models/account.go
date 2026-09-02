@@ -195,10 +195,10 @@ func FindAccountByEmail(email string) (*Account, error) {
 	return &account, nil
 }
 
-func (a *Account) GetAccountProviders() ([]AccountProvider, error) {
+func (a *Account) GetAccountProviders(tx *gorm.DB) ([]AccountProvider, error) {
 	providers := []AccountProvider{}
 
-	err := database.Conn().
+	err := tx.
 		Where("account_id = ?", a.ID).
 		Find(&providers).
 		Error
@@ -266,7 +266,7 @@ func CountActiveInstallationAdmins(tx *gorm.DB) (int64, error) {
 	return count, err
 }
 
-func (a *Account) UpdateNameInTransaction(tx *gorm.DB, name string) error {
+func (a *Account) UpdateName(tx *gorm.DB, name string) error {
 	err := tx.Model(a).Update("name", name).Error
 	if err != nil {
 		return err
@@ -286,13 +286,13 @@ func (a *Account) UpdateNameInTransaction(tx *gorm.DB, name string) error {
 	return nil
 }
 
-func (a *Account) SignInEmailsInTransaction(tx *gorm.DB) ([]string, error) {
+func (a *Account) SignInEmails(tx *gorm.DB) ([]string, error) {
 	emails := []string{}
 	if a.Email != "" {
 		emails = append(emails, utils.NormalizeEmail(a.Email))
 	}
 
-	providers, err := a.GetAccountProvidersInTransaction(tx)
+	providers, err := a.GetAccountProviders(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -305,13 +305,13 @@ func (a *Account) SignInEmailsInTransaction(tx *gorm.DB) ([]string, error) {
 	return emails, nil
 }
 
-func (a *Account) SetEmailInTransaction(tx *gorm.DB, email string) error {
+func (a *Account) SetEmail(tx *gorm.DB, email string) error {
 	normalized := utils.NormalizeEmail(email)
 	if normalized == "" {
 		return ErrAccountEmailNotFromSignInMethod
 	}
 
-	allowed, err := a.SignInEmailsInTransaction(tx)
+	allowed, err := a.SignInEmails(tx)
 	if err != nil {
 		return err
 	}

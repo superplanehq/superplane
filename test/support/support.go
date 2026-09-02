@@ -144,6 +144,12 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		t.FailNow()
 	}
 
+	organization, err = models.FindOrganizationByIDInTransaction(tx, organization.ID.String())
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
 	err = tx.Commit().Error
 	if !assert.NoError(t, err) {
 		t.FailNow()

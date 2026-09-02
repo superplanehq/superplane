@@ -473,7 +473,14 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     {
       pattern: re("/account"),
       resolve: () => ({
-        json: { id: meUser.id, email: meUser.email, name: meUser.name, avatar_url: "/storybook/leonardo-dicaprio.jpg", has_password: true, providers: [{ provider: "github", username: "ada", email: meUser.email }] },
+        json: {
+          id: meUser.id,
+          email: meUser.email,
+          name: meUser.name,
+          avatar_url: "/storybook/leonardo-dicaprio.jpg",
+          has_password: true,
+          providers: [{ provider: "github", username: "ada", email: meUser.email }],
+        },
       }),
     },
   ];

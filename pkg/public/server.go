@@ -1135,7 +1135,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	account = fresh
 
-	providers, err := account.GetAccountProviders()
+	providers, err := account.GetAccountProviders(database.DB(r.Context()))
 	if err != nil {
 		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
 		http.Error(w, "", http.StatusInternalServerError)

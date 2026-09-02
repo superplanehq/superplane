@@ -32,7 +32,7 @@ func AccountHasPassword(tx *gorm.DB, accountID uuid.UUID) (bool, error) {
 }
 
 func AccountSignInMethodCount(tx *gorm.DB, account *Account) (int, error) {
-	providers, err := account.GetAccountProvidersInTransaction(tx)
+	providers, err := account.GetAccountProviders(tx)
 	if err != nil {
 		return 0, err
 	}
@@ -46,12 +46,6 @@ func AccountSignInMethodCount(tx *gorm.DB, account *Account) (int, error) {
 		count++
 	}
 	return count, nil
-}
-
-func (a *Account) GetAccountProvidersInTransaction(tx *gorm.DB) ([]AccountProvider, error) {
-	providers := []AccountProvider{}
-	err := tx.Where("account_id = ?", a.ID).Find(&providers).Error
-	return providers, err
 }
 
 func (a *Account) DisconnectProvider(tx *gorm.DB, provider string) error {
@@ -84,7 +78,7 @@ func (a *Account) reassignEmailAfterDisconnect(tx *gorm.DB, disconnectedEmail st
 		return nil
 	}
 
-	remaining, err := a.GetAccountProvidersInTransaction(tx)
+	remaining, err := a.GetAccountProviders(tx)
 	if err != nil {
 		return err
 	}
@@ -95,7 +89,7 @@ func (a *Account) reassignEmailAfterDisconnect(tx *gorm.DB, disconnectedEmail st
 		if next == "" || next == current {
 			continue
 		}
-		err := a.SetEmailInTransaction(tx, next)
+		err := a.SetEmail(tx, next)
 		if errors.Is(err, ErrAccountEmailInUse) {
 			continue
 		}
@@ -129,7 +123,7 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	}
 	for i := range users {
 		email := tombstoneEmail(a.ID, now)
-		if err := users[i].DeleteInTransaction(tx, now, email); err != nil {
+		if err := users[i].SoftDelete(tx, now, email); err != nil {
 			return err
 		}
 	}
