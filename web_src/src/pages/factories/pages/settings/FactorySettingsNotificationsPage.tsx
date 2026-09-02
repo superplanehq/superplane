@@ -172,6 +172,22 @@ export function FactorySettingsNotificationsPage() {
     <FactorySettingsPageFrame
       title="Notifications"
       subtitle="Choose which task emails you receive. You never get an email about your own actions."
+      actions={
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You do not have permission to change notification settings."
+        >
+          <LoadingButton
+            disabled={isLoading || !canUpdate || !isDirty}
+            loading={updateSettings.isPending}
+            loadingText="Saving..."
+            onClick={() => void handleSave()}
+            data-testid="notifications-save"
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
+      }
     >
       <div className="space-y-6" data-testid="factory-settings-notifications-form">
         <FactorySettingsCard>
@@ -221,20 +237,6 @@ export function FactorySettingsNotificationsPage() {
             ) : null}
           </div>
         </FactorySettingsCard>
-        <PermissionTooltip
-          allowed={canUpdate || permissionsLoading}
-          message="You do not have permission to change notification settings."
-        >
-          <LoadingButton
-            disabled={isLoading || !canUpdate || !isDirty}
-            loading={updateSettings.isPending}
-            loadingText="Saving..."
-            onClick={() => void handleSave()}
-            data-testid="notifications-save"
-          >
-            Save
-          </LoadingButton>
-        </PermissionTooltip>
       </div>
     </FactorySettingsPageFrame>
   );
