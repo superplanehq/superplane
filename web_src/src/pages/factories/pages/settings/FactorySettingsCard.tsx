@@ -37,6 +37,7 @@ export function FactorySettingsCard({
   action,
   children,
   className,
+  id,
   "data-testid": testId,
 }: {
   title?: string;
@@ -44,10 +45,16 @@ export function FactorySettingsCard({
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  id?: string;
   "data-testid"?: string;
 }) {
+  const sectionId = id ?? testId;
   return (
-    <section className={cn(factoryCardClassName, "p-4", className)} data-testid={testId}>
+    <section
+      id={sectionId}
+      className={cn(factoryCardClassName, "scroll-mt-8 p-4", className)}
+      data-testid={testId}
+    >
       {title || action ? (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title ? (
