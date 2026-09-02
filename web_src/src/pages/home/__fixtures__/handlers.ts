@@ -133,7 +133,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           organization: {
-            metadata: { id: orgId, name: fixture.organizationName },
+            metadata: { id: orgId, name: fixture.organizationName, slug: fixture.organizationSlug ?? "" },
             spec: {
               enabledExperimentalFeatures: fixture.enabledExperimentalFeatures ?? [],
             },
