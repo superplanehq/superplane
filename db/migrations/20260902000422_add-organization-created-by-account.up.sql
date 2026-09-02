@@ -7,7 +7,7 @@ UPDATE organizations o
 SET created_by_account_id = first_user.account_id
 FROM (
   SELECT DISTINCT ON (organization_id) organization_id, account_id
-  FROM users
+    FROM users
   WHERE type = 'human'
     AND account_id IS NOT NULL
   ORDER BY organization_id, created_at ASC, id ASC

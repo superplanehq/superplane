@@ -870,6 +870,7 @@ CREATE TABLE public.organizations (
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL,
+    slug text NOT NULL,
     created_by_account_id uuid
 );
 
@@ -2996,6 +2997,13 @@ CREATE INDEX index_organizations_on_created_by_account_id ON public.organization
 
 
 --
+-- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organizations_slug_active_key ON public.organizations USING btree (slug) WHERE (deleted_at IS NULL);
+
+
+--
 -- Name: unique_api_key_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4015,7 +4023,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260901223216	f
+20260902000423	f
 \.
 
 

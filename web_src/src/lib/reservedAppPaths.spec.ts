@@ -10,8 +10,16 @@ describe("isReservedAppPathSegment", () => {
     expect(isReservedAppPathSegment("create")).toBe(true);
   });
 
-  it("allows organization ids", () => {
+  it("treats infrastructure roots as reserved", () => {
+    expect(isReservedAppPathSegment("api")).toBe(true);
+    expect(isReservedAppPathSegment("health")).toBe(true);
+    expect(isReservedAppPathSegment("assets")).toBe(true);
+    expect(isReservedAppPathSegment("logout")).toBe(true);
+  });
+
+  it("allows organization ids and slugs", () => {
     expect(isReservedAppPathSegment("3ee1aa47-3a60-4c1f-b645-0b9859ab91f8")).toBe(false);
+    expect(isReservedAppPathSegment("acme-corp")).toBe(false);
     expect(isReservedAppPathSegment(undefined)).toBe(false);
   });
 });
