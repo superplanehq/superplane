@@ -22,6 +22,7 @@ type Organization struct {
 	// not by a gorm tag.
 	Slug                        string
 	Description                 string
+	CreatedByAccountID          *uuid.UUID
 	AllowedProviders            datatypes.JSONSlice[string]
 	EnabledExperimentalFeatures datatypes.JSONSlice[string]
 	UsageSyncedAt               *time.Time
@@ -222,6 +223,22 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 	}
 
 	return nil, err
+}
+
+func SetOrganizationCreatedByAccount(tx *gorm.DB, organizationID, accountID uuid.UUID) error {
+	return tx.Model(&Organization{}).
+		Where("id = ?", organizationID).
+		Update("created_by_account_id", accountID).
+		Error
+}
+
+func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Organization, error) {
+	var organizations []Organization
+	err := tx.
+		Where("created_by_account_id = ?", accountID).
+		Find(&organizations).
+		Error
+	return organizations, err
 }
 
 func SoftDeleteOrganization(id string) error {

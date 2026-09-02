@@ -44,10 +44,11 @@ export const Automations: Story = {
   ),
 };
 
+/** Storybook Account settings use the Profile redesign. Live app stays on General. */
 export const AccountGeneral: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/general`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/profile`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
