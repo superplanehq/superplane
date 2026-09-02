@@ -217,14 +217,18 @@ function WorkOrderCardMetaRow({
         </div>
       ) : null}
       {attentionReasons.length > 0 ? (
-        <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          {attentionReasons.map((reason) => (
-            <WorkOrderAttentionChip
-              key={reason}
-              reason={reason}
-              label={reason === "feedback" ? feedbackLabel : undefined}
-            />
-          ))}
+        <div className="flex shrink-0 justify-end gap-1">
+          {attentionReasons.map((reason) =>
+            reason === "checksPassed" ? (
+              <WorkOrderChecksPassedMark key={reason} />
+            ) : (
+              <WorkOrderAttentionChip
+                key={reason}
+                reason={reason}
+                label={reason === "feedback" ? feedbackLabel : undefined}
+              />
+            ),
+          )}
         </div>
       ) : null}
     </div>
@@ -262,6 +266,33 @@ function WorkOrderAttentionChip({ reason, label }: { reason: WorkOrderAttentionR
         aria-hidden
       />
       <span className="truncate">{text}</span>
+    </span>
+  );
+}
+
+/**
+ * Compact, icon-only mark for the "checksPassed" attention reason.
+ *
+ * getWorkOrderAttentionReasons only emits "checksPassed" alongside
+ * "approval", so this mark sits next to the full Waiting for user review
+ * chip. A second full-labeled chip would overflow the footer, so this
+ * keeps the same color and icon but drops the visible label. The label
+ * stays available as the accessible name (title and aria-label) so the
+ * meaning is still announced to screen readers and shown on hover.
+ */
+function WorkOrderChecksPassedMark() {
+  const Icon = WORK_ORDER_ATTENTION_ICON.checksPassed;
+  const text = WORK_ORDER_ATTENTION_LABEL.checksPassed;
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-md border px-1 py-0.5",
+        WORK_ORDER_ATTENTION_CHIP_CLASSNAME.checksPassed,
+      )}
+      title={text}
+      aria-label={text}
+    >
+      <Icon className="size-3 shrink-0" aria-hidden />
     </span>
   );
 }
