@@ -95,6 +95,7 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 		FactoryID:      f.ID,
 		Name:           name,
 		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
+		ColumnColors:   datatypes.NewJSONType(map[string]string{}),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

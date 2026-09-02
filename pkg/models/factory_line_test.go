@@ -22,6 +22,13 @@ func Test__FactoryLine__ColumnColors__DefaultsToEmptyMap(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]string{}, line.ColumnColorsValue())
+
+	// Round-trip through storage so we catch a NULL insert into the
+	// NOT NULL column_colors column (the DB default is not applied when
+	// GORM sends an explicit null for an unset JSONType field).
+	reloaded, err := factory.FindLine(db, line.ID)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{}, reloaded.ColumnColorsValue())
 }
 
 func Test__FactoryLine__Update__PersistsColumnColors(t *testing.T) {

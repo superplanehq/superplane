@@ -843,6 +843,7 @@ function PhaseBoard({
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
   );
+  const columnColorsRef = useRef(columnColors);
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
@@ -859,16 +860,22 @@ function PhaseBoard({
       : undefined;
 
   // The line query is the source of truth for persisted colors. Resync
-  // local state when it refetches (e.g. after this mutation settles, or
-  // after another session's edit) so a stale cache never lingers.
+  // when it refetches, but skip while a color save is in flight so a
+  // stale cache cannot wipe the optimistic lane color.
   useEffect(() => {
-    setColumnColors(normalizeColumnColors(line.columnColors));
-  }, [line.columnColors]);
+    if (updateLine.isPending) {
+      return;
+    }
+    const next = normalizeColumnColors(line.columnColors);
+    columnColorsRef.current = next;
+    setColumnColors(next);
+  }, [line.columnColors, updateLine.isPending]);
 
   const setColumnColor = useCallback(
     async (columnKey: string, colorId: LineBoardColumnColorId | null) => {
-      const previousColors = columnColors;
-      const nextColors = { ...columnColors, [columnKey]: colorId };
+      const previousColors = columnColorsRef.current;
+      const nextColors = { ...previousColors, [columnKey]: colorId };
+      columnColorsRef.current = nextColors;
       setColumnColors(nextColors);
 
       if (!lineId) {
@@ -880,11 +887,12 @@ function PhaseBoard({
           columnColors: serializeColumnColors(nextColors),
         });
       } catch (error) {
+        columnColorsRef.current = previousColors;
         setColumnColors(previousColors);
         showErrorToast(getApiErrorMessage(error, "Failed to update column color"));
       }
     },
-    [columnColors, lineId, updateLine],
+    [lineId, updateLine],
   );
 
   const setColumnTitle = useCallback((columnKey: string, title: string) => {
