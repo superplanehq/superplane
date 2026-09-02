@@ -20,6 +20,7 @@ import {
   startPlanningSession,
   updatePlanningSessionDraft,
 } from "./planningSessionClient";
+import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./planningSessionView";
 
 const POLL_MS = 1500;
@@ -173,7 +174,13 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       survey: undefined,
       messages: [
         ...current.messages,
-        { id: `local-${current.messages.length + 1}`, kind: "text", role: "user", text: body },
+        {
+          id: `local-${current.messages.length + 1}`,
+          kind: "text",
+          role: "user",
+          text: body,
+          ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
+        },
       ],
     }));
     void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)

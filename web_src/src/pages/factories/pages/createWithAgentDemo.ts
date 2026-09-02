@@ -1,5 +1,6 @@
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
+import { isPlanningSurveyReply } from "./planningSessionSurvey";
 
 export const CREATE_WITH_AGENT_DEMO_REPOSITORY = "acme/payments";
 
@@ -47,6 +48,7 @@ export function sendCreateWithAgentMessage(view: CreateWithAgentView): CreateWit
     kind: "text",
     role: "user",
     text,
+    ...(isPlanningSurveyReply(text) ? { origin: "survey" as const } : {}),
   };
   return { ...view, composer: "", survey: undefined, messages: [...view.messages, userMessage] };
 }

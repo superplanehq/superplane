@@ -96,6 +96,32 @@ describe("createWithAgentViewFromSession", () => {
     ]);
   });
 
+  it("marks the user text after a survey as a survey reply", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          {
+            id: "pending-survey",
+            kind: "survey",
+            role: "agent",
+            text: JSON.stringify({
+              questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }],
+            }),
+          },
+          { id: "reply", kind: "text", role: "user", text: "What is the priority? High" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
   it("keeps the work area empty after create so the session list can sit above it", () => {
     const view = createWithAgentViewFromSession(
       {

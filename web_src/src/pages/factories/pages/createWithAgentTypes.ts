@@ -22,6 +22,7 @@ export type CreateWithAgentMessage = {
   kind: "text";
   role: "user" | "agent";
   text: string;
+  origin?: "survey";
 };
 
 export type CreateWithAgentSurveyQuestion = {

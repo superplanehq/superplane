@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
-import { formatPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
+import { formatPlanningSurveyReply, isPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
 
 describe("parsePlanningSurvey", () => {
   it("reads questions from survey JSON", () => {
@@ -37,5 +37,13 @@ describe("formatPlanningSurveyReply", () => {
 
   it("uses the skip line when every question is empty", () => {
     expect(formatPlanningSurveyReply(questions, [null, ""])).toBe(CREATE_WITH_AGENT_COPY.surveySkipped);
+  });
+});
+
+describe("isPlanningSurveyReply", () => {
+  it("matches formatted answers and the skip line", () => {
+    expect(isPlanningSurveyReply("What is the priority? High\nWhat is the scope? skipped")).toBe(true);
+    expect(isPlanningSurveyReply(CREATE_WITH_AGENT_COPY.surveySkipped)).toBe(true);
+    expect(isPlanningSurveyReply("I want to add color to puppies")).toBe(false);
   });
 });

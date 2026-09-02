@@ -369,6 +369,76 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByRole("button", { name: "Read 1 file, ran 1 command" })).toBeInTheDocument();
   });
 
+  it("marks user replies in the compact session log", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "user-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            componentName: "Add a Size field",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "I can draft that.",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You");
+    expect(userNote).toHaveTextContent("Add a Size field");
+    expect(screen.getByText("I can draft that.")).toBeInTheDocument();
+    expect(screen.getByText("I can draft that.").closest("[data-testid='split-run-user-note']")).toBeNull();
+  });
+
+  it("labels a survey reply as You (survey response)", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "user-survey",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            userTalk: "survey",
+            componentName: "What is the priority? High",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You (survey response)");
+    expect(userNote).toHaveTextContent("What is the priority? High");
+  });
+
   it("keeps yaml notes when live sections are only setup", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [

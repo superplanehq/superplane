@@ -94,4 +94,22 @@ describe("planningSessionPhase", () => {
       componentName: "Add a Size field",
     });
   });
+
+  it("marks survey replies so the log can label them", () => {
+    expect(
+      planningSessionTalkLines([
+        { id: "user-1", kind: "text", role: "user", text: "Add a Size field" },
+        {
+          id: "user-survey",
+          kind: "text",
+          role: "user",
+          text: "What is the priority? High",
+          origin: "survey",
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({ id: "user-1", userTalk: "message" }),
+      expect.objectContaining({ id: "user-survey", userTalk: "survey" }),
+    ]);
+  });
 });

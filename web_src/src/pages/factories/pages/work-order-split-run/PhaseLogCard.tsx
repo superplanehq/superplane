@@ -18,7 +18,8 @@ import { PhaseGlyph } from "../linePhaseGlyph";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
-import { groupPlanningSessionLog } from "../planningSessionLog";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { groupPlanningSessionLog, mergePlanningSessionNotes } from "../planningSessionLog";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
@@ -749,7 +750,9 @@ function StreamNode({
 }) {
   const { line, notes, artifact, pullRequest } = group;
   const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
-  const merged = mergeLiveStreamNotes(liveNotes, notes);
+  const merged = compactSessionLog
+    ? mergePlanningSessionNotes(liveNotes, notes)
+    : mergeLiveStreamNotes(liveNotes, notes);
   const steps = compactSessionLog ? groupPlanningSessionLog(merged) : groupClaudeSteps(merged);
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
 
@@ -766,7 +769,7 @@ function StreamNode({
       {hasChildren ? (
         <ol className="min-w-0">
           {steps.map((step) => (
-            <StreamStep key={step.line.id} step={step} />
+            <StreamStep key={step.line.id} step={step} highlightUserTalk={compactSessionLog} />
           ))}
         </ol>
       ) : null}
@@ -844,7 +847,7 @@ function StreamNodeHeader({
   );
 }
 
-function StreamStep({ step }: { step: ClaudeStepGroup }) {
+function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup; highlightUserTalk?: boolean }) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
   const showHeader = Boolean(step.line.componentName.trim() || step.line.componentType);
@@ -871,17 +874,7 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
           {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
           {step.events.map((event) =>
             event.kind === "note" ? (
-              <div
-                key={event.line.id}
-                data-testid={`split-run-stream-line-${event.line.id}`}
-                {...streamLineAttrs(event.line.status)}
-                className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
-              >
-                <span className="inline-flex w-4 shrink-0" aria-hidden />
-                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
-                  {event.line.componentName}
-                </span>
-              </div>
+              <StreamTalkNote key={event.line.id} line={event.line} highlightUserTalk={highlightUserTalk} />
             ) : (
               <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} label={event.label} />
             ),
@@ -889,6 +882,30 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
         </>
       ) : null}
     </li>
+  );
+}
+
+function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine; highlightUserTalk: boolean }) {
+  const isUserTalk = highlightUserTalk && (line.componentType === "prompt" || Boolean(line.userTalk));
+  const youLabel = line.userTalk === "survey" ? CREATE_WITH_AGENT_COPY.youSurvey : CREATE_WITH_AGENT_COPY.you;
+  return (
+    <div
+      data-testid={isUserTalk ? "split-run-user-note" : `split-run-stream-line-${line.id}`}
+      {...streamLineAttrs(line.status)}
+      className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
+    >
+      <span className="inline-flex w-4 shrink-0" aria-hidden />
+      {isUserTalk ? (
+        <div className="min-w-0 flex-1 rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
+          <span className="mb-0.5 block text-[11px] font-medium leading-none text-primary">{youLabel}</span>
+          <span className="whitespace-normal break-words leading-5 text-foreground">{line.componentName}</span>
+        </div>
+      ) : (
+        <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
+          {line.componentName}
+        </span>
+      )}
+    </div>
   );
 }
 
