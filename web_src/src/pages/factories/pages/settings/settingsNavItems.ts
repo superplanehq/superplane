@@ -37,6 +37,11 @@ export interface FactorySettingsNavItem {
   Icon: LucideIcon;
   scope: FactorySettingsScope;
   section: FactorySettingsSection;
+  /**
+   * Searchable page content: field labels, card titles, and short aliases.
+   * Find settings matches these in addition to the nav label and group label.
+   */
+  keywords?: string[];
 }
 
 export interface FactorySettingsNavGroup {
@@ -50,43 +55,305 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
     id: "account",
     label: "Account",
     items: [
-      { id: "account-profile", label: "Profile", Icon: CircleUser, scope: "account", section: "profile" },
-      { id: "account-security", label: "Security", Icon: Shield, scope: "account", section: "security" },
-      { id: "account-notifications", label: "Notifications", Icon: Bell, scope: "account", section: "notifications" },
+      {
+        id: "account-profile",
+        label: "Profile",
+        Icon: CircleUser,
+        scope: "account",
+        section: "profile",
+        keywords: [
+          "identity",
+          "name",
+          "primary email",
+          "avatar",
+          "appearance",
+          "theme",
+          "light",
+          "dark",
+          "system",
+          "github for velocity",
+          "velocity",
+          "pull requests",
+          "danger zone",
+          "delete account",
+        ],
+      },
+      {
+        id: "account-security",
+        label: "Security",
+        Icon: Shield,
+        scope: "account",
+        section: "security",
+        keywords: [
+          "sign in methods",
+          "password",
+          "change password",
+          "github",
+          "google",
+          "sso",
+          "personal tokens",
+          "create token",
+          "revoke",
+          "cli",
+          "api",
+          "login",
+        ],
+      },
+      {
+        id: "account-notifications",
+        label: "Notifications",
+        Icon: Bell,
+        scope: "account",
+        section: "notifications",
+        keywords: [
+          "email",
+          "send task emails",
+          "task emails",
+          "events",
+          "mentions",
+          "comments",
+          "task owner",
+          "artifacts",
+          "review requests",
+          "status changes",
+          "workspaces",
+          "all workspaces",
+          "selected workspaces",
+        ],
+      },
     ],
   },
   {
     id: "workspace",
     label: "Workspace",
     items: [
-      { id: "workspace-general", label: "General", Icon: Grid3x3, scope: "workspace", section: "general" },
-      { id: "workspace-repository", label: "Repository", Icon: Blocks, scope: "workspace", section: "repository" },
-      { id: "workspace-automations", label: "Automations", Icon: Workflow, scope: "workspace", section: "automations" },
-      { id: "workspace-models", label: "Models", Icon: Cpu, scope: "workspace", section: "models" },
-      { id: "workspace-spending", label: "Spending", Icon: BarChart3, scope: "workspace", section: "spending" },
+      {
+        id: "workspace-general",
+        label: "General",
+        Icon: Grid3x3,
+        scope: "workspace",
+        section: "general",
+        keywords: [
+          "name",
+          "workspace key",
+          "key",
+          "description",
+          "task identifier",
+          "task ids",
+          "danger zone",
+          "delete workspace",
+        ],
+      },
+      {
+        id: "workspace-repository",
+        label: "Repository",
+        Icon: Blocks,
+        scope: "workspace",
+        section: "repository",
+        keywords: [
+          "github repository",
+          "repo",
+          "git",
+          "github",
+          "issue intake",
+          "pull request automations",
+          "save repository",
+        ],
+      },
+      {
+        id: "workspace-automations",
+        label: "Automations",
+        Icon: Workflow,
+        scope: "workspace",
+        section: "automations",
+        keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
+      },
+      {
+        id: "workspace-models",
+        label: "Models",
+        Icon: Cpu,
+        scope: "workspace",
+        section: "models",
+        keywords: [
+          "llm",
+          "ai",
+          "allowlist",
+          "anthropic",
+          "openai",
+          "openrouter",
+          "superplane-hosted models",
+          "use your keys",
+          "byok",
+          "organization list",
+          "save models",
+        ],
+      },
+      {
+        id: "workspace-spending",
+        label: "Spending",
+        Icon: BarChart3,
+        scope: "workspace",
+        section: "spending",
+        keywords: [
+          "billing",
+          "usage",
+          "cost",
+          "credit",
+          "tokens",
+          "vm time",
+          "estimated spend",
+          "hosted spend limit",
+          "no limit",
+          "limit in usd",
+          "remaining hosted credit",
+          "hosted billed spend",
+          "by model",
+          "by machine type",
+        ],
+      },
     ],
   },
   {
     id: "organization",
     label: "Organization",
     items: [
-      { id: "organization-general", label: "General", Icon: Settings, scope: "organization", section: "general" },
-      { id: "organization-members", label: "Members", Icon: Users, scope: "organization", section: "members" },
+      {
+        id: "organization-general",
+        label: "General",
+        Icon: Settings,
+        scope: "organization",
+        section: "general",
+        keywords: ["name", "organization slug", "slug", "workspace url"],
+      },
+      {
+        id: "organization-members",
+        label: "Members",
+        Icon: Users,
+        scope: "organization",
+        section: "members",
+        keywords: [
+          "invite",
+          "invite link",
+          "copy link",
+          "people",
+          "team",
+          "role",
+          "email",
+          "name",
+          "remove",
+          "owner",
+          "admin",
+        ],
+      },
       {
         id: "organization-integrations",
         label: "Integrations",
         Icon: Plug,
         scope: "organization",
         section: "integrations",
+        keywords: ["connect", "filter integrations", "github", "slack", "request it"],
       },
-      { id: "organization-api-keys", label: "API keys", Icon: KeyRound, scope: "organization", section: "api-keys" },
-      { id: "organization-secrets", label: "Secrets", Icon: Key, scope: "organization", section: "secrets" },
-      { id: "organization-spending", label: "Spending", Icon: BarChart3, scope: "organization", section: "spending" },
+      {
+        id: "organization-api-keys",
+        label: "API keys",
+        Icon: KeyRound,
+        scope: "organization",
+        section: "api-keys",
+        keywords: [
+          "create api key",
+          "programmatic access",
+          "name",
+          "description",
+          "role",
+          "access",
+          "expiration",
+          "organization-wide",
+          "selected apps",
+          "credentials",
+          "token",
+        ],
+      },
+      {
+        id: "organization-secrets",
+        label: "Secrets",
+        Icon: Key,
+        scope: "organization",
+        section: "secrets",
+        keywords: ["create secret", "secret name", "key-value pairs", "credentials", "env"],
+      },
+      {
+        id: "organization-spending",
+        label: "Spending",
+        Icon: BarChart3,
+        scope: "organization",
+        section: "spending",
+        keywords: [
+          "billing",
+          "usage",
+          "cost",
+          "credit",
+          "tokens",
+          "vm time",
+          "estimated spend",
+          "remaining hosted credit",
+          "superplane grant",
+          "purchased hosted credit",
+          "add hosted credit",
+          "polar invoices",
+          "manage invoices",
+          "use your keys",
+          "byok",
+          "anthropic",
+          "openai",
+          "openrouter",
+          "by model",
+          "by machine type",
+        ],
+      },
     ],
   },
 ];
 
 export const FACTORY_SETTINGS_NAV_ITEMS = FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
+
+/**
+ * Filters settings nav groups for the Find settings field.
+ * Matches item labels, indexed page content, and group labels (group match keeps all items).
+ */
+export function filterFactorySettingsNavGroups(
+  groups: FactorySettingsNavGroup[],
+  query: string,
+): FactorySettingsNavGroup[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => {
+      if (group.label.toLowerCase().includes(normalized)) {
+        return group;
+      }
+
+      const items = group.items.filter((item) => navItemMatchesQuery(item, normalized));
+      return { ...group, items };
+    })
+    .filter((group) => group.items.length > 0);
+}
+
+function navItemSearchText(item: FactorySettingsNavItem): string {
+  return [item.label, ...(item.keywords ?? [])].join(" ").toLowerCase();
+}
+
+function navItemMatchesQuery(item: FactorySettingsNavItem, normalizedQuery: string): boolean {
+  const haystack = navItemSearchText(item);
+  if (haystack.includes(normalizedQuery)) {
+    return true;
+  }
+
+  const words = normalizedQuery.split(/\s+/).filter(Boolean);
+  return words.length > 1 && words.every((word) => haystack.includes(word));
+}
 
 export function factorySettingsRouteFromPathname(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);

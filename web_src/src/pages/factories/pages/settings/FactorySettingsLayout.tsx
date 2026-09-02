@@ -1,11 +1,13 @@
+import { Input } from "@/components/ui/input";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
+import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { Navigate, NavLink, Outlet, useLocation, useParams } from "react-router";
+import { ArrowLeft, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, NavLink, Outlet, useLocation, useParams, useSearchParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
@@ -22,7 +24,14 @@ import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPat
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
+import {
+  buildFactorySettingsSearchIndex,
+  factorySettingsSearchResultPath,
+  searchFactorySettings,
+  type FactorySettingsSearchResult,
+} from "./settingsSearch";
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
+import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScroll";
 
 /** Nav item id for the in-progress workspace Models settings page, gated behind `FEATURE_WORKSPACE_MODELS`. */
 const WORKSPACE_MODELS_NAV_ITEM_ID = "workspace-models";
@@ -104,13 +113,26 @@ function FactorySettingsLayoutContent({
   factoryKey: string;
 }) {
   useFactoriesThemeClass();
+  useFactorySettingsSectionScroll();
   const settingsNavGroups = useFactorySettingsNavGroups();
   const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const { data: availableIntegrations = [] } = useAvailableIntegrations();
+  const [navQuery, setNavQuery] = useState("");
   const navGroups = visibleFactorySettingsNavGroups(
     settingsNavGroups,
     hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
   );
+  const searchIndex = useMemo(
+    () =>
+      buildFactorySettingsSearchIndex({
+        navGroups,
+        integrations: availableIntegrations,
+      }),
+    [availableIntegrations, navGroups],
+  );
+  const searchResults = useMemo(() => searchFactorySettings(searchIndex, navQuery), [navQuery, searchIndex]);
+  const isSearching = navQuery.trim().length > 0;
 
   // See the matching comment in `FactoriesLayout`: once `factory` has loaded
   // the `<Outlet/>` below mounts a leaf settings page that owns the full
@@ -162,17 +184,45 @@ function FactorySettingsLayoutContent({
                   Back to workspace
                 </NavLink>
               </div>
+              <div className="px-3 pt-3">
+                <label className="sr-only" htmlFor="factory-settings-find">
+                  Find settings
+                </label>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <Input
+                    id="factory-settings-find"
+                    data-testid="factory-settings-find"
+                    type="search"
+                    value={navQuery}
+                    onChange={(event) => setNavQuery(event.target.value)}
+                    placeholder="Find settings"
+                    className="h-8 border-border bg-background pl-8 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus:border-ring dark:bg-background"
+                  />
+                </div>
+              </div>
               <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
-                {navGroups.map((group) => (
-                  <SettingsNavGroup
-                    key={group.id}
+                {isSearching ? (
+                  <SettingsSearchResults
                     organizationId={organizationId}
                     factoryKey={factoryKey}
-                    scope={group.id}
-                    title={group.label}
-                    items={group.items}
+                    results={searchResults}
                   />
-                ))}
+                ) : (
+                  navGroups.map((group) => (
+                    <SettingsNavGroup
+                      key={group.id}
+                      organizationId={organizationId}
+                      factoryKey={factoryKey}
+                      scope={group.id}
+                      title={group.label}
+                      items={group.items}
+                    />
+                  ))
+                )}
               </nav>
             </aside>
             {/*
@@ -190,6 +240,59 @@ function FactorySettingsLayoutContent({
         </IntegrationsBasePathProvider>
       </OrganizationSettingsPathsProvider>
     </FactorySettingsLayoutContext.Provider>
+  );
+}
+
+function SettingsSearchResults({
+  organizationId,
+  factoryKey,
+  results,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  results: FactorySettingsSearchResult[];
+}) {
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const activeSection = searchParams.get("section");
+
+  if (results.length === 0) {
+    return (
+      <p className="px-2.5 text-[13px] text-muted-foreground" data-testid="factory-settings-find-empty">
+        No matching settings.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="flex flex-col gap-0.5" data-testid="factory-settings-search-results">
+      {results.map((result) => {
+        const href = factorySettingsSearchResultPath(
+          organizationId,
+          factoryKey,
+          result,
+          factorySettingsSectionPath,
+        );
+        const pathMatches = pathname.includes(`/settings/${result.scope}/${result.section}`);
+        const isActive = pathMatches && (result.anchor ? activeSection === result.anchor : !activeSection);
+
+        return (
+          <li key={result.id}>
+            <Link
+              to={href}
+              className={cn(
+                "flex flex-col gap-0.5 rounded-md px-2.5 py-1.5 text-left hover:bg-sidebar-accent hover:text-foreground",
+                isActive && "bg-sidebar-accent font-medium text-foreground",
+              )}
+              data-testid={`factory-settings-search-${result.id}`}
+            >
+              <span className="text-[13px] tracking-[-0.01em] text-foreground/90">{result.title}</span>
+              <span className="text-[11px] text-muted-foreground">{result.breadcrumb.join(" › ")}</span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
