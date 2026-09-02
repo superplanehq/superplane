@@ -61,7 +61,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeRoles = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) => {
   return useQuery({
     queryKey: includeRoles
       ? [...organizationKeys.users(organizationId), includeRoles]
@@ -80,6 +80,7 @@ export const useOrganizationUsers = (organizationId: string, includeRoles = fals
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId && enabled,
   });
 };
 
