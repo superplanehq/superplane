@@ -2,8 +2,9 @@
 # Context: repository root — docker build -f runner/Dockerfile.local .
 #
 # Local-dev image with factory host-mode tools (bash, python3, node, git, gh,
-# jq, Claude Code, Codex) plus Docker CLI. Mount the daemon socket for
-# execution_mode=docker:
+# jq, Claude Code, Codex) plus Docker CLI. Runs as the image user node
+# (uid 1000) because Claude Code rejects bypassPermissions as root. Mount
+# the daemon socket for execution_mode=docker:
 #   -v /var/run/docker.sock:/var/run/docker.sock
 #
 # Agent CLI versions match packer/scripts/install.sh. Bump both together.
@@ -59,5 +60,11 @@ COPY --from=build /out/runner /usr/local/bin/runner
 COPY --from=build /out/mint-runner-registration /usr/local/bin/mint-runner-registration
 COPY runner/local-entrypoint.sh /usr/local/bin/local-entrypoint.sh
 RUN chmod +x /usr/local/bin/local-entrypoint.sh
+
+# node:bookworm-slim already has user node (uid 1000). Claude Code refuses
+# --permission-mode bypassPermissions as root.
+ENV HOME=/home/node
+WORKDIR /home/node
+USER node
 
 ENTRYPOINT ["/usr/local/bin/local-entrypoint.sh"]
