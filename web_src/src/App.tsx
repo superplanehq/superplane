@@ -37,8 +37,9 @@ import {
   FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsNotificationsPage,
-  FactorySettingsProfilePage,
+  FactorySettingsAccountNotificationsPage,
+  FactorySettingsAccountProfilePage,
+  FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
@@ -295,11 +296,25 @@ function FactoryLineEditPageGate() {
 
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route key="factory-settings-account-general" path="account/general" element={<FactorySettingsProfilePage />} />,
+  <Route
+    key="factory-settings-account-general"
+    path="account/general"
+    element={<Navigate to="../profile" replace />}
+  />,
+  <Route
+    key="factory-settings-account-profile"
+    path="account/profile"
+    element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-security"
+    path="account/security"
+    element={<FactorySettingsAccountSecurityPage />}
+  />,
   <Route
     key="factory-settings-account-notifications"
     path="account/notifications"
-    element={<FactorySettingsNotificationsPage />}
+    element={<FactorySettingsAccountNotificationsPage />}
   />,
   <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
   <Route
