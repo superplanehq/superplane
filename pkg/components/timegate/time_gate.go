@@ -21,7 +21,12 @@ func init() {
 type TimeGate struct{}
 
 type Metadata struct {
-	NextValidTime   *string    `json:"nextValidTime"`
+	NextValidTime *string `json:"nextValidTime"`
+
+	// Data holds the event the gate is waiting on. Hooks that finish the
+	// execution run without an ExecutionContext, so the payload has to survive
+	// in metadata to be forwarded once the window opens.
+	Data            any        `json:"data,omitempty"`
 	PushedThroughBy *core.User `json:"pushedThroughBy,omitempty"`
 	PushedThroughAt *string    `json:"pushedThroughAt,omitempty"`
 }
@@ -65,6 +70,7 @@ func (tg *TimeGate) Documentation() string {
 ## Behavior
 
 - Events wait until the next valid time window is reached
+- The gate forwards the event that it held, so downstream nodes receive the original payload
 - Exclude dates override the day/time rules
 - Can be manually pushed through using the "Push Through" action
 - Automatically schedules execution when the time window is reached`
@@ -190,6 +196,7 @@ func (tg *TimeGate) Execute(ctx core.ExecutionContext) error {
 	formatted := nextValidTime.Format(time.RFC3339)
 	return ctx.Metadata.Set(Metadata{
 		NextValidTime: &formatted,
+		Data:          ctx.Data,
 	})
 }
 
@@ -263,10 +270,15 @@ func (tg *TimeGate) HandleTimeReached(ctx core.ActionHookContext) error {
 		return nil
 	}
 
+	var metadata Metadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to parse metadata: %w", err)
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"timegate.finished",
-		[]any{map[string]any{}},
+		[]any{gatedData(metadata)},
 	)
 }
 
@@ -293,8 +305,18 @@ func (tg *TimeGate) HandlePushThrough(ctx core.ActionHookContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"timegate.finished",
-		[]any{map[string]any{}},
+		[]any{gatedData(metadata)},
 	)
+}
+
+// gatedData returns the event the gate held. Executions that finish without
+// ever storing a payload fall back to an empty object.
+func gatedData(metadata Metadata) any {
+	if metadata.Data == nil {
+		return map[string]any{}
+	}
+
+	return metadata.Data
 }
 
 func (tg *TimeGate) findNextValidTime(now time.Time, spec Spec, startMinutes int, endMinutes int) time.Time {
