@@ -859,17 +859,23 @@ function PhaseBoard({
         })
       : undefined;
 
-  // The line query is the source of truth for persisted colors. Resync
-  // when it refetches, but skip while a color save is in flight so a
-  // stale cache cannot wipe the optimistic lane color.
+  // The line query is the source of truth for persisted colors. Resync when
+  // it changes, but skip while a color save is in flight so a stale refetch
+  // cannot wipe the optimistic lane color. Do not depend on isPending here:
+  // when a save finishes, isPending flips before the factory query refetch
+  // lands and would briefly restore the previous color.
   useEffect(() => {
     if (updateLine.isPending) {
       return;
     }
     const next = normalizeColumnColors(line.columnColors);
+    if (serializeColumnColors(next) === serializeColumnColors(columnColorsRef.current)) {
+      return;
+    }
     columnColorsRef.current = next;
     setColumnColors(next);
-  }, [line.columnColors, updateLine.isPending]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPending must not trigger resync; see comment above
+  }, [line.columnColors]);
 
   const setColumnColor = useCallback(
     async (columnKey: string, colorId: LineBoardColumnColorId | null) => {
@@ -882,10 +888,13 @@ function PhaseBoard({
         return;
       }
       try {
-        await updateLine.mutateAsync({
+        const updatedLine = await updateLine.mutateAsync({
           lineId,
           columnColors: serializeColumnColors(nextColors),
         });
+        const persisted = normalizeColumnColors(updatedLine.columnColors);
+        columnColorsRef.current = persisted;
+        setColumnColors(persisted);
       } catch (error) {
         columnColorsRef.current = previousColors;
         setColumnColors(previousColors);
