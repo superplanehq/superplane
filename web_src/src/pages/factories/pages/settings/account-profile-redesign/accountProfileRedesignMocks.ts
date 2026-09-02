@@ -1,6 +1,6 @@
 import { defaultNotificationTypeToggles, type NotificationTypeToggles } from "@/lib/notificationSettings";
 
-export type AccountRedesignPageId = "profile" | "linked-accounts" | "security";
+export type AccountRedesignPageId = "profile" | "security";
 
 export type AccountRedesignWorkspaceScope = "all" | "selected";
 

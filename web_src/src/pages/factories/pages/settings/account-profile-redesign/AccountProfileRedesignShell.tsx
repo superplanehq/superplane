@@ -9,7 +9,6 @@ import {
   Grid3x3,
   Key,
   KeyRound,
-  Link2,
   Plug,
   Settings,
   Shield,
@@ -40,7 +39,6 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     label: "Account",
     items: [
       { id: "account-profile", label: "Profile", Icon: CircleUser, page: "profile" },
-      { id: "account-linked-accounts", label: "Linked accounts", Icon: Link2, page: "linked-accounts" },
       { id: "account-security", label: "Security", Icon: Shield, page: "security" },
     ],
   },
