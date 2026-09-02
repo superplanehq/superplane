@@ -1,4 +1,5 @@
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useOrganization, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
 import {
@@ -9,6 +10,7 @@ import {
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { clearHostedCreditGrantSnapshot, rememberHostedCreditGrantSnapshot } from "@/lib/hostedCredit";
+import { hostedCreditOwnerContactCopy } from "@/lib/hostedCreditOwnerContact";
 import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { useParams, useSearchParams } from "react-router";
@@ -93,6 +95,7 @@ function WorkspaceUsageLoaded({
   refetch: ReturnType<typeof useOrganizationWorkspaceUsage>["refetch"];
 }) {
   const { canAct } = usePermissions();
+  const canManageBilling = canAct("org", "update");
   const grantTotalCents = parseWorkOrderMetric(data.grantTotalCents);
   const billing = useHostedCreditActions(organizationId, data.billingEnabled === true, grantTotalCents);
   const creditRefreshStatus = useHostedCreditReturnRefresh({
@@ -101,6 +104,10 @@ function WorkspaceUsageLoaded({
     grantTotalCents,
     refetch,
   });
+  const billingContactMessage = useHostedCreditOwnerContactMessage(
+    organizationId,
+    data.billingEnabled === true && !canManageBilling,
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -119,7 +126,8 @@ function WorkspaceUsageLoaded({
         remainingCreditWarning={data.remainingCreditWarning}
         billingEnabled={data.billingEnabled}
         hasBillingCustomer={data.hasBillingCustomer}
-        canManageBilling={canAct("org", "update")}
+        canManageBilling={canManageBilling}
+        billingContactMessage={billingContactMessage}
         products={billing.products}
         invoices={data.invoices}
         creditRefreshStatus={creditRefreshStatus}
@@ -166,4 +174,28 @@ function useHostedCreditActions(organizationId: string, billingEnabled: boolean,
       }
     },
   };
+}
+
+/**
+ * Builds the "contact an owner" sentence shown to admins and viewers in
+ * place of the hosted credit checkout packs. Only fetched when the caller
+ * actually needs it (Polar is on and the signed-in user cannot manage
+ * billing); owners never see the extra requests.
+ */
+function useHostedCreditOwnerContactMessage(organizationId: string, needed: boolean): string | undefined {
+  const { data: organization } = useOrganization(organizationId, needed);
+  const { data: users = [] } = useOrganizationUsers(organizationId, true, needed);
+
+  if (!needed) {
+    return undefined;
+  }
+
+  const owners = users
+    .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))
+    .map((user) => ({ name: user.spec?.displayName, email: user.metadata?.email }));
+
+  return hostedCreditOwnerContactCopy({
+    organizationName: organization?.metadata?.name,
+    owners,
+  });
 }

@@ -109,6 +109,54 @@ describe("HostedCreditSummary", () => {
     expect(screen.queryByRole("button", { name: "Open invoice" })).not.toBeInTheDocument();
   });
 
+  it("shows checkout packs but no contact sentence when the signed-in user can manage billing", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="0"
+        grantTotalCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling
+        billingContactMessage="Contact the Acme owner (Jane Doe) to purchase hosted credit."
+        products={[
+          { id: "prod-25", amountCents: "2500" },
+          { id: "prod-100", amountCents: "10000" },
+          { id: "prod-500", amountCents: "50000" },
+        ]}
+        onAddCredit={vi.fn()}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "Add hosted credit" })).toHaveLength(3);
+    expect(screen.queryByText("Contact the Acme owner (Jane Doe) to purchase hosted credit.")).not.toBeInTheDocument();
+  });
+
+  it("shows the owner contact sentence instead of checkout packs when the user cannot manage billing", () => {
+    render(
+      <HostedCreditSummary
+        remainingCreditCents="0"
+        grantTotalCents="0"
+        hostedBilledCents="0"
+        billingEnabled
+        canManageBilling={false}
+        hasBillingCustomer
+        billingContactMessage="Contact the Acme owner (Jane Doe) to purchase hosted credit."
+        products={[{ id: "prod-25", amountCents: "2500" }]}
+        invoices={[]}
+        cardClassName=""
+        labelClassName=""
+        valueClassName=""
+      />,
+    );
+
+    expect(screen.getByText("Contact the Acme owner (Jane Doe) to purchase hosted credit.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add hosted credit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Manage invoices" })).not.toBeInTheDocument();
+  });
+
   it("shows the credit refresh message when checkout returns", () => {
     render(
       <HostedCreditSummary
