@@ -76,18 +76,20 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 			return
 		}
 		if session.WaitState == models.PlanningWaitResolved {
-			result, err := session.ConsumeWait(database.DB(r.Context()))
+			result, consumed, err := consumeResolvedWait(session, database.DB(r.Context()))
 			if err != nil {
 				writeRunnerPlanningError(w, err)
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{
-				"status":         result.Kind,
-				"text":           result.Text,
-				"work_order_id":  result.WorkOrderID,
-				"work_order_key": result.WorkOrderKey,
-			})
-			return
+			if consumed {
+				writeJSON(w, http.StatusOK, map[string]any{
+					"status":         result.Kind,
+					"text":           result.Text,
+					"work_order_id":  result.WorkOrderID,
+					"work_order_key": result.WorkOrderKey,
+				})
+				return
+			}
 		}
 		if err := session.BeginWait(database.DB(r.Context())); err != nil {
 			writeRunnerPlanningError(w, err)
@@ -152,6 +154,17 @@ func (s *Server) handleRunnerPlanningSurvey(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
+func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {
+	result, err := session.ConsumeWait(tx)
+	if errors.Is(err, models.ErrFactoryPlanningWaitIdle) {
+		return models.PlanningWaitResult{}, false, nil
+	}
+	if err != nil {
+		return models.PlanningWaitResult{}, false, err
+	}
+	return result, true, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

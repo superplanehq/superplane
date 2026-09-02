@@ -12,6 +12,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const HOLD_SECONDS = 45;
+const MAX_RETRY_WAIT_SECONDS = 60;
+const DEFAULT_RETRY_WAIT_SECONDS = 1;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -69,13 +71,35 @@ async function requestJSON(method, urlPath) {
       parsed = { message: text };
     }
   }
-  if (!response.ok) {
-    if (response.status === 409) {
-      return { status: "ended" };
-    }
-    throw new Error(parsed.message || parsed.error || text || `HTTP ${response.status}`);
+  return interpretWaitResponse(response.status, parsed, text);
+}
+
+function isTransientWaitFailure(status, parsed) {
+  if (status === 429 || status === 502 || status === 503 || status === 504) {
+    return true;
   }
-  return parsed;
+  return Boolean(parsed && (parsed.retryable === true || parsed.cloudflare_error === true));
+}
+
+function retryWaitSeconds(parsed) {
+  const n = Number(parsed && parsed.retry_after);
+  if (!Number.isFinite(n) || n < 1) {
+    return DEFAULT_RETRY_WAIT_SECONDS;
+  }
+  return Math.min(MAX_RETRY_WAIT_SECONDS, Math.floor(n));
+}
+
+function interpretWaitResponse(status, parsed, text) {
+  if (status === 409) {
+    return { status: "ended" };
+  }
+  if (status >= 200 && status < 300) {
+    return parsed && typeof parsed === "object" ? parsed : {};
+  }
+  if (isTransientWaitFailure(status, parsed)) {
+    return { status: "pending", retry_after: retryWaitSeconds(parsed) };
+  }
+  throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
 }
 
 async function waitOnce() {
@@ -100,9 +124,16 @@ function runPromptFile(taskDir, promptFile, model) {
   });
 }
 
+function defaultSleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function runLoop(helpers) {
   const wait = helpers.waitOnce;
   const runPrompt = helpers.runPrompt;
+  const sleep = helpers.sleep || defaultSleep;
   while (true) {
     const result = await wait();
     const action = nextAction(result);
@@ -110,6 +141,11 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
+      const seconds = Number(result && result.retry_after);
+      if (Number.isFinite(seconds) && seconds > 0) {
+        process.stderr.write(`planning wait hit a transient error; retrying in ${seconds}s\n`);
+        await sleep(seconds * 1000);
+      }
       continue;
     }
     const code = await runPrompt(action.text);
@@ -129,7 +165,7 @@ async function main() {
   process.exit(code);
 }
 
-module.exports = { nextAction, runLoop, writePrompt };
+module.exports = { interpretWaitResponse, nextAction, runLoop, writePrompt };
 
 if (require.main === module) {
   main().catch((err) => {
