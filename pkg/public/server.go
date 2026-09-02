@@ -679,6 +679,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account", s.updateAccount).Methods("PATCH")
+	accountRoute.HandleFunc("/account", s.deleteAccount).Methods("DELETE")
+	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
@@ -1066,6 +1069,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Error setting creator for organization %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1092,14 +1103,21 @@ type AccountImpersonation struct {
 	UserName string `json:"user_name,omitempty"`
 }
 
+type AccountProviderResponse struct {
+	Provider string `json:"provider"`
+	Email    string `json:"email,omitempty"`
+	Username string `json:"username,omitempty"`
+}
+
 type AccountResponse struct {
-	ID                string                `json:"id"`
-	Name              string                `json:"name"`
-	Email             string                `json:"email"`
-	AvatarURL         string                `json:"avatar_url"`
-	InstallationAdmin bool                  `json:"installation_admin"`
-	HasPassword       bool                  `json:"has_password"`
-	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
+	ID                string                    `json:"id"`
+	Name              string                    `json:"name"`
+	Email             string                    `json:"email"`
+	AvatarURL         string                    `json:"avatar_url"`
+	InstallationAdmin bool                      `json:"installation_admin"`
+	HasPassword       bool                      `json:"has_password"`
+	Providers         []AccountProviderResponse `json:"providers"`
+	Impersonation     *AccountImpersonation     `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -1109,7 +1127,15 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providers, err := account.GetAccountProviders()
+	fresh, err := models.FindAccountByID(account.ID.String())
+	if err != nil {
+		log.Errorf("Error reloading account %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	account = fresh
+
+	providers, err := account.GetAccountProviders(database.DB(r.Context()))
 	if err != nil {
 		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
 		http.Error(w, "", http.StatusInternalServerError)
@@ -1130,6 +1156,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
 		HasPassword:       hasPassword,
+		Providers:         accountProviderResponses(providers),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1558,11 +1585,12 @@ func (s *Server) setupDevProxy(webBasePath string) {
 }
 
 func getAvatarURL(providers []models.AccountProvider) string {
-	if len(providers) == 0 {
-		return ""
+	for _, provider := range providers {
+		if provider.AvatarURL != "" {
+			return provider.AvatarURL
+		}
 	}
-
-	return providers[0].AvatarURL
+	return ""
 }
 
 func getBaseURL() string {
