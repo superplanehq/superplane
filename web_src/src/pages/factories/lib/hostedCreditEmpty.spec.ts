@@ -64,4 +64,12 @@ describe("hostedCreditEmptyBannerCopy", () => {
       actionLabel: "View spending",
     });
   });
+
+  it("points a non-owner to Spending instead of promising a checkout button", () => {
+    expect(hostedCreditEmptyBannerCopy(true, false)).toEqual({
+      title: "Hosted credit is empty",
+      description: "Add hosted credit to start SuperPlane-hosted runs.",
+      actionLabel: "View spending",
+    });
+  });
 });
