@@ -766,7 +766,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         return `__app${expr.slice(appMatch[0].length)}`;
       }
 
-      const orderMatch = expr.match(/^order\(\)/);
+      const orderMatch = expr.match(/^(?:order|task)\(\)/);
       if (orderMatch) {
         return `__order${expr.slice(orderMatch[0].length)}`;
       }

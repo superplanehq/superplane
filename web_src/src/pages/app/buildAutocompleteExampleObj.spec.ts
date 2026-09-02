@@ -69,6 +69,12 @@ describe("buildAutocompleteExampleObj", () => {
         artifacts: expect.any(Array),
         comments: expect.any(Array),
       }),
+      __workspace: expect.objectContaining({
+        id: expect.any(String),
+        name: "Example workspace",
+        repository: "acme/service",
+        default_branch: "main",
+      }),
     });
     expect(
       evaluateExpr(
@@ -127,9 +133,16 @@ describe("buildAutocompleteExampleObj", () => {
         artifacts: expect.any(Array),
         comments: expect.any(Array),
       }),
+      __workspace: expect.objectContaining({
+        id: expect.any(String),
+        name: "Example workspace",
+        repository: "acme/service",
+        default_branch: "main",
+      }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
     expect(evaluateExpr("app().name", autocompleteContext!)).toBe("Deploy");
     expect(evaluateExpr("order().title", autocompleteContext!)).toBe("Ship feature");
+    expect(evaluateExpr("task().title", autocompleteContext!)).toBe("Ship feature");
   });
 });

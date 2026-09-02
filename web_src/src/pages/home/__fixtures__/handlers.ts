@@ -3,6 +3,7 @@ import {
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_NAME,
 } from "@/pages/factories/__fixtures__/factoryPageResponses";
+import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
 import { storybookHostedLlmModels } from "./hostedLlmModels";
 
@@ -120,7 +121,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
     },
     { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     {
-      pattern: re("/api/v1/organizations/[^/]+/llm-spend"),
+      pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
       resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
     },
     {
@@ -133,7 +134,7 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       resolve: () => ({
         json: {
           organization: {
-            metadata: { id: orgId, name: fixture.organizationName },
+            metadata: { id: orgId, name: fixture.organizationName, slug: fixture.organizationSlug ?? "" },
             spec: {
               enabledExperimentalFeatures: fixture.enabledExperimentalFeatures ?? [],
             },
@@ -175,6 +176,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "Factories",
               description: "Software factories for tasks",
             },
+            {
+              id: "workspace_models",
+              label: "Workspace Models",
+              description: "Show the in-progress workspace Models settings page",
+            },
           ],
         },
       }),
@@ -197,6 +203,8 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           name: meUser.name,
           organization_id: orgId,
           avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
+          has_password: true,
+          providers: storybookAccountProviders(meUser.email),
         },
       }),
     },
@@ -442,6 +450,9 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
+    if (url.searchParams.get("type") === "default_branch") {
+      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }
 

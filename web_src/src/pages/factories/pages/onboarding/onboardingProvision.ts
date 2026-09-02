@@ -5,10 +5,16 @@ import type {
   FactoriesFactoryLine,
   FactoriesFactoryPrFeedbackHandler,
   FactoriesUpdateFactoryOnboardingBody,
+  FactoryApp,
   FactoryLineStep,
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
-import { ONBOARDING_EVENT_APPS, ONBOARDING_LINE_APPS, type FactoryAgentRewrite } from "@/pages/home/factories";
+import {
+  getFactoryDefinition,
+  ONBOARDING_EVENT_APPS,
+  ONBOARDING_LINE_APPS,
+  type FactoryAgentRewrite,
+} from "@/pages/home/factories";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "plan-and-implement";
@@ -97,9 +103,27 @@ async function provisionLineApps(args: {
   return steps;
 }
 
-// Event apps listen for GitHub events and are not factory line steps. Install
-// them even when the line already exists, so a retry after a failed finish
-// still creates PR Closure.
+export type ListFactoryApps = () => Promise<FactoryApp[]>;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// installFactoryCanvas names a new canvas after the factory definition title,
+// then appends " (N)" (uniqueCanvasName) to dodge a name collision. Match both
+// forms so a retry recognizes a copy it created under either name.
+function matchesEventAppTitle(appName: string | undefined, title: string): boolean {
+  if (!appName) return false;
+  if (appName === title) return true;
+  return new RegExp(`^${escapeRegExp(title)} \\(\\d+\\)$`).test(appName);
+}
+
+// Event apps listen for GitHub events and are not factory line steps. Skip an
+// app whose title already matches an app the workspace has, so a retry after
+// a failed finish does not create a second PR Closure. Known limitation: a
+// user-renamed app (to something other than "<title>" or "<title> (N)") is
+// not matched, so onboarding installs another copy — see ListFactoryApps,
+// which does not return the source factory id needed for an exact match.
 export async function provisionEventApps(args: {
   factoryId: string;
   selections: IntegrationSelections;
@@ -108,8 +132,15 @@ export async function provisionEventApps(args: {
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
+  listApps: ListFactoryApps;
 }): Promise<void> {
+  const apps = await args.listApps();
   for (const appFactoryId of ONBOARDING_EVENT_APPS) {
+    const title = getFactoryDefinition(appFactoryId).title;
+    if (apps.some((app) => matchesEventAppTitle(app.name, title))) {
+      continue;
+    }
+
     await installOnboardingApp({
       factoryId: args.factoryId,
       appFactoryId,

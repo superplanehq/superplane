@@ -206,12 +206,46 @@ func Test_NodeConfigurationBuilder_AppFunction(t *testing.T) {
 	})
 }
 
+func Test_NodeConfigurationBuilder_WorkspaceFunction(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "WK")
+	require.NoError(t, err)
+	repository := "acme/service"
+	defaultBranch := "develop"
+	require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		AppRepository:     &repository,
+		BacklogRepository: &repository,
+		DefaultBranch:     &defaultBranch,
+	}))
+	canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, "Workspace app")
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).WithInput(map[string]any{})
+	value, err := builder.ResolveExpression(`workspace()`)
+	require.NoError(t, err)
+	payload, ok := value.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, factoryModel.ID.String(), payload["id"])
+	assert.Equal(t, "WK", payload["key"])
+	assert.Equal(t, repository, payload["repository"])
+	assert.Equal(t, defaultBranch, payload["default_branch"])
+
+	_, err = builder.ResolveExpression(`workspace(1)`)
+	require.ErrorContains(t, err, "workspace() takes no arguments")
+}
+
 func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
+	repository := "acme/service"
+	defaultBranch := "main"
+	require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		AppRepository: &repository,
+	}))
 
 	sourceCanvas, _ := support.CreateCanvas(
 		t,
@@ -310,6 +344,9 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, factoryModel.ID.String(), payload["factory_id"])
 		assert.Equal(t, models.FactoryWorkOrderStateDraft, payload["state"])
 		assert.Equal(t, "", payload["result"])
+		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
+		assert.Equal(t, defaultBranch, payload["default_branch"])
 		assert.NotContains(t, payload, "url")
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
@@ -323,6 +360,42 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.Equal(t, "Fix login", issue["title"])
 	})
 
+	t.Run("uses workspace values for legacy work orders", func(t *testing.T) {
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     nil,
+			"default_branch": nil,
+		}).Error)
+
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, repository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+repository+".git", payload["repository_url"])
+		assert.Equal(t, defaultBranch, payload["default_branch"])
+	})
+
+	t.Run("uses workspace values for partial work order snapshots", func(t *testing.T) {
+		currentRepository := "acme/current-service"
+		currentDefaultBranch := "develop"
+		require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			AppRepository: &currentRepository,
+			DefaultBranch: &currentDefaultBranch,
+		}))
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     "acme/previous-service",
+			"default_branch": nil,
+		}).Error)
+
+		result, err := builder.ResolveExpression(`order()`)
+		require.NoError(t, err)
+		payload, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, currentRepository, payload["repository"])
+		assert.Equal(t, "https://github.com/"+currentRepository+".git", payload["repository_url"])
+		assert.Equal(t, currentDefaultBranch, payload["default_branch"])
+	})
+
 	t.Run("field access and templates", func(t *testing.T) {
 		id, err := builder.ResolveExpression(`order().id`)
 		require.NoError(t, err)
@@ -331,6 +404,10 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		title, err := builder.ResolveExpression(`order().title`)
 		require.NoError(t, err)
 		assert.Equal(t, "Ship feature", title)
+
+		repositoryURL, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/acme/current-service.git", repositoryURL)
 
 		issueNumber, err := builder.ResolveExpression(`order().source.issue.number`)
 		require.NoError(t, err)
@@ -343,6 +420,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), built["orderID"])
 		assert.Equal(t, "Ship feature", built["title"])
+	})
+
+	t.Run("task is an alias of order", func(t *testing.T) {
+		id, err := builder.ResolveExpression(`task().id`)
+		require.NoError(t, err)
+		assert.Equal(t, order.ID.String(), id)
+
+		title, err := builder.ResolveExpression(`task().title`)
+		require.NoError(t, err)
+		assert.Equal(t, "Ship feature", title)
+
+		count, err := builder.ResolveExpression(`len(task().artifacts)`)
+		require.NoError(t, err)
+		assert.Equal(t, 2, count)
+
+		_, err = builder.ResolveExpression(`task(1)`)
+		require.ErrorContains(t, err, "task() takes no arguments")
 	})
 
 	t.Run("permalink back to the work order", func(t *testing.T) {
@@ -364,6 +458,22 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.Equal(t, fmt.Sprintf("[Work Order](%s)", url), built["body"])
+
+		expectedKey := factoryModel.WorkOrderKey(order.Number)
+
+		key, err := builder.ResolveExpression(`order().key`)
+		require.NoError(t, err)
+		assert.Equal(t, expectedKey, key)
+
+		taskKey, err := builder.ResolveExpression(`task().key`)
+		require.NoError(t, err)
+		assert.Equal(t, expectedKey, taskKey)
+
+		builtKey, err := builder.Build(map[string]any{
+			"body": "[{{ order().key }}]({{ order().url }})",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("[%s](%s)", expectedKey, url), builtKey["body"])
 	})
 
 	t.Run("artifacts equivalents", func(t *testing.T) {

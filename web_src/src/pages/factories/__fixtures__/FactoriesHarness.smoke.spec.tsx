@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
-import { factorySettingsPath } from "../lib/factoryPagePaths";
+import { factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
 import {
@@ -187,7 +187,10 @@ describe("FactoriesHarness tasks", () => {
 
     const settingsLink = await screen.findByTestId("factories-workspace-settings-link", {}, { timeout: 8000 });
     await waitFor(() => {
-      expect(settingsLink).toHaveAttribute("href", factorySettingsPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY));
+      expect(settingsLink).toHaveAttribute(
+        "href",
+        factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY),
+      );
     });
     expect(settingsLink).not.toHaveClass("pointer-events-none");
   }, 10000);
@@ -206,11 +209,15 @@ describe("FactoriesHarness tasks", () => {
     await user.click(trigger);
     const orgCog = await screen.findByTestId("factories-sidebar-organization-settings-link");
     await user.click(orgCog);
-    const sidebar = await screen.findByTestId("organization-settings-sidebar", {}, { timeout: 8000 });
-    const backLink = within(sidebar).getByTestId("organization-settings-back");
-    expect(backLink).toHaveTextContent("Back to workspace");
-    expect(backLink).toHaveAttribute("href", `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`);
-    expect(within(sidebar).getByTestId("organization-settings-nav-general")).toHaveAttribute("aria-current", "page");
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).getByTestId("factory-settings-back")).toHaveAttribute(
+      "href",
+      `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`,
+    );
+    expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   }, 10000);
 });
 

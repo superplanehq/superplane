@@ -1,9 +1,11 @@
-/** Storybook payload for factory Usage and org LLM spend reports. */
+/** Storybook payload for factory Usage and org workspace usage reports. */
 export interface StorybookUsageReport {
   totalTokens: string;
   totalCostCents: string;
+  totalDurationSeconds?: string;
   periodDays: number;
   byModel: Array<{ provider: string; model: string; totalTokens: string; costCents: string }>;
+  byMachineType?: Array<{ machineType: string; durationSeconds: string; costCents: string }>;
   remainingCreditCents?: string;
   grantTotalCents?: string;
   superplaneGrantCents?: string;
@@ -28,8 +30,10 @@ export interface StorybookUsageReport {
 export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   totalTokens: "0",
   totalCostCents: "0",
+  totalDurationSeconds: "0",
   periodDays: 30,
   byModel: [],
+  byMachineType: [],
   remainingCreditCents: "5000",
   grantTotalCents: "5000",
   superplaneGrantCents: "5000",
@@ -41,8 +45,10 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
 export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
   totalTokens: "0",
   totalCostCents: "0",
+  totalDurationSeconds: "0",
   periodDays: 30,
   byModel: [],
+  byMachineType: [],
   remainingCreditCents: "0",
   grantTotalCents: "0",
   superplaneGrantCents: "0",
@@ -55,10 +61,15 @@ export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
 export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   totalTokens: "25600",
   totalCostCents: "876",
+  totalDurationSeconds: "3600",
   periodDays: 30,
   byModel: [
     { provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "18400", costCents: "620" },
     { provider: "openai", model: "gpt-4o", totalTokens: "7200", costCents: "256" },
+  ],
+  byMachineType: [
+    { machineType: "e1-large-amd64", durationSeconds: "2400", costCents: "133" },
+    { machineType: "e1-tiny-amd64", durationSeconds: "1200", costCents: "17" },
   ],
   remainingCreditCents: "4124",
   grantTotalCents: "5000",
@@ -67,3 +78,23 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   hostedBilledCents: "876",
   remainingCreditWarning: false,
 };
+
+/** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
+export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "0",
+  grantTotalCents: "5000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "0",
+  hostedBilledCents: "5000",
+  remainingCreditWarning: true,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};
+
+/** Polar packs for empty-credit Storybook recovery screens. */
+export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
+  { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
+  { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
+  { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
+];

@@ -1,0 +1,209 @@
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type * as ReactRouterDom from "react-router";
+import { MemoryRouter } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { FactoriesFactory } from "@/api-client";
+
+import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import { FirstRunSetup } from "./FirstRunSetup";
+import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import type { useOnboardingPageModel } from "./useOnboardingPageModel";
+
+type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
+
+let factory: FactoriesFactory;
+let factories: FactoriesFactory[];
+
+vi.mock("../../layout/factoriesLayoutContext", () => ({
+  useFactoriesLayout: () => ({
+    organizationId: "org-1",
+    factoryId: "factory-1",
+    factoryKey: "PAY",
+    factory,
+    factories,
+  }),
+}));
+
+vi.mock("@/contexts/useAccount", () => ({
+  useAccount: () => ({ account: { id: "user-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+}));
+
+vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
+
+const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
+const navigateSpy = vi.fn();
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
+}));
+
+vi.mock("react-router", async () => {
+  const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
+  return {
+    ...actual,
+    useNavigate: () => navigateSpy,
+  };
+});
+
+// The agent step reports organization spend, which this flow test does not use.
+vi.mock("./AgentStep", () => ({
+  AgentStep: () => <div data-testid="agent-step" />,
+}));
+
+function setupState(): OnboardingSetupApi {
+  const { result } = renderHook(() => useOnboardingSetupState("Payments Service", { simulateDiscovery: false }));
+  return result.current;
+}
+
+function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPageModel {
+  return {
+    setup: setupState(),
+    hostedAgentReady: false,
+    openSection: "issues",
+    setOpenSection: vi.fn(),
+    requestConnect: vi.fn(),
+    requestPrivateGitHubConnect: vi.fn(),
+    offersPrivateGitHubAppSetup: false,
+    createVcsConnection: vi.fn(),
+    selectVcsConnection: vi.fn(),
+    githubConnections: { name: "github", allInstances: [], readyInstances: [] },
+    selectedVcsConnectionId: "github-1",
+    requestConfigure: vi.fn(),
+    integrationDialogs: <></>,
+    repositories: ["acme/payments-service"],
+    repositoriesLoading: false,
+    repositoriesError: null,
+    canConfigureWorkspace: true,
+    saving: false,
+    saveName: vi.fn().mockResolvedValue(true),
+    saveRepository: vi.fn().mockResolvedValue(true),
+    saveIssues: vi.fn().mockResolvedValue(true),
+    finish: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderSetup(model: OnboardingPageModel) {
+  render(
+    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+      <FirstRunSetup model={model} />
+    </MemoryRouter>,
+  );
+}
+
+describe("FirstRunSetup", () => {
+  beforeEach(() => {
+    factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
+    factories = [factory];
+    deleteFactoryMutateAsync.mockClear();
+    navigateSpy.mockClear();
+  });
+
+  it("finishes setup from the ticket screen when hosted credentials cover the agent", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  // Regression: the click that sets the issues choice and the call that
+  // provisions the workspace happen in the same handler. `finish` used to
+  // read the issues choice back off setup state captured before the click,
+  // which was still empty, so it saved an empty issues source over the one
+  // `saveIssues` had just stored and provisioning failed on the first click.
+  // A repository with no issues took the same "vcs" (GitHub Issues) answer as
+  // any other repository, so this reproduced on every repository, not only
+  // ones without issues.
+  it("passes the just-selected issues choice to finish instead of stale setup state", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: true });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
+
+    await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
+    expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("counts the ticket screen as the last step when the agent screen is skipped", () => {
+    renderSetup(pageModel({ hostedAgentReady: true }));
+
+    expect(screen.getByRole("navigation", { name: FIRST_RUN_COPY.chrome.stepLabel(4, 4) })).toBeInTheDocument();
+  });
+
+  it("shows setup progress on the ticket screen while it provisions the workspace", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, saving: true }));
+
+    const finish = screen.getByTestId("first-run-analyze-tickets");
+    expect(finish).toHaveTextContent(FIRST_RUN_COPY.finish.saving);
+    expect(finish).toBeDisabled();
+  });
+
+  it("opens the agent screen when the agent needs a connected provider", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({ hostedAgentReady: false });
+
+    renderSetup(model);
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.continue }));
+
+    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
+    expect(await screen.findByTestId("first-run-agent")).toBeInTheDocument();
+    expect(model.finish).not.toHaveBeenCalled();
+  });
+
+  // Setup saved the ticket answer, then provisioning did not finish. The user
+  // returns to the screen that carries the action, not to a screen with no
+  // question left to answer.
+  it("resumes on the ticket screen when hosted credentials cover the agent", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }));
+
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+  });
+
+  it("resumes on the agent screen when the agent still needs a connected provider", () => {
+    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }));
+
+    expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
+  });
+
+  it("shows the close control instead of Log out when another workspace exists", () => {
+    factories = [factory, { id: "factory-2" }];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+  });
+
+  it("deletes the placeholder workspace and returns to the workspace index on cancel", async () => {
+    factories = [factory, { id: "factory-2" }];
+    const user = userEvent.setup();
+
+    renderSetup(pageModel());
+
+    await user.click(screen.getByTestId("first-run-cancel"));
+
+    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
+    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
+  });
+
+  it("keeps Log out and hides the close control on the first ever workspace", () => {
+    factories = [factory];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
+  });
+});

@@ -6,12 +6,16 @@ import {
   EMPTY_FACTORY_KEY,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
+import {
+  CONNECTED_SETUP_INTEGRATIONS,
+  SETUP_ANSWERS,
+  factoriesFixtureWithSetupAnswers,
+} from "../../__fixtures__/setupStoryFixtures";
 
-/**
- * Factory settings — dedicated layout with its own left nav and General page content.
- */
+/** Factory settings with Account, Workspace, and Organization navigation. */
 const meta = {
   title: "Factories/Pages/Settings",
   component: FactorySettingsLayout,
@@ -22,10 +26,10 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const General: Story = {
+export const WorkspaceGeneral: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/general`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -34,16 +38,17 @@ export const General: Story = {
 export const Automations: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/automations`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/automations`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };
 
-export const Profile: Story = {
+/** Storybook Account settings use the Profile redesign. Live app stays on General. */
+export const AccountGeneral: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/profile`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/profile`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -52,7 +57,7 @@ export const Profile: Story = {
 export const Notifications: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/notifications`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/notifications`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
@@ -62,7 +67,7 @@ export const NotificationsFiltered: Story = {
   name: "Notifications (Filtered)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/notifications`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/notifications`}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         notificationSettings: {
@@ -85,40 +90,40 @@ export const NotificationsFiltered: Story = {
   ),
 };
 
-export const RepositoriesSoon: Story = {
-  name: "Repositories (Soon)",
+export const Repository: Story = {
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/repositories`}
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+    />
+  ),
+};
+
+export const Models: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
+      factoriesFixture={defaultFactoriesFixture}
+      experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
+    />
+  ),
+};
+
+export const Spending: Story = {
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/spending`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };
 
-export const Usage: Story = {
+export const SpendingEmpty: Story = {
+  name: "Spending (empty)",
   render: () => (
     <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/usage`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const UsageEmpty: Story = {
-  name: "Usage (empty)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${EMPTY_FACTORY_KEY}/settings/usage`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const MembersSoon: Story = {
-  name: "Members (Soon)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/members`}
+      pathSuffix={`workspaces/${EMPTY_FACTORY_KEY}/settings/workspace/spending`}
       factoriesFixture={defaultFactoriesFixture}
     />
   ),

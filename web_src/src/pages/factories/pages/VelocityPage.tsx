@@ -1,5 +1,5 @@
-import { AlertCircle, Loader2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -8,89 +8,151 @@ import { SegmentedNav } from "@/ui/SegmentedNav";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { VELOCITY_PERIOD_OPTIONS } from "../lib/factoryVelocityFlow";
+import { workOrdersPath } from "../lib/factoryPagePaths";
+import {
+  VELOCITY_PERIOD_OPTIONS,
+  type VelocityBreakdown,
+  type VelocityPeriodDays,
+  type VelocityReport,
+} from "../lib/factoryVelocityReport";
 import { factoryCenteredSectionBodyClassName, factoryCenteredSectionHeaderClassName } from "./factoryPageLayoutStyles";
-import { VelocityLoadedView, type VelocityPeriodDays, type VelocitySourceSplitConfig } from "./VelocityLoadedView";
+import { CostCard, DeliveryCard, SummaryCard, TaskTimeCard } from "./velocityCards";
+import { VelocityPeopleTable } from "./VelocityPeopleTable";
+import { VelocityZeroState } from "./VelocityZeroState";
 import { useVelocityPageModel, type VelocityPageModel } from "./useVelocityPageModel";
 
 const CARD_CLASSES =
   "flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center";
 
 export function VelocityPage() {
-  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
   const model = useVelocityPageModel(organizationId, factoryId, factory?.onboarding);
   usePageTitle(["Velocity", factory?.name ?? "Workspace"]);
 
   const header = <VelocityHeader model={model} />;
 
-  if (model.velocity.error && !model.velocity.data) {
+  if (model.velocity.error && !model.velocity.report) {
     return renderShell(header, <VelocityErrorState onRetry={model.velocity.refetch} />);
   }
 
-  if (model.velocity.isLoading || !model.velocity.data) {
+  if (model.velocity.isLoading || !model.velocity.report) {
     return renderShell(header, <VelocityLoadingState />);
   }
 
-  const sourceSplit: VelocitySourceSplitConfig = {
-    hasPeopleCohort: model.velocity.hasPeopleCohort,
-    repositoryLabel: model.velocity.repositoryLabel,
-    emptyState: renderSourceSplitEmptyState({
-      hasIntegration: Boolean(model.integrationId),
-      hasRepository: Boolean(model.repository),
-      peopleSearchFailed: model.velocity.peopleSearchFailed,
-    }),
-  };
+  if (model.velocity.isEmpty) {
+    return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, factoryKey)} />);
+  }
 
-  return renderShell(
-    header,
-    <VelocityLoadedView
-      periodLabel={model.periodLabel}
-      periodDays={model.periodDays}
-      data={model.velocity.data}
-      sourceSplit={sourceSplit}
-      workOrderFlow={
-        model.workOrderFlow.isLoading
-          ? undefined
-          : {
-              flow: model.workOrderFlow.flow,
-              emptyLabel: model.workOrderFlow.error ? "We could not load task time." : undefined,
-            }
-      }
-    />,
-    "factory-velocity-page",
+  return renderShell(header, <VelocityReportView model={model} report={model.velocity.report} />);
+}
+
+/**
+ * Gray page, white cards, so the report reads as a stack of separate findings.
+ * Dark mode keeps its darker page, because the factories theme paints the
+ * sidebar and the cards the same color.
+ */
+function renderShell(header: ReactNode, body: ReactNode) {
+  return (
+    <div className="min-h-full bg-sidebar dark:bg-background">
+      {header}
+      <div className={cn(factoryCenteredSectionBodyClassName, "space-y-5 pb-10")} data-testid="factory-velocity-page">
+        {body}
+      </div>
+    </div>
   );
 }
 
-function renderShell(header: ReactNode, body: ReactNode, bodyTestId?: string) {
+function VelocityReportView({ model, report }: { model: VelocityPageModel; report: VelocityReport }) {
+  const [breakdown, setBreakdown] = useState<VelocityBreakdown>("origin");
+  const flow = model.taskTime.flow;
+
   return (
     <>
-      {header}
-      <div className={cn(factoryCenteredSectionBodyClassName, "space-y-6")} data-testid={bodyTestId}>
-        {body}
+      <SummaryCard
+        totals={report.totals}
+        caption={summaryCaption(model.periodLabel, model.periodDays, Boolean(report.previous))}
+        medianCycleHours={flow && flow.sampleSize > 0 ? flow.medianCycleHours : undefined}
+        comparison={model.comparison}
+      />
+      <DeliveryCard
+        points={report.points}
+        breakdown={breakdown}
+        onBreakdownChange={setBreakdown}
+        intakeSeries={report.intakeSeries}
+        hasOutput={report.totals.merged > 0 || report.totals.waste > 0}
+      />
+      {report.people.length > 0 ? (
+        <VelocityPeopleTable
+          people={report.people}
+          periodLabel={model.periodLabel}
+          emptyAuthorship={peopleEmptyAuthorship(report, model)}
+        />
+      ) : null}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <TaskTimeCard flow={flow} emptyLabel={taskTimeEmptyLabel(model)} />
+        <CostCard totals={report.totals} points={report.points} />
       </div>
     </>
   );
 }
 
+function summaryCaption(periodLabel: string, periodDays: VelocityPeriodDays, hasPrevious: boolean): string {
+  if (hasPrevious) {
+    return `${periodLabel}. Compared with the previous ${periodDays} days.`;
+  }
+  return `${periodLabel}. There is no earlier period to compare with yet.`;
+}
+
+/** Explains a People table that lists SuperPlane work but no direct authorship. */
+function peopleEmptyAuthorship(report: VelocityReport, model: VelocityPageModel): string | undefined {
+  if (report.hasPeopleCohort) return undefined;
+  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people merged.";
+  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people merged.";
+  if (model.velocity.peopleSyncPending) {
+    return "SuperPlane is collecting merges from GitHub. The Authored column fills in after the first sync.";
+  }
+  return undefined;
+}
+
+function taskTimeEmptyLabel(model: VelocityPageModel): string | undefined {
+  if (model.taskTime.error) return "We could not load task time.";
+  if (model.taskTime.isLoading) return "Loading task time…";
+  return undefined;
+}
+
 function VelocityHeader({ model }: { model: VelocityPageModel }) {
+  return (
+    <>
+      <VelocityHeaderBar model={model} />
+      {model.sync.isSyncing ? (
+        <div className={cn(factoryCenteredSectionBodyClassName, "pt-1 pb-4")}>
+          <VelocitySyncProgress />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
   return (
     <WorkspacePageHeader
       className={factoryCenteredSectionHeaderClassName}
       title="Velocity"
       subtitle={
         model.repository
-          ? `Merged pull requests and task time for ${model.repository}.`
-          : "Merged pull requests and task time."
+          ? `What ${model.repository} ships, how long the work takes, and what it costs.`
+          : "What this workspace ships, how long the work takes, and what it costs."
       }
       actions={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
+          <VelocitySyncButton model={model} />
           <SegmentedNav
             ariaLabel="Velocity period in days"
             size="xs"
             value={String(model.periodDays)}
             onValueChange={(value) => {
               const next = Number(value);
-              if (next === 7 || next === 30) model.setPeriodDays(next as VelocityPeriodDays);
+              if (next === 14 || next === 30) model.setPeriodDays(next as VelocityPeriodDays);
             }}
             options={VELOCITY_PERIOD_OPTIONS}
           />
@@ -100,37 +162,54 @@ function VelocityHeader({ model }: { model: VelocityPageModel }) {
   );
 }
 
-interface SourceSplitEmptyStateArgs {
-  hasIntegration: boolean;
-  hasRepository: boolean;
-  peopleSearchFailed: boolean;
+/**
+ * Shows that a sync is in flight.
+ *
+ * The sync reads sixty days of history in a background worker that reports no
+ * progress of its own, so the bar is indeterminate: it says work is happening
+ * without claiming to know how much is left.
+ */
+function VelocitySyncProgress() {
+  return (
+    <div
+      className="h-1 w-full overflow-hidden rounded-full bg-primary/15"
+      role="progressbar"
+      aria-label="Reading merges from GitHub"
+      data-testid="velocity-sync-progress"
+    >
+      <div className="sp-indeterminate-bar h-full w-1/4 rounded-full bg-primary" />
+    </div>
+  );
 }
 
-function renderSourceSplitEmptyState({ hasIntegration, hasRepository, peopleSearchFailed }: SourceSplitEmptyStateArgs) {
-  if (!hasIntegration) {
-    return (
-      <p className="text-[13px] text-muted-foreground">
-        Connect GitHub in workspace setup to compare People and SuperPlane.
-      </p>
-    );
-  }
-  if (!hasRepository) {
-    return (
-      <p className="text-[13px] text-muted-foreground">
-        Select a repository in workspace setup to compare People and SuperPlane.
-      </p>
-    );
-  }
-  if (peopleSearchFailed) {
-    return (
-      <p className="text-[13px] text-muted-foreground">
-        We could not load People merges. SuperPlane counts still show.
-      </p>
-    );
-  }
+/**
+ * Merge counts come from a background sync rather than from GitHub at request
+ * time, so a merge made moments ago is not on the page yet. This asks for a
+ * fresh read instead of leaving the user to wait for the next scheduled sync.
+ */
+function VelocitySyncButton({ model }: { model: VelocityPageModel }) {
+  if (model.sync.isUnavailable) return null;
+
   return (
-    <p className="text-[13px] text-muted-foreground">No merged pull requests in this repository for the period.</p>
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      onClick={model.sync.start}
+      disabled={model.sync.isSyncing}
+      title={syncButtonTitle(model.velocity.syncedAt)}
+      data-testid="velocity-sync-button"
+    >
+      <RefreshCw className={cn("size-3.5", model.sync.isSyncing && "animate-spin")} aria-hidden />
+      {model.sync.isSyncing ? "Syncing…" : "Sync now"}
+    </Button>
   );
+}
+
+function syncButtonTitle(syncedAt?: Date): string {
+  const action = "Read the merges of the last 60 days from GitHub.";
+  if (!syncedAt) return action;
+  return `${action} Last synced ${syncedAt.toLocaleString()}.`;
 }
 
 function VelocityLoadingState() {

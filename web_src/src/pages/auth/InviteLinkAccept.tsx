@@ -65,13 +65,13 @@ export default function InviteLinkAccept() {
           throw new Error(responseMessage || "Unable to accept invite link.");
         }
 
-        const data = (await response.json()) as { organization_id?: string };
-        if (!data.organization_id) {
+        const data = (await response.json()) as { organization_id?: string; organization_slug?: string };
+        if (!data.organization_id || !data.organization_slug) {
           throw new Error("Invite link response was missing organization details.");
         }
 
         analytics.memberAccept(data.organization_id);
-        navigate(`/${data.organization_id}`);
+        navigate(`/${data.organization_slug}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unable to accept invite link.";
         setStatus("error");

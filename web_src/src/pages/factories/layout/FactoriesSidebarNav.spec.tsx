@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
 function renderNav(path: string, showVelocity = false) {
@@ -48,7 +48,7 @@ describe("FactoriesSidebarNav", () => {
     );
     expect(screen.getByTestId("factories-workspace-settings-link")).toHaveAttribute(
       "href",
-      factorySettingsPath(org, key),
+      factorySettingsWorkspaceGeneralPath(org, key),
     );
   });
 
