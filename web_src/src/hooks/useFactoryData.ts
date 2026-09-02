@@ -672,7 +672,16 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       }
       return response.data.line;
     },
-    onSuccess: () => {
+    onSuccess: (line) => {
+      queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {
+        if (!current?.lines) {
+          return current;
+        }
+        return {
+          ...current,
+          lines: current.lines.map((existing) => (existing.id === line.id ? line : existing)),
+        };
+      });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });
