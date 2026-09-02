@@ -2,13 +2,19 @@ import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
 import { EMPTY_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
+  DEFAULT_STORYBOOK_API_KEYS,
+  DEFAULT_STORYBOOK_INVITE_LINK,
+  DEFAULT_STORYBOOK_SECRETS,
+  STORYBOOK_ORGANIZATION_ROLES,
   defaultFactoriesFixture,
+  defaultStorybookOrganizationUsers,
   ORGANIZATION_USERS,
   STORYBOOK_ME_USER_EMAIL,
   STORYBOOK_ME_USER_ID,
   STORYBOOK_ME_USER_NAME,
-  toStorybookOrganizationUser,
   type FactoriesFixture,
+  type StorybookApiKey,
+  type StorybookSecret,
 } from "./factoryPageResponses";
 import {
   DEFAULT_ARTIFACTS_BY_ORDER_ID,
@@ -669,9 +675,147 @@ function billingPortalSessionRoute(): FactoriesRoute {
   };
 }
 
-const STORYBOOK_ME_MEMBER_PERMISSIONS = ["members"].flatMap((resource) =>
+const STORYBOOK_ME_EXTRA_PERMISSIONS = ["members", "api_keys"].flatMap((resource) =>
   ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
 );
+
+function ensureApiKeys(fixture: FactoriesFixture): StorybookApiKey[] {
+  if (!fixture.apiKeys) {
+    fixture.apiKeys = structuredClone(DEFAULT_STORYBOOK_API_KEYS);
+  }
+  return fixture.apiKeys;
+}
+
+function organizationIdentity(fixture: FactoriesFixture) {
+  return {
+    id: fixture.organizationId,
+    name: fixture.organizationName ?? "SuperPlane",
+    slug: fixture.organizationSlug ?? "superplane",
+    description: fixture.organizationDescription ?? "",
+  };
+}
+
+function organizationRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)"),
+    resolve: (_match, method, body) => {
+      if (method !== "PUT" && method !== "PATCH") {
+        return null;
+      }
+      const request = (body ?? {}) as {
+        organization?: { metadata?: { name?: string; slug?: string; description?: string } };
+      };
+      const metadata = request.organization?.metadata ?? {};
+      if (metadata.name !== undefined) fixture.organizationName = metadata.name;
+      if (metadata.slug !== undefined) fixture.organizationSlug = metadata.slug;
+      if (metadata.description !== undefined) fixture.organizationDescription = metadata.description;
+      const identity = organizationIdentity(fixture);
+      return {
+        json: {
+          organization: {
+            metadata: identity,
+            spec: { enabledExperimentalFeatures: ["factories", "claude_managed_agents"] },
+            status: {},
+          },
+        },
+      };
+    },
+  };
+}
+
+function ensureSecrets(fixture: FactoriesFixture): StorybookSecret[] {
+  if (!fixture.secrets) {
+    fixture.secrets = structuredClone(DEFAULT_STORYBOOK_SECRETS);
+  }
+  return fixture.secrets;
+}
+
+function secretsCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/secrets"),
+    resolve: (_match, method, body) => {
+      const secrets = ensureSecrets(fixture);
+      if (method === "POST") {
+        const request = (body ?? {}) as { name?: string; secret?: { metadata?: { name?: string } } };
+        const name = request.secret?.metadata?.name?.trim() || request.name?.trim() || "untitled";
+        const created: StorybookSecret = {
+          metadata: { id: `secret-${secrets.length + 1}`, name },
+          spec: { local: { data: {} } },
+        };
+        secrets.push(created);
+        return { json: { secret: created } };
+      }
+      return { json: { secrets } };
+    },
+  };
+}
+
+function apiKeysCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/api-keys"),
+    resolve: (_match, method, body) => {
+      const apiKeys = ensureApiKeys(fixture);
+      if (method === "POST") {
+        const request = (body ?? {}) as {
+          name?: string;
+          description?: string;
+          expiresAt?: string;
+          canvasIds?: string[];
+        };
+        const created: StorybookApiKey = {
+          id: `api-key-${apiKeys.length + 1}`,
+          name: request.name?.trim() || "Untitled",
+          description: request.description?.trim() || "",
+          canvasIds: request.canvasIds ?? [],
+          createdByName: STORYBOOK_ME_USER_NAME,
+          hasToken: true,
+          expiresAt: request.expiresAt,
+        };
+        apiKeys.push(created);
+        return { json: { apiKey: created, token: "sp_live_storybook_new" } };
+      }
+      return { json: { apiKeys } };
+    },
+  };
+}
+
+function apiKeyRegenerateRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/api-keys/([^/]+)/regenerate"),
+    resolve: (match, method) => {
+      const apiKeys = ensureApiKeys(fixture);
+      const key = apiKeys.find((item) => item.id === match[1]);
+      if (!key || method !== "POST") {
+        return { json: {} };
+      }
+      return { json: { apiKey: key, token: "sp_live_storybook_regenerated" } };
+    },
+  };
+}
+
+function apiKeyDetailRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/api-keys/([^/]+)"),
+    resolve: (match, method, body) => {
+      const apiKeys = ensureApiKeys(fixture);
+      const id = match[1];
+      const index = apiKeys.findIndex((key) => key.id === id);
+      if (index < 0) {
+        return { json: {} };
+      }
+      if (method === "DELETE") {
+        apiKeys.splice(index, 1);
+        return { json: {} };
+      }
+      if (method === "PUT" || method === "PATCH") {
+        const request = (body ?? {}) as Partial<StorybookApiKey>;
+        apiKeys[index] = { ...apiKeys[index], ...request, id };
+        return { json: { apiKey: apiKeys[index] } };
+      }
+      return { json: { apiKey: apiKeys[index] } };
+    },
+  };
+}
 
 /** Serves `/api/v1/me` so factory stories resolve `useMe` without the Home harness. */
 function meRoute(organizationId: string): FactoriesRoute {
@@ -686,7 +830,7 @@ function meRoute(organizationId: string): FactoriesRoute {
             id: STORYBOOK_ME_USER_ID,
             name: STORYBOOK_ME_USER_NAME,
             email: STORYBOOK_ME_USER_EMAIL,
-            permissions: [...user.permissions, ...STORYBOOK_ME_MEMBER_PERMISSIONS],
+            permissions: [...user.permissions, ...STORYBOOK_ME_EXTRA_PERMISSIONS],
           },
         },
       };
@@ -715,6 +859,17 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     factoriesCollectionRoute(fixture),
     meRoute(fixture.organizationId),
     notificationSettingsRoute(fixture),
+    organizationUsersRoute(fixture),
+    organizationRolesRoute(fixture),
+    organizationAssignRoleRoute(fixture),
+    organizationInviteLinkResetRoute(fixture),
+    organizationInviteLinkRoute(fixture),
+    organizationRemoveUserRoute(fixture),
+    organizationRoute(fixture),
+    secretsCollectionRoute(fixture),
+    apiKeysCollectionRoute(fixture),
+    apiKeyRegenerateRoute(fixture),
+    apiKeyDetailRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
@@ -749,11 +904,101 @@ export function matchFactoryPageFixture(
   return null;
 }
 
+function ensureOrganizationUsers(fixture: FactoriesFixture) {
+  if (!fixture.organizationUsers) {
+    fixture.organizationUsers = defaultStorybookOrganizationUsers();
+  }
+  return fixture.organizationUsers;
+}
+
+function ensureInviteLink(fixture: FactoriesFixture) {
+  if (!fixture.inviteLink) {
+    fixture.inviteLink = { ...DEFAULT_STORYBOOK_INVITE_LINK };
+  }
+  return fixture.inviteLink;
+}
+
+function organizationUsersRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/users"),
+    resolve: (_match, method) => (method === "GET" ? factoriesOrganizationUsersResponse(fixture) : null),
+  };
+}
+
+function organizationRolesRoute(_fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/roles"),
+    resolve: (_match, method) => (method === "GET" ? { json: { roles: STORYBOOK_ORGANIZATION_ROLES } } : null),
+  };
+}
+
+function organizationAssignRoleRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/roles/([^/]+)/users"),
+    resolve: (match, method, body) => {
+      if (method !== "POST") return null;
+      const roleName = match[1];
+      const role = STORYBOOK_ORGANIZATION_ROLES.find((item) => item.metadata.name === roleName);
+      const userId = typeof body?.userId === "string" ? body.userId : "";
+      const users = ensureOrganizationUsers(fixture);
+      const user = users.find((item) => item.metadata?.id === userId);
+      if (user && role) {
+        user.status = {
+          ...user.status,
+          roles: [{ roleName: role.metadata.name, roleDisplayName: role.spec.displayName }],
+        };
+      }
+      return { json: {} };
+    },
+  };
+}
+
+function organizationInviteLinkRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/invite-link"),
+    resolve: (_match, method, body) => {
+      const inviteLink = ensureInviteLink(fixture);
+      if (method === "PATCH") {
+        inviteLink.enabled = Boolean(body?.enabled);
+      }
+      if (method === "GET" || method === "PATCH") {
+        return { json: { inviteLink } };
+      }
+      return null;
+    },
+  };
+}
+
+function organizationInviteLinkResetRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/invite-link/reset"),
+    resolve: (_match, method) => {
+      if (method !== "POST") return null;
+      const inviteLink = ensureInviteLink(fixture);
+      inviteLink.token = `storybook-token-${Date.now()}`;
+      inviteLink.enabled = true;
+      return { json: { inviteLink } };
+    },
+  };
+}
+
+function organizationRemoveUserRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/users/([^/]+)"),
+    resolve: (match, method) => {
+      if (method !== "DELETE") return null;
+      const users = ensureOrganizationUsers(fixture);
+      fixture.organizationUsers = users.filter((user) => user.metadata?.id !== match[2]);
+      return { json: {} };
+    },
+  };
+}
+
 /** Response body for `GET /api/v1/users` (`useOrganizationUsers`). */
-export function factoriesOrganizationUsersResponse(): FixtureResult {
+export function factoriesOrganizationUsersResponse(fixture: FactoriesFixture = defaultFactoriesFixture): FixtureResult {
   return {
     json: {
-      users: ORGANIZATION_USERS.map(toStorybookOrganizationUser),
+      users: ensureOrganizationUsers(fixture),
     },
   };
 }

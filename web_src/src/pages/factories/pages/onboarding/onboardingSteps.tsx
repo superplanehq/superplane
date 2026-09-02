@@ -153,6 +153,8 @@ export function RepositoryPicker({
   onSelect,
   title,
   description,
+  searchClassName,
+  itemClassName,
 }: {
   host: VcsHostId;
   repos: string[];
@@ -161,6 +163,8 @@ export function RepositoryPicker({
   /** Only for pickers that need their own heading, such as the backlog picker. */
   title?: string;
   description?: string;
+  searchClassName?: string;
+  itemClassName?: string;
 }) {
   const [query, setQuery] = useState("");
 
@@ -184,7 +188,7 @@ export function RepositoryPicker({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search repositories"
-          className="h-9 pl-9"
+          className={cn("h-9 pl-9", searchClassName)}
           aria-label="Search repositories"
         />
       </div>
@@ -209,6 +213,7 @@ export function RepositoryPicker({
                     className={cn(
                       "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
                       selected ? "bg-accent/50" : "hover:bg-accent/30",
+                      itemClassName,
                     )}
                   >
                     <IntegrationChoiceIcon name={host} />

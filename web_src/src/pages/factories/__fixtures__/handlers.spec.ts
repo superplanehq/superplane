@@ -81,8 +81,37 @@ describe("matchFactoryPageFixture", () => {
     const me = await fetchFactoryPageFixture("/api/v1/me");
     await expect(me.json()).resolves.toMatchObject({
       user: {
-        permissions: expect.arrayContaining([expect.objectContaining({ resource: "factories", action: "update" })]),
+        permissions: expect.arrayContaining([
+          expect.objectContaining({ resource: "factories", action: "update" }),
+          expect.objectContaining({ resource: "api_keys", action: "read" }),
+        ]),
       },
+    });
+  });
+
+  it("lists organization members with roles and an invite link", async () => {
+    const users = await fetchFactoryPageFixture("/api/v1/users");
+    const body = (await users.json()) as {
+      users: Array<{ spec?: { displayName?: string }; status?: { roles?: Array<{ roleName?: string }> } }>;
+    };
+    const owner = body.users.find((user) => user.spec?.displayName === "Leonardo DiCaprio");
+    expect(owner?.status?.roles?.[0]?.roleName).toBe("org_owner");
+
+    const roles = await fetchFactoryPageFixture("/api/v1/roles");
+    await expect(roles.json()).resolves.toMatchObject({
+      roles: expect.arrayContaining([expect.objectContaining({ metadata: { name: "org_admin" } })]),
+    });
+
+    const invite = await fetchFactoryPageFixture(`/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/invite-link`);
+    await expect(invite.json()).resolves.toMatchObject({
+      inviteLink: { token: "storybook-token", enabled: true },
+    });
+  });
+
+  it("lists mocked organization API keys", async () => {
+    const response = await fetchFactoryPageFixture("/api/v1/api-keys");
+    await expect(response.json()).resolves.toMatchObject({
+      apiKeys: [expect.objectContaining({ name: "CI pipeline" }), expect.objectContaining({ name: "Local CLI" })],
     });
   });
 
