@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { groupPlanningSessionLog, isPlanningSessionNoise, isPlanningSessionToolPayload } from "./planningSessionLog";
+import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
+import {
+  groupPlanningSessionLog,
+  isPlanningSessionNoise,
+  isPlanningSessionToolPayload,
+  mergePlanningSessionNotes,
+} from "./planningSessionLog";
 import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
 function note(
@@ -172,7 +178,7 @@ describe("groupPlanningSessionLog", () => {
         kind: "note",
         line: expect.objectContaining({
           id: "user-1",
-          componentType: "note",
+          componentType: "prompt",
           componentName: "I want to extend the puppies to include size",
         }),
       }),
@@ -209,6 +215,11 @@ describe("groupPlanningSessionLog", () => {
     );
     expect(notes).toEqual(["Add a Size field to Puppy", "Priority: High\nScope: One file"]);
     expect(notes.join("\n")).not.toContain("The user created the draft task");
+    expect(
+      groups
+        .flatMap((group) => group.events)
+        .filter((event) => event.kind === "note" && event.line.componentType === "prompt"),
+    ).toHaveLength(2);
   });
 
   it("hides setup and collapses truncated draft tool JSON", () => {
@@ -253,5 +264,142 @@ describe("groupPlanningSessionLog", () => {
         tools: [expect.objectContaining({ id: "draft" })],
       }),
     );
+  });
+
+  it("keeps survey answers marked so the log can label them", () => {
+    const groups = groupPlanningSessionLog([
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "How should the color field be entered? Dropdown\nShould color be required? Optional",
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(groups[0]?.events[0]).toEqual(
+      expect.objectContaining({
+        kind: "note",
+        line: expect.objectContaining({
+          componentType: "prompt",
+          userTalk: "survey",
+          componentName: "How should the color field be entered? Dropdown\nShould color be required? Optional",
+        }),
+      }),
+    );
+  });
+});
+
+describe("mergePlanningSessionNotes", () => {
+  it("keeps user replies in conversation order instead of stacking them on the greeting", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "greet",
+        componentType: "prompt",
+        componentName: "Greet the user in plain text. Then stop.",
+      }),
+      note({
+        id: "hi",
+        noteParentId: "greet",
+        componentType: "note",
+        componentName: "Hi! I'm ready to help you plan work in this repo. Tell me what you'd like to do.",
+      }),
+      note({
+        id: "wait",
+        componentType: "prompt",
+        componentName: "Wait for the next user message",
+        status: "running",
+      }),
+      note({
+        id: "look",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: 'Let me take a look at the repo to understand what "puppies" refers to here.',
+      }),
+      note({
+        id: "got-it",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Got it. This is a small Express + EJS CRUD app where a Puppy currently has just a name.",
+      }),
+      note({
+        id: "asked",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName:
+          "I've asked a few scoping questions above. Once you answer, I'll have what I need to draft the task.",
+      }),
+    ];
+    const surveyReply =
+      "How should the color field be entered? Dropdown of preset colors (e.g. black, brown, white, golden)\nShould color be required or optional? Optional, matching how name works today\nWhere should color show up? skipped";
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-1",
+        componentType: "prompt",
+        componentName: "I want to add color to puppies",
+        userTalk: "message",
+      }),
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    const groups = groupPlanningSessionLog(merged);
+    const talk = groups.flatMap((group) =>
+      group.events.filter((event) => event.kind === "note").map((event) => event.line),
+    );
+
+    expect(talk.map((line) => line.componentName)).toEqual([
+      "Hi! I'm ready to help you plan work in this repo. Tell me what you'd like to do.",
+      "I want to add color to puppies",
+      'Let me take a look at the repo to understand what "puppies" refers to here.',
+      "Got it. This is a small Express + EJS CRUD app where a Puppy currently has just a name.",
+      "I've asked a few scoping questions above. Once you answer, I'll have what I need to draft the task.",
+      surveyReply,
+    ]);
+    expect(talk[1]?.userTalk).toBe("message");
+    expect(talk[5]?.userTalk).toBe("survey");
+  });
+
+  it("skips a user extra already in the live prompt and marks a matching survey reply", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-7",
+        componentType: "prompt",
+        componentName: "I want to add color to puppies",
+      }),
+      note({
+        id: "look",
+        noteParentId: "agent-step-7",
+        componentType: "note",
+        componentName: "Let me take a look at the repo.",
+      }),
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-1",
+        componentType: "prompt",
+        componentName: "I want to add color to puppies",
+        userTalk: "message",
+      }),
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-7", "look", "agent-step-8"]);
+    expect(merged[2]?.userTalk).toBe("survey");
   });
 });

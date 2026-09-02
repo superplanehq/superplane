@@ -1,5 +1,5 @@
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
-import { parsePlanningSurvey } from "./planningSessionSurvey";
+import { isPlanningSurveyReply, parsePlanningSurvey } from "./planningSessionSurvey";
 
 export function workspacePlanningRepository(
   factory: { onboarding?: { appRepository?: string | null } } | null | undefined,
@@ -87,7 +87,15 @@ function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWi
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
   if (message.kind === "text" && message.text && (message.role === "user" || message.role === "agent")) {
-    return [{ id: message.id ?? message.text, kind: "text", role: message.role, text: message.text }];
+    return [
+      {
+        id: message.id ?? message.text,
+        kind: "text",
+        role: message.role,
+        text: message.text,
+        ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
+      },
+    ];
   }
   return [];
 }

@@ -1,3 +1,4 @@
+import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import type { ClaudeStepGroup } from "./work-order-split-run/PhaseLogCard";
 import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
@@ -105,7 +106,8 @@ export function groupPlanningSessionLog(notes: SplitRunStreamLine[]): ClaudeStep
       attachNote({
         ...line,
         id: `${line.id}-talk`,
-        componentType: "note",
+        componentType: "prompt",
+        userTalk: line.userTalk ?? (isPlanningSurveyReply(line.componentName) ? "survey" : "message"),
         detail: undefined,
       });
     }
@@ -119,7 +121,11 @@ export function groupPlanningSessionLog(notes: SplitRunStreamLine[]): ClaudeStep
     flushTools(parent);
     parent.events.push({
       kind: "note",
-      line: { ...line, componentType: "note", detail: undefined },
+      line: {
+        ...line,
+        componentType: line.componentType === "prompt" ? "prompt" : "note",
+        detail: undefined,
+      },
     });
   };
 
@@ -205,6 +211,105 @@ function isPlanningSessionSystemPrompt(text: string): boolean {
     name.startsWith("The user skipped that draft") ||
     name.startsWith("The user started refining")
   );
+}
+
+export function mergePlanningSessionNotes(
+  live: SplitRunStreamLine[] | undefined,
+  extra: SplitRunStreamLine[],
+): SplitRunStreamLine[] {
+  if (!live?.length) {
+    return extra;
+  }
+  if (extra.length === 0) {
+    return live;
+  }
+
+  const merged = live.map((line) => ({ ...line }));
+  const unmatchedUsers: SplitRunStreamLine[] = [];
+  const unmatchedOthers: SplitRunStreamLine[] = [];
+
+  for (const line of extra) {
+    if (streamNoteHasText(merged, line.componentName)) {
+      if (line.userTalk === "survey") {
+        markLiveUserTalk(merged, line.componentName, "survey");
+      }
+      continue;
+    }
+    if (isSessionUserExtra(line)) {
+      unmatchedUsers.push(line);
+      continue;
+    }
+    unmatchedOthers.push(line);
+  }
+
+  const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
+  const insertions: { afterIndex: number; line: SplitRunStreamLine }[] = [];
+  const trailing: SplitRunStreamLine[] = [];
+
+  for (const [index, line] of unmatchedUsers.entries()) {
+    const slot = emptyWaits[index];
+    if (!slot) {
+      trailing.push(line);
+      continue;
+    }
+    insertions.push({
+      afterIndex: slot.index,
+      line: {
+        ...line,
+        noteParentId: slot.line.id,
+        noteDepth: 1,
+      },
+    });
+  }
+
+  insertions.sort((left, right) => right.afterIndex - left.afterIndex);
+  for (const insertion of insertions) {
+    merged.splice(insertion.afterIndex + 1, 0, insertion.line);
+  }
+
+  return [...merged, ...unmatchedOthers, ...trailing];
+}
+
+function isSessionUserExtra(line: SplitRunStreamLine): boolean {
+  return !line.noteParentId && line.componentType === "prompt";
+}
+
+function isEmptyWaitSlot(line: SplitRunStreamLine): boolean {
+  return !line.noteParentId && line.componentType === "prompt" && isPlanningSessionWaitPrompt(line.componentName);
+}
+
+function isPlanningSessionWaitPrompt(text: string): boolean {
+  const name = text.trim();
+  return (
+    name === "Wait for the next user message" ||
+    name.startsWith("The user created the draft task") ||
+    name.startsWith("The user skipped that draft") ||
+    name.startsWith("The user started refining")
+  );
+}
+
+function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
+  const needle = text.trim();
+  if (!needle) {
+    return true;
+  }
+  const prefix = needle.slice(0, 48);
+  return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
+function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {
+  const prefix = text.trim().slice(0, 48);
+  if (!prefix) {
+    return;
+  }
+  for (const note of notes) {
+    if (note.noteParentId || note.componentType !== "prompt") {
+      continue;
+    }
+    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+      note.userTalk = userTalk;
+    }
+  }
 }
 
 function parentStep(steps: ClaudeStepGroup[], line: SplitRunStreamLine): ClaudeStepGroup | undefined {

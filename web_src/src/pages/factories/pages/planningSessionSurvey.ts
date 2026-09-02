@@ -17,6 +17,21 @@ export function parsePlanningSurvey(raw: string | undefined): CreateWithAgentSur
   }
 }
 
+export function isPlanningSurveyReply(text: string): boolean {
+  const name = text.trim();
+  if (!name) {
+    return false;
+  }
+  if (name === CREATE_WITH_AGENT_COPY.surveySkipped) {
+    return true;
+  }
+  const lines = name
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.length > 0 && lines.every((line) => /\?\s+\S/.test(line));
+}
+
 export function formatPlanningSurveyReply(
   questions: CreateWithAgentSurveyQuestion[],
   answers: Array<string | null | undefined>,

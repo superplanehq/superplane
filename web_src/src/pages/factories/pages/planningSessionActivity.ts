@@ -57,6 +57,7 @@ export function planningSessionTalkLines(messages: CreateWithAgentMessage[]): Sp
         componentType: message.role === "user" ? "prompt" : "note",
         status: "passed" as const,
         detail: message.role === "user" ? text : undefined,
+        ...(message.role === "user" ? { userTalk: message.origin === "survey" ? "survey" : "message" } : {}),
       },
     ];
   });
