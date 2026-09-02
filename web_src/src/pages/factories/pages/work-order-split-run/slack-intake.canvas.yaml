@@ -31,7 +31,7 @@ spec:
         'y': 618
       isCollapsed: false
     - id: create-work-order
-      name: Create Work Order
+      name: Create Task Order
       type: TYPE_ACTION
       component: createWorkOrder
       configuration:

@@ -27,7 +27,7 @@ func (c *CreateWorkOrder) Name() string {
 }
 
 func (c *CreateWorkOrder) Label() string {
-	return "Create Work Order"
+	return "Create Task Order"
 }
 
 func (c *CreateWorkOrder) Description() string {
@@ -35,7 +35,7 @@ func (c *CreateWorkOrder) Description() string {
 }
 
 func (c *CreateWorkOrder) Documentation() string {
-	return `The Create Work Order component creates a new work order in the factory. This component can only be used in factory-owned apps.`
+	return `The Create Task Order component creates a new work order in the factory. This component can only be used in factory-owned apps.`
 }
 
 func (c *CreateWorkOrder) Icon() string {

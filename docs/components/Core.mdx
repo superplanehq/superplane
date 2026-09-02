@@ -27,11 +27,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Add Pull Request" href="#add-pull-request" description="Attach a pull request to a work order" />
   <LinkCard title="Add Pull Request Activity" href="#add-pull-request-activity" description="Create a factory pull request activity for the current run" />
   <LinkCard title="Add Run Error" href="#add-run-error" description="Record a business failure on the current run" />
-  <LinkCard title="Add Work Order Artifact" href="#add-work-order-artifact" description="Attach a typed artifact (markdown note, branch, or link) to a work order" />
+  <LinkCard title="Add Task Artifact" href="#add-task-artifact" description="Attach a typed artifact (markdown note, branch, or link) to a work order" />
   <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
-  <LinkCard title="Create Work Order" href="#create-work-order" description="Create a new work order" />
+  <LinkCard title="Create Task Order" href="#create-task-order" description="Create a new work order" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
@@ -596,13 +596,13 @@ The Add Run Error component appends an error entry to the current run.
 }
 ```
 
-<a id="add-work-order-artifact"></a>
+<a id="add-task-artifact"></a>
 
-## Add Work Order Artifact
+## Add Task Artifact
 
 **Component key:** `addWorkOrderArtifact`
 
-The Add Work Order Artifact component stores a typed artifact against a work order.
+The Add Task Artifact component stores a typed artifact against a work order.
 
 Supported types:
 
@@ -749,13 +749,13 @@ Broadcast a message to other SuperPlane apps subscribed to this app
 }
 ```
 
-<a id="create-work-order"></a>
+<a id="create-task-order"></a>
 
-## Create Work Order
+## Create Task Order
 
 **Component key:** `createWorkOrder`
 
-The Create Work Order component creates a new work order in the factory. This component can only be used in factory-owned apps.
+The Create Task Order component creates a new work order in the factory. This component can only be used in factory-owned apps.
 
 ### Example Output
 

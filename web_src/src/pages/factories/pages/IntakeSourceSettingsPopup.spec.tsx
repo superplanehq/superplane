@@ -33,7 +33,7 @@ function githubIntakeGraph(): IntakeAutomationGraph {
             component: "if",
             configuration: { expression: "true" },
           },
-          { id: "create", name: "Create Work Order", type: "TYPE_ACTION", component: "createWorkOrder" },
+          { id: "create", name: "Create Task Order", type: "TYPE_ACTION", component: "createWorkOrder" },
         ],
         edges: [
           { channel: "default", sourceId: "trigger", targetId: "filter" },
@@ -44,7 +44,7 @@ function githubIntakeGraph(): IntakeAutomationGraph {
     [{ name: "github.onIssue", label: "On Issue" }],
     [
       { name: "if", label: "If" },
-      { name: "createWorkOrder", label: "Create Work Order" },
+      { name: "createWorkOrder", label: "Create Task Order" },
     ],
     {},
     {},
@@ -123,7 +123,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(automation).getByTestId("rf__node-trigger")).toBeInTheDocument();
     expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
-    expect(within(automation).getAllByText("Create Work Order").length).toBeGreaterThan(0);
+    expect(within(automation).getAllByText("Create Task Order").length).toBeGreaterThan(0);
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
       "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1",
