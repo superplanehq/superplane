@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -187,10 +188,17 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(account, "id = ?", account.ID).Error; err != nil {
 			return err
 		}
-		if err := s.refuseAccountDeleteGuards(r, tx, account); err != nil {
+		users, err := models.ListActiveHumanUsersForAccount(tx, account.ID)
+		if err != nil {
 			return err
 		}
-		return account.SoftDelete(tx, time.Now())
+		if err := s.refuseAccountDeleteGuards(r, tx, account, users); err != nil {
+			return err
+		}
+		if err := account.SoftDelete(tx, time.Now()); err != nil {
+			return err
+		}
+		return s.removeAccountOrganizationRoles(r.Context(), users)
 	})
 	if errors.Is(err, models.ErrAccountDeleteLastUncreatedOwner) {
 		http.Error(w, "Transfer ownership of organizations you did not create before you delete this account.", http.StatusConflict)
@@ -210,7 +218,7 @@ func (s *Server) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account *models.Account) error {
+func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account *models.Account, users []models.User) error {
 	if account.IsInstallationAdmin() {
 		count, err := models.CountActiveInstallationAdmins(tx)
 		if err != nil {
@@ -219,11 +227,6 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account
 		if count <= 1 {
 			return models.ErrAccountDeleteLastInstallationAdmin
 		}
-	}
-
-	users, err := models.ListActiveHumanUsersForAccount(tx, account.ID)
-	if err != nil {
-		return err
 	}
 
 	for _, user := range users {
@@ -242,10 +245,44 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account
 		if err != nil {
 			return err
 		}
-		if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
+		livingIDs, err := livingOwnerIDs(tx, organization.ID.String(), ownerIDs)
+		if err != nil {
+			return err
+		}
+		if len(livingIDs) <= 1 && slices.Contains(livingIDs, user.ID.String()) {
 			return models.ErrAccountDeleteLastUncreatedOwner
 		}
 	}
 
+	return nil
+}
+
+func livingOwnerIDs(tx *gorm.DB, organizationID string, ownerIDs []string) ([]string, error) {
+	if len(ownerIDs) == 0 {
+		return nil, nil
+	}
+	living, err := models.ListActiveUsersByIDInTransaction(tx, organizationID, ownerIDs)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(living))
+	for i := range living {
+		ids = append(ids, living[i].ID.String())
+	}
+	return ids, nil
+}
+
+func (s *Server) removeAccountOrganizationRoles(ctx context.Context, users []models.User) error {
+	for _, user := range users {
+		roles, err := s.authService.GetUserRolesForOrg(ctx, user.ID.String(), user.OrganizationID.String())
+		if err != nil {
+			return err
+		}
+		for _, role := range roles {
+			if err := s.authService.RemoveRole(user.ID.String(), role.Name, user.OrganizationID.String(), models.DomainTypeOrganization); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

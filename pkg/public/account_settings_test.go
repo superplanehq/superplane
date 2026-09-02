@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
@@ -334,6 +336,81 @@ func TestDeleteAccount_SkipsDeletedOrganizationMembership(t *testing.T) {
 	server.Router.ServeHTTP(res, req)
 
 	require.Equal(t, http.StatusNoContent, res.Code)
+}
+
+func TestDeleteAccount_RemovesOrganizationRoles(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
+
+	server, account, token := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusNoContent, res.Code)
+
+	ownerIDs, err := r.AuthService.GetOrgUsersForRole(t.Context(), models.RoleOrgOwner, r.Organization.ID.String())
+	require.NoError(t, err)
+	assert.NotContains(t, ownerIDs, r.User.String())
+}
+
+func TestDeleteAccount_RefusesLastLivingOwnerAfterDeletedOwner(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, database.Conn().Model(r.Account).Update("installation_admin", false).Error)
+
+	creator, err := models.CreateAccount("Creator", "org-creator@example.com")
+	require.NoError(t, err)
+	require.NoError(t, models.SetOrganizationCreatedByAccount(database.Conn(), r.Organization.ID, creator.ID))
+
+	otherAccount, err := models.CreateAccount("Other Owner", "other-living-owner@example.com")
+	require.NoError(t, err)
+
+	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(otherUser.ID.String(), models.RoleOrgOwner, r.Organization.ID.String(), models.DomainTypeOrganization))
+
+	firstServer, _, firstToken := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": r.Account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: firstToken})
+	res := httptest.NewRecorder()
+	firstServer.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusNoContent, res.Code)
+
+	otherToken, err := authentication.GenerateAccountToken(jwt.NewSigner("test-client-secret"), otherAccount.ID.String(), time.Now(), time.Hour)
+	require.NoError(t, err)
+	body, err = json.Marshal(map[string]string{"email": otherAccount.Email})
+	require.NoError(t, err)
+	req, _ = http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: otherToken})
+	res = httptest.NewRecorder()
+	firstServer.Router.ServeHTTP(res, req)
+	require.Equal(t, http.StatusConflict, res.Code)
+	assert.Contains(t, res.Body.String(), "Transfer ownership")
+}
+
+func TestDeleteAccount_RefusesWhenOnlyOtherAdminIsBlocked(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+
+	blocked, err := models.CreateAccount("Blocked Admin", "blocked-admin@example.com")
+	require.NoError(t, err)
+	require.NoError(t, models.PromoteToInstallationAdmin(blocked.ID.String()))
+	require.NoError(t, blocked.Block(database.Conn(), time.Now()))
+
+	server, _, token := setupTestServer(r, t)
+	body, err := json.Marshal(map[string]string{"email": r.Account.Email})
+	require.NoError(t, err)
+	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
+	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	res := httptest.NewRecorder()
+	server.Router.ServeHTTP(res, req)
+
+	require.Equal(t, http.StatusConflict, res.Code)
+	assert.Contains(t, res.Body.String(), "installation admin")
 }
 
 func TestDeleteAccount_RequiresEmailConfirmation(t *testing.T) {

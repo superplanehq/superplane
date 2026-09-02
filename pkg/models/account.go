@@ -261,6 +261,7 @@ func CountActiveInstallationAdmins(tx *gorm.DB) (int64, error) {
 	var count int64
 	err := tx.Model(&Account{}).
 		Where("installation_admin = ?", true).
+		Where("blocked_at IS NULL").
 		Count(&count).
 		Error
 	return count, err
