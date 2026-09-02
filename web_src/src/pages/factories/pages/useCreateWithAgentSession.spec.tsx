@@ -49,6 +49,7 @@ describe("useCreateWithAgentSession", () => {
     endPlanningSession.mockResolvedValue(session("ended"));
     describePlanningSession.mockResolvedValue(session("session-1"));
     showErrorToast.mockReset();
+    vi.useRealTimers();
   });
 
   it("ends the session when the dialog closes after Open task", async () => {
@@ -204,6 +205,58 @@ describe("useCreateWithAgentSession", () => {
     });
     expect(result.current.view.canvasId).toBe("");
     expect(showErrorToast).toHaveBeenCalled();
+  });
+
+  it("does not save a draft after close", async () => {
+    vi.useFakeTimers();
+    startPlanningSession.mockResolvedValue(session("session-1"));
+    updatePlanningSessionDraft.mockResolvedValue(session("session-1"));
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.view.canvasId).toBe("canvas-session-1");
+
+    act(() => {
+      result.current.onDraftTitleChange("Retry refunds");
+    });
+    act(() => {
+      result.current.close();
+    });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(updatePlanningSessionDraft).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("does not save a draft after unmount", async () => {
+    vi.useFakeTimers();
+    startPlanningSession.mockResolvedValue(session("session-1"));
+    updatePlanningSessionDraft.mockResolvedValue(session("session-1"));
+    const { result, unmount } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.view.canvasId).toBe("canvas-session-1");
+
+    act(() => {
+      result.current.onDraftTitleChange("Retry refunds");
+    });
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(updatePlanningSessionDraft).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("ends a session that arrives after close", async () => {

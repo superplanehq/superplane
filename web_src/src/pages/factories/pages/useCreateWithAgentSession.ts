@@ -52,6 +52,14 @@ function schedulePlanningSessionEnd(key: string, end: () => void) {
   );
 }
 
+function clearDraftSaveTimer(timer: { current: number | undefined }) {
+  if (timer.current === undefined) {
+    return;
+  }
+  window.clearTimeout(timer.current);
+  timer.current = undefined;
+}
+
 export function useCreateWithAgentSession(repository: string, organizationId: string, factoryId: string) {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState("");
@@ -64,6 +72,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
   openRef.current = open;
 
   const resetLocalSession = useCallback(() => {
+    clearDraftSaveTimer(draftSaveTimer);
     setOpen(false);
     setSessionId("");
     setView(emptyCreateWithAgentView(repository));
@@ -111,6 +120,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     const key = planningSessionHookKey(organizationId, factoryId);
     cancelScheduledPlanningSessionEnd(key);
     return () => {
+      clearDraftSaveTimer(draftSaveTimer);
       const id = sessionIdRef.current;
       if (!openRef.current || !id) {
         return;
@@ -322,10 +332,9 @@ function savePlanningDraft({
   if (!sessionId) {
     return;
   }
-  if (draftSaveTimer.current !== undefined) {
-    window.clearTimeout(draftSaveTimer.current);
-  }
+  clearDraftSaveTimer(draftSaveTimer);
   draftSaveTimer.current = window.setTimeout(() => {
+    draftSaveTimer.current = undefined;
     void updatePlanningSessionDraft(organizationId, factoryId, sessionId, { title, description }).catch(
       (error: unknown) => {
         showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedDraft));

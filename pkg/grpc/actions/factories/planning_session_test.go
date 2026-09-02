@@ -288,6 +288,49 @@ func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
 	assert.True(t, foundClaude)
 }
 
+func Test__StartPlanningSession__SwitchesExistingCodexNodeToClaude(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	upsertHostedOnboardingProvider(t, db)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+
+	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	node, err := models.FindCanvasNode(db, canvas.ID, planningCanvasAgentNodeID)
+	require.NoError(t, err)
+	node.Ref = datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}})
+	require.NoError(t, db.Model(node).Select("Ref").Updates(node).Error)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+
+	node, err = models.FindCanvasNode(db, canvas.ID, planningCanvasAgentNodeID)
+	require.NoError(t, err)
+	assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+	assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration.Data()), "Greet the user in plain text")
+
+	version, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	for _, live := range version.Nodes {
+		if live.ID == planningCanvasAgentNodeID {
+			assert.Equal(t, "runnerClaudeCode", live.ComponentName())
+			return
+		}
+	}
+	t.Fatal("missing planning agent on live version")
+}
+
 func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

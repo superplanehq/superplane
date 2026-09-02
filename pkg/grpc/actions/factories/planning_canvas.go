@@ -139,7 +139,7 @@ func ensurePlanningAgentNode(tx *gorm.DB, factoryModel *models.Factory, canvas *
 	agentConfig := planningCanvasAgentConfiguration(tx, factoryModel, agent)
 	for i := range nodes {
 		if nodes[i].Type == models.NodeTypeComponent {
-			if err := refreshPlanningAgentNode(tx, canvas, &nodes[i], agentConfig); err != nil {
+			if err := refreshPlanningAgentNode(tx, canvas, &nodes[i], agent, agentConfig); err != nil {
 				return err
 			}
 			return ensurePlanningAgentConcurrency(tx, canvas, &nodes[i])
@@ -338,14 +338,18 @@ func planningCanvasCloneCommand() string {
 git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`
 }
 
-func refreshPlanningAgentNode(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, agentConfig map[string]any) error {
-	if planningCanvasPromptFromConfig(node.Configuration.Data()) == planningCanvasPrompt() {
+func refreshPlanningAgentNode(tx *gorm.DB, canvas *models.Canvas, node *models.CanvasNode, agent *intakeAgent, agentConfig map[string]any) error {
+	wantRef := models.NodeRef{Component: &models.ComponentRef{Name: agent.component()}}
+	promptCurrent := planningCanvasPromptFromConfig(node.Configuration.Data()) == planningCanvasPrompt()
+	componentCurrent := node.ComponentName() == agent.component()
+	if promptCurrent && componentCurrent {
 		return nil
 	}
 	now := time.Now()
+	node.Ref = datatypes.NewJSONType(wantRef)
 	node.Configuration = datatypes.NewJSONType(agentConfig)
 	node.UpdatedAt = &now
-	if err := tx.Model(node).Select("Configuration", "UpdatedAt").Updates(node).Error; err != nil {
+	if err := tx.Model(node).Select("Ref", "Configuration", "UpdatedAt").Updates(node).Error; err != nil {
 		return err
 	}
 	version, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
@@ -355,6 +359,7 @@ func refreshPlanningAgentNode(tx *gorm.DB, canvas *models.Canvas, node *models.C
 	nodes := append([]models.Node{}, version.Nodes...)
 	for i := range nodes {
 		if nodes[i].ID == node.NodeID {
+			nodes[i].Ref = wantRef
 			nodes[i].Configuration = agentConfig
 		}
 	}
