@@ -409,7 +409,8 @@ CREATE TABLE public.factory_lines (
     name text NOT NULL,
     steps jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    column_colors jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -4081,7 +4082,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902070817	f
+20260902092740	f
 \.
 
 
