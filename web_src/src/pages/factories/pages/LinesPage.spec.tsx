@@ -42,6 +42,7 @@ function renderLinesBoard(
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
+const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
@@ -82,7 +83,12 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
-  useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
+  useUpdateFactoryLine: () => ({
+    mutateAsync: updateFactoryLineMutateAsync,
+    get isPending() {
+      return updateLineIsPending.value;
+    },
+  }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
@@ -175,6 +181,7 @@ async function resetLinesBoardMocks() {
   const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
   updateFactoryLineMutateAsync.mockReset();
+  updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryApps.mockReturnValue({ data: [] });
   useFactoryIntakes.mockReturnValue({ data: [] });
@@ -753,7 +760,10 @@ describe("LinesPage board editing", () => {
   });
 
   it("picking a color saves it on the line and updates the lane immediately", async () => {
-    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      id: REFUND_LINE_PLAN_ID,
+      columnColors: { backlog: "lime", "phase-0": "sky" },
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -765,6 +775,44 @@ describe("LinesPage board editing", () => {
         lineId: REFUND_LINE_PLAN_ID,
         columnColors: { backlog: "lime", "phase-0": "sky" },
       });
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).toHaveClass(className);
+    }
+  });
+
+  it("keeps the picked color when the save completes before the factory refetch", async () => {
+    const view = renderLinesBoard();
+    updateFactoryLineMutateAsync.mockImplementation(async (input) => {
+      updateLineIsPending.value = true;
+      view.rerender(
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          factory={REFUND_FACTORY}
+        />,
+      );
+      await Promise.resolve();
+      updateLineIsPending.value = false;
+      view.rerender(
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          factory={REFUND_FACTORY}
+        />,
+      );
+      return {
+        id: REFUND_LINE_PLAN_ID,
+        columnColors: input.columnColors,
+      };
+    });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalled();
     });
 
     const phaseLane = screen.getByTestId("lines-phase-column-0");
