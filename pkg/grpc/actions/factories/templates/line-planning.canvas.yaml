@@ -85,7 +85,7 @@ spec:
         'y': 1056
       isCollapsed: false
     - id: add-plan-artifact
-      name: Add Plan Artifact
+      name: Add Task Artifact
       type: TYPE_ACTION
       component: addWorkOrderArtifact
       configuration:

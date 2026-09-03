@@ -298,7 +298,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
   if: { title: "If", iconSlug: "split" },
   filter: { title: "Filter", iconSlug: "funnel" },
-  addWorkOrderArtifact: { title: "Add Work Order Artifact", iconSlug: "factory" },
+  addWorkOrderArtifact: { title: "Add Task Artifact", iconSlug: "factory" },
   addPullRequest: { title: "Add Pull Request", iconSlug: "factory" },
   updatePullRequest: { title: "Update Pull Request", iconSlug: "factory" },
   findPullRequest: { title: "Find Pull Request", iconSlug: "factory" },
@@ -316,7 +316,7 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
   findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
-  createWorkOrder: { title: "Create Work Order", iconSlug: "factory" },
+  createWorkOrder: { title: "Create Task", iconSlug: "factory" },
   updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
 };
 
