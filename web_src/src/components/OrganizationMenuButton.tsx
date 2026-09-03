@@ -52,7 +52,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOrganizationSwitchOpen, setIsOrganizationSwitchOpen] = useState(false);
-  const { data: accountOrganizations = [] } = useAccountOrganizations();
+  const accountOrganizationsQuery = useAccountOrganizations();
+  const accountOrganizations = accountOrganizationsQuery.data ?? [];
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleMenuButtonClick = () => {
@@ -292,8 +293,13 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       className="mt-1 max-h-52 overflow-y-auto rounded-md border border-slate-950/15 p-1 dark:border-gray-700/70"
                       data-testid="legacy-organization-switch-list"
                     >
+                      {accountOrganizationsQuery.isLoading ? <p className="px-1.5 py-1 text-sm text-gray-500">Loading organizations...</p> : null}
+                      {accountOrganizationsQuery.isError ? <p className="px-1.5 py-1 text-sm text-gray-500">Could not load organizations.</p> : null}
+                      {!accountOrganizationsQuery.isLoading && !accountOrganizationsQuery.isError && accountOrganizations.length === 0 ? (
+                        <p className="px-1.5 py-1 text-sm text-gray-500">No organizations available.</p>
+                      ) : null}
                       {accountOrganizations.map((accountOrganization) => {
-                        const isCurrent = accountOrganization.id === organizationId;
+                        const isCurrent = accountOrganization.slug === organizationId;
                         return (
                           <Link
                             key={accountOrganization.id}
