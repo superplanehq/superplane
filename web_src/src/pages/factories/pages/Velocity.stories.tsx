@@ -2,16 +2,22 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
-  defaultFactoriesFixture,
   PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
+  REFUND_FACTORY,
   type FactoriesFixture,
 } from "../__fixtures__/factoryPageResponses";
+import {
+  factoriesFixtureWithSetupAnswers,
+  GITHUB_CONNECTION_ID,
+  GITHUB_SETUP_INTEGRATIONS,
+} from "../__fixtures__/setupStoryFixtures";
 import {
   DEFAULT_FACTORY_VELOCITY,
   EARLY_USAGE_FACTORY_VELOCITY,
   EMPTY_FACTORY_VELOCITY,
   PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
+  VELOCITY_REPOSITORY,
 } from "../__fixtures__/velocityReportFixtures";
 import { VelocityPage } from "./VelocityPage";
 
@@ -27,31 +33,37 @@ type Story = StoryObj<typeof meta>;
 
 const velocityPath = `workspaces/${PRIMARY_FACTORY_KEY}/velocity`;
 
+/**
+ * The page reads the GitHub connection and the repository that workspace setup
+ * stored, so the fixture workspace must name the repository the reports are
+ * built from. Without it the page hides Refresh data and tells the reader to
+ * connect GitHub, which a set-up workspace never shows.
+ */
+const velocityWorkspaceSetup = {
+  ...REFUND_FACTORY.onboarding,
+  vcsIntegrationId: GITHUB_CONNECTION_ID,
+  appRepository: VELOCITY_REPOSITORY,
+};
+
 /** Serves one velocity report for every period the page can request. */
-function fixtureWithVelocity(report: FactoriesFixture["velocityByFactoryId"]): FactoriesFixture {
-  return { ...defaultFactoriesFixture, velocityByFactoryId: report };
+function renderVelocity(report: FactoriesFixture["velocityByFactoryId"]) {
+  return (
+    <FactoriesHarness
+      pathSuffix={velocityPath}
+      factoriesFixture={{ ...factoriesFixtureWithSetupAnswers(velocityWorkspaceSetup), velocityByFactoryId: report }}
+      orgIntegrations={GITHUB_SETUP_INTEGRATIONS}
+    />
+  );
 }
 
 export const Default: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={velocityPath}
-      factoriesFixture={fixtureWithVelocity({ [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY })}
-    />
-  ),
+  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY }),
 };
 
 /** New workspace with no merges and no spend — empty state that points at the board. */
 export const ZeroState: Story = {
   name: "Zero state",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={velocityPath}
-      factoriesFixture={fixtureWithVelocity({
-        [PRIMARY_FACTORY_ID]: { 14: EMPTY_FACTORY_VELOCITY, 30: EMPTY_FACTORY_VELOCITY },
-      })}
-    />
-  ),
+  render: () => renderVelocity({ [PRIMARY_FACTORY_ID]: { 14: EMPTY_FACTORY_VELOCITY, 30: EMPTY_FACTORY_VELOCITY } }),
 };
 
 /**
@@ -60,14 +72,8 @@ export const ZeroState: Story = {
  */
 export const EarlyUsage: Story = {
   name: "Early usage",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={velocityPath}
-      factoriesFixture={fixtureWithVelocity({
-        [PRIMARY_FACTORY_ID]: { 14: EARLY_USAGE_FACTORY_VELOCITY, 30: EARLY_USAGE_FACTORY_VELOCITY },
-      })}
-    />
-  ),
+  render: () =>
+    renderVelocity({ [PRIMARY_FACTORY_ID]: { 14: EARLY_USAGE_FACTORY_VELOCITY, 30: EARLY_USAGE_FACTORY_VELOCITY } }),
 };
 
 /**
@@ -77,15 +83,11 @@ export const EarlyUsage: Story = {
  */
 export const PeopleSyncPending: Story = {
   name: "People sync pending",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={velocityPath}
-      factoriesFixture={fixtureWithVelocity({
-        [PRIMARY_FACTORY_ID]: {
-          14: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
-          30: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
-        },
-      })}
-    />
-  ),
+  render: () =>
+    renderVelocity({
+      [PRIMARY_FACTORY_ID]: {
+        14: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
+        30: PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
+      },
+    }),
 };
