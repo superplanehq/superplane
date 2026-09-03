@@ -30,8 +30,15 @@ export const FIRST_RUN_COPY = {
     searchPlaceholder: "Search repositories",
     missingRepository: "Do not see your repository?",
     editConnection: "Edit the GitHub connection.",
+    accessHint: "You need admin access to the GitHub App or organization to change the repositories.",
     continue: "Choose a repository to continue",
     moreLater: "You can add more repositories later.",
+    missingTitle: "Why is my repository not shown?",
+    missingReasons: [
+      "The repository must be granted to the SuperPlane GitHub App.",
+      "You need admin rights on the GitHub organization to add a repository.",
+      "Editing the connection opens GitHub. A 404 there means you do not have access.",
+    ],
   },
   tickets: {
     headline: "Connect your ticket system",
