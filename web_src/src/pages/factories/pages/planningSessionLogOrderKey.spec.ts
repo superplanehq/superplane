@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mergePlanningSessionNotes } from "./planningSessionLog";
+import { groupPlanningSessionLog, mergePlanningSessionNotes } from "./planningSessionLog";
 import type { SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 
 function note(
@@ -152,6 +152,187 @@ describe("mergePlanningSessionNotes ordering by orderKey", () => {
 
     expect(merged.map((line) => line.id)).toEqual(["wait", "greet", "greet-done", "user-1", "reply", "reply-done"]);
     expect(merged[3]?.noteParentId).toBe("wait");
+  });
+
+  it("places each follow-up after the done line that closed the previous turn", () => {
+    // Real Create with an Agent log: greet is one prompt, then a single
+    // "Wait for the next user message" section holds every later agent turn.
+    // Agent replies are not persisted as extras, so there is nothing to stamp.
+    // User messages after the first must still sit after the done line of the
+    // turn they replied to, not in a pile at the bottom.
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "greet",
+        componentType: "prompt",
+        componentName: "Greet the user in plain text. Then stop.",
+        orderKey: 500,
+      }),
+      note({
+        id: "greet-note",
+        noteParentId: "greet",
+        componentType: "note",
+        componentName: "Hi there. I'm ready to help you plan work in this repository. What would you like to do?",
+        orderKey: 500,
+      }),
+      note({
+        id: "greet-done",
+        noteParentId: "greet",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0164 · 1.7s",
+        orderKey: 500,
+      }),
+      note({
+        id: "wait",
+        componentType: "prompt",
+        componentName: "Wait for the next user message",
+        status: "running",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "hello-reply",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Hello. What would you like to work on today?",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "hello-done",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0018 · 1.6s",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "alright-reply",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Yes, all good here. The repository is on the master branch with a clean working tree.",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "alright-done",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0022 · 1.9s",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "strange-reply",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "What didn't work? Can you share more details, like what you tried and what happened?",
+        orderKey: 1_000,
+      }),
+      note({
+        id: "strange-done",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0034 · 2.7s",
+        orderKey: 1_000,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-hello",
+        componentType: "prompt",
+        componentName: "hello",
+        userTalk: "message",
+        orderKey: 1_100,
+      }),
+      note({
+        id: "user-alright",
+        componentType: "prompt",
+        componentName: "everything alright?",
+        userTalk: "message",
+        orderKey: 1_200,
+      }),
+      note({
+        id: "user-strange",
+        componentType: "prompt",
+        componentName: "very strange it didnt work",
+        userTalk: "message",
+        orderKey: 1_300,
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual([
+      "greet",
+      "greet-note",
+      "greet-done",
+      "user-hello",
+      "wait",
+      "hello-reply",
+      "hello-done",
+      "user-alright",
+      "alright-reply",
+      "alright-done",
+      "user-strange",
+      "strange-reply",
+      "strange-done",
+    ]);
+
+    const talk = groupPlanningSessionLog(merged).flatMap((group) =>
+      group.events.filter((event) => event.kind === "note").map((event) => event.line.componentName),
+    );
+    expect(talk).toEqual([
+      "Hi there. I'm ready to help you plan work in this repository. What would you like to do?",
+      "✓ done · 1 turns · $0.0164 · 1.7s",
+      "hello",
+      "Hello. What would you like to work on today?",
+      "✓ done · 1 turns · $0.0018 · 1.6s",
+      "everything alright?",
+      "Yes, all good here. The repository is on the master branch with a clean working tree.",
+      "✓ done · 1 turns · $0.0022 · 1.9s",
+      "very strange it didnt work",
+      "What didn't work? Can you share more details, like what you tried and what happened?",
+      "✓ done · 1 turns · $0.0034 · 2.7s",
+    ]);
+  });
+
+  it("places follow-ups after Codex and OpenRouter done lines the same way as Claude", () => {
+    const live: SplitRunStreamLine[] = [
+      note({ id: "wait", componentType: "prompt", componentName: "Wait for the next user message", status: "running" }),
+      note({
+        id: "codex-reply",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Hello. What would you like to work on today?",
+      }),
+      note({
+        id: "codex-done",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · 1.6s",
+      }),
+      note({
+        id: "openrouter-reply",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "Yes, all good here.",
+      }),
+      note({
+        id: "openrouter-done",
+        noteParentId: "wait",
+        componentType: "note",
+        componentName: "✓ done · 2 turns · $0.0020 · 2.2s",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({ id: "user-1", componentType: "prompt", componentName: "hello", userTalk: "message" }),
+      note({ id: "user-2", componentType: "prompt", componentName: "everything alright?", userTalk: "message" }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual([
+      "wait",
+      "codex-reply",
+      "codex-done",
+      "user-1",
+      "openrouter-reply",
+      "openrouter-done",
+      "user-2",
+    ]);
   });
 
   it("falls back to the wait-slot heuristic when the live log has no orderKey data", () => {

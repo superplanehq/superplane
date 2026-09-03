@@ -92,6 +92,7 @@ async function runPrompt(promptFile, model) {
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
 
+  const startedAt = Date.now();
   const planning = planningEnabled();
   const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"));
   if (planning) {
@@ -153,6 +154,11 @@ async function runPrompt(promptFile, model) {
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  formatTurnResult({
+    is_error: exitCode !== 0,
+    num_turns: 1,
+    duration_ms: Date.now() - startedAt,
+  });
   return exitCode;
 }
 
@@ -381,6 +387,26 @@ function toolFailed(item) {
   return Number.isFinite(exit) && exit !== 0;
 }
 
+function formatTurnResult(event) {
+  const isError = Boolean(event && event.is_error);
+  const status = isError ? "failed" : "done";
+  const parts = [isError ? `✗ ${status}` : `✓ ${status}`];
+  if (event && event.num_turns != null) {
+    parts.push(`${event.num_turns} turns`);
+  }
+  if (event && event.total_cost_usd != null) {
+    const cost = Number(event.total_cost_usd);
+    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+  }
+  if (event && event.duration_ms != null) {
+    const ms = Number(event.duration_ms);
+    if (Number.isFinite(ms)) {
+      parts.push(`${(ms / 1000).toFixed(1)}s`);
+    }
+  }
+  process.stdout.write(`${parts.join(" · ")}\n`);
+}
+
 function formatCodexJsonLines(rawLines) {
   const formatter = createCodexFormatter();
   for (const line of rawLines) {
@@ -403,6 +429,7 @@ if (require.main === module) {
 
 module.exports = {
   formatCodexJsonLines,
+  formatTurnResult,
   createCodexFormatter,
   normalizeCodexToolKind,
   codexExecArgs,

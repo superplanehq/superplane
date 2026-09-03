@@ -81,6 +81,21 @@ func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(output, `"type":"tool_start"`))
 }
 
+func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
+	output := runCodexTurnResult(t, map[string]any{
+		"is_error":       false,
+		"num_turns":      1,
+		"duration_ms":    1600,
+		"total_cost_usd": 0.0022,
+	})
+	assert.Equal(t, "✓ done · 1 turns · $0.0022 · 1.6s\n", output)
+}
+
+func TestFormatTurnResultWritesFailedLine(t *testing.T) {
+	output := runCodexTurnResult(t, map[string]any{"is_error": true, "num_turns": 1, "duration_ms": 900})
+	assert.Equal(t, "✗ failed · 1 turns · 0.9s\n", output)
+}
+
 func TestFormatCodexJsonLinesKeepsOverlappingOutputOnTheRightTool(t *testing.T) {
 	output := runCodexFormatter(t, []string{
 		`{"type":"item.started","item":{"id":"item_a","type":"command_execution","command":"echo a"}}`,
@@ -133,6 +148,18 @@ func planningEnabledFromScript(t *testing.T, env map[string]string) bool {
 	var enabled bool
 	require.NoError(t, json.Unmarshal(out, &enabled))
 	return enabled
+}
+
+func runCodexTurnResult(t *testing.T, event map[string]any) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatTurnResult } = require(process.argv[1]); formatTurnResult(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
 }
 
 func runCodexFormatter(t *testing.T, lines []string) string {

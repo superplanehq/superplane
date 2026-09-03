@@ -304,8 +304,23 @@ function placeUnmatchedUserExtras(
   const trailing: SplitRunStreamLine[] = [];
   let waitCursor = slots.waitCursor;
   let lastWait = slots.lastWait;
+  const turnEnds = turnEndIndexes(merged);
   let insertOrder = 0;
+  let turnEndCursor = 0;
   for (const line of unmatchedUsers) {
+    // Each Claude, Codex, or OpenRouter turn in the follow-up wait slot ends
+    // with a "✓ done" line.
+    // Place the next user message after that line so replies stay after the
+    // prompt that triggered them. Time-based orderKey cannot do this: every
+    // note in the wait slot shares the section start time, and agent extras
+    // are not persisted, so there is nothing to stamp.
+    if (turnEndCursor < turnEnds.length) {
+      const afterIndex = turnEnds[turnEndCursor];
+      insertions.push(userExtraInsertion(line, afterIndex, insertOrder, turnEndParent(merged, afterIndex)));
+      turnEndCursor += 1;
+      insertOrder += 1;
+      continue;
+    }
     // True chronological order is known for both sides: place the message
     // right after the last live note that happened at or before it, rather
     // than guessing from wait-slot position. This is what keeps a user
@@ -361,6 +376,25 @@ function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number
     }
   }
   return index;
+}
+
+function turnEndIndexes(merged: SplitRunStreamLine[]): number[] {
+  const indexes: number[] = [];
+  for (let i = 0; i < merged.length; i += 1) {
+    if (isPlanningSessionTurnEnd(merged[i]?.componentName ?? "")) {
+      indexes.push(i);
+    }
+  }
+  return indexes;
+}
+
+function isPlanningSessionTurnEnd(text: string): boolean {
+  const line = text.trim();
+  return line.startsWith("✓ done") || line.startsWith("✗ failed");
+}
+
+function turnEndParent(merged: SplitRunStreamLine[], afterIndex: number): string {
+  return orderKeyInsertionParent(merged, afterIndex) ?? merged[afterIndex]?.id ?? "";
 }
 
 /** The note/step group a chronologically placed insertion should nest under. */
