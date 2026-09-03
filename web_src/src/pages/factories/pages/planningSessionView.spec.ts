@@ -214,4 +214,40 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.right).toEqual({ kind: "preview", order: selected });
   });
+
+  it("carries the server created_at through as a comparable order key", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "Add color to puppies", createdAt: "2026-09-03T10:00:00Z" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages).toEqual([
+      {
+        id: "reply",
+        kind: "text",
+        role: "user",
+        text: "Add color to puppies",
+        createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+      },
+    ]);
+  });
+
+  it("leaves the order key undefined when the server sends no created_at", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.messages[0]?.createdAtMs).toBeUndefined();
+  });
 });

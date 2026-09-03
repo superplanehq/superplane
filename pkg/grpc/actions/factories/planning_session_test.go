@@ -368,6 +368,8 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, sent.Session.Messages, 1)
 	assert.Equal(t, "Add refund retries", sent.Session.Messages[0].Text)
+	require.NotNil(t, sent.Session.Messages[0].CreatedAt)
+	assert.False(t, sent.Session.Messages[0].CreatedAt.AsTime().IsZero())
 
 	db := database.DB(t.Context())
 	session, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(sessionID))

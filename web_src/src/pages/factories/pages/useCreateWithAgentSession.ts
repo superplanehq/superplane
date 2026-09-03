@@ -377,6 +377,10 @@ function sendPlanningText({
         kind: "text",
         role: "user",
         text: body,
+        // Sorts to the end immediately. The server round-trip replaces this
+        // with the persisted message, whose created_at keeps the same
+        // relative position so there is no visible jump.
+        createdAtMs: Date.now(),
         ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
       },
     ],

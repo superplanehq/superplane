@@ -20,6 +20,7 @@ func TestRunPromptReturnsZeroWhenModelStops(t *testing.T) {
 	assertToolRouting(t, result.requests[1], true)
 	require.GreaterOrEqual(t, len(result.requests[1]["messages"].([]any)), 3)
 	assert.Equal(t, "working", resultText(t, result.resultFile))
+	assert.Regexp(t, `✓ done · \d+ turns · \$\d+\.\d{4} · \d+\.\d+s`, result.output)
 }
 
 func TestRunPromptRequiresToolCapableProviders(t *testing.T) {
@@ -61,6 +62,7 @@ func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 4, failOnRequest: 2})
 	assert.Equal(t, 1, result.exitCode)
 	assert.Contains(t, result.output, "provider exploded")
+	assert.Regexp(t, `✗ failed · \d+ turns · \$0\.0020 · \d+\.\d+s`, result.output)
 
 	payload := resultPayload(t, result.resultFile)
 	usage, ok := payload["usage"].(map[string]any)

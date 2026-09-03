@@ -193,10 +193,14 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   let costMicros = 0;
   let pendingToolCalls = false;
   let nudgedForTools = false;
+  let numTurns = 0;
+  let exitCode = 1;
+  const startedAt = Date.now();
   const turnLimit = resolveMaxTurns(maxTurns);
 
   try {
     for (let turn = 0; turn < turnLimit; turn += 1) {
+      numTurns += 1;
       const response = await chat(baseURL, apiKey, model, messages, true, tools);
       addUsage(usage, response.usage);
       costMicros += usageCostMicros(response.usage);
@@ -255,14 +259,43 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       const wrapUp = await requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, turnLimit);
       lastText = wrapUp.text;
       costMicros += wrapUp.costMicros;
+      numTurns += 1;
     }
+    exitCode = 0;
     return 0;
   } catch (err) {
     console.error(err && err.message ? err.message : err);
+    exitCode = 1;
     return 1;
   } finally {
     writeResult(resultFile, model, usage, costMicros, lastText);
+    formatTurnResult({
+      is_error: exitCode !== 0,
+      num_turns: numTurns || 1,
+      total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
+      duration_ms: Date.now() - startedAt,
+    });
   }
+}
+
+function formatTurnResult(event) {
+  const isError = Boolean(event && event.is_error);
+  const status = isError ? "failed" : "done";
+  const parts = [isError ? `✗ ${status}` : `✓ ${status}`];
+  if (event && event.num_turns != null) {
+    parts.push(`${event.num_turns} turns`);
+  }
+  if (event && event.total_cost_usd != null) {
+    const cost = Number(event.total_cost_usd);
+    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+  }
+  if (event && event.duration_ms != null) {
+    const ms = Number(event.duration_ms);
+    if (Number.isFinite(ms)) {
+      parts.push(`${(ms / 1000).toFixed(1)}s`);
+    }
+  }
+  process.stdout.write(`${parts.join(" · ")}\n`);
 }
 
 function writeResult(resultFile, model, usage, costMicros, lastText) {
@@ -515,4 +548,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { runPrompt, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT, planningEnabled };
+module.exports = { runPrompt, formatTurnResult, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT, planningEnabled };
