@@ -72,6 +72,7 @@ function VelocityReportView({ model, report }: { model: VelocityPageModel; repor
       <SummaryCard
         totals={report.totals}
         caption={summaryCaption(model.periodLabel, model.periodDays, Boolean(report.previous))}
+        periodDays={model.periodDays}
         medianCycleHours={flow && flow.sampleSize > 0 ? flow.medianCycleHours : undefined}
         comparison={model.comparison}
       />
@@ -104,13 +105,13 @@ function summaryCaption(periodLabel: string, periodDays: VelocityPeriodDays, has
   return `${periodLabel}. There is no earlier period to compare with yet.`;
 }
 
-/** Explains a People table that lists SuperPlane work but no direct authorship. */
+/** Explains a People table that lists SuperPlane work but no manual work yet. */
 function peopleEmptyAuthorship(report: VelocityReport, model: VelocityPageModel): string | undefined {
   if (report.hasPeopleCohort) return undefined;
-  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people merged.";
-  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people merged.";
+  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people created.";
+  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people created.";
   if (model.velocity.peopleSyncPending) {
-    return "SuperPlane is collecting merges from GitHub. The Authored column fills in after the first sync.";
+    return "SuperPlane is collecting merges from GitHub. The Manual work column fills in after the first sync.";
   }
   return undefined;
 }

@@ -73,7 +73,7 @@ export const EarlyUsage: Story = {
 /**
  * Right after a repository is connected: the background sync has not stored the
  * repository history yet, so the People series is withheld and the People table
- * explains why the Authored column is empty.
+ * explains why the Manual work column is empty.
  */
 export const PeopleSyncPending: Story = {
   name: "People sync pending",
