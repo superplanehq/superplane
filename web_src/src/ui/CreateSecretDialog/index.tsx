@@ -194,6 +194,17 @@ function initialPairs(initialKeyName?: string): KeyValuePair[] {
   return [createEmptyPair(key)];
 }
 
+function FormError({ children }: { children?: React.ReactNode }) {
+  if (!children) {
+    return null;
+  }
+  return (
+    <p role="alert" className="text-xs text-destructive">
+      {children}
+    </p>
+  );
+}
+
 export function CreateSecretDialog({
   open,
   onOpenChange,
@@ -288,16 +299,12 @@ export function CreateSecretDialog({
               setKeyValuePairs((prev) => prev.filter((_, i) => i !== index));
             }}
           />
-          {formError ? (
-            <p role="alert" className="text-xs text-destructive">
-              {formError}
-            </p>
-          ) : null}
-          {createSecretMutation.isError && (
-            <p role="alert" className="text-xs text-destructive">
-              SuperPlane could not create the secret. {getApiErrorMessage(createSecretMutation.error)}
-            </p>
-          )}
+          <FormError>{formError}</FormError>
+          <FormError>
+            {createSecretMutation.isError
+              ? `SuperPlane could not create the secret. ${getApiErrorMessage(createSecretMutation.error)}`
+              : undefined}
+          </FormError>
           <DialogFooter>
             <Button
               type="button"
