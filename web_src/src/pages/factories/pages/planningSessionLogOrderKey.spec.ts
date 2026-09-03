@@ -290,6 +290,71 @@ describe("mergePlanningSessionNotes ordering by orderKey", () => {
     ]);
   });
 
+  it("skips a done line already used by a user prompt that is in the live log", () => {
+    const live: SplitRunStreamLine[] = [
+      note({ id: "greet", componentType: "prompt", componentName: "Greet the user in plain text. Then stop." }),
+      note({
+        id: "greet-note",
+        noteParentId: "greet",
+        componentType: "note",
+        componentName: "Hi there. I'm ready to help you plan work in this repository.",
+      }),
+      note({
+        id: "greet-done",
+        noteParentId: "greet",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0164 · 1.7s",
+      }),
+      note({ id: "hello-live", componentType: "prompt", componentName: "hello" }),
+      note({
+        id: "hello-reply",
+        noteParentId: "hello-live",
+        componentType: "note",
+        componentName: "Hello. What would you like to work on today?",
+      }),
+      note({
+        id: "hello-done",
+        noteParentId: "hello-live",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0018 · 1.6s",
+      }),
+      note({
+        id: "alright-reply",
+        noteParentId: "hello-live",
+        componentType: "note",
+        componentName: "Yes, all good here.",
+      }),
+      note({
+        id: "alright-done",
+        noteParentId: "hello-live",
+        componentType: "note",
+        componentName: "✓ done · 1 turns · $0.0022 · 1.9s",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({ id: "user-hello", componentType: "prompt", componentName: "hello", userTalk: "message" }),
+      note({
+        id: "user-alright",
+        componentType: "prompt",
+        componentName: "everything alright?",
+        userTalk: "message",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual([
+      "greet",
+      "greet-note",
+      "greet-done",
+      "hello-live",
+      "hello-reply",
+      "hello-done",
+      "user-alright",
+      "alright-reply",
+      "alright-done",
+    ]);
+  });
+
   it("places follow-ups after Codex and OpenRouter done lines the same way as Claude", () => {
     const live: SplitRunStreamLine[] = [
       note({ id: "wait", componentType: "prompt", componentName: "Wait for the next user message", status: "running" }),

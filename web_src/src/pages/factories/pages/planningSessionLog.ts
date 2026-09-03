@@ -233,7 +233,12 @@ export function mergePlanningSessionNotes(
   const { unmatchedUsers, unmatchedOthers } = partitionPlanningExtras(merged, extra);
   const hasLiveOrder = merged.some((line) => typeof line.orderKey === "number");
   const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
-  const slots = consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits);
+  const turnEnds = turnEndIndexes(merged);
+  const slots = {
+    ...consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits),
+    turnEnds,
+    turnEndCursor: consumeMatchedTurnEnds(extra, unmatchedUsers, turnEnds.length),
+  };
   const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots, hasLiveOrder);
   placed.insertions.sort((left, right) => right.afterIndex - left.afterIndex || right.order - left.order);
   for (const insertion of placed.insertions) {
@@ -293,6 +298,23 @@ function consumeMatchedWaitSlots(
   return { waitCursor, lastWait };
 }
 
+function consumeMatchedTurnEnds(
+  extra: SplitRunStreamLine[],
+  unmatchedUsers: SplitRunStreamLine[],
+  turnEndCount: number,
+): number {
+  let cursor = 0;
+  for (const line of extra) {
+    if (!isSessionUserExtra(line) || unmatchedUsers.includes(line)) {
+      continue;
+    }
+    if (cursor < turnEndCount) {
+      cursor += 1;
+    }
+  }
+  return cursor;
+}
+
 type UserPlacementState = {
   merged: SplitRunStreamLine[];
   emptyWaits: WaitSlot[];
@@ -308,7 +330,7 @@ function placeUnmatchedUserExtras(
   merged: SplitRunStreamLine[],
   unmatchedUsers: SplitRunStreamLine[],
   emptyWaits: WaitSlot[],
-  slots: { waitCursor: number; lastWait?: WaitSlot },
+  slots: { waitCursor: number; lastWait?: WaitSlot; turnEnds: number[]; turnEndCursor: number },
   hasLiveOrder: boolean,
 ): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
   const insertions: NoteInsertion[] = [];
@@ -318,8 +340,8 @@ function placeUnmatchedUserExtras(
     emptyWaits,
     waitCursor: slots.waitCursor,
     lastWait: slots.lastWait,
-    turnEnds: turnEndIndexes(merged),
-    turnEndCursor: 0,
+    turnEnds: slots.turnEnds,
+    turnEndCursor: slots.turnEndCursor,
     hasLiveOrder,
     insertOrder: 0,
   };
