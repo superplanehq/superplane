@@ -5,8 +5,10 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useOrganization } from "./hooks/useOrganizationData";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -257,19 +259,48 @@ function PageObservabilityScope() {
   return null;
 }
 
-function OrganizationScope() {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function OrganizationScope() {
+  const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
-  useConsumeIntegrationSetupReturnOnArrival(organizationId);
+  const location = useLocation();
+  useConsumeIntegrationSetupReturnOnArrival(segment);
+
+  const isReserved = isReservedAppPathSegment(segment);
+  // The route param accepts either the org slug or its UID, so resolve it
+  // once here and self-correct any UID URL to the slug below. Every other
+  // in-app link reuses this same `:organizationId` URL segment, so fixing
+  // it at this single boundary keeps the rest of the app slug-only.
+  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const resolvedId = organization?.metadata?.id ?? "";
+  const resolvedSlug = organization?.metadata?.slug ?? "";
+
+  const uidRedirectPath =
+    !isReserved && segment
+      ? resolveOrganizationUidRedirect({
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+          segment,
+          organizationId: resolvedId,
+          organizationSlug: resolvedSlug,
+        })
+      : null;
 
   useEffect(() => {
-    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
-      recordLastVisitedOrganization(account.id, organizationId);
+    if (!account?.id || !segment || isReserved || uidRedirectPath) {
+      return;
     }
-  }, [account?.id, organizationId]);
+    // Prefer the resolved slug so the last-visited value never carries a UID
+    // forward into a later auto-redirect (see OrganizationSelect).
+    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
+  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 
-  if (isReservedAppPathSegment(organizationId)) {
+  if (isReserved) {
     return <Navigate to="/" replace />;
+  }
+
+  if (uidRedirectPath) {
+    return <Navigate to={uidRedirectPath} replace />;
   }
 
   return (

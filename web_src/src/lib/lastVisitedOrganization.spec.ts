@@ -49,25 +49,31 @@ describe("lastVisitedOrganization", () => {
 });
 
 describe("pickAutoRedirectOrganization", () => {
-  it("returns the only organization even without a last visited entry", () => {
-    expect(pickAutoRedirectOrganization([{ id: "org-a" }], null)).toBe("org-a");
+  it("returns the only organization's slug even without a last visited entry", () => {
+    expect(pickAutoRedirectOrganization([{ slug: "org-a" }], null)).toBe("org-a");
   });
 
-  it("returns the last visited organization when the account still belongs to it", () => {
-    const organizations = [{ id: "org-a" }, { id: "org-b" }];
+  it("returns the last visited organization slug when the account still belongs to it", () => {
+    const organizations = [{ slug: "org-a" }, { slug: "org-b" }];
     expect(pickAutoRedirectOrganization(organizations, "org-b")).toBe("org-b");
   });
 
   it("ignores a last visited organization the account no longer belongs to", () => {
-    const organizations = [{ id: "org-a" }, { id: "org-b" }];
+    const organizations = [{ slug: "org-a" }, { slug: "org-b" }];
     expect(pickAutoRedirectOrganization(organizations, "org-gone")).toBeNull();
   });
 
   it("returns null with multiple organizations and no last visited entry", () => {
-    expect(pickAutoRedirectOrganization([{ id: "org-a" }, { id: "org-b" }], null)).toBeNull();
+    expect(pickAutoRedirectOrganization([{ slug: "org-a" }, { slug: "org-b" }], null)).toBeNull();
   });
 
   it("returns null when there are no organizations", () => {
     expect(pickAutoRedirectOrganization([], "org-a")).toBeNull();
+  });
+
+  it("never returns a raw UID: the single-organization branch trusts the caller's slug field", () => {
+    // Callers must map their data to `{ slug }` before calling this helper;
+    // once they do, only slugs ever come out, even for a single organization.
+    expect(pickAutoRedirectOrganization([{ slug: "acme" }], null)).toBe("acme");
   });
 });

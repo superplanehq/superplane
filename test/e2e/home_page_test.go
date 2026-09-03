@@ -161,7 +161,7 @@ func (steps *TestHomePageSteps) AssertUpdatePermissionToast() {
 
 func (steps *TestHomePageSteps) ClickNewApp() {
 	steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
-	steps.session.WaitForBrowserPath("/" + steps.session.OrgID.String() + "/apps/new")
+	steps.session.WaitForBrowserPath("/" + steps.session.OrgSlug + "/apps/new")
 	steps.ClickStartFromScratch()
 	steps.session.Sleep(2500)
 }
