@@ -97,7 +97,7 @@ function interpretWaitResponse(status, parsed, text) {
     return parsed && typeof parsed === "object" ? parsed : {};
   }
   if (isTransientWaitFailure(status, parsed)) {
-    return { status: "pending", retry_after: retryWaitSeconds(parsed) };
+    return { status: "pending", retry_after: retryWaitSeconds(parsed), transient: true };
   }
   throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
 }
@@ -134,6 +134,7 @@ async function runLoop(helpers) {
   const wait = helpers.waitOnce;
   const runPrompt = helpers.runPrompt;
   const sleep = helpers.sleep || defaultSleep;
+  const log = helpers.log || ((msg) => process.stderr.write(msg));
   while (true) {
     const result = await wait();
     const action = nextAction(result);
@@ -141,16 +142,16 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
-      const seconds = Number(result && result.retry_after);
-      if (Number.isFinite(seconds) && seconds > 0) {
-        process.stderr.write(`planning wait hit a transient error; retrying in ${seconds}s\n`);
-        await sleep(seconds * 1000);
+      const seconds = retryWaitSeconds(result);
+      if (result && result.transient) {
+        log(`planning wait hit a transient error; retrying in ${seconds}s\n`);
       }
+      await sleep(seconds * 1000);
       continue;
     }
     const code = await runPrompt(action.text);
     if (code !== 0) {
-      process.stderr.write(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
+      log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
     }
   }
 }
