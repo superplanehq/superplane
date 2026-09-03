@@ -42,6 +42,7 @@ describe("useRedirectIntegrationSetupReturn", () => {
 
     expect(await screen.findByText("workspace setup")).toBeInTheDocument();
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull();
   });
 
   it("keeps the hosted-install picker on integration settings", async () => {

@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { hasIntegrationSetupStay, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import {
+  consumeIntegrationSetupReturn,
+  hasIntegrationSetupStay,
+  peekIntegrationSetupReturn,
+} from "@/lib/integrationSetupReturn";
 
 function isLegacyIntegrationDetailsPath(organizationId: string, pathname: string): boolean {
   const segments = pathname.split("/").filter(Boolean);
@@ -26,6 +30,12 @@ export function useRedirectIntegrationSetupReturn(organizationId: string | undef
     if (hasIntegrationSetupStay(location.search)) return;
 
     const returnTo = peekIntegrationSetupReturn(organizationId);
-    if (returnTo) navigate(returnTo, { replace: true });
+    if (!returnTo) return;
+
+    // The provider can finish on a later callback after setup has already
+    // completed. Consume this one-shot return before navigating so that late
+    // callbacks cannot reopen the setup wizard.
+    consumeIntegrationSetupReturn(organizationId);
+    navigate(returnTo, { replace: true });
   }, [location.pathname, location.search, navigate, organizationId]);
 }
