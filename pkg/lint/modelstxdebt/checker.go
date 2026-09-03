@@ -41,7 +41,7 @@ Use an explicit *gorm.DB parameter instead:
       return err
   })
 
-See AGENTS.md "Database Transaction Guidelines".`
+See pkg/models/AGENTS.md "Database Transaction Guidelines".`
 
 type Location struct {
 	File string
