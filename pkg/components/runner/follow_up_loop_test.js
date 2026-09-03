@@ -2,7 +2,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { interpretWaitResponse, nextAction, runLoop } = require("./follow_up_loop.js");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { interpretWaitResponse, nextAction, runLoop, runPromptFile } = require("./follow_up_loop.js");
 
 test("waits while SuperPlane has no event", () => {
   assert.deepEqual(nextAction({ status: "pending" }), { type: "wait" });
@@ -181,4 +184,20 @@ test("runLoop backs off silently on idle pending and empty-message waits", async
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000, 1000]);
   assert.deepEqual(logs, []);
+});
+
+test("runPromptFile forwards extra argv to run.js", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-"));
+  const argvFile = path.join(taskDir, "argv.json");
+  fs.writeFileSync(
+    path.join(taskDir, "run.js"),
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+  );
+  const promptFile = path.join(taskDir, "prompt.txt");
+  fs.writeFileSync(promptFile, "hello\n");
+
+  const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
+  assert.equal(code, 0);
+  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
 });
