@@ -215,6 +215,20 @@ func (c *Client) ListPullRequests(
 	return c.underlying.PullRequests.List(ctx, owner, name, opts)
 }
 
+// HeadFilter builds the "owner:branch" value GitHub's pull request list "head"
+// filter requires, using repository to resolve the owner the same way every
+// other call on this client does. If branch already carries an "owner:"
+// prefix (for example, a cross-repository head), it is returned unchanged.
+func (c *Client) HeadFilter(repository, branch string) string {
+	branch = strings.TrimSpace(branch)
+	if strings.Contains(branch, ":") {
+		return branch
+	}
+
+	owner, _ := c.ownerAndName(repository)
+	return owner + ":" + branch
+}
+
 // ListCommits returns one page of a repository's commits.
 //
 // The commit message carries the trailers a squashed merge collected, which name
