@@ -558,6 +558,18 @@ func startPublicAPI(
 	go func() {
 		<-ctx.Done()
 
+		//
+		// Keep serving for a moment first. Kubernetes removes the pod from the
+		// Endpoints list asynchronously, so kube-proxy still routes here for a
+		// short while after SIGTERM. Closing the listener immediately would turn
+		// those requests into connection refused, which is worse than the abrupt
+		// stop this change replaces.
+		//
+		if delay := drainDelay(); delay > 0 {
+			log.Printf("Draining Public API traffic for %s before shutdown", delay)
+			time.Sleep(delay)
+		}
+
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
 		defer cancel()
 
@@ -907,6 +919,34 @@ func shutdownTimeout() time.Duration {
 	}
 
 	return timeout
+}
+
+// defaultDrainDelay is how long the public API keeps serving after the
+// termination signal, so that Kubernetes has time to stop routing new requests
+// here. It is deliberately shorter than the readiness probe period: the point
+// is to outlast kube-proxy's endpoint update, not to wait for a probe.
+const defaultDrainDelay = 5 * time.Second
+
+// drainDelay returns the wait before the public API stops listening.
+// Development restarts skip it, because a five second pause on every local
+// restart pushes people towards killing the process instead.
+func drainDelay() time.Duration {
+	if os.Getenv("APP_ENV") == "development" {
+		return 0
+	}
+
+	value := os.Getenv("SHUTDOWN_DRAIN_DELAY")
+	if value == "" {
+		return defaultDrainDelay
+	}
+
+	delay, err := time.ParseDuration(value)
+	if err != nil {
+		log.Warnf("Invalid SHUTDOWN_DRAIN_DELAY %q, using %s: %v", value, defaultDrainDelay, err)
+		return defaultDrainDelay
+	}
+
+	return delay
 }
 
 // waitForShutdown waits for every tracked goroutine to return, and gives up when

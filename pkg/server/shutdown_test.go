@@ -239,3 +239,36 @@ func Test__WorkersAreStartedWithACancellableContext(t *testing.T) {
 
 	assert.Empty(t, offenders, "startWorkers must hand every worker the cancellable context, not context.Background()")
 }
+
+func Test__DrainDelay(t *testing.T) {
+	t.Run("defaults in production-like environments", func(t *testing.T) {
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("SHUTDOWN_DRAIN_DELAY", "")
+		assert.Equal(t, defaultDrainDelay, drainDelay())
+	})
+
+	t.Run("is skipped in development", func(t *testing.T) {
+		t.Setenv("APP_ENV", "development")
+		assert.Equal(t, time.Duration(0), drainDelay())
+	})
+
+	t.Run("reads the environment", func(t *testing.T) {
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("SHUTDOWN_DRAIN_DELAY", "2s")
+		assert.Equal(t, 2*time.Second, drainDelay())
+	})
+
+	t.Run("falls back when the value does not parse", func(t *testing.T) {
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("SHUTDOWN_DRAIN_DELAY", "soon")
+		assert.Equal(t, defaultDrainDelay, drainDelay())
+	})
+
+	t.Run("leaves room inside the shutdown budget", func(t *testing.T) {
+		//
+		// The delay runs before the HTTP drain, and both must finish inside the
+		// Kubernetes grace period.
+		//
+		assert.Less(t, defaultDrainDelay+defaultShutdownTimeout, 31*time.Second)
+	})
+}
