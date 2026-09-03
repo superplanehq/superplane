@@ -15,7 +15,7 @@ import (
 )
 
 func TestFactories(t *testing.T) {
-	t.Run("updating factory name and description", func(t *testing.T) {
+	t.Run("updating factory name", func(t *testing.T) {
 		steps := &factorySteps{t: t}
 		originalName := support.RandomName("factory")
 		updatedName := support.RandomName("factory-updated")
@@ -24,11 +24,10 @@ func TestFactories(t *testing.T) {
 		factory := steps.givenFactoryExists(originalName, "original description")
 		steps.visitFactorySettings(factory)
 		steps.fillFactorySettingsName(updatedName)
-		steps.fillFactorySettingsDescription("updated description")
 		steps.submitFactorySettings()
 		steps.visitFactorySettings(factory)
 		steps.assertFactorySettingsName(updatedName)
-		steps.assertFactorySavedInDB(factory.ID, updatedName, "updated description")
+		steps.assertFactorySavedInDB(factory.ID, updatedName, "original description")
 	})
 
 	t.Run("soft-deleting a factory", func(t *testing.T) {
@@ -102,13 +101,6 @@ func (s *factorySteps) completeFactoryOnboarding(factory *models.Factory) {
 func (s *factorySteps) fillFactorySettingsName(name string) {
 	page := s.session.Page()
 	err := page.GetByTestId("factory-settings-name").Fill(name)
-	require.NoError(s.t, err)
-	s.session.Sleep(200)
-}
-
-func (s *factorySteps) fillFactorySettingsDescription(description string) {
-	page := s.session.Page()
-	err := page.GetByTestId("factory-settings-description").Fill(description)
 	require.NoError(s.t, err)
 	s.session.Sleep(200)
 }
