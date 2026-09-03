@@ -16,6 +16,7 @@ import {
   DEFAULT_FACTORY_VELOCITY,
   EARLY_USAGE_FACTORY_VELOCITY,
   EMPTY_FACTORY_VELOCITY,
+  PEOPLE_LOAD_MORE_FACTORY_VELOCITY,
   PEOPLE_SYNC_PENDING_FACTORY_VELOCITY,
   VELOCITY_REPOSITORY,
 } from "../__fixtures__/velocityReportFixtures";
@@ -74,6 +75,18 @@ export const EarlyUsage: Story = {
   name: "Early usage",
   render: () =>
     renderVelocity({ [PRIMARY_FACTORY_ID]: { 14: EARLY_USAGE_FACTORY_VELOCITY, 30: EARLY_USAGE_FACTORY_VELOCITY } }),
+};
+
+/**
+ * A cohort of 14 people: the People table shows its first 10 rows and a
+ * "Load more" control that fetches the rest, sorted and paged by the backend.
+ */
+export const PeopleLoadMore: Story = {
+  name: "People load more",
+  render: () =>
+    renderVelocity({
+      [PRIMARY_FACTORY_ID]: PEOPLE_LOAD_MORE_FACTORY_VELOCITY,
+    }),
 };
 
 /**

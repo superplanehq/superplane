@@ -103,6 +103,10 @@ export interface VelocityReport {
   points: VelocityPoint[];
   intakeSeries: VelocityIntakeSeries[];
   people: VelocityPerson[];
+  /** Total people with activity in the window, before paging. */
+  peopleTotal: number;
+  /** True when the People table has rows beyond the ones already fetched. */
+  peopleHasMore: boolean;
   hasPeopleCohort: boolean;
   /** When the background sync last stored repository merges. */
   peopleSyncedAt?: Date;
@@ -194,6 +198,8 @@ export function toVelocityReport(response: FactoriesDescribeFactoryVelocityRespo
     points: (response.points ?? []).map(toPoint),
     intakeSeries,
     people,
+    peopleTotal: response.peopleTotal ?? people.length,
+    peopleHasMore: Boolean(response.peopleHasMore),
     hasPeopleCohort: Boolean(response.hasPeopleCohort),
     peopleSyncedAt: response.peopleSyncedAt ? new Date(response.peopleSyncedAt) : undefined,
     peopleSyncPending: Boolean(response.peopleSyncPending),
