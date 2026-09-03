@@ -149,9 +149,9 @@ func TestBuildOpenRouterBrokerTaskPassesMaxTurns(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 64
-	commands, _ := buildOpenRouterBrokerTask(spec, "", nil)
-	require.GreaterOrEqual(t, len(commands), 2)
-	require.Contains(t, commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6' 64`)
+	task := buildOpenRouterBrokerTask(spec, "", nil)
+	require.GreaterOrEqual(t, len(task.Commands), 2)
+	require.Contains(t, task.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/run.js" "$SUPERPLANE_TASK_DIR/prompts/01-prompt.txt" 'anthropic/claude-sonnet-4-6' 64`)
 }
 
 func TestBuildOpenRouterBrokerTaskDefaultsMaxTurns(t *testing.T) {
@@ -160,9 +160,49 @@ func TestBuildOpenRouterBrokerTaskDefaultsMaxTurns(t *testing.T) {
 	prompt := "fix tests"
 	spec := validOpenRouterSpec(prompt)
 	spec.MaxTurns = 0
-	commands, _ := buildOpenRouterBrokerTask(spec, "", nil)
-	require.GreaterOrEqual(t, len(commands), 2)
-	require.Contains(t, commands[1].Command, fmt.Sprintf("'anthropic/claude-sonnet-4-6' %d", DefaultMaxTurns))
+	task := buildOpenRouterBrokerTask(spec, "", nil)
+	require.GreaterOrEqual(t, len(task.Commands), 2)
+	require.Contains(t, task.Commands[1].Command, fmt.Sprintf("'anthropic/claude-sonnet-4-6' %d", DefaultMaxTurns))
+}
+
+func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	spec := validOpenRouterSpec("fix tests")
+	base := buildOpenRouterBrokerTask(spec, "", nil)
+	got := applyPlanningFollowUp(base, nil, spec)
+	require.Len(t, got.Commands, len(base.Commands))
+	require.Len(t, got.Files, len(base.Files))
+}
+
+func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
+	t.Parallel()
+
+	prompt := "greet"
+	spec := validOpenRouterSpec(prompt)
+	spec.MaxTurns = 32
+	spec.Steps[0].WorkingDirectory = "repo"
+	base := buildOpenRouterBrokerTask(spec, "", nil)
+	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	last := got.Commands[len(got.Commands)-1]
+	require.Equal(t, "Wait for the next message", last.Name)
+	require.Equal(t, runner.LiveLogKindPrompt, last.Kind)
+	require.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'anthropic/claude-sonnet-4-6' 32`)
+	require.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
+
+	var found bool
+	for _, file := range got.Files {
+		if file.Path == "follow_up_loop.js" {
+			found = true
+			require.Equal(t, runner.FollowUpLoopFile().Content, file.Content)
+		}
+	}
+	require.True(t, found, "expected follow_up_loop.js task file")
 }
 
 func validOpenRouterSpec(prompt string) RunOpenRouterSpec {

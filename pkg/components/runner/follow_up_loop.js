@@ -97,7 +97,7 @@ function interpretWaitResponse(status, parsed, text) {
     return parsed && typeof parsed === "object" ? parsed : {};
   }
   if (isTransientWaitFailure(status, parsed)) {
-    return { status: "pending", retry_after: retryWaitSeconds(parsed) };
+    return { status: "pending", retry_after: retryWaitSeconds(parsed), transient: true };
   }
   throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
 }
@@ -114,11 +114,13 @@ function writePrompt(taskDir, text) {
   return file;
 }
 
-function runPromptFile(taskDir, promptFile, model) {
+function runPromptFile(taskDir, promptFile, model, extraArgs = []) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.join(taskDir, "run.js"), promptFile, model || ""], {
-      stdio: "inherit",
-    });
+    const child = spawn(
+      process.execPath,
+      [path.join(taskDir, "run.js"), promptFile, model || "", ...extraArgs],
+      { stdio: "inherit" },
+    );
     child.on("error", reject);
     child.on("close", (code) => resolve(code == null ? 1 : code));
   });
@@ -134,6 +136,7 @@ async function runLoop(helpers) {
   const wait = helpers.waitOnce;
   const runPrompt = helpers.runPrompt;
   const sleep = helpers.sleep || defaultSleep;
+  const log = helpers.log || ((msg) => process.stderr.write(msg));
   while (true) {
     const result = await wait();
     const action = nextAction(result);
@@ -141,16 +144,16 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
-      const seconds = Number(result && result.retry_after);
-      if (Number.isFinite(seconds) && seconds > 0) {
-        process.stderr.write(`planning wait hit a transient error; retrying in ${seconds}s\n`);
-        await sleep(seconds * 1000);
+      const seconds = retryWaitSeconds(result);
+      if (result && result.transient) {
+        log(`planning wait hit a transient error; retrying in ${seconds}s\n`);
       }
+      await sleep(seconds * 1000);
       continue;
     }
     const code = await runPrompt(action.text);
     if (code !== 0) {
-      process.stderr.write(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
+      log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
     }
   }
 }
@@ -158,14 +161,18 @@ async function runLoop(helpers) {
 async function main() {
   const taskDir = readEnv("SUPERPLANE_TASK_DIR");
   const model = String(process.argv[2] || "").trim();
+  // Forward any additional argv (for example OpenRouter's max-turns) straight
+  // through to run.js so every runner's follow-up prompt uses the same
+  // arguments as its original prompt step.
+  const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,
-    runPrompt: (text) => runPromptFile(taskDir, writePrompt(taskDir, text), model),
+    runPrompt: (text) => runPromptFile(taskDir, writePrompt(taskDir, text), model, extraArgs),
   });
   process.exit(code);
 }
 
-module.exports = { interpretWaitResponse, nextAction, runLoop, writePrompt };
+module.exports = { interpretWaitResponse, nextAction, runLoop, writePrompt, runPromptFile };
 
 if (require.main === module) {
   main().catch((err) => {

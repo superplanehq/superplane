@@ -26,6 +26,8 @@ export type PlanningSessionMessagePayload = {
   id?: string;
   role?: string;
   text?: string;
+  /** When the server persisted the message (ISO 8601). Both roles carry this. */
+  createdAt?: string;
 };
 
 export type PlanningSessionSurveyPayload = {
@@ -116,6 +118,7 @@ function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWi
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
   if (message.text && (message.role === "user" || message.role === "agent")) {
+    const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
     return [
       {
         id: message.id ?? message.text,
@@ -123,8 +126,17 @@ function planningSessionMessageFromPayload(message: PlanningSessionMessagePayloa
         role: message.role,
         text: message.text,
         ...(message.role === "user" && isPlanningSurveyReply(message.text) ? { origin: "survey" as const } : {}),
+        ...(createdAtMs === undefined ? {} : { createdAtMs }),
       },
     ];
   }
   return [];
+}
+
+function parsePlanningMessageCreatedAt(createdAt: string | undefined): number | undefined {
+  if (!createdAt) {
+    return undefined;
+  }
+  const parsed = Date.parse(createdAt);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }

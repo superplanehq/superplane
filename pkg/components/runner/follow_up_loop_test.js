@@ -2,7 +2,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { interpretWaitResponse, nextAction, runLoop } = require("./follow_up_loop.js");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { interpretWaitResponse, nextAction, runLoop, runPromptFile } = require("./follow_up_loop.js");
 
 test("waits while SuperPlane has no event", () => {
   assert.deepEqual(nextAction({ status: "pending" }), { type: "wait" });
@@ -47,6 +50,7 @@ test("runLoop runs the user prompt then exits on ended", async () => {
       prompts.push(text);
       return 0;
     },
+    sleep: async () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
@@ -78,7 +82,7 @@ test("interpretWaitResponse retries a 502 with retryable body", () => {
     retryable: true,
     retry_after: 60,
   });
-  assert.deepEqual(got, { status: "pending", retry_after: 60 });
+  assert.deepEqual(got, { status: "pending", retry_after: 60, transient: true });
 });
 
 test("interpretWaitResponse retries 503, 504, and 429", () => {
@@ -89,7 +93,7 @@ test("interpretWaitResponse retries 503, 504, and 429", () => {
 
 test("interpretWaitResponse retries a Cloudflare error body", () => {
   const got = interpretWaitResponse(500, { cloudflare_error: true, retry_after: 30 });
-  assert.deepEqual(got, { status: "pending", retry_after: 30 });
+  assert.deepEqual(got, { status: "pending", retry_after: 30, transient: true });
 });
 
 test("interpretWaitResponse caps retry_after at 60 seconds", () => {
@@ -122,4 +126,78 @@ test("runLoop waits again after a transient wait, then exits 0", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [60000]);
+});
+
+test("runLoop backs off with the default floor when a transient wait has no retry_after", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [{ status: "pending", transient: true }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
+  assert.match(logs[0], /planning wait hit a transient error; retrying in 1s/);
+});
+
+test("runLoop clamps a large retry_after to the 60s cap", async () => {
+  const sleeps = [];
+  const results = [{ status: "pending", retry_after: 99999, transient: true }, { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [60000]);
+});
+
+test("runLoop backs off silently on idle pending and empty-message waits", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [
+    { status: "pending" },
+    { status: "message", text: "   " },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000, 1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("runPromptFile forwards extra argv to run.js", async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-loop-"));
+  const argvFile = path.join(taskDir, "argv.json");
+  fs.writeFileSync(
+    path.join(taskDir, "run.js"),
+    `require("fs").writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(process.argv.slice(2)));\n`,
+  );
+  const promptFile = path.join(taskDir, "prompt.txt");
+  fs.writeFileSync(promptFile, "hello\n");
+
+  const code = await runPromptFile(taskDir, promptFile, "openai/gpt-4.1", ["64"]);
+  assert.equal(code, 0);
+  const argv = JSON.parse(fs.readFileSync(argvFile, "utf8"));
+  assert.deepEqual(argv, [promptFile, "openai/gpt-4.1", "64"]);
 });

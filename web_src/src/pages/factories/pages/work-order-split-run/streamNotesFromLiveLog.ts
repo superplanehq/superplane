@@ -20,6 +20,11 @@ export function isRunnerComponent(component?: string): boolean {
   return Boolean(component && RUNNER_COMPONENTS.has(component));
 }
 
+/** Spreads `orderKey` only when known, so untimed lines stay comparable-key-free. */
+function orderKeyProps(orderKey: number | undefined): { orderKey?: number } {
+  return orderKey === undefined ? {} : { orderKey };
+}
+
 export function notesFromLiveLogSections(nodeId: string, sections: CommandSection[]): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -32,6 +37,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
       continue;
     }
     const stepId = `${nodeId}-step-${section.index}`;
+    const orderKey = section.started_at ?? undefined;
     notes.push({
       id: stepId,
       nodeId,
@@ -41,6 +47,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
       componentName: section.preview?.trim() || section.text,
       status: streamStatus(section.status),
       detail: section.kind === "prompt" ? undefined : section.lines.filter((line) => line.trim()).join("\n"),
+      ...orderKeyProps(orderKey),
     });
     for (const [eventIndex, event] of section.events.entries()) {
       if (event.kind === "note") {
@@ -57,6 +64,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentType: "note",
           componentName: event.text,
           status: "passed",
+          ...orderKeyProps(orderKey),
         });
         continue;
       }
@@ -72,6 +80,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentName: tool.text,
           status: streamStatus(tool.status),
           detail: tool.lines.filter((line) => line.trim()).join("\n") || undefined,
+          ...orderKeyProps(orderKey),
         });
       }
     }
@@ -94,6 +103,7 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
     return undefined;
   }
   const stepId = `${nodeId}-step-${section.index}`;
+  const orderKey = section.started_at ?? undefined;
   const notes: SplitRunStreamLine[] = [
     {
       id: stepId,
@@ -104,6 +114,7 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
       componentName: section.preview?.trim() || step.name,
       status: step.status,
       detail: step.output,
+      ...orderKeyProps(orderKey),
     },
   ];
   for (const [index, command] of step.commands.entries()) {
@@ -118,6 +129,7 @@ function fallbackNotesFromPlaintext(nodeId: string, section: CommandSection): Sp
       componentName: command.name,
       status: command.status,
       detail: command.output,
+      ...orderKeyProps(orderKey),
     });
   }
   return notes;

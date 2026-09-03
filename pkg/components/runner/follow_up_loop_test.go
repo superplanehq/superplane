@@ -1,4 +1,4 @@
-package claude
+package runner
 
 import (
 	"os/exec"

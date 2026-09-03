@@ -6,6 +6,9 @@ import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
  * a mixed result instead of every metric improving at once.
  */
 
+/** Repository these reports are built from. Workspace setup must name the same one. */
+export const VELOCITY_REPOSITORY = "acme/refunds";
+
 const PEOPLE_AUTHORS = [
   { id: "user-darko", name: "Darko Fabijan", email: "darko@superplane.com", accountId: 20469, share: 0.24 },
   { id: "user-aleksandar", name: "Aleksandar Mitrovic", email: "alex@superplane.com", accountId: 61409859, share: 0.2 },
@@ -165,7 +168,7 @@ function buildReport(periodDays: number, withComparison: boolean): FactoriesDesc
     yesterday: { superplaneMerged: yesterday.superplaneMerged, waste: yesterday.waste },
     totals,
     points,
-    repository: "acme/refunds",
+    repository: VELOCITY_REPOSITORY,
     hasPeopleCohort: true,
     peopleSyncedAt: new Date().toISOString(),
     peopleSyncPending: false,
