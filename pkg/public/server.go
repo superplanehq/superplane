@@ -854,7 +854,8 @@ type OrganizationCreationRequest struct {
 }
 
 type initialWorkspaceRequest struct {
-	Owner string `json:"owner"`
+	Owner     string `json:"owner"`
+	AttemptID string `json:"attemptID"`
 }
 
 type initialWorkspaceResponse struct {
@@ -1135,13 +1136,18 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "GitHub account is required", http.StatusBadRequest)
 		return
 	}
+	attemptID, err := uuid.Parse(req.AttemptID)
+	if err != nil {
+		http.Error(w, "Invalid onboarding attempt", http.StatusBadRequest)
+		return
+	}
 
 	if !accountOwnsGitHubName(database.DB(r.Context()), account, owner) {
 		http.Error(w, "GitHub account does not match this account", http.StatusForbidden)
 		return
 	}
 
-	if organization, workspace, found, err := findIncompleteInitialWorkspace(database.DB(r.Context()), account.ID); err != nil {
+	if organization, workspace, found, err := findIncompleteInitialWorkspace(database.DB(r.Context()), account.ID, attemptID); err != nil {
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to find incomplete initial workspace")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
@@ -1160,7 +1166,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	organization, workspace, err := s.createInitialOrganizationAndWorkspace(account, owner)
+	organization, workspace, err := s.createInitialOrganizationAndWorkspace(account, owner, attemptID)
 	if err != nil {
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to create initial workspace")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
@@ -1174,7 +1180,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
 
-func findIncompleteInitialWorkspace(tx *gorm.DB, accountID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
+func findIncompleteInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
 	organizations, err := models.ListOrganizationsCreatedByAccount(tx, accountID)
 	if err != nil {
 		return nil, nil, false, err
@@ -1186,7 +1192,7 @@ func findIncompleteInitialWorkspace(tx *gorm.DB, accountID uuid.UUID) (*models.O
 			return nil, nil, false, err
 		}
 		for _, factory := range factories {
-			if factory.Name == "New workspace" && !factory.IsOnboardingComplete() {
+			if factory.Description == initialWorkspaceAttemptDescription(attemptID) && !factory.IsOnboardingComplete() {
 				return &organization, &factory, true, nil
 			}
 		}
@@ -1218,14 +1224,14 @@ func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) b
 	})
 }
 
-func (s *Server) createInitialOrganizationAndWorkspace(account *models.Account, owner string) (*models.Organization, *models.Factory, error) {
+func (s *Server) createInitialOrganizationAndWorkspace(account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
 	for suffix := 1; suffix <= 100; suffix++ {
 		organizationName := owner
 		if suffix > 1 {
 			organizationName = fmt.Sprintf("%s %d", owner, suffix)
 		}
 
-		organization, workspace, err := s.createInitialOrganizationAttempt(account, organizationName)
+		organization, workspace, err := s.createInitialOrganizationAttempt(account, organizationName, attemptID)
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			continue
 		}
@@ -1235,7 +1241,7 @@ func (s *Server) createInitialOrganizationAndWorkspace(account *models.Account, 
 	return nil, nil, fmt.Errorf("could not find an available organization name for %q", owner)
 }
 
-func (s *Server) createInitialOrganizationAttempt(account *models.Account, organizationName string) (*models.Organization, *models.Factory, error) {
+func (s *Server) createInitialOrganizationAttempt(account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, organizationName, "")
 	if err != nil {
@@ -1257,7 +1263,7 @@ func (s *Server) createInitialOrganizationAttempt(account *models.Account, organ
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
 
-	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
+	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", initialWorkspaceAttemptDescription(attemptID), "")
 	if err != nil {
 		tx.Rollback()
 		return nil, nil, fmt.Errorf("create initial workspace: %w", err)
@@ -1266,6 +1272,10 @@ func (s *Server) createInitialOrganizationAttempt(account *models.Account, organ
 		return nil, nil, fmt.Errorf("commit initial workspace: %w", err)
 	}
 	return organization, workspace, nil
+}
+
+func initialWorkspaceAttemptDescription(attemptID uuid.UUID) string {
+	return "initial-onboarding:" + attemptID.String()
 }
 
 type AccountImpersonation struct {
