@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
-import { SplitRunFollowSwitch } from "./SplitRunLogHeader";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
@@ -141,7 +141,7 @@ export function WorkOrderSplitRunBody({
   };
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" data-testid="split-run-log-pane">
       <ol
         ref={follow.scrollRef}
         onScroll={follow.onScroll}
@@ -172,6 +172,9 @@ export function WorkOrderSplitRunBody({
           </li>
         ))}
       </ol>
+      {follow.following ? null : (
+        <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
+      )}
     </div>
   );
 }
@@ -340,7 +343,9 @@ function SplitRunPopupTabs({
   footerActions: SplitRunFooterActions;
 }) {
   const [streamTick, setStreamTick] = useState("");
-  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick);
+  const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
+    resumeOnBottom: true,
+  });
 
   return (
     <Tabs
@@ -367,9 +372,6 @@ function SplitRunPopupTabs({
             Automations
           </TabsTrigger>
         </TabsList>
-        {tab === "log" ? (
-          <SplitRunFollowSwitch following={follow.following} onFollowingChange={follow.setFollowing} />
-        ) : null}
       </div>
       <TabsContent value="description" className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden">
         <WorkOrderSplitRunOverview
