@@ -87,21 +87,20 @@ func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
 
 	prompt := "\nFirst line.\nSecond line.\n"
 	command := "set -e\necho one\necho two"
-	commands, _ := BuildAgentBrokerTask(
-		"Prepare",
-		NodePrepareScript("", "", ""),
-		"run.js",
-		"echo run",
-		"",
-		[]AgentStep{
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
 			{Name: "Run", Type: AgentStepBash, Command: &command},
 			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
 		},
-		"google/gemini-3.7-flash",
-		func(promptName, model string) string {
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
 			return "node run.js " + promptName + " " + model
 		},
-	)
+	})
 
 	require.Len(t, commands, 3)
 	assert.Equal(t, "set -e\necho one\necho two", commands[1].Preview)

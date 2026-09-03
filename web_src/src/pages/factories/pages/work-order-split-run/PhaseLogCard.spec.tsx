@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
+import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
 
