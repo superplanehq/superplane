@@ -19,6 +19,8 @@ func TestExpressionUsesOrderArtifacts(t *testing.T) {
 		{name: "len", raw: `len(order().artifacts)`, want: true},
 		{name: "none predicate", raw: `none(order().artifacts, {#.type == "pr"})`, want: true},
 		{name: "any predicate", raw: `any(order().artifacts, {#.type == "pr"})`, want: true},
+		{name: "task alias", raw: `task().artifacts`, want: true},
+		{name: "task alias none", raw: `none(task().artifacts, {#.type == "pr"})`, want: true},
 		{name: "unrelated", raw: `root().data.work_order`, want: false},
 	}
 
@@ -47,12 +49,41 @@ func TestExpressionUsesOrderURL(t *testing.T) {
 		{name: "dot url", raw: `order().url`, want: true},
 		{name: "bracket url", raw: `order()["url"]`, want: true},
 		{name: "concatenated", raw: `"[Work Order](" + order().url + ")"`, want: true},
+		{name: "task alias", raw: `task().url`, want: true},
 		{name: "unrelated", raw: `app().url`, want: false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := ExpressionUsesOrderURL(tc.raw)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestExpressionUsesOrderKey(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "order only", raw: `order()`, want: false},
+		{name: "order id", raw: `order().id`, want: false},
+		{name: "dot key", raw: `order().key`, want: true},
+		{name: "bracket key", raw: `order()["key"]`, want: true},
+		{name: "concatenated", raw: `"[" + order().key + "](" + order().url + ")"`, want: true},
+		{name: "task alias", raw: `task().key`, want: true},
+		{name: "unrelated", raw: `app().key`, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ExpressionUsesOrderKey(tc.raw)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -79,6 +110,7 @@ func TestExpressionUsesOrderAssignees(t *testing.T) {
 		{name: "mixed bracket", raw: `order()["assignees"][0]["name"]`, want: true},
 		{name: "len", raw: `len(order().assignees)`, want: true},
 		{name: "filter", raw: `filter(order().assignees, {#.email != ""})`, want: true},
+		{name: "task alias", raw: `task().assignees`, want: true},
 		{name: "unrelated", raw: `root().data.work_order`, want: false},
 	}
 
@@ -112,6 +144,7 @@ func TestExpressionUsesOrderComments(t *testing.T) {
 		{name: "len", raw: `len(order().comments)`, want: true},
 		{name: "none predicate", raw: `none(order().comments, {#.author.kind == "automation"})`, want: true},
 		{name: "any predicate", raw: `any(order().comments, {#.author.kind == "automation"})`, want: true},
+		{name: "task alias", raw: `task().comments`, want: true},
 		{name: "unrelated", raw: `root().data.work_order`, want: false},
 	}
 

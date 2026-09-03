@@ -302,7 +302,7 @@ function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStream
       id: "set-pr-closure-note",
       at: "19:52:39",
       componentType: "setWorkOrderStatusNote",
-      componentName: "Set PR closure note",
+      componentName: "Set Closure Note",
       action: "passed",
       iconSlug: "box",
       duration: "1s",

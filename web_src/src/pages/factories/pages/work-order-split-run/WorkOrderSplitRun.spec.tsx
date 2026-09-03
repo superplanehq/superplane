@@ -200,7 +200,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start Implementation").length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
@@ -747,6 +747,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(sidebar).getByText("plan.md")).toBeInTheDocument();
     expect(within(sidebar).queryByText("PAY-842")).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("details.md")).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(sidebar).getByText("No pull requests yet.")).toBeInTheDocument();
+    const artifactsHeading = within(sidebar).getByRole("heading", { name: "Artifacts" });
+    const pullRequestsHeading = within(sidebar).getByRole("heading", { name: "Pull requests" });
+    expect(
+      artifactsHeading.compareDocumentPosition(pullRequestsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(tab).getByTestId("split-run-overview-checks")).toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence")).toHaveAttribute("open");
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
@@ -792,6 +799,18 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
     expect(coverage).toHaveAttribute("open");
+  });
+
+  it("shows the full check summary without a one-line clamp", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
+    expect(summary.tagName).toBe("P");
+    expect(summary).not.toHaveClass("truncate");
+    expect(summary).toHaveClass("break-words");
   });
 
   it("keeps description checks collapsed when the task is not a draft", async () => {
@@ -863,6 +882,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByText("The work is done. The result met the goal.")).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+
+    const sidebar = screen.getByTestId("split-run-overview-sidebar");
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole("link", { name: "#510 Send refund receipts after provider confirm" }),
+    ).toHaveAttribute("href", "https://github.com/example/ledger/pull/510");
   });
 
   it("explains a rejected result without Reopen", () => {
@@ -883,6 +908,9 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false }),
     });
 
+    const sidebar = screen.getByTestId("split-run-overview-sidebar");
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "closure.md" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();

@@ -6,7 +6,7 @@ import {
   EMPTY_FACTORY_KEY,
   PRIMARY_FACTORY_KEY,
 } from "../../__fixtures__/factoryPageResponses";
-import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/notificationSettings";
+import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 import {
   CONNECTED_SETUP_INTEGRATIONS,
@@ -43,51 +43,6 @@ export const Automations: Story = {
   ),
 };
 
-export const AccountGeneral: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/general`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const Notifications: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/notifications`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const NotificationsFiltered: Story = {
-  name: "Notifications (Filtered)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/notifications`}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        notificationSettings: {
-          workspaces: {
-            scope: "WORKSPACE_SCOPE_FILTERED",
-            filters: [
-              {
-                workspaceId: defaultFactoriesFixture.factories[0]?.id ?? "",
-                eventTypes: eventTypesFromToggles({
-                  ...defaultNotificationTypeToggles(),
-                  TYPE_WORK_ORDER_COMMENT_CREATED: false,
-                  TYPE_WORK_ORDER_ARTIFACT_OWNED: false,
-                }),
-              },
-            ],
-          },
-        },
-      }}
-    />
-  ),
-};
-
 export const Repository: Story = {
   render: () => (
     <FactoriesHarness
@@ -103,6 +58,7 @@ export const Models: Story = {
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
       factoriesFixture={defaultFactoriesFixture}
+      experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
     />
   ),
 };

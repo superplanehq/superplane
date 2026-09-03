@@ -28,20 +28,11 @@ export interface PlanningReviewDraft {
 }
 
 const implementationSteps: PlanningReviewStep[] = [
-  { name: "Set Up Git User", type: "bash", command: 'git config --global user.email "agent@superplane.com"' },
-  {
-    name: "Provide order",
-    type: "bash",
-    command: "echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md\ncat /tmp/ORDER.md",
-    workingDirectory: "repo",
-  },
-  { name: "Provide Plan", type: "bash", command: "echo $PLAN | base64 -d > /tmp/PLAN.md" },
-  { name: "Checkout Branch", type: "bash", command: "git checkout $BRANCH", workingDirectory: "repo" },
-  { name: "Set Up DCO Signing", type: "bash", command: "git config commit.gpgsign false", workingDirectory: "repo" },
+  { name: "Clone Repo", type: "bash", command: 'git clone --depth 1 "$REPO_URL" repo' },
   {
     name: "Implementation",
     type: "prompt",
-    prompt: "Implement the approved plan. Make the smallest complete change and update the tests.",
+    prompt: "Create a working branch and implement the approved plan.",
     workingDirectory: "repo",
   },
   { name: "Commit and Push", type: "bash", command: "git push origin HEAD", workingDirectory: "repo" },
@@ -58,14 +49,8 @@ const implementationConfiguration: Record<string, unknown> = {
   workingDirectory: "/tmp/repo",
   environmentFrom: [{ source: "integration", integration: "github-superplanehq" }],
   environment: [
-    { name: "REPO", valueSource: "literal", value: "superplanehq/superplane" },
-    { name: "BRANCH", valueSource: "literal", value: '{{ $["Create Branch"].data.result.branch }}' },
-    { name: "ORDER_DESCRIPTION", valueSource: "literal", value: "{{ toBase64(order().description) }}" },
-    {
-      name: "PLAN",
-      valueSource: "literal",
-      value: '{{ toBase64(find(order().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body) }}',
-    },
+    { name: "REPO_URL", valueSource: "literal", value: "{{ order().repository_url }}" },
+    { name: "BASE", valueSource: "literal", value: "{{ order().default_branch }}" },
   ],
   executionTimeoutSeconds: 3600,
 };
@@ -75,7 +60,7 @@ export const PLANNING_REVIEW_DRAFT: PlanningReviewDraft = {
   components: [
     {
       id: "implementation-agent",
-      title: "Agent - Implement from order description",
+      title: "Implement From Task Description",
       description: "Implement the approved plan and prepare the branch for review.",
       expanded: true,
       configuration: implementationConfiguration,

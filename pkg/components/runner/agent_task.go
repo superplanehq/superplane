@@ -8,34 +8,88 @@ import (
 
 type AgentPromptCommand func(promptName, model string) string
 
-func BuildAgentBrokerTask(
-	prepareName, prepareScript, runScriptName, runScript, workingDirectory string,
-	steps []AgentStep,
-	model string,
-	promptCommand AgentPromptCommand,
-) (commands []BrokerCommand, files []BrokerTaskFile) {
+type AgentBrokerTaskInput struct {
+	PrepareName      string
+	PrepareScript    string
+	RunScriptName    string
+	RunScript        string
+	WorkingDirectory string
+	Steps            []AgentStep
+	Usage            string
+	Setups           []IntegrationSetup
+	Model            string
+	PromptCommand    AgentPromptCommand
+}
+
+func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
 	files = []BrokerTaskFile{
 		LLMUsageTaskFile(),
-		{Path: runScriptName, Content: runScript, Mode: "0644"},
-		{Path: "prepare.sh", Content: prepareScript, Mode: "0644"},
+		{Path: input.RunScriptName, Content: input.RunScript, Mode: "0644"},
+		{Path: "prepare.sh", Content: input.PrepareScript, Mode: "0644"},
 	}
 
-	commands = make([]BrokerCommand, 0, len(steps)+1)
+	setupCommands, setupFiles := BuildIntegrationSetupCommands(input.Setups)
+	files = append(files, setupFiles...)
+
+	commands = make([]BrokerCommand, 0, len(input.Steps)+len(setupCommands)+1)
 	commands = append(commands, BrokerCommand{
-		Name:    prepareName,
-		Command: `source "$SUPERPLANE_TASK_DIR/prepare.sh"`,
+		Name:    input.PrepareName,
+		Command: WithTaskBinOnPath(`source "$SUPERPLANE_TASK_DIR/prepare.sh"`),
 		Kind:    LiveLogKindSetup,
 	})
+	commands = append(commands, setupCommands...)
 
-	for i, step := range steps {
-		file, command := buildAgentStep(i+1, step, workingDirectory, model, runScriptName, promptCommand)
+	for i, step := range input.Steps {
+		file, command := buildAgentStep(i+1, step, input.WorkingDirectory, input.Usage, input.Model, input.PromptCommand)
 		files = append(files, file)
 		commands = append(commands, command)
 	}
 	return commands, files
 }
 
-func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model, runScriptName string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
+func ApplyIntegrationUsage(prompt, usage string) string {
+	usage = strings.TrimSpace(usage)
+	if usage == "" {
+		return prompt
+	}
+	if strings.TrimSpace(prompt) == "" {
+		return usage
+	}
+	return usage + "\n\n" + prompt
+}
+
+func WithTaskBinOnPath(command string) string {
+	return `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"
+` + command
+}
+
+func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []BrokerCommand, files []BrokerTaskFile) {
+	for i, setup := range setups {
+		if strings.TrimSpace(setup.Script) == "" {
+			continue
+		}
+		name := strings.TrimSpace(setup.Name)
+		if name == "" {
+			name = "Set up integration"
+		}
+		scriptName := AgentStepSlug(i+1, name) + ".sh"
+		path := "setup/" + scriptName
+		files = append(files, BrokerTaskFile{
+			Path:    path,
+			Content: setup.Script,
+			Mode:    "0644",
+		})
+		commands = append(commands, BrokerCommand{
+			Name:    name,
+			Command: WrapAgentStepCommand(fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/%s"`, path)),
+			Kind:    LiveLogKindSetup,
+			Preview: LiveLogText(name),
+		})
+	}
+	return commands, files
+}
+
+func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, usage, model string, promptCommand AgentPromptCommand) (BrokerTaskFile, BrokerCommand) {
 	stepSlug := AgentStepSlug(stepNumber, step.Name)
 	workingDirectory := EffectiveWorkingDirectory(nodeWorkingDirectory, step.WorkingDirectory)
 	switch NormalizeAgentStepType(step.Type) {
@@ -63,7 +117,7 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, model,
 		promptName := stepSlug + ".txt"
 		return BrokerTaskFile{
 				Path:    "prompts/" + promptName,
-				Content: prompt,
+				Content: ApplyIntegrationUsage(prompt, usage),
 				Mode:    "0644",
 			}, BrokerCommand{
 				Name:    AgentStepLabel(step.Name, promptName),
@@ -104,7 +158,7 @@ cd "$_sp_root"/` + ShellSingleQuote(dir) + ` && ` + command
 func WrapAgentStepCommand(command string) string {
 	return `_sp_status=0
 {
-` + command + `
+` + WithTaskBinOnPath(command) + `
 } || _sp_status=$?
 node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge || true
 if [ "$_sp_status" -ne 0 ]; then

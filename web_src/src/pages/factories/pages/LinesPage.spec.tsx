@@ -19,6 +19,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
+import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
@@ -41,10 +42,15 @@ function renderLinesBoard(
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
+const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
 const useFactoryIntakes = vi.fn(() => ({ data: [] as FactoriesFactoryIntake[] }));
 const createFactoryIntakeMutateAsync = vi.fn();
+const useFactoryPRFeedbackHandlers = vi.fn(() => ({
+  data: [] as { id?: string; source?: string; healthy?: boolean }[],
+}));
+const createFactoryPRFeedbackHandler = vi.fn();
 const searchFactoryIntakeItems = vi.fn(() => ({
   data: [] as { id: string; key: string; title: string; body: string; url: string }[],
   isLoading: false,
@@ -77,7 +83,12 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
   useFactoryApps: () => useFactoryApps(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
-  useUpdateFactoryLine: () => ({ mutateAsync: updateFactoryLineMutateAsync, isPending: false }),
+  useUpdateFactoryLine: () => ({
+    mutateAsync: updateFactoryLineMutateAsync,
+    get isPending() {
+      return updateLineIsPending.value;
+    },
+  }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
@@ -108,8 +119,8 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
-  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
-  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryPRFeedbackHandlers: () => useFactoryPRFeedbackHandlers(),
+  useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: createFactoryPRFeedbackHandler, isPending: false }),
   useUpdateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
@@ -166,35 +177,42 @@ vi.mock("@/hooks/useWorkOrderChecks", () => ({
   useWorkOrderChecks,
 }));
 
+async function resetLinesBoardMocks() {
+  const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
+  window.localStorage.clear();
+  updateFactoryLineMutateAsync.mockReset();
+  updateLineIsPending.value = false;
+  useFactoryWorkOrders.mockReturnValue({ data: [] });
+  useFactoryApps.mockReturnValue({ data: [] });
+  useFactoryIntakes.mockReturnValue({ data: [] });
+  createFactoryIntakeMutateAsync.mockReset();
+  createFactoryPRFeedbackHandler.mockReset();
+  useFactoryPRFeedbackHandlers.mockReturnValue({ data: [] });
+  searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
+  importFactoryIntakeItem.mockReset();
+  enabledExperimentalFeatures.clear();
+  useWorkOrderChecks.mockReset();
+  useWorkOrderChecks.mockImplementation(
+    (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
+      data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
+    }),
+  );
+  useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
+    if (options?.enabled === false) {
+      return { data: undefined, isPending: false, isError: false };
+    }
+    if (canvasId === "app-refund-implementer") {
+      return canvasQuery(implementerCanvas);
+    }
+    return canvasQuery(canvasWithoutAgent);
+  });
+  updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
+  commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+}
+
 describe("LinesPage board", () => {
   beforeEach(async () => {
-    const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
-    window.localStorage.clear();
-    updateFactoryLineMutateAsync.mockReset();
-    useFactoryWorkOrders.mockReturnValue({ data: [] });
-    useFactoryApps.mockReturnValue({ data: [] });
-    useFactoryIntakes.mockReturnValue({ data: [] });
-    createFactoryIntakeMutateAsync.mockReset();
-    searchFactoryIntakeItems.mockReturnValue({ data: [], isLoading: false, isError: false });
-    importFactoryIntakeItem.mockReset();
-    enabledExperimentalFeatures.clear();
-    useWorkOrderChecks.mockReset();
-    useWorkOrderChecks.mockImplementation(
-      (_organizationId: string, _factoryId: string, orderId: string, options?: { enabled?: boolean }) => ({
-        data: options?.enabled === false ? [] : (DEFAULT_CHECKS_BY_ORDER_ID[orderId] ?? []),
-      }),
-    );
-    useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
-      if (options?.enabled === false) {
-        return { data: undefined, isPending: false, isError: false };
-      }
-      if (canvasId === "app-refund-implementer") {
-        return canvasQuery(implementerCanvas);
-      }
-      return canvasQuery(canvasWithoutAgent);
-    });
-    updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
-    commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
+    await resetLinesBoardMocks();
   });
 
   it("does not show a back link to the lines list", () => {
@@ -349,20 +367,67 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
   });
 
-  it("names the mention the Verify column listens to", async () => {
+  it("names each Verify listener from its source", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+    });
     const user = userEvent.setup();
     renderLinesBoard();
 
     const verify = screen.getByTestId("lines-verify-column");
-    expect(within(verify).getByTestId("lines-verify-listener-pr-feedback")).toHaveTextContent(
-      "Listening to PR comments",
+    expect(within(verify).getByTestId("lines-verify-listener-handler-discussion")).toHaveTextContent(
+      "Listening to pull request comments",
+    );
+    expect(within(verify).getByTestId("lines-verify-listener-handler-checks")).toHaveTextContent(
+      "Monitoring pull request checks",
     );
 
-    await user.click(screen.getByRole("button", { name: "Open PR feedback settings" }));
+    await user.click(within(verify).getByTestId("lines-verify-listener-handler-checks"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-checks`,
     );
+  });
+
+  it("opens the source picker from the Verify column header", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-verify-listener-pr-feedback")).not.toBeInTheDocument();
+    const verify = screen.getByTestId("lines-verify-column");
+    const add = within(verify).getByTestId("lines-verify-add-pr-feedback");
+    expect(add.closest("[data-testid='lines-verify-listeners']")).toBeNull();
+    expect(within(add.parentElement as HTMLElement).getByTestId("lines-verify-menu")).toBeInTheDocument();
+    await user.click(add);
+    expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+  });
+
+  it("hides add when every feedback source already has a handler", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+    });
+    renderLinesBoard();
+
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+  });
+
+  it("does not offer a source that already has a handler", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    expect(screen.getByTestId("add-pr-feedback-template-discussion")).toBeDisabled();
+    expect(screen.getByTestId("add-pr-feedback-template-checks")).toBeEnabled();
   });
 
   it("lists two intakes on the same source", () => {
@@ -489,6 +554,12 @@ describe("LinesPage board", () => {
     expect(screen.queryByText("No intake runs in progress.")).not.toBeInTheDocument();
     expect(screen.queryByText("Handle duplicate refunds on retry")).not.toBeInTheDocument();
   });
+});
+
+describe("LinesPage board editing", () => {
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
 
   it("renames the board title on Enter", async () => {
     updateFactoryLineMutateAsync.mockResolvedValueOnce({});
@@ -578,15 +649,13 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-component-toggle-implementation-agent")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone Repo");
+    expect(screen.getByTestId("planning-review-step-toggle-0")).toHaveAttribute("aria-expanded", "false");
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue("Clone Repo");
-    expect(screen.getByTestId("planning-review-step-body-0")).toHaveValue("git clone $REPO repo");
+    expect(screen.getByTestId("planning-review-step-body-0-editor")).toBeInTheDocument();
   });
 
   it("hides Edit Agent when the column canvas has no agent", async () => {
@@ -605,6 +674,7 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
     await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
     await user.type(stepName, "Clone repository");
@@ -678,6 +748,96 @@ describe("LinesPage board", () => {
         }),
       );
     });
+  });
+
+  it("hydrates a persisted column color on mount", async () => {
+    renderLinesBoard();
+
+    const backlogLane = screen.getByTestId("lines-backlog-column");
+    for (const className of lineBoardColumnLaneClassName("lime")!.split(" ")) {
+      expect(backlogLane).toHaveClass(className);
+    }
+  });
+
+  it("picking a color saves it on the line and updates the lane immediately", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      id: REFUND_LINE_PLAN_ID,
+      columnColors: { backlog: "lime", "phase-0": "sky" },
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnColors: { backlog: "lime", "phase-0": "sky" },
+      });
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).toHaveClass(className);
+    }
+  });
+
+  it("keeps the picked color when the save completes before the factory refetch", async () => {
+    const view = renderLinesBoard();
+    updateFactoryLineMutateAsync.mockImplementation(async (input) => {
+      updateLineIsPending.value = true;
+      view.rerender(
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          factory={REFUND_FACTORY}
+        />,
+      );
+      await Promise.resolve();
+      updateLineIsPending.value = false;
+      view.rerender(
+        <LinesBoardSpecHarness
+          path={`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`}
+          factory={REFUND_FACTORY}
+        />,
+      );
+      return {
+        id: REFUND_LINE_PLAN_ID,
+        columnColors: input.columnColors,
+      };
+    });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalled();
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).toHaveClass(className);
+    }
+  });
+
+  it("rolls back the color and shows an error toast when saving fails", async () => {
+    const { showErrorToast } = await import("@/lib/toast");
+    updateFactoryLineMutateAsync.mockRejectedValueOnce(new Error("network error"));
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-color-sky"));
+
+    await waitFor(() => {
+      expect(showErrorToast).toHaveBeenCalled();
+    });
+
+    const phaseLane = screen.getByTestId("lines-phase-column-0");
+    for (const className of lineBoardColumnLaneClassName("sky")!.split(" ")) {
+      expect(phaseLane).not.toHaveClass(className);
+    }
   });
 
   it("hides Edit on the Done column", async () => {

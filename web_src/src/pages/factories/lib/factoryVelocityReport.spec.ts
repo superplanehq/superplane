@@ -17,6 +17,9 @@ const RESPONSE: FactoriesDescribeFactoryVelocityResponse = {
     costCents: "12000",
     tokens: "450000",
     wasteCostCents: "2500",
+    // Fewer tasks than pull request closes: one task merged two pull requests.
+    tasksClosed: 24,
+    tasksWaste: 6,
   },
   previousTotals: {
     superplaneMerged: 10,
@@ -26,6 +29,8 @@ const RESPONSE: FactoriesDescribeFactoryVelocityResponse = {
     costCents: "9000",
     tokens: "300000",
     wasteCostCents: "3000",
+    tasksClosed: 15,
+    tasksWaste: 6,
   },
   hasPreviousWindow: true,
   points: [
@@ -73,28 +78,31 @@ describe("toVelocityReport", () => {
     expect(report.totals.superplaneMerged).toBe(20);
   });
 
-  it("converts cents to dollars and derives cost per SuperPlane merge", () => {
+  it("converts cents to dollars and spreads spend over the closed tasks", () => {
     const report = toVelocityReport(RESPONSE);
 
     expect(report.totals.costUsd).toBe(120);
     expect(report.totals.wasteCostUsd).toBe(25);
     expect(report.totals.tokens).toBe(450_000);
-    expect(report.totals.costPerMerge).toBe(6);
+    expect(report.totals.costPerTask).toBe(5);
   });
 
-  it("keeps the waste rate the API reports", () => {
+  it("counts tasks apart from the pull requests they opened", () => {
     const report = toVelocityReport(RESPONSE);
 
-    expect(report.totals.wasteRate).toBe(20);
+    expect(report.totals.tasksClosed).toBe(24);
+    expect(report.totals.tasksWaste).toBe(6);
+    expect(report.totals.taskWasteRate).toBe(25);
   });
 
-  it("derives the waste rate when the API omits it", () => {
+  it("reports no task waste and no cost per task when no task closed", () => {
     const report = toVelocityReport({
       ...RESPONSE,
-      totals: { superplaneMerged: 3, peopleMerged: 0, waste: 1 },
+      totals: { superplaneMerged: 3, peopleMerged: 0, waste: 1, costCents: "5000" },
     });
 
-    expect(report.totals.wasteRate).toBe(25);
+    expect(report.totals.taskWasteRate).toBe(0);
+    expect(report.totals.costPerTask).toBe(0);
   });
 
   it("reports no previous totals when the API has no earlier window", () => {
@@ -107,7 +115,7 @@ describe("toVelocityReport", () => {
     const report = toVelocityReport(RESPONSE);
 
     expect(report.previous?.merged).toBe(35);
-    expect(report.previous?.costPerMerge).toBe(9);
+    expect(report.previous?.costPerTask).toBe(6);
   });
 
   it("keys the intake counts of a day by source", () => {
@@ -150,6 +158,7 @@ describe("toVelocityReport", () => {
     const report = toVelocityReport({});
 
     expect(report.totals.merged).toBe(0);
+    expect(report.totals.tasksClosed).toBe(0);
     expect(report.points).toEqual([]);
     expect(report.intakeSeries).toEqual([]);
     expect(report.people).toEqual([]);

@@ -11,7 +11,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -28,8 +28,6 @@ import {
   FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsNotificationsPage,
-  FactorySettingsProfilePage,
   FactorySettingsRepositoryPage,
   FactorySettingsUsagePage,
   FactorySettingsModelsPage,
@@ -47,6 +45,7 @@ import {
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import {
+  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
@@ -74,6 +73,10 @@ import { NewAppPage } from "@/pages/home/NewAppPage";
 import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
+
+import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
+import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
+import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -238,11 +241,30 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
 
 const factorySettingsStorybookRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route key="factory-settings-account-general" path="account/general" element={<FactorySettingsProfilePage />} />,
+  <Route
+    key="factory-settings-account-general"
+    path="account/general"
+    element={<Navigate to="../profile" replace />}
+  />,
+  <Route
+    key="factory-settings-account-profile"
+    path="account/profile"
+    element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-linked-accounts"
+    path="account/linked-accounts"
+    element={<AccountLinkedAccountsRedirect />}
+  />,
+  <Route
+    key="factory-settings-account-security"
+    path="account/security"
+    element={<FactorySettingsAccountSecurityPage />}
+  />,
   <Route
     key="factory-settings-account-notifications"
     path="account/notifications"
-    element={<FactorySettingsNotificationsPage />}
+    element={<FactorySettingsAccountNotificationsPage />}
   />,
   <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
   <Route
@@ -255,7 +277,15 @@ const factorySettingsStorybookRoutes = [
     path="workspace/automations"
     element={<FactorySettingsAutomationsPage />}
   />,
-  <Route key="factory-settings-workspace-models" path="workspace/models" element={<FactorySettingsModelsPage />} />,
+  <Route
+    key="factory-settings-workspace-models"
+    path="workspace/models"
+    element={
+      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
+        <FactorySettingsModelsPage />
+      </RequireExperimentalFeature>
+    }
+  />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
   <Route
     key="factory-settings-organization-general"

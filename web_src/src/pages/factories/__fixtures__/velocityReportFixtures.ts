@@ -96,6 +96,9 @@ function sumTotals(points: Point[]) {
     costCents: String(costCents),
     tokens: String(tokens),
     wasteCostCents: String(wasteCostCents),
+    // Every pull request of these payloads comes from a task of its own.
+    tasksClosed: superplaneMerged + waste,
+    tasksWaste: waste,
   };
 }
 
@@ -190,6 +193,8 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
     costCents: "0",
     tokens: "0",
     wasteCostCents: "0",
+    tasksClosed: 0,
+    tasksWaste: 0,
   },
   points: Array.from({ length: 14 }, (_, index) => ({
     day: dayLabel(index, 14),

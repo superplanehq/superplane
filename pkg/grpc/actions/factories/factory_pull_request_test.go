@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -186,6 +187,118 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 		assert.Equal(t, canvas.ID.String(), linked.GetRun().GetCanvasId())
 		assert.Equal(t, canvasespb.CanvasRun_STATE_STARTED, linked.GetRun().GetState())
 		assert.Equal(t, "Please add tests for the retry path.", linked.GetDescription())
+	})
+
+	t.Run("includes usage on pull request activities", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory, "Tracked")
+		created := createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
+			WorkOrderId: order.ID.String(),
+			Url:         "https://github.com/acme/app/pull/88",
+		})
+
+		canvas, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "fix-checks", "start")
+		event := support.EmitCanvasEventForNodeWithData(t, canvas.ID, entry, "default", nil, map[string]any{"key": "value"})
+		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, event)
+		require.NoError(t, err)
+		modelPR, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, created.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, modelPR.LinkRun(db, run.ID, "Fixing failed checks on d8b80c2"))
+		require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+			OrganizationID:  r.Organization.ID,
+			CanvasRunID:     run.ID,
+			NodeExecutionID: uuid.New(),
+			NodeID:          "prompt",
+			Provider:        models.UsageProviderAnthropic,
+			Model:           "claude-sonnet-4-6",
+			InputTokens:     1_000_000,
+			TotalTokens:     1_000_000,
+		}))
+
+		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.GetPullRequests(), 1)
+		require.Len(t, resp.GetPullRequests()[0].GetActivities(), 1)
+		activity := resp.GetPullRequests()[0].GetActivities()[0]
+		assert.Equal(t, int64(1_000_000), activity.GetTotalTokens())
+		assert.Greater(t, activity.GetCostCents(), int64(0))
+		assert.Equal(t, int64(1_000_000), resp.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+	})
+
+	t.Run("degrades to zero usage when usage rollup is unavailable", func(t *testing.T) {
+		factory := newFactory(t)
+		order := createOrder(t, factory, "Tracked")
+		created := createPR(t, factory, &pb.CreateFactoryPullRequestRequest{
+			WorkOrderId: order.ID.String(),
+			Url:         "https://github.com/acme/app/pull/70",
+			Title:       "Retry flaky test",
+		})
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+			nil,
+		)
+		rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+		require.NoError(t, err)
+		modelPR, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, created.GetId())})
+		require.NoError(t, err)
+		require.NoError(t, modelPR.LinkRun(db, run.ID, "Automated fix"))
+
+		now := time.Now()
+		require.NoError(t, db.Create(&models.WorkspaceUsageEvent{
+			ID:               uuid.New(),
+			OrganizationID:   r.Organization.ID,
+			CanvasRunID:      run.ID,
+			NodeExecutionID:  uuid.New(),
+			NodeID:           "prompt",
+			Provider:         models.UsageProviderAnthropic,
+			Model:            "claude-sonnet-4-6",
+			UsageKind:        models.UsageKindModel,
+			FundingSource:    models.UsageFundingSourceBYOK,
+			TotalTokens:      1_000_000,
+			CostMicros:       300_000,
+			Currency:         "usd",
+			PriceBookVersion: "test",
+			IdempotencyKey:   uuid.NewString(),
+			OccurredAt:       now,
+			CreatedAt:        now,
+		}).Error)
+
+		resp, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.GetPullRequests(), 1)
+		require.Len(t, resp.GetPullRequests()[0].GetRuns(), 1)
+		assert.EqualValues(t, 1_000_000, resp.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+		assert.Positive(t, resp.GetPullRequests()[0].GetRuns()[0].GetCostCents())
+
+		// Simulate the usage rollup table being unavailable mid-migration
+		// (for example, during a table rename). The PR listing must still
+		// succeed, degrading to zero usage instead of failing with a 500.
+		require.NoError(t, db.Exec(
+			"ALTER TABLE workspace_usage_events RENAME TO workspace_usage_events_test_missing",
+		).Error)
+		defer func() {
+			require.NoError(t, db.Exec(
+				"ALTER TABLE workspace_usage_events_test_missing RENAME TO workspace_usage_events",
+			).Error)
+		}()
+
+		degraded, err := ListFactoryPullRequests(ctx, orgID, &pb.ListFactoryPullRequestsRequest{
+			FactoryId: factory.ID.String(),
+		})
+		require.NoError(t, err)
+		require.Len(t, degraded.GetPullRequests(), 1)
+		require.Len(t, degraded.GetPullRequests()[0].GetRuns(), 1)
+		assert.EqualValues(t, 0, degraded.GetPullRequests()[0].GetRuns()[0].GetTotalTokens())
+		assert.EqualValues(t, 0, degraded.GetPullRequests()[0].GetRuns()[0].GetCostCents())
 	})
 
 	t.Run("updates a tracked pull request", func(t *testing.T) {

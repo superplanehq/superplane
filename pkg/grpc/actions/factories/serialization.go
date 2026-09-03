@@ -108,12 +108,14 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 }
 
 func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, len(canvases))
-	for i, canvas := range canvases {
+	result := make([]*pb.Factory_App, 0, len(canvases))
+	for _, canvas := range canvases {
+		name := canvas.Name
+		description := canvas.Description
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
-			Name:        canvas.Name,
-			Description: canvas.Description,
+			Name:        name,
+			Description: description,
 		}
 		if canvas.CreatedAt != nil {
 			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
@@ -121,7 +123,7 @@ func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 		if canvas.UpdatedAt != nil {
 			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
 		}
-		result[i] = app
+		result = append(result, app)
 	}
 	return result
 }
@@ -182,16 +184,23 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 	}
 }
 
-func serializeFactoryPRFeedbackHandlers(handlers []models.FactoryPRFeedbackHandler, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryPRFeedbackHandler {
+func serializeFactoryPRFeedbackHandlers(tx *gorm.DB, orgID uuid.UUID, handlers []models.FactoryPRFeedbackHandler, specs map[uuid.UUID]models.LiveCanvasSpec) []*pb.FactoryPRFeedbackHandler {
 	result := make([]*pb.FactoryPRFeedbackHandler, len(handlers))
 	for i := range handlers {
-		result[i] = serializeFactoryPRFeedbackHandler(&handlers[i], specs[handlers[i].CanvasID])
+		result[i] = serializeFactoryPRFeedbackHandler(tx, orgID, &handlers[i], specs[handlers[i].CanvasID])
 	}
 	return result
 }
 
-func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
+func serializeFactoryPRFeedbackHandler(tx *gorm.DB, orgID uuid.UUID, handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
 	graph := resolvePRFeedbackGraph(spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec)
+	if handler.MaximumAttempts != nil {
+		settings.MaximumAttempts = *handler.MaximumAttempts
+	}
+	if tx != nil && orgID != uuid.Nil {
+		_ = resolveRunnerIntegrationIDs(tx, orgID, &settings)
+	}
 
 	serialized := &pb.FactoryPRFeedbackHandler{
 		Id:        handler.ID.String(),
@@ -200,7 +209,7 @@ func serializeFactoryPRFeedbackHandler(handler *models.FactoryPRFeedbackHandler,
 		Name:      handler.Name(),
 		Subject:   serializeFactoryPRFeedbackHandlerSubject(handler.Subject),
 		Source:    serializeFactoryPRFeedbackHandlerSource(handler.Source),
-		Settings:  serializePRFeedbackSettings(prFeedbackSettingsFromGraph(graph, spec)),
+		Settings:  serializePRFeedbackSettings(settings),
 		Healthy:   graph.Healthy(spec),
 		CreatedAt: timestamppb.New(handler.CreatedAt),
 		UpdatedAt: timestamppb.New(handler.UpdatedAt),
@@ -226,6 +235,8 @@ func serializeFactoryPRFeedbackHandlerSource(source string) pb.FactoryPRFeedback
 	switch source {
 	case models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion:
 		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION
+	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
+		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS
 	default:
 		return pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED
 	}
@@ -244,6 +255,8 @@ func parseFactoryPRFeedbackHandlerSource(source pb.FactoryPRFeedbackHandler_Sour
 	switch source {
 	case pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED, pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION:
 		return models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, nil
+	case pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS:
+		return models.FactoryPRFeedbackHandlerSourcePullRequestChecks, nil
 	default:
 		return "", invalidArgument("PR feedback handler source is not supported")
 	}
@@ -266,11 +279,12 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 
 	return &pb.FactoryLine{
-		Id:        line.ID.String(),
-		Name:      line.Name,
-		Steps:     steps,
-		CreatedAt: timestamppb.New(line.CreatedAt),
-		UpdatedAt: timestamppb.New(line.UpdatedAt),
+		Id:           line.ID.String(),
+		Name:         line.Name,
+		Steps:        steps,
+		CreatedAt:    timestamppb.New(line.CreatedAt),
+		UpdatedAt:    timestamppb.New(line.UpdatedAt),
+		ColumnColors: line.ColumnColorsValue(),
 	}
 }
 

@@ -26,6 +26,10 @@ const (
 	prFeedbackRunnerNodeName = "Address PR feedback"
 	prFeedbackMachineType    = runner.MachineTypeE1LargeAMD64
 	prFeedbackTimeoutSeconds = 3600
+
+	prFeedbackDefaultMaximumAttempts = 3
+	prFeedbackMaximumAttemptsMin     = 1
+	prFeedbackMaximumAttemptsMax     = 10
 )
 
 var prFeedbackTriggerNodeIDs = []string{
@@ -35,20 +39,32 @@ var prFeedbackTriggerNodeIDs = []string{
 }
 
 type prFeedbackBuildRequest struct {
-	Name        string
-	Repository  string
-	Mention     string
-	IgnoreBots  bool
-	AllowedBots []string
-	Binding     *intakeBinding
-	Agent       *intakeAgent
+	Name                   string
+	Repository             string
+	Mention                string
+	IgnoreBots             bool
+	AllowedBots            []string
+	CheckNames             []string
+	MaximumAttempts        int
+	RunnerIntegrationNames []string
+	Binding                *intakeBinding
+	Agent                  *intakeAgent
 }
 
 func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
+	return buildDiscussionPRFeedbackCanvas(request)
+}
+
+func prFeedbackCanvasName(request prFeedbackBuildRequest, fallback string) string {
 	name := strings.TrimSpace(request.Name)
 	if name == "" {
-		name = prFeedbackDefaultName
+		return fallback
 	}
+	return name
+}
+
+func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
+	name := prFeedbackCanvasName(request, prFeedbackDefaultName)
 	mention := strings.TrimSpace(request.Mention)
 	if mention == "" {
 		mention = prFeedbackDefaultMention
@@ -119,6 +135,7 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Configuration: map[string]any{
 						"pullRequestId": `{{ $["Find Pull Request"].data.pullRequest.id }}`,
 						"description":   prFeedbackActivityDescriptionExpression(),
+						"access":        "exclusive",
 					},
 					Position: yaml.Position{X: 500, Y: 260},
 				},
@@ -128,7 +145,6 @@ func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
 					Configuration: prFeedbackRunnerConfiguration(request),
-					Concurrency:   prFeedbackRunnerConcurrency(),
 					Position:      yaml.Position{X: 640, Y: 260},
 				},
 			},
@@ -174,15 +190,7 @@ func prFeedbackPRHeadExpression() string {
 }
 
 func prFeedbackCoauthorsExpression() string {
-	return `{{ order() == nil ? "" : join(map(filter(order().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}`
-}
-
-func prFeedbackRunnerConcurrency() *yaml.ConcurrencySpec {
-	max := 1
-	return &yaml.ConcurrencySpec{
-		Key: "github-{{ root().data.repository.id }}-pr-{{ root().data.pull_request?.number ?? root().data.issue?.number }}",
-		Max: &max,
-	}
+	return `{{ task() == nil ? "" : join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}`
 }
 
 func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]any {
@@ -190,7 +198,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
 		"steps":                   prFeedbackRunnerSteps(),
-		"environmentFrom":         prFeedbackGitHubEnvironmentFrom(request.Binding),
+		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
 			map[string]any{
 				"name":        "REPO",
@@ -226,12 +234,16 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 }
 
 func prFeedbackGitHubEnvironmentFrom(binding *intakeBinding) []any {
+	return prFeedbackEnvironmentFrom(binding, nil)
+}
+
+func prFeedbackEnvironmentFrom(binding *intakeBinding, extraIntegrationNames []string) []any {
 	name := intakeGitHubAppName
 	if binding != nil && binding.Integration != nil && strings.TrimSpace(binding.Integration.Name) != "" {
 		name = binding.Integration.Name
 	}
 
-	return []any{
+	entries := []any{
 		map[string]any{
 			"source": "integration",
 			"integration": map[string]any{
@@ -239,6 +251,21 @@ func prFeedbackGitHubEnvironmentFrom(binding *intakeBinding) []any {
 			},
 		},
 	}
+	seen := map[string]bool{strings.ToLower(name): true}
+	for _, extra := range extraIntegrationNames {
+		trimmed := strings.TrimSpace(extra)
+		if trimmed == "" || seen[strings.ToLower(trimmed)] {
+			continue
+		}
+		seen[strings.ToLower(trimmed)] = true
+		entries = append(entries, map[string]any{
+			"source": "integration",
+			"integration": map[string]any{
+				"name": trimmed,
+			},
+		})
+	}
+	return entries
 }
 
 func prFeedbackRunnerSteps() []any {
@@ -256,7 +283,6 @@ func prFeedbackRunnerSteps() []any {
 			"type": "bash",
 			"command": strings.Join([]string{
 				"set -euo pipefail",
-				"rm -rf repo",
 				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
 				"cd repo",
 				`if [ -z "${PR_HEAD:-}" ]; then`,

@@ -23,6 +23,7 @@ var (
  */
 type ExecutionContext struct {
 	ID             uuid.UUID
+	RunID          uuid.UUID
 	WorkflowID     string
 	OrganizationID string
 	CanvasName     string
@@ -215,7 +216,7 @@ type ProcessQueueContext struct {
 type SecretsContext interface {
 	GetKey(secretName, keyName string) ([]byte, error)
 	GetSecretKeys(secretName string) (map[string][]byte, error)
-	GetIntegrationKeys(installationName string) (map[string][]byte, error)
+	GetIntegrationSecrets(installationName string) (IntegrationSecrets, error)
 }
 
 type User struct {

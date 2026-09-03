@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -41,15 +42,27 @@ func serializeFactoryPullRequests(
 		return nil, err
 	}
 
+	revisions, err := listCurrentPullRequestRevisions(tx, pullRequests)
+	if err != nil {
+		return nil, err
+	}
+
 	runIDs := make([]uuid.UUID, 0)
 	for _, runs := range runsByPullRequest {
 		for _, linked := range runs {
 			runIDs = append(runIDs, linked.Run.ID)
 		}
 	}
+	// Usage totals are enrichment-only. If the usage rollup lookup fails
+	// (for example, a transient schema migration issue), do not fail the
+	// whole PR listing. Log a warning and degrade to zero usage instead.
 	usageByRun, err := models.SumUsageForRunTrees(tx, runIDs)
 	if err != nil {
-		return nil, err
+		log.WithError(err).Warnf(
+			"factory PR listing: usage rollup unavailable for %d run(s), returning zero usage",
+			len(runIDs),
+		)
+		usageByRun = map[uuid.UUID]models.UsageTotals{}
 	}
 
 	serialized := make([]*pb.FactoryPullRequest, 0, len(pullRequests))
@@ -58,6 +71,7 @@ func serializeFactoryPullRequests(
 			&pullRequests[i],
 			numbers[pullRequests[i].WorkOrderID],
 			runsByPullRequest[pullRequests[i].ID],
+			revisions[pullRequests[i].ID],
 			usageByRun,
 		))
 	}
@@ -68,6 +82,7 @@ func serializeFactoryPullRequest(
 	pullRequest *models.FactoryPullRequest,
 	workOrderNumber int64,
 	runs []models.FactoryPullRequestLinkedRun,
+	currentRevision *models.FactoryPullRequestRevision,
 	usageByRun map[uuid.UUID]models.UsageTotals,
 ) *pb.FactoryPullRequest {
 	serialized := &pb.FactoryPullRequest{
@@ -84,6 +99,8 @@ func serializeFactoryPullRequest(
 		CreatedAt:       timestamppb.New(pullRequest.CreatedAt),
 		UpdatedAt:       timestamppb.New(pullRequest.UpdatedAt),
 		Runs:            serializePullRequestRuns(runs, usageByRun),
+		Activities:      serializePullRequestActivities(runs, usageByRun),
+		CurrentRevision: serializePullRequestRevision(currentRevision),
 	}
 	if pullRequest.ExternalID != nil {
 		serialized.ExternalId = *pullRequest.ExternalID
@@ -112,6 +129,76 @@ func serializePullRequestRuns(
 		})
 	}
 	return result
+}
+
+func serializePullRequestActivities(
+	runs []models.FactoryPullRequestLinkedRun,
+	usageByRun map[uuid.UUID]models.UsageTotals,
+) []*pb.FactoryPullRequestActivity {
+	result := make([]*pb.FactoryPullRequestActivity, 0, len(runs))
+	for _, linked := range runs {
+		usage := usageByRun[linked.Run.ID]
+		activity := &pb.FactoryPullRequestActivity{
+			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Description: linked.Description,
+			Access:      linked.Access,
+			State:       linked.State,
+			Revision:    serializePullRequestRevision(linked.Revision),
+			TotalTokens: usage.TotalTokens,
+			CostCents:   usage.CostCents(),
+		}
+		if linked.Attempt != nil {
+			attempt := int32(*linked.Attempt)
+			activity.Attempt = &attempt
+		}
+		if linked.AttemptLimit != nil {
+			limit := int32(*linked.AttemptLimit)
+			activity.AttemptLimit = &limit
+		}
+		result = append(result, activity)
+	}
+	return result
+}
+
+func serializePullRequestRevision(revision *models.FactoryPullRequestRevision) *pb.FactoryPullRequestRevision {
+	if revision == nil {
+		return nil
+	}
+	return &pb.FactoryPullRequestRevision{
+		Id:        revision.ID.String(),
+		Sha:       revision.SHA,
+		CreatedAt: timestamppb.New(revision.ObservedAt),
+	}
+}
+
+func listCurrentPullRequestRevisions(
+	tx *gorm.DB,
+	pullRequests []models.FactoryPullRequest,
+) (map[uuid.UUID]*models.FactoryPullRequestRevision, error) {
+	result := map[uuid.UUID]*models.FactoryPullRequestRevision{}
+	ids := make([]uuid.UUID, 0)
+	ownerByRevision := map[uuid.UUID]uuid.UUID{}
+	for i := range pullRequests {
+		if pullRequests[i].CurrentRevisionID == nil {
+			continue
+		}
+		ids = append(ids, *pullRequests[i].CurrentRevisionID)
+		ownerByRevision[*pullRequests[i].CurrentRevisionID] = pullRequests[i].ID
+	}
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	var revisions []models.FactoryPullRequestRevision
+	if err := tx.Where("id IN ?", ids).Find(&revisions).Error; err != nil {
+		return nil, err
+	}
+	for i := range revisions {
+		if owner, ok := ownerByRevision[revisions[i].ID]; ok {
+			result[owner] = &revisions[i]
+		}
+	}
+	return result, nil
 }
 
 func workOrderNumbersByID(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]int64, error) {

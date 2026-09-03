@@ -3,6 +3,7 @@ import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
+    close: "Cancel setup",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
   },

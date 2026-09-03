@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
+import type { IssuesChoiceId } from "./onboardingFixtures";
 import {
   provisionEventApps,
   provisionGithubIntake,
@@ -16,6 +17,7 @@ import {
   type CreateFactoryIntake,
   type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
+  type ListFactoryApps,
   type ListFactoryIntakes,
   type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
@@ -63,11 +65,10 @@ function navigateAfterFinish(
   navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
 }
 
-async function provisionWorkspace(args: {
+export async function provisionWorkspace(args: {
   organizationId: string;
   factoryId: string;
   factory: FactoriesFactory | null;
-  setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
@@ -77,10 +78,12 @@ async function provisionWorkspace(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
   appRepository: string;
   backlogRepository: string;
+  issuesChoice: IssuesChoiceId | null;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   github: { id: string };
   agentPlan: OnboardingAgentPlan;
@@ -99,7 +102,7 @@ async function provisionWorkspace(args: {
     ...(args.agentIntegrationId ? { agentIntegrationId: args.agentIntegrationId } : {}),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
-    issuesSource: apiIssuesSource(args.setup.issuesChoice),
+    issuesSource: apiIssuesSource(args.issuesChoice),
     agentHarness: args.agentPlan.harness,
   });
   // Onboarding installs the Implement app with the real default branch (main,
@@ -128,6 +131,7 @@ async function provisionWorkspace(args: {
     defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
+    listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
   await provisionGithubIntake({
@@ -163,6 +167,7 @@ export function useFinishOnboarding(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
   remainingCreditCents: number;
@@ -170,10 +175,17 @@ export function useFinishOnboarding(args: {
   plan: OnboardingAgentPlan | undefined;
 }) {
   const navigate = useNavigate();
-  return async () => {
+  // A caller that just changed the issues answer in the same click (the
+  // ticket screen's Analyze action) passes it here instead of reading
+  // `args.setup.issuesChoice`. That value comes from a render captured before
+  // the click, so it would still read the answer the user had before this
+  // click, and provisioning would save that stale (often empty) answer over
+  // the one `saveIssues` already stored.
+  return async (issuesChoiceOverride?: IssuesChoiceId) => {
     const appRepository = args.setup.selectedRepo;
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
+    const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
     const github = args.selections.github;
     const error = finishOnboardingError({
       appRepository,
@@ -199,6 +211,7 @@ export function useFinishOnboarding(args: {
         workspaceName,
         appRepository,
         backlogRepository,
+        issuesChoice,
         github,
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),

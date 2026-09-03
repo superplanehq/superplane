@@ -1,11 +1,13 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
+import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
+import { factoryListPath } from "../../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
@@ -201,7 +203,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setup.commitIssuesStep();
     if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
     if (skipAgentScreen) {
-      await model.finish();
+      // The issues choice was just set above, in this same click; the setup
+      // state captured when this render closed over `model.finish` still
+      // holds the answer from before the click. Passing the answer here
+      // keeps a single click from saving a stale, empty issues source over
+      // the one `saveIssues` already stored.
+      await model.finish(DEFAULT_ISSUES_CHOICE);
       return;
     }
     goToScreen("agent");
@@ -230,14 +237,29 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId } = useFactoriesLayout();
+  const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
+  const navigate = useNavigate();
+  const deleteFactory = useDeleteFactory(organizationId);
+
+  // The placeholder workspace under setup is itself in `factories`, so
+  // another workspace exists when any factory has a different id.
+  const hasOtherWorkspace = factories.some((existing) => existing.id !== factoryId);
+
+  const cancelSetup = async () => {
+    // Guards against a double delete from a second click while the mutation
+    // is already in flight.
+    if (deleteFactory.isPending) return;
+    await deleteFactory.mutateAsync(factoryId);
+    navigate(factoryListPath(organizationId));
+  };
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
     displayName: firstNameOf(account?.name),
     email: account?.email,
-    onLogOut: signOut,
+    onLogOut: hasOtherWorkspace ? undefined : signOut,
+    onCancel: hasOtherWorkspace ? () => void cancelSetup() : undefined,
     stepIndex: STEP_INDEX_FOR_SCREEN[target],
     stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
   });

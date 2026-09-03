@@ -720,6 +720,8 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
 
   function renderCanvas(overrides: {
     fitViewContentKey?: string;
+    lockNativeZoom?: boolean;
+    factoryDisplayLayout?: boolean;
     hasFitToViewRef: { current: boolean };
     lastFittedContentKeyRef: { current: string | null };
   }) {
@@ -751,6 +753,43 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     expect(lastFittedContentKeyRef.current).toBe("canvas-1:v1");
+  });
+
+  it("fits immediately when factoryDisplayLayout is set", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ factoryDisplayLayout: true, hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        duration: 0,
+      }),
+    );
+  });
+
+  it("locks the first-load fit to 100% zoom when lockNativeZoom is set", () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ lockNativeZoom: true, hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    expect(fitViewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        minZoom: 1,
+        maxZoom: 1,
+        duration: 500,
+      }),
+    );
   });
 
   it("re-fits when the content key changes (canvas/version switch)", () => {

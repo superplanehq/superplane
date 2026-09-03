@@ -18,7 +18,9 @@ import { PhaseGlyph } from "../linePhaseGlyph";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
-import { isRunnerComponent, notesForLiveStream } from "./streamNotesFromLiveLog";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { groupPlanningSessionLog, mergePlanningSessionNotes } from "../planningSessionLog";
+import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
 const LOG_FACE = "font-mono text-[14px]";
@@ -108,7 +110,7 @@ export function toolCallSummary(tools: Array<{ type?: string; componentType?: st
 
 export type ClaudeStepEvent =
   | { kind: "note"; line: SplitRunStreamLine }
-  | { kind: "tools"; id: string; tools: SplitRunStreamLine[] };
+  | { kind: "tools"; id: string; tools: SplitRunStreamLine[]; label?: string };
 
 export type ClaudeStepGroup = {
   line: SplitRunStreamLine;
@@ -326,6 +328,7 @@ export function PhaseLogCard({
   collapsible = true,
   organizationId,
   canvasId,
+  compactSessionLog = false,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -343,6 +346,8 @@ export function PhaseLogCard({
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
+  /** Collapse setup noise and bash in the Create with an Agent session log. */
+  compactSessionLog?: boolean;
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
@@ -416,6 +421,7 @@ export function PhaseLogCard({
                 onSelect={onSelectNode}
                 organizationId={organizationId}
                 canvasId={canvasId ?? phase.appId}
+                compactSessionLog={compactSessionLog}
               />
             ))}
           </ol>
@@ -733,16 +739,21 @@ function StreamNode({
   onSelect,
   organizationId,
   canvasId,
+  compactSessionLog,
 }: {
   group: StreamNodeGroup;
   highlighted: boolean;
   onSelect?: (nodeId: string) => void;
   organizationId?: string;
   canvasId?: string;
+  compactSessionLog: boolean;
 }) {
   const { line, notes, artifact, pullRequest } = group;
   const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
-  const steps = groupClaudeSteps(liveNotes ?? notes);
+  const merged = compactSessionLog
+    ? mergePlanningSessionNotes(liveNotes, notes)
+    : mergeLiveStreamNotes(liveNotes, notes);
+  const steps = compactSessionLog ? groupPlanningSessionLog(merged) : groupClaudeSteps(merged);
   const hasChildren = steps.length > 0 || isRunnerComponent(line.component);
 
   return (
@@ -758,7 +769,7 @@ function StreamNode({
       {hasChildren ? (
         <ol className="min-w-0">
           {steps.map((step) => (
-            <StreamStep key={step.line.id} step={step} />
+            <StreamStep key={step.line.id} step={step} highlightUserTalk={compactSessionLog} />
           ))}
         </ol>
       ) : null}
@@ -836,41 +847,36 @@ function StreamNodeHeader({
   );
 }
 
-function StreamStep({ step }: { step: ClaudeStepGroup }) {
+function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup; highlightUserTalk?: boolean }) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
+  const showHeader = Boolean(step.line.componentName.trim() || step.line.componentType);
 
   return (
     <li className="min-w-0">
-      <div
-        data-testid={`split-run-stream-line-${step.line.id}`}
-        {...streamLineAttrs(step.line.status)}
-        className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
-      >
-        {step.line.componentType ? (
-          <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>{step.line.componentType}</span>
-        ) : null}
-        <StreamLineTitle wrap>{step.line.componentName}</StreamLineTitle>
-        <StepStatusMark status={step.line.status} />
-      </div>
+      {showHeader ? (
+        <div
+          data-testid={`split-run-stream-line-${step.line.id}`}
+          {...streamLineAttrs(step.line.status)}
+          className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
+        >
+          {step.line.componentType ? (
+            <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>
+              {step.line.componentType}
+            </span>
+          ) : null}
+          <StreamLineTitle wrap>{step.line.componentName}</StreamLineTitle>
+          <StepStatusMark status={step.line.status} />
+        </div>
+      ) : null}
       {hasBody ? (
         <>
           {hasOutput ? <StreamOutput text={step.line.detail ?? ""} /> : null}
           {step.events.map((event) =>
             event.kind === "note" ? (
-              <div
-                key={event.line.id}
-                data-testid={`split-run-stream-line-${event.line.id}`}
-                {...streamLineAttrs(event.line.status)}
-                className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
-              >
-                <span className="inline-flex w-4 shrink-0" aria-hidden />
-                <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
-                  {event.line.componentName}
-                </span>
-              </div>
+              <StreamTalkNote key={event.line.id} line={event.line} highlightUserTalk={highlightUserTalk} />
             ) : (
-              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} />
+              <StreamToolGroup key={event.id} stepId={event.id} tools={event.tools} label={event.label} />
             ),
           )}
         </>
@@ -879,9 +885,33 @@ function StreamStep({ step }: { step: ClaudeStepGroup }) {
   );
 }
 
-function StreamToolGroup({ stepId, tools }: { stepId: string; tools: SplitRunStreamLine[] }) {
+function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine; highlightUserTalk: boolean }) {
+  const isUserTalk = highlightUserTalk && (line.componentType === "prompt" || Boolean(line.userTalk));
+  const youLabel = line.userTalk === "survey" ? CREATE_WITH_AGENT_COPY.youSurvey : CREATE_WITH_AGENT_COPY.you;
+  return (
+    <div
+      data-testid={isUserTalk ? "split-run-user-note" : `split-run-stream-line-${line.id}`}
+      {...streamLineAttrs(line.status)}
+      className={cn("flex w-full items-start", STREAM_SECTION, LAST_RUNNING_LINE_PULSE)}
+    >
+      <span className="inline-flex w-4 shrink-0" aria-hidden />
+      {isUserTalk ? (
+        <div className="min-w-0 flex-1 rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
+          <span className="mb-0.5 block text-[11px] font-medium leading-none text-primary">{youLabel}</span>
+          <span className="whitespace-normal break-words leading-5 text-foreground">{line.componentName}</span>
+        </div>
+      ) : (
+        <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
+          {line.componentName}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function StreamToolGroup({ stepId, tools, label }: { stepId: string; tools: SplitRunStreamLine[]; label?: string }) {
   const [expanded, setExpanded] = useState(false);
-  const summary = toolCallSummary(tools);
+  const summary = label ?? toolCallSummary(tools);
 
   return (
     <div className="min-w-0">
@@ -1045,7 +1075,7 @@ function useRunnerNodeLiveNotes(
   canvasId?: string,
 ): SplitRunStreamLine[] | undefined {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
@@ -1058,6 +1088,7 @@ function useRunnerNodeLiveNotes(
   return notesForLiveStream({
     nodeId: line.nodeId ?? line.id,
     sections,
+    orphanLines,
     error,
     isStreaming,
     nodeStatus: line.status,

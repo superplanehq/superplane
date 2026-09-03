@@ -30,6 +30,7 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 			Metadata: &pb.Organization_Metadata{
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
+				Slug:        organization.Slug,
 				Description: organization.Description,
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
@@ -47,5 +48,5 @@ func loadOrganization(ctx context.Context, orgID string) (organization *models.O
 	ctx, done := telemetry.Span(ctx, "organizations.load")
 	defer done(&err)
 
-	return models.FindOrganizationByIDInTransaction(database.DB(ctx), orgID)
+	return models.FindOrganizationByIDOrSlug(database.DB(ctx), orgID)
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -9,10 +9,19 @@ function mockOverflow(el: HTMLElement, box: { height: number; view: number }) {
   Object.defineProperty(el, "clientHeight", { configurable: true, get: () => box.view });
 }
 
-function FollowLog({ tick, running = "implement" }: { tick: number; running?: string | null }) {
-  const follow = useFollowLogScroll(running, tick);
+function FollowLog({
+  tick,
+  running = "implement",
+  resumeOnBottom = false,
+}: {
+  tick: number;
+  running?: string | null;
+  resumeOnBottom?: boolean;
+}) {
+  const follow = useFollowLogScroll<HTMLOListElement>(running, tick, { resumeOnBottom });
   return (
     <>
+      <span data-testid="following">{follow.following ? "on" : "off"}</span>
       <button type="button" onClick={() => follow.setFollowing(false)}>
         Stop follow
       </button>
@@ -21,6 +30,12 @@ function FollowLog({ tick, running = "implement" }: { tick: number; running?: st
       </ol>
     </>
   );
+}
+
+async function settleScrollIgnore() {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
 }
 
 async function appendNestedLine(scroller: HTMLElement, box: { height: number; view: number }, height: number) {
@@ -59,6 +74,38 @@ describe("useFollowLogScroll", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(scroller.scrollTop).toBe(40);
+  });
+
+  it("turns Follow back on at the bottom when resumeOnBottom is on", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} resumeOnBottom />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    await settleScrollIgnore();
+
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+
+    scroller.scrollTop = 300;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("on");
+  });
+
+  it("does not turn Follow back on at the bottom by default", async () => {
+    const box = { height: 400, view: 100 };
+    render(<FollowLog tick={1} />);
+    const scroller = screen.getByTestId("log-scroller");
+    mockOverflow(scroller, box);
+    await settleScrollIgnore();
+
+    scroller.scrollTop = 0;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
+
+    scroller.scrollTop = 300;
+    fireEvent.scroll(scroller);
+    expect(screen.getByTestId("following")).toHaveTextContent("off");
   });
 
   it("does not pin the scroller when only text inside a line changes", async () => {

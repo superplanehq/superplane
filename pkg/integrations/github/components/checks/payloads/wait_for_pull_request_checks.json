@@ -1,0 +1,31 @@
+{
+  "data": {
+    "repository": "hello",
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "checks": [
+      {
+        "key": "check-run:github-actions:DCO",
+        "name": "DCO",
+        "kind": "check_run",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/testhq/hello/runs/1"
+      }
+    ],
+    "selectedChecks": [
+      {
+        "key": "check-run:github-actions:DCO",
+        "name": "DCO",
+        "kind": "check_run",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/testhq/hello/runs/1"
+      }
+    ],
+    "failedChecks": [],
+    "startedAt": "2026-08-31T12:00:00Z",
+    "completedAt": "2026-08-31T12:01:05Z"
+  },
+  "timestamp": "2026-08-31T12:01:05Z",
+  "type": "github.pullRequestChecks"
+}

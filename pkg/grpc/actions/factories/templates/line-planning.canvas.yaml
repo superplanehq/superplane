@@ -22,7 +22,7 @@ spec:
         'y': 888
       isCollapsed: true
     - id: planner-agent-no-issue
-      name: Agent - No GH Issue Plan
+      name: Draft Implementation Plan
       type: TYPE_ACTION
       component: runnerClaudeCode
       concurrency:
@@ -38,10 +38,10 @@ spec:
               name: github
         environment:
           - name: REPO
-            value: '{{ order().repository }}'
+            value: '{{ task().repository }}'
             valueSource: literal
           - name: ORDER_DESCRIPTION
-            value: '{{ toBase64(order().description) }}'
+            value: '{{ toBase64(task().description) }}'
             valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
@@ -50,7 +50,6 @@ spec:
           - name: Clone Repo
             type: bash
             command: |-
-              rm -rf repo
               git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
               cd repo
               echo $ORDER_DESCRIPTION | base64 -d > /tmp/ORDER.md
@@ -61,7 +60,7 @@ spec:
             prompt: |-
               You are writing an implementation plan for a SuperPlane Task. The repository is cloned out in your current working directory.
 
-              Repository: {{ order().repository }}
+              Repository: {{ task().repository }}
               Task Title: {{ root().data.work_order.title }}
 
               1/ The description is in the /tmp/ORDER.md
@@ -92,7 +91,7 @@ spec:
       configuration:
         artifactType: markdown
         body: '{{ fromBase64(previous().data.result.plan) }}'
-        orderId: '{{ order().id }}'
+        orderId: '{{ task().id }}'
         title: PLAN.md
       position:
         x: 360

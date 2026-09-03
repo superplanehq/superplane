@@ -604,18 +604,20 @@ export function useCloseWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
+export async function fetchFactoryApps(organizationId: string, factoryId: string): Promise<FactoryApp[]> {
+  const response = await factoriesListFactoryApps(
+    withOrganizationHeader({
+      organizationId,
+      path: { factoryId },
+    }),
+  );
+  return response.data?.apps ?? [];
+}
+
 export function useFactoryApps(organizationId: string, factoryId: string) {
   return useQuery({
     queryKey: factoryAppsKey(organizationId, factoryId),
-    queryFn: async (): Promise<FactoryApp[]> => {
-      const response = await factoriesListFactoryApps(
-        withOrganizationHeader({
-          organizationId,
-          path: { factoryId },
-        }),
-      );
-      return response.data?.apps ?? [];
-    },
+    queryFn: () => fetchFactoryApps(organizationId, factoryId),
     enabled: Boolean(organizationId && factoryId),
   });
 }
@@ -650,7 +652,12 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { lineId: string; name?: string; steps?: FactoryLineStep[] }) => {
+    mutationFn: async (input: {
+      lineId: string;
+      name?: string;
+      steps?: FactoryLineStep[];
+      columnColors?: Record<string, string>;
+    }) => {
       const response = await factoriesUpdateFactoryLine(
         withOrganizationHeader({
           organizationId,
@@ -658,6 +665,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
           body: {
             name: input.name,
             steps: input.steps,
+            columnColors: input.columnColors,
           },
         }),
       );
@@ -666,7 +674,16 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       }
       return response.data.line;
     },
-    onSuccess: () => {
+    onSuccess: (line) => {
+      queryClient.setQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId), (current) => {
+        if (!current?.lines) {
+          return current;
+        }
+        return {
+          ...current,
+          lines: current.lines.map((existing) => (existing.id === line.id ? line : existing)),
+        };
+      });
       void queryClient.invalidateQueries({ queryKey: factoryDetailKey(organizationId, factoryId) });
     },
   });

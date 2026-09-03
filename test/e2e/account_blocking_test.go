@@ -218,6 +218,6 @@ func (s *accountBlockingSteps) assertAccountBlockedMessageVisible() {
 
 func (s *accountBlockingSteps) assertSignedInToOrganization() {
 	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.session.OrgID.String(),
+	assert.Contains(s.t, currentURL, "/"+s.session.OrgSlug,
 		"expected redirect to organization home, got %s", currentURL)
 }
