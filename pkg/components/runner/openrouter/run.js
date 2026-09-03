@@ -3,6 +3,8 @@
 
 /**
  * SuperPlane OpenRouter agent: bash, read, edit, write tools.
+ * Planning sessions (SUPERPLANE_PLANNING_SESSION_ID set) drop edit/write and
+ * add the propose_draft/survey planning tools instead.
  *
  *   node run.js <prompt-file> [model] [max-turns]
  */
@@ -13,10 +15,22 @@ const { spawnSync } = require("child_process");
 
 const DEFAULT_MAX_TURNS = 128;
 const MAX_TURNS_LIMIT = 256;
+const BASE_SYSTEM_PROMPT =
+  "You are a coding agent on a SuperPlane fleet runner. Use bash, read, edit, and write tools. Write assistant messages as plain terminal text.";
+const PLANNING_SYSTEM_PROMPT =
+  "This is a SuperPlane planning session. Use the bash and read tools only to explore the repository for context; " +
+  "do not edit or write any files. Call propose_draft only when the user asked for a task in this turn. Call survey " +
+  "to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or " +
+  "skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft " +
+  "unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and " +
+  "ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain " +
+  "text.";
 const WRAP_UP_PROMPT =
   "You have no remaining tool turns. Do not call tools. Write a plain-text summary of what you completed and what remains.";
 const TOOL_NUDGE =
   "Use the bash, read, edit, or write tools to do the work. Do not only describe the changes.";
+const PLANNING_TOOL_NUDGE =
+  "Use the bash or read tools to gather context, or call propose_draft/survey. Do not only describe the changes.";
 const TOOLS = [
   {
     type: "function",
@@ -71,6 +85,60 @@ const TOOLS = [
     },
   },
 ];
+// Planning sessions may only explore the repo (bash is documented read-only
+// in its tool description and the system prompt; edit/write are dropped
+// entirely so the model has no structured way to change files).
+const PLANNING_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "bash",
+      description: "Run a read-only shell command (inspect files, search, run tests). Do not modify the repository.",
+      parameters: {
+        type: "object",
+        properties: { command: { type: "string" } },
+        required: ["command"],
+      },
+    },
+  },
+  TOOLS[1], // read
+];
+
+function envFlag(env, name) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function planningEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+// The planning MCP server module is shipped alongside run.js only for
+// planning sessions (see runner.PlanningSessionMCPScriptFile). Reuse its
+// proposeDraft/proposeSurvey HTTP calls here instead of duplicating the
+// request contract.
+function loadPlanningHelpers(env = process.env) {
+  const taskDir = env.SUPERPLANE_TASK_DIR;
+  if (!taskDir) {
+    return null;
+  }
+  const script = path.join(taskDir, "planning_session_mcp.js");
+  if (!fs.existsSync(script)) {
+    return null;
+  }
+  return require(script);
+}
+
+function toFunctionTool(def) {
+  return {
+    type: "function",
+    function: { name: def.name, description: def.description, parameters: def.inputSchema },
+  };
+}
+
+function planningToolDefs(helpers) {
+  const defs = (helpers && Array.isArray(helpers.TOOLS) && helpers.TOOLS) || [];
+  return [...PLANNING_TOOLS, ...defs.map(toFunctionTool)];
+}
 
 function main() {
   const args = process.argv.slice(2);
@@ -99,14 +167,19 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
     throw new Error("model is required");
   }
 
+  const planning = planningEnabled(process.env);
+  const planningHelpers = planning ? loadPlanningHelpers(process.env) : null;
+  const tools = planning ? planningToolDefs(planningHelpers) : TOOLS;
+  const toolNudge = planning ? PLANNING_TOOL_NUDGE : TOOL_NUDGE;
+  if (planning) {
+    process.stdout.write("Planning session tools enabled\n");
+    process.stdout.write(`allowed tools: ${tools.map((tool) => tool.function.name).join(", ")}\n`);
+  }
+
   const prompt = fs.readFileSync(promptFile, "utf8");
   const baseURL = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
   const messages = [
-    {
-      role: "system",
-      content:
-        "You are a coding agent on a SuperPlane fleet runner. Use bash, read, edit, and write tools. Write assistant messages as plain terminal text.",
-    },
+    { role: "system", content: planning ? PLANNING_SYSTEM_PROMPT : BASE_SYSTEM_PROMPT },
     { role: "user", content: prompt },
   ];
 
@@ -124,7 +197,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
 
   try {
     for (let turn = 0; turn < turnLimit; turn += 1) {
-      const response = await chat(baseURL, apiKey, model, messages, true);
+      const response = await chat(baseURL, apiKey, model, messages, true, tools);
       addUsage(usage, response.usage);
       costMicros += usageCostMicros(response.usage);
 
@@ -142,7 +215,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
         if (!nudgedForTools) {
           nudgedForTools = true;
           process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
-          messages.push({ role: "user", content: TOOL_NUDGE });
+          messages.push({ role: "user", content: toolNudge });
           continue;
         }
         break;
@@ -159,7 +232,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
           text: toolPreview(kind, args),
           started_at: startedAt,
         });
-        const result = runTool(name, args);
+        const result = await dispatchTool(name, args, { planning, planningHelpers });
         if (result.output) {
           process.stdout.write(`${result.output}\n`);
         }
@@ -280,14 +353,14 @@ async function requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, 
   };
 }
 
-async function chat(baseURL, apiKey, model, messages, withTools) {
+async function chat(baseURL, apiKey, model, messages, withTools, tools = TOOLS) {
   const payload = {
     model,
     messages,
     usage: { include: true },
   };
   if (withTools) {
-    payload.tools = TOOLS;
+    payload.tools = tools;
     payload.tool_choice = "auto";
     payload.provider = { require_parameters: true };
   }
@@ -336,6 +409,35 @@ function parseArgs(raw) {
     return JSON.parse(raw);
   } catch (_err) {
     return {};
+  }
+}
+
+// dispatchTool routes bash/read/write/edit through the synchronous local
+// tool runner and propose_draft/survey through the async planning helpers
+// (network calls to SuperPlane). Planning sessions never see write/edit in
+// their tool list, but reject them here too in case a model hallucinates a
+// call to a tool it was not offered.
+async function dispatchTool(name, args, ctx) {
+  if (ctx.planning) {
+    if (name === "propose_draft" || name === "survey") {
+      return runPlanningTool(name, args, ctx.planningHelpers);
+    }
+    if (name === "write" || name === "edit") {
+      return { output: `${name} is not available in a planning session`, failed: true };
+    }
+  }
+  return runTool(name, args);
+}
+
+async function runPlanningTool(name, args, helpers) {
+  if (!helpers) {
+    return { output: "planning tools are not available in this run", failed: true };
+  }
+  try {
+    const result = name === "propose_draft" ? await helpers.proposeDraft(args) : await helpers.proposeSurvey(args);
+    return { output: JSON.stringify(result), failed: false };
+  } catch (err) {
+    return { output: err && err.message ? err.message : String(err), failed: true };
   }
 }
 
@@ -388,6 +490,9 @@ function toolPreview(kind, args) {
   if (kind === "bash" && typeof args.command === "string" && args.command.trim()) {
     return args.command.trim();
   }
+  if (kind === "propose_draft" && typeof args.title === "string" && args.title.trim()) {
+    return args.title.trim();
+  }
   if (typeof args.path === "string" && args.path.trim()) {
     return args.path.trim();
   }
@@ -410,4 +515,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { runPrompt, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT };
+module.exports = { runPrompt, DEFAULT_MAX_TURNS, MAX_TURNS_LIMIT, planningEnabled };

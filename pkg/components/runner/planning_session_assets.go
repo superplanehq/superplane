@@ -28,14 +28,24 @@ func PlanningSessionMCPConfigJSON() string { return planningSessionMCPConfig }
 // run.js --continue (or the runner's equivalent) for each one.
 func FollowUpLoopScript() string { return followUpLoopScript }
 
+// PlanningSessionMCPScriptFile is just the MCP server task file. Runners that
+// do not speak MCP (OpenRouter) still ship this file so their tool loop can
+// require() its exported proposeDraft/proposeSurvey helpers instead of
+// duplicating the SuperPlane planning-endpoint request contract.
+func PlanningSessionMCPScriptFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"}
+}
+
+// PlanningSessionMCPConfigFile is the static mcp.json reference config file.
+func PlanningSessionMCPConfigFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"}
+}
+
 // PlanningSessionMCPFiles returns the MCP server + static config task files.
 // Only attach these when HasPlanningSessionToken is true; line automations
 // never receive them.
 func PlanningSessionMCPFiles() []BrokerTaskFile {
-	return []BrokerTaskFile{
-		{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"},
-		{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"},
-	}
+	return []BrokerTaskFile{PlanningSessionMCPScriptFile(), PlanningSessionMCPConfigFile()}
 }
 
 // FollowUpLoopFile returns the shared wait-loop task file. Only attach this
