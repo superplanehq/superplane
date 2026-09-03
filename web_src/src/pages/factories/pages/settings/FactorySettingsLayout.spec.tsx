@@ -132,6 +132,130 @@ describe("FactorySettingsLayout sidebar", () => {
     );
   });
 
+  describe("Find settings", () => {
+    it("shows section results for Security and hides the grouped nav", async () => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/profile`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.type(within(sidebar).getByTestId("factory-settings-find"), "secur");
+      expect(within(sidebar).getByTestId("factory-settings-search-results")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Security")).toBeInTheDocument();
+      expect(within(sidebar).getByText("Sign in methods")).toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-account-nav")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("shows Spending results when the query matches billing", async () => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.type(within(sidebar).getByTestId("factory-settings-find"), "billing");
+      const results = within(sidebar).getByTestId("factory-settings-search-results");
+      expect(within(results).getAllByText("Spending").length).toBeGreaterThanOrEqual(2);
+      expect(within(sidebar).queryByTestId("factory-settings-workspace-nav")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("shows Workspace key and scrolls to that field when opened", async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/profile`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.type(within(sidebar).getByTestId("factory-settings-find"), "workspace key");
+      await user.click(
+        within(sidebar).getByTestId("factory-settings-search-section:workspace:general:factory-settings-key"),
+      );
+      expect(await screen.findByTestId("factory-settings-key")).toBeInTheDocument();
+      expect(screen.getByTestId("factory-settings-key").closest("#factory-settings-key")).toHaveAttribute(
+        "id",
+        "factory-settings-key",
+      );
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+    }, 10000);
+
+    it("shows Claude under Organization Integrations", async () => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.type(within(sidebar).getByTestId("factory-settings-find"), "claude");
+      const claudeResult = await waitFor(
+        () => within(sidebar).getByTestId("factory-settings-search-integration:claude"),
+        { timeout: 8000 },
+      );
+      expect(claudeResult).toHaveTextContent("Claude");
+      expect(claudeResult).toHaveTextContent("Organization › Integrations");
+      expect(claudeResult).toHaveAttribute(
+        "href",
+        expect.stringContaining("/settings/organization/integrations?section=integration-claude"),
+      );
+      await user.click(claudeResult);
+      expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent(
+        "Integrations",
+      );
+    }, 15000);
+
+    it("shows an empty state when nothing matches", async () => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      await user.type(within(sidebar).getByTestId("factory-settings-find"), "zzzz-no-match");
+      expect(within(sidebar).getByTestId("factory-settings-find-empty")).toHaveTextContent("No matching settings.");
+      expect(within(sidebar).queryByTestId("factory-settings-account-nav")).not.toBeInTheDocument();
+    }, 10000);
+
+    it("keeps the find query after navigating to a match", async () => {
+      const user = userEvent.setup();
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/account/profile`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
+
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      const findInput = within(sidebar).getByTestId("factory-settings-find");
+      await user.type(findInput, "sign in methods");
+      await user.click(
+        within(sidebar).getByTestId("factory-settings-search-section:account:security:account-redesign-signin"),
+      );
+      expect(await screen.findByTestId("account-redesign-signin")).toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-find")).toHaveValue("sign in methods");
+      expect(within(sidebar).getByTestId("factory-settings-search-results")).toBeInTheDocument();
+    }, 10000);
+  });
+
   describe("workspace-models experimental feature", () => {
     it("hides the Models nav item when the feature is off", async () => {
       render(
