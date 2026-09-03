@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,7 +50,7 @@ func NewFactoryNotificationConsumer(rabbitMQURL string, emailService services.Em
 	}
 }
 
-func (c *FactoryNotificationConsumer) Start() error {
+func (c *FactoryNotificationConsumer) Start(ctx context.Context) error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
 		ConnectionName: FactoryNotificationConnectionName,
@@ -59,17 +60,27 @@ func (c *FactoryNotificationConsumer) Start() error {
 	}
 
 	for {
-		log.Infof("Connecting to RabbitMQ queue for %s events", messages.FactoryWorkOrderNotificationRoutingKey)
-
-		err := c.Consumer.Start(&options, c.Consume)
-		if err != nil {
-			log.Errorf("Error consuming messages from %s: %v", messages.FactoryWorkOrderNotificationRoutingKey, err)
-			time.Sleep(5 * time.Second)
-			continue
+		if ctx.Err() != nil {
+			return nil
 		}
 
-		log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.FactoryWorkOrderNotificationRoutingKey)
-		time.Sleep(5 * time.Second)
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.FactoryWorkOrderNotificationRoutingKey)
+
+		if err := c.Consumer.Start(&options, c.Consume); err != nil {
+			log.Errorf("Error consuming messages from %s: %v", messages.FactoryWorkOrderNotificationRoutingKey, err)
+		} else {
+			log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.FactoryWorkOrderNotificationRoutingKey)
+		}
+
+		//
+		// Wait before reconnecting, but give up as soon as the process is shutting
+		// down, so a cancelled consumer does not reconnect and take new messages.
+		//
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(reconnectDelay):
+		}
 	}
 }
 
