@@ -334,7 +334,7 @@ describe("VelocityPage shell", () => {
     expect(people).toHaveTextContent("1 person with activity in this period");
   });
 
-  it("explains an empty Authored column when GitHub is not connected", () => {
+  it("explains an empty Manual work column when GitHub is not connected", () => {
     resetState();
     velocityHookState.data = populatedResponse({
       hasPeopleCohort: false,
@@ -344,7 +344,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.getByTestId("velocity-people")).toHaveTextContent(
-      "Connect GitHub in workspace setup to count the pull requests people merged.",
+      "Connect GitHub in workspace setup to count the pull requests people created.",
     );
   });
 
@@ -355,7 +355,7 @@ describe("VelocityPage shell", () => {
     renderShell();
 
     expect(screen.queryByText("Intake source")).not.toBeInTheDocument();
-    expect(screen.getByText("Origin")).toBeInTheDocument();
+    expect(screen.getByText("Who created")).toBeInTheDocument();
   });
 
   it("offers the intake split when the response names its sources", () => {

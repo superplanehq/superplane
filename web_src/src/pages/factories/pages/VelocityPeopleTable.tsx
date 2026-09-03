@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
 import type { VelocityPerson } from "../lib/factoryVelocityReport";
 
-type SortKey = "total" | "authoredMerged" | "factoryMerged" | "factoryWaste" | "medianCycleHours" | "costUsd";
+type SortKey = "total" | "factoryMerged" | "authoredMerged" | "medianCycleHours" | "costUsd";
 
 /** Members without a connected account photo still need a stable, legible avatar. */
 const AVATAR_COLORS = [
@@ -37,22 +37,16 @@ interface Column {
 
 const COLUMNS: Column[] = [
   {
-    key: "authoredMerged",
-    label: "Authored",
-    hint: "Pull requests the person merged themselves",
-    format: (person) => String(person.authoredMerged),
-  },
-  {
     key: "factoryMerged",
-    label: "SuperPlane merged",
-    hint: "Merged pull requests from tasks this person opened",
+    label: "Via SuperPlane",
+    hint: "Merged pull requests from SuperPlane tasks this person opened",
     format: (person) => String(person.factoryMerged),
   },
   {
-    key: "factoryWaste",
-    label: "SuperPlane waste",
-    hint: "Tasks this person opened that closed without a merge",
-    format: (person) => String(person.factoryWaste),
+    key: "authoredMerged",
+    label: "Manual work",
+    hint: "Pull requests this person created without SuperPlane",
+    format: (person) => String(person.authoredMerged),
   },
   {
     key: "medianCycleHours",
@@ -62,14 +56,14 @@ const COLUMNS: Column[] = [
   },
   {
     key: "costUsd",
-    label: "Tracked cost",
-    hint: "Tracked model spend of their tasks",
+    label: "Costs",
+    hint: "Tracked model spend of their SuperPlane tasks",
     format: (person) => `$${person.costUsd.toFixed(0)}`,
   },
   {
     key: "total",
     label: "Merged PRs",
-    hint: "Authored plus SuperPlane merged",
+    hint: "Via SuperPlane plus manual work",
     format: (person) => String(totalMerged(person)),
   },
 ];
@@ -90,7 +84,7 @@ export function VelocityPeopleTable({
 }: {
   people: VelocityPerson[];
   periodLabel: string;
-  /** Names why the Authored column is empty, when the cohort is unavailable. */
+  /** Names why the Manual work column is empty, when the cohort is unavailable. */
   emptyAuthorship?: string;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("total");
@@ -109,7 +103,7 @@ export function VelocityPeopleTable({
         <div>
           <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">People</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            What each member merged directly and through SuperPlane. Select a column to sort.
+            {people.length} {people.length === 1 ? "person" : "people"} with activity in this period
           </p>
         </div>
         <p className="text-[12px] text-muted-foreground">{periodLabel}</p>
@@ -170,10 +164,7 @@ export function VelocityPeopleTable({
         </table>
       </div>
 
-      <p className="mt-4 text-[12px] text-muted-foreground">
-        {people.length} {people.length === 1 ? "person" : "people"} with activity in this period
-      </p>
-      {emptyAuthorship ? <p className="mt-1 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
+      {emptyAuthorship ? <p className="mt-4 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
     </section>
   );
 }
