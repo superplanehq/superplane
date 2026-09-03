@@ -159,7 +159,8 @@ describe("VelocityPage shell", () => {
     velocityHookState.data = populatedResponse();
 
     renderShell(FACTORY_WITH_SETUP_REPO);
-    await userEvent.click(screen.getByTestId("velocity-sync-button"));
+    await userEvent.click(screen.getByTestId("velocity-overflow-menu"));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Refresh data" }));
 
     expect(startSync).toHaveBeenCalledTimes(1);
   });
@@ -186,13 +187,13 @@ describe("VelocityPage shell", () => {
     expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
   });
 
-  it("hides the sync control when there is no repository to read", () => {
+  it("hides the overflow menu when there is no repository to read", () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
     renderShell();
 
-    expect(screen.queryByTestId("velocity-sync-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-overflow-menu")).not.toBeInTheDocument();
   });
 
   it("keeps the report when a refetch fails and cached data remains", () => {
