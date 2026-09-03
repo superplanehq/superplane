@@ -115,6 +115,8 @@ export interface OrgWorkspacePageOverrides {
   workOrders?: ComponentType;
   /** Storybook-only Velocity page (e.g. work-order flow prototype). */
   velocity?: ComponentType;
+  /** Storybook-only Organization Spending explorer. Live app ignores this. */
+  organizationSpending?: ComponentType;
 }
 
 export interface OrgWorkspaceHarnessProps {
@@ -237,6 +239,20 @@ function OptionalOnboardingGate({ enabled }: { enabled: boolean }) {
     return <Outlet />;
   }
   return <OnboardingGate />;
+}
+
+function factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage: ComponentType) {
+  return (
+    <Route
+      key="factory-settings-organization-spending"
+      path="organization/spending"
+      element={
+        <RequirePermission resource="org" action="read">
+          <OrganizationSpendingPage />
+        </RequirePermission>
+      }
+    />
+  );
 }
 
 const factorySettingsStorybookRoutes = [
@@ -365,16 +381,6 @@ const factorySettingsStorybookRoutes = [
       </RequirePermission>
     }
   />,
-  <Route
-    key="factory-settings-organization-spending"
-    path="organization/spending"
-    element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsWorkspaceUsagePage />
-      </RequirePermission>
-    }
-  />,
-  <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
 ];
 
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
@@ -437,6 +443,10 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
             {factorySettingsStorybookRoutes}
+            {factorySettingsOrganizationSpendingRoute(
+              pageOverrides?.organizationSpending ?? OrganizationSettingsWorkspaceUsagePage,
+            )}
+            <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />
           </Route>
           <Route
             path=":factoryKey/organization/*"
