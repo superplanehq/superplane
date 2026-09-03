@@ -30,6 +30,7 @@ var reservedOrganizationSlugs = []string{
 	"login",
 	"signup",
 	"welcome",
+	"onboarding",
 	"create",
 	"setup",
 	"invite",
