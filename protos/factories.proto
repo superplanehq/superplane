@@ -1734,6 +1734,27 @@ message SyncFactoryVelocityResponse {
 }
 
 message DescribeFactoryVelocityRequest {
+  // How the People table is ordered. Values name the column the table sorts
+  // on; the UI's sort keys map to these one-to-one.
+  enum PeopleSort {
+    // Same as PEOPLE_SORT_TOTAL.
+    PEOPLE_SORT_UNSPECIFIED = 0;
+    // authored_merged + factory_merged.
+    PEOPLE_SORT_TOTAL = 1;
+    PEOPLE_SORT_FACTORY_MERGED = 2;
+    PEOPLE_SORT_AUTHORED_MERGED = 3;
+    PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
+    // Sorts on cost_cents.
+    PEOPLE_SORT_COST_USD = 5;
+  }
+
+  enum SortDirection {
+    // Same as SORT_DIRECTION_DESC.
+    SORT_DIRECTION_UNSPECIFIED = 0;
+    SORT_DIRECTION_ASC = 1;
+    SORT_DIRECTION_DESC = 2;
+  }
+
   string factory_id = 1;
   // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
@@ -1742,6 +1763,15 @@ message DescribeFactoryVelocityRequest {
   // response returns SuperPlane data only and sets `has_people_cohort = false`
   // so the UI can hide the People series.
   string repository = 3;
+  // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
+  PeopleSort people_sort = 4;
+  // Defaults to SORT_DIRECTION_DESC.
+  SortDirection people_sort_direction = 5;
+  // Rows per page of the People table. Defaults to 10, and is capped
+  // server-side so a client cannot request the whole table in one call.
+  int32 people_page_size = 6;
+  // 0-based row offset into the sorted People table, for "Load more" paging.
+  int32 people_offset = 7;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1775,6 +1805,12 @@ message DescribeFactoryVelocityResponse {
   // merges yet. SuperPlane counts are still present; the People series is
   // omitted until the sync finishes.
   bool people_sync_pending = 11;
+  // Total people with activity in the window, before `people_offset` and
+  // `people_page_size` are applied. Drives the "N people with activity" count.
+  int32 people_total = 12;
+  // True when `people_offset + len(people) < people_total`, so the UI knows
+  // whether to show "Load more".
+  bool people_has_more = 13;
 }
 
 message DescribeFactoryVelocityDay {
