@@ -1352,7 +1352,7 @@ describe("line board work-order examples", () => {
     const verifyStream = fixture.phases.find((phase) => phase.id === "ci-loop-3")?.stream ?? [];
     expect(verifyStream.map((line) => [line.at, line.componentType, line.componentName, line.action])).toEqual([
       ["19:52:40", "On Run", "CI verification", "triggered"],
-      ["20:02:50", "Report Work Order Check", "Report CI Check", "passed"],
+      ["20:02:50", "Report Task Check", "Report CI Check", "passed"],
       ["20:02:50", "github.markPullRequestReadyForReview", "Mark Pull Request Ready", "passed"],
       ["19:52:40", "loop", "loop", "passed"],
       ["19:52:40", "semaphore.runWorkflow", "Run Semaphore CI", "passed"],
@@ -1365,7 +1365,7 @@ describe("line board work-order examples", () => {
       ["20:03:23", "Run Claude Code", "Assess Storybook Coverage", "passed"],
       ["20:03:57", "Run JavaScript", "Format Coverage Review", "passed"],
       ["20:03:23", "Run Bash", "Deploy Storybook", "passed"],
-      ["20:03:58", "Report Work Order Check", "Report Coverage Check", "passed"],
+      ["20:03:58", "Report Task Check", "Report Coverage Check", "passed"],
       ["20:04:46", "github.updatePullRequest", "Update PR with preview links", "passed"],
     ]);
   });

@@ -305,8 +305,8 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   addPullRequestActivity: { title: "Add Pull Request Activity", iconSlug: "factory" },
   updatePullRequestActivity: { title: "Update Pull Request Activity", iconSlug: "factory" },
   addRunError: { title: "Add Run Error", iconSlug: "triangle-alert" },
-  setWorkOrderStatusNote: { title: "Set Work Order Status Note", iconSlug: "factory" },
-  reportWorkOrderCheck: { title: "Report Work Order Check", iconSlug: "factory" },
+  setWorkOrderStatusNote: { title: "Set Task Status Note", iconSlug: "factory" },
+  reportWorkOrderCheck: { title: "Report Task Check", iconSlug: "factory" },
   "github.createIssueComment": { title: "Create Issue Comment", iconSlug: "github" },
   "github.createPullRequest": { title: "Create Pull Request", iconSlug: "github" },
   "github.addIssueLabel": { title: "Add Issue Label", iconSlug: "github" },
@@ -315,9 +315,9 @@ const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; 
   "sentry.onIssue": { title: "On Issue", iconSlug: "bug", iconSrc: sentryIcon },
   "slack.onAppMention": { title: "On Mention", iconSlug: "slack", iconSrc: slackIcon },
   "pagerduty.onIncident": { title: "On Incident", iconSlug: "pagerduty" },
-  findWorkOrder: { title: "Find Work Order", iconSlug: "factory" },
+  findWorkOrder: { title: "Find Task", iconSlug: "factory" },
   createWorkOrder: { title: "Create Task", iconSlug: "factory" },
-  updateWorkOrderStatus: { title: "Update Work Order Status", iconSlug: "factory" },
+  updateWorkOrderStatus: { title: "Update Task Status", iconSlug: "factory" },
 };
 
 export function componentPresentation(component?: string): { title: string; iconSlug: string; iconSrc?: string } {
