@@ -363,3 +363,60 @@ func Test__CreateMultiInputNodeReplay_ReplayPayloadHoldsAttributedPairs(t *testi
 	assert.Equal(t, map[string]any{"v": "from-a"}, bySource[laneA])
 	assert.Equal(t, map[string]any{"v": "from-b"}, bySource[laneB])
 }
+
+// A multi-input replay leaves several events with no execution of their own.
+// Queue items (and later executions) are rooted on exactly one of them.
+func Test__ListRootEventsForRuns__PrefersEventWorkIsRootedOn(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	laneA, laneB := "lane-a", "lane-b"
+	joinNodeID := "join"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: laneA, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+			{NodeID: laneB, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+			{NodeID: joinNodeID, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "merge"}})},
+		},
+		[]models.Edge{
+			{SourceID: laneA, TargetID: joinNodeID, Channel: "default"},
+			{SourceID: laneB, TargetID: joinNodeID, Channel: "default"},
+		},
+	)
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, joinNodeID)
+	require.NoError(t, err)
+
+	var run *models.CanvasRun
+	var queueItems []*models.CanvasNodeQueueItem
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		run, queueItems, txErr = models.CreateMultiInputNodeReplay(tx, node, nil, []models.ReplayInput{
+			{Payload: map[string]any{"v": "from-a"}, SourceNodeID: &laneA},
+			{Payload: map[string]any{"v": "from-b"}, SourceNodeID: &laneB},
+		})
+		return txErr
+	})
+	require.NoError(t, err)
+	require.Len(t, queueItems, 2)
+
+	rootEventID := queueItems[0].RootEventID
+	require.Equal(t, rootEventID, queueItems[1].RootEventID)
+
+	var otherInputEventID uuid.UUID
+	for _, item := range queueItems {
+		if item.EventID != rootEventID {
+			otherInputEventID = item.EventID
+		}
+	}
+	require.NotEqual(t, uuid.Nil, otherInputEventID)
+
+	events, err := models.ListRootEventsForRuns(database.Conn(), canvas.ID, []uuid.UUID{run.ID})
+	require.NoError(t, err)
+	require.Contains(t, events, run.ID)
+	assert.Equal(t, rootEventID, events[run.ID].ID)
+	assert.NotEqual(t, otherInputEventID, events[run.ID].ID)
+}
