@@ -1192,7 +1192,7 @@ func findIncompleteInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID)
 			return nil, nil, false, err
 		}
 		for _, factory := range factories {
-			if factory.Description == initialWorkspaceAttemptDescription(attemptID) && !factory.IsOnboardingComplete() {
+			if factory.HasInitialOnboardingAttempt(attemptID) && !factory.IsOnboardingComplete() {
 				return &organization, &factory, true, nil
 			}
 		}
@@ -1263,19 +1263,19 @@ func (s *Server) createInitialOrganizationAttempt(account *models.Account, organ
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
 
-	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", initialWorkspaceAttemptDescription(attemptID), "")
+	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
 	if err != nil {
 		tx.Rollback()
 		return nil, nil, fmt.Errorf("create initial workspace: %w", err)
+	}
+	if err := workspace.SetInitialOnboardingAttempt(tx, attemptID); err != nil {
+		tx.Rollback()
+		return nil, nil, fmt.Errorf("set initial workspace onboarding attempt: %w", err)
 	}
 	if err := tx.Commit().Error; err != nil {
 		return nil, nil, fmt.Errorf("commit initial workspace: %w", err)
 	}
 	return organization, workspace, nil
-}
-
-func initialWorkspaceAttemptDescription(attemptID uuid.UUID) string {
-	return "initial-onboarding:" + attemptID.String()
 }
 
 type AccountImpersonation struct {
