@@ -26,7 +26,7 @@ const multipleChoiceQuestion = {
 
 const textQuestion = {
   id: "q3",
-  question: "If you had a single task for an AI agent on your software development process today, what would it be?",
+  question: "What engineering work would you automate first?",
   type: "open",
 };
 
@@ -53,11 +53,7 @@ describe("PostHogSurveyForm", () => {
 
     await user.click(screen.getByRole("button", { name: /software engineer/i }));
 
-    expect(
-      screen.getByText(
-        "If you had a single task for an AI agent on your software development process today, what would it be?",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText(textQuestion.question)).toBeInTheDocument();
   });
 
   it("requires at least one selection before continuing on multiple choice questions", async () => {

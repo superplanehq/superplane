@@ -37,9 +37,8 @@ export const onboardingSurvey: PostHogSurvey = {
       ],
     },
     {
-      id: "q-agent-task",
-      question:
-        "If you had a single task for an AI agent on your software development process today, what would it be?",
+      id: "q-automate-first",
+      question: "What engineering work would you automate first?",
       type: "open",
       placeholder: "Describe the task",
     },

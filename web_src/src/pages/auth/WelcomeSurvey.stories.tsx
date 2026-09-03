@@ -79,14 +79,14 @@ export const MainRoleDark: Story = {
   args: { initialQuestionIndex: 1 },
 };
 
-/** Question 3 of 3. Open text with the new agent-task copy. */
-export const AgentTask: Story = {
-  name: "3 Agent task",
+/** Question 3 of 3. Open text for the work the user would automate first. */
+export const AutomateFirst: Story = {
+  name: "3 Automate first",
   args: { initialQuestionIndex: 2 },
 };
 
-export const AgentTaskDark: Story = {
-  name: "3b Agent task (dark)",
+export const AutomateFirstDark: Story = {
+  name: "3b Automate first (dark)",
   globals: darkGlobals,
   args: { initialQuestionIndex: 2 },
 };
