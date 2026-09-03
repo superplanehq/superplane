@@ -3,9 +3,8 @@ import type { PostHogSurvey } from "./PostHogSurveyForm";
 /**
  * Representative "New User Onboarding Survey" for Storybook.
  *
- * Question 1 matches the live PostHog poll. Question 3 uses the intended
- * replacement copy. Question 2 documents the multiple-choice poll; the live
- * middle question still comes from PostHog at runtime.
+ * Question 1 matches the live PostHog poll. Question 2 is the main-role
+ * poll. Question 3 uses the intended replacement copy.
  */
 export const onboardingSurvey: PostHogSurvey = {
   id: "new-user-onboarding",
@@ -27,15 +26,14 @@ export const onboardingSurvey: PostHogSurvey = {
       ],
     },
     {
-      id: "q-tools",
-      question: "Which tools does your team use today?",
-      type: "multiple_choice",
-      allow_multiple: true,
+      id: "q-role",
+      question: "What best describes your role?",
+      type: "single_choice",
       choices: [
-        "GitHub (source control)",
-        "GitHub Actions (CI/CD)",
-        "PagerDuty (incidents)",
-        "Terraform (infrastructure)",
+        "Software engineer (writes and ships code)",
+        "Engineering manager (leads a team)",
+        "Product manager (owns the roadmap)",
+        "Other",
       ],
     },
     {

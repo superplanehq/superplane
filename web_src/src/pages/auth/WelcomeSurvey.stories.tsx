@@ -1,7 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withFactoriesTheme } from "@/pages/factories/__fixtures__/factoriesStoryTheme";
-
 import PostHogSurveyForm from "./PostHogSurveyForm";
 import { WelcomeSurveyLayout } from "./WelcomeSurveyLayout";
 import { onboardingSurvey } from "./welcomeSurveyStoryFixtures";
@@ -16,6 +14,7 @@ const meta = {
   component: PostHogSurveyForm,
   parameters: {
     layout: "fullscreen",
+    backgrounds: { disabled: true },
     docs: {
       description: {
         component:
@@ -29,7 +28,6 @@ const meta = {
   },
   tags: ["autodocs"],
   decorators: [
-    withFactoriesTheme,
     (Story) => (
       <WelcomeSurveyLayout>
         <Story />
@@ -50,7 +48,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const darkGlobals = { theme: "dark" as const, backgrounds: { value: "dark" } };
+const darkGlobals = { theme: "dark" as const };
 
 /** Full three-question survey. Select an option or Skip to move to the next step. */
 export const Journey: Story = {
@@ -69,14 +67,14 @@ export const HowYouHeardDark: Story = {
   args: { initialQuestionIndex: 0 },
 };
 
-/** Question 2 of 3. Multiple-choice poll keeps the checkbox and a Continue button. */
-export const MultipleChoice: Story = {
-  name: "2 Multiple choice",
+/** Question 2 of 3. Single-choice poll for the main role. */
+export const MainRole: Story = {
+  name: "2 Main role",
   args: { initialQuestionIndex: 1 },
 };
 
-export const MultipleChoiceDark: Story = {
-  name: "2b Multiple choice (dark)",
+export const MainRoleDark: Story = {
+  name: "2b Main role (dark)",
   globals: darkGlobals,
   args: { initialQuestionIndex: 1 },
 };
