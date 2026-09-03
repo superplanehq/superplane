@@ -1,4 +1,5 @@
 import { useAccount } from "@/contexts/useAccount";
+import { getGitHubAccountLinkHref } from "./githubAccountLinkHref";
 import { useEffect, useRef, useState } from "react";
 
 type ProvisionedWorkspace = {
@@ -20,7 +21,7 @@ export function OrganizationOnboardingRedirect() {
     if (!account || hasStartedProvisioning.current) return;
 
     if (!owner) {
-      window.location.replace("/auth/github?redirect=/onboarding");
+      window.location.replace(getGitHubAccountLinkHref());
       return;
     }
 
