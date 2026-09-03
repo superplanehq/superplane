@@ -130,10 +130,7 @@ function CollapsibleStreamTitle({ text }: { text: string }) {
     <span className="flex min-w-0 flex-1 flex-col items-start">
       <span
         ref={textRef}
-        className={cn(
-          "w-full whitespace-pre-wrap break-words text-muted-foreground",
-          !expanded && "line-clamp-2",
-        )}
+        className={cn("w-full whitespace-pre-wrap break-words text-muted-foreground", !expanded && "line-clamp-2")}
       >
         {text}
       </span>
@@ -933,7 +930,9 @@ function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup
               {step.line.componentType}
             </span>
           ) : null}
-          <StreamLineTitle wrap collapsible>{step.line.componentName}</StreamLineTitle>
+          <StreamLineTitle wrap collapsible>
+            {step.line.componentName}
+          </StreamLineTitle>
           <StepStatusMark status={step.line.status} />
         </div>
       ) : null}

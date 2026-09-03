@@ -156,8 +156,7 @@ describe("PhaseLogCard collapsed stream", () => {
     render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
 
     const title = screen.getByText(
-      (_, element) =>
-        element?.textContent === multilineTitle && element.classList.contains("whitespace-pre-wrap"),
+      (_, element) => element?.textContent === multilineTitle && element.classList.contains("whitespace-pre-wrap"),
     );
     expect(title).toHaveClass("whitespace-pre-wrap");
     expect(title.textContent).toBe(multilineTitle);
