@@ -302,7 +302,7 @@ func (a *AWS) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (a *AWS) cleanupEventBridge(ctx core.IntegrationCleanupContext, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
-	var err error
+	var errs error
 
 	//
 	// Remove the EventBridge rules and targets.
@@ -311,12 +311,12 @@ func (a *AWS) cleanupEventBridge(ctx core.IntegrationCleanupContext, metadata *c
 		client := eventbridge.NewClient(ctx.HTTP, credentials, rule.Region)
 		err := client.RemoveTargets(rule.Name, []string{"api-destination"})
 		if err != nil && !common.IsNotFoundErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to remove targets for rule %s in region %s: %w", rule.Name, rule.Region, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to remove targets for rule %s in region %s: %w", rule.Name, rule.Region, err))
 		}
 
 		err = client.DeleteRule(rule.Name)
 		if err != nil && !common.IsNotFoundErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to delete rule %s in region %s: %w", rule.Name, rule.Region, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to delete rule %s in region %s: %w", rule.Name, rule.Region, err))
 		}
 	}
 
@@ -328,35 +328,35 @@ func (a *AWS) cleanupEventBridge(ctx core.IntegrationCleanupContext, metadata *c
 
 		err := client.DeleteAPIDestination(destination.Name)
 		if err != nil && !common.IsNotFoundErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to delete API destination in region %s: %w", region, err))
 		}
 
 		err = client.DeleteConnection(destination.Name)
 		if err != nil && !common.IsNotFoundErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to delete connection in region %s: %w", region, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to delete connection in region %s: %w", region, err))
 		}
 	}
 
-	return err
+	return errs
 }
 
 func (a *AWS) cleanupIAM(ctx core.IntegrationCleanupContext, metadata *common.IntegrationMetadata, credentials *aws.Credentials) error {
 	client := iam.NewClient(ctx.HTTP, credentials)
 
-	var err error
+	var errs error
 	if metadata.IAM.TargetDestinationRole != nil {
 		err := client.DeleteRolePolicy(metadata.IAM.TargetDestinationRole.RoleName, "invoke-api-destination")
 		if err != nil && !iam.IsNoSuchEntityErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to delete IAM role policy for %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to delete IAM role policy for %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
 		}
 
 		err = client.DeleteRole(metadata.IAM.TargetDestinationRole.RoleName)
 		if err != nil && !iam.IsNoSuchEntityErr(err) {
-			err = errors.Join(err, fmt.Errorf("failed to delete IAM role %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to delete IAM role %s: %w", metadata.IAM.TargetDestinationRole.RoleName, err))
 		}
 	}
 
-	return err
+	return errs
 }
 
 func (a *AWS) showBrowserAction(ctx core.SyncContext) error {
