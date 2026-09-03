@@ -60,7 +60,7 @@ export function OrganizationSwitchMenu({
         })}
       </div>
       <DropdownMenuSeparator />
-      <DropdownMenuItem onSelect={() => navigate("/create")} data-testid={`${testIdPrefix}-organization-create`}>
+      <DropdownMenuItem onSelect={() => navigate("/onboarding")} data-testid={`${testIdPrefix}-organization-create`}>
         <Plus className="h-3.5 w-3.5" aria-hidden />
         Create new organization
       </DropdownMenuItem>
