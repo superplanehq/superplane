@@ -9,6 +9,7 @@ import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
 import { useOrganization } from "./hooks/useOrganizationData";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -263,6 +264,7 @@ export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const location = useLocation();
+  useRedirectIntegrationSetupReturn(segment);
   useConsumeIntegrationSetupReturnOnArrival(segment);
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -285,7 +287,6 @@ export function OrganizationScope() {
           organizationSlug: resolvedSlug,
         })
       : null;
-
   useEffect(() => {
     if (!account?.id || !segment || isReserved || uidRedirectPath) {
       return;
