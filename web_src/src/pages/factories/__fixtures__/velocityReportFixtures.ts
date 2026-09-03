@@ -124,14 +124,16 @@ function distribute(total: number, shares: number[]): number[] {
   return result;
 }
 
-function buildPeople(totals: ReturnType<typeof sumTotals>) {
-  const shares = PEOPLE_AUTHORS.map((person) => person.share);
+type Author = { id: string; name: string; email: string; accountId: number; share: number };
+
+function buildPeople(totals: ReturnType<typeof sumTotals>, authors: Author[] = PEOPLE_AUTHORS) {
+  const shares = authors.map((person) => person.share);
   const authored = distribute(totals.peopleMerged, shares);
   const factoryMerged = distribute(totals.superplaneMerged, shares);
   const factoryWaste = distribute(totals.waste, shares);
   const costCents = Number(totals.costCents);
 
-  return PEOPLE_AUTHORS.map((person, index) => ({
+  return authors.map((person, index) => ({
     id: person.id,
     name: person.name,
     email: person.email,
@@ -143,6 +145,20 @@ function buildPeople(totals: ReturnType<typeof sumTotals>) {
     costCents: String(Math.round(costCents * person.share)),
   }));
 }
+
+/**
+ * A cohort large enough that the People table's "Load more" control has
+ * something to show. Named so the alphabetical order matches the default
+ * total-merged-descending sort closely enough for the Storybook fixture to
+ * read as a believable, stable first page.
+ */
+const MANY_PEOPLE_AUTHORS: Author[] = Array.from({ length: 14 }, (_, index) => ({
+  id: `contributor-${index + 1}`,
+  name: `Contributor ${String(index + 1).padStart(2, "0")}`,
+  email: `contributor${index + 1}@superplane.com`,
+  accountId: 900_000 + index,
+  share: 1 / 14,
+}));
 
 function intakeSources(points: Point[]) {
   const totals = new Map<string, number>();
@@ -158,7 +174,11 @@ function intakeSources(points: Point[]) {
   }));
 }
 
-function buildReport(periodDays: number, withComparison: boolean): FactoriesDescribeFactoryVelocityResponse {
+function buildReport(
+  periodDays: number,
+  withComparison: boolean,
+  authors: Author[] = PEOPLE_AUTHORS,
+): FactoriesDescribeFactoryVelocityResponse {
   const points = buildPoints(periodDays, periodDays);
   const totals = sumTotals(points);
   const previous = sumTotals(buildPoints(periodDays, 0));
@@ -175,7 +195,7 @@ function buildReport(periodDays: number, withComparison: boolean): FactoriesDesc
     previousTotals: previous,
     hasPreviousWindow: withComparison,
     intakeSources: intakeSources(points),
-    people: buildPeople(totals),
+    people: buildPeople(totals, authors),
   };
 }
 
@@ -264,3 +284,58 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVeloc
     people: buildPeople(totals).map((person) => ({ ...person, authoredMerged: 0 })),
   };
 })();
+
+/**
+ * Fourteen people with activity, so the People table's "Load more" control has
+ * something to load. Every other fixture keeps the small default cohort so its
+ * story keeps rendering one page with no control.
+ */
+export const PEOPLE_LOAD_MORE_FACTORY_VELOCITY: Record<number, FactoriesDescribeFactoryVelocityResponse> = {
+  14: buildReport(14, true, MANY_PEOPLE_AUTHORS),
+  30: buildReport(30, true, MANY_PEOPLE_AUTHORS),
+};
+
+type VelocityPerson = NonNullable<FactoriesDescribeFactoryVelocityResponse["people"]>[number];
+
+function totalMergedOf(person: VelocityPerson): number {
+  return (person.authoredMerged ?? 0) + (person.factoryMerged ?? 0);
+}
+
+const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => number>> = {
+  PEOPLE_SORT_FACTORY_MERGED: (person) => person.factoryMerged ?? 0,
+  PEOPLE_SORT_AUTHORED_MERGED: (person) => person.authoredMerged ?? 0,
+  PEOPLE_SORT_MEDIAN_CYCLE_HOURS: (person) => person.medianCycleHours ?? 0,
+  PEOPLE_SORT_COST_USD: (person) => Number(person.costCents ?? 0),
+};
+
+/**
+ * Stands in for the backend's sort-then-page step: orders `report.people` by
+ * the request's `peopleSort`/`peopleSortDirection`, then slices to
+ * `peopleOffset`/`peoplePageSize`, so Storybook and the mock server exercise
+ * the same "Load more" contract the real API does.
+ */
+export function paginateVelocityPeople(
+  report: FactoriesDescribeFactoryVelocityResponse,
+  url: URL,
+): FactoriesDescribeFactoryVelocityResponse {
+  const people = [...(report.people ?? [])];
+  const valueOf = PEOPLE_SORT_VALUE[url.searchParams.get("peopleSort") ?? ""] ?? totalMergedOf;
+  const ascending = url.searchParams.get("peopleSortDirection") === "SORT_DIRECTION_ASC";
+
+  people.sort((a, b) => {
+    const diff = valueOf(a) - valueOf(b);
+    if (diff !== 0) return ascending ? diff : -diff;
+    return (a.name ?? "").localeCompare(b.name ?? "");
+  });
+
+  const offset = Number(url.searchParams.get("peopleOffset") ?? 0);
+  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? 10);
+  const page = people.slice(offset, offset + pageSize);
+
+  return {
+    ...report,
+    people: page,
+    peopleTotal: people.length,
+    peopleHasMore: offset + page.length < people.length,
+  };
+}
