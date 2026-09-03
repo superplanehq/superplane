@@ -83,11 +83,18 @@ function VelocityReportView({ model, report }: { model: VelocityPageModel; repor
         intakeSeries={report.intakeSeries}
         hasOutput={report.totals.merged > 0 || report.totals.waste > 0}
       />
-      {report.people.length > 0 ? (
+      {model.people.total > 0 ? (
         <VelocityPeopleTable
-          people={report.people}
+          people={model.people.list}
+          total={model.people.total}
           periodLabel={model.periodLabel}
           emptyAuthorship={peopleEmptyAuthorship(report, model)}
+          sortKey={model.people.sortKey}
+          sortDirection={model.people.sortDirection}
+          onSort={model.people.onSort}
+          canLoadMore={model.people.canLoadMore}
+          isLoadingMore={model.people.isLoadingMore}
+          onLoadMore={model.people.loadMore}
         />
       ) : null}
       <div className="grid gap-5 lg:grid-cols-2">
