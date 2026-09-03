@@ -80,7 +80,13 @@ export function RunRow({
         className="absolute inset-0 z-0"
         aria-label={title}
       />
-      <RunRowTitleLine title={title} status={status} isSelected={isSelected} runHref={runHref} />
+      <RunRowTitleLine
+        title={title}
+        status={status}
+        isSelected={isSelected}
+        runHref={runHref}
+        isReplay={Boolean(run.isReplay)}
+      />
       <RunRowMetadataLine
         triggerName={triggerName}
         iconSrc={iconSrc}
@@ -99,11 +105,13 @@ function RunRowTitleLine({
   status,
   isSelected,
   runHref,
+  isReplay,
 }: {
   title: string;
   status: RunStatusKey;
   isSelected: boolean;
   runHref: string;
+  isReplay: boolean;
 }) {
   return (
     <div className="pointer-events-none relative z-10 flex min-w-0 items-center gap-2">
@@ -116,6 +124,14 @@ function RunRowTitleLine({
       >
         {title}
       </span>
+      {isReplay ? (
+        <span
+          data-testid="run-replay-badge"
+          className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+        >
+          Replay
+        </span>
+      ) : null}
       <CopyRunLinkButton runHref={runHref} />
       <RunStatusBadge status={status} />
     </div>

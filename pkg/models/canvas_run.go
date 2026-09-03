@@ -48,6 +48,20 @@ type CanvasRun struct {
 	CancelledAt       *time.Time
 	CancelledBy       *uuid.UUID
 	FinishedAt        *time.Time
+
+	//
+	// Replay fields. A replay run re-executes a single node in isolation from
+	// the graph: downstream routing and on-error dispatch are suppressed for
+	// it (see EventRouter.processExecutionEvent and ExecutionStateContext.Fail).
+	//
+	// ReplaySourceExecutionID references the execution being replayed (the
+	// original, or a previous replay of it). ReplayPayload pins a copy of the
+	// input payload on the run itself, so replaying a replay keeps working
+	// after retention deletes the underlying input event.
+	//
+	IsReplay                bool
+	ReplaySourceExecutionID *uuid.UUID
+	ReplayPayload           JSONValue
 }
 
 type RunDeletionSummary struct {

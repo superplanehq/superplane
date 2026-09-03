@@ -51,6 +51,63 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	assert.False(t, response.HasNextPage)
 }
 
+func Test__ListRuns__SerializesReplayLineage(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{NodeID: "node-1", Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{},
+	)
+
+	//
+	// Original run + execution being replayed.
+	//
+	originalRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	originalRun := createFinishedRun(t, originalRootEvent, models.CanvasRunResultPassed)
+	originalExecution := createRunExecution(t, originalRun, originalRootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
+
+	//
+	// A second, unrelated normal run - the boundary case: a run list with no
+	// replay runs at all must still serialize is_replay: false for it.
+	//
+	otherRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	createFinishedRun(t, otherRootEvent, models.CanvasRunResultPassed)
+
+	//
+	// The replay run itself.
+	//
+	replayRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	replayRun := createFinishedRun(t, replayRootEvent, models.CanvasRunResultPassed)
+	require.NoError(t, database.Conn().Model(replayRun).Updates(map[string]any{
+		"is_replay":                  true,
+		"replay_source_execution_id": originalExecution.ID,
+	}).Error)
+
+	response, err := ListRuns(context.Background(), database.DB(t.Context()), canvas, 0, nil, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 3)
+
+	runsByID := map[string]*pb.CanvasRun{}
+	for _, run := range response.Runs {
+		runsByID[run.Id] = run
+	}
+
+	replaySerialized, ok := runsByID[replayRun.ID.String()]
+	require.True(t, ok)
+	assert.True(t, replaySerialized.IsReplay)
+	assert.Equal(t, originalExecution.ID.String(), replaySerialized.ReplaySourceExecutionId)
+
+	originalSerialized, ok := runsByID[originalRun.ID.String()]
+	require.True(t, ok)
+	assert.False(t, originalSerialized.IsReplay)
+	assert.Empty(t, originalSerialized.ReplaySourceExecutionId)
+}
+
 func Test__ListRuns__ReturnsRunsWithQueueItems(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(
