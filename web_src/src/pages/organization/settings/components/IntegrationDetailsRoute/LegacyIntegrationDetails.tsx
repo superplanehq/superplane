@@ -137,7 +137,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
   };
 
   return (
-    <div className="pt-6">
+    <div className="mx-auto w-full max-w-3xl px-3 pt-14 pb-10">
       <Header
         organizationId={organizationId}
         integration={integration}
