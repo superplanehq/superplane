@@ -77,10 +77,10 @@ const OrganizationSelect: React.FC = () => {
 
         const explicitSelection = new URLSearchParams(location.search).has("select");
         if (!explicitSelection) {
-          // The URL routes by slug, and last-visited is recorded from the
-          // URL segment, so match the last-visited value against slugs.
+          // The URL routes by slug, and last-visited is recorded as a slug,
+          // so pick among slugs.
           const redirectOrganizationSlug = pickAutoRedirectOrganization(
-            organizations.map((org) => ({ id: org.slug })),
+            organizations.map((org) => ({ slug: org.slug })),
             readLastVisitedOrganization(account.id),
           );
           if (redirectOrganizationSlug) {
