@@ -155,9 +155,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -192,9 +192,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -217,9 +217,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -243,9 +243,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -268,9 +268,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -295,9 +295,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -322,9 +322,9 @@ func Test__GetVMInstance__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+		newClient = func(ctx core.ExecutionContext) (Client, error) {
 			return mc, nil
-		})
+		}
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{

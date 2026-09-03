@@ -113,6 +113,42 @@ func cacheSet(key string, data any) {
 	defer machineConfigCacheMu.Unlock()
 	machineConfigCache[key] = &cacheEntry{data: data, expires: time.Now().Add(cacheTTL)}
 }
+
+// listAll fetches every page of a paginated Compute Engine list endpoint and
+// caches the combined result under cacheKey. The page callback fetches and
+// parses one page; it owns request-specific URL parameters, item mapping,
+// nil-item filtering, and error wrapping. post, when given, transforms the
+// full result before it is cached and returned.
+func listAll[T any](
+	ctx context.Context,
+	c Client,
+	cacheKey string,
+	page func(ctx context.Context, pageToken string) (items []T, nextToken string, err error),
+	post ...func([]T),
+) ([]T, error) {
+	if v, ok := cacheGet(cacheKey); ok {
+		return v.([]T), nil
+	}
+
+	var all []T
+	var pageToken string
+	for {
+		items, next, err := page(ctx, pageToken)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, items...)
+		pageToken = next
+		if pageToken == "" {
+			break
+		}
+	}
+	for _, p := range post {
+		p(all)
+	}
+	cacheSet(cacheKey, all)
+	return all, nil
+}
 func regionFromAPI(it *regionItem) Region {
 	zoneNames := make([]string, 0, len(it.Zones))
 	for _, z := range it.Zones {
@@ -294,36 +330,25 @@ func formatFloatWithCommas(x float64) string {
 	return b.String()
 }
 func ListRegions(ctx context.Context, c Client) ([]Region, error) {
-	cacheKey := "regions:" + c.ProjectID()
-	if v, ok := cacheGet(cacheKey); ok {
-		return v.([]Region), nil
-	}
-
-	path := fmt.Sprintf("projects/%s/regions", c.ProjectID())
-	var all []Region
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp regionsListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse regions response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "regions:"+c.ProjectID(),
+		func(ctx context.Context, pageToken string) ([]Region, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/regions", c.ProjectID()), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, regionFromAPI(it))
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	cacheSet(cacheKey, all)
-	return all, nil
+			var resp regionsListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse regions response: %w", err)
+			}
+			items := make([]Region, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, regionFromAPI(it))
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func ListZones(ctx context.Context, c Client, region string) ([]Zone, error) {
@@ -350,36 +375,25 @@ func ListZones(ctx context.Context, c Client, region string) ([]Zone, error) {
 
 func ListMachineTypes(ctx context.Context, c Client, zone string) ([]MachineType, error) {
 	zone = strings.TrimSpace(zone)
-	cacheKey := "machineTypes:" + c.ProjectID() + ":" + zone
-	if v, ok := cacheGet(cacheKey); ok {
-		return v.([]MachineType), nil
-	}
-
-	path := fmt.Sprintf("projects/%s/zones/%s/machineTypes", c.ProjectID(), zone)
-	var all []MachineType
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp machineTypesListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse machineTypes response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "machineTypes:"+c.ProjectID()+":"+zone,
+		func(ctx context.Context, pageToken string) ([]MachineType, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/zones/%s/machineTypes", c.ProjectID(), zone), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, machineTypeFromAPI(it))
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	cacheSet(cacheKey, all)
-	return all, nil
+			var resp machineTypesListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse machineTypes response: %w", err)
+			}
+			items := make([]MachineType, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, machineTypeFromAPI(it))
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func GetMachineType(ctx context.Context, c Client, zone, machineType string) (*MachineType, error) {
@@ -635,36 +649,25 @@ func ListPublicImages(ctx context.Context, c Client, project string) ([]Image, e
 	if !isPublicImageProject(project) {
 		return nil, nil
 	}
-	cacheKey := "publicImages:" + project
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]Image), nil
-	}
-	path := fmt.Sprintf("projects/%s/global/images", project)
-	var all []Image
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withMaxResults(path, maxPublicImagesPerPage, pageToken))
-		if err != nil {
-			return nil, fmt.Errorf("list public images for %s: %w", project, err)
-		}
-		var resp imagesListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse images response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "publicImages:"+project,
+		func(ctx context.Context, pageToken string) ([]Image, string, error) {
+			body, err := c.Get(ctx, withMaxResults(fmt.Sprintf("projects/%s/global/images", project), maxPublicImagesPerPage, pageToken))
+			if err != nil {
+				return nil, "", fmt.Errorf("list public images for %s: %w", project, err)
 			}
-			all = append(all, imageItemToImage(it))
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	sortPublicImagesForProject(all)
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp imagesListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse images response: %w", err)
+			}
+			items := make([]Image, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, imageItemToImage(it))
+			}
+			return items, resp.NextPageToken, nil
+		}, sortPublicImagesForProject)
 }
 
 func GetImageFromFamily(ctx context.Context, c Client, project, family string) (*Image, error) {
@@ -694,35 +697,25 @@ func ListCustomImages(ctx context.Context, c Client, project string) ([]Image, e
 	if project == "" {
 		project = c.ProjectID()
 	}
-	cacheKey := "customImages:" + project
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]Image), nil
-	}
-	path := fmt.Sprintf("projects/%s/global/images", project)
-	var all []Image
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp imagesListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse custom images response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "customImages:"+project,
+		func(ctx context.Context, pageToken string) ([]Image, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/global/images", project), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, imageItemToImage(it))
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp imagesListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse custom images response: %w", err)
+			}
+			items := make([]Image, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, imageItemToImage(it))
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func ListPublicImageResources(ctx context.Context, c Client, project string) ([]core.IntegrationResource, error) {
@@ -829,74 +822,30 @@ type resourcePolicyItem struct {
 	Name string `json:"name"`
 }
 
-var (
-	osStorageCache   = make(map[string]*cacheEntry)
-	osStorageCacheMu sync.RWMutex
-)
-
-const osStorageCacheTTL = 24 * time.Hour
-
-func osStorageCacheGet(key string) (any, bool) {
-	osStorageCacheMu.RLock()
-	e, ok := osStorageCache[key]
-	if !ok || e == nil {
-		osStorageCacheMu.RUnlock()
-		return nil, false
-	}
-	if time.Now().After(e.expires) {
-		osStorageCacheMu.RUnlock()
-		// Lazy eviction: remove expired entry to avoid unbounded memory growth
-		osStorageCacheMu.Lock()
-		if e2, ok2 := osStorageCache[key]; ok2 && e2 != nil && time.Now().After(e2.expires) {
-			delete(osStorageCache, key)
-		}
-		osStorageCacheMu.Unlock()
-		return nil, false
-	}
-	data := e.data
-	osStorageCacheMu.RUnlock()
-	return data, true
-}
-
-func osStorageCacheSet(key string, data any) {
-	osStorageCacheMu.Lock()
-	defer osStorageCacheMu.Unlock()
-	osStorageCache[key] = &cacheEntry{data: data, expires: time.Now().Add(osStorageCacheTTL)}
-}
 func ListSnapshots(ctx context.Context, c Client, project string) ([]Snapshot, error) {
 	project = strings.TrimSpace(project)
 	if project == "" {
 		project = c.ProjectID()
 	}
-	cacheKey := "snapshots:" + project
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]Snapshot), nil
-	}
-	path := fmt.Sprintf("projects/%s/global/snapshots", project)
-	var all []Snapshot
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp snapshotsListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse snapshots response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "snapshots:"+project,
+		func(ctx context.Context, pageToken string) ([]Snapshot, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/global/snapshots", project), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, Snapshot{Name: it.Name})
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp snapshotsListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse snapshots response: %w", err)
+			}
+			items := make([]Snapshot, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, Snapshot{Name: it.Name})
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func ListDisks(ctx context.Context, c Client, project, zone string) ([]Disk, error) {
@@ -908,35 +857,25 @@ func ListDisks(ctx context.Context, c Client, project, zone string) ([]Disk, err
 	if zone == "" {
 		return nil, fmt.Errorf("zone is required")
 	}
-	cacheKey := "disks:" + project + ":" + zone
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]Disk), nil
-	}
-	path := fmt.Sprintf("projects/%s/zones/%s/disks", project, zone)
-	var all []Disk
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp disksListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse disks response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "disks:"+project+":"+zone,
+		func(ctx context.Context, pageToken string) ([]Disk, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/zones/%s/disks", project, zone), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, Disk{Name: it.Name})
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp disksListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse disks response: %w", err)
+			}
+			items := make([]Disk, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, Disk{Name: it.Name})
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func ListDiskTypes(ctx context.Context, c Client, project, zone string) ([]DiskType, error) {
@@ -948,35 +887,25 @@ func ListDiskTypes(ctx context.Context, c Client, project, zone string) ([]DiskT
 	if zone == "" {
 		return nil, fmt.Errorf("zone is required")
 	}
-	cacheKey := "diskTypes:" + project + ":" + zone
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]DiskType), nil
-	}
-	path := fmt.Sprintf("projects/%s/zones/%s/diskTypes", project, zone)
-	var all []DiskType
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp diskTypesListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse diskTypes response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "diskTypes:"+project+":"+zone,
+		func(ctx context.Context, pageToken string) ([]DiskType, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/zones/%s/diskTypes", project, zone), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, DiskType{Name: it.Name, Description: it.Description})
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp diskTypesListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse diskTypes response: %w", err)
+			}
+			items := make([]DiskType, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, DiskType{Name: it.Name, Description: it.Description})
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 func ListSnapshotSchedules(ctx context.Context, c Client, project, region string) ([]ResourcePolicy, error) {
@@ -988,35 +917,25 @@ func ListSnapshotSchedules(ctx context.Context, c Client, project, region string
 	if region == "" {
 		return nil, fmt.Errorf("region is required")
 	}
-	cacheKey := "resourcePolicies:" + project + ":" + region
-	if v, ok := osStorageCacheGet(cacheKey); ok {
-		return v.([]ResourcePolicy), nil
-	}
-	path := fmt.Sprintf("projects/%s/regions/%s/resourcePolicies", project, region)
-	var all []ResourcePolicy
-	var pageToken string
-	for {
-		body, err := c.Get(ctx, withPageToken(path, pageToken))
-		if err != nil {
-			return nil, err
-		}
-		var resp resourcePoliciesListResp
-		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse resourcePolicies response: %w", err)
-		}
-		for _, it := range resp.Items {
-			if it == nil {
-				continue
+	return listAll(ctx, c, "resourcePolicies:"+project+":"+region,
+		func(ctx context.Context, pageToken string) ([]ResourcePolicy, string, error) {
+			body, err := c.Get(ctx, withPageToken(fmt.Sprintf("projects/%s/regions/%s/resourcePolicies", project, region), pageToken))
+			if err != nil {
+				return nil, "", err
 			}
-			all = append(all, ResourcePolicy{Name: it.Name})
-		}
-		pageToken = resp.NextPageToken
-		if pageToken == "" {
-			break
-		}
-	}
-	osStorageCacheSet(cacheKey, all)
-	return all, nil
+			var resp resourcePoliciesListResp
+			if err := json.Unmarshal(body, &resp); err != nil {
+				return nil, "", fmt.Errorf("parse resourcePolicies response: %w", err)
+			}
+			items := make([]ResourcePolicy, 0, len(resp.Items))
+			for _, it := range resp.Items {
+				if it == nil {
+					continue
+				}
+				items = append(items, ResourcePolicy{Name: it.Name})
+			}
+			return items, resp.NextPageToken, nil
+		})
 }
 
 var allowedBootDiskTypes = []string{"pd-balanced", "pd-ssd", "pd-standard"}

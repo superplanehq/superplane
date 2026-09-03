@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
-
-	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 // roleHintRead is the IAM role required to read metrics from Managed Service
@@ -119,10 +116,3 @@ func formatPromError(errorType, errMsg string) error {
 // apiErrorMessage formats an API error for the execution state, appending an IAM
 // hint on 403 since a missing monitoring.viewer role is the most common cause of
 // query failures.
-func apiErrorMessage(action string, err error) string {
-	var apiErr *gcpcommon.GCPAPIError
-	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
-		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHintRead)
-	}
-	return fmt.Sprintf("%s: %v", action, err)
-}

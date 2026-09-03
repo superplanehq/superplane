@@ -69,7 +69,7 @@ func Test__DeleteFirewall__Execute(t *testing.T) {
 				return opDone("op-del"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -91,7 +91,7 @@ func Test__DeleteFirewall__Execute(t *testing.T) {
 				return nil, &gcpcommon.GCPAPIError{StatusCode: http.StatusNotFound, Message: "firewall not found"}
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -112,7 +112,7 @@ func Test__DeleteFirewall__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{

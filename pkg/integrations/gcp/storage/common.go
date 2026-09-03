@@ -3,12 +3,8 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
-
-	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 // bucketPayloadType is the type tag emitted by every Cloud Storage bucket
@@ -172,10 +168,3 @@ func bucketPayload(b *Bucket) map[string]any {
 // apiErrorMessage formats an API error for the execution state, appending the
 // IAM role the component needs on a 403 (a missing role is the most common
 // cause). Callers pass the role appropriate to the operation (read vs. write).
-func apiErrorMessage(action string, err error, roleHint string) string {
-	var apiErr *gcpcommon.GCPAPIError
-	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
-		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHint)
-	}
-	return fmt.Sprintf("%s: %v", action, err)
-}

@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type DeleteDatabase struct{}
@@ -138,7 +139,7 @@ func (d *DeleteDatabase) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if err := deleteDatabase(context.Background(), client, client.ProjectID(), instance, database); err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to delete database", err, roleHintAdmin))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to delete database", roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "gcp.cloudsql.database", []any{

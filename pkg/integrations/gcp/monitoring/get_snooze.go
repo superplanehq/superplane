@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type GetSnooze struct{}
@@ -95,7 +96,7 @@ func (g *GetSnooze) Execute(ctx core.ExecutionContext) error {
 
 	body, err := client.GetURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, name))
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to get snooze", roleHintRead, err))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to get snooze", roleHintRead))
 	}
 
 	var s snooze
