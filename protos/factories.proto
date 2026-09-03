@@ -1968,6 +1968,7 @@ message PlanningSessionMessage {
   string id = 1;
   string role = 2;
   string text = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message PlanningSessionSurveyQuestion {
