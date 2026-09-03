@@ -159,7 +159,8 @@ spec:
               2/ The title must follow conventional commits structure. Use only feat, fix, chore, or docs.
               3/ The description must start with a brief summary of the changes, and include sections to describe the changes made in each logical part of the system (UI, API, workers, database, ...).
               4/ Do not hard-wrap lines. Write each paragraph as a single line. Use blank lines only to separate paragraphs, headings, list items, or other Markdown elements. GitHub renders single newlines as line breaks.
-              5/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
+              5/ Do not include any issue-closing keywords (for example "Closes #", "Fixes #", "Resolves #") in the description. The automation adds that reference on its own.
+              6/ Write the title to /tmp/TITLE and the description to /tmp/DESCRIPTION.md. Do not add these files to the repository.
 
               Write clearly, for humans, in ASD-STE100 / Simplified Technical English
           - name: Push output
@@ -227,7 +228,7 @@ spec:
       configuration:
         base: '{{ task().default_branch }}'
         body: |-
-          [{{ task().key }}]({{ task().url }})
+          {{ (task().source?.issue?.number != nil && task().source?.repository?.full_name == task().repository) ? "Closes #" + string(task().source.issue.number) + "\n\n" : "" }}[{{ task().key }}]({{ task().url }})
 
           {{ fromBase64($["Implement From Task Description"].data.result.description) }}
 
@@ -253,7 +254,7 @@ spec:
         pullNumber: '{{ $["Find Pull Request"].data.number }}'
         title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
         body: |-
-          [{{ task().key }}]({{ task().url }})
+          {{ (task().source?.issue?.number != nil && task().source?.repository?.full_name == task().repository) ? "Closes #" + string(task().source.issue.number) + "\n\n" : "" }}[{{ task().key }}]({{ task().url }})
 
           {{ fromBase64($["Implement From Task Description"].data.result.description) }}
 

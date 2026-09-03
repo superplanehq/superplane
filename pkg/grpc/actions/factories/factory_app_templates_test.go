@@ -1,7 +1,6 @@
 package factories
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -56,8 +55,18 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 
 	body, ok := createPR.Configuration["body"].(string)
 	require.True(t, ok, "expected create-pr body to be a string")
-	assert.True(t, strings.HasPrefix(body, "[{{ task().key }}]({{ task().url }})"), "body: %s", body)
+	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
 	assert.NotContains(t, body, "[Task](")
+
+	const closesExpression = `task().source?.issue?.number`
+	assert.Contains(t, body, closesExpression, "create-pr body should conditionally close the originating issue")
+	assert.Contains(t, body, `"Closes #"`)
+
+	updatePR := findYAMLNode(t, canvas, "update-pr")
+	updateBody, ok := updatePR.Configuration["body"].(string)
+	require.True(t, ok, "expected update-pr body to be a string")
+	assert.Contains(t, updateBody, closesExpression, "update-pr body should conditionally close the originating issue")
+	assert.Equal(t, body, updateBody, "create-pr and update-pr bodies must stay in sync")
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
