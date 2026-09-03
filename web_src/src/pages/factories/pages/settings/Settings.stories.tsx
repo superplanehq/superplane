@@ -1,20 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
-import {
-  defaultFactoriesFixture,
-  EMPTY_FACTORY_KEY,
-  PRIMARY_FACTORY_KEY,
-} from "../../__fixtures__/factoryPageResponses";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
-import { FactorySettingsLayout } from "./FactorySettingsLayout";
-import {
-  CONNECTED_SETUP_INTEGRATIONS,
-  SETUP_ANSWERS,
-  factoriesFixtureWithSetupAnswers,
-} from "../../__fixtures__/setupStoryFixtures";
 
-/** Factory settings with Account, Workspace, and Organization navigation. */
+import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
+import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
+import { FactorySettingsLayout } from "./FactorySettingsLayout";
+
+/** Current factory settings chrome. Use the sidebar to open each page. */
 const meta = {
   title: "Factories/Pages/Settings",
   component: FactorySettingsLayout,
@@ -25,59 +17,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const WorkspaceGeneral: Story = {
+export const Current: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
       factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const Automations: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/automations`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const Repository: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
-      factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
-      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
-    />
-  ),
-};
-
-export const Models: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/models`}
-      factoriesFixture={defaultFactoriesFixture}
       experimentalFeatures={[FEATURE_WORKSPACE_MODELS]}
-    />
-  ),
-};
-
-export const Spending: Story = {
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/spending`}
-      factoriesFixture={defaultFactoriesFixture}
-    />
-  ),
-};
-
-export const SpendingEmpty: Story = {
-  name: "Spending (empty)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`workspaces/${EMPTY_FACTORY_KEY}/settings/workspace/spending`}
-      factoriesFixture={defaultFactoriesFixture}
     />
   ),
 };

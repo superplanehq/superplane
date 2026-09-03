@@ -35,16 +35,18 @@ describe("AccountProfileRedesignPlayground", () => {
     Element.prototype.scrollIntoView ??= () => undefined;
   });
 
-  it("shows Profile copy and the redesigned Account nav", () => {
+  it("shows Account copy and the redesigned Account nav", () => {
     renderPlayground();
 
-    expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    expect(screen.getByText("Your name, appearance, and GitHub identity.")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("Account");
+    expect(
+      screen.getByText("Preferences, profile information, and security for your SuperPlane account."),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Profile");
-    expect(screen.getByTestId("account-redesign-nav-account-security")).toHaveTextContent("Security");
-    expect(screen.queryByTestId("account-redesign-nav-account-notifications")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
+    expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
     expect(screen.queryByTestId("account-redesign-nav-account-preferences")).not.toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-nav-account-general")).not.toBeInTheDocument();
     expect(screen.queryByText("Leave workspace")).not.toBeInTheDocument();
@@ -52,6 +54,8 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.queryByTestId("account-redesign-danger")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-appearance")).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-theme")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-security")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-user-id")).not.toBeInTheDocument();
     expect(screen.queryByText(/User ID/)).not.toBeInTheDocument();
   });
@@ -155,12 +159,10 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByText("Keep at least one sign-in method.")).toBeInTheDocument();
   });
 
-  it("opens Security with password, SSO methods, and tokens", async () => {
-    const user = userEvent.setup();
+  it("shows Security & access on the Account page with password, SSO methods, and tokens", () => {
     renderPlayground();
 
-    await user.click(screen.getByTestId("account-redesign-nav-account-security"));
-    expect(screen.getByRole("heading", { name: "Security" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Security & access" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sign in methods" })).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
@@ -171,8 +173,7 @@ describe("AccountProfileRedesignPlayground", () => {
     ).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
-    expect(screen.queryByText("GitHub for Velocity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
   });
 
   it("connects Google and disconnects GitHub on the same account", async () => {
@@ -240,7 +241,7 @@ describe("AccountProfileRedesignPlayground", () => {
     renderPlayground();
 
     await user.type(screen.getByTestId("account-redesign-find"), "sec");
-    expect(screen.getByTestId("account-redesign-nav-account-security")).toBeInTheDocument();
-    expect(screen.queryByTestId("account-redesign-nav-account-profile")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-nav-account-profile")).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-nav-account-notifications")).not.toBeInTheDocument();
   });
 });

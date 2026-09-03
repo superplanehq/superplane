@@ -1,4 +1,5 @@
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { Avatar } from "@/components/Avatar/avatar";
 import { useTheme } from "@/contexts/useTheme";
 import { isThemePreference } from "@/lib/themePreference";
@@ -186,16 +187,17 @@ function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationI
         <DropdownMenuSubContent className="w-64" data-testid="factories-sidebar-organization-switch-menu">
           <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
           {organizations.map((organization) => {
-            const isCurrent = organization.id === currentOrganizationId;
+            const isCurrent = organizationMatchesRoute(organization, currentOrganizationId);
             return (
               <DropdownMenuItem
                 key={organization.id}
                 onClick={() => {
                   if (!isCurrent) {
-                    navigate(`/${organization.id}`);
+                    navigate(`/${organizationRouteId(organization)}`);
                   }
                 }}
-                data-testid={`factories-sidebar-organization-option-${organization.id}`}
+                aria-checked={isCurrent}
+                data-testid={`factories-sidebar-organization-option-${organizationRouteId(organization)}`}
               >
                 <Building2 className="h-3.5 w-3.5" aria-hidden />
                 <span className="truncate">{organization.name}</span>

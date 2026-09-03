@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { CopyLinkButton } from "../../CopyLinkButton";
+import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
@@ -32,6 +34,18 @@ import { useFollowLogScroll } from "./useFollowLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
+
+/**
+ * Absolute work-order permalink, so the popup copies the right link even
+ * when it is shown without a route change (e.g. straight from a board card).
+ * Falls back to the current address when identifiers are missing.
+ */
+function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNumber?: string, lineId?: string) {
+  if (!organizationId || !factoryKey || !orderNumber) {
+    return window.location.href;
+  }
+  return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
+}
 
 function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
   if (!canUpdate) {
@@ -235,6 +249,14 @@ export function WorkOrderSplitRunPopup({
         onTitleSave={(next) => void edits.saveTitle(next)}
         expanded={fullPage}
         onToggleExpanded={() => setFullPage((current) => !current)}
+        actions={
+          <CopyLinkButton
+            url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
+            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
+            iconClassName="h-4 w-4"
+            testId="popup-work-order-copy-link-button"
+          />
+        }
       >
         <OwnerTimeCostRow fixture={{ ...fixture, owner: edits.owner }} assigneeIds={edits.assigneeIds} />
       </PopupHeader>
