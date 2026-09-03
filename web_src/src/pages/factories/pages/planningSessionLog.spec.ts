@@ -459,4 +459,77 @@ describe("mergePlanningSessionNotes", () => {
     expect(merged.map((line) => line.id)).toEqual(["agent-step-7", "look", "agent-step-8"]);
     expect(merged[2]?.userTalk).toBe("survey");
   });
+
+  it("renders the submitted answer, not the live log's own wording, for a matched survey reply", () => {
+    // The live runner log can summarize a user turn in its own words (for
+    // example a truncated preview). That summary is not guaranteed to spell
+    // out the chosen answer, so the merge must prefer the text the user
+    // actually submitted once it recognizes the turn as a survey reply.
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "What is the priority? High (agent noted the rest of the form was skipped)",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: "What is the priority? High",
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-8"]);
+    expect(merged[0]?.userTalk).toBe("survey");
+    expect(merged[0]?.componentName).toBe("What is the priority? High");
+    expect(merged[0]?.componentName).not.toContain("skipped");
+  });
+
+  it("keeps a partially answered multi-question reply intact when it matches the live log", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "Which ORM? skipped\nWhich auth library? Passport",
+      }),
+    ];
+
+    const surveyReply = "Which ORM? skipped\nWhich auth library? Passport";
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged[0]?.componentName).toBe(surveyReply);
+    expect(merged[0]?.componentName).toContain("Passport");
+  });
+
+  it("keeps the skipped label when every answer in the reply was empty", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged[0]?.componentName).toBe(CREATE_WITH_AGENT_COPY.surveySkipped);
+  });
 });
