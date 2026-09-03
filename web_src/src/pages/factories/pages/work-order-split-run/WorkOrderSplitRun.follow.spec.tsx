@@ -47,16 +47,13 @@ describe("WorkOrderSplitRunPopup jump-to-latest", () => {
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
-  it("shows the pill once the run is finished, since following starts off", async () => {
+  it("keeps the pill hidden for a finished run, since auto-scroll starts on", async () => {
     const user = userEvent.setup();
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(BOARD_IMPLEMENT_NOTIFY_ORDER),
     });
     await user.click(screen.getByRole("tab", { name: "Automations" }));
 
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.viewingOlder)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest }));
     expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
   });
 
