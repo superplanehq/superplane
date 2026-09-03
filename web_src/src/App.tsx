@@ -7,6 +7,7 @@ import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalF
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -260,6 +261,7 @@ function PageObservabilityScope() {
 function OrganizationScope() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  useRedirectIntegrationSetupReturn(organizationId);
   useConsumeIntegrationSetupReturnOnArrival(organizationId);
 
   useEffect(() => {
