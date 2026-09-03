@@ -59,6 +59,7 @@ func (w *RepositoryProvisionerWorker) Start(ctx context.Context) {
 
 	<-ctx.Done()
 	w.Stop()
+	drainTasks(w.semaphore, maxConcurrentTasks)
 }
 
 func (w *RepositoryProvisionerWorker) Stop() {

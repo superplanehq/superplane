@@ -36,7 +36,7 @@ func NewWebhookProvisioner(baseURL string, encryptor crypto.Encryptor, registry 
 		registry:  registry,
 		baseURL:   baseURL,
 		encryptor: encryptor,
-		semaphore: semaphore.NewWeighted(25),
+		semaphore: semaphore.NewWeighted(maxConcurrentTasks),
 		logger:    log.WithFields(log.Fields{"worker": "WebhookProvisioner"}),
 	}
 }
@@ -56,6 +56,7 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
@@ -68,6 +69,15 @@ func (w *WebhookProvisioner) Start(ctx context.Context) {
 			telemetry.RecordWebhookProvisionerWorkerWebhooksCount(context.Background(), len(webhooks))
 
 			for _, webhook := range webhooks {
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue

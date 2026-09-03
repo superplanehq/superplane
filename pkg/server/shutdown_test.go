@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -59,7 +62,7 @@ func Test__StartWorker(t *testing.T) {
 		}
 
 		cancel()
-		waitForShutdown(&wg, time.Second)
+		waitForShutdownFor(t, &wg, time.Second)
 
 		select {
 		case <-stopped:
@@ -79,7 +82,7 @@ func Test__WaitForShutdown(t *testing.T) {
 		}()
 
 		start := time.Now()
-		waitForShutdown(&wg, time.Second)
+		assert.True(t, waitForShutdownFor(t, &wg, time.Second), "every worker returned")
 		assert.Less(t, time.Since(start), time.Second)
 	})
 
@@ -94,7 +97,7 @@ func Test__WaitForShutdown(t *testing.T) {
 		defer close(release)
 
 		start := time.Now()
-		waitForShutdown(&wg, 50*time.Millisecond)
+		assert.False(t, waitForShutdownFor(t, &wg, 50*time.Millisecond), "work was abandoned")
 		elapsed := time.Since(start)
 
 		//
@@ -155,7 +158,7 @@ func Test__StartConsumer(t *testing.T) {
 
 		startConsumer(ctx, &wg, "test consumer", start, stop)
 		cancel()
-		waitForShutdown(&wg, 5*time.Second)
+		waitForShutdownFor(t, &wg, 5*time.Second)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -174,7 +177,65 @@ func Test__StartConsumer(t *testing.T) {
 			func() { stopped = true },
 		)
 
-		waitForShutdown(&wg, 5*time.Second)
+		waitForShutdownFor(t, &wg, 5*time.Second)
 		assert.False(t, stopped, "the watcher must exit when the consumer already returned")
 	})
+}
+
+// waitForShutdownFor adapts waitForShutdown's context to a plain duration, which
+// keeps the timing intent of these tests readable.
+func waitForShutdownFor(t *testing.T, wg *sync.WaitGroup, timeout time.Duration) bool {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return waitForShutdown(ctx, wg)
+}
+
+func Test__TimeLeft(t *testing.T) {
+	t.Run("reports the remaining time", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
+		left := timeLeft(ctx)
+		assert.Greater(t, left, 50*time.Second)
+		assert.LessOrEqual(t, left, time.Minute)
+	})
+
+	t.Run("is zero for an expired deadline", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), -time.Second)
+		defer cancel()
+
+		assert.Equal(t, time.Duration(0), timeLeft(ctx))
+	})
+
+	t.Run("is zero when there is no deadline", func(t *testing.T) {
+		assert.Equal(t, time.Duration(0), timeLeft(context.Background()))
+	})
+}
+
+// Each worker launch must pass the cancellable context. Reverting a single one
+// of them back to context.Background() compiles and passes every behavioural
+// test, because nothing constructs the full startWorkers dependency graph, so
+// guard the wiring at the source level instead.
+func Test__WorkersAreStartedWithACancellableContext(t *testing.T) {
+	source, err := os.ReadFile("server.go")
+	require.NoError(t, err)
+
+	body := string(source)
+	start := strings.Index(body, "func startWorkers(")
+	require.NotEqual(t, -1, start, "startWorkers not found")
+
+	end := strings.Index(body[start:], "\nfunc ")
+	require.NotEqual(t, -1, end, "end of startWorkers not found")
+
+	var offenders []string
+	for i, line := range strings.Split(body[start:start+end], "\n") {
+		if strings.Contains(line, "context.Background()") {
+			offenders = append(offenders, fmt.Sprintf("line %d: %s", i+1, strings.TrimSpace(line)))
+		}
+	}
+
+	assert.Empty(t, offenders, "startWorkers must hand every worker the cancellable context, not context.Background()")
 }

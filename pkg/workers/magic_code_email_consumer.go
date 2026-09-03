@@ -60,7 +60,22 @@ func (c *MagicCodeEmailConsumer) Start(ctx context.Context) error {
 
 		log.Infof("Connecting to RabbitMQ queue for %s events", messages.MagicCodeRequestedRoutingKey)
 
-		if err := c.Consumer.Start(&options, c.Consume); err != nil {
+		err := c.Consumer.Start(&options, c.Consume)
+
+		//
+		// A cancelled context means shutdown closed the connection on purpose,
+		// so this is neither a failure nor a reconnect. Keep a real error
+		// visible, at a level that does not read as an alert during a deploy.
+		//
+		if ctx.Err() != nil {
+			if err != nil {
+				log.Infof("Consumer for %s stopped during shutdown: %v", messages.MagicCodeRequestedRoutingKey, err)
+			}
+
+			return nil
+		}
+
+		if err != nil {
 			log.Errorf("Error consuming messages from %s: %v", messages.MagicCodeRequestedRoutingKey, err)
 		} else {
 			log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.MagicCodeRequestedRoutingKey)

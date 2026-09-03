@@ -511,6 +511,14 @@ func startPublicAPI(
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
 		log.Println("Starting Event Distributer Worker")
 		eventDistributer := workers.NewEventDistributer(server.WebsocketHub())
+
+		//
+		// Deliberately outside the drain. Start blocks on its own channel while
+		// the real work happens in per-route consumers that consumeMessages
+		// creates inside a loop, so there is no handle to stop them. Joining the
+		// drain would report every worker stopped while those consumers still
+		// run. Giving them a lifecycle needs its own change.
+		//
 		go eventDistributer.Start()
 	} else {
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
@@ -840,20 +848,49 @@ func Start() {
 	stop()
 	log.Println("Shutdown signal received, stopping SuperPlane...")
 
-	waitForShutdown(&wg, shutdownTimeout())
+	//
+	// One deadline covers the whole sequence. Giving each step its own full
+	// timeout would let a slow drain plus a slow telemetry flush run for several
+	// times the grace period, and SIGKILL would then cut the process off with no
+	// chance to log why.
+	//
 	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout())
 	defer cancelShutdown()
+
+	drained := waitForShutdown(shutdownCtx, &wg)
 
 	if err := telemetry.ShutdownTracing(shutdownCtx); err != nil {
 		log.Warnf("Error shutting down tracing: %v", err)
 	}
-	telemetry.FlushSentry(shutdownTimeout())
+	telemetry.FlushSentry(timeLeft(shutdownCtx))
+
+	if !drained {
+		log.Warn("SuperPlane is DOWN, with work still in flight.")
+		return
+	}
+
 	log.Println("SuperPlane is DOWN.")
 }
 
-// defaultShutdownTimeout bounds the drain. It stays below the Kubernetes
+// timeLeft reports how much of ctx's deadline remains, for the steps that take a
+// duration rather than a context. It never returns a negative value.
+func timeLeft(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+
+	if left := time.Until(deadline); left > 0 {
+		return left
+	}
+
+	return 0
+}
+
+// defaultShutdownTimeout bounds the entire shutdown: the worker drain, the
+// tracing shutdown and the Sentry flush share it. It stays below the Kubernetes
 // default termination grace period of 30s, which the Helm chart does not
-// override, so the process finishes its own shutdown before SIGKILL arrives.
+// override, so the process finishes before SIGKILL arrives.
 // Raise SHUTDOWN_TIMEOUT and terminationGracePeriodSeconds together.
 const defaultShutdownTimeout = 25 * time.Second
 
@@ -872,9 +909,11 @@ func shutdownTimeout() time.Duration {
 	return timeout
 }
 
-// waitForShutdown waits for every tracked goroutine to return, and gives up
-// once timeout expires so a stuck worker cannot hold the process open forever.
-func waitForShutdown(wg *sync.WaitGroup, timeout time.Duration) {
+// waitForShutdown waits for every tracked goroutine to return, and gives up when
+// ctx expires so a stuck worker cannot hold the process open forever. It reports
+// whether every goroutine finished, so the caller does not announce a clean stop
+// after abandoning work.
+func waitForShutdown(ctx context.Context, wg *sync.WaitGroup) bool {
 	done := make(chan struct{})
 
 	go func() {
@@ -882,14 +921,13 @@ func waitForShutdown(wg *sync.WaitGroup, timeout time.Duration) {
 		close(done)
 	}()
 
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
 	select {
 	case <-done:
 		log.Println("All workers stopped")
-	case <-timer.C:
-		log.Warnf("Shutdown timeout of %s expired, exiting with work still in flight", timeout)
+		return true
+	case <-ctx.Done():
+		log.Warn("Shutdown deadline expired, exiting with work still in flight")
+		return false
 	}
 }
 
