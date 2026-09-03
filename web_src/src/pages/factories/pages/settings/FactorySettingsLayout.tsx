@@ -1,13 +1,32 @@
+import type { FactoriesFactory } from "@/api-client";
 import { Input } from "@/components/ui/input";
+import { useAccount } from "@/contexts/useAccount";
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import {
+  organizationMatchesRoute,
+  organizationRouteId,
+  selectedOrganizationRouteId,
+  type AccountOrganization,
+} from "@/lib/accountOrganizations";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
+import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, Search } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+import { ArrowLeft, Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, NavLink, Outlet, useLocation, useParams, useSearchParams } from "react-router";
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
@@ -17,10 +36,8 @@ import {
   factoryDetailPath,
   factoryListPath,
   factorySettingsSectionPath,
-  type FactorySettingsScope,
+  replaceOrganizationSegment,
 } from "../../lib/factoryPagePaths";
-import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
-import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
@@ -99,6 +116,7 @@ function FactorySettingsLayoutResolver({ organizationId, factoryKey }: { organiz
       organizationId={organizationId}
       factoryId={resolution.factory.id}
       factoryKey={resolution.factory.key ?? factoryKey}
+      factories={factories}
     />
   );
 }
@@ -107,10 +125,12 @@ function FactorySettingsLayoutContent({
   organizationId,
   factoryId,
   factoryKey,
+  factories,
 }: {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
+  factories: FactoriesFactory[];
 }) {
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
@@ -173,6 +193,8 @@ function FactorySettingsLayoutContent({
             <FactorySettingsSidebar
               organizationId={organizationId}
               factoryKey={factoryKey}
+              factory={factory}
+              factories={factories}
               navQuery={navQuery}
               onNavQueryChange={setNavQuery}
               isSearching={isSearching}
@@ -200,6 +222,8 @@ function FactorySettingsLayoutContent({
 function FactorySettingsSidebar({
   organizationId,
   factoryKey,
+  factory,
+  factories,
   navQuery,
   onNavQueryChange,
   isSearching,
@@ -208,12 +232,22 @@ function FactorySettingsSidebar({
 }: {
   organizationId: string;
   factoryKey: string;
+  factory: FactoriesFactory;
+  factories: FactoriesFactory[];
   navQuery: string;
   onNavQueryChange: (query: string) => void;
   isSearching: boolean;
   searchResults: FactorySettingsSearchResult[];
   navGroups: FactorySettingsNavGroup[];
 }) {
+  const { account } = useAccount();
+  const { data: organization } = useOrganization(organizationId);
+  const { data: organizations = [] } = useAccountOrganizations();
+  const accountLabel = account?.name?.trim() || "Account";
+  const organizationName = organization?.metadata?.name?.trim() || "Organization";
+  const workspaceName = factory.name?.trim() || "Workspace";
+  const workspaceKey = factory.key ?? factoryKey;
+
   return (
     <aside
       className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
@@ -258,9 +292,14 @@ function FactorySettingsSidebar({
               key={group.id}
               organizationId={organizationId}
               factoryKey={factoryKey}
-              scope={group.id}
-              title={group.label}
-              items={group.items}
+              factory={factory}
+              factories={factories}
+              organizations={organizations}
+              accountLabel={accountLabel}
+              organizationName={organizationName}
+              workspaceName={workspaceName}
+              workspaceKey={workspaceKey}
+              group={group}
             />
           ))
         )}
@@ -320,14 +359,148 @@ function SettingsSearchResults({
 function SettingsNavGroup({
   organizationId,
   factoryKey,
-  scope,
-  title,
+  factory,
+  factories,
+  organizations,
+  accountLabel,
+  organizationName,
+  workspaceName,
+  workspaceKey,
+  group,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  factory: FactoriesFactory;
+  factories: FactoriesFactory[];
+  organizations: AccountOrganization[];
+  accountLabel: string;
+  organizationName: string;
+  workspaceName: string;
+  workspaceKey: string;
+  group: FactorySettingsNavGroup;
+}) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const currentOrganizationRouteId = selectedOrganizationRouteId(organizations, organizationId);
+
+  return (
+    <section data-testid={`factory-settings-${group.id}-nav`}>
+      {group.id === "workspace" ? (
+        <SettingsEntitySwitcher
+          ariaLabel={`Switch workspace, ${workspaceName}`}
+          name={workspaceName}
+          helper={`Workspace · ${workspaceKey}`}
+          menuLabel="Switch workspace"
+          selectedId={factory.id ?? ""}
+          options={factories.flatMap((item) =>
+            item.id && item.key ? [{ id: item.id, name: item.name?.trim() || item.key, detail: item.key }] : [],
+          )}
+          onChange={(nextId) => {
+            const nextFactory = factories.find((item) => item.id === nextId);
+            if (!nextFactory?.key || nextFactory.key === factoryKey) {
+              return;
+            }
+            navigate(replaceFactoryKeySegment(pathname, organizationId, factoryKey, nextFactory.key));
+          }}
+          testId="factory-settings-workspace-switcher"
+        />
+      ) : group.id === "organization" ? (
+        <SettingsEntitySwitcher
+          ariaLabel={`Switch organization, ${organizationName}`}
+          name={organizationName}
+          helper="Organization"
+          menuLabel="Switch organization"
+          selectedId={currentOrganizationRouteId}
+          options={organizations.map((item) => ({
+            id: organizationRouteId(item),
+            name: item.name,
+            detail: "",
+          }))}
+          onChange={(nextRouteId) => {
+            const nextOrganization = organizations.find((item) => organizationRouteId(item) === nextRouteId);
+            if (!nextOrganization || organizationMatchesRoute(nextOrganization, organizationId)) {
+              return;
+            }
+            navigate(replaceOrganizationSegment(pathname, organizationId, organizationRouteId(nextOrganization)));
+          }}
+          testId="factory-settings-organization-switcher"
+        />
+      ) : (
+        <div className="px-2.5 pb-1">
+          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{accountLabel}</h2>
+        </div>
+      )}
+      <SettingsNavItems organizationId={organizationId} factoryKey={factoryKey} items={group.items} />
+    </section>
+  );
+}
+
+function SettingsEntitySwitcher({
+  ariaLabel,
+  name,
+  helper,
+  menuLabel,
+  selectedId,
+  options,
+  onChange,
+  testId,
+}: {
+  ariaLabel: string;
+  name: string;
+  helper: string;
+  menuLabel: string;
+  selectedId: string;
+  options: Array<{ id: string; name: string; detail: string }>;
+  onChange: (id: string) => void;
+  testId: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className="mb-1 flex w-full items-start justify-between gap-2 rounded-md px-2.5 py-1 text-left hover:bg-sidebar-accent"
+          data-testid={testId}
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">{helper}</span>
+          </span>
+          <ChevronDown className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>
+        {options.map((option) => {
+          const isCurrent = option.id === selectedId;
+          return (
+            <DropdownMenuItem
+              key={option.id}
+              onClick={() => onChange(option.id)}
+              aria-checked={isCurrent}
+              data-testid={`${testId}-option-${option.id}`}
+            >
+              <span className="min-w-0 flex-1 truncate">
+                {option.name}
+                {option.detail ? <span className="text-muted-foreground"> · {option.detail}</span> : null}
+              </span>
+              {isCurrent ? <Check className="ml-auto size-3.5 shrink-0" aria-hidden /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SettingsNavItems({
+  organizationId,
+  factoryKey,
   items,
 }: {
   organizationId: string;
   factoryKey: string;
-  scope: FactorySettingsScope;
-  title: string;
   items: FactorySettingsNavItem[];
 }) {
   const { pathname } = useLocation();
@@ -339,31 +512,28 @@ function SettingsNavGroup({
   }, [activeItem?.id]);
 
   return (
-    <section data-testid={`factory-settings-${scope}-nav`}>
-      <h2 className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{title}</h2>
-      <ul className="flex flex-col gap-0.5">
-        {items.map((item) => {
-          const Icon = item.Icon;
-          return (
-            <li key={item.id}>
-              <NavLink
-                ref={item.id === activeItem?.id ? activeItemRef : undefined}
-                to={factorySettingsSectionPath(organizationId, factoryKey, item.scope, item.section)}
-                className={({ isActive }) =>
-                  cn(
-                    "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
-                    isActive && "bg-sidebar-accent font-medium text-foreground",
-                  )
-                }
-                data-testid={`factory-settings-nav-${item.id}`}
-              >
-                <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
-                <span>{item.label}</span>
-              </NavLink>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <ul className="flex flex-col gap-0.5">
+      {items.map((item) => {
+        const Icon = item.Icon;
+        return (
+          <li key={item.id}>
+            <NavLink
+              ref={item.id === activeItem?.id ? activeItemRef : undefined}
+              to={factorySettingsSectionPath(organizationId, factoryKey, item.scope, item.section)}
+              className={({ isActive }) =>
+                cn(
+                  "group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] tracking-[-0.01em] text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                  isActive && "bg-sidebar-accent font-medium text-foreground",
+                )
+              }
+              data-testid={`factory-settings-nav-${item.id}`}
+            >
+              <Icon className="size-[15px] shrink-0 opacity-80" strokeWidth={1.75} aria-hidden />
+              <span>{item.label}</span>
+            </NavLink>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
