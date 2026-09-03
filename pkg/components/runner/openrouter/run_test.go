@@ -211,6 +211,196 @@ runPrompt(%q, "openai/gpt-4.1", %d)
 	}
 }
 
+func TestRunPromptPlanningAdvertisesPlanningToolsNotWriteEdit(t *testing.T) {
+	result := runOpenRouterPlanningPrompt(t, "none")
+	assert.Equal(t, 0, result.exitCode)
+	require.NotEmpty(t, result.chatRequests)
+	names := toolNames(t, result.chatRequests[0])
+	assert.Contains(t, names, "propose_draft")
+	assert.Contains(t, names, "survey")
+	assert.Contains(t, names, "bash")
+	assert.Contains(t, names, "read")
+	assert.NotContains(t, names, "write")
+	assert.NotContains(t, names, "edit")
+	assert.Empty(t, result.planningRequests)
+}
+
+func TestRunPromptPlanningProposeDraftPostsToDraftsEndpoint(t *testing.T) {
+	result := runOpenRouterPlanningPrompt(t, "propose_draft")
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.planningRequests, 1)
+	req := result.planningRequests[0]
+	assert.Contains(t, req["url"], "/api/v1/runner/planning-sessions/drafts")
+	assert.Equal(t, "POST", req["method"])
+	headers, ok := req["headers"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Bearer test-run-token", headers["Authorization"])
+	body, ok := req["body"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Add dark mode", body["title"])
+	assert.Equal(t, "Add a dark color scheme", body["description"])
+}
+
+func TestRunPromptPlanningSurveyPostsToSurveysEndpoint(t *testing.T) {
+	result := runOpenRouterPlanningPrompt(t, "survey")
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.planningRequests, 1)
+	req := result.planningRequests[0]
+	assert.Contains(t, req["url"], "/api/v1/runner/planning-sessions/surveys")
+	body, ok := req["body"].(map[string]any)
+	require.True(t, ok)
+	questions, ok := body["questions"].([]any)
+	require.True(t, ok)
+	require.Len(t, questions, 1)
+	question := questions[0].(map[string]any)
+	assert.Equal(t, "Which theme?", question["prompt"])
+}
+
+type openRouterPlanningResult struct {
+	exitCode         int
+	output           string
+	resultFile       string
+	chatRequests     []map[string]any
+	planningRequests []map[string]any
+}
+
+// toolMode selects which tool call (if any) the fake model returns on its
+// first tool-enabled turn: "propose_draft", "survey", or "none".
+func runOpenRouterPlanningPrompt(t *testing.T, toolMode string) openRouterPlanningResult {
+	t.Helper()
+
+	dir := t.TempDir()
+	resultFile := filepath.Join(dir, "result.json")
+	promptFile := filepath.Join(dir, "prompt.txt")
+	harnessFile := filepath.Join(dir, "harness.js")
+	requestsFile := filepath.Join(dir, "requests.json")
+	require.NoError(t, os.WriteFile(promptFile, []byte("what should we build next?"), 0o644))
+
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	planningScript, err := filepath.Abs("../planning_session_mcp.js")
+	require.NoError(t, err)
+	planningBody, err := os.ReadFile(planningScript)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "planning_session_mcp.js"), planningBody, 0o644))
+
+	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
+const fs = require("fs");
+const { runPrompt } = require(%q);
+const chatRequests = [];
+const planningRequests = [];
+const toolMode = %q;
+let toolTurn = 0;
+global.fetch = async (url, init) => {
+  const target = String(url);
+  if (target.endsWith("/chat/completions")) {
+    const body = JSON.parse(init.body);
+    chatRequests.push(body);
+    const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
+    let message = { content: hasTools ? "" : "Thanks, noted." };
+    if (hasTools && toolTurn === 0 && toolMode === "propose_draft") {
+      toolTurn += 1;
+      message = {
+        content: "",
+        tool_calls: [{
+          id: "call_1",
+          type: "function",
+          function: {
+            name: "propose_draft",
+            arguments: JSON.stringify({ title: "Add dark mode", description: "Add a dark color scheme" }),
+          },
+        }],
+      };
+    } else if (hasTools && toolTurn === 0 && toolMode === "survey") {
+      toolTurn += 1;
+      message = {
+        content: "",
+        tool_calls: [{
+          id: "call_1",
+          type: "function",
+          function: {
+            name: "survey",
+            arguments: JSON.stringify({ questions: [{ prompt: "Which theme?", options: ["Dark", "Light"] }] }),
+          },
+        }],
+      };
+    }
+    return { ok: true, json: async () => ({ usage: { prompt_tokens: 5, completion_tokens: 2 }, choices: [{ message }] }) };
+  }
+  const body = init.body ? JSON.parse(init.body) : undefined;
+  planningRequests.push({ url: target, method: init.method, headers: init.headers, body });
+  if (target.endsWith("/drafts")) {
+    return { ok: true, text: async () => JSON.stringify({ status: "created", work_order_key: "WO-1" }) };
+  }
+  if (target.endsWith("/surveys")) {
+    return { ok: true, text: async () => JSON.stringify({ status: "ok" }) };
+  }
+  return { ok: false, status: 404, text: async () => "not found" };
+};
+runPrompt(%q, "openai/gpt-4.1", 4)
+  .then((code) => {
+    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify({ chatRequests, planningRequests }));
+    process.exit(code);
+  })
+  .catch((err) => {
+    fs.writeFileSync(process.env.REQUESTS_FILE, JSON.stringify({ chatRequests, planningRequests }));
+    console.error(err && err.message ? err.message : err);
+    process.exit(1);
+  });
+`, script, toolMode, promptFile)), 0o644))
+
+	cmd := exec.Command("node", harnessFile)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"SUPERPLANE_RESULT_FILE="+resultFile,
+		"SUPERPLANE_TASK_DIR="+dir,
+		"SUPERPLANE_PLANNING_SESSION_ID=session-1",
+		"SUPERPLANE_BASE_URL=https://superplane.example",
+		"SUPERPLANE_RUN_TOKEN=test-run-token",
+		"OPENROUTER_API_KEY=test",
+		"REQUESTS_FILE="+requestsFile,
+	)
+	out, err := cmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		require.Truef(t, ok, "node harness failed: %v\n%s", err, out)
+		exitCode = exitErr.ExitCode()
+	}
+
+	raw, readErr := os.ReadFile(requestsFile)
+	require.NoError(t, readErr)
+	var parsed struct {
+		ChatRequests     []map[string]any `json:"chatRequests"`
+		PlanningRequests []map[string]any `json:"planningRequests"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+
+	return openRouterPlanningResult{
+		exitCode:         exitCode,
+		output:           string(out),
+		resultFile:       resultFile,
+		chatRequests:     parsed.ChatRequests,
+		planningRequests: parsed.PlanningRequests,
+	}
+}
+
+func toolNames(t *testing.T, request map[string]any) []string {
+	t.Helper()
+	tools, ok := request["tools"].([]any)
+	require.True(t, ok)
+	names := make([]string, 0, len(tools))
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		require.True(t, ok)
+		fn, ok := tool["function"].(map[string]any)
+		require.True(t, ok)
+		name, _ := fn["name"].(string)
+		names = append(names, name)
+	}
+	return names
+}
+
 func assertToolRouting(t *testing.T, request map[string]any, wantTools bool) {
 	t.Helper()
 	_, hasTools := request["tools"]
