@@ -144,11 +144,17 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	commands, files := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups)
+	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+
+	task := buildCodexBrokerTask(spec, resolved.Usage, resolved.Setups)
+	task = applyPlanningFollowUp(task, environment, spec)
+	if runner.HasPlanningSessionToken(environment) {
+		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+	}
 	taskID, err := broker.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       commands,
-		Files:          files,
+		Commands:       task.Commands,
+		Files:          task.Files,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  runner.ExecutionModeHost,

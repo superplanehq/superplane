@@ -24,6 +24,10 @@ const PLANNING_SYSTEM_PROMPT =
   " This is a SuperPlane planning session. Call mcp__superplane__propose_draft only when the user asked for a task in this turn. Call mcp__superplane__survey to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. Write to the user in plain text.";
 
 const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
+// Planning sessions may only explore the repo (Read/Bash) and use the planning
+// MCP tools. Edit/Write are intentionally excluded so the agent cannot make
+// changes while drafting a task.
+const PLANNING_READONLY_TOOLS = "Read,Bash";
 const PLANNING_ALLOWED_TOOLS = ["mcp__superplane__propose_draft", "mcp__superplane__survey"];
 
 function envFlag(env, name) {
@@ -32,14 +36,17 @@ function envFlag(env, name) {
 
 function allowedClaudeTools(env = process.env) {
   if (envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID")) {
-    return [BASE_ALLOWED_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
+    return [PLANNING_READONLY_TOOLS, "mcp__superplane", ...PLANNING_ALLOWED_TOOLS].join(",");
   }
   return BASE_ALLOWED_TOOLS;
 }
 
 function claudePermissionMode(env = process.env) {
   if (mcpToolsEnabled(env)) {
-    return "bypassPermissions";
+    // "plan" mode keeps the session read-only: Claude can still use Read/Bash
+    // and the allowed planning MCP tools, but it cannot Edit/Write files or
+    // run any tool outside allowedClaudeTools without asking first.
+    return "plan";
   }
   return "acceptEdits";
 }

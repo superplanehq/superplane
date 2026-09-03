@@ -188,7 +188,8 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
-	assert.Contains(t, runScript, `"bypassPermissions"`)
+	assert.Contains(t, runScript, `"plan"`)
+	assert.NotContains(t, runScript, "bypassPermissions")
 	assert.Contains(t, runScript, "--mcp-config")
 	assert.Contains(t, runScript, "planning_session_mcp.js")
 	assert.Contains(t, runScript, "mcp__superplane__propose_draft")
@@ -277,7 +278,7 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.Equal(t, runner.LiveLogKindPrompt, last.Kind)
 	assert.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'opus'`)
 	assert.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
-	assert.Equal(t, followUpLoopScript, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
+	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
