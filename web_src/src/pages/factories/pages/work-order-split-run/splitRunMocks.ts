@@ -93,6 +93,13 @@ export interface SplitRunStreamLine {
   component?: string;
   /** Node execution id for live runner logs. */
   executionId?: string;
+  /**
+   * Comparable chronological sort key (epoch ms), when known. Lets the
+   * planning session merge interleave a user reply with agent notes by true
+   * time instead of guessing from wait-slot position. Absent when the
+   * source has no timestamp (falls back to positional heuristics).
+   */
+  orderKey?: number;
 }
 
 export interface SplitRunPhase {

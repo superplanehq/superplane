@@ -72,6 +72,18 @@ describe("notesFromLiveLogSections", () => {
     expect(notes[3]?.noteParentId).toBe("agent-step-5");
   });
 
+  it("tags the section, its notes, and its tools with the section start time", () => {
+    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: 5_000 }]);
+
+    expect(notes.map((note) => note.orderKey)).toEqual([5_000, 5_000, 5_000]);
+  });
+
+  it("leaves orderKey undefined when the section has no start time", () => {
+    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: null }]);
+
+    expect(notes.every((note) => note.orderKey === undefined)).toBe(true);
+  });
+
   it("falls back to parseClaudeCodeLog for old -> [Tool] lines", () => {
     const notes = notesFromLiveLogSections("agent", [
       {

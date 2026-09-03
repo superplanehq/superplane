@@ -16,6 +16,7 @@ import (
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -300,9 +301,10 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	messagesOut := make([]*pb.PlanningSessionMessage, 0, len(messages))
 	for _, message := range messages {
 		messagesOut = append(messagesOut, &pb.PlanningSessionMessage{
-			Id:   message.ID.String(),
-			Role: message.Role,
-			Text: message.Text,
+			Id:        message.ID.String(),
+			Role:      message.Role,
+			Text:      message.Text,
+			CreatedAt: timestamppb.New(message.CreatedAt),
 		})
 	}
 
