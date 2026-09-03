@@ -231,9 +231,10 @@ export function mergePlanningSessionNotes(
 
   const merged = live.map((line) => ({ ...line }));
   const { unmatchedUsers, unmatchedOthers } = partitionPlanningExtras(merged, extra);
+  const hasLiveOrder = merged.some((line) => typeof line.orderKey === "number");
   const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
   const slots = consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits);
-  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots);
+  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots, hasLiveOrder);
   placed.insertions.sort((left, right) => right.afterIndex - left.afterIndex || right.order - left.order);
   for (const insertion of placed.insertions) {
     merged.splice(insertion.afterIndex + 1, 0, insertion.line);
@@ -254,6 +255,13 @@ function partitionPlanningExtras(
     if (streamNoteHasText(merged, line.componentName)) {
       if (line.userTalk === "survey") {
         markLiveUserTalk(merged, line.componentName, "survey");
+      }
+      // Live notes only carry the coarse section start time, which every note
+      // in an agent turn shares. Stamp the matching live note with the agent
+      // message's own created_at so a later user reply can interleave by true
+      // chronology instead of landing after the whole turn.
+      if (!isSessionUserExtra(line) && typeof line.orderKey === "number") {
+        stampLiveNoteOrderKey(merged, line.componentName, line.orderKey);
       }
       continue;
     }
@@ -290,6 +298,7 @@ function placeUnmatchedUserExtras(
   unmatchedUsers: SplitRunStreamLine[],
   emptyWaits: WaitSlot[],
   slots: { waitCursor: number; lastWait?: WaitSlot },
+  hasLiveOrder: boolean,
 ): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
   const insertions: NoteInsertion[] = [];
   const trailing: SplitRunStreamLine[] = [];
@@ -297,6 +306,21 @@ function placeUnmatchedUserExtras(
   let lastWait = slots.lastWait;
   let insertOrder = 0;
   for (const line of unmatchedUsers) {
+    // True chronological order is known for both sides: place the message
+    // right after the last live note that happened at or before it, rather
+    // than guessing from wait-slot position. This is what keeps a user
+    // reply after an agent error note that came before it.
+    if (hasLiveOrder && typeof line.orderKey === "number") {
+      const afterIndex = insertionIndexByOrderKey(merged, line.orderKey);
+      const parentId = orderKeyInsertionParent(merged, afterIndex);
+      insertions.push({
+        afterIndex,
+        order: insertOrder,
+        line: parentId ? { ...line, noteParentId: parentId, noteDepth: 1 } : { ...line },
+      });
+      insertOrder += 1;
+      continue;
+    }
     const slot = emptyWaits[waitCursor];
     if (slot) {
       lastWait = slot;
@@ -313,6 +337,39 @@ function placeUnmatchedUserExtras(
     trailing.push(line);
   }
   return { insertions, trailing };
+}
+
+/**
+ * Finds the index to insert after so a line with `orderKey` lands in true
+ * chronological order. Live notes carry mixed granularity: an agent reply
+ * gets its own message time, while the "done" stat and tool notes around it
+ * keep the coarser section start time. Tracking the running maximum lets those
+ * trailing coarse notes inherit the turn's real time, so a later user message
+ * is not pulled back in front of them. Ties resolve to the later index, and a
+ * return of -1 means every timestamped line comes after `orderKey`.
+ */
+function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number): number {
+  let index = -1;
+  let runningMax = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < merged.length; i += 1) {
+    const key = merged[i]?.orderKey;
+    if (typeof key === "number" && key > runningMax) {
+      runningMax = key;
+    }
+    if (runningMax !== Number.NEGATIVE_INFINITY && runningMax <= orderKey) {
+      index = i;
+    }
+  }
+  return index;
+}
+
+/** The note/step group a chronologically placed insertion should nest under. */
+function orderKeyInsertionParent(merged: SplitRunStreamLine[], afterIndex: number): string | undefined {
+  const target = merged[afterIndex];
+  if (!target) {
+    return undefined;
+  }
+  return target.noteParentId ?? target.id;
 }
 
 function userExtraInsertion(
@@ -365,6 +422,27 @@ function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
   }
   const prefix = needle.slice(0, 48);
   return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
+/**
+ * Copies an agent message's created_at onto the live note that already renders
+ * its text, so the note is ordered by when it was said rather than by the
+ * section it streamed under. Only the first matching agent note is stamped.
+ */
+function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderKey: number): void {
+  const prefix = text.trim().slice(0, 48);
+  if (!prefix) {
+    return;
+  }
+  for (const note of notes) {
+    if (note.componentType === "prompt") {
+      continue;
+    }
+    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+      note.orderKey = orderKey;
+      return;
+    }
+  }
 }
 
 function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {

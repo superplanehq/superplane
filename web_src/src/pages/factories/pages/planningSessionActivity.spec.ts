@@ -124,4 +124,18 @@ describe("planningSessionPhase", () => {
       expect.objectContaining({ id: "user-survey", userTalk: "survey" }),
     ]);
   });
+
+  it("carries the message createdAtMs through as the talk line orderKey", () => {
+    const lines = planningSessionTalkLines([
+      { id: "user-1", kind: "text", role: "user", text: "Add a Size field", createdAtMs: 1000 },
+    ]);
+
+    expect(lines[0]?.orderKey).toBe(1000);
+  });
+
+  it("leaves orderKey undefined when the message has no createdAtMs", () => {
+    const lines = planningSessionTalkLines([{ id: "user-1", kind: "text", role: "user", text: "Add a Size field" }]);
+
+    expect(lines[0]?.orderKey).toBeUndefined();
+  });
 });
