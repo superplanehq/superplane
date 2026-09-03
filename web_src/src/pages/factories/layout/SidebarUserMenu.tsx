@@ -1,6 +1,5 @@
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { Avatar } from "@/components/Avatar/avatar";
+import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
 import { useTheme } from "@/contexts/useTheme";
 import { isThemePreference } from "@/lib/themePreference";
 import type { ThemePreference } from "@/lib/themePreference";
@@ -10,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -22,11 +20,8 @@ import {
 } from "@/ui/dropdownMenu";
 import {
   ArrowRightLeft,
-  Building2,
-  Check,
   LayoutGrid,
   LogOut,
-  Plus,
   Settings,
   SunMoon,
   User as UserIcon,
@@ -171,9 +166,6 @@ function OrganizationMenuHeader({
 }
 
 function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationId: string }) {
-  const navigate = useNavigate();
-  const { data: organizations = [] } = useAccountOrganizations();
-
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
@@ -184,32 +176,11 @@ function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationI
         <ArrowRightLeft className="size-3.5" aria-hidden />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className="w-64" data-testid="factories-sidebar-organization-switch-menu">
-          <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
-          {organizations.map((organization) => {
-            const isCurrent = organizationMatchesRoute(organization, currentOrganizationId);
-            return (
-              <DropdownMenuItem
-                key={organization.id}
-                onClick={() => {
-                  if (!isCurrent) {
-                    navigate(`/${organizationRouteId(organization)}`);
-                  }
-                }}
-                aria-checked={isCurrent}
-                data-testid={`factories-sidebar-organization-option-${organizationRouteId(organization)}`}
-              >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
-                <span className="truncate">{organization.name}</span>
-                {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/create")} data-testid="factories-sidebar-organization-create">
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Create new organization
-          </DropdownMenuItem>
+        <DropdownMenuSubContent
+          className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
+          data-testid="factories-sidebar-organization-switch-menu"
+        >
+          <OrganizationSwitchMenu currentOrganizationId={currentOrganizationId} testIdPrefix="factories-sidebar" />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>
