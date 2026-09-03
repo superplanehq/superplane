@@ -43,15 +43,15 @@ export function pickAutoRedirectOrganization(
   organizations: { id: string }[],
   lastVisitedOrganizationId: string | null,
 ): string | null {
-  if (organizations.length === 1) {
-    return organizations[0].id;
+  if (organizations.length === 0) {
+    return null;
   }
 
   if (lastVisitedOrganizationId && organizations.some((org) => org.id === lastVisitedOrganizationId)) {
     return lastVisitedOrganizationId;
   }
 
-  return null;
+  return organizations[0].id;
 }
 
 export function recordLastVisitedOrganization(accountId: string, organizationId: string): void {

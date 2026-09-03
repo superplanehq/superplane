@@ -1,4 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useAccount } from "@/contexts/useAccount";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
@@ -50,6 +51,9 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
     !!organizationId && canReadOrg,
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isOrganizationSwitchOpen, setIsOrganizationSwitchOpen] = useState(false);
+  const accountOrganizationsQuery = useAccountOrganizations();
+  const accountOrganizations = accountOrganizationsQuery.data ?? [];
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleMenuButtonClick = () => {
@@ -169,7 +173,6 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
   const handleSignOut = () => {
@@ -187,6 +190,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
               <button
                 type="button"
                 onClick={handleMenuButtonClick}
+                data-testid="legacy-organization-menu"
                 className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100 cursor-pointer"
                 aria-label="Open organization menu"
                 aria-expanded={isMenuOpen}
@@ -274,6 +278,51 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       );
                     })}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsOrganizationSwitchOpen((open) => !open)}
+                    data-testid="legacy-organization-switch"
+                    className="mt-2 flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                    aria-expanded={isOrganizationSwitchOpen}
+                  >
+                    <ArrowRightLeft size={16} aria-hidden />
+                    Switch organization
+                  </button>
+                  {isOrganizationSwitchOpen ? (
+                    <div
+                      className="mt-1 max-h-52 overflow-y-auto rounded-md border border-slate-950/15 p-1 dark:border-gray-700/70"
+                      data-testid="legacy-organization-switch-list"
+                    >
+                      {accountOrganizationsQuery.isLoading ? <p className="px-1.5 py-1 text-sm text-gray-500">Loading organizations...</p> : null}
+                      {accountOrganizationsQuery.isError ? <p className="px-1.5 py-1 text-sm text-gray-500">Could not load organizations.</p> : null}
+                      {!accountOrganizationsQuery.isLoading && !accountOrganizationsQuery.isError && accountOrganizations.length === 0 ? (
+                        <p className="px-1.5 py-1 text-sm text-gray-500">No organizations available.</p>
+                      ) : null}
+                      {accountOrganizations.map((accountOrganization) => {
+                        const isCurrent = accountOrganization.slug === organizationId;
+                        return (
+                          <Link
+                            key={accountOrganization.id}
+                            to={`/${accountOrganization.slug}`}
+                            onClick={() => setIsMenuOpen(false)}
+                            data-testid={`legacy-organization-option-${accountOrganization.id}`}
+                            className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                          >
+                            <span className="min-w-0 flex-1 truncate">{accountOrganization.name}</span>
+                            {isCurrent ? <span className="text-xs text-gray-400">Current</span> : null}
+                          </Link>
+                        );
+                      })}
+                      <Link
+                        to="/create"
+                        onClick={() => setIsMenuOpen(false)}
+                        data-testid="legacy-organization-create"
+                        className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"
+                      >
+                        <span>Create new organization</span>
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
               )}
               <div className="px-4 py-2">

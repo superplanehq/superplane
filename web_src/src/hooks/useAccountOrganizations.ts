@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 export interface AccountOrganization {
   id: string;
+  slug: string;
   name: string;
 }
 
@@ -21,6 +22,7 @@ async function fetchAccountOrganizations(): Promise<AccountOrganization[]> {
       entry &&
         typeof entry === "object" &&
         typeof (entry as AccountOrganization).id === "string" &&
+        typeof (entry as AccountOrganization).slug === "string" &&
         typeof (entry as AccountOrganization).name === "string",
     );
   });
