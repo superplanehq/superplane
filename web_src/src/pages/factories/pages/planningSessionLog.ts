@@ -293,6 +293,17 @@ function consumeMatchedWaitSlots(
   return { waitCursor, lastWait };
 }
 
+type UserPlacementState = {
+  merged: SplitRunStreamLine[];
+  emptyWaits: WaitSlot[];
+  waitCursor: number;
+  lastWait?: WaitSlot;
+  turnEnds: number[];
+  turnEndCursor: number;
+  hasLiveOrder: boolean;
+  insertOrder: number;
+};
+
 function placeUnmatchedUserExtras(
   merged: SplitRunStreamLine[],
   unmatchedUsers: SplitRunStreamLine[],
@@ -302,56 +313,70 @@ function placeUnmatchedUserExtras(
 ): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
   const insertions: NoteInsertion[] = [];
   const trailing: SplitRunStreamLine[] = [];
-  let waitCursor = slots.waitCursor;
-  let lastWait = slots.lastWait;
-  const turnEnds = turnEndIndexes(merged);
-  let insertOrder = 0;
-  let turnEndCursor = 0;
+  const state: UserPlacementState = {
+    merged,
+    emptyWaits,
+    waitCursor: slots.waitCursor,
+    lastWait: slots.lastWait,
+    turnEnds: turnEndIndexes(merged),
+    turnEndCursor: 0,
+    hasLiveOrder,
+    insertOrder: 0,
+  };
   for (const line of unmatchedUsers) {
-    // Each Claude, Codex, or OpenRouter turn in the follow-up wait slot ends
-    // with a "✓ done" line.
-    // Place the next user message after that line so replies stay after the
-    // prompt that triggered them. Time-based orderKey cannot do this: every
-    // note in the wait slot shares the section start time, and agent extras
-    // are not persisted, so there is nothing to stamp.
-    if (turnEndCursor < turnEnds.length) {
-      const afterIndex = turnEnds[turnEndCursor];
-      insertions.push(userExtraInsertion(line, afterIndex, insertOrder, turnEndParent(merged, afterIndex)));
-      turnEndCursor += 1;
-      insertOrder += 1;
+    const insertion = nextUserPlacement(state, line);
+    if (!insertion) {
+      trailing.push(line);
       continue;
     }
-    // True chronological order is known for both sides: place the message
-    // right after the last live note that happened at or before it, rather
-    // than guessing from wait-slot position. This is what keeps a user
-    // reply after an agent error note that came before it.
-    if (hasLiveOrder && typeof line.orderKey === "number") {
-      const afterIndex = insertionIndexByOrderKey(merged, line.orderKey);
-      const parentId = orderKeyInsertionParent(merged, afterIndex);
-      insertions.push({
-        afterIndex,
-        order: insertOrder,
-        line: parentId ? { ...line, noteParentId: parentId, noteDepth: 1 } : { ...line },
-      });
-      insertOrder += 1;
-      continue;
-    }
-    const slot = emptyWaits[waitCursor];
-    if (slot) {
-      lastWait = slot;
-      waitCursor += 1;
-      insertions.push(userExtraInsertion(line, slot.index, insertOrder, slot.line.id));
-      insertOrder += 1;
-      continue;
-    }
-    if (lastWait) {
-      insertions.push(userExtraInsertion(line, lastWaitGroupEndIndex(merged, lastWait), insertOrder, lastWait.line.id));
-      insertOrder += 1;
-      continue;
-    }
-    trailing.push(line);
+    insertions.push(insertion);
+    state.insertOrder += 1;
   }
   return { insertions, trailing };
+}
+
+function nextUserPlacement(state: UserPlacementState, line: SplitRunStreamLine): NoteInsertion | undefined {
+  const turnEnd = state.turnEnds[state.turnEndCursor];
+  if (turnEnd !== undefined) {
+    state.turnEndCursor += 1;
+    return userExtraInsertion(line, turnEnd, state.insertOrder, turnEndParent(state.merged, turnEnd));
+  }
+  if (state.hasLiveOrder && typeof line.orderKey === "number") {
+    return orderKeyUserInsertion(state.merged, line, line.orderKey, state.insertOrder);
+  }
+  return waitSlotUserInsertion(state, line);
+}
+
+function orderKeyUserInsertion(
+  merged: SplitRunStreamLine[],
+  line: SplitRunStreamLine,
+  orderKey: number,
+  order: number,
+): NoteInsertion {
+  const afterIndex = insertionIndexByOrderKey(merged, orderKey);
+  const parentId = orderKeyInsertionParent(merged, afterIndex);
+  if (!parentId) {
+    return { afterIndex, order, line: { ...line } };
+  }
+  return userExtraInsertion(line, afterIndex, order, parentId);
+}
+
+function waitSlotUserInsertion(state: UserPlacementState, line: SplitRunStreamLine): NoteInsertion | undefined {
+  const slot = state.emptyWaits[state.waitCursor];
+  if (slot) {
+    state.lastWait = slot;
+    state.waitCursor += 1;
+    return userExtraInsertion(line, slot.index, state.insertOrder, slot.line.id);
+  }
+  if (!state.lastWait) {
+    return undefined;
+  }
+  return userExtraInsertion(
+    line,
+    lastWaitGroupEndIndex(state.merged, state.lastWait),
+    state.insertOrder,
+    state.lastWait.line.id,
+  );
 }
 
 /**
