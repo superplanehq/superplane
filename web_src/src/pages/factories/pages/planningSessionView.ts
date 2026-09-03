@@ -26,7 +26,7 @@ export type PlanningSessionMessagePayload = {
   id?: string;
   role?: string;
   text?: string;
-  /** When the server persisted the message (ISO 8601). Only user messages carry this today. */
+  /** When the server persisted the message (ISO 8601). Both roles carry this. */
   createdAt?: string;
 };
 

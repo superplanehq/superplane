@@ -256,6 +256,13 @@ function partitionPlanningExtras(
       if (line.userTalk === "survey") {
         markLiveUserTalk(merged, line.componentName, "survey");
       }
+      // Live notes only carry the coarse section start time, which every note
+      // in an agent turn shares. Stamp the matching live note with the agent
+      // message's own created_at so a later user reply can interleave by true
+      // chronology instead of landing after the whole turn.
+      if (!isSessionUserExtra(line) && typeof line.orderKey === "number") {
+        stampLiveNoteOrderKey(merged, line.componentName, line.orderKey);
+      }
       continue;
     }
     if (isSessionUserExtra(line)) {
@@ -333,17 +340,23 @@ function placeUnmatchedUserExtras(
 }
 
 /**
- * Finds the index of the last line in `merged` whose orderKey is at or
- * before `orderKey`. Ties resolve to the later index, so the caller inserts
- * after every note that shares the same (section-granular) timestamp
- * instead of splitting them apart. Returns -1 when every timestamped line
- * comes after `orderKey`, meaning the caller should insert at the front.
+ * Finds the index to insert after so a line with `orderKey` lands in true
+ * chronological order. Live notes carry mixed granularity: an agent reply
+ * gets its own message time, while the "done" stat and tool notes around it
+ * keep the coarser section start time. Tracking the running maximum lets those
+ * trailing coarse notes inherit the turn's real time, so a later user message
+ * is not pulled back in front of them. Ties resolve to the later index, and a
+ * return of -1 means every timestamped line comes after `orderKey`.
  */
 function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number): number {
   let index = -1;
+  let runningMax = Number.NEGATIVE_INFINITY;
   for (let i = 0; i < merged.length; i += 1) {
     const key = merged[i]?.orderKey;
-    if (typeof key === "number" && key <= orderKey) {
+    if (typeof key === "number" && key > runningMax) {
+      runningMax = key;
+    }
+    if (runningMax !== Number.NEGATIVE_INFINITY && runningMax <= orderKey) {
       index = i;
     }
   }
@@ -409,6 +422,27 @@ function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
   }
   const prefix = needle.slice(0, 48);
   return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
+/**
+ * Copies an agent message's created_at onto the live note that already renders
+ * its text, so the note is ordered by when it was said rather than by the
+ * section it streamed under. Only the first matching agent note is stamped.
+ */
+function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderKey: number): void {
+  const prefix = text.trim().slice(0, 48);
+  if (!prefix) {
+    return;
+  }
+  for (const note of notes) {
+    if (note.componentType === "prompt") {
+      continue;
+    }
+    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+      note.orderKey = orderKey;
+      return;
+    }
+  }
 }
 
 function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {
