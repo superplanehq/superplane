@@ -36,7 +36,13 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "velocity",
     "pull requests",
   ]),
-  entry("account", "profile", "Security", "account-redesign-security", ["sign in", "password", "token", "sso", "login"]),
+  entry("account", "profile", "Security", "account-redesign-security", [
+    "sign in",
+    "password",
+    "token",
+    "sso",
+    "login",
+  ]),
   entry("account", "profile", "Sign in methods", "account-redesign-signin", [
     "security",
     "password",
