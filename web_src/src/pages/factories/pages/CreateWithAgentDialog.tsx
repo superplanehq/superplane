@@ -19,6 +19,7 @@ import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createWithAgentTypes";
 import { planningSessionPhase } from "./planningSessionActivity";
 import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
+import { JumpToLatestPill } from "./work-order-split-run/JumpToLatestPill";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 import { SplitRunAttentionNote } from "./work-order-split-run/SplitRunAttentionNote";
 import { useFollowLogScroll } from "./work-order-split-run/useFollowLogScroll";
@@ -214,7 +215,9 @@ function CreateWithAgentStream({
             compactSessionLog
           />
         </div>
-        {follow.following ? null : <OlderMessagesBar onJumpToLatest={() => follow.setFollowing(true)} />}
+        {follow.following ? null : (
+          <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="create-with-agent-older" />
+        )}
       </div>
       {failed ? (
         <SplitRunAttentionNote
@@ -261,22 +264,6 @@ function CreateWithAgentStream({
         </div>
       </form>
     </section>
-  );
-}
-
-function OlderMessagesBar({ onJumpToLatest }: { onJumpToLatest: () => void }) {
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center"
-      data-testid="create-with-agent-older"
-    >
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-zinc-900 py-1 pl-3 pr-1 text-[12px] text-white shadow-md">
-        <span>{CREATE_WITH_AGENT_COPY.viewingOlder}</span>
-        <Button type="button" size="sm" className="h-7 rounded-md px-2.5 text-[12px]" onClick={onJumpToLatest}>
-          {CREATE_WITH_AGENT_COPY.jumpToLatest}
-        </Button>
-      </div>
-    </div>
   );
 }
 
