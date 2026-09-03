@@ -19,6 +19,7 @@ type AccountSecurityRedesignPageProps = {
   onCreateToken: (name: string) => string;
   onRevokeToken: (id: string) => void;
   hideMockDialogs?: boolean;
+  embedded?: boolean;
 };
 
 export function AccountSecurityRedesignPage({
@@ -31,6 +32,7 @@ export function AccountSecurityRedesignPage({
   onCreateToken,
   onRevokeToken,
   hideMockDialogs = false,
+  embedded = false,
 }: AccountSecurityRedesignPageProps) {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [createTokenOpen, setCreateTokenOpen] = useState(false);
@@ -40,23 +42,34 @@ export function AccountSecurityRedesignPage({
   const connectedCount = ssoAccounts.filter((account) => account.identity).length;
   const canDisconnectSso = passwordSet || connectedCount > 1;
 
+  const cards = (
+    <div className="flex flex-col gap-5" data-testid="account-redesign-security">
+      <h2 className="text-[15px] font-medium tracking-[-0.01em] text-foreground">Security & access</h2>
+      <AccountSecuritySignInCard
+        passwordSet={passwordSet}
+        ssoAccounts={ssoAccounts}
+        canDisconnectSso={canDisconnectSso}
+        onChangePassword={() => (hideMockDialogs ? onChangePassword() : setPasswordOpen(true))}
+        onConnectSso={onConnectSso}
+        onDisconnect={setDisconnectProvider}
+      />
+      <AccountSecurityTokensCard
+        tokens={tokens}
+        onCreate={() => (hideMockDialogs ? onCreateToken("") : setCreateTokenOpen(true))}
+        onRevokeToken={onRevokeToken}
+      />
+    </div>
+  );
+
   return (
     <>
-      <FactorySettingsPageFrame title="Security" subtitle="Manage sign-in methods and personal tokens.">
-        <AccountSecuritySignInCard
-          passwordSet={passwordSet}
-          ssoAccounts={ssoAccounts}
-          canDisconnectSso={canDisconnectSso}
-          onChangePassword={() => (hideMockDialogs ? onChangePassword() : setPasswordOpen(true))}
-          onConnectSso={onConnectSso}
-          onDisconnect={setDisconnectProvider}
-        />
-        <AccountSecurityTokensCard
-          tokens={tokens}
-          onCreate={() => (hideMockDialogs ? onCreateToken("") : setCreateTokenOpen(true))}
-          onRevokeToken={onRevokeToken}
-        />
-      </FactorySettingsPageFrame>
+      {embedded ? (
+        cards
+      ) : (
+        <FactorySettingsPageFrame title="Security & access" subtitle="Manage sign-in methods and personal tokens.">
+          {cards}
+        </FactorySettingsPageFrame>
+      )}
 
       {hideMockDialogs ? null : (
         <PasswordDialog
