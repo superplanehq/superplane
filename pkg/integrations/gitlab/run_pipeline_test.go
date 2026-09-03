@@ -225,3 +225,85 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	assert.Equal(t, RunPipelinePollInterval, requestsCtx.Duration)
 	assert.Empty(t, executionState.Channel)
 }
+
+func Test__RunPipeline__Poll__EmitsTerminalStatus(t *testing.T) {
+	testCases := []struct {
+		name            string
+		pipelineStatus  string
+		expectedChannel string
+	}{
+		{
+			name:            "successful pipeline",
+			pipelineStatus:  PipelineStatusSuccess,
+			expectedChannel: PipelinePassedOutputChannel,
+		},
+		{
+			name:            "failed pipeline",
+			pipelineStatus:  PipelineStatusFailed,
+			expectedChannel: PipelineFailedOutputChannel,
+		},
+		{
+			name:            "canceled pipeline",
+			pipelineStatus:  PipelineStatusCanceled,
+			expectedChannel: PipelineFailedOutputChannel,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			component := &RunPipeline{}
+			metadataCtx := &contexts.MetadataContext{
+				Metadata: RunPipelineExecutionMetadata{
+					Pipeline: &PipelineMetadata{
+						ID:     1001,
+						Status: "running",
+					},
+				},
+			}
+			executionState := &contexts.ExecutionStateContext{
+				KVs: map[string]string{},
+			}
+
+			err := component.HandleHook(core.ActionHookContext{
+				Name: RunPipelinePollAction,
+				Configuration: map[string]any{
+					"project": "123",
+					"ref":     "main",
+				},
+				Metadata: metadataCtx,
+				Integration: &contexts.IntegrationContext{
+					Configuration: map[string]any{
+						"authType":    AuthTypePersonalAccessToken,
+						"groupId":     "123",
+						"accessToken": "pat",
+						"baseUrl":     "https://gitlab.com",
+					},
+				},
+				HTTP: &contexts.HTTPContext{
+					Responses: []*http.Response{
+						GitlabMockResponse(http.StatusOK, `{
+							"id": 1001,
+							"iid": 73,
+							"project_id": 123,
+							"status": "`+testCase.pipelineStatus+`",
+							"ref": "main",
+							"web_url": "https://gitlab.com/group/project/-/pipelines/1001"
+						}`),
+					},
+				},
+				Requests:       &contexts.RequestContext{},
+				ExecutionState: executionState,
+				Logger:         log.NewEntry(log.New()),
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, testCase.expectedChannel, executionState.Channel)
+			assert.Equal(t, PipelinePayloadType, executionState.Type)
+
+			metadata, ok := metadataCtx.Metadata.(RunPipelineExecutionMetadata)
+			require.True(t, ok)
+			require.NotNil(t, metadata.Pipeline)
+			assert.Equal(t, testCase.pipelineStatus, metadata.Pipeline.Status)
+		})
+	}
+}
