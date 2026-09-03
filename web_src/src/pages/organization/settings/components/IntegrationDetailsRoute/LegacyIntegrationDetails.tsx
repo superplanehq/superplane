@@ -149,7 +149,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
 
       <div className="space-y-6">
         {integration.status?.state === "error" && integration.status.stateDescription ? (
-          <Alert variant="destructive" className="[&>svg+div]:translate-y-0 [&>svg]:top-[14px]">
+          <Alert className="border-destructive/40 bg-destructive/10 text-destructive [&>svg+div]:translate-y-0 [&>svg]:top-[14px] [&>svg]:text-destructive">
             <CircleX className="size-4" />
             <AlertTitle>Connection issue</AlertTitle>
             <AlertDescription>{integration.status.stateDescription}</AlertDescription>
@@ -163,10 +163,10 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
             appSlug={hostedGitHubAppSlug(integration.status?.metadata)}
           />
         ) : integration.status?.browserAction ? (
-          <IntegrationInstructions description={integration.status.browserAction.description} />
+          <IntegrationInstructions description={integration.status.browserAction.description} tone="settings" />
         ) : null}
 
-        {instructions ? <IntegrationInstructions description={instructions} /> : null}
+        {instructions ? <IntegrationInstructions description={instructions} tone="settings" /> : null}
 
         <Tabs
           value={activeTab}
@@ -185,10 +185,10 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
           </div>
 
           <TabsContent value="configuration" className="mt-4">
-            <section className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-gray-800 dark:bg-gray-900">
-              <div className="border-b border-gray-200 px-6 py-5 dark:border-gray-800">
-                <h2 className="text-base font-medium text-gray-900 dark:text-gray-100">Configuration</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            <section className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+              <div className="border-b border-border px-6 py-5">
+                <h2 className="text-base font-medium text-foreground">Configuration</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Update the integration name or replace its stored credentials.
                 </p>
               </div>
@@ -211,7 +211,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                         disabled={!canUpdateIntegrations}
                         autoComplete="off"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-muted-foreground">
                         Use a unique name that identifies this connection.
                       </p>
                     </div>
@@ -238,13 +238,11 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                         );
                       })
                     ) : (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        This integration has no configuration fields.
-                      </p>
+                      <p className="text-sm text-muted-foreground">This integration has no configuration fields.</p>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 bg-gray-50/70 px-6 py-4 dark:border-gray-800 dark:bg-gray-950/30">
+                  <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted/40 px-6 py-4">
                     <LoadingButton
                       type="submit"
                       color="blue"
@@ -266,7 +264,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                       Reset
                     </Button>
                     {updateMutation.isError ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">
+                      <p className="text-sm text-destructive">
                         SuperPlane could not save the integration. {getApiErrorMessage(updateMutation.error)}
                       </p>
                     ) : null}
@@ -276,9 +274,9 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
             </section>
 
             {typeof integration.status?.metadata?.webhookUrl === "string" ? (
-              <section className="mt-4 rounded-lg border border-gray-300 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-                <h2 className="text-base font-medium text-gray-900 dark:text-gray-100">Webhook URL</h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <section className="mt-4 rounded-lg border border-border bg-card p-6 text-card-foreground">
+                <h2 className="text-base font-medium text-foreground">Webhook URL</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Add this URL to the external service that sends webhook events.
                 </p>
                 <div className="mt-4 flex max-w-2xl items-center gap-2">
