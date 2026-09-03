@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft,
   BarChart3,
+  Bell,
   Blocks,
   CircleUser,
   Cpu,
@@ -11,7 +12,6 @@ import {
   KeyRound,
   Plug,
   Settings,
-  Shield,
   Users,
   Workflow,
 } from "lucide-react";
@@ -25,6 +25,7 @@ interface RedesignNavItem {
   label: string;
   Icon: LucideIcon;
   page?: AccountRedesignPageId;
+  keywords?: string[];
 }
 
 interface RedesignNavGroup {
@@ -38,8 +39,14 @@ const REDESIGN_NAV_GROUPS: RedesignNavGroup[] = [
     id: "account",
     label: "Account",
     items: [
-      { id: "account-profile", label: "Profile", Icon: CircleUser, page: "profile" },
-      { id: "account-security", label: "Security", Icon: Shield, page: "security" },
+      {
+        id: "account-profile",
+        label: "Account",
+        Icon: CircleUser,
+        page: "profile",
+        keywords: ["account", "preferences", "profile", "security", "access", "theme"],
+      },
+      { id: "account-notifications", label: "Notifications", Icon: Bell },
     ],
   },
   {
@@ -112,7 +119,13 @@ export function AccountProfileRedesignShell({
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 py-4">
           {REDESIGN_NAV_GROUPS.map((group) => {
-            const items = group.items.filter((item) => !query || item.label.toLowerCase().includes(query));
+            const items = group.items.filter((item) => {
+              if (!query) {
+                return true;
+              }
+              const haystack = [item.label, ...(item.keywords ?? [])].join(" ").toLowerCase();
+              return haystack.includes(query);
+            });
             if (items.length === 0) {
               return null;
             }
@@ -124,7 +137,7 @@ export function AccountProfileRedesignShell({
                 <ul className="flex flex-col gap-0.5">
                   {items.map((item) => {
                     const Icon = item.Icon;
-                    const isActive = item.page === activePage;
+                    const isActive = item.page === activePage || (item.page === "profile" && activePage === "security");
                     return (
                       <li key={item.id}>
                         <button

@@ -47,11 +47,11 @@ describe("searchFactorySettings", () => {
     const results = searchFactorySettings(index, "email");
     const titles = results.map((result) => result.title);
     expect(titles).toContain("Identity");
-    expect(titles).not.toContain("Profile");
-    expect(results.find((result) => result.title === "Identity")?.breadcrumb).toEqual(["Account", "Profile"]);
+    expect(titles).not.toContain("Account");
+    expect(results.find((result) => result.title === "Identity")?.breadcrumb).toEqual(["Account"]);
   });
 
-  it("keeps the Security page and Sign in methods when the query matches the page title", () => {
+  it("keeps the Security heading and Sign in methods when the query matches the page title", () => {
     const titles = searchFactorySettings(index, "secur").map((result) => result.title);
     expect(titles).toContain("Security");
     expect(titles).toContain("Sign in methods");

@@ -376,6 +376,22 @@ export function organizationSettingsBackPath(organizationId: string, fromFactory
   return factoryListPath(organizationId);
 }
 
+/**
+ * Swaps the `/:organizationId` route segment, leaving the rest of the path
+ * untouched so settings (and other workspace pages) stay in context.
+ */
+export function replaceOrganizationSegment(
+  pathname: string,
+  currentOrganizationId: string,
+  nextOrganizationId: string,
+): string {
+  const prefix = `/${currentOrganizationId}`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return factoryListPath(nextOrganizationId);
+  }
+  return `/${nextOrganizationId}${pathname.slice(prefix.length)}`;
+}
+
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */
 export function factorySettingsGeneralPathAfterKeyChange(
   organizationId: string,
