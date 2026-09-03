@@ -5,21 +5,11 @@ import { useNavigate, useParams } from "react-router";
 import type { SuperplaneSecretsSecret } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Textarea } from "@/components/ui/textarea";
 import { usePermissions } from "@/contexts/usePermissions";
 import {
-  useCreateSecret,
   useDeleteSecret,
   useDeleteSecretKey,
   useSecret,
@@ -33,6 +23,7 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { CreateSecretDialog } from "@/ui/CreateSecretDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,18 +41,8 @@ import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettings
 const MASKED_VALUE = "••••••••";
 const SECRET_DOMAIN = "DOMAIN_TYPE_ORGANIZATION" as const;
 
-type KeyPairDraft = {
-  id: string;
-  name: string;
-  value: string;
-};
-
 function formatKeyCount(count: number): string {
   return `${count} key${count === 1 ? "" : "s"}`;
-}
-
-function createDraftId(): string {
-  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 function secretName(secret: SuperplaneSecretsSecret): string {
@@ -251,149 +232,6 @@ function FactorySettingsSecretsList() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function CreateSecretDialog({
-  open,
-  organizationId,
-  onOpenChange,
-}: {
-  open: boolean;
-  organizationId: string;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const createMutation = useCreateSecret(organizationId, SECRET_DOMAIN);
-  const [name, setName] = useState("");
-  const [pairs, setPairs] = useState<KeyPairDraft[]>([{ id: createDraftId(), name: "", value: "" }]);
-  const [error, setError] = useState("");
-
-  const resetForm = () => {
-    setName("");
-    setPairs([{ id: createDraftId(), name: "", value: "" }]);
-    setError("");
-  };
-
-  const handleSubmit = async () => {
-    const trimmedName = name.trim();
-    const validPairs = pairs
-      .map((pair) => ({ name: pair.name.trim(), value: pair.value.trim() }))
-      .filter((pair) => pair.name && pair.value);
-    if (!trimmedName) {
-      setError("Secret name is required.");
-      return;
-    }
-    if (validPairs.length === 0) {
-      setError("Add at least one key and value.");
-      return;
-    }
-    const keys = validPairs.map((pair) => pair.name);
-    if (new Set(keys).size !== keys.length) {
-      setError("Key names must be unique.");
-      return;
-    }
-
-    try {
-      await createMutation.mutateAsync({
-        name: trimmedName,
-        environmentVariables: validPairs,
-      });
-      showSuccessToast("Secret created.");
-      resetForm();
-      onOpenChange(false);
-    } catch (createError) {
-      showErrorToast(getApiErrorMessage(createError, "Failed to create secret."));
-    }
-  };
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          resetForm();
-        }
-        onOpenChange(nextOpen);
-      }}
-    >
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Create secret</DialogTitle>
-          <DialogDescription>Store credentials that integrations can use.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="factory-settings-secret-name">Name</Label>
-            <Input
-              id="factory-settings-secret-name"
-              value={name}
-              onChange={(event) => {
-                setError("");
-                setName(event.target.value);
-              }}
-            />
-          </div>
-          <div className="space-y-3">
-            <p className="text-[13px] font-medium text-foreground">Keys</p>
-            {pairs.map((pair, index) => (
-              <div key={pair.id} className="grid gap-2 sm:grid-cols-2">
-                <Input
-                  value={pair.name}
-                  placeholder="KEY_NAME"
-                  className="font-mono text-[13px]"
-                  onChange={(event) =>
-                    setPairs((current) =>
-                      current.map((item) => (item.id === pair.id ? { ...item, name: event.target.value } : item)),
-                    )
-                  }
-                  data-testid="secrets-create-key"
-                />
-                <Textarea
-                  value={pair.value}
-                  placeholder="Value"
-                  rows={2}
-                  className="font-mono text-[13px]"
-                  onChange={(event) =>
-                    setPairs((current) =>
-                      current.map((item) => (item.id === pair.id ? { ...item, value: event.target.value } : item)),
-                    )
-                  }
-                  data-testid="secrets-create-value"
-                />
-                {index > 0 ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="sm:col-span-2 justify-self-start"
-                    onClick={() => setPairs((current) => current.filter((item) => item.id !== pair.id))}
-                  >
-                    Remove key
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setPairs((current) => [...current, { id: createDraftId(), name: "", value: "" }])}
-            >
-              Add key
-            </Button>
-          </div>
-          {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <LoadingButton type="button" size="sm" loading={createMutation.isPending} onClick={() => void handleSubmit()}>
-            Create secret
-          </LoadingButton>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
