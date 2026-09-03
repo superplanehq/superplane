@@ -1,21 +1,30 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import type { FactoriesDescribeFactoryVelocityResponse, FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoryVelocityParams } from "@/hooks/useFactoryVelocity";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { VelocityPage } from "./VelocityPage";
 
+type VelocityPerson = NonNullable<FactoriesDescribeFactoryVelocityResponse["people"]>[number];
+
 interface VelocityHookState {
   data?: FactoriesDescribeFactoryVelocityResponse;
   isLoading?: boolean;
   isFetching?: boolean;
   error?: Error | null;
+  /**
+   * The whole People cohort behind the mock's paging, sorted the way the
+   * backend would return it. Defaults to `data.people` when unset, which is
+   * enough for tests with fewer than 10 people.
+   */
+  allPeople?: VelocityPerson[];
 }
 
 interface WorkOrdersHookState {
@@ -27,6 +36,8 @@ interface WorkOrdersHookState {
 
 const velocityHookState: VelocityHookState = {};
 const workOrdersHookState: WorkOrdersHookState = {};
+/** Every call the page made to `useFactoryVelocity`, newest last. */
+const velocityHookCalls: FactoryVelocityParams[] = [];
 
 /** Workspace setup picks the GitHub integration and the app repository. */
 const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
@@ -37,14 +48,45 @@ const FACTORY_WITH_SETUP_REPO: FactoriesFactory = {
 const startSync = vi.fn();
 const syncHookState: { isPending?: boolean } = {};
 
+/** A cohort large enough to exercise paging, already in default sort order. */
+function manyPeople(count: number): VelocityPerson[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `person-${index + 1}`,
+    name: `Contributor ${String(index + 1).padStart(2, "0")}`,
+    email: `contributor${index + 1}@example.com`,
+    authoredMerged: 1,
+    factoryMerged: 0,
+    factoryWaste: 0,
+    medianCycleHours: 0,
+    costCents: "0",
+  }));
+}
+
 vi.mock("@/hooks/useFactoryVelocity", () => ({
-  useFactoryVelocity: () => ({
-    data: velocityHookState.data,
-    isLoading: velocityHookState.isLoading ?? false,
-    isFetching: velocityHookState.isFetching ?? false,
-    error: velocityHookState.error ?? null,
-    refetch: vi.fn(),
-  }),
+  useFactoryVelocity: (_organizationId: string, _factoryId: string, params: FactoryVelocityParams) => {
+    velocityHookCalls.push(params);
+
+    const base = velocityHookState.data;
+    const allPeople = velocityHookState.allPeople ?? base?.people ?? [];
+    const offset = params.peopleOffset ?? 0;
+    const pageSize = params.peoplePageSize ?? 10;
+    const page = allPeople.slice(offset, offset + pageSize);
+
+    return {
+      data: base
+        ? {
+            ...base,
+            people: page,
+            peopleTotal: allPeople.length,
+            peopleHasMore: offset + page.length < allPeople.length,
+          }
+        : undefined,
+      isLoading: velocityHookState.isLoading ?? false,
+      isFetching: velocityHookState.isFetching ?? false,
+      error: velocityHookState.error ?? null,
+      refetch: vi.fn(),
+    };
+  },
   useSyncFactoryVelocity: () => ({
     mutate: startSync,
     isPending: syncHookState.isPending ?? false,
@@ -117,6 +159,8 @@ function resetState() {
   velocityHookState.isLoading = false;
   velocityHookState.isFetching = false;
   velocityHookState.error = null;
+  velocityHookState.allPeople = undefined;
+  velocityHookCalls.length = 0;
   workOrdersHookState.data = [];
   workOrdersHookState.isLoading = false;
   workOrdersHookState.isFetching = false;
@@ -332,6 +376,67 @@ describe("VelocityPage shell", () => {
     const people = screen.getByTestId("velocity-people");
     expect(people).toHaveTextContent("Ada Lovelace");
     expect(people).toHaveTextContent("1 person with activity in this period");
+  });
+
+  it("shows only the first 10 people and the true total, with a Load more control", () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+
+    renderShell();
+
+    const people = screen.getByTestId("velocity-people");
+    expect(people).toHaveTextContent("12 people with activity in this period");
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + 10); // header row + 10 people
+    expect(within(people).getByText("Contributor 01", { selector: "p" })).toBeInTheDocument();
+    expect(within(people).queryByText("Contributor 11", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+  });
+
+  it("loads more people, keeping ranks sequential, and hides the control once every row is shown", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+
+    const people = screen.getByTestId("velocity-people");
+    expect(within(people).getByText("Contributor 12", { selector: "p" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 10 });
+
+    const ranks = within(people)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
+    expect(ranks).toEqual(Array.from({ length: 12 }, (_, index) => String(index + 1)));
+  });
+
+  it("sorts through the backend and resets paging to the first page", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent("Contributor 12");
+
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleSort: "costUsd",
+      peopleSortDirection: "desc",
+      peopleOffset: 0,
+    });
+    // Paging restarted, so the control is back and the second page is gone.
+    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-people")).not.toHaveTextContent("Contributor 12");
+
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleSort: "costUsd", peopleSortDirection: "asc" });
   });
 
   it("explains an empty Manual work column when GitHub is not connected", () => {
