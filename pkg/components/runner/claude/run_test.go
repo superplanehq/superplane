@@ -18,16 +18,25 @@ func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
 		"SUPERPLANE_BASE_URL":            "http://localhost:8000",
 	})
 
+	assert.Contains(t, tools, "Read")
+	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "mcp__superplane")
 	assert.Contains(t, tools, "mcp__superplane__propose_draft")
 	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "Edit")
+	assert.NotContains(t, tools, "Write")
 	assert.NotContains(t, tools, "mcp__superplane__say")
 	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, tools, "mcp__superplane__ask")
 }
 
-func TestClaudePermissionModeBypassesPromptsWhenMCPIsAttached(t *testing.T) {
-	assert.Equal(t, "bypassPermissions", claudePermissionModeFromScript(t, map[string]string{
+func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{})
+	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+}
+
+func TestClaudePermissionModeUsesPlanModeWhenPlanningSessionIsAttached(t *testing.T) {
+	assert.Equal(t, "plan", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
