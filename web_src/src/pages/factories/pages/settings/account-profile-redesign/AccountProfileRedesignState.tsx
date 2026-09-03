@@ -123,8 +123,19 @@ function useAccountProfileRedesign() {
 }
 
 export function AccountProfileRedesignRoutePage() {
-  const { profile, setName, setEmail, saveName, linkVelocityGithub, removeVelocityGithub } =
-    useAccountProfileRedesign();
+  const {
+    profile,
+    setName,
+    setEmail,
+    saveName,
+    linkVelocityGithub,
+    removeVelocityGithub,
+    changePassword,
+    connectSso,
+    disconnectSso,
+    createToken,
+    revokeToken,
+  } = useAccountProfileRedesign();
   return (
     <AccountProfileRedesignPage
       name={profile.name}
@@ -142,6 +153,19 @@ export function AccountProfileRedesignRoutePage() {
       velocityGithubUsername={profile.velocityGithubUsername}
       onLinkVelocityGithub={linkVelocityGithub}
       onRemoveVelocityGithub={removeVelocityGithub}
+      security={
+        <AccountSecurityRedesignPage
+          passwordSet={profile.passwordSet}
+          tokens={profile.tokens}
+          ssoAccounts={profile.ssoAccounts}
+          embedded
+          onChangePassword={changePassword}
+          onConnectSso={connectSso}
+          onDisconnectSso={disconnectSso}
+          onCreateToken={createToken}
+          onRevokeToken={revokeToken}
+        />
+      }
     />
   );
 }

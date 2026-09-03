@@ -27,8 +27,8 @@ const GROUP_LABEL: Record<FactorySettingsScope, string> = {
 
 /** Static section-level entries: field labels, cards, and page titles users search for. */
 export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
-  // Account · Profile
-  entry("account", "profile", "Profile", undefined, ["identity", "name", "avatar"]),
+  // Account · Profile (includes security and access)
+  entry("account", "profile", "Account", undefined, ["identity", "name", "avatar", "preferences"]),
   entry("account", "profile", "Identity", "account-redesign-identity", ["name", "primary email", "email", "avatar"]),
   entry("account", "profile", "Appearance", "account-redesign-appearance", ["theme", "light", "dark", "system"]),
   entry("account", "profile", "GitHub for Velocity", "account-redesign-velocity-github", [
@@ -36,18 +36,16 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "velocity",
     "pull requests",
   ]),
-  entry("account", "profile", "Delete account", "account-redesign-danger", ["danger zone", "delete account"]),
-
-  // Account · Security
-  entry("account", "security", "Security", undefined, ["sign in", "password", "token", "sso", "login"]),
-  entry("account", "security", "Sign in methods", "account-redesign-signin", [
+  entry("account", "profile", "Security", "account-redesign-security", ["sign in", "password", "token", "sso", "login"]),
+  entry("account", "profile", "Sign in methods", "account-redesign-signin", [
+    "security",
     "password",
     "change password",
     "github",
     "google",
     "sso",
   ]),
-  entry("account", "security", "Personal tokens", "account-redesign-tokens", [
+  entry("account", "profile", "Personal tokens", "account-redesign-tokens", [
     "create token",
     "revoke",
     "cli",
@@ -146,10 +144,13 @@ function entry(
     FACTORY_SETTINGS_NAV_GROUPS.find((group) => group.id === scope)?.items.find((item) => item.section === section)
       ?.label ?? title;
 
+  const groupLabel = GROUP_LABEL[scope];
+  const showPageLabel = pageLabel !== title && pageLabel !== groupLabel;
+
   return {
     id: anchor ? `section:${scope}:${section}:${anchor}` : `nav:${scope}:${section}`,
     title,
-    breadcrumb: title === pageLabel ? [GROUP_LABEL[scope]] : [GROUP_LABEL[scope], pageLabel],
+    breadcrumb: showPageLabel ? [groupLabel, pageLabel] : [groupLabel],
     scope,
     section,
     anchor,
