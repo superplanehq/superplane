@@ -1141,6 +1141,15 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if organization, workspace, found, err := findIncompleteInitialWorkspace(database.DB(r.Context()), account.ID); err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to find incomplete initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	} else if found {
+		writeInitialWorkspaceResponse(w, organization, workspace)
+		return
+	}
+
 	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
 	if err != nil {
 		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
@@ -1162,6 +1171,31 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		log.WithError(err).WithField("organization_id", organization.ID).Error("failed to publish organization created message")
 	}
 
+	writeInitialWorkspaceResponse(w, organization, workspace)
+}
+
+func findIncompleteInitialWorkspace(tx *gorm.DB, accountID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
+	organizations, err := models.ListOrganizationsCreatedByAccount(tx, accountID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	for _, organization := range organizations {
+		factories, err := models.ListFactories(tx, organization.ID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		for _, factory := range factories {
+			if factory.Name == "New workspace" && !factory.IsOnboardingComplete() {
+				return &organization, &factory, true, nil
+			}
+		}
+	}
+
+	return nil, nil, false, nil
+}
+
+func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.Organization, workspace *models.Factory) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(initialWorkspaceResponse{
 		OrganizationSlug: organization.Slug,
