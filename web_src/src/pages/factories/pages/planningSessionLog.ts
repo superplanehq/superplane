@@ -231,9 +231,10 @@ export function mergePlanningSessionNotes(
 
   const merged = live.map((line) => ({ ...line }));
   const { unmatchedUsers, unmatchedOthers } = partitionPlanningExtras(merged, extra);
+  const hasLiveOrder = merged.some((line) => typeof line.orderKey === "number");
   const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
   const slots = consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits);
-  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots);
+  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots, hasLiveOrder);
   placed.insertions.sort((left, right) => right.afterIndex - left.afterIndex || right.order - left.order);
   for (const insertion of placed.insertions) {
     merged.splice(insertion.afterIndex + 1, 0, insertion.line);
@@ -290,6 +291,7 @@ function placeUnmatchedUserExtras(
   unmatchedUsers: SplitRunStreamLine[],
   emptyWaits: WaitSlot[],
   slots: { waitCursor: number; lastWait?: WaitSlot },
+  hasLiveOrder: boolean,
 ): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
   const insertions: NoteInsertion[] = [];
   const trailing: SplitRunStreamLine[] = [];
@@ -297,6 +299,21 @@ function placeUnmatchedUserExtras(
   let lastWait = slots.lastWait;
   let insertOrder = 0;
   for (const line of unmatchedUsers) {
+    // True chronological order is known for both sides: place the message
+    // right after the last live note that happened at or before it, rather
+    // than guessing from wait-slot position. This is what keeps a user
+    // reply after an agent error note that came before it.
+    if (hasLiveOrder && typeof line.orderKey === "number") {
+      const afterIndex = insertionIndexByOrderKey(merged, line.orderKey);
+      const parentId = orderKeyInsertionParent(merged, afterIndex);
+      insertions.push({
+        afterIndex,
+        order: insertOrder,
+        line: parentId ? { ...line, noteParentId: parentId, noteDepth: 1 } : { ...line },
+      });
+      insertOrder += 1;
+      continue;
+    }
     const slot = emptyWaits[waitCursor];
     if (slot) {
       lastWait = slot;
@@ -313,6 +330,33 @@ function placeUnmatchedUserExtras(
     trailing.push(line);
   }
   return { insertions, trailing };
+}
+
+/**
+ * Finds the index of the last line in `merged` whose orderKey is at or
+ * before `orderKey`. Ties resolve to the later index, so the caller inserts
+ * after every note that shares the same (section-granular) timestamp
+ * instead of splitting them apart. Returns -1 when every timestamped line
+ * comes after `orderKey`, meaning the caller should insert at the front.
+ */
+function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number): number {
+  let index = -1;
+  for (let i = 0; i < merged.length; i += 1) {
+    const key = merged[i]?.orderKey;
+    if (typeof key === "number" && key <= orderKey) {
+      index = i;
+    }
+  }
+  return index;
+}
+
+/** The note/step group a chronologically placed insertion should nest under. */
+function orderKeyInsertionParent(merged: SplitRunStreamLine[], afterIndex: number): string | undefined {
+  const target = merged[afterIndex];
+  if (!target) {
+    return undefined;
+  }
+  return target.noteParentId ?? target.id;
 }
 
 function userExtraInsertion(
