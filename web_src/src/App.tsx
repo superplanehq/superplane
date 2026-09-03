@@ -20,9 +20,10 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
+import { InitialOnboarding } from "./pages/auth/InitialOnboarding";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
-import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
@@ -230,6 +231,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
+              <Route path="onboarding" element={withAuthOnly(InitialOnboarding)} />
               <Route path="create" element={<OrganizationCreate />} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
@@ -239,7 +241,7 @@ function AppRouter() {
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
-              <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
               {organizationScopedRouteTree()}
