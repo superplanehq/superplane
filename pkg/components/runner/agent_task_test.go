@@ -82,6 +82,31 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
 }
 
+func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {
+	t.Parallel()
+
+	prompt := "\nFirst line.\nSecond line.\n"
+	command := "set -e\necho one\necho two"
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Run", Type: AgentStepBash, Command: &command},
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 3)
+	assert.Equal(t, "set -e\necho one\necho two", commands[1].Preview)
+	assert.Equal(t, "First line.\nSecond line.", commands[2].Preview)
+}
+
 func TestBuildAgentBrokerTaskAppliesNodeWorkingDirectoryWhenStepEmpty(t *testing.T) {
 	t.Parallel()
 

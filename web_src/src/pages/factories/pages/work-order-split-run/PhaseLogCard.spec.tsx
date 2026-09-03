@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
+import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
 
@@ -113,19 +114,39 @@ describe("PhaseLogCard collapsed stream", () => {
     const bashTitle = within(bash).getByText("Clone Repo");
     expect(bash).not.toHaveClass("whitespace-nowrap");
     expect(bashTitle).not.toHaveClass("truncate");
-    expect(bashTitle).toHaveClass("whitespace-normal", "break-words");
+    expect(bashTitle).toHaveClass("whitespace-pre-wrap", "break-words");
 
     const prompt = screen.getByTestId("split-run-stream-line-step-write");
     const promptTitle = within(prompt).getByText("Write Implementation Plan");
     expect(prompt).not.toHaveClass("whitespace-nowrap");
     expect(promptTitle).not.toHaveClass("truncate");
-    expect(promptTitle).toHaveClass("whitespace-normal", "break-words");
+    expect(promptTitle).toHaveClass("whitespace-pre-wrap", "break-words");
 
     const output = within(screen.getByTestId("split-run-stream-line-step-clone").parentElement as HTMLElement)
       .getByTestId("split-run-stream-output")
       .querySelector("pre");
     expect(output).toHaveClass("whitespace-pre-wrap", "break-words");
     expect(output).not.toHaveClass("truncate");
+  });
+
+  it("preserves newlines in a multi-line step title", () => {
+    const multilineTitle = "set -e\necho line two";
+    const stream: SplitRunStreamLine[] = [
+      line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+      line({
+        id: "step-multiline",
+        note: true,
+        componentName: multilineTitle,
+        componentType: "bash",
+        status: "passed",
+      }),
+    ];
+
+    render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+    const title = screen.getByText((_, element) => element?.textContent === multilineTitle);
+    expect(title).toHaveClass("whitespace-pre-wrap");
+    expect(title.textContent).toBe(multilineTitle);
   });
 
   it("expands the selected node in the log", () => {
