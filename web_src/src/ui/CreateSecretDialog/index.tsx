@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { Key, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/Textarea/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useCreateSecret, type CreateSecretParams } from "@/hooks/useSecrets";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -27,53 +34,80 @@ export interface CreateSecretDialogProps {
 }
 
 interface KeyValuePair {
+  id: string;
   name: string;
   value: string;
 }
 
-const EMPTY_PAIR: KeyValuePair = { name: "", value: "" };
+type ValidKeyValuePair = Pick<KeyValuePair, "name" | "value">;
 
-function validateForm(name: string, pairs: KeyValuePair[]): { error: string | null; validPairs: KeyValuePair[] } {
+function createEmptyPair(name = ""): KeyValuePair {
+  return {
+    id: `secret-key-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    value: "",
+  };
+}
+
+function validateForm(name: string, pairs: KeyValuePair[]): { error: string | null; validPairs: ValidKeyValuePair[] } {
   const trimmedName = name.trim();
-  if (!trimmedName) return { error: "Secret name is required", validPairs: [] };
+  if (!trimmedName) {
+    return { error: "Enter a secret name.", validPairs: [] };
+  }
 
-  const validPairs = pairs
-    .map((p) => ({ name: p.name.trim(), value: p.value.trim() }))
-    .filter((p) => p.name && p.value);
-  if (validPairs.length === 0) return { error: "At least one key-value pair is required", validPairs: [] };
+  if (pairs.some((pair) => !pair.name.trim() || !pair.value.trim())) {
+    return { error: "Enter a name and value for each key.", validPairs: [] };
+  }
 
-  const keys = validPairs.map((p) => p.name);
-  if (new Set(keys).size !== keys.length) return { error: "Duplicate key names are not allowed", validPairs: [] };
+  const validPairs = pairs.map((pair) => ({ name: pair.name.trim(), value: pair.value }));
+  const keys = validPairs.map((pair) => pair.name);
+  if (new Set(keys).size !== keys.length) {
+    return { error: "Use a unique name for each key.", validPairs: [] };
+  }
 
   return { error: null, validPairs };
 }
 
 interface KeyValueRowProps {
   pair: KeyValuePair;
+  index: number;
   onChange: (patch: Partial<KeyValuePair>) => void;
   onRemove: (() => void) | null;
   disabled: boolean;
 }
 
-function KeyValueRow({ pair, onChange, onRemove, disabled }: KeyValueRowProps) {
+function KeyValueRow({ pair, index, onChange, onRemove, disabled }: KeyValueRowProps) {
+  const keyInputId = `${pair.id}-name`;
+  const valueInputId = `${pair.id}-value`;
+
   return (
-    <div className="flex gap-2 items-start">
-      <div className="flex-1 min-w-0">
+    <div className="grid gap-2 p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_2rem] sm:items-start">
+      <div className="min-w-0 space-y-1.5">
+        <Label htmlFor={keyInputId} className="text-xs text-muted-foreground sm:sr-only">
+          Key name {index + 1}
+        </Label>
         <Input
+          id={keyInputId}
           type="text"
           value={pair.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="Key"
-          className="mb-2"
+          placeholder="API_TOKEN"
+          className="font-mono text-[13px]"
           disabled={disabled}
           data-testid="secrets-create-key"
         />
+      </div>
+      <div className="min-w-0 space-y-1.5">
+        <Label htmlFor={valueInputId} className="text-xs text-muted-foreground sm:sr-only">
+          Secret value {index + 1}
+        </Label>
         <Textarea
+          id={valueInputId}
           value={pair.value}
           onChange={(e) => onChange({ value: e.target.value })}
-          placeholder="Value"
-          rows={3}
-          className="font-mono text-sm wrap-anywhere"
+          placeholder="Enter a value"
+          rows={1}
+          className="min-h-8 resize-y py-1.5 font-mono text-[13px]"
           disabled={disabled}
           data-testid="secrets-create-value"
         />
@@ -81,15 +115,16 @@ function KeyValueRow({ pair, onChange, onRemove, disabled }: KeyValueRowProps) {
       {onRemove && (
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon-xs"
           onClick={onRemove}
-          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 mt-0"
-          title="Remove pair"
+          className="text-muted-foreground hover:text-destructive"
+          aria-label={`Remove key ${index + 1}`}
+          title="Remove key"
           disabled={disabled}
           data-testid="secrets-create-remove-pair"
         >
-          <Trash2 className="w-3 h-3" />
+          <Trash2 className="size-3.5" aria-hidden />
         </Button>
       )}
     </div>
@@ -106,41 +141,57 @@ interface KeyValuePairsSectionProps {
 
 function KeyValuePairsSection({ pairs, disabled, onUpdate, onAdd, onRemove }: KeyValuePairsSectionProps) {
   return (
-    <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-      <Label className="text-gray-800 dark:text-gray-100 mb-2 block">
-        Key-Value Pairs <span className="text-red-500">*</span>
-      </Label>
-      <div className="space-y-3">
-        {pairs.map((pair, index) => (
-          <KeyValueRow
-            key={index}
-            pair={pair}
-            onChange={(patch) => onUpdate(index, patch)}
-            onRemove={pairs.length > 1 ? () => onRemove(index) : null}
-            disabled={disabled}
-          />
-        ))}
+    <section className="space-y-2" aria-labelledby="secret-keys-heading">
+      <div className="flex items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h3 id="secret-keys-heading" className="text-[13px] font-medium text-foreground">
+            Secret keys
+          </h3>
+          <p className="text-xs text-muted-foreground">Add each key that integrations can use.</p>
+        </div>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {pairs.length} {pairs.length === 1 ? "key" : "keys"}
+        </span>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onAdd}
-        className="mt-3 text-xs"
-        disabled={disabled}
-        data-testid="secrets-create-add-pair"
-      >
-        <Plus className="w-3 h-3 mr-1" />
-        Add Pair
-      </Button>
-    </div>
+      <div className="overflow-hidden rounded-md border border-border">
+        <div className="hidden grid-cols-[minmax(0,2fr)_minmax(0,3fr)_2rem] gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground sm:grid">
+          <span>Key name</span>
+          <span>Secret value</span>
+          <span className="sr-only">Actions</span>
+        </div>
+        <div className="max-h-[min(40vh,22rem)] divide-y divide-border overflow-y-auto">
+          {pairs.map((pair, index) => (
+            <KeyValueRow
+              key={pair.id}
+              pair={pair}
+              index={index}
+              onChange={(patch) => onUpdate(index, patch)}
+              onRemove={pairs.length > 1 ? () => onRemove(index) : null}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+        <div className="border-t border-border bg-muted/20 p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onAdd}
+            disabled={disabled}
+            data-testid="secrets-create-add-pair"
+          >
+            <Plus className="size-3.5" aria-hidden />
+            Add another key
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 
 function initialPairs(initialKeyName?: string): KeyValuePair[] {
   const key = initialKeyName?.trim();
-  if (!key) return [{ ...EMPTY_PAIR }];
-  return [{ name: key, value: "" }];
+  return [createEmptyPair(key)];
 }
 
 export function CreateSecretDialog({
@@ -152,12 +203,14 @@ export function CreateSecretDialog({
 }: CreateSecretDialogProps) {
   const [secretName, setSecretName] = useState("");
   const [keyValuePairs, setKeyValuePairs] = useState<KeyValuePair[]>(() => initialPairs(initialKeyName));
+  const [formError, setFormError] = useState("");
   const createSecretMutation = useCreateSecret(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const isPending = createSecretMutation.isPending;
 
   const reset = () => {
     setSecretName("");
     setKeyValuePairs(initialPairs(initialKeyName));
+    setFormError("");
     createSecretMutation.reset();
   };
 
@@ -168,6 +221,7 @@ export function CreateSecretDialog({
   };
 
   const updatePair = (index: number, patch: Partial<KeyValuePair>) => {
+    setFormError("");
     setKeyValuePairs((prev) => prev.map((pair, i) => (i === index ? { ...pair, ...patch } : pair)));
   };
 
@@ -175,13 +229,13 @@ export function CreateSecretDialog({
     event.preventDefault();
     const { error, validPairs } = validateForm(secretName, keyValuePairs);
     if (error) {
-      showErrorToast(error);
+      setFormError(error);
       return;
     }
     try {
       const params: CreateSecretParams = { name: secretName.trim(), environmentVariables: validPairs };
       const result = await createSecretMutation.mutateAsync(params);
-      showSuccessToast("Secret created successfully");
+      showSuccessToast("Secret created.");
 
       const createdId = result?.data?.secret?.metadata?.id ?? "";
       const createdName = result?.data?.secret?.metadata?.name ?? params.name;
@@ -190,30 +244,32 @@ export function CreateSecretDialog({
       reset();
       onCreated?.({ id: createdId, name: createdName, keys: validPairs.map((p) => p.name) });
     } catch (err) {
-      showErrorToast(`Failed to create secret: ${getApiErrorMessage(err)}`);
+      showErrorToast(getApiErrorMessage(err, "SuperPlane could not create the secret."));
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent showCloseButton={!isPending}>
+      <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-2xl" showCloseButton={!isPending}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <Key className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-            Create Secret
-          </DialogTitle>
+          <DialogTitle>Create secret</DialogTitle>
+          <DialogDescription>
+            Store credentials for integrations. SuperPlane hides values after you save.
+          </DialogDescription>
         </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit} data-testid="secrets-create-form">
+        <form className="flex min-h-0 flex-col gap-4" onSubmit={handleSubmit} data-testid="secrets-create-form">
           <div className="space-y-2">
-            <Label htmlFor="create-secret-name" className="text-gray-800 dark:text-gray-100">
-              Secret Name <span className="text-red-500">*</span>
-            </Label>
+            <Label htmlFor="create-secret-name">Secret name</Label>
             <Input
               id="create-secret-name"
               type="text"
               value={secretName}
-              onChange={(e) => setSecretName(e.target.value)}
-              placeholder="e.g., production-api-keys"
+              onChange={(e) => {
+                setFormError("");
+                setSecretName(e.target.value);
+              }}
+              placeholder="Production API credentials"
+              autoFocus
               required
               disabled={isPending}
               data-testid="secrets-create-name"
@@ -223,30 +279,43 @@ export function CreateSecretDialog({
             pairs={keyValuePairs}
             disabled={isPending}
             onUpdate={updatePair}
-            onAdd={() => setKeyValuePairs((prev) => [...prev, { ...EMPTY_PAIR }])}
-            onRemove={(index) => setKeyValuePairs((prev) => prev.filter((_, i) => i !== index))}
+            onAdd={() => {
+              setFormError("");
+              setKeyValuePairs((prev) => [...prev, createEmptyPair()]);
+            }}
+            onRemove={(index) => {
+              setFormError("");
+              setKeyValuePairs((prev) => prev.filter((_, i) => i !== index));
+            }}
           />
+          {formError ? (
+            <p role="alert" className="text-xs text-destructive">
+              {formError}
+            </p>
+          ) : null}
           {createSecretMutation.isError && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-              <p className="text-sm text-red-800 dark:text-red-200">
-                Failed to create secret: {getApiErrorMessage(createSecretMutation.error)}
-              </p>
-            </div>
+            <p role="alert" className="text-xs text-destructive">
+              SuperPlane could not create the secret. {getApiErrorMessage(createSecretMutation.error)}
+            </p>
           )}
-          <DialogFooter className="mt-2">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
+          <DialogFooter>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isPending}
+            >
               Cancel
             </Button>
             <LoadingButton
               type="submit"
-              color="blue"
-              disabled={!secretName.trim()}
+              size="sm"
               loading={isPending}
-              loadingText="Creating..."
-              className="flex items-center gap-2"
+              loadingText="Creating…"
               data-testid="secrets-create-submit"
             >
-              Create Secret
+              Create secret
             </LoadingButton>
           </DialogFooter>
         </form>
