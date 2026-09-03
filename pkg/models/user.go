@@ -1,14 +1,24 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+// ErrAPIKeyNameAlreadyExists is returned when an organization already has an
+// API key with the same name. The unique_api_key_in_organization index enforces
+// this, and CreateAPIKey maps its violation to this error so callers can return
+// a 409 instead of a 500.
+var ErrAPIKeyNameAlreadyExists = errors.New("an API key with this name already exists")
+
+const apiKeyNameUniqueConstraint = "unique_api_key_in_organization"
 
 type User struct {
 	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
@@ -147,10 +157,19 @@ func CreateAPIKey(tx *gorm.DB, orgID uuid.UUID, name string, description *string
 
 	err := tx.Create(user).Error
 	if err != nil {
-		return nil, err
+		return nil, mapAPIKeyNameUniqueConstraintError(err)
 	}
 
 	return user, nil
+}
+
+func mapAPIKeyNameUniqueConstraintError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.ConstraintName == apiKeyNameUniqueConstraint {
+		return ErrAPIKeyNameAlreadyExists
+	}
+
+	return err
 }
 
 func FindAPIKeysByOrganization(db *gorm.DB, orgID string) ([]User, error) {
