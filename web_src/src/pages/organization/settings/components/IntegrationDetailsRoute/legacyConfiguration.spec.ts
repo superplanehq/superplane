@@ -1,4 +1,5 @@
 import type { ConfigurationField } from "@/api-client";
+import { describe, expect, it } from "vitest";
 import { editableConfigurationValue, nextConfigurationValue } from "./legacyConfiguration";
 
 describe("legacy integration configuration", () => {
