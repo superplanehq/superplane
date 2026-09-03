@@ -35,8 +35,11 @@ func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "Bash,Read,Edit,Write", tools)
 }
 
-func TestClaudePermissionModeUsesPlanModeWhenPlanningSessionIsAttached(t *testing.T) {
-	assert.Equal(t, "plan", claudePermissionModeFromScript(t, map[string]string{
+func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *testing.T) {
+	// Planning sessions must use "default" (not "plan"): plan mode blocks the
+	// planning MCP tools, breaking propose_draft/survey. Read-only is enforced
+	// by allowedClaudeTools dropping Edit/Write instead.
+	assert.Equal(t, "default", claudePermissionModeFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
 	}))
 	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{

@@ -43,10 +43,15 @@ function allowedClaudeTools(env = process.env) {
 
 function claudePermissionMode(env = process.env) {
   if (mcpToolsEnabled(env)) {
-    // "plan" mode keeps the session read-only: Claude can still use Read/Bash
-    // and the allowed planning MCP tools, but it cannot Edit/Write files or
-    // run any tool outside allowedClaudeTools without asking first.
-    return "plan";
+    // Planning sessions stay read-only by restricting allowedClaudeTools to
+    // Read/Bash plus the planning MCP tools. We intentionally do NOT use
+    // "plan" mode here: Claude Code blocks every non-read-only tool call in
+    // plan mode, including our MCP tools, which fails propose_draft/survey with
+    // "Cannot call mcp__superplane__propose_draft while in plan mode." In
+    // headless ("-p") mode "default" treats allowedTools as the allowlist, so
+    // Edit/Write are still denied (there is no interactive prompt to grant
+    // them) while the planning MCP tools remain callable.
+    return "default";
   }
   return "acceptEdits";
 }

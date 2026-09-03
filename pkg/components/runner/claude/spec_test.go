@@ -188,7 +188,9 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
-	assert.Contains(t, runScript, `"plan"`)
+	// Planning sessions use "default" (not "plan"): plan mode blocks the
+	// planning MCP tools. Read-only is enforced via the allowedTools allowlist.
+	assert.Contains(t, runScript, `return "default"`)
 	assert.NotContains(t, runScript, "bypassPermissions")
 	assert.Contains(t, runScript, "--mcp-config")
 	assert.Contains(t, runScript, "planning_session_mcp.js")
