@@ -27,6 +27,7 @@ interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
   redirectTo: string;
   onComplete?: () => void;
+  initialQuestionIndex?: number;
 }
 
 type SurveyAnswer = string | string[];
@@ -225,8 +226,13 @@ const SurveyQuestionHeader: React.FC<{ question: string | undefined }> = ({ ques
   </div>
 );
 
-const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({
+  survey,
+  redirectTo,
+  onComplete,
+  initialQuestionIndex = 0,
+}) => {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
   const [multiAnswer, setMultiAnswer] = useState<string[]>([]);

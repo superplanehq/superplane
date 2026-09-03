@@ -114,4 +114,17 @@ describe("PostHogSurveyForm", () => {
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(surveyCapture).toHaveBeenCalledWith("survey dismissed", { $survey_id: "survey-1" });
   });
+
+  it("opens at the requested question so later steps can be documented in isolation", () => {
+    render(
+      <PostHogSurveyForm
+        survey={buildSurvey([singleChoiceQuestion, multipleChoiceQuestion, textQuestion])}
+        redirectTo="/"
+        initialQuestionIndex={2}
+      />,
+    );
+
+    expect(screen.getByText(textQuestion.question)).toBeInTheDocument();
+    expect(screen.getByLabelText("Question 3 of 3")).toBeInTheDocument();
+  });
 });

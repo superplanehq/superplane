@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { useFactoriesThemeClass } from "@/pages/factories/lib/useFactoriesThemeClass";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { WelcomeSurveyLayout } from "./WelcomeSurveyLayout";
 import { getWelcomeSurveyRedirectPath } from "./welcomeSurveyRedirect";
 
 const NEW_USER_ONBOARDING_SURVEY_NAME = "New User Onboarding Survey";
@@ -82,11 +83,9 @@ const WelcomeSurvey: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <div className="w-full max-w-xl rounded-lg border border-border bg-card px-8 py-9 text-foreground shadow-sm sm:px-10">
-        <PostHogSurveyForm survey={survey} redirectTo={redirectTo} onComplete={handleSurveyComplete} />
-      </div>
-    </div>
+    <WelcomeSurveyLayout>
+      <PostHogSurveyForm survey={survey} redirectTo={redirectTo} onComplete={handleSurveyComplete} />
+    </WelcomeSurveyLayout>
   );
 };
 
