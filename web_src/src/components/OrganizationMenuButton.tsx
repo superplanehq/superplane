@@ -314,7 +314,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                         );
                       })}
                       <Link
-                        to="/create"
+                        to="/onboarding"
                         onClick={() => setIsMenuOpen(false)}
                         data-testid="legacy-organization-create"
                         className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"

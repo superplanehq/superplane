@@ -46,8 +46,6 @@ func TestOrganizationEntry(t *testing.T) {
 		session.Login()
 
 		session.Visit("/")
-		session.AssertText("Set up your workspace")
-		session.Click(q.TestID("initial-onboarding-create-workspace"))
 		waitErr := session.Page().WaitForURL("**/workspaces/*/setup**", pw.PageWaitForURLOptions{
 			Timeout: pw.Float(30000),
 		})
@@ -66,6 +64,10 @@ func TestOrganizationEntry(t *testing.T) {
 		require.NoError(t, models.DisableExperimentalFeature(session.OrgID, features.FeatureFactories))
 		secondOrganization := createOrganizationForAccount(t, session, "Second E2E Organization")
 		require.NoError(t, models.DisableExperimentalFeature(secondOrganization.ID, features.FeatureFactories))
+		require.NoError(t, models.SaveAccountLinkedAccount(
+			database.DB(t.Context()),
+			models.NewAccountLinkedAccount(session.Account.ID, models.ProviderGitHub, "github-user-id", "github-owner", "GitHub Owner", ""),
+		))
 
 		session.Visit("/" + session.OrgSlug)
 		session.Click(q.TestID("legacy-organization-menu"))
@@ -76,6 +78,14 @@ func TestOrganizationEntry(t *testing.T) {
 		require.Contains(t, currentOrganizationText, "Current")
 		session.Click(q.TestID("legacy-organization-option-" + secondOrganization.ID.String()))
 		session.WaitForBrowserPath("/" + secondOrganization.Slug)
+
+		session.Click(q.TestID("legacy-organization-menu"))
+		session.Click(q.TestID("legacy-organization-switch"))
+		session.Click(q.TestID("legacy-organization-create"))
+		waitErr := session.Page().WaitForURL("**/workspaces/*/setup**", pw.PageWaitForURLOptions{
+			Timeout: pw.Float(30000),
+		})
+		require.NoError(t, waitErr)
 	})
 }
 
