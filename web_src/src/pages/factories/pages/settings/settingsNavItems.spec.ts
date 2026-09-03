@@ -9,8 +9,8 @@ import {
 describe("factorySettingsRouteFromPathname", () => {
   it("reads a canonical scoped settings route", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/profile")?.id).toBe("account-profile");
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/security")?.id).toBe(
-      "account-security",
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/notifications")?.id).toBe(
+      "account-notifications",
     );
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")?.id).toBe(
       "workspace-automations",
@@ -24,6 +24,7 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/general")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/overview")).toBeUndefined();
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/linked-accounts")).toBeUndefined();
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/account/security")).toBeUndefined();
   });
 });
 
@@ -31,8 +32,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
   it("contains only the approved settings in display order", () => {
     expect(FACTORY_SETTINGS_NAV_GROUPS.map((group) => group.label)).toEqual(["Account", "Workspace", "Organization"]);
     expect(FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items.map((item) => item.label))).toEqual([
-      "Profile",
-      "Security",
+      "Account",
       "Notifications",
       "General",
       "Repository",
@@ -56,9 +56,15 @@ describe("filterFactorySettingsNavGroups", () => {
   });
 
   it("keeps items whose label matches the query", () => {
+    const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "notif");
+    expect(filtered.map((group) => group.id)).toEqual(["account"]);
+    expect(filtered[0]?.items.map((item) => item.id)).toEqual(["account-notifications"]);
+  });
+
+  it("matches security keywords on the combined Account page", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "secur");
     expect(filtered.map((group) => group.id)).toEqual(["account"]);
-    expect(filtered[0]?.items.map((item) => item.id)).toEqual(["account-security"]);
+    expect(filtered[0]?.items.map((item) => item.id)).toEqual(["account-profile"]);
   });
 
   it("keeps every item in a group when the group label matches", () => {

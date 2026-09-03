@@ -1,17 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router";
 
-import { Avatar } from "@/components/Avatar/avatar";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { accountEmailSourceLabel, type AccountEmailOption } from "@/lib/accountSettings";
-import { getNameInitials } from "@/lib/nameInitials";
 import { showSuccessToast } from "@/lib/toast";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../FactorySettingsCard";
+import { SettingsIdentityField } from "../settingsIdentityField";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
 import { AccountProfileVelocityGithubCard } from "./AccountProfileVelocityGithubCard";
 
@@ -21,25 +18,25 @@ export function AccountProfileRedesignPage({
   name,
   email,
   emailOptions = [],
-  securityHref,
   onNameChange,
   onEmailChange,
   onSave,
   velocityGithubUsername = null,
   onLinkVelocityGithub,
   onRemoveVelocityGithub,
+  security,
   dangerZone,
 }: {
   name: string;
   email: string;
   emailOptions?: AccountEmailOption[];
-  securityHref?: string;
   onNameChange: (name: string) => void;
   onEmailChange?: (email: string) => void | Promise<void>;
   onSave: () => void | Promise<void>;
   velocityGithubUsername?: string | null;
   onLinkVelocityGithub?: () => void;
   onRemoveVelocityGithub?: () => void;
+  security?: ReactNode;
   dangerZone?: ReactNode;
 }) {
   const [savedName, setSavedName] = useState(name);
@@ -57,31 +54,33 @@ export function AccountProfileRedesignPage({
   };
 
   return (
-    <FactorySettingsPageFrame title="Profile" subtitle="Your name, appearance, and GitHub identity.">
-      <FactorySettingsCard title="Identity" data-testid="account-redesign-identity">
-        <div className="space-y-6">
-          <div className="flex items-start gap-4">
-            <Avatar initials={getNameInitials(name || email) || "?"} alt={name || email} className="size-16 shrink-0" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="account-redesign-name">Name</Label>
-              <Input
-                id="account-redesign-name"
-                data-testid="account-redesign-name"
-                value={name}
-                maxLength={MAX_NAME_LENGTH}
-                onChange={(event) => onNameChange(event.target.value)}
-              />
-              <p className="text-[12px] text-muted-foreground">This name appears on tasks, comments, and mentions.</p>
-              {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
-            </div>
-          </div>
+    <FactorySettingsPageFrame
+      title="Account"
+      subtitle="Preferences, profile information, and security for your SuperPlane account."
+    >
+      <FactorySettingsCard title="Preferences" data-testid="account-redesign-appearance">
+        <SettingsActionRow
+          title="Theme"
+          description="Choose light, dark, or match this device."
+          testId="account-redesign-appearance-theme"
+          action={<ThemePreferenceControl variant="settings" />}
+        />
+      </FactorySettingsCard>
 
-          <ProfileEmailField
-            email={email}
-            options={emailOptions}
-            securityHref={securityHref}
-            onEmailChange={onEmailChange}
+      <FactorySettingsCard title="Profile information" data-testid="account-redesign-identity">
+        <div className="space-y-6">
+          <SettingsIdentityField
+            name={name}
+            nameId="account-redesign-name"
+            nameTestId="account-redesign-name"
+            initialsFrom={name || email}
+            maxLength={MAX_NAME_LENGTH}
+            helperText="This name appears on tasks, comments, and mentions."
+            error={nameError}
+            onNameChange={onNameChange}
           />
+
+          <ProfileEmailField email={email} options={emailOptions} onEmailChange={onEmailChange} />
 
           <LoadingButton
             disabled={!isDirty || Boolean(nameError)}
@@ -101,14 +100,7 @@ export function AccountProfileRedesignPage({
         />
       ) : null}
 
-      <FactorySettingsCard title="Appearance" data-testid="account-redesign-appearance">
-        <SettingsActionRow
-          title="Theme"
-          description="Choose light, dark, or match this device."
-          testId="account-redesign-appearance-theme"
-          action={<ThemePreferenceControl variant="settings" />}
-        />
-      </FactorySettingsCard>
+      {security}
 
       {dangerZone}
     </FactorySettingsPageFrame>
@@ -118,12 +110,10 @@ export function AccountProfileRedesignPage({
 function ProfileEmailField({
   email,
   options,
-  securityHref,
   onEmailChange,
 }: {
   email: string;
   options: AccountEmailOption[];
-  securityHref?: string;
   onEmailChange?: (email: string) => void | Promise<void>;
 }) {
   const canSwitch = options.length > 1 && Boolean(onEmailChange);
@@ -165,16 +155,7 @@ function ProfileEmailField({
             notifications.
           </>
         ) : (
-          <>
-            SuperPlane uses this email to sign you in.{" "}
-            {securityHref ? (
-              <Link to={securityHref} className="text-foreground underline-offset-2 hover:underline">
-                Change this on Security
-              </Link>
-            ) : (
-              "Change this on Security."
-            )}
-          </>
+          "SuperPlane uses this email to sign you in. Change this in Security & access below."
         )}
       </p>
     </div>
