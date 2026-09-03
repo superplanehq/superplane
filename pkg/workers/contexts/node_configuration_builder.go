@@ -1048,7 +1048,7 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 // and its task() alias. Returns nil when the run is not attached to a
 // factory work-order execution. The url, key, artifacts, comments, and
 // assignees are loaded only when the expression AST references those fields
-// on order() or task().
+// on order() or task(). Origin is attached whenever the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1094,6 +1094,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
 	}
+	attachOrderOrigin(order, payload)
 
 	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
 	if err != nil {
@@ -1226,6 +1227,19 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 
 func githubRepositoryURL(repository string) string {
 	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
+}
+
+func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
+	origin := order.Origin()
+	if origin == nil {
+		return
+	}
+
+	item := map[string]any{"url": origin.URL}
+	if origin.Label != "" {
+		item["label"] = origin.Label
+	}
+	payload["origin"] = item
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {

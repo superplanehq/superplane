@@ -56,8 +56,15 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 
 	body, ok := createPR.Configuration["body"].(string)
 	require.True(t, ok, "expected create-pr body to be a string")
-	assert.True(t, strings.HasPrefix(body, "[{{ task().key }}]({{ task().url }})"), "body: %s", body)
+	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
+	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
+	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
+
+	updatePR := findYAMLNode(t, canvas, "update-pr")
+	updateBody, ok := updatePR.Configuration["body"].(string)
+	require.True(t, ok, "expected update-pr body to be a string")
+	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
