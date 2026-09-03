@@ -144,7 +144,7 @@ func (s *factorySteps) confirmDeleteFactory() {
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
-	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
+	s.session.WaitForBrowserPath("/" + s.session.OrgSlug + "/workspaces")
 }
 
 func (s *factorySteps) assertFactoryNotVisibleInList(name string) {
