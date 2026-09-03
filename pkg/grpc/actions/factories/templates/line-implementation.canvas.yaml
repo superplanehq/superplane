@@ -13,13 +13,25 @@ spec:
       targetId: add-branch-artifact
     - channel: default
       sourceId: add-branch-artifact
+      targetId: find-pr
+    - channel: notFound
+      sourceId: find-pr
       targetId: create-pr
+    - channel: found
+      sourceId: find-pr
+      targetId: update-pr
     - channel: default
       sourceId: create-pr
       targetId: attach-pr-artifact
     - channel: default
       sourceId: attach-pr-artifact
       targetId: set-pr-closure-note
+    - channel: default
+      sourceId: update-pr
+      targetId: attach-pr-artifact-updated
+    - channel: default
+      sourceId: attach-pr-artifact-updated
+      targetId: set-pr-closure-note-updated
     - channel: failed
       sourceId: implementation-agent-no-issue
       targetId: add-run-error
@@ -109,6 +121,7 @@ spec:
               1/ Create a new branch. Do not commit on {{ task().default_branch }}.
               2/ Implement the task and the plan. Keep the change focused.
               3/ Commit on the working branch with clear messages.
+              4/ Do not create or open the pull request. Only commit and push to the working branch. The automation opens or updates the pull request after you finish.
 
               Guidelines:
 
@@ -190,6 +203,21 @@ spec:
         x: 1495
         'y': 648
       isCollapsed: true
+    - id: find-pr
+      name: Find Pull Request
+      type: TYPE_ACTION
+      component: github.findPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        repository: '{{ task().repository }}'
+        head: '{{ $["Implement From Task Description"].data.result.branch }}'
+        base: '{{ task().default_branch }}'
+        state: open
+      position:
+        x: 1442
+        'y': 816
+      isCollapsed: true
     - id: create-pr
       name: Create Pull Request
       type: TYPE_ACTION
@@ -211,8 +239,30 @@ spec:
         repository: '{{ task().repository }}'
         title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
       position:
-        x: 1442
-        'y': 816
+        x: 1160
+        'y': 984
+      isCollapsed: true
+    - id: update-pr
+      name: Update Pull Request
+      type: TYPE_ACTION
+      component: github.updatePullRequest
+      concurrency:
+        max: 100
+      configuration:
+        repository: '{{ task().repository }}'
+        pullNumber: '{{ $["Find Pull Request"].data.number }}'
+        title: '{{ fromBase64($["Implement From Task Description"].data.result.title) }}'
+        body: |-
+          [{{ task().key }}]({{ task().url }})
+
+          {{ fromBase64($["Implement From Task Description"].data.result.description) }}
+
+          <hr>
+
+          Created via [SuperPlane](https://superplane.com).
+      position:
+        x: 1724
+        'y': 984
       isCollapsed: true
     - id: attach-pr-artifact
       name: Attach PR to Task
@@ -230,8 +280,8 @@ spec:
         state: open
         externalId: '{{ $["Create Pull Request"].data.id }}'
       position:
-        x: 1442
-        'y': 984
+        x: 1160
+        'y': 1152
       isCollapsed: true
     - id: set-pr-closure-note
       name: Set Closure Note
@@ -246,8 +296,43 @@ spec:
         ctaUrl: '{{ $["Create Pull Request"].data.html_url }}'
         showOnlyWhenWaiting: true
       position:
-        x: 1442
+        x: 1160
+        'y': 1320
+      isCollapsed: true
+    - id: attach-pr-artifact-updated
+      name: Attach Updated PR to Task
+      type: TYPE_ACTION
+      component: addPullRequest
+      concurrency:
+        max: 100
+      configuration:
+        orderId: '{{ task().id }}'
+        provider: github
+        repository: '{{ task().repository }}'
+        number: '{{ $["Update Pull Request"].data.number }}'
+        url: '{{ $["Update Pull Request"].data._links.html.href }}'
+        title: '{{ $["Update Pull Request"].data.title }}'
+        state: open
+        externalId: '{{ $["Update Pull Request"].data.id }}'
+      position:
+        x: 1724
         'y': 1152
+      isCollapsed: true
+    - id: set-pr-closure-note-updated
+      name: Set Closure Note (Updated PR)
+      type: TYPE_ACTION
+      component: setWorkOrderStatusNote
+      configuration:
+        orderId: '{{ task().id }}'
+        noteKey: pr-closure
+        headline: Waiting for user review
+        body: The pull request is open and waiting for user review. Mention @superplaneagent in a pull request comment or review to request changes. Task will automatically close when the pull request is closed or merged.
+        ctaLabel: 'Review PR #{{ $["Update Pull Request"].data.number }}'
+        ctaUrl: '{{ $["Update Pull Request"].data.html_url }}'
+        showOnlyWhenWaiting: true
+      position:
+        x: 1724
+        'y': 1320
       isCollapsed: true
     - id: add-run-error
       name: Record Implementation Failure
