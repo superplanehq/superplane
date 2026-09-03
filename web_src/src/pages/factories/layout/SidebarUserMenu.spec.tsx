@@ -37,8 +37,8 @@ describe("SidebarUserMenu", () => {
       if (url.includes("/organizations")) {
         return new Response(
           JSON.stringify([
-            { id: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
-            { id: "org-acme", name: "Acme" },
+            { id: FACTORIES_ORGANIZATION_ID, slug: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
+            { id: "org-acme", slug: "org-acme", name: "Acme" },
           ]),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
