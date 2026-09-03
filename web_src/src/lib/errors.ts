@@ -1,3 +1,6 @@
+const HTTP_NOT_FOUND_STATUS = 404;
+const GRPC_NOT_FOUND_CODE = 5;
+
 /**
  * Extract error message from API error response
  * Handles the structure returned by the generated OpenAPI client
@@ -11,6 +14,21 @@ export function getApiErrorMessage(error: unknown, fallback = "An error occurred
     getNonEmptyString(error instanceof Error ? error.message : null) ??
     fallback
   );
+}
+
+/** Detect API errors that indicate the requested resource does not exist. */
+export function isNotFoundError(error: unknown): boolean {
+  const response = getErrorField(error, "response");
+  const nestedError = getErrorField(error, "error");
+  const responseData = getErrorField(response, "data");
+  const errorCandidates = [error, response, nestedError, responseData];
+
+  if (errorCandidates.some(hasNotFoundStatus)) {
+    return true;
+  }
+
+  const message = getApiErrorMessage(error, "").toLowerCase();
+  return message.includes("not found") || message.includes("404");
 }
 
 export async function getResponseErrorMessage(response: Response, fallback = "An error occurred"): Promise<string> {
@@ -35,6 +53,20 @@ function getNestedError(error: unknown): unknown {
   }
 
   return error.error;
+}
+
+function hasNotFoundStatus(error: unknown): boolean {
+  const status = getErrorField(error, "status");
+  const code = getErrorField(error, "code");
+  return status === HTTP_NOT_FOUND_STATUS || code === GRPC_NOT_FOUND_CODE || code === "NOT_FOUND";
+}
+
+function getErrorField(error: unknown, key: string): unknown {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  return (error as Record<string, unknown>)[key];
 }
 
 function getResponseDataError(error: unknown): unknown {
