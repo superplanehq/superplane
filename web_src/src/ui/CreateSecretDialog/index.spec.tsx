@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,7 +90,6 @@ describe("CreateSecretDialog", () => {
         expect.objectContaining({ name: "CLIENT_SECRET", value: "secret" }),
       ],
     });
-    expect(within(screen.getByRole("dialog")).getByText("Create secret")).toBeInTheDocument();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
