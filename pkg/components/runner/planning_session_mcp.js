@@ -279,3 +279,5 @@ async function main() {
 if (require.main === module) {
   main();
 }
+
+module.exports = { proposeDraft, proposeSurvey, surveyQuestions, TOOLS };
