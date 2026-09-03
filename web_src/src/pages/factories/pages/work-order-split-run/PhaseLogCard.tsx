@@ -76,13 +76,81 @@ const STREAM_LINE_WRAP_ROW = cn(
   LAST_RUNNING_LINE_PULSE,
 );
 
-function StreamLineTitle({ children, wrap = false }: { children: string; wrap?: boolean }) {
+function StreamLineTitle({
+  children,
+  wrap = false,
+  collapsible = false,
+}: {
+  children: string;
+  wrap?: boolean;
+  collapsible?: boolean;
+}) {
   if (wrap) {
-    return <span className="min-w-0 flex-1 whitespace-normal break-words text-muted-foreground">{children}</span>;
+    if (collapsible) {
+      return <CollapsibleStreamTitle text={children} />;
+    }
+    return <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-muted-foreground">{children}</span>;
   }
   return (
     <span className="min-w-0 w-0 flex-1 overflow-hidden">
       <span className="block truncate text-muted-foreground">{children}</span>
+    </span>
+  );
+}
+
+/**
+ * Full bash command or prompt text. It is clamped to two lines so a long
+ * prompt does not fill the sticky step header. A subtle toggle shows the rest
+ * and hides it again when the text does not fit in two lines.
+ */
+function CollapsibleStreamTitle({ text }: { text: string }) {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+
+  useLayoutEffect(() => {
+    if (expanded) {
+      return;
+    }
+    const el = textRef.current;
+    if (!el) {
+      return;
+    }
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, expanded]);
+
+  return (
+    <span className="flex min-w-0 flex-1 flex-col items-start">
+      <span
+        ref={textRef}
+        className={cn(
+          "w-full whitespace-pre-wrap break-words text-muted-foreground",
+          !expanded && "line-clamp-2",
+        )}
+      >
+        {text}
+      </span>
+      {overflows ? (
+        <button
+          type="button"
+          data-testid="split-run-title-toggle"
+          aria-expanded={expanded}
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded((open) => !open);
+          }}
+          className="mt-0.5 text-[12px] leading-none text-muted-foreground/70 hover:text-foreground"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      ) : null}
     </span>
   );
 }
@@ -865,7 +933,7 @@ function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup
               {step.line.componentType}
             </span>
           ) : null}
-          <StreamLineTitle wrap>{step.line.componentName}</StreamLineTitle>
+          <StreamLineTitle wrap collapsible>{step.line.componentName}</StreamLineTitle>
           <StepStatusMark status={step.line.status} />
         </div>
       ) : null}

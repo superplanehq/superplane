@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { groupClaudeSteps, PhaseLogCard, toolCallSummary } from "./PhaseLogCard";
 import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
+import type { SplitRunStreamLine } from "./splitRunMocks";
 
 const useLiveLogStreamMock = vi.fn();
 
@@ -14,6 +15,17 @@ vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
 beforeEach(() => {
   useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
 });
+
+// jsdom reports 0 for layout sizes, so overflow can only be exercised by
+// stubbing the read-only height getters. Returns a cleanup that removes them.
+function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+  return () => {
+    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+  };
+}
 
 describe("toolCallSummary", () => {
   it("names read files and ran commands", () => {
@@ -113,19 +125,96 @@ describe("PhaseLogCard collapsed stream", () => {
     const bashTitle = within(bash).getByText("Clone Repo");
     expect(bash).not.toHaveClass("whitespace-nowrap");
     expect(bashTitle).not.toHaveClass("truncate");
-    expect(bashTitle).toHaveClass("whitespace-normal", "break-words");
+    expect(bashTitle).toHaveClass("whitespace-pre-wrap", "break-words");
 
     const prompt = screen.getByTestId("split-run-stream-line-step-write");
     const promptTitle = within(prompt).getByText("Write Implementation Plan");
     expect(prompt).not.toHaveClass("whitespace-nowrap");
     expect(promptTitle).not.toHaveClass("truncate");
-    expect(promptTitle).toHaveClass("whitespace-normal", "break-words");
+    expect(promptTitle).toHaveClass("whitespace-pre-wrap", "break-words");
 
     const output = within(screen.getByTestId("split-run-stream-line-step-clone").parentElement as HTMLElement)
       .getByTestId("split-run-stream-output")
       .querySelector("pre");
     expect(output).toHaveClass("whitespace-pre-wrap", "break-words");
     expect(output).not.toHaveClass("truncate");
+  });
+
+  it("preserves newlines in a multi-line step title", () => {
+    const multilineTitle = "set -e\necho line two";
+    const stream: SplitRunStreamLine[] = [
+      line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+      line({
+        id: "step-multiline",
+        note: true,
+        componentName: multilineTitle,
+        componentType: "bash",
+        status: "passed",
+      }),
+    ];
+
+    render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+    const title = screen.getByText(
+      (_, element) =>
+        element?.textContent === multilineTitle && element.classList.contains("whitespace-pre-wrap"),
+    );
+    expect(title).toHaveClass("whitespace-pre-wrap");
+    expect(title.textContent).toBe(multilineTitle);
+  });
+
+  it("clamps a long step title to two lines with a subtle expand toggle", async () => {
+    const restoreHeights = stubElementHeights({ scrollHeight: 120, clientHeight: 40 });
+    try {
+      const user = userEvent.setup();
+      const longTitle = "line one\nline two\nline three\nline four";
+      const stream: SplitRunStreamLine[] = [
+        line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+        line({
+          id: "step-long",
+          note: true,
+          componentName: longTitle,
+          componentType: "bash",
+          status: "passed",
+        }),
+      ];
+
+      render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+      const titleEl = () =>
+        screen.getByText(
+          (_, element) => element?.textContent === longTitle && element.classList.contains("whitespace-pre-wrap"),
+        );
+
+      expect(titleEl()).toHaveClass("line-clamp-2");
+      const toggle = screen.getByTestId("split-run-title-toggle");
+      expect(toggle).toHaveTextContent("Show more");
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(toggle);
+
+      expect(titleEl()).not.toHaveClass("line-clamp-2");
+      expect(screen.getByTestId("split-run-title-toggle")).toHaveTextContent("Show less");
+      expect(screen.getByTestId("split-run-title-toggle")).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      restoreHeights();
+    }
+  });
+
+  it("does not add an expand toggle when a short title fits in two lines", () => {
+    const restoreHeights = stubElementHeights({ scrollHeight: 40, clientHeight: 40 });
+    try {
+      const stream: SplitRunStreamLine[] = [
+        line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+        line({ id: "step-short", note: true, componentName: "echo hi", componentType: "bash", status: "passed" }),
+      ];
+
+      render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+      expect(screen.queryByTestId("split-run-title-toggle")).not.toBeInTheDocument();
+    } finally {
+      restoreHeights();
+    }
   });
 
   it("expands the selected node in the log", () => {

@@ -245,7 +245,7 @@ func claudeBashStepBrokerCommand(stepName, scriptName, command, workingDirectory
 		Name:    runner.AgentStepLabel(stepName, scriptName),
 		Command: runner.WrapAgentStepCommand(runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 		Kind:    runner.LiveLogKindBash,
-		Preview: runner.LiveLogPreview(command),
+		Preview: runner.LiveLogText(command),
 	}
 }
 
@@ -263,6 +263,6 @@ func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, workingD
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,
-		Preview: runner.LiveLogPreview(prompt),
+		Preview: runner.LiveLogText(prompt),
 	}
 }
