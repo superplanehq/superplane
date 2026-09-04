@@ -119,6 +119,11 @@ func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
 	assert.Equal(t, "Add refund retries", result.Text)
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+
+	require.NoError(t, session.RestoreWait(db, result))
+	assert.Equal(t, PlanningWaitResolved, session.WaitState)
+	assert.Equal(t, PlanningWaitKindMessage, session.Wait().Kind)
+	assert.Equal(t, "Add refund retries", session.Wait().Text)
 }
 
 func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T) {
