@@ -501,6 +501,52 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 	assert.Equal(t, first, retryResult)
 }
 
+func Test__InitialOrganizationNameUsesEmailWhenAccountNameEmpty(t *testing.T) {
+	account := &models.Account{Name: "  ", Email: "dev@superplane.local"}
+	assert.Equal(t, "dev", initialOrganizationName(account, ""))
+	assert.Equal(t, "dev", initialOrganizationName(account, "dev"))
+	assert.True(t, accountMayNameOrganization(nil, account, "dev"))
+}
+
+func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
+	r := support.Setup(t)
+	account, err := models.CreateAccount("Ada Lovelace", "ada-onboarding@superplane.local")
+	require.NoError(t, err)
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	attemptID := uuid.New()
+	body, err := json.Marshal(initialWorkspaceRequest{Owner: "", AttemptID: attemptID.String()})
+	require.NoError(t, err)
+
+	request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(body))
+	request = request.WithContext(accountContext(account))
+	response := httptest.NewRecorder()
+	server.createInitialWorkspace(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+
+	organization, err := models.FindOrganizationByName("Ada Lovelace")
+	require.NoError(t, err)
+	workspaces, err := models.ListFactories(database.DB(t.Context()), organization.ID)
+	require.NoError(t, err)
+	require.Len(t, workspaces, 1)
+}
+
 func Test__OrganizationCreationSerializesLimitChecks(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.SaveAccountLinkedAccount(

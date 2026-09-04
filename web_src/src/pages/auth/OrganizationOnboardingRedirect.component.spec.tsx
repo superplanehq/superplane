@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AccountContextType } from "@/contexts/accountContextState";
@@ -82,69 +81,41 @@ describe("OrganizationOnboardingRedirect", () => {
     expect(workspace).toHaveTextContent("NEWWO");
     expect(workspace.dataset.entryPath).toMatch(/^\/onboarding\?attempt=[0-9a-f-]+$/);
     expect(location.replace).not.toHaveBeenCalled();
-  });
-
-  it("connects GitHub when the account has no GitHub identity", async () => {
-    accountState.account.linked_accounts = [];
-    accountState.account.providers = [];
-
-    renderOnboarding();
-
-    await waitFor(() => {
-      expect(location.replace).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fonboarding");
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it("shows a sign-in conflict and does not restart GitHub", async () => {
-    accountState.account.linked_accounts = [];
-    accountState.account.providers = [];
-    window.history.replaceState(
-      null,
-      "",
-      "/onboarding?auth_error=signin_method_in_use&provider=github&attempt=42d6ce14-6153-4390-85fe-3d15e9df53c9",
+    expect(fetch).toHaveBeenCalledWith(
+      "/account/onboarding",
+      expect.objectContaining({
+        body: expect.stringContaining('"owner":"Dev User"'),
+      }),
     );
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        pathname: "/onboarding",
-        search: "?auth_error=signin_method_in_use&provider=github&attempt=42d6ce14-6153-4390-85fe-3d15e9df53c9",
-        replace: location.replace,
-        assign: location.assign,
-      },
-    });
-
-    renderOnboarding();
-
-    expect(
-      await screen.findByText(
-        "This GitHub identity already belongs to another SuperPlane account. Delete that account first.",
-      ),
-    ).toBeInTheDocument();
-    expect(location.replace).not.toHaveBeenCalled();
-    expect(fetch).not.toHaveBeenCalled();
-
-    await userEvent.click(screen.getByRole("button", { name: "Connect GitHub" }));
-    expect(location.assign).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fonboarding");
   });
 
-  it("shows a linked-account conflict and does not restart GitHub", async () => {
-    accountState.account.linked_accounts = [];
-    accountState.account.providers = [];
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        pathname: "/onboarding",
-        search: "?auth_error=linked_account_in_use&provider=github&attempt=42d6ce14-6153-4390-85fe-3d15e9df53c9",
-        replace: location.replace,
-        assign: location.assign,
-      },
-    });
+  it("shows an error when the account has no name", async () => {
+    accountState.account.name = "";
+    accountState.account.email = "";
 
     renderOnboarding();
 
-    expect(await screen.findByText("Another SuperPlane account already uses this GitHub account.")).toBeInTheDocument();
-    expect(location.replace).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Could not start workspace setup/)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("starts workspace setup without GitHub authorization", async () => {
+    accountState.account.linked_accounts = [];
+    accountState.account.providers = [];
+
+    renderOnboarding();
+
+    const workspace = await screen.findByTestId("internal-workspace-key");
+    expect(workspace).toHaveTextContent("NEWWO");
+    expect(location.replace).not.toHaveBeenCalled();
+    expect(location.assign).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/account/onboarding",
+        expect.objectContaining({
+          body: expect.stringContaining('"owner":"Dev User"'),
+        }),
+      );
+    });
   });
 });
