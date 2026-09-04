@@ -31,17 +31,13 @@ func TestOrganizationEntry(t *testing.T) {
 		session.WaitForBrowserPath("/" + session.OrgSlug + "/apps/new")
 	})
 
-	t.Run("creates an organization and workspace from the GitHub account during onboarding", func(t *testing.T) {
+	t.Run("creates an organization and workspace from the account name during onboarding", func(t *testing.T) {
 		session := ctx.NewSession(t)
 		session.StartWithoutUser()
 
 		account, err := models.CreateAccount("GitHub User", "github-user@superplane.local")
 		require.NoError(t, err)
 		middleware.MarkOwnerSetupCompleted()
-		require.NoError(t, models.SaveAccountLinkedAccount(
-			database.DB(t.Context()),
-			models.NewAccountLinkedAccount(account.ID, models.ProviderGitHub, "github-user-id", "github-owner", "GitHub Owner", ""),
-		))
 		session.Account = account
 		session.Login()
 
@@ -52,7 +48,7 @@ func TestOrganizationEntry(t *testing.T) {
 		require.NoError(t, waitErr)
 		session.AssertVisible(q.TestID("workspace-setup"))
 
-		organization, err := models.FindOrganizationByName("GitHub Owner")
+		organization, err := models.FindOrganizationByName("GitHub User")
 		require.NoError(t, err)
 
 		workspaces, err := models.ListFactories(database.DB(t.Context()), organization.ID)

@@ -77,7 +77,7 @@ async function finishFactoryInstall(args: {
 }) {
   const shouldTriggerRun = args.startInitialRun && args.startingTaskPrompt.length > 0;
   if (shouldTriggerRun) {
-    await invokeFactoryRun(args.canvasId, args.definition, args.startingTaskPrompt);
+    await invokeFactoryRun(args.organizationId, args.canvasId, args.definition, args.startingTaskPrompt);
     args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
   }
 
