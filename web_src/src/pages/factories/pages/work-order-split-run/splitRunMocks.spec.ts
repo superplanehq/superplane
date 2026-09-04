@@ -96,6 +96,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(implement?.status).toBe("running");
     expect(implement?.costCents).toBe("28");
     expect(implement?.totalTokens).toBe("900");
+    expect(implement?.model).toBe("anthropic/claude-sonnet-4-6");
     expect(implement?.componentName).toBe("Implementation");
     expect(implement?.appId).toBe("app-refund-implementer");
     expect(implement?.runId).toBe(RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id);

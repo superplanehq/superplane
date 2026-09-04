@@ -128,6 +128,8 @@ export interface SplitRunPhase {
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
   totalTokens?: string;
+  /** Runner model this automation used. Hidden when empty. */
+  model?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -576,7 +578,16 @@ function phasesForOrder(
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
-    ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
+    ...executions.map((execution) =>
+      executionToPhase(
+        order,
+        execution,
+        apiChecks,
+        demoArtifacts,
+        executions,
+        dispatchModelForExecution(order, execution),
+      ),
+    ),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
 }
@@ -932,6 +943,7 @@ function executionToPhase(
   apiChecks?: FactoriesWorkOrderCheck[],
   demoArtifacts = true,
   peers: FactoriesWorkOrderExecution[] = [],
+  dispatchModel?: string,
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
@@ -967,6 +979,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
+    model: dispatchModel?.trim() || undefined,
   };
 }
 
@@ -1087,6 +1100,17 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function dispatchModelForExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): string | undefined {
+  const owner = (order.lineDispatches ?? []).find((dispatch) =>
+    (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
+  );
+  const value = owner?.model?.trim();
+  return value || undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {
