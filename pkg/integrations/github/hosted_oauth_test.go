@@ -199,9 +199,10 @@ func Test__afterHostedAppBind(t *testing.T) {
 
 		integration := pendingHostedIntegration("csrf")
 		integration.Metadata = common.Metadata{
-			State:     "csrf",
-			HostedApp: true,
-			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			State:            "csrf",
+			HostedApp:        true,
+			InstallRequested: true,
+			GitHubApp:        common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 			PendingInstallations: []common.PendingInstallation{
 				{ID: "11", AccountLogin: "acme"},
 			},
@@ -215,7 +216,65 @@ func Test__afterHostedAppBind(t *testing.T) {
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Equal(t, "11", metadata.InstallationID)
 		assert.Empty(t, metadata.PendingInstallations)
+		assert.False(t, metadata.InstallRequested)
 		assertNoPlaintextSecrets(t, integration)
+	})
+}
+
+func Test__afterAppInstallationLegacy_installRequest(t *testing.T) {
+	t.Run("accepts request without installation id", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request",
+			rec.Header().Get("Location"),
+		)
+		assert.Equal(t, "pending", integration.State)
+		assert.Empty(t, integration.Metadata.(common.Metadata).InstallationID)
+		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
+	})
+
+	t.Run("persists the requested GitHub organization", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubOrg=acme",
+			rec.Header().Get("Location"),
+		)
+		assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	})
+
+	t.Run("rejects request with a mismatched state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=other&setup_action=request",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Equal(t, "pending", integration.State)
+		assert.False(t, integration.Metadata.(common.Metadata).InstallRequested)
 	})
 }
 
