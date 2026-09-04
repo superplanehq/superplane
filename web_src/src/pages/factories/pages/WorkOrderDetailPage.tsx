@@ -11,7 +11,7 @@ import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useParams } from "react-router";
+import { Navigate, useLocation, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
@@ -36,6 +36,7 @@ export function WorkOrderDetailPage() {
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();
+  const location = useLocation();
   const { data: workOrders = [], isLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const resolution = resolveWorkOrderByNumber(workOrders, orderId, isLoading);
   const number = canonicalWorkOrderNumber(resolution.order);
@@ -44,7 +45,9 @@ export function LegacyWorkOrderDetailRedirect() {
     return null;
   }
   if (number) {
-    return <Navigate to={workOrderDetailPath(organizationId, factoryKey, number)} replace />;
+    // Carry the query string (e.g. `lineId`) so a bookmarked board line survives
+    // the id-to-number redirect instead of falling back to the first line.
+    return <Navigate to={`${workOrderDetailPath(organizationId, factoryKey, number)}${location.search}`} replace />;
   }
   return <Navigate to={factoryHomePath(organizationId, factoryKey, firstFactoryLineId(factory))} replace />;
 }
