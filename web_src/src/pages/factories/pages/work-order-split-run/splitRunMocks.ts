@@ -578,16 +578,7 @@ function phasesForOrder(
   return [
     ...sourcePhasesForOrder(order, executions.length > 0, demoArtifacts),
     ...phasesForAnalysisRuns(options?.analysisRuns ?? [], apiChecks),
-    ...executions.map((execution) =>
-      executionToPhase(
-        order,
-        execution,
-        apiChecks,
-        demoArtifacts,
-        executions,
-        dispatchModelForExecution(order, execution),
-      ),
-    ),
+    ...executions.map((execution) => executionToPhase(order, execution, apiChecks, demoArtifacts, executions)),
     ...phasesForPRFeedbackRuns(options?.prFeedbackRuns ?? []),
   ];
 }
@@ -943,7 +934,6 @@ function executionToPhase(
   apiChecks?: FactoriesWorkOrderCheck[],
   demoArtifacts = true,
   peers: FactoriesWorkOrderExecution[] = [],
-  dispatchModel?: string,
 ): SplitRunPhase {
   const status = statusForExecution(execution);
   const { name, componentName } = lineAutomationPresentation(execution.run, execution.step);
@@ -979,7 +969,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
-    model: dispatchModel?.trim() || undefined,
+    model: dispatchModelForExecution(order, execution),
   };
 }
 

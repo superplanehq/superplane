@@ -414,7 +414,6 @@ function buildDispatchedLineDispatch(
   now: string,
   apps: Array<{ id?: string; name?: string }> = [],
   startStepIndex = 0,
-  model = "",
 ): FactoriesWorkOrderLineDispatch {
   const stepIndex = Math.max(0, startStepIndex);
   const firstStep = line?.steps?.[stepIndex] ?? line?.steps?.[0];
@@ -430,7 +429,6 @@ function buildDispatchedLineDispatch(
     state: "STATE_ACTIVE",
     result: "RESULT_UNKNOWN",
     createdAt: now,
-    model,
     stepExecutions: [
       {
         id: `exec-${Date.now()}`,
@@ -483,14 +481,10 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   if (options.replaceActive) {
     cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(
-    line,
-    options.lineName,
-    now,
-    apps,
-    options.startStepIndex,
-    options.model,
-  );
+  const newDispatch = {
+    ...buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex),
+    model: options.model,
+  };
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }

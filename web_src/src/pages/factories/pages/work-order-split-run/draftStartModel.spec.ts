@@ -48,7 +48,7 @@ describe("phaseWithRunnerModel", () => {
   });
 
   it("fills Auto from the canvas when the phase has no model", () => {
-    expect(phaseWithRunnerModel({}, [{ configuration: { model: "opus" } }]).model).toBe("opus");
+    expect(phaseWithRunnerModel({ model: undefined }, [{ configuration: { model: "opus" } }]).model).toBe("opus");
   });
 
   it("keeps a start model the canvas runners can use", () => {
