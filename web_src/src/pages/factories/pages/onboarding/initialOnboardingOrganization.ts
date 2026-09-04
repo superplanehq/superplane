@@ -24,7 +24,9 @@ export function organizationIdentityFromOwner(owner: string, suffix?: string): {
   if (!suffix) {
     return { name: base, slug: slugBase };
   }
-  return { name: `${base}-${suffix}`, slug: `${slugBase}-${suffix}` };
+  // Only the slug needs to stay unique; the name always mirrors the plain
+  // GitHub owner so retries on a slug collision don't rename the org.
+  return { name: base, slug: `${slugBase}-${suffix}` };
 }
 
 export function isOrganizationIdentityTaken(message: string): boolean {
