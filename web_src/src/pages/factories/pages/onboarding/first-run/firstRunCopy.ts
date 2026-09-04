@@ -1,3 +1,9 @@
+import {
+  GITHUB_INSTALL_REQUEST_NEXT,
+  GITHUB_INSTALL_REQUEST_TITLE,
+  githubInstallRequestBody,
+} from "@/lib/githubInstallRequestCopy";
+
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
@@ -19,6 +25,9 @@ export const FIRST_RUN_COPY = {
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
+    installRequested: GITHUB_INSTALL_REQUEST_TITLE,
+    installRequestedBody: githubInstallRequestBody,
+    installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
   },
   choose: {
     headline: "Choose a repository",
