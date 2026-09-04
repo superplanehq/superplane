@@ -323,6 +323,13 @@ describe("SpendingRedesignPage", () => {
       expect(screen.getByRole("heading", { name: "Spending" })).toBeInTheDocument();
     });
 
+    it("keeps the full-page loading message while only one report has resolved on the first load", () => {
+      renderPage({ isLoading: true, isFetching: true, modelReport: FAKE_REPORT, machineReport: undefined });
+
+      expect(screen.getByText("Loading spending...")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
+
     it("shows a quiet top-right indicator while a report refetches over existing data", () => {
       renderPage({ isLoading: false, isFetching: true, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
 

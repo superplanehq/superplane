@@ -63,11 +63,16 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
   const view = useSpendingRedesignPageModel({ ...modelArgs, catalogs });
   const metrics = spendingMetricCopy(view.rangeTotals);
   // Reports from a real query are only present once the first fetch
-  // resolves. Once we have one, keep rendering it (and swap in the small
+  // resolves. Once we have them, keep rendering them (and swap in the small
   // top-right indicator below) instead of dropping back to the full-page
   // loading state on every refetch, including on remounts that reuse a
   // cached report.
-  const hasReport = Boolean(props.modelReport || props.machineReport);
+  //
+  // Require *both* reports so that a partially resolved first load (the model
+  // query settling before the compute query, or vice versa) does not suppress
+  // the full-page loading state and render the still-loading section as empty
+  // data behind a background-refresh indicator.
+  const hasReport = Boolean(props.modelReport && props.machineReport);
   const showFullPageLoading = isLoading && !hasReport;
 
   if (errorMessage) {
