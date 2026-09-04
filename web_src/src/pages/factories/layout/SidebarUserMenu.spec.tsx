@@ -69,7 +69,8 @@ describe("SidebarUserMenu", () => {
     expect(screen.queryByRole("menuitem", { name: "SuperPlane" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Organization settings")).toBeInTheDocument();
     expect(screen.getByLabelText("Switch organization")).toBeInTheDocument();
-    expect(screen.getByTestId("factories-sidebar-back-to-apps")).toHaveTextContent("Back to Apps");
+    expect(screen.queryByTestId("factories-sidebar-back-to-apps")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Back to Apps" })).not.toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByTestId("factories-sidebar-appearance")).toHaveTextContent("Appearance");
     expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();

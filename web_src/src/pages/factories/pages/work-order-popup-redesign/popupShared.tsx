@@ -5,7 +5,7 @@ import { MarkdownContent } from "@/pages/app/Markdown";
 import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageResponses";
+import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { ClickToRename } from "../../layout/ClickToRename";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { OrgUserReference } from "../../OrgUserReference";
@@ -249,6 +249,7 @@ export function WaitingNotes({ notes }: { notes: PopupFixture["waitingNotes"] })
           key={note.key}
           note={note}
           organizationId={FACTORIES_ORGANIZATION_ID}
+          factoryKey={PRIMARY_FACTORY_KEY}
           canClose={false}
           canManage={false}
           isBusy={false}

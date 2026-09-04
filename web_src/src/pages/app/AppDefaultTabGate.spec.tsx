@@ -26,9 +26,31 @@ type CanvasQueryLike = {
 
 let mockCanvasQuery: CanvasQueryLike = { data: undefined, isLoading: false };
 
+const featureMocks = vi.hoisted(() => ({
+  factoriesEnabled: false,
+  featureLoading: false,
+  factories: [] as Array<{ id?: string; key?: string }>,
+  factoriesLoading: false,
+}));
+
 vi.mock("@/hooks/useCanvasData", () => ({
   useCanvasConsole: () => mockConsoleQuery,
   useCanvas: () => mockCanvasQuery,
+}));
+
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => featureId === "factories" && featureMocks.factoriesEnabled,
+    enabledExperimentalFeatures: [],
+    isLoading: featureMocks.featureLoading,
+  }),
+}));
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactories: () => ({
+    data: featureMocks.factories,
+    isLoading: featureMocks.factoriesLoading,
+  }),
 }));
 
 // AppPage pulls in the entire canvas surface; substitute a marker so the gate
@@ -46,6 +68,9 @@ function renderGate({ initialEntry }: { initialEntry: string }) {
       <Routes>
         <Route path="/:organizationId/apps/:appId" element={<AppDefaultTabGate />} />
         <Route path="/apps/:appId" element={<AppDefaultTabGate />} />
+        <Route path="/:organizationId" element={<div data-testid="org-home" />} />
+        <Route path="/:organizationId/workspaces" element={<div data-testid="workspaces-index" />} />
+        <Route path="/:organizationId/workspaces/:factoryKey/apps/:appId" element={<div data-testid="factory-app" />} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -69,6 +94,10 @@ beforeEach(() => {
   window.localStorage.clear();
   mockConsoleQuery = consoleLoaded([]);
   mockCanvasQuery = { data: undefined, isLoading: false };
+  featureMocks.factoriesEnabled = false;
+  featureMocks.featureLoading = false;
+  featureMocks.factories = [];
+  featureMocks.factoriesLoading = false;
 });
 
 describe("AppDefaultTabGate — pinned URLs", () => {
@@ -146,22 +175,56 @@ describe("AppDefaultTabGate — stored-tab redirect", () => {
 });
 
 describe("AppDefaultTabGate — factory apps", () => {
-  it("keeps factory apps on the canvas and strips console/memory/files views", () => {
+  it("sends factory-owned apps to org home when factories are off", () => {
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
-    recordLastVisitedAppTab("canvas-1", "console");
     renderGate({ initialEntry: "/org-1/apps/canvas-1?view=console" });
 
-    expect(getLocation().search).toBe("");
-    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+    expect(getLocation().pathname).toBe("/org-1");
+    expect(screen.getByTestId("org-home")).toBeInTheDocument();
   });
 
-  it("does not redirect factory apps to a stored non-canvas tab", () => {
-    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
-    recordLastVisitedAppTab("canvas-1", "memory");
+  it("sends leftover classic apps to /workspaces when factories are on", () => {
+    featureMocks.factoriesEnabled = true;
+    mockCanvasQuery = { data: { metadata: {} }, isLoading: false };
     renderGate({ initialEntry: "/org-1/apps/canvas-1" });
 
-    expect(getLocation().search).toBe("");
-    expect(screen.getByTestId("app-page")).toBeInTheDocument();
+    expect(getLocation().pathname).toBe("/org-1/workspaces");
+    expect(screen.getByTestId("workspaces-index")).toBeInTheDocument();
+  });
+
+  it("sends factory-owned apps to the workspace editor when factories are on", () => {
+    featureMocks.factoriesEnabled = true;
+    featureMocks.factories = [{ id: "factory-1", key: "RF" }];
+    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
+    renderGate({ initialEntry: "/org-1/apps/canvas-1" });
+
+    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().search).toBe("?configure=1&agent=1");
+    expect(screen.getByTestId("factory-app")).toBeInTheDocument();
+  });
+
+  it("keeps a run query on the workspace app URL", () => {
+    featureMocks.factoriesEnabled = true;
+    featureMocks.factories = [{ id: "factory-1", key: "RF" }];
+    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
+    renderGate({ initialEntry: "/org-1/apps/canvas-1?run=run-9" });
+
+    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().search).toBe("?run=run-9");
+    expect(screen.getByTestId("factory-app")).toBeInTheDocument();
+  });
+
+  it("keeps node, version, and file pins on the workspace editor URL", () => {
+    featureMocks.factoriesEnabled = true;
+    featureMocks.factories = [{ id: "factory-1", key: "RF" }];
+    mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
+    renderGate({
+      initialEntry: "/org-1/apps/canvas-1?edit=1&sidebar=1&node=create-pr&version=v1&file=app.yaml",
+    });
+
+    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1&file=app.yaml");
+    expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
 });
 
