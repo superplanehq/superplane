@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -10,7 +10,7 @@ import {
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
-import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 
@@ -61,7 +61,7 @@ export function useIntegrationConnectDialog({
   /** Configuration field names the create dialog never shows, keyed by integration name. */
   hiddenConfigurationFields?: Record<string, string[]>;
 }) {
-  const { data: me } = useMe();
+  const { data: me } = useMe(true, organizationId);
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
@@ -76,6 +76,7 @@ export function useIntegrationConnectDialog({
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
+  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean }>(false);
 
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
@@ -130,19 +131,26 @@ export function useIntegrationConnectDialog({
 
   const connectGitHubWithoutDialog = useCallback(
     async (forceNew = false) => {
+      if (!me?.id) {
+        pendingGitHubConnectRef.current = { forceNew };
+        return;
+      }
+
+      pendingGitHubConnectRef.current = false;
       try {
         await startDirectGitHubConnect({
           organizationId,
           returnTo,
           existingNames: existingIntegrationNames,
           connected,
-          currentUserId: me?.id,
+          currentUserId: me.id,
           forceNew,
           goTo: navigate,
           create: async (payload) => {
             const response = await createIntegrationMutation.mutateAsync(payload);
             return response.data;
           },
+          update: persistGitHubSetupReturnPath(organizationId),
         });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
@@ -150,6 +158,16 @@ export function useIntegrationConnectDialog({
     },
     [connected, createIntegrationMutation, existingIntegrationNames, me?.id, navigate, organizationId, returnTo],
   );
+
+  useEffect(() => {
+    if (!me?.id || !pendingGitHubConnectRef.current) {
+      return;
+    }
+
+    const { forceNew } = pendingGitHubConnectRef.current;
+    pendingGitHubConnectRef.current = false;
+    void connectGitHubWithoutDialog(forceNew);
+  }, [connectGitHubWithoutDialog, me?.id]);
 
   const requestConnect = (integrationName: string) => {
     if (integrationName === "github" && githubConnect.hosted) {

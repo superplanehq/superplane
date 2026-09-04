@@ -23,6 +23,9 @@ type Metadata struct {
 	// InstallRequestedAccount is the GitHub organization (or user) login the
 	// member asked an admin to approve.
 	InstallRequestedAccount string `mapstructure:"installRequestedAccount" json:"installRequestedAccount,omitempty"`
+	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
+	// use it when the browser cookie is missing, for example localhost to ngrok.
+	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
 }
 
 type PendingInstallation struct {
