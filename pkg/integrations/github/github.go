@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"text/template"
@@ -780,6 +781,16 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	installationID = ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	requestState := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if requestState != state {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || requestState != state {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -861,6 +872,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	clearInstallRequested(ctx)
 	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App - installation=%s", installationID)
@@ -903,6 +915,16 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	installationID := ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	state := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if state != metadata.State {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || state != metadata.State {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -1028,15 +1050,74 @@ func isPendingInstallationSetupAction(setupAction string) bool {
 	return setupAction == "install" || setupAction == "update"
 }
 
+func isInstallationRequestSetupAction(setupAction string) bool {
+	return setupAction == "request"
+}
+
+func persistInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	metadata.InstallRequested = true
+	if account := requestedInstallAccount(ctx); account != "" {
+		metadata.InstallRequestedAccount = account
+	}
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func clearInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return
+	}
+	if !metadata.InstallRequested && metadata.InstallRequestedAccount == "" {
+		return
+	}
+	metadata.InstallRequested = false
+	metadata.InstallRequestedAccount = ""
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func requestedInstallAccount(ctx core.HTTPRequestContext) string {
+	for _, key := range []string{"account", "org", "organization", "githubOrg"} {
+		if value := strings.TrimSpace(ctx.Request.URL.Query().Get(key)); value != "" {
+			return value
+		}
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		return metadata.InstallRequestedAccount
+	}
+	if metadata.Owner != "" {
+		return metadata.Owner
+	}
+
+	return ""
+}
+
 func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
-	http.Redirect(
-		ctx.Response,
-		ctx.Request,
-		fmt.Sprintf(
-			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-		),
-		http.StatusSeeOther,
+	redirectToIntegrationSettingsURL(ctx, "")
+}
+
+func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
+	query := "githubSetup=request"
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		query += "&githubOrg=" + url.QueryEscape(metadata.InstallRequestedAccount)
+	}
+	redirectToIntegrationSettingsURL(ctx, query)
+}
+
+func redirectToIntegrationSettingsURL(ctx core.HTTPRequestContext, rawQuery string) {
+	location := fmt.Sprintf(
+		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 	)
+	if rawQuery != "" {
+		location = location + "?" + rawQuery
+	}
+	http.Redirect(ctx.Response, ctx.Request, location, http.StatusSeeOther)
 }
 
 func ownerFromRepositories(repos []common.Repository) string {
