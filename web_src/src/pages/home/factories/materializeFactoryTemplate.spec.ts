@@ -5,6 +5,7 @@ import { getFactoryDefinition } from "./index";
 import {
   FACTORY_CANVAS_ID_PLACEHOLDER,
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   normalizeFactoryInstallParams,
@@ -263,5 +264,38 @@ spec:
   it("exposes separate app and backlog install params on the bundled definition", () => {
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
+  });
+
+  it("maps SuperPlane rewrites to hosted credential source for the backend template", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      model: "",
+      planningModel: "",
+      credentialSource: "hosted",
+      credentialIntegrationName: undefined,
+    });
+  });
+
+  it("maps integration rewrites to the selected installation name", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
+        component: "runnerClaudeCode",
+        model: "sonnet",
+        planningModel: "opus",
+        credentials: { source: "integration", name: "acme-claude" },
+      }),
+    ).toEqual({
+      component: "runnerClaudeCode",
+      model: "sonnet",
+      planningModel: "opus",
+      credentialSource: "integration",
+      credentialIntegrationName: "acme-claude",
+    });
   });
 });

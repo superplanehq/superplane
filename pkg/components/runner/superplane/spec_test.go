@@ -7,7 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/models"
 )
+
+func TestComponentNameMatchesModels(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, models.SuperPlaneRunnerComponent, ComponentName)
+}
 
 func TestValidateRunSuperPlaneSpecRejectsUnsupportedFields(t *testing.T) {
 	t.Parallel()

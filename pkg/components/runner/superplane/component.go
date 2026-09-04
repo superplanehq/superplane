@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ComponentName     = models.SuperPlaneRunnerComponent
+	ComponentName     = "runnerSuperPlane"
 	FinishedEventType = "runnerSuperPlane.finished"
 )
 

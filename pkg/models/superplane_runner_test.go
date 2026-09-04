@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
@@ -64,6 +65,33 @@ func Test__RewriteHostedProviderRunnerToSuperPlane(t *testing.T) {
 		assert.False(t, models.RewriteHostedProviderRunnerToSuperPlane(&node))
 		assert.Equal(t, "runnerCodex", node.ComponentName())
 		assert.Equal(t, "gpt-5", node.Configuration["model"])
+	})
+
+	t.Run("rewrites a slice of hosted nodes", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerClaudeCode"}},
+				Configuration: map[string]any{
+					"credentials": map[string]any{"source": "hosted"},
+				},
+			},
+			{
+				Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerCodex"}},
+				Configuration: map[string]any{
+					"credentials": map[string]any{
+						"source":      "integration",
+						"integration": map[string]any{"name": "openai"},
+					},
+				},
+			},
+		}
+		models.RewriteHostedProviderRunnerNodes(nodes)
+		assert.Equal(t, models.SuperPlaneRunnerComponent, nodes[0].ComponentName())
+		assert.Equal(t, "runnerCodex", nodes[1].ComponentName())
+	})
+
+	t.Run("ignores a nil node", func(t *testing.T) {
+		assert.False(t, models.RewriteHostedProviderRunnerToSuperPlane(nil))
 	})
 }
 
@@ -135,6 +163,17 @@ func Test__InstallationDefaultHostedLLMModel(t *testing.T) {
 		err = models.SyncDefaultHostedLLMModelAfterProviderChange(db)
 		assert.ErrorIs(t, err, models.ErrDefaultHostedModelMustBeReplaced)
 	})
+}
+
+func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, models.SuperPlaneRunnerNoCreditMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoCredit))
+	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoFactoryBudget))
+	assert.Equal(t, models.SuperPlaneRunnerNoFactoryBudgetMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrFactoryHostedBudgetEmpty))
+	assert.Equal(t, models.SuperPlaneRunnerNoModelMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerNoModel))
+	assert.Equal(t, models.SuperPlaneRunnerModelNotAllowedMessage, models.SuperPlaneRunnerReadinessMessage(models.ErrSuperPlaneRunnerModelNotAllowed))
+	assert.Equal(t, "organization is required for hosted LLM credit", models.SuperPlaneRunnerReadinessMessage(fmt.Errorf("organization is required for hosted LLM credit")))
 }
 
 func Test__SuperPlaneRunnerReadinessError(t *testing.T) {

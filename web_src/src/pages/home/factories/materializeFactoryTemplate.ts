@@ -121,6 +121,17 @@ export type FactoryAgentRewrite = {
   credentials?: { source: "integration"; name: string };
 };
 
+export function factoryAppTemplateAgentFromRewrite(rewrite: FactoryAgentRewrite) {
+  const credentials = rewrite.credentials;
+  return {
+    component: rewrite.component,
+    model: rewrite.model,
+    planningModel: rewrite.planningModel,
+    credentialSource: credentials?.source ?? (rewrite.component === "runnerSuperPlane" ? "hosted" : undefined),
+    credentialIntegrationName: credentials?.source === "integration" ? credentials.name : undefined,
+  };
+}
+
 function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
   for (const node of doc.spec?.nodes ?? []) {
     if (node.component !== CLAUDE_CODE_COMPONENT) continue;
