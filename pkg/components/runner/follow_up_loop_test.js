@@ -5,7 +5,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { interpretWaitResponse, nextAction, runLoop, runPromptFile } = require("./follow_up_loop.js");
+const { interpretWaitResponse, nextAction, runLoop, runPromptFile, safeWaitRequest } = require("./follow_up_loop.js");
+
+const CLOUDFLARE_502 = {
+  error: "An error occurred with your request. Please try again.",
+  retryable: true,
+  retry_after: 60,
+};
 
 test("waits while SuperPlane has no event", () => {
   assert.deepEqual(nextAction({ status: "pending" }), { type: "wait" });
@@ -76,29 +82,25 @@ test("runLoop prompts after create or skip", async () => {
   assert.match(prompts[1], /skipped/i);
 });
 
-test("interpretWaitResponse retries a 502 with retryable body", () => {
-  const got = interpretWaitResponse(502, {
-    error: "An error occurred with your request. Please try again.",
-    retryable: true,
-    retry_after: 60,
-  });
-  assert.deepEqual(got, { status: "pending", retry_after: 60, transient: true });
+test("interpretWaitResponse treats a Cloudflare 502 as idle pending", () => {
+  const got = interpretWaitResponse(502, CLOUDFLARE_502);
+  assert.deepEqual(got, { status: "pending" });
 });
 
-test("interpretWaitResponse retries 503, 504, and 429", () => {
-  assert.equal(interpretWaitResponse(503, {}).status, "pending");
-  assert.equal(interpretWaitResponse(504, {}).status, "pending");
-  assert.equal(interpretWaitResponse(429, { retry_after: 12 }).retry_after, 12);
+test("interpretWaitResponse retries 503, 504, and 429 as idle pending", () => {
+  assert.deepEqual(interpretWaitResponse(503, {}), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(504, {}), { status: "pending" });
+  assert.deepEqual(interpretWaitResponse(429, { retry_after: 12 }), { status: "pending" });
 });
 
-test("interpretWaitResponse retries a Cloudflare error body", () => {
+test("interpretWaitResponse treats a Cloudflare error body as idle pending", () => {
   const got = interpretWaitResponse(500, { cloudflare_error: true, retry_after: 30 });
-  assert.deepEqual(got, { status: "pending", retry_after: 30, transient: true });
+  assert.deepEqual(got, { status: "pending" });
 });
 
-test("interpretWaitResponse caps retry_after at 60 seconds", () => {
+test("interpretWaitResponse ignores retry_after on a transient wait", () => {
   const got = interpretWaitResponse(502, { retryable: true, retry_after: 120 });
-  assert.equal(got.retry_after, 60);
+  assert.deepEqual(got, { status: "pending" });
 });
 
 test("interpretWaitResponse ends on 409", () => {
@@ -109,26 +111,29 @@ test("interpretWaitResponse throws on 401", () => {
   assert.throws(() => interpretWaitResponse(401, { message: "unauthorized" }), /unauthorized/);
 });
 
-test("runLoop waits again after a transient wait, then exits 0", async () => {
+test("runLoop sleeps 1s with no log after a Cloudflare 502, then runs the next message", async () => {
   const sleeps = [];
-  const results = [
-    { status: "pending", retry_after: 60 },
-    { status: "ended" },
-  ];
+  const logs = [];
+  const prompts = [];
+  const results = [interpretWaitResponse(502, CLOUDFLARE_502), { status: "message", text: "hello" }, { status: "ended" }];
   const code = await runLoop({
     waitOnce: async () => results.shift(),
-    runPrompt: async () => {
-      throw new Error("prompt must not run");
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
     },
     sleep: async (ms) => {
       sleeps.push(ms);
     },
+    log: (msg) => logs.push(msg),
   });
   assert.equal(code, 0);
-  assert.deepEqual(sleeps, [60000]);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
+  assert.deepEqual(prompts, ["hello"]);
 });
 
-test("runLoop backs off with the default floor when a transient wait has no retry_after", async () => {
+test("runLoop sleeps 1s with no log when a transient wait has no retry_after", async () => {
   const sleeps = [];
   const logs = [];
   const results = [{ status: "pending", transient: true }, { status: "ended" }];
@@ -144,11 +149,12 @@ test("runLoop backs off with the default floor when a transient wait has no retr
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000]);
-  assert.match(logs[0], /planning wait hit a transient error; retrying in 1s/);
+  assert.deepEqual(logs, []);
 });
 
-test("runLoop clamps a large retry_after to the 60s cap", async () => {
+test("runLoop ignores a large retry_after and stays silent", async () => {
   const sleeps = [];
+  const logs = [];
   const results = [{ status: "pending", retry_after: 99999, transient: true }, { status: "ended" }];
   const code = await runLoop({
     waitOnce: async () => results.shift(),
@@ -158,9 +164,11 @@ test("runLoop clamps a large retry_after to the 60s cap", async () => {
     sleep: async (ms) => {
       sleeps.push(ms);
     },
+    log: (msg) => logs.push(msg),
   });
   assert.equal(code, 0);
-  assert.deepEqual(sleeps, [60000]);
+  assert.deepEqual(sleeps, [1000]);
+  assert.deepEqual(logs, []);
 });
 
 test("runLoop backs off silently on idle pending and empty-message waits", async () => {
@@ -183,6 +191,52 @@ test("runLoop backs off silently on idle pending and empty-message waits", async
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000, 1000]);
+  assert.deepEqual(logs, []);
+});
+
+test("safeWaitRequest treats a fetch throw as pending", async () => {
+  const got = await safeWaitRequest(async () => {
+    throw new TypeError("fetch failed");
+  });
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("safeWaitRequest treats an abort as pending", async () => {
+  const got = await safeWaitRequest(async () => {
+    const err = new Error("This operation was aborted");
+    err.name = "AbortError";
+    throw err;
+  });
+  assert.deepEqual(got, { status: "pending" });
+});
+
+test("safeWaitRequest still throws on 401", async () => {
+  await assert.rejects(
+    () =>
+      safeWaitRequest(async () => ({
+        status: 401,
+        text: async () => JSON.stringify({ message: "unauthorized" }),
+      })),
+    /unauthorized/,
+  );
+});
+
+test("runLoop stays alive when waitOnce returns pending after a fetch throw", async () => {
+  const sleeps = [];
+  const logs = [];
+  const results = [await safeWaitRequest(async () => { throw new TypeError("fetch failed"); }), { status: "ended" }];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => {
+      throw new Error("prompt must not run");
+    },
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(sleeps, [1000]);
   assert.deepEqual(logs, []);
 });
 
