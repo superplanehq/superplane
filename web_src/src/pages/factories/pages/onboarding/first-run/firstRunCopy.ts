@@ -26,7 +26,6 @@ export const FIRST_RUN_COPY = {
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
-    installRequestedHelp: "Why this request is waiting",
     installRequestedBody: githubInstallRequestBody,
     installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
   },

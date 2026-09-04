@@ -50,11 +50,12 @@ describe("FirstRunConnectScreen", () => {
     );
     expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody())).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-install-org")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-install-help")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
     expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
 
-    await user.hover(screen.getByTestId("first-run-github-install-help"));
+    await user.hover(screen.getByTestId("first-run-github-install-requested"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody());
     expect(screen.getByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedNext);
 
@@ -106,7 +107,7 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    await user.hover(screen.getByTestId("first-run-github-install-help"));
+    await user.hover(screen.getByTestId("first-run-github-install-requested"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 

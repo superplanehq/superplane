@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, CircleHelp, Clock } from "lucide-react";
+import { Check, Clock } from "lucide-react";
 
 import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -51,39 +51,36 @@ export function FirstRunConnectScreen({
         ) : (
           <>
             {waitingForApproval ? (
-              <FirstRunPanel>
-                <div className="flex items-start gap-3" data-testid="first-run-github-install-requested">
-                  <IntegrationChoiceIcon name="github" />
-                  <div className="min-w-0 flex-1 text-left">
-                    <p className="text-[13px] font-medium">{copy.installRequested}</p>
-                    {githubOrganization ? (
-                      <p
-                        className="mt-0.5 text-[13px] text-muted-foreground"
-                        data-testid="first-run-github-install-org"
-                      >
-                        {githubOrganization}
-                      </p>
-                    ) : null}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div data-testid="first-run-github-install-requested">
+                    <FirstRunPanel>
+                      <div className="flex items-start gap-3">
+                        <IntegrationChoiceIcon name="github" />
+                        <div className="min-w-0 flex-1 text-left">
+                          <p className="text-[13px] font-medium">{copy.installRequested}</p>
+                          {githubOrganization ? (
+                            <p
+                              className="mt-0.5 text-[13px] text-muted-foreground"
+                              data-testid="first-run-github-install-org"
+                            >
+                              {githubOrganization}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Clock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                      </div>
+                    </FirstRunPanel>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="mt-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label={copy.installRequestedHelp}
-                        data-testid="first-run-github-install-help"
-                      >
-                        <CircleHelp className="size-3.5" aria-hidden />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs space-y-1 text-left">
-                      <p>{copy.installRequestedBody(githubOrganization)}</p>
-                      <p>{copy.installRequestedNext}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Clock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                </div>
-              </FirstRunPanel>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  className="w-[var(--radix-tooltip-trigger-width)] max-w-md space-y-1 text-left text-pretty"
+                >
+                  <p>{copy.installRequestedBody(githubOrganization)}</p>
+                  <p>{copy.installRequestedNext}</p>
+                </TooltipContent>
+              </Tooltip>
             ) : null}
             <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
               {copy.connectGitHub}
