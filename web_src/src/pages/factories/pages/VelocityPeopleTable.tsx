@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 import { Avatar } from "@/components/Avatar/avatar";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
 import type { VelocityPerson } from "../lib/factoryVelocityReport";
 import type { PeopleSortDirection, PeopleSortKey } from "../lib/velocityPeopleSort";
+import { VelocitySortableHeader } from "./VelocitySortableHeader";
 
 type SortKey = PeopleSortKey;
 
@@ -126,9 +127,10 @@ export function VelocityPeopleTable({
                 Member
               </th>
               {COLUMNS.map((column) => (
-                <SortableHeader
+                <VelocitySortableHeader
                   key={column.key}
-                  column={column}
+                  label={column.label}
+                  hint={column.hint}
                   isActive={sortKey === column.key}
                   direction={sortDirection}
                   onSort={() => onSort(column.key)}
@@ -196,38 +198,5 @@ export function VelocityPeopleTable({
 
       {emptyAuthorship ? <p className="mt-4 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
     </section>
-  );
-}
-
-function SortableHeader({
-  column,
-  isActive,
-  direction,
-  onSort,
-}: {
-  column: Column;
-  isActive: boolean;
-  direction: PeopleSortDirection;
-  onSort: () => void;
-}) {
-  const ariaSort = isActive ? (direction === "asc" ? "ascending" : "descending") : "none";
-  const Icon = isActive && direction === "asc" ? ArrowUp : ArrowDown;
-
-  return (
-    <th scope="col" className="pb-2 pl-6 text-right text-[12px] font-normal">
-      <button
-        type="button"
-        onClick={onSort}
-        title={column.hint}
-        aria-sort={ariaSort}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          isActive ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        <Icon className={cn("size-3", !isActive && "opacity-0")} aria-hidden />
-        {column.label}
-      </button>
-    </th>
   );
 }
