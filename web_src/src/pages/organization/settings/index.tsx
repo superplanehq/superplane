@@ -23,7 +23,6 @@ import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import {
-  ArrowRightLeft,
   Gauge,
   CircleUser,
   Home,
@@ -210,7 +209,6 @@ export function OrganizationSettings() {
       Icon: Key,
       permission: { resource: "secrets", action: "read" },
     },
-    { id: "change-org", label: "Change Organization", href: "/?select=true", Icon: ArrowRightLeft },
   ];
 
   if (usageEnabled) {
@@ -232,7 +230,7 @@ export function OrganizationSettings() {
     if (link.id === "canvases") {
       return location.pathname === `/${organizationId}`;
     }
-    if (link.id === "change-org" || link.id === "sign-out") {
+    if (link.id === "sign-out") {
       return false;
     }
     if (link.id === "integrations" && currentSection === "integrations") {

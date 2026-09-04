@@ -12,8 +12,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const HOLD_SECONDS = 45;
-const MAX_RETRY_WAIT_SECONDS = 60;
-const DEFAULT_RETRY_WAIT_SECONDS = 1;
+const WAIT_RETRY_SECONDS = 1;
+const FOLLOW_UP_CMD_INDEX_BASE = 1000;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -52,17 +52,15 @@ function readEnv(name) {
   return value;
 }
 
-async function requestJSON(method, urlPath) {
-  const baseURL = readEnv("SUPERPLANE_BASE_URL").replace(/\/$/, "");
-  const token = readEnv("SUPERPLANE_RUN_TOKEN");
-  const response = await fetch(`${baseURL}${urlPath}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-  const text = await response.text();
+async function safeWaitRequest(doFetch) {
+  let response;
+  let text;
+  try {
+    response = await doFetch();
+    text = await response.text();
+  } catch {
+    return { status: "pending" };
+  }
   let parsed = {};
   if (text) {
     try {
@@ -74,19 +72,25 @@ async function requestJSON(method, urlPath) {
   return interpretWaitResponse(response.status, parsed, text);
 }
 
+async function requestJSON(method, urlPath) {
+  const baseURL = readEnv("SUPERPLANE_BASE_URL").replace(/\/$/, "");
+  const token = readEnv("SUPERPLANE_RUN_TOKEN");
+  return safeWaitRequest(() =>
+    fetch(`${baseURL}${urlPath}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    }),
+  );
+}
+
 function isTransientWaitFailure(status, parsed) {
   if (status === 429 || status === 502 || status === 503 || status === 504) {
     return true;
   }
   return Boolean(parsed && (parsed.retryable === true || parsed.cloudflare_error === true));
-}
-
-function retryWaitSeconds(parsed) {
-  const n = Number(parsed && parsed.retry_after);
-  if (!Number.isFinite(n) || n < 1) {
-    return DEFAULT_RETRY_WAIT_SECONDS;
-  }
-  return Math.min(MAX_RETRY_WAIT_SECONDS, Math.floor(n));
 }
 
 function interpretWaitResponse(status, parsed, text) {
@@ -97,7 +101,7 @@ function interpretWaitResponse(status, parsed, text) {
     return parsed && typeof parsed === "object" ? parsed : {};
   }
   if (isTransientWaitFailure(status, parsed)) {
-    return { status: "pending", retry_after: retryWaitSeconds(parsed), transient: true };
+    return { status: "pending" };
   }
   throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
 }
@@ -132,11 +136,46 @@ function defaultSleep(ms) {
   });
 }
 
+function writeLiveLogRecord(rec) {
+  process.stdout.write(`${JSON.stringify(rec)}\n`);
+}
+
+function emitFollowUpCommandStart(text, index, startedAt, writeRecord) {
+  writeRecord({
+    type: "cmd_start",
+    index,
+    text,
+    kind: "prompt",
+    preview: text,
+    started_at: startedAt,
+  });
+}
+
+function emitFollowUpCommandEnd(index, code, startedAt, now, writeRecord) {
+  writeRecord({
+    type: "cmd_end",
+    index,
+    status: code === 0 ? "passed" : "failed",
+    duration_ms: Math.max(0, now - startedAt),
+  });
+}
+
+async function runFollowUpPrompt(text, helpers, followUpIndex) {
+  const writeRecord = helpers.writeLiveLogRecord || writeLiveLogRecord;
+  const now = helpers.now || Date.now;
+  const index = FOLLOW_UP_CMD_INDEX_BASE + followUpIndex;
+  const startedAt = now();
+  emitFollowUpCommandStart(text, index, startedAt, writeRecord);
+  const code = await helpers.runPrompt(text);
+  emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
+  return code;
+}
+
 async function runLoop(helpers) {
   const wait = helpers.waitOnce;
-  const runPrompt = helpers.runPrompt;
   const sleep = helpers.sleep || defaultSleep;
   const log = helpers.log || ((msg) => process.stderr.write(msg));
+  let followUpIndex = 0;
   while (true) {
     const result = await wait();
     const action = nextAction(result);
@@ -144,14 +183,11 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
-      const seconds = retryWaitSeconds(result);
-      if (result && result.transient) {
-        log(`planning wait hit a transient error; retrying in ${seconds}s\n`);
-      }
-      await sleep(seconds * 1000);
+      await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
-    const code = await runPrompt(action.text);
+    const code = await runFollowUpPrompt(action.text, helpers, followUpIndex);
+    followUpIndex += 1;
     if (code !== 0) {
       log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
     }
@@ -172,7 +208,16 @@ async function main() {
   process.exit(code);
 }
 
-module.exports = { interpretWaitResponse, nextAction, runLoop, writePrompt, runPromptFile };
+module.exports = {
+  FOLLOW_UP_CMD_INDEX_BASE,
+  interpretWaitResponse,
+  nextAction,
+  runLoop,
+  safeWaitRequest,
+  writeLiveLogRecord,
+  writePrompt,
+  runPromptFile,
+};
 
 if (require.main === module) {
   main().catch((err) => {

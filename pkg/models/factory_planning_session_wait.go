@@ -47,6 +47,26 @@ func (s *FactoryPlanningSession) ConsumeWait(tx *gorm.DB) (PlanningWaitResult, e
 	return result, err
 }
 
+func (s *FactoryPlanningSession) RestoreWait(tx *gorm.DB, result PlanningWaitResult) error {
+	return s.withLockedSession(tx, func(inner *gorm.DB) error {
+		if s.WaitState == PlanningWaitResolved {
+			return nil
+		}
+		if err := s.guardOpen(); err != nil {
+			return err
+		}
+		_, found, err := s.nextUndeliveredUserMessage(inner)
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
+		s.resolveWait(result)
+		return s.saveWait(inner)
+	})
+}
+
 func PlanningRefineNote(key, title string) string {
 	return "Refine " + strings.TrimSpace(key) + ": " + strings.TrimSpace(title) + "."
 }

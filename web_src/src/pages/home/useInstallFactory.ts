@@ -54,6 +54,7 @@ export type InstallFactoryResult = FactoryCanvasHandle;
 
 interface UseInstallFactoryOptions {
   folder?: CanvasFolderData;
+  organizationId?: string;
 }
 
 async function prepareFactoryCanvas(
@@ -76,7 +77,7 @@ async function finishFactoryInstall(args: {
 }) {
   const shouldTriggerRun = args.startInitialRun && args.startingTaskPrompt.length > 0;
   if (shouldTriggerRun) {
-    await invokeFactoryRun(args.canvasId, args.definition, args.startingTaskPrompt);
+    await invokeFactoryRun(args.organizationId, args.canvasId, args.definition, args.startingTaskPrompt);
     args.queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(args.canvasId) });
   }
 
@@ -96,8 +97,9 @@ async function finishFactoryInstall(args: {
   args.navigate(appPath(args.organizationId, args.canvasId, shouldTriggerRun ? "?view=console" : ""));
 }
 
-export function useInstallFactory({ folder }: UseInstallFactoryOptions = {}) {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function useInstallFactory({ folder, organizationId: organizationIdOverride }: UseInstallFactoryOptions = {}) {
+  const { organizationId: routeOrganizationId } = useParams<{ organizationId: string }>();
+  const organizationId = organizationIdOverride ?? routeOrganizationId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canAct } = usePermissions();
