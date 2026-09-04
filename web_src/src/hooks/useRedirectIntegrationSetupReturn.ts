@@ -31,6 +31,10 @@ export function useRedirectIntegrationSetupReturn(
 
   useEffect(() => {
     if (!routeOrganizationId || !storageOrganizationId) return;
+    // OrganizationScope rewrites a UID URL to the slug first. Bouncing on the
+    // UID URL consumes the return, then that rewrite wins and the wizard
+    // never comes back.
+    if (routeOrganizationId !== storageOrganizationId) return;
     if (!isLegacyIntegrationDetailsPath(routeOrganizationId, location.pathname)) return;
     if (hasIntegrationSetupStay(location.search)) return;
 

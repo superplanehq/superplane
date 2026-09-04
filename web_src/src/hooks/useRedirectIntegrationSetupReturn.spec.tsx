@@ -55,13 +55,14 @@ describe("useRedirectIntegrationSetupReturn", () => {
     expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull();
   });
 
-  it("returns a callback that uses the organization UID to a slug route", async () => {
+  it("does not consume the return while the URL still uses the organization UID", () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
 
     renderAt("/organization-uid/settings/integrations/github-connection", "organization-uid");
 
-    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
-    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull();
+    expect(screen.getByText("integration details")).toBeInTheDocument();
+    expect(screen.queryByText("workspace setup")).not.toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
   });
 
   it("forwards a GitHub install request onto the stored return path", async () => {
