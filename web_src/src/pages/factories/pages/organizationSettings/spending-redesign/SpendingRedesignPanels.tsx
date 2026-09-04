@@ -11,120 +11,249 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useElementWidth } from "@/hooks/useElementWidth";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { SegmentedNav } from "@/ui/SegmentedNav";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
+import { Separator } from "@/ui/separator";
 
 import { pickVelocityAxisTicks } from "../../../lib/velocityAxisTicks";
-import { formatCompactTokens, formatDurationSeconds, formatUsdCents } from "../../../lib/workOrderUsage";
+import { formatUsdCents } from "../../../lib/workOrderUsage";
 import { factoryCardClassName } from "../../factoryPageLayoutStyles";
 import type { SpendingCreditSnapshot } from "./spendingRedesignMocks";
 import {
   EMPTY_SPENDING_FILTERS,
   formatFilterTriggerLabel,
   formatShare,
-  SPENDING_BREAKDOWN_OPTIONS,
-  toggleFilterValue,
+  hasActiveSpendingFilters,
+  MACHINE_BREAKDOWN_OPTIONS,
+  MODEL_BREAKDOWN_OPTIONS,
   type SpendingBreakdown,
   type SpendingCatalogItem,
   type SpendingCatalogs,
   type SpendingFilters,
   type SpendingReport,
+  type SpendingUsageKind,
 } from "./spendingRedesignLib";
 
 const SERIES_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#3b82f6", "#8b5cf6", "#94a3b8"];
+const ALL_FILTER_VALUE = "all";
 
-export function SpendingFilterBar({
+export function SpendingUsageSection({
+  kind,
   catalogs,
   filters,
-  filtersActive,
+  breakdown,
+  report,
   onChange,
+  onBreakdownChange,
+}: {
+  kind: SpendingUsageKind;
+  catalogs: SpendingCatalogs;
+  filters: SpendingFilters;
+  breakdown: SpendingBreakdown;
+  report: SpendingReport;
+  onChange: (filters: SpendingFilters) => void;
+  onBreakdownChange: (value: SpendingBreakdown) => void;
+}) {
+  const copy = usageCopy(kind);
+  const prefix = copy.testIdPrefix;
+  const empty = report.totals.costCents === 0;
+
+  return (
+    <section className="flex flex-col gap-5" data-testid={`${prefix}-usage`}>
+      <div>
+        <h2 className="workspace-section-title">{copy.title}</h2>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">{copy.description}</p>
+        <div className="mt-3">
+          <SpendingFilterBar
+            breakdown={breakdown}
+            breakdownOptions={copy.breakdownOptions}
+            catalogs={catalogs}
+            filters={filters}
+            kind={kind}
+            testIdPrefix={prefix}
+            onBreakdownChange={onBreakdownChange}
+            onChange={onChange}
+          />
+        </div>
+      </div>
+      <SpendingChartCard
+        breakdown={breakdown}
+        breakdownOptions={copy.breakdownOptions}
+        empty={empty}
+        emptyMessage={copy.emptyMessage}
+        report={report}
+        testId={`${prefix}-chart`}
+      />
+      <SpendingBreakdownCard
+        breakdown={breakdown}
+        empty={empty}
+        emptyMessage={copy.emptyMessage}
+        report={report}
+        testId={`${prefix}-breakdown`}
+      />
+    </section>
+  );
+}
+
+function SpendingFilterBar({
+  catalogs,
+  filters,
+  kind,
+  breakdown,
+  breakdownOptions,
+  testIdPrefix,
+  onChange,
+  onBreakdownChange,
 }: {
   catalogs: SpendingCatalogs;
   filters: SpendingFilters;
-  filtersActive: boolean;
+  kind: SpendingUsageKind;
+  breakdown: SpendingBreakdown;
+  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
+  testIdPrefix: string;
   onChange: (filters: SpendingFilters) => void;
+  onBreakdownChange: (value: SpendingBreakdown) => void;
 }) {
+  const filtersActive = hasActiveSpendingFilters(filters);
+
   return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="spending-filter-bar">
+    <div className="flex flex-wrap items-center gap-2" data-testid={`${testIdPrefix}-filter-bar`}>
       <SpendingFilterMenu
         allLabel="All users"
-        noun="user"
         items={catalogs.users}
-        selected={filters.userIds}
-        testId="spending-filter-users"
-        onToggle={(id) => onChange({ ...filters, userIds: toggleFilterValue(filters.userIds, id) })}
+        selected={filters.userId}
+        testId={`${testIdPrefix}-filter-users`}
+        onSelect={(userId) => onChange({ ...filters, userId })}
       />
       <SpendingFilterMenu
         allLabel="All workspaces"
-        noun="workspace"
         items={catalogs.workspaces}
-        selected={filters.workspaceIds}
-        testId="spending-filter-workspaces"
-        onToggle={(id) => onChange({ ...filters, workspaceIds: toggleFilterValue(filters.workspaceIds, id) })}
+        selected={filters.workspaceId}
+        testId={`${testIdPrefix}-filter-workspaces`}
+        onSelect={(workspaceId) => onChange({ ...filters, workspaceId })}
       />
-      <SpendingFilterMenu
-        allLabel="All models"
-        noun="model"
-        items={catalogs.models}
-        selected={filters.models}
-        testId="spending-filter-models"
-        onToggle={(id) => onChange({ ...filters, models: toggleFilterValue(filters.models, id) })}
-      />
-      <SpendingFilterMenu
-        allLabel="All machines"
-        noun="machine"
-        items={catalogs.machines}
-        selected={filters.machineTypes}
-        testId="spending-filter-machines"
-        onToggle={(id) => onChange({ ...filters, machineTypes: toggleFilterValue(filters.machineTypes, id) })}
-      />
+      {kind === "model" ? (
+        <SpendingFilterMenu
+          allLabel="All models"
+          items={catalogs.models}
+          selected={filters.model}
+          testId={`${testIdPrefix}-filter-models`}
+          onSelect={(model) => onChange({ ...filters, model })}
+        />
+      ) : (
+        <SpendingFilterMenu
+          allLabel="All machine types"
+          items={catalogs.machines}
+          selected={filters.machineType}
+          testId={`${testIdPrefix}-filter-machines`}
+          onSelect={(machineType) => onChange({ ...filters, machineType })}
+        />
+      )}
       {filtersActive ? (
         <Button
           variant="ghost"
           size="sm"
-          data-testid="spending-clear-filters"
+          data-testid={`${testIdPrefix}-clear-filters`}
           onClick={() => onChange(EMPTY_SPENDING_FILTERS)}
         >
           Clear filters
         </Button>
       ) : null}
+      <Separator
+        orientation="vertical"
+        className="mx-2 h-7 w-px self-center bg-slate-950/20 dark:bg-gray-600/70"
+        data-testid={`${testIdPrefix}-group-by-separator`}
+      />
+      <SpendingGroupBy
+        breakdown={breakdown}
+        breakdownOptions={breakdownOptions}
+        testId={`${testIdPrefix}-group-by`}
+        onBreakdownChange={onBreakdownChange}
+      />
     </div>
+  );
+}
+
+function SpendingGroupBy({
+  breakdown,
+  breakdownOptions,
+  testId,
+  onBreakdownChange,
+}: {
+  breakdown: SpendingBreakdown;
+  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
+  testId: string;
+  onBreakdownChange: (value: SpendingBreakdown) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" aria-label="Group by" data-testid={testId}>
+          Group by {breakdownLabel(breakdown, breakdownOptions)}
+          <ChevronDown className="size-3.5" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuRadioGroup
+          value={breakdown}
+          onValueChange={(value) => {
+            const next = breakdownOptions.find((option) => option.value === value);
+            if (next) {
+              onBreakdownChange(next.value);
+            }
+          }}
+        >
+          {breakdownOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
 function SpendingFilterMenu({
   allLabel,
-  noun,
   items,
   selected,
   testId,
-  onToggle,
+  onSelect,
 }: {
   allLabel: string;
-  noun: string;
   items: SpendingCatalogItem[];
-  selected: string[];
+  selected: string;
   testId: string;
-  onToggle: (id: string) => void;
+  onSelect: (id: string) => void;
 }) {
+  const selectedLabel = items.find((item) => item.id === selected)?.label;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" data-testid={testId}>
-          {formatFilterTriggerLabel(allLabel, selected.length, noun)}
+          {formatFilterTriggerLabel(allLabel, selectedLabel)}
           <ChevronDown className="size-3.5" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
-        {items.map((item) => (
-          <DropdownMenuCheckboxItem
-            key={item.id}
-            checked={selected.includes(item.id)}
-            onCheckedChange={() => onToggle(item.id)}
-          >
-            {item.label}
-          </DropdownMenuCheckboxItem>
-        ))}
+        <DropdownMenuRadioGroup
+          value={selected || ALL_FILTER_VALUE}
+          onValueChange={(value) => onSelect(value === ALL_FILTER_VALUE ? "" : value)}
+        >
+          <DropdownMenuRadioItem value={ALL_FILTER_VALUE}>{allLabel}</DropdownMenuRadioItem>
+          {items.map((item) => (
+            <DropdownMenuRadioItem key={item.id} value={item.id}>
+              {item.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -169,24 +298,84 @@ function SpendingKpi({ label, value, hint, testId }: { label: string; value: str
   );
 }
 
-export function SpendingChartCard({ report, breakdown }: { report: SpendingReport; breakdown: SpendingBreakdown }) {
-  const empty = report.totals.costCents === 0;
+function SpendingChartCard({
+  breakdown,
+  breakdownOptions,
+  empty,
+  emptyMessage,
+  report,
+  testId,
+}: {
+  breakdown: SpendingBreakdown;
+  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
+  empty: boolean;
+  emptyMessage: string;
+  report: SpendingReport;
+  testId: string;
+}) {
   return (
-    <section className={factoryCardClassName}>
-      <div className="flex items-start justify-between gap-3 px-4 pt-4">
-        <div>
-          <h2 className="workspace-section-title">Spend over time</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Stacked by {breakdownLabel(breakdown).toLowerCase()}. SuperPlane-hosted spend and your keys both show.
-          </p>
-        </div>
+    <section className={factoryCardClassName} data-testid={testId}>
+      <div className="px-4 pt-4">
+        <h3 className="workspace-section-title">Spend over time</h3>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          Stacked by {breakdownLabel(breakdown, breakdownOptions).toLowerCase()}.
+        </p>
       </div>
       {empty ? (
-        <SpendingEmptyState />
+        <SpendingEmptyState message={emptyMessage} />
       ) : (
         <div className="px-2 pb-4 pt-2">
           <SpendingBarChart report={report} />
         </div>
+      )}
+    </section>
+  );
+}
+
+function SpendingBreakdownCard({
+  breakdown,
+  empty,
+  emptyMessage,
+  report,
+  testId,
+}: {
+  breakdown: SpendingBreakdown;
+  empty: boolean;
+  emptyMessage: string;
+  report: SpendingReport;
+  testId: string;
+}) {
+  return (
+    <section className={factoryCardClassName} data-testid={testId}>
+      <div className="px-4 pt-4">
+        <h3 className="workspace-section-title">Breakdown</h3>
+        <p className="mt-0.5 text-[12px] text-muted-foreground">
+          {breakdown === "user"
+            ? "Spend is grouped by the task owner."
+            : `One row per ${breakdownColumnLabel(breakdown).toLowerCase()} in this range.`}
+        </p>
+      </div>
+      {empty ? (
+        <SpendingEmptyState message={emptyMessage} />
+      ) : (
+        <table className="mt-2 w-full text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-border text-muted-foreground">
+              <th className="px-4 py-2 font-medium">{breakdownColumnLabel(breakdown)}</th>
+              <th className="px-4 py-2 font-medium">Spend</th>
+              <th className="px-4 py-2 font-medium">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.breakdown.map((row) => (
+              <tr key={row.id} className="border-b border-border last:border-0">
+                <td className="px-4 py-2">{row.label}</td>
+                <td className="px-4 py-2">{formatUsdCents(row.costCents)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{formatShare(row.share)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );
@@ -266,74 +455,14 @@ function SpendingBarChart({ report }: { report: SpendingReport }) {
   );
 }
 
-export function SpendingBreakdownCard({
-  breakdown,
-  onBreakdownChange,
-  report,
-}: {
-  breakdown: SpendingBreakdown;
-  onBreakdownChange: (value: SpendingBreakdown) => void;
-  report: SpendingReport;
-}) {
-  return (
-    <section className={factoryCardClassName} data-testid="spending-breakdown">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
-        <div>
-          <h2 className="workspace-section-title">Breakdown</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {breakdown === "user"
-              ? "Spend is grouped by the task owner."
-              : `One row per ${breakdownLabel(breakdown).toLowerCase().replace(/s$/, "")} in this range.`}
-          </p>
-        </div>
-        <SegmentedNav
-          ariaLabel="Spending breakdown"
-          options={SPENDING_BREAKDOWN_OPTIONS}
-          size="xs"
-          value={breakdown}
-          onValueChange={(value) => onBreakdownChange(value as SpendingBreakdown)}
-        />
-      </div>
-      {report.breakdown.length === 0 ? (
-        <SpendingEmptyState />
-      ) : (
-        <table className="mt-2 w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="px-4 py-2 font-medium">{breakdownColumnLabel(breakdown)}</th>
-              <th className="px-4 py-2 font-medium">{breakdown === "machine" ? "Time" : "Tokens"}</th>
-              <th className="px-4 py-2 font-medium">Spend</th>
-              <th className="px-4 py-2 font-medium">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.breakdown.map((row) => (
-              <tr key={row.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{row.label}</td>
-                <td className="px-4 py-2">
-                  {breakdown === "machine"
-                    ? formatDurationSeconds(row.durationSeconds)
-                    : formatCompactTokens(row.tokens)}
-                </td>
-                <td className="px-4 py-2">{formatUsdCents(row.costCents)}</td>
-                <td className="px-4 py-2 text-muted-foreground">{formatShare(row.share)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
-  );
-}
-
-function SpendingEmptyState() {
+function SpendingEmptyState({ message }: { message: string }) {
   return (
     <div
       className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center"
       data-testid="spending-empty"
     >
       <CircleDollarSign className="size-5 text-muted-foreground" aria-hidden />
-      <p className="text-[13px] text-foreground">No factory usage is recorded for this period.</p>
+      <p className="text-[13px] text-foreground">{message}</p>
       <p className="max-w-sm text-[13px] text-muted-foreground">
         Change the time range or filters, or run a factory task to record spend.
       </p>
@@ -341,8 +470,36 @@ function SpendingEmptyState() {
   );
 }
 
-function breakdownLabel(breakdown: SpendingBreakdown): string {
-  return SPENDING_BREAKDOWN_OPTIONS.find((option) => option.value === breakdown)?.label ?? "Workspaces";
+function usageCopy(kind: SpendingUsageKind): {
+  title: string;
+  description: string;
+  emptyMessage: string;
+  testIdPrefix: string;
+  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
+} {
+  if (kind === "model") {
+    return {
+      title: "Model usage",
+      description: "Estimated spend in dollars for SuperPlane-hosted models and your keys.",
+      emptyMessage: "No model usage is recorded for this period.",
+      testIdPrefix: "spending-model",
+      breakdownOptions: MODEL_BREAKDOWN_OPTIONS,
+    };
+  }
+  return {
+    title: "VM usage",
+    description: "Estimated spend in dollars for SuperPlane runner machines.",
+    emptyMessage: "No VM usage is recorded for this period.",
+    testIdPrefix: "spending-vm",
+    breakdownOptions: MACHINE_BREAKDOWN_OPTIONS,
+  };
+}
+
+function breakdownLabel(
+  breakdown: SpendingBreakdown,
+  options: Array<{ value: SpendingBreakdown; label: string }>,
+): string {
+  return options.find((option) => option.value === breakdown)?.label ?? "Workspaces";
 }
 
 function breakdownColumnLabel(breakdown: SpendingBreakdown): string {

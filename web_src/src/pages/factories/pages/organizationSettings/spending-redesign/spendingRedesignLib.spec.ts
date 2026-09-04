@@ -7,10 +7,11 @@ import {
   formatFilterTriggerLabel,
   formatSpendingRangeCaption,
   hasActiveSpendingFilters,
+  MACHINE_BREAKDOWN_OPTIONS,
+  MODEL_BREAKDOWN_OPTIONS,
   modelKey,
   rangeForPreset,
   rangeFromCustomDays,
-  toggleFilterValue,
   type SpendingCatalogs,
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
@@ -107,63 +108,108 @@ describe("filterSpendingEvents", () => {
     expect(matched.map((item) => item.id)).toEqual(["today-model", "today-compute", "week-gpt"]);
   });
 
-  it("applies workspace and user filters together", () => {
+  it("limits one section to a single usage kind", () => {
+    const models = filterSpendingEvents(ledger, rangeForPreset("week", NOW), EMPTY_SPENDING_FILTERS, "model");
+    const machines = filterSpendingEvents(ledger, rangeForPreset("week", NOW), EMPTY_SPENDING_FILTERS, "compute");
+    expect(models.map((item) => item.id)).toEqual(["today-model", "week-gpt"]);
+    expect(machines.map((item) => item.id)).toEqual(["today-compute"]);
+  });
+
+  it("applies a single workspace and user together", () => {
     const matched = filterSpendingEvents(ledger, rangeForPreset("week", NOW), {
       ...EMPTY_SPENDING_FILTERS,
-      workspaceIds: ["ws-refunds"],
-      userIds: ["user-a"],
+      workspaceId: "ws-refunds",
+      userId: "user-a",
     });
     expect(matched.map((item) => item.id)).toEqual(["today-model", "today-compute"]);
   });
 
-  it("limits model events without dropping unmatched compute", () => {
-    const matched = filterSpendingEvents(ledger, rangeForPreset("week", NOW), {
-      ...EMPTY_SPENDING_FILTERS,
-      models: [modelKey("openai", "gpt-4o")],
-    });
-    expect(matched.map((item) => item.id)).toEqual(["today-compute", "week-gpt"]);
+  it("keeps one selected model and drops other model rows", () => {
+    const matched = filterSpendingEvents(
+      ledger,
+      rangeForPreset("week", NOW),
+      { ...EMPTY_SPENDING_FILTERS, model: modelKey("openai", "gpt-4o") },
+      "model",
+    );
+    expect(matched.map((item) => item.id)).toEqual(["week-gpt"]);
   });
 });
 
 describe("buildSpendingReport", () => {
-  it("totals spend, tokens, and VM time for the month window", () => {
-    const report = buildSpendingReport(
-      ledger,
-      rangeForPreset("month", NOW),
-      EMPTY_SPENDING_FILTERS,
-      "workspace",
+  it("totals model spend without VM rows", () => {
+    const report = buildSpendingReport({
+      events: ledger,
+      range: rangeForPreset("month", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "workspace",
       catalogs,
-    );
-    expect(report.totals).toEqual({
-      costCents: 370,
-      tokens: 6000,
-      durationSeconds: 600,
-      hostedCostCents: 290,
-      byokCostCents: 80,
+      usageKind: "model",
     });
+    expect(report.totals.costCents).toBe(330);
     expect(report.breakdown.map((row) => row.id)).toEqual(["ws-refunds", "ws-payments"]);
-    expect(report.breakdown[0]?.costCents).toBe(290);
+    expect(report.breakdown[0]?.costCents).toBe(250);
+  });
+
+  it("totals VM spend without model rows", () => {
+    const report = buildSpendingReport({
+      events: ledger,
+      range: rangeForPreset("week", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "machine",
+      catalogs,
+      usageKind: "compute",
+    });
+    expect(report.totals.costCents).toBe(40);
+    expect(report.breakdown.map((row) => row.id)).toEqual(["e1-large-amd64"]);
+    expect(report.series.some((point) => (point.values["e1-large-amd64"] ?? 0) > 0)).toBe(true);
   });
 
   it("groups model spend without mixing in VM rows", () => {
-    const report = buildSpendingReport(ledger, rangeForPreset("week", NOW), EMPTY_SPENDING_FILTERS, "model", catalogs);
+    const report = buildSpendingReport({
+      events: ledger,
+      range: rangeForPreset("week", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "model",
+      catalogs,
+      usageKind: "model",
+    });
     expect(report.breakdown.map((row) => row.id)).toEqual(["anthropic/claude-sonnet-4-6", "openai/gpt-4o"]);
+    expect(report.breakdown.map((row) => row.label)).toEqual(["claude-sonnet-4-6", "gpt-4o"]);
+    expect(report.seriesKeys.map((item) => item.label)).toEqual(["claude-sonnet-4-6", "gpt-4o"]);
     expect(report.series.some((point) => (point.values["anthropic/claude-sonnet-4-6"] ?? 0) > 0)).toBe(true);
+  });
+
+  it("labels stored family aliases from the catalog", () => {
+    const report = buildSpendingReport({
+      events: [event({ id: "alias-sonnet", occurredAt: "2026-09-03T10:00:00.000Z", model: "sonnet", costCents: 100 })],
+      range: rangeForPreset("week", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "model",
+      catalogs: {
+        ...catalogs,
+        models: [{ id: "anthropic/sonnet", label: "claude-sonnet-4-6" }],
+      },
+      usageKind: "model",
+    });
+    expect(report.breakdown[0]).toMatchObject({ id: "anthropic/sonnet", label: "claude-sonnet-4-6" });
+    expect(report.seriesKeys[0].label).toBe("claude-sonnet-4-6");
   });
 });
 
 describe("filter helpers", () => {
-  it("toggles selected ids and reports an active filter set", () => {
-    expect(toggleFilterValue(["a"], "b")).toEqual(["a", "b"]);
-    expect(toggleFilterValue(["a", "b"], "a")).toEqual(["b"]);
+  it("reports an active single-select filter set", () => {
     expect(hasActiveSpendingFilters(EMPTY_SPENDING_FILTERS)).toBe(false);
-    expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, models: ["openai/gpt-4o"] })).toBe(true);
+    expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, model: "openai/gpt-4o" })).toBe(true);
   });
 
-  it("labels filter triggers and the visible date caption", () => {
-    expect(formatFilterTriggerLabel("All users", 0, "user")).toBe("All users");
-    expect(formatFilterTriggerLabel("All users", 1, "user")).toBe("1 user");
-    expect(formatFilterTriggerLabel("All users", 2, "user")).toBe("2 users");
+  it("labels filter triggers with the selected name", () => {
+    expect(formatFilterTriggerLabel("All users")).toBe("All users");
+    expect(formatFilterTriggerLabel("All users", "Alex")).toBe("Alex");
     expect(formatSpendingRangeCaption(rangeForPreset("day", NOW))).toBe("Sep 2, 2026 – Sep 3, 2026");
+  });
+
+  it("exposes group-by options for each usage section", () => {
+    expect(MODEL_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "model"]);
+    expect(MACHINE_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "machine"]);
   });
 });

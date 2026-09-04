@@ -29,7 +29,6 @@ import {
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
   FactorySettingsRepositoryPage,
-  FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   LegacyWorkOrderDetailRedirect,
   LinesPage,
@@ -50,6 +49,7 @@ import {
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
+  WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
@@ -302,7 +302,8 @@ const factorySettingsStorybookRoutes = [
       </RequireExperimentalFeature>
     }
   />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
+  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"

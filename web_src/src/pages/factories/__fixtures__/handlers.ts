@@ -1,4 +1,5 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
 import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
@@ -613,6 +614,13 @@ function organizationWorkspaceUsageRoute(fixture: FactoriesFixture): FactoriesRo
   };
 }
 
+function organizationSpendingReportRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/spending-report"),
+    resolve: () => ({ json: fixture.organizationSpendingReport ?? DEFAULT_ORG_SPENDING_REPORT }),
+  };
+}
+
 function hostedLlmModelsRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
@@ -723,6 +731,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
+    organizationSpendingReportRoute(fixture),
     hostedLlmModelsRoute(),
     byokModelsRoute(),
     hostedCreditProductsRoute(fixture),

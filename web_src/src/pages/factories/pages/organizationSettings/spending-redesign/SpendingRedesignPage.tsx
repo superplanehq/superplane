@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
@@ -8,21 +7,15 @@ import { cn } from "@/lib/utils";
 import { Calendar } from "@/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { SegmentedNav } from "@/ui/SegmentedNav";
-import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
 
 import { WorkspacePageHeader } from "../../../layout/WorkspacePageHeader";
 import {
-  factoryCardClassName,
   factoryCenteredSectionBodyClassName,
   factoryCenteredSectionHeaderClassName,
 } from "../../factoryPageLayoutStyles";
 import type { SpendingCreditSnapshot } from "./spendingRedesignMocks";
 import {
-  buildSpendingReport,
-  EMPTY_SPENDING_FILTERS,
   formatSpendingRangeCaption,
-  hasActiveSpendingFilters,
-  rangeForPreset,
   rangeFromCustomDays,
   spendingMetricCopy,
   SPENDING_PERIOD_OPTIONS,
@@ -33,71 +26,51 @@ import {
   type SpendingPeriodPreset,
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
-import { SpendingBreakdownCard, SpendingChartCard, SpendingFilterBar, SpendingKpiRow } from "./SpendingRedesignPanels";
+import { SpendingKpiRow, SpendingUsageSection } from "./SpendingRedesignPanels";
+import { useSpendingRedesignPageModel, type SpendingRedesignControlledState } from "./useSpendingRedesignPageModel";
 
-export interface SpendingRedesignPageProps {
-  events: SpendingUsageEvent[];
+export interface SpendingRedesignPageProps extends SpendingRedesignControlledState {
+  events?: SpendingUsageEvent[];
   catalogs: SpendingCatalogs;
   credit: SpendingCreditSnapshot;
-  now: Date;
+  now?: Date;
   initialPeriod?: SpendingPeriodPreset;
-  initialFilters?: SpendingFilters;
-  initialBreakdown?: SpendingBreakdown;
+  initialModelFilters?: SpendingFilters;
+  initialMachineFilters?: SpendingFilters;
+  initialModelBreakdown?: SpendingBreakdown;
+  initialMachineBreakdown?: SpendingBreakdown;
   initialCustomRange?: SpendingDateRange;
+  isLoading?: boolean;
+  errorMessage?: string;
 }
 
 /**
- * Organization Spending explorer (Storybook-only).
+ * Organization Spending explorer.
  *
- * Time range, user, workspace, model, and machine filters slice the same
- * ledger the live Spending page reads: model tokens and runner VM time, with
- * estimated dollars. Task-owner is the user dimension because usage rows do
- * not store a user id.
+ * Storybook passes ledger events. Production passes server-built reports from
+ * the spending-report API.
  */
-export function SpendingRedesignPage({
-  events,
-  catalogs,
-  credit,
-  now,
-  initialPeriod = "month",
-  initialFilters = EMPTY_SPENDING_FILTERS,
-  initialBreakdown = "workspace",
-  initialCustomRange,
-}: SpendingRedesignPageProps) {
+export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
+  const { credit, catalogs, isLoading = false, errorMessage, ...modelArgs } = props;
   usePageTitle(["Spending"]);
-  const [period, setPeriod] = useState<SpendingPeriodPreset>(initialPeriod);
-  const [customRange, setCustomRange] = useState<SpendingDateRange | undefined>(initialCustomRange);
-  const [customOpen, setCustomOpen] = useState(initialPeriod === "custom");
-  const [filters, setFilters] = useState<SpendingFilters>(initialFilters);
-  const [breakdown, setBreakdown] = useState<SpendingBreakdown>(initialBreakdown);
+  const view = useSpendingRedesignPageModel({ ...modelArgs, catalogs });
+  const metrics = spendingMetricCopy(view.rangeTotals);
 
-  const range = useMemo(() => {
-    if (period === "custom") {
-      return customRange ?? rangeForPreset("week", now);
-    }
-    return rangeForPreset(period, now);
-  }, [customRange, now, period]);
+  if (errorMessage) {
+    return (
+      <div className="min-h-full bg-sidebar p-6 dark:bg-background" data-testid="spending-redesign-page">
+        <p className="text-[13px] text-destructive">{errorMessage}</p>
+      </div>
+    );
+  }
 
-  const report = useMemo(
-    () => buildSpendingReport(events, range, filters, breakdown, catalogs),
-    [breakdown, catalogs, events, filters, range],
-  );
-  const metrics = spendingMetricCopy(report.totals);
-  const filtersActive = hasActiveSpendingFilters(filters);
-
-  const handlePeriodChange = (value: string) => {
-    const next = value as SpendingPeriodPreset;
-    if (next === "custom") {
-      setPeriod("custom");
-      setCustomOpen(true);
-      if (!customRange) {
-        setCustomRange(rangeForPreset("week", now));
-      }
-      return;
-    }
-    setPeriod(next);
-    setCustomOpen(false);
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-full bg-sidebar p-6 dark:bg-background" data-testid="spending-redesign-page">
+        <p className="text-[13px] text-muted-foreground">Loading spending...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-sidebar dark:bg-background" data-testid="spending-redesign-page">
@@ -107,43 +80,34 @@ export function SpendingRedesignPage({
         subtitle="Review factory token usage, VM time, and estimated spend for this organization."
         actions={
           <SpendingPeriodControls
-            customOpen={customOpen}
-            customRange={range}
-            period={period}
-            onCustomOpenChange={setCustomOpen}
-            onCustomRangeChange={(next) => {
-              setCustomRange(next);
-              setPeriod("custom");
-            }}
-            onPeriodChange={handlePeriodChange}
-          />
-        }
-        belowRow={
-          <SpendingFilterBar
-            catalogs={catalogs}
-            filters={filters}
-            filtersActive={filtersActive}
-            onChange={setFilters}
+            customOpen={view.customOpen}
+            customRange={view.range}
+            period={view.period}
+            onCustomOpenChange={view.setCustomOpen}
+            onCustomRangeChange={view.setCustomRange}
+            onPeriodChange={view.handlePeriodChange}
           />
         }
       />
       <div className={cn(factoryCenteredSectionBodyClassName, "flex flex-col gap-5 pb-10")}>
-        <SpendingKpiRow credit={credit} metrics={metrics} rangeCaption={formatSpendingRangeCaption(range)} />
-        <SpendingChartCard breakdown={breakdown} report={report} />
-        <SpendingBreakdownCard breakdown={breakdown} onBreakdownChange={setBreakdown} report={report} />
-        <HostedCreditSummary
-          remainingCreditCents={credit.remainingCreditCents}
-          grantTotalCents={credit.grantTotalCents}
-          superplaneGrantCents={credit.superplaneGrantCents}
-          purchasedCreditCents={credit.purchasedCreditCents}
-          hostedBilledCents={credit.hostedBilledCents}
-          remainingCreditWarning={credit.remainingCreditWarning}
-          billingEnabled={credit.billingEnabled}
-          hasBillingCustomer={credit.hasBillingCustomer}
-          canManageBilling
-          cardClassName={`${factoryCardClassName} p-4`}
-          labelClassName="workspace-section-label"
-          valueClassName="workspace-page-title mt-1"
+        <SpendingKpiRow credit={credit} metrics={metrics} rangeCaption={formatSpendingRangeCaption(view.range)} />
+        <SpendingUsageSection
+          breakdown={view.modelBreakdown}
+          catalogs={catalogs}
+          filters={view.modelFilters}
+          kind="model"
+          report={view.modelReport}
+          onBreakdownChange={view.setModelBreakdown}
+          onChange={view.setModelFilters}
+        />
+        <SpendingUsageSection
+          breakdown={view.machineBreakdown}
+          catalogs={catalogs}
+          filters={view.machineFilters}
+          kind="compute"
+          report={view.machineReport}
+          onBreakdownChange={view.setMachineBreakdown}
+          onChange={view.setMachineFilters}
         />
       </div>
     </div>

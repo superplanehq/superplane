@@ -106,17 +106,6 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "use your keys",
   ]),
 
-  // Workspace · Spending
-  entry("workspace", "spending", "Spending", undefined, [
-    "billing",
-    "usage",
-    "cost",
-    "credit",
-    "tokens",
-    "vm time",
-    "hosted spend limit",
-  ]),
-
   // Organization · General
   entry("organization", "general", "General", undefined, ["name", "organization slug", "slug", "workspace url"]),
 
@@ -129,14 +118,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   // Organization · API keys / Secrets / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
-  entry("organization", "spending", "Spending", undefined, [
-    "billing",
-    "usage",
-    "credit",
-    "hosted credit",
-    "polar invoices",
-    "byok",
-  ]),
+  entry("organization", "spending", "Spending", undefined, ["billing", "usage", "credit", "hosted credit", "byok"]),
 ];
 
 function entry(

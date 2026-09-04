@@ -42,10 +42,10 @@ export interface SpendingDateRange {
 }
 
 export interface SpendingFilters {
-  userIds: string[];
-  workspaceIds: string[];
-  models: string[];
-  machineTypes: string[];
+  userId: string;
+  workspaceId: string;
+  model: string;
+  machineType: string;
 }
 
 export interface SpendingTotals {
@@ -81,10 +81,10 @@ export interface SpendingReport {
 }
 
 export const EMPTY_SPENDING_FILTERS: SpendingFilters = {
-  userIds: [],
-  workspaceIds: [],
-  models: [],
-  machineTypes: [],
+  userId: "",
+  workspaceId: "",
+  model: "",
+  machineType: "",
 };
 
 export const SPENDING_PERIOD_OPTIONS: Array<{ value: SpendingPeriodPreset; label: string }> = [
@@ -99,8 +99,11 @@ export const SPENDING_BREAKDOWN_OPTIONS: Array<{ value: SpendingBreakdown; label
   { value: "workspace", label: "Workspaces" },
   { value: "user", label: "Users" },
   { value: "model", label: "Models" },
-  { value: "machine", label: "Machines" },
+  { value: "machine", label: "Machine types" },
 ];
+
+export const MODEL_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter((option) => option.value !== "machine");
+export const MACHINE_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter((option) => option.value !== "model");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -131,37 +134,34 @@ export function rangeFromCustomDays(from: Date, to: Date): SpendingDateRange {
 }
 
 export function hasActiveSpendingFilters(filters: SpendingFilters): boolean {
-  return (
-    filters.userIds.length > 0 ||
-    filters.workspaceIds.length > 0 ||
-    filters.models.length > 0 ||
-    filters.machineTypes.length > 0
-  );
-}
-
-export function toggleFilterValue(values: string[], id: string): string[] {
-  if (values.includes(id)) {
-    return values.filter((value) => value !== id);
-  }
-  return [...values, id];
+  return Boolean(filters.userId || filters.workspaceId || filters.model || filters.machineType);
 }
 
 export function filterSpendingEvents(
   events: SpendingUsageEvent[],
   range: SpendingDateRange,
   filters: SpendingFilters,
+  usageKind?: SpendingUsageKind,
 ): SpendingUsageEvent[] {
-  return events.filter((event) => eventMatches(event, range, filters));
+  return events.filter((event) => eventMatches(event, range, filters, usageKind));
 }
 
-export function buildSpendingReport(
-  events: SpendingUsageEvent[],
-  range: SpendingDateRange,
-  filters: SpendingFilters,
-  breakdown: SpendingBreakdown,
-  catalogs: SpendingCatalogs,
-): SpendingReport {
-  const matched = filterSpendingEvents(events, range, filters);
+export function buildSpendingReport({
+  events,
+  range,
+  filters,
+  breakdown,
+  catalogs,
+  usageKind,
+}: {
+  events: SpendingUsageEvent[];
+  range: SpendingDateRange;
+  filters: SpendingFilters;
+  breakdown: SpendingBreakdown;
+  catalogs: SpendingCatalogs;
+  usageKind: SpendingUsageKind;
+}): SpendingReport {
+  const matched = filterSpendingEvents(events, range, filters, usageKind);
   const totals = sumSpendingTotals(matched);
   const grain = chartGrainForRange(range);
   const grouped = groupBreakdown(matched, breakdown, catalogs);
@@ -211,14 +211,8 @@ export function formatSpendingRangeCaption(range: SpendingDateRange): string {
   return `${startLabel} – ${endLabel}`;
 }
 
-export function formatFilterTriggerLabel(allLabel: string, selectedCount: number, noun: string): string {
-  if (selectedCount === 0) {
-    return allLabel;
-  }
-  if (selectedCount === 1) {
-    return `1 ${noun}`;
-  }
-  return `${selectedCount} ${noun}s`;
+export function formatFilterTriggerLabel(allLabel: string, selectedLabel?: string): string {
+  return selectedLabel || allLabel;
 }
 
 export function formatShare(share: number): string {
@@ -246,29 +240,33 @@ export function spendingMetricCopy(totals: SpendingTotals): {
 
 type ChartGrain = "hour" | "day" | "month";
 
-function eventMatches(event: SpendingUsageEvent, range: SpendingDateRange, filters: SpendingFilters): boolean {
+export function spendingTimeGrainForRange(range: SpendingDateRange): ChartGrain {
+  return chartGrainForRange(range);
+}
+
+function eventMatches(
+  event: SpendingUsageEvent,
+  range: SpendingDateRange,
+  filters: SpendingFilters,
+  usageKind?: SpendingUsageKind,
+): boolean {
   const occurred = Date.parse(event.occurredAt);
   if (Number.isNaN(occurred) || occurred < range.start.getTime() || occurred >= range.end.getTime()) {
     return false;
   }
-  if (filters.userIds.length > 0 && !filters.userIds.includes(event.userId)) {
+  if (usageKind && event.usageKind !== usageKind) {
     return false;
   }
-  if (filters.workspaceIds.length > 0 && !filters.workspaceIds.includes(event.factoryId)) {
+  if (filters.userId && event.userId !== filters.userId) {
     return false;
   }
-  if (
-    event.usageKind === "model" &&
-    filters.models.length > 0 &&
-    !filters.models.includes(modelKey(event.provider, event.model))
-  ) {
+  if (filters.workspaceId && event.factoryId !== filters.workspaceId) {
     return false;
   }
-  if (
-    event.usageKind === "compute" &&
-    filters.machineTypes.length > 0 &&
-    !filters.machineTypes.includes(event.machineType)
-  ) {
+  if (filters.model && modelKey(event.provider, event.model) !== filters.model) {
+    return false;
+  }
+  if (filters.machineType && event.machineType !== filters.machineType) {
     return false;
   }
   return true;

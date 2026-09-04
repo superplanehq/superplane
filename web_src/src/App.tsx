@@ -44,7 +44,6 @@ import {
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
-  FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   OrganizationSettingsOverviewPage,
   LegacyWorkOrderDetailRedirect,
@@ -68,6 +67,7 @@ import {
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
+  WorkspaceSpendingRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
@@ -388,7 +388,8 @@ const factorySettingsSectionRoutes = [
       </RequireExperimentalFeature>
     }
   />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
+  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"

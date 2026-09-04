@@ -21,7 +21,7 @@ import { EMPTY_SPENDING_FILTERS, rangeForPreset } from "./spendingRedesignLib";
 
 /**
  * Organization Spending explorer. Storybook-only: one Spending tab under
- * Organization, with time range and ledger filters. Mock data follows
+ * Organization, with a time range and two explorers. Mock data follows
  * `workspace_usage_events` (model tokens + runner VM time).
  */
 const meta = {
@@ -76,7 +76,7 @@ function LastYearPage() {
       catalogs={SPENDING_CATALOGS}
       credit={SPENDING_CREDIT}
       events={SPENDING_LEDGER}
-      initialBreakdown="user"
+      initialModelBreakdown="user"
       initialPeriod="year"
       now={SPENDING_REDESIGN_NOW}
     />
@@ -102,11 +102,11 @@ function FilteredWorkspacePage() {
       catalogs={SPENDING_CATALOGS}
       credit={SPENDING_CREDIT}
       events={SPENDING_LEDGER}
-      initialBreakdown="model"
-      initialFilters={{
+      initialModelBreakdown="model"
+      initialModelFilters={{
         ...EMPTY_SPENDING_FILTERS,
-        workspaceIds: [PRIMARY_FACTORY_ID],
-        models: ["anthropic/claude-sonnet-4-6"],
+        workspaceId: PRIMARY_FACTORY_ID,
+        model: "anthropic/claude-sonnet-4-6",
       }}
       now={SPENDING_REDESIGN_NOW}
     />
@@ -155,7 +155,7 @@ export const ThisWeek: Story = {
   render: () => renderSpending(ThisWeekPage),
 };
 
-/** Last 12 months with monthly bars, grouped by task owner. */
+/** Last 12 months with monthly bars, grouped by task owner on model usage. */
 export const LastYear: Story = {
   name: "Last 12 months",
   render: () => renderSpending(LastYearPage),
