@@ -879,7 +879,7 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	response, err := s.describeOrganizationCreationStatus(r.Context(), database.DB(r.Context()), account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields, so we don't repeat
@@ -896,9 +896,10 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 
 func (s *Server) describeOrganizationCreationStatus(
 	ctx context.Context,
+	tx *gorm.DB,
 	accountID string,
 ) (*organizationCreationStatusResponse, error) {
-	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
+	organizationCount, err := models.CountOrganizationsByBillingAccount(tx, accountID)
 	if err != nil {
 		log.WithError(err).
 			WithField("account_id", accountID).
@@ -1029,7 +1030,15 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	tx, err := acquireOrganizationCreationLock(r.Context(), account.ID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock organization creation")
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), tx, account.ID.String())
 	if err != nil {
 		// describeOrganizationCreationStatus already logs the underlying
 		// error with stage-specific structured fields.
@@ -1047,14 +1056,13 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	//
 	// Create the organization
 	//
-	tx := database.Conn().Begin()
 	log.Infof("Creating organization %s for account %s", req.Name, account.Email)
 	organization, err := models.CreateOrganizationInTransaction(tx, req.Name, "")
 
 	if err != nil {
 		tx.Rollback()
 
-		if err.Error() == "name already used" {
+		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			http.Error(w, "Organization name already in use", http.StatusConflict)
 			return
 		}
@@ -1148,7 +1156,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	creationLock, err := acquireInitialWorkspaceCreationLock(r.Context(), account.ID)
+	creationLock, err := acquireOrganizationCreationLock(r.Context(), account.ID)
 	if err != nil {
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock initial workspace creation")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
@@ -1170,7 +1178,7 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), creationLock, account.ID.String())
 	if err != nil {
 		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
 		return
@@ -1200,9 +1208,9 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
 
-// acquireInitialWorkspaceCreationLock serializes onboarding for one account.
+// acquireOrganizationCreationLock serializes organization creation for one account.
 // Waiting requests release their database connections between attempts.
-func acquireInitialWorkspaceCreationLock(ctx context.Context, accountID uuid.UUID) (*gorm.DB, error) {
+func acquireOrganizationCreationLock(ctx context.Context, accountID uuid.UUID) (*gorm.DB, error) {
 	lockKey := int64(binary.BigEndian.Uint64(accountID[:8]))
 
 	for {

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +40,7 @@ import (
 type fakePublicUsageService struct {
 	checkAccountResponse *usagepb.CheckAccountLimitsResponse
 	checkAccountErr      error
+	checkAccount         func(*usagepb.AccountState) *usagepb.CheckAccountLimitsResponse
 }
 
 func (s *fakePublicUsageService) Enabled() bool {
@@ -66,12 +68,16 @@ func (s *fakePublicUsageService) DescribeOrganizationUsage(context.Context, stri
 }
 
 func (s *fakePublicUsageService) CheckAccountLimits(
-	context.Context,
-	string,
-	*usagepb.AccountState,
+	_ context.Context,
+	_ string,
+	state *usagepb.AccountState,
 ) (*usagepb.CheckAccountLimitsResponse, error) {
 	if s.checkAccountErr != nil {
 		return nil, s.checkAccountErr
+	}
+
+	if s.checkAccount != nil {
+		return s.checkAccount(state), nil
 	}
 
 	if s.checkAccountResponse != nil {
@@ -493,6 +499,90 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 	var retryResult initialWorkspaceResponse
 	require.NoError(t, json.Unmarshal(retryResponse.Body.Bytes(), &retryResult))
 	assert.Equal(t, first, retryResult)
+}
+
+func Test__OrganizationCreationSerializesLimitChecks(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.DB(t.Context()),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "github-owner-id", "github-owner", "GitHub Owner", ""),
+	))
+	initialOrganizations, err := models.CountOrganizationsByBillingAccount(database.DB(t.Context()), r.Account.ID.String())
+	require.NoError(t, err)
+	maxOrganizations := int32(initialOrganizations + 1)
+	var limitChecks atomic.Int32
+	concurrentLimitChecks := make(chan struct{})
+
+	usageService := &fakePublicUsageService{
+		checkAccount: func(state *usagepb.AccountState) *usagepb.CheckAccountLimitsResponse {
+			if limitChecks.Add(1) == 1 {
+				select {
+				case <-concurrentLimitChecks:
+				case <-time.After(100 * time.Millisecond):
+				}
+			} else {
+				close(concurrentLimitChecks)
+			}
+			response := &usagepb.CheckAccountLimitsResponse{
+				Allowed: state.GetOrganizations() <= maxOrganizations,
+				Limits:  &usagepb.AccountLimits{MaxOrganizations: maxOrganizations},
+			}
+			if response.Allowed {
+				return response
+			}
+			response.Violations = []*usagepb.LimitViolation{{
+				Limit:           usagepb.LimitName_LIMIT_NAME_MAX_ORGANIZATIONS,
+				ConfiguredLimit: int64(maxOrganizations),
+				CurrentValue:    int64(state.GetOrganizations()),
+			}}
+			return response
+		},
+	}
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		usageService,
+		false,
+	)
+	require.NoError(t, err)
+
+	onboardingBody, err := json.Marshal(initialWorkspaceRequest{Owner: "GitHub Owner", AttemptID: uuid.NewString()})
+	require.NoError(t, err)
+	organizationBody, err := json.Marshal(OrganizationCreationRequest{Name: "Manual Organization"})
+	require.NoError(t, err)
+
+	responses := []*httptest.ResponseRecorder{httptest.NewRecorder(), httptest.NewRecorder()}
+	start := make(chan struct{})
+	var requests sync.WaitGroup
+	requests.Add(2)
+	go func() {
+		defer requests.Done()
+		<-start
+		request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(onboardingBody))
+		server.createInitialWorkspace(responses[0], request.WithContext(accountContext(r.Account)))
+	}()
+	go func() {
+		defer requests.Done()
+		<-start
+		request := httptest.NewRequest(http.MethodPost, "/organizations", bytes.NewReader(organizationBody))
+		server.createOrganization(responses[1], request.WithContext(accountContext(r.Account)))
+	}()
+	close(start)
+	requests.Wait()
+
+	assert.ElementsMatch(t, []int{http.StatusOK, http.StatusTooManyRequests}, []int{responses[0].Code, responses[1].Code})
+	organizations, err := models.CountOrganizationsByBillingAccount(database.DB(t.Context()), r.Account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, initialOrganizations+1, organizations)
 }
 
 func Test__CreateOrganization(t *testing.T) {
