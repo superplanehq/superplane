@@ -23,6 +23,14 @@ func TestOrganizationEntry(t *testing.T) {
 		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
 	})
 
+	t.Run("opens workspaces when factories are enabled and the org home is requested", func(t *testing.T) {
+		session := newLoggedInSession(t)
+
+		require.NoError(t, models.EnableExperimentalFeature(session.OrgID, features.FeatureFactories))
+		session.Visit("/" + session.OrgSlug)
+		session.WaitForBrowserPath("/" + session.OrgSlug + "/workspaces")
+	})
+
 	t.Run("opens the legacy organization when factories are disabled", func(t *testing.T) {
 		session := newLoggedInSession(t)
 
