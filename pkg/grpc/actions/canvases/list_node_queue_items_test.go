@@ -268,6 +268,50 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 	assert.False(t, secondResponse.HasNextPage)
 }
 
+func Test__ListNodeQueueItems__LastPageIsFull(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	//
+	// Four items over pages of two: the second page is full and is also the
+	// last one, so it must not advertise a page that does not exist.
+	//
+	for i := 0; i < 4; i++ {
+		inputEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+		createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
+	}
+
+	firstResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, nil)
+	require.NoError(t, err)
+	require.Len(t, firstResponse.Items, 2)
+	assert.True(t, firstResponse.HasNextPage)
+
+	secondResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, firstResponse.LastTimestamp)
+	require.NoError(t, err)
+	require.Len(t, secondResponse.Items, 2)
+	assert.False(t, secondResponse.HasNextPage)
+
+	thirdResponse, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 2, secondResponse.LastTimestamp)
+	require.NoError(t, err)
+	assert.Empty(t, thirdResponse.Items)
+}
+
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
 	result, err := SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{})
 	require.NoError(t, err)

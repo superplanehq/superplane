@@ -47,10 +47,12 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
 
-	events, err := order.ListEvents(db, int(limit), before)
+	events, err := order.ListEvents(db, int(limit)+1, before)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work order events")
 	}
+
+	events, hasNext := trimWorkOrderEventsPage(events, int(limit))
 
 	totalCount, err := order.CountEvents(db)
 	if err != nil {
@@ -65,7 +67,7 @@ func ListWorkOrderEvents(ctx context.Context, organizationID string, req *pb.Lis
 	return &pb.ListWorkOrderEventsResponse{
 		Events:        serialized,
 		TotalCount:    uint32(totalCount),
-		HasNextPage:   hasWorkOrderEventsNextPage(len(events), int(limit), totalCount),
+		HasNextPage:   hasNext,
 		LastTimestamp: lastWorkOrderEventTimestamp(events),
 	}, nil
 }
@@ -123,8 +125,16 @@ func getWorkOrderEventsBefore(before *timestamppb.Timestamp) *time.Time {
 	return &t
 }
 
-func hasWorkOrderEventsNextPage(numResults, limit int, totalCount int64) bool {
-	return int64(numResults) >= int64(limit) && int64(numResults) < totalCount
+// trimWorkOrderEventsPage drops the extra row fetched alongside the page
+// (limit+1) and reports whether more events follow it. Events are paged by
+// timestamp cursor while the total counts every event, so a full page is not
+// on its own evidence that anything remains after the cursor.
+func trimWorkOrderEventsPage(events []models.FactoryWorkOrderEvent, limit int) ([]models.FactoryWorkOrderEvent, bool) {
+	if limit > 0 && len(events) > limit {
+		return events[:limit], true
+	}
+
+	return events, false
 }
 
 func lastWorkOrderEventTimestamp(events []models.FactoryWorkOrderEvent) *timestamppb.Timestamp {
