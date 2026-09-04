@@ -39,6 +39,12 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
 }));
 
+let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
+
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: accountOrganizations }),
+}));
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof ReactRouterDom>("react-router");
   return {
@@ -97,6 +103,7 @@ describe("FirstRunSetup", () => {
   beforeEach(() => {
     factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }];
     deleteFactoryMutateAsync.mockClear();
     navigateSpy.mockClear();
   });
@@ -217,8 +224,33 @@ describe("FirstRunSetup", () => {
     await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
   });
 
-  it("keeps Log out and hides the close control on the first ever workspace", () => {
+  it("shows the close control when another organization exists, even with no other workspace here", () => {
     factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }, { id: "org-2", name: "Other Co" }];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+  });
+
+  it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
+    factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }, { id: "org-2", name: "Other Co", slug: "other-co" }];
+    const user = userEvent.setup();
+
+    renderSetup(pageModel());
+
+    await user.click(screen.getByTestId("first-run-cancel"));
+
+    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
+    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/other-co"));
+    expect(navigateSpy).not.toHaveBeenCalledWith("/org-1/workspaces");
+  });
+
+  it("keeps Log out and hides the close control with a single org and single (placeholder) workspace", () => {
+    factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }];
 
     renderSetup(pageModel());
 
