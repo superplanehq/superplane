@@ -38,6 +38,8 @@ export interface CanvasLogSidebarProps {
   minHeight?: number;
   maxHeight?: number;
   onHeightChange?: (height: number) => void;
+  /** Inset from the right so the log stays in the canvas strip beside absolute right panels. */
+  rightOffset?: number;
   searchValue: string;
   onSearchChange: (value: string) => void;
   entries: LogEntry[];
@@ -79,6 +81,7 @@ export function CanvasLogSidebar({
   minHeight = 240,
   maxHeight = 820,
   onHeightChange,
+  rightOffset = 0,
   searchValue,
   onSearchChange,
   entries,
@@ -235,7 +238,11 @@ export function CanvasLogSidebar({
   const searchPlaceholder = activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
-    <aside className="ph-no-capture absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
+    <aside
+      data-testid="canvas-log-sidebar"
+      className="ph-no-capture pointer-events-auto absolute bottom-0 left-0 z-31"
+      style={{ right: rightOffset }}
+    >
       <div
         className={cn("flex flex-col border-t bg-white dark:bg-gray-900", appDarkModeClasses.sidebarEdge)}
         style={{ height: sidebarHeight, minHeight, maxHeight }}
