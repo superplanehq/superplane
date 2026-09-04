@@ -48,12 +48,15 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
     );
-    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody())).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedNext)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody())).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-install-org")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
     expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByTestId("first-run-github-install-help"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody());
+    expect(screen.getByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedNext);
 
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(onConnectGitHub).toHaveBeenCalled();
@@ -87,8 +90,24 @@ describe("FirstRunConnectScreen", () => {
     );
 
     expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody())).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
+  });
+
+  it("names the GitHub organization in the waiting tooltip", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="acme"
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    await user.hover(screen.getByTestId("first-run-github-install-help"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
   it("continues to the repository step after GitHub is connected", async () => {

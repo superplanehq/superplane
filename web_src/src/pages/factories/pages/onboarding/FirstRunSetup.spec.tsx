@@ -150,7 +150,7 @@ describe("FirstRunSetup", () => {
     );
 
     expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {

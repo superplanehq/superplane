@@ -144,5 +144,4 @@ func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
 
 func (s *githubInstallRequestSteps) assertPendingRequestCopy() {
 	s.session.AssertText("Waiting for approval")
-	s.session.AssertText("After they approve, click Connect GitHub again.")
 }
