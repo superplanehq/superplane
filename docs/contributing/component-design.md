@@ -545,7 +545,7 @@ A **ComponentBaseMapper** defines how a component's run items are displayed. Eac
 | `subtitle()` | Returns the subtitle text for a run item |
 | `getExecutionDetails()` | Returns data for the Details tab |
 
-Mappers are registered in `web_src/src/pages/workflowv2/mappers/index.ts`.
+Mappers are registered in `web_src/src/pages/app/mappers/index.ts`.
 
 ### State Registry
 
