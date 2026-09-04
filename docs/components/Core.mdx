@@ -41,6 +41,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
+  <LinkCard title="List Pull Requests" href="#list-pull-requests" description="List factory pull requests for a repository from the database" />
   <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
@@ -1186,6 +1187,47 @@ The expression has access to:
   "data": {},
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "if.executed"
+}
+```
+
+<a id="list-pull-requests"></a>
+
+## List Pull Requests
+
+**Component key:** `listPullRequests`
+
+The List Pull Requests component reads factory pull requests for one repository from the SuperPlane database. It does not call GitHub.
+
+Use `states` to select which pull request states to include. Leave it empty to list open and draft pull requests, the common case for rechecking mergeability after a base branch push.
+
+Pair this component with `forEach` to start one downstream path per listed pull request.
+
+This component can only be used in factory-owned apps.
+
+### Output Channels
+
+- **Default**: The matching pull requests, oldest work order first
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pullRequests": [
+      {
+        "id": "2b3cf24d-c0e2-4d42-bbe7-4c30ff2cb2a4",
+        "number": 42,
+        "provider": "github",
+        "repository": "acme/app",
+        "state": "open",
+        "title": "Fix retry handling",
+        "url": "https://github.com/acme/app/pull/42",
+        "workOrderId": "9ac921bc-68e4-46dc-a78b-60b955f3bbf2"
+      }
+    ]
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "pullRequest.listed"
 }
 ```
 

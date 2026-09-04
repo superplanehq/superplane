@@ -57,6 +57,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a pull request's title, body, state, base branch, labels, or assignees in a GitHub repository" />
   <LinkCard title="Update Release" href="#update-release" description="Update an existing release in a GitHub repository" />
   <LinkCard title="Wait For Pull Request Checks" href="#wait-for-pull-request-checks" description="Wait until pull request checks on a commit become complete" />
+  <LinkCard title="Wait For Pull Request Mergeable" href="#wait-for-pull-request-mergeable" description="Wait until GitHub reports whether a pull request has a merge conflict" />
 </CardGrid>
 
 <a id="on-branch-created"></a>
@@ -5340,6 +5341,54 @@ Each output includes the repository, SHA, all observed checks, selected checks, 
   },
   "timestamp": "2026-08-31T12:01:05Z",
   "type": "github.pullRequestChecks"
+}
+```
+
+<a id="wait-for-pull-request-mergeable"></a>
+
+## Wait For Pull Request Mergeable
+
+**Component key:** `github.waitForPullRequestMergeable`
+
+The Wait For Pull Request Mergeable component polls one pull request until GitHub finishes computing mergeability.
+
+GitHub computes `mergeable` asynchronously after a push. The field is often `null` for a short time after a pull request changes. This component polls on a short interval until GitHub reports a definite answer, or until the timeout elapses.
+
+### Use Cases
+
+- **Conflict repair**: Start an agent run only when GitHub reports a real merge conflict, not a pending computation
+- **Base branch rechecks**: After a push to a shared base branch, recheck every open pull request for a new conflict
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Number**: Pull request number. Supports expressions.
+- **Timeout Seconds**: Maximum time to poll before giving up. Default: 300.
+
+### Output Channels
+
+- **Clean**: GitHub reports `mergeable: true`
+- **Conflicted**: GitHub reports `mergeable: false` (this includes `mergeable_state: dirty`)
+- **Timed Out**: The timeout elapsed while `mergeable` was still `null`
+
+Each output includes the repository, number, head SHA, base ref, `mergeable`, and `mergeableState`.
+
+A pull request blocked, behind, or unstable for reasons other than a conflict still reports `mergeable: true` and finishes on the Clean channel; this component only signals a real conflict.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "baseRef": "main",
+    "mergeable": false,
+    "mergeableState": "dirty",
+    "number": 42,
+    "repository": "acme/app",
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+  },
+  "timestamp": "2026-01-01T00:00:00Z",
+  "type": "github.pullRequestMergeable"
 }
 ```
 
