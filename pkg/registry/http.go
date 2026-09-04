@@ -328,9 +328,9 @@ func (c *HTTPContext) validateURLWithPolicy(policy compiledHTTPPolicy, URL *url.
 	//
 	// Check blocked hostnames
 	//
-	hostLower := strings.ToLower(host)
+	normalizedHost := normalizeHost(host)
 	for _, blocked := range policy.blockedHosts {
-		if hostLower == blocked || strings.HasSuffix(hostLower, "."+blocked) {
+		if normalizedHost == blocked || strings.HasSuffix(normalizedHost, "."+blocked) {
 			return fmt.Errorf("access to %s is not allowed", host)
 		}
 	}
@@ -339,13 +339,22 @@ func (c *HTTPContext) validateURLWithPolicy(policy compiledHTTPPolicy, URL *url.
 	// If host is an IP address, validate it immediately
 	// For hostnames, IP validation happens at connection time via the dialer.
 	//
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := net.ParseIP(normalizedHost); ip != nil {
 		if err := c.validateIPWithPolicy(policy, ip); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// normalizeHost prepares a hostname for policy matching. Hostnames are
+// case-insensitive, and the fully qualified form ("example.com.") names the
+// same host as "example.com", so both forms must match the same policy entry.
+// A policy entry can also arrive padded from configuration, so surrounding
+// space is removed here and not at each call site.
+func normalizeHost(host string) string {
+	return strings.TrimRight(strings.ToLower(strings.TrimSpace(host)), ".")
 }
 
 func (c *HTTPContext) validateIP(ip net.IP) error {
@@ -437,7 +446,12 @@ func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {
 	}
 
 	for _, host := range policy.BlockedHosts {
-		compiledPolicy.blockedHosts = append(compiledPolicy.blockedHosts, strings.ToLower(host))
+		normalizedHost := normalizeHost(host)
+		if normalizedHost == "" {
+			continue
+		}
+
+		compiledPolicy.blockedHosts = append(compiledPolicy.blockedHosts, normalizedHost)
 	}
 
 	for _, cidr := range policy.PrivateIPRanges {
