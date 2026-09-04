@@ -210,6 +210,14 @@ test("safeWaitRequest treats an abort as pending", async () => {
   assert.deepEqual(got, { status: "pending" });
 });
 
+test("safeWaitRequest keeps a delivered user message", async () => {
+  const got = await safeWaitRequest(async () => ({
+    status: 200,
+    text: async () => JSON.stringify({ status: "message", text: "hello" }),
+  }));
+  assert.deepEqual(got, { status: "message", text: "hello" });
+});
+
 test("safeWaitRequest still throws on 401", async () => {
   await assert.rejects(
     () =>
@@ -219,6 +227,30 @@ test("safeWaitRequest still throws on 401", async () => {
       })),
     /unauthorized/,
   );
+});
+
+test("runLoop runs a user message after a dropped wait", async () => {
+  const prompts = [];
+  const logs = [];
+  const results = [
+    await safeWaitRequest(async () => {
+      throw new TypeError("fetch failed");
+    }),
+    { status: "message", text: "hello" },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async () => {},
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["hello"]);
+  assert.deepEqual(logs, []);
 });
 
 test("runLoop stays alive when waitOnce returns pending after a fetch throw", async () => {
