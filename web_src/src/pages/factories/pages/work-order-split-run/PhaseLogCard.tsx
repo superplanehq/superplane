@@ -15,6 +15,7 @@ import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
 import { WorkOrderPullRequestInline } from "../../WorkOrderPullRequestInline";
 import { PhaseGlyph } from "../linePhaseGlyph";
+import { displayRunnerModel } from "./draftStartModel";
 import { logStatusTimeLabel, tickingRunningClock } from "./logStatusTime";
 import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
@@ -759,12 +760,16 @@ function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
     : formatClockDurationLabel(phase.duration);
   const tokens = parseWorkOrderMetric(phase.totalTokens);
   const cents = parseWorkOrderMetric(phase.costCents);
+  const model = displayRunnerModel(phase.model ?? "");
   const parts: string[] = [];
   if (cents > 0) {
     parts.push(formatUsdCents(cents));
   }
   if (tokens > 0) {
     parts.push(formatCompactTokenValue(tokens));
+  }
+  if (model) {
+    parts.push(model);
   }
   if (clock && clock !== "—") {
     parts.push(clock);
