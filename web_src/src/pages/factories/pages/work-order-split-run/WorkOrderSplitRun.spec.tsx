@@ -1027,7 +1027,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(view).toHaveAttribute(
       "href",
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        from: "work-order",
+        from: "task",
         orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
         canvas: "closure",
       }),

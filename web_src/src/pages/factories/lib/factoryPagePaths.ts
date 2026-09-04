@@ -121,7 +121,7 @@ export function factorySetupPath(organizationId: string, factoryKey: string) {
 }
 
 export function workOrdersPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/tasks`;
 }
 
 export function createWorkOrderPath(organizationId: string, factoryKey: string) {
@@ -129,8 +129,8 @@ export function createWorkOrderPath(organizationId: string, factoryKey: string) 
 }
 
 /**
- * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
- * (singular segment, sibling of `work-orders`). `orderNumber` is the
+ * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/task/{orderNumber}`
+ * (singular segment, sibling of the plural `tasks` list). `orderNumber` is the
  * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
  * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
  */
@@ -140,7 +140,7 @@ export function workOrderDetailPath(
   orderNumber: string | number,
   lineId?: string | null,
 ) {
-  const path = `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/task/${orderNumber}`;
   const boardLineId = lineId?.trim();
   if (!boardLineId) {
     return path;
@@ -148,7 +148,7 @@ export function workOrderDetailPath(
   return `${path}?${WORK_ORDER_LINE_SEARCH_PARAM}=${encodeURIComponent(boardLineId)}`;
 }
 
-/** Line id carried on a work-order permalink when the popup opened from a board. */
+/** Line id carried on a task permalink when the popup opened from a board. */
 export const WORK_ORDER_LINE_SEARCH_PARAM = "lineId";
 
 export function workOrderBoardLineIdFromSearch(search: string): string | null {
@@ -173,12 +173,12 @@ export function workOrderOpenPath(
 }
 
 /**
- * Old id-based task URL shape, kept around only so the legacy
- * redirect route can compare against it / build test fixtures. New code
- * should always call `workOrderDetailPath`.
+ * Old id-based task URL shape (`.../work-orders/{orderId}`), kept around only
+ * so the legacy redirect route can compare against it / build test fixtures.
+ * New code should always call `workOrderDetailPath`.
  */
 export function legacyWorkOrderDetailPath(organizationId: string, factoryKey: string, orderId: string) {
-  return `${workOrdersPath(organizationId, factoryKey)}/${orderId}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders/${orderId}`;
 }
 
 export function linesPath(organizationId: string, factoryKey: string) {
@@ -205,10 +205,17 @@ export function automationDetailPath(organizationId: string, factoryKey: string,
   return `${automationsPath(organizationId, factoryKey)}/${appId}`;
 }
 
-export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
+export type FactoryAppNavFrom = "automations" | "lines" | "task" | "overview";
 
+/**
+ * Parses the `from` nav hint, accepting the legacy `work-order` value (from
+ * links generated before the task rename) and normalizing it to `task`.
+ */
 export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom | undefined {
-  if (value === "automations" || value === "lines" || value === "work-order" || value === "overview") {
+  if (value === "work-order") {
+    return "task";
+  }
+  if (value === "automations" || value === "lines" || value === "task" || value === "overview") {
     return value;
   }
   return undefined;
