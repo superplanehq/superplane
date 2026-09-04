@@ -8,6 +8,10 @@ describe("resolvePageObservability", () => {
     expect(resolvePageObservability("/onboarding")).toEqual({ pageKey: "organizationOnboarding", attributes: {} });
     expect(resolvePageObservability("/setup")).toEqual({ pageKey: "ownerSetup", attributes: {} });
     expect(resolvePageObservability("/install")).toEqual({ pageKey: "install", attributes: {} });
+    expect(resolvePageObservability("/github/approved")).toEqual({
+      pageKey: "githubInstallApproved",
+      attributes: {},
+    });
   });
 
   it("maps invite links", () => {

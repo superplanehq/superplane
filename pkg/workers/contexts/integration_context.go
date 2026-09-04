@@ -330,6 +330,14 @@ func (c *IntegrationContext) SetMetadata(value any) {
 	c.integration.Metadata = datatypes.NewJSONType(v)
 }
 
+func (c *IntegrationContext) Persist() error {
+	if c.tx == nil || c.integration == nil {
+		return nil
+	}
+
+	return c.tx.Save(c.integration).Error
+}
+
 func (c *IntegrationContext) GetState() string {
 	return c.integration.State
 }
