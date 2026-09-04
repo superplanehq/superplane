@@ -145,6 +145,37 @@ func Test__isPendingInstallationSetupAction(t *testing.T) {
 	assert.False(t, isPendingInstallationSetupAction("request"))
 }
 
+func Test__isInstallationRequestSetupAction(t *testing.T) {
+	assert.True(t, isInstallationRequestSetupAction("request"))
+	assert.False(t, isInstallationRequestSetupAction("install"))
+	assert.False(t, isInstallationRequestSetupAction("update"))
+	assert.False(t, isInstallationRequestSetupAction(""))
+}
+
+func Test__afterAppInstallation_installRequest(t *testing.T) {
+	integration := &contexts.IntegrationContext{
+		NewSetupFlow:  true,
+		IntegrationID: "11111111-1111-1111-1111-111111111111",
+		CurrentProperties: map[string]any{
+			common.PropertyAppState: "csrf",
+		},
+	}
+	ctx, rec := hostedRequestContext(
+		integration,
+		"/api/v1/integrations/11111111-1111-1111-1111-111111111111/setup?state=csrf&setup_action=request",
+		nil,
+	)
+
+	(&GitHub{}).afterAppInstallation(ctx)
+
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(
+		t,
+		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request",
+		rec.Header().Get("Location"),
+	)
+}
+
 func Test__ownerFromRepositories(t *testing.T) {
 	assert.Equal(t, "acme", ownerFromRepositories([]common.Repository{
 		{URL: "https://github.com/acme/payments"},

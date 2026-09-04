@@ -1,12 +1,22 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useSearchParams } from "react-router";
 
 import { peekIntegrationSetupReturn, rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { IntegrationSetupReturn } from "./IntegrationSetupReturn";
 
 const ORGANIZATION_ID = "org-1";
 const SETUP_PATH = "/org-1/workspaces/APP/setup";
+
+function SetupLanding() {
+  const [searchParams] = useSearchParams();
+  return (
+    <div>
+      workspace setup
+      {searchParams.toString() ? <span>{searchParams.toString()}</span> : null}
+    </div>
+  );
+}
 
 function renderAt(path: string, children: React.ReactNode) {
   return render(
@@ -16,7 +26,7 @@ function renderAt(path: string, children: React.ReactNode) {
           path="/:organizationId/settings/integrations/:integrationId"
           element={<IntegrationSetupReturn organizationId={ORGANIZATION_ID}>{children}</IntegrationSetupReturn>}
         />
-        <Route path="/org-1/workspaces/APP/setup" element={<div>workspace setup</div>} />
+        <Route path="/org-1/workspaces/APP/setup" element={<SetupLanding />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -30,7 +40,7 @@ function returnRoute(organizationId: string, children: React.ReactNode) {
           path="/:organizationId/settings/integrations/:integrationId"
           element={<IntegrationSetupReturn organizationId={organizationId}>{children}</IntegrationSetupReturn>}
         />
-        <Route path="/org-1/workspaces/APP/setup" element={<div>workspace setup</div>} />
+        <Route path="/org-1/workspaces/APP/setup" element={<SetupLanding />} />
       </Routes>
     </MemoryRouter>
   );
@@ -72,6 +82,16 @@ describe("IntegrationSetupReturn", () => {
     page.rerender(returnRoute(ORGANIZATION_ID, <div>integration details</div>));
 
     expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
+  it("forwards a GitHub install request onto the stored return path", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/abc?githubSetup=request", <div>integration details</div>);
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText("githubSetup=request")).toBeInTheDocument();
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 

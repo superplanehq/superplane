@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Clock } from "lucide-react";
 
 import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -8,18 +8,21 @@ import type { FirstRunChrome } from "./firstRunTypes";
 
 export function FirstRunConnectScreen({
   githubConnected,
+  installRequested = false,
   connectError,
   chrome,
   onConnectGitHub,
   onContinue,
 }: {
   githubConnected: boolean;
+  installRequested?: boolean;
   connectError?: string;
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onContinue: () => void;
 }) {
   const copy = FIRST_RUN_COPY.connect;
+  const waitingForApproval = installRequested && !githubConnected;
 
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
@@ -43,11 +46,29 @@ export function FirstRunConnectScreen({
             </Button>
           </>
         ) : (
-          <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
-            {copy.connectGitHub}
-          </Button>
+          <>
+            {waitingForApproval ? (
+              <div
+                className="flex items-center gap-3 rounded-md bg-accent/40 px-3 py-2.5 text-left"
+                data-testid="first-run-github-install-requested"
+              >
+                <IntegrationChoiceIcon name="github" />
+                <span className="text-[13px] font-medium">{copy.installRequested}</span>
+                <Clock className="ml-auto size-3.5 text-muted-foreground" aria-hidden />
+              </div>
+            ) : null}
+            <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
+              {copy.connectGitHub}
+            </Button>
+          </>
         )}
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
+        {waitingForApproval ? (
+          <>
+            <p className="text-[13px] text-muted-foreground">{copy.installRequestedBody}</p>
+            <p className="text-[13px] text-muted-foreground">{copy.installRequestedNext}</p>
+          </>
+        ) : null}
         {connectError ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>
