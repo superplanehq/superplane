@@ -23,6 +23,14 @@ type Metadata struct {
 	// InstallRequestedAccount is the GitHub organization (or user) login the
 	// member asked an admin to approve.
 	InstallRequestedAccount string `mapstructure:"installRequestedAccount" json:"installRequestedAccount,omitempty"`
+	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
+	// use it when the browser cookie is missing, for example localhost to ngrok.
+	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
+	// GitHubUserID is the signed-in GitHub user id from hosted OAuth. The
+	// personal-account install URL uses it as target_id.
+	GitHubUserID string `mapstructure:"githubUserId" json:"githubUserId,omitempty"`
+	// GitHubUserLogin is the signed-in GitHub user login from hosted OAuth.
+	GitHubUserLogin string `mapstructure:"githubUserLogin" json:"githubUserLogin,omitempty"`
 }
 
 type PendingInstallation struct {

@@ -111,13 +111,87 @@ describe("FirstRunConnectScreen", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
+  it("asks which GitHub account to use when two installs are pending", async () => {
+    const user = userEvent.setup();
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        pendingInstallations={[
+          { id: "11", accountLogin: "acme", accountType: "Organization" },
+          { id: "22", accountLogin: "octo", accountType: "User" },
+        ]}
+        githubUserLogin="octo"
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.usePersonal("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.selectAccount,
+    );
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toHaveAttribute(
+      "href",
+      "https://github.com/apps/superplane/installations/new?state=csrf",
+    );
+
+    try {
+      await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+      expect(assign).toHaveBeenCalledWith("/api/v1/github/app/bind?state=csrf&installation_id=11");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("shows the personal account and a GitHub cancel link when an org request is waiting", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="acme"
+        pendingInstallations={[{ id: "22", accountLogin: "octo", accountType: "User" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        githubUserLogin="octo"
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.usePersonal("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-cancel-request")).toHaveAttribute(
+      "href",
+      "https://github.com/apps/superplane/installations/new?state=csrf",
+    );
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
   it("continues to the repository step after GitHub is connected", async () => {
     const user = userEvent.setup();
     const onContinue = vi.fn();
 
-    render(<FirstRunConnectScreen githubConnected onConnectGitHub={vi.fn()} onContinue={onContinue} />);
+    render(
+      <FirstRunConnectScreen
+        githubConnected
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onContinue={onContinue}
+      />,
+    );
 
     expect(screen.getByTestId("first-run-github-connected")).toHaveTextContent(FIRST_RUN_COPY.connect.connected);
+    expect(screen.getByTestId("first-run-github-manage-accounts")).toHaveAttribute(
+      "href",
+      "https://github.com/apps/superplane/installations/new",
+    );
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-github-continue"));
     expect(onContinue).toHaveBeenCalled();

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -93,13 +94,15 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 
 	t.Run("zero installs redirects to install URL", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthHTTP(jsonResponse(`{"access_token":"user-token"}`), jsonResponse(`{"installations":[]}`))
+		httpCtx := oauthWithUserHTTP(`{"installations":[]}`)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Contains(t, rec.Header().Get("Location"), "https://github.com/apps/superplane/installations/new?state=csrf")
+		assert.Contains(t, rec.Header().Get("Location"), "https://github.com/apps/superplane/installations/new?")
+		assert.Contains(t, rec.Header().Get("Location"), "state=csrf")
+		assert.Contains(t, rec.Header().Get("Location"), "target_id=7")
 		assert.Equal(t, "pending", integration.State)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
@@ -117,10 +120,7 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		}
 
 		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthHTTP(
-			jsonResponse(`{"access_token":"user-token"}`),
-			jsonResponse(`{"installations":[{"id":11,"account":{"login":"acme","type":"Organization"}}]}`),
-		)
+		httpCtx := oauthWithUserHTTP(`{"installations":[{"id":11,"account":{"login":"acme","type":"Organization"}}]}`)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
@@ -136,32 +136,69 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assertNoPlaintextSecrets(t, integration)
 	})
 
-	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
+	t.Run("one install stays pending when an org request is waiting", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthHTTP(
-			jsonResponse(`{"access_token":"user-token"}`),
-			jsonResponse(`{"installations":[
-				{"id":11,"account":{"login":"acme","type":"Organization"}},
-				{"id":22,"account":{"login":"octo","type":"User"}}
-			]}`),
-		)
+		integration.Metadata = common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			SetupReturnPath:         "/onboarding?attempt=1&step=vcs",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthWithUserHTTP(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
+		assert.NotEqual(t, "ready", integration.State)
+		metadata := integration.Metadata.(common.Metadata)
+		assert.Empty(t, metadata.InstallationID)
+		assert.True(t, metadata.InstallRequested)
+		assert.Equal(t, "acme", metadata.InstallRequestedAccount)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.Equal(t, "22", metadata.PendingInstallations[0].ID)
+		assert.Equal(t, "octo", metadata.PendingInstallations[0].AccountLogin)
+	})
+
+	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthWithUserHTTP(`{"installations":[
+				{"id":11,"account":{"login":"acme","type":"Organization"}},
+				{"id":22,"account":{"login":"octo","type":"User"}}
+			]}`)
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
 		assert.NotEqual(t, "ready", integration.State)
 		assert.Nil(t, integration.BrowserAction)
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Empty(t, metadata.InstallationID)
 		assert.Equal(t, "csrf", metadata.State)
+		assert.Equal(t, "/onboarding?attempt=1&step=vcs", metadata.SetupReturnPath)
 		require.Len(t, metadata.PendingInstallations, 2)
-		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+		assert.Equal(t, "22", metadata.PendingInstallations[0].ID)
+		assert.Equal(t, "octo", metadata.PendingInstallations[0].AccountLogin)
+		assert.Equal(t, "11", metadata.PendingInstallations[1].ID)
+		assert.Equal(t, "7", metadata.GitHubUserID)
+		assert.Equal(t, "octo", metadata.GitHubUserLogin)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
-		require.Len(t, httpCtx.Requests, 2)
-		assert.Equal(t, "/user/installations", httpCtx.Requests[1].URL.Path)
-		assert.NotContains(t, httpCtx.Requests[1].URL.Path, "/app/installations")
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Equal(t, "/user", httpCtx.Requests[1].URL.Path)
+		assert.Equal(t, "/user/installations", httpCtx.Requests[2].URL.Path)
+		assert.NotContains(t, httpCtx.Requests[2].URL.Path, "/app/installations")
 	})
 }
 
@@ -260,6 +297,31 @@ func Test__afterAppInstallationLegacy_installRequest(t *testing.T) {
 			rec.Header().Get("Location"),
 		)
 		assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	})
+
+	t.Run("returns to the stored onboarding path instead of settings", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+		ctx.Request.AddCookie(&http.Cookie{
+			Name:  integrationSetupReturnCookie,
+			Value: "/org-1/workspaces/APP/setup?step=vcs&pick=newest",
+		})
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		location, err := url.Parse(rec.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, "/org-1/workspaces/APP/setup", location.Path)
+		assert.Equal(t, "vcs", location.Query().Get("step"))
+		assert.Equal(t, "newest", location.Query().Get("pick"))
+		assert.Equal(t, "request", location.Query().Get("githubSetup"))
+		assert.Equal(t, "acme", location.Query().Get("githubOrg"))
+		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
 	})
 
 	t.Run("rejects request with a mismatched state", func(t *testing.T) {
@@ -386,6 +448,7 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 			State:           "csrf-keep",
 			HostedApp:       true,
 			StartedByUserID: "starter-user",
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
 			PendingInstallations: []common.PendingInstallation{
 				{ID: "11", AccountLogin: "acme"},
 				{ID: "22", AccountLogin: "octo"},
@@ -398,14 +461,39 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		ActorUserID:    "other-user",
 		BaseURL:        "https://app.example",
+		Configuration:  Configuration{SetupReturnPath: "/onboarding?attempt=new&step=vcs"},
 		Integration:    integrationCtx,
 	}))
 
 	metadata := integrationCtx.Metadata.(common.Metadata)
 	assert.Equal(t, "csrf-keep", metadata.State)
 	assert.Equal(t, "starter-user", metadata.StartedByUserID)
+	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 2)
 	assert.Nil(t, integrationCtx.BrowserAction)
+}
+
+func Test__Sync_hostedAppKeepsSetupReturnPathWhenConfigOmitsIt(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:           "csrf-keep",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.Equal(t, "/onboarding?attempt=old&step=vcs", integrationCtx.Metadata.(common.Metadata).SetupReturnPath)
 }
 
 func Test__afterAppInstallationLegacy_afterZeroInstallOAuth(t *testing.T) {
@@ -475,6 +563,14 @@ func hostedRequestContext(integration *contexts.IntegrationContext, path string,
 
 func oauthHTTP(responses ...*http.Response) *contexts.HTTPContext {
 	return &contexts.HTTPContext{Responses: responses}
+}
+
+func oauthWithUserHTTP(installationsJSON string) *contexts.HTTPContext {
+	return oauthHTTP(
+		jsonResponse(`{"access_token":"user-token"}`),
+		jsonResponse(`{"id":7,"login":"octo"}`),
+		jsonResponse(installationsJSON),
+	)
 }
 
 func jsonResponse(body string) *http.Response {
