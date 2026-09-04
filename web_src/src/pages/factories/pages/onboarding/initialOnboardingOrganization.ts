@@ -6,5 +6,5 @@ export function githubIntegrationOwner(integration: OrganizationsIntegration): s
 }
 
 export function shouldNameOrganizationFromGitHub(factory: FactoriesFactory | null, selectNewest: boolean): boolean {
-  return selectNewest && factory?.onboarding?.initial === true && !factory.onboarding.vcsIntegrationId;
+  return selectNewest && factory?.onboarding?.initial === true;
 }

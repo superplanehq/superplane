@@ -192,6 +192,7 @@ function useOnboardingGithubConnectionSelected(args: {
   organizationId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  onboardingEntryPath?: string | null;
   selectNewest: boolean;
   setup: OnboardingSetupApi;
   setOpenSection: (section: WizardStepId) => void;
@@ -224,7 +225,19 @@ function useOnboardingGithubConnectionSelected(args: {
       const response = await args.updateOrganization.mutateAsync({ name: owner, slug });
       const nextSlug = response.data?.organization?.metadata?.slug;
       if (!nextSlug) return;
-      navigate(`${factorySetupPath(nextSlug, args.factoryKey)}?step=repo`, { replace: true });
+
+      const nextPath = onboardingStepPath(
+        args.onboardingEntryPath ?? factorySetupPath(nextSlug, args.factoryKey),
+        "repo",
+      );
+      if (args.onboardingEntryPath) {
+        // Reload so the retry-safe onboarding endpoint resolves the workspace
+        // with its new organization slug without exposing the internal route.
+        window.location.replace(nextPath);
+        return;
+      }
+
+      navigate(nextPath, { replace: true });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
     }

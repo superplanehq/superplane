@@ -14,9 +14,9 @@ describe("shouldNameOrganizationFromGitHub", () => {
     expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({}), true)).toBe(false);
   });
 
-  it("does not rename after the onboarding flow saves a GitHub integration", () => {
+  it("retries naming after the GitHub connection was saved", () => {
     const factory = factoryWithOnboarding({ initial: true, vcsIntegrationId: "integration-id" });
-    expect(shouldNameOrganizationFromGitHub(factory, true)).toBe(false);
+    expect(shouldNameOrganizationFromGitHub(factory, true)).toBe(true);
   });
 
   it("does not rename when the user selects an existing connection", () => {
