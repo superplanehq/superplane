@@ -8,6 +8,7 @@ import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { useOrganization } from "./hooks/useOrganizationData";
 import { Toaster } from "sonner";
 import "./App.css";
@@ -22,9 +23,9 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
-import OrganizationCreate from "./pages/auth/OrganizationCreate";
-import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
@@ -232,7 +233,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRedirect)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
@@ -241,7 +242,7 @@ function AppRouter() {
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
-              <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
               {organizationScopedRouteTree()}
@@ -263,7 +264,6 @@ export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const location = useLocation();
-  useConsumeIntegrationSetupReturnOnArrival(segment);
 
   const isReserved = isReservedAppPathSegment(segment);
   // The route param accepts either the org slug or its UID, so resolve it
@@ -273,6 +273,8 @@ export function OrganizationScope() {
   const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
+  useRedirectIntegrationSetupReturn(segment, resolvedSlug);
+  useConsumeIntegrationSetupReturnOnArrival(resolvedSlug || segment);
 
   const uidRedirectPath =
     !isReserved && segment
@@ -291,7 +293,7 @@ export function OrganizationScope() {
       return;
     }
     // Prefer the resolved slug so the last-visited value never carries a UID
-    // forward into a later auto-redirect (see OrganizationSelect).
+    // forward into a later root redirect.
     recordLastVisitedOrganization(account.id, resolvedSlug || segment);
   }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 

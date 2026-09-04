@@ -69,6 +69,7 @@ describe("api-interceptor", () => {
     const paths = [
       "/account",
       "/account/limits",
+      "/account/onboarding",
       "/account/password",
       "/account/experimental-features",
       "/organizations",

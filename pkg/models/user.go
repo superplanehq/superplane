@@ -490,11 +490,7 @@ func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string)
 	return count, nil
 }
 
-func CountOrganizationsByBillingAccount(accountID string) (int64, error) {
-	return CountOrganizationsByBillingAccountInTransaction(database.Conn(), accountID)
-}
-
-func CountOrganizationsByBillingAccountInTransaction(tx *gorm.DB, accountID string) (int64, error) {
+func CountOrganizationsByBillingAccount(tx *gorm.DB, accountID string) (int64, error) {
 	subquery := tx.
 		Table("users").
 		Select("DISTINCT ON (organization_id) organization_id, account_id").

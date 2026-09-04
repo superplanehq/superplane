@@ -25,6 +25,7 @@ export const PUBLIC_TOP_LEVEL_SEGMENTS = new Set([
   "invite",
   "install",
   "login",
+  "onboarding",
   "setup",
   "signup",
   "welcome",
