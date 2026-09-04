@@ -1,4 +1,5 @@
-import { CalendarDays } from "lucide-react";
+import { useState } from "react";
+import { CalendarDays, ChevronDown } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { SegmentedNav } from "@/ui/SegmentedNav";
 
 import { WorkspacePageHeader } from "../../../layout/WorkspacePageHeader";
 import {
@@ -18,7 +18,8 @@ import {
   formatSpendingRangeCaption,
   rangeFromCustomDays,
   spendingMetricCopy,
-  SPENDING_PERIOD_OPTIONS,
+  spendingPeriodTriggerLabel,
+  SPENDING_PERIOD_PRESETS,
   type SpendingBreakdown,
   type SpendingCatalogs,
   type SpendingDateRange,
@@ -129,46 +130,85 @@ function SpendingPeriodControls({
   onCustomOpenChange: (open: boolean) => void;
   onCustomRangeChange: (range: SpendingDateRange) => void;
 }) {
-  const selected: DateRange = {
+  const committed: DateRange = {
     from: customRange.start,
     to: new Date(customRange.end.getTime() - 1),
   };
+  const [draftRange, setDraftRange] = useState<DateRange | undefined>();
+  const selected = draftRange ?? committed;
+  const triggerLabel = spendingPeriodTriggerLabel(period, customRange);
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <SegmentedNav
-        ariaLabel="Spending time range"
-        options={SPENDING_PERIOD_OPTIONS}
-        size="xs"
-        value={period}
-        onValueChange={onPeriodChange}
-      />
-      <Popover open={customOpen} onOpenChange={onCustomOpenChange}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label="Select a custom date range"
-            data-testid="spending-custom-range"
+    <Popover
+      open={customOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          setDraftRange(undefined);
+        }
+        onCustomOpenChange(open);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-expanded={customOpen}
+          aria-haspopup="dialog"
+          aria-label={`Spending period, ${triggerLabel}`}
+          data-testid="spending-period"
+        >
+          <CalendarDays className="size-3.5" aria-hidden />
+          {triggerLabel}
+          <ChevronDown className="size-3.5" aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto overflow-visible p-0" data-testid="spending-period-picker">
+        <div className="flex flex-col sm:flex-row">
+          <div
+            role="radiogroup"
+            aria-label="Spending period"
+            className="flex flex-col gap-0.5 border-b p-2 sm:w-44 sm:border-r sm:border-b-0"
           >
-            <CalendarDays className="size-3.5" aria-hidden />
-            {period === "custom" ? formatSpendingRangeCaption(customRange) : "Custom range"}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-auto p-3">
+            {SPENDING_PERIOD_PRESETS.map((option) => {
+              const isActive = period === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={isActive}
+                  className={cn(
+                    "rounded-md px-2.5 py-1.5 text-left text-[13px]",
+                    isActive
+                      ? "bg-accent font-medium text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                  onClick={() => onPeriodChange(option.value)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
           <Calendar
+            className="p-2 [--cell-size:2rem]"
+            classNames={{ root: "rdp-root w-[16.5rem]" }}
+            defaultMonth={selected.from}
             mode="range"
-            numberOfMonths={2}
             selected={selected}
             onSelect={(next) => {
               if (!next?.from) {
                 return;
               }
-              onCustomRangeChange(rangeFromCustomDays(next.from, next.to ?? next.from));
+              setDraftRange(next);
+              if (!next.to) {
+                return;
+              }
+              onCustomRangeChange(rangeFromCustomDays(next.from, next.to));
             }}
           />
-        </PopoverContent>
-      </Popover>
-    </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

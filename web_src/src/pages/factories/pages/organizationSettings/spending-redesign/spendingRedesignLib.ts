@@ -87,12 +87,14 @@ export const EMPTY_SPENDING_FILTERS: SpendingFilters = {
   machineType: "",
 };
 
-export const SPENDING_PERIOD_OPTIONS: Array<{ value: SpendingPeriodPreset; label: string }> = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-  { value: "year", label: "Year" },
-  { value: "custom", label: "Custom" },
+export const SPENDING_PERIOD_PRESETS: Array<{
+  value: Exclude<SpendingPeriodPreset, "custom">;
+  label: string;
+}> = [
+  { value: "day", label: "Last 24 hours" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "year", label: "Last 12 months" },
 ];
 
 export const SPENDING_BREAKDOWN_OPTIONS: Array<{ value: SpendingBreakdown; label: string }> = [
@@ -209,6 +211,14 @@ export function formatSpendingRangeCaption(range: SpendingDateRange): string {
     return startLabel;
   }
   return `${startLabel} – ${endLabel}`;
+}
+
+export function spendingPeriodTriggerLabel(period: SpendingPeriodPreset, range: SpendingDateRange): string {
+  const preset = SPENDING_PERIOD_PRESETS.find((option) => option.value === period);
+  if (preset) {
+    return preset.label;
+  }
+  return formatSpendingRangeCaption(range);
 }
 
 export function formatFilterTriggerLabel(allLabel: string, selectedLabel?: string): string {
