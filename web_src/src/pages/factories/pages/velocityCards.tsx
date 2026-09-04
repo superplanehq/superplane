@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
 
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
@@ -10,14 +10,17 @@ import { formatDurationHours, type FactoryVelocityFlow } from "../lib/factoryVel
 import {
   VELOCITY_BREAKDOWN_COPY,
   VELOCITY_BREAKDOWN_OPTIONS,
+  VELOCITY_COST_MODE_COPY,
+  VELOCITY_COST_MODE_OPTIONS,
   type VelocityBreakdown,
+  type VelocityCostMode,
   type VelocityIntakeSeries,
   type VelocityPeriodDays,
   type VelocityPoint,
   type VelocityTotals,
 } from "../lib/factoryVelocityReport";
-import { VELOCITY_TIME_COLORS } from "../lib/velocitySeriesColors";
-import { CostChart, DeliveryChart, FlowChart } from "./VelocityCharts";
+import { VELOCITY_COST_COLORS, VELOCITY_TIME_COLORS } from "../lib/velocitySeriesColors";
+import { CostChart, DeliveryChart, FlowChart, TaskCostChart } from "./VelocityCharts";
 
 export const velocityCardClassName = "rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5";
 const cardTitleClassName = "text-[14px] font-medium tracking-[-0.01em] text-foreground";
@@ -75,16 +78,22 @@ function Metric({
   hint,
   tooltip,
   change,
+  color,
 }: {
   label: string;
   value: string;
   hint?: string;
   tooltip?: string;
   change?: MetricChange;
+  /** Color of the band this number belongs to, when a chart below draws one. */
+  color?: string;
 }) {
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1">
+        {color ? (
+          <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+        ) : null}
         <p className="text-[12px] text-muted-foreground">{label}</p>
         {tooltip ? (
           <Tooltip>
@@ -306,35 +315,78 @@ export function TaskTimeCard({
 }
 
 export function CostCard({ totals, points }: { totals: VelocityTotals; points: VelocityPoint[] }) {
+  const [mode, setMode] = useState<VelocityCostMode>("daily");
   const hasCost = totals.costUsd > 0;
 
   return (
     <section className={velocityCardClassName} data-testid="velocity-cost">
-      <h2 className={cardTitleClassName}>Tracked SuperPlane cost</h2>
-      <p className={cardSubtitleClassName}>Model spend of the tasks that closed. Third-party charges are excluded.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className={cardTitleClassName}>Costs</h2>
+          <p className={cardSubtitleClassName}>{VELOCITY_COST_MODE_COPY[mode]}</p>
+        </div>
+        {hasCost ? (
+          <SegmentedNav
+            ariaLabel="Add up costs by"
+            size="xs"
+            value={mode}
+            onValueChange={(value) => setMode(value as VelocityCostMode)}
+            options={VELOCITY_COST_MODE_OPTIONS}
+          />
+        ) : null}
+      </div>
 
       {hasCost ? (
         <>
-          <div className="mt-5">
+          <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-3">
+            <Metric label="Total cost" value={formatUsd(totals.costUsd)} />
             <Metric
-              label="Total cost"
-              value={formatUsd(totals.costUsd)}
+              label="Tokens"
+              color={VELOCITY_COST_COLORS.model}
+              value={formatUsd(totals.modelCostUsd)}
               hint={`${formatCompactTokenValue(totals.tokens)} tokens`}
             />
-          </div>
-
-          <div className="mt-4 border-t border-border pt-2">
-            <p className="text-[12px] text-muted-foreground">
-              {formatUsd(totals.wasteCostUsd)} of this went to tasks that closed without a merge.
-            </p>
+            <Metric label="Compute" color={VELOCITY_COST_COLORS.compute} value={formatUsd(totals.computeCostUsd)} />
           </div>
 
           <div className="mt-5 border-t border-border pt-4">
-            <CostChart points={points} />
+            <CostChart points={points} mode={mode} />
           </div>
         </>
       ) : (
-        <ChartEmptyNote>No tracked model spend in this period.</ChartEmptyNote>
+        <ChartEmptyNote>No tracked spend in this period.</ChartEmptyNote>
+      )}
+    </section>
+  );
+}
+
+/**
+ * What one task costs, tracked over the period. The Costs card above answers
+ * "what did we spend"; this one answers "is a task getting cheaper".
+ */
+export function TaskCostCard({ points }: { points: VelocityPoint[] }) {
+  /*
+   * Tasks can close with nothing tracked, on a plan that reports no cost or
+   * on spend below a cent. The chart then has no line to draw, so the note
+   * speaks about the missing spend rather than claiming no task closed.
+   */
+  const hasMedian = points.some(
+    (point) => point.medianTaskCost.modelCostUsd > 0 || point.medianTaskCost.computeCostUsd > 0,
+  );
+
+  return (
+    <section className={velocityCardClassName} data-testid="velocity-task-cost">
+      <h2 className={cardTitleClassName}>Per task costs</h2>
+      <p className={cardSubtitleClassName}>
+        Median spend of one task that closed, by day, split between tokens and compute.
+      </p>
+
+      {hasMedian ? (
+        <div className="mt-5">
+          <TaskCostChart points={points} />
+        </div>
+      ) : (
+        <ChartEmptyNote>No tracked spend for closed tasks in this period.</ChartEmptyNote>
       )}
     </section>
   );
