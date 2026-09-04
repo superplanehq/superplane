@@ -42,7 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
   <LinkCard title="If" href="#if" description="Route events based on expression" />
   <LinkCard title="Loop" href="#loop" description="Repeat downstream steps until a condition is met" />
-  <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
+  <LinkCard title="Join" href="#merge" description="Wait for all upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a work order" />
@@ -1262,11 +1262,11 @@ The until expression has access to:
 
 <a id="merge"></a>
 
-## Merge
+## Join
 
 **Component key:** `merge`
 
-The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+The Join component (formerly Merge) waits for events from all upstream nodes before forwarding a combined result downstream.
 
 ### Use Cases
 
@@ -1277,7 +1277,7 @@ The Merge component waits for events from all upstream nodes before forwarding a
 
 ### How It Works
 
-1. The Merge component waits for events from all distinct upstream source nodes
+1. The Join component waits for events from all distinct upstream source nodes
 2. Once all inputs are received, it emits the combined data to the Success channel
 3. Optional timeout and conditional stop features allow early completion
 
