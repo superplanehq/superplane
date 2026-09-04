@@ -19,7 +19,7 @@ const (
 	velocityPeriodDaysDefault = 14
 	velocityPeriodDaysMax     = 30
 
-	velocityPeoplePageSizeDefault = 10
+	velocityPeoplePageSizeDefault = 5
 	velocityPeoplePageSizeMax     = 50
 )
 

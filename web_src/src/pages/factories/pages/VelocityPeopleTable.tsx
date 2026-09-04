@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Loader2 } from "lucide-react";
 
 import { Avatar } from "@/components/Avatar/avatar";
 import { Button } from "@/components/ui/button";
@@ -172,14 +172,25 @@ export function VelocityPeopleTable({
       </div>
 
       {canLoadMore ? (
-        <div className="mt-4 flex flex-col items-center gap-1.5">
-          <Button type="button" variant="outline" size="sm" onClick={onLoadMore} disabled={isLoadingMore}>
-            {isLoadingMore ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-            Load more
-          </Button>
+        <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
           <p className="text-[12px] text-muted-foreground">
             Showing {people.length} of {total}
           </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="h-auto px-2 py-1 text-[12px] font-normal text-muted-foreground hover:text-foreground"
+          >
+            {isLoadingMore ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+            ) : (
+              <ChevronDown className="size-3" aria-hidden />
+            )}
+            Show more
+          </Button>
         </div>
       ) : null}
 
