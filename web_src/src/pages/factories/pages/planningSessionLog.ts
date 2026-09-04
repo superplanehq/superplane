@@ -254,7 +254,7 @@ function partitionPlanningExtras(
   for (const line of extra) {
     if (streamNoteHasText(merged, line.componentName)) {
       if (line.userTalk === "survey") {
-        markLiveUserTalk(merged, line.componentName, "survey");
+        markLiveSurveyReply(merged, line.componentName);
       }
       // Live notes only carry the coarse section start time, which every note
       // in an agent turn shares. Stamp the matching live note with the agent
@@ -504,8 +504,13 @@ function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderK
   }
 }
 
-function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {
-  const prefix = text.trim().slice(0, 48);
+// A survey reply is the source of truth for what the user answered. The live
+// runner log only proves that the reply reached the agent; its own rendering
+// of that turn (for example a truncated preview) is not guaranteed to spell
+// out the chosen answer, so the matching live note is rewritten to show the
+// submitted reply text instead of whatever the live log recorded for it.
+function markLiveSurveyReply(notes: SplitRunStreamLine[], submittedReply: string): void {
+  const prefix = submittedReply.trim().slice(0, 48);
   if (!prefix) {
     return;
   }
@@ -514,7 +519,8 @@ function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "
       continue;
     }
     if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
-      note.userTalk = userTalk;
+      note.userTalk = "survey";
+      note.componentName = submittedReply;
     }
   }
 }
