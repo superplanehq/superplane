@@ -66,6 +66,10 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	defer ticker.Stop()
 
 	for {
+		if r.Context().Err() != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		}
 		session, err := s.loadPlanningSessionForRunner(r, scope)
 		if err != nil {
 			writeRunnerPlanningError(w, err)

@@ -13,7 +13,6 @@ const { spawn } = require("child_process");
 
 const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
-const WAIT_ABORT_SLACK_SECONDS = 5;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -52,10 +51,6 @@ function readEnv(name) {
   return value;
 }
 
-function waitAbortSignal() {
-  return AbortSignal.timeout((HOLD_SECONDS + WAIT_ABORT_SLACK_SECONDS) * 1000);
-}
-
 async function safeWaitRequest(doFetch) {
   let response;
   let text;
@@ -86,7 +81,6 @@ async function requestJSON(method, urlPath) {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
       },
-      signal: waitAbortSignal(),
     }),
   );
 }
