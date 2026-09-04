@@ -129,6 +129,23 @@ export function rangeForPreset(preset: Exclude<SpendingPeriodPreset, "custom">, 
   return { start: new Date(now.getTime() - 365 * DAY_MS), end };
 }
 
+/**
+ * Bucket size used to stabilize the "now" anchor for preset ranges.
+ *
+ * Rounding "now" down to the start of the current minute means quick
+ * remounts (switching settings tabs and back) resolve to the exact same
+ * range, so the spending report query cache is hit instead of starting a
+ * brand-new query on every mount. A stale-but-fresh-enough end time is a
+ * fine trade-off: `useOrganizationSpendingReport`'s `staleTime` still
+ * triggers a background refetch to catch up.
+ */
+const SPENDING_NOW_QUANTIZE_MS = 60 * 1000;
+
+export function quantizeSpendingNow(now: Date): Date {
+  const quantized = Math.floor(now.getTime() / SPENDING_NOW_QUANTIZE_MS) * SPENDING_NOW_QUANTIZE_MS;
+  return new Date(quantized);
+}
+
 export function rangeFromCustomDays(from: Date, to: Date): SpendingDateRange {
   const start = startOfUtcDay(from);
   const endDay = startOfUtcDay(to);
