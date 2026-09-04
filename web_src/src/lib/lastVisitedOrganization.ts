@@ -46,7 +46,7 @@ export function readLastVisitedOrganization(accountId: string): string | null {
 
 /**
  * Picks the organization slug to auto-redirect the account to, or `null`
- * when the account should stay on the organization picker.
+ * when the account has no organizations.
  *
  * `organizations` must be keyed by slug (not UID) since the returned value
  * is used directly as the `/{slug}` URL segment.
@@ -55,15 +55,15 @@ export function pickAutoRedirectOrganization(
   organizations: { slug: string }[],
   lastVisitedOrganizationSlug: string | null,
 ): string | null {
-  if (organizations.length === 1) {
-    return organizations[0].slug;
+  if (organizations.length === 0) {
+    return null;
   }
 
   if (lastVisitedOrganizationSlug && organizations.some((org) => org.slug === lastVisitedOrganizationSlug)) {
     return lastVisitedOrganizationSlug;
   }
 
-  return null;
+  return organizations[0].slug;
 }
 
 /** Records the organization slug the account last visited. */

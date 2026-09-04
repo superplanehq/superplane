@@ -55,6 +55,12 @@ describe("integration setup return", () => {
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
   });
 
+  it("accepts the account onboarding route as an integration return", () => {
+    rememberIntegrationSetupReturn("org-1", "/onboarding?attempt=attempt-1&step=vcs&pick=newest");
+
+    expect(peekIntegrationSetupReturn("org-1")).toBe("/onboarding?attempt=attempt-1&step=vcs&pick=newest");
+  });
+
   it("expires a return path after fifteen minutes", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-19T12:00:00Z"));
