@@ -40,7 +40,6 @@ describe("hosted GitHub URLs", () => {
     expect(hostedGitHubInstallURL("superplane", "csrf")).toBe(
       "https://github.com/apps/superplane/installations/new?state=csrf",
     );
-    expect(hostedGitHubInstallURL("superplane", "")).toBe("https://github.com/apps/superplane/installations/new");
   });
 
   it("reads state and slug", () => {

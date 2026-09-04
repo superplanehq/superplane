@@ -26,8 +26,6 @@ export const FIRST_RUN_COPY = {
     selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
     useAccount: (account: string) => `Use ${account}`,
     installDifferentAccount: "Install on a different account",
-    cancelRequest: "Cancel the request on GitHub",
-    manageAccounts: "Manage GitHub accounts",
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",

@@ -84,10 +84,5 @@ export function hostedGitHubBindPath(state: string, installationId: string): str
 }
 
 export function hostedGitHubInstallURL(slug: string, state: string): string {
-  const path = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new`;
-  if (!state) {
-    return path;
-  }
-
-  return `${path}?state=${encodeURIComponent(state)}`;
+  return `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
 }

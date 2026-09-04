@@ -94,10 +94,10 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	switch {
-	case len(installations) == 0:
+	switch len(installations) {
+	case 0:
 		g.redirectToHostedInstall(ctx, metadata, app.Slug)
-	case len(installations) == 1 && !metadata.InstallRequested:
+	case 1:
 		if err := g.bindHostedInstallation(ctx, metadata, installations[0].ID); err != nil {
 			ctx.Logger.Errorf("%v", err)
 			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)

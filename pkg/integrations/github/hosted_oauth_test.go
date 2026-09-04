@@ -137,36 +137,6 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assertNoPlaintextSecrets(t, integration)
 	})
 
-	t.Run("one install stays pending when an org request is waiting", func(t *testing.T) {
-		integration := pendingHostedIntegration("csrf")
-		integration.Metadata = common.Metadata{
-			State:                   "csrf",
-			HostedApp:               true,
-			InstallRequested:        true,
-			InstallRequestedAccount: "acme",
-			SetupReturnPath:         "/onboarding?attempt=1&step=vcs",
-			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
-		}
-		httpCtx := oauthHTTP(
-			jsonResponse(`{"access_token":"user-token"}`),
-			jsonResponse(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`),
-		)
-		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
-
-		g.afterHostedAppOAuth(ctx)
-
-		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
-		assert.NotEqual(t, "ready", integration.State)
-		metadata := integration.Metadata.(common.Metadata)
-		assert.Empty(t, metadata.InstallationID)
-		assert.True(t, metadata.InstallRequested)
-		assert.Equal(t, "acme", metadata.InstallRequestedAccount)
-		require.Len(t, metadata.PendingInstallations, 1)
-		assert.Equal(t, "22", metadata.PendingInstallations[0].ID)
-		assert.Equal(t, "octo", metadata.PendingInstallations[0].AccountLogin)
-	})
-
 	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
 		integration.Metadata = common.Metadata{

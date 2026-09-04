@@ -5,11 +5,7 @@ import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
-import {
-  hostedGitHubAppSlug,
-  hostedGitHubInstallRequested,
-  hostedGitHubInstallRequestedAccount,
-} from "@/lib/hostedGitHubInstall";
+import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
 import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
@@ -248,12 +244,6 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
   // user. The /account id is the account, so a match would hide the picker.
   const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
-  const githubAppSlug =
-    accountPicker?.appSlug ||
-    model.githubConnections.allInstances
-      .map((instance) => hostedGitHubAppSlug(instance.status?.metadata))
-      .find((slug) => slug !== "") ||
-    "";
 
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
@@ -261,7 +251,6 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     installRequested,
     githubOrganization,
     accountPicker,
-    githubAppSlug,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -335,7 +324,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         githubOrganization={flow.githubOrganization}
         pendingInstallations={flow.accountPicker?.installations}
         githubState={flow.accountPicker?.state}
-        githubAppSlug={flow.githubAppSlug}
+        githubAppSlug={flow.accountPicker?.appSlug}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onContinue={() => flow.goToScreen("choose")}

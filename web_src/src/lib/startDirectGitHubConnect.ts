@@ -9,7 +9,6 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
-  hostedGitHubInstallRequested,
   hostedGitHubState,
   pendingGitHubInstallations,
   type PendingGitHubInstallation,
@@ -39,15 +38,6 @@ function isOwnPendingGitHub(item: OrganizationsIntegration, currentUserId?: stri
   }
 
   return startedBy === "" || startedBy === currentUserId;
-}
-
-function hasGitHubAccountChoices(metadata: unknown): boolean {
-  const installs = pendingGitHubInstallations(metadata);
-  if (installs.length >= 2) {
-    return true;
-  }
-
-  return installs.length >= 1 && hostedGitHubInstallRequested(metadata);
 }
 
 function isOwnPendingGitHubItem(item: OrganizationsIntegration, currentUserId?: string): boolean {
@@ -94,7 +84,7 @@ export function pendingGitHubAccountPicker(
     if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
       return false;
     }
-    return hasGitHubAccountChoices(item.status?.metadata);
+    return pendingGitHubInstallations(item.status?.metadata).length >= 2;
   });
   if (!pending?.metadata?.id) {
     return undefined;

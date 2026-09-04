@@ -131,35 +131,6 @@ describe("pendingGitHubInstallPicker", () => {
     });
   });
 
-  it("returns a picker when one install is ready and an org request is waiting", () => {
-    expect(
-      pendingGitHubAccountPicker(
-        [
-          {
-            metadata: { id: "int-1", integrationName: "github" },
-            status: {
-              state: "pending",
-              metadata: {
-                startedByUserID: "user-1",
-                state: "csrf",
-                installRequested: true,
-                installRequestedAccount: "acme",
-                githubApp: { slug: "superplane" },
-                pendingInstallations: [{ id: "22", accountLogin: "octo" }],
-              },
-            },
-          },
-        ],
-        "user-1",
-      ),
-    ).toEqual({
-      id: "int-1",
-      state: "csrf",
-      appSlug: "superplane",
-      installations: [{ id: "22", accountLogin: "octo" }],
-    });
-  });
-
   it("returns undefined when there is no picker", () => {
     expect(
       pendingGitHubInstallPicker(
