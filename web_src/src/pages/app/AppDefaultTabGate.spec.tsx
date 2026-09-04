@@ -214,7 +214,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
 
-  it("keeps node, version, and file pins on the workspace editor URL", () => {
+  it("keeps node and version pins on the workspace editor URL", () => {
     featureMocks.factoriesEnabled = true;
     featureMocks.factories = [{ id: "factory-1", key: "RF" }];
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
@@ -223,7 +223,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     });
 
     expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
-    expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1&file=app.yaml");
+    expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
 });

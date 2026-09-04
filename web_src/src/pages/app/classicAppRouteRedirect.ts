@@ -10,7 +10,6 @@ export type ClassicAppPinnedSearch = {
   runId?: string | null;
   nodeId?: string | null;
   version?: string | null;
-  file?: string | null;
   edit?: boolean;
   sidebar?: boolean;
 };
@@ -30,7 +29,6 @@ export function pinnedSearchFromParams(searchParams: URLSearchParams): ClassicAp
     runId: searchParams.get("run"),
     nodeId: searchParams.get("node"),
     version: searchParams.get("version"),
-    file: searchParams.get("file"),
     edit: searchParams.get("edit") === "1",
     sidebar: searchParams.get("sidebar") === "1",
   };
@@ -48,20 +46,14 @@ function firstNonEmpty(...values: Array<string | null | undefined>): string | un
 
 function appendPreservedClassicSearch(path: string, pinned: ClassicAppPinnedSearch): string {
   const version = pinned.version?.trim();
-  const file = pinned.file?.trim();
-  if (!version && !file) {
+  if (!version) {
     return path;
   }
 
   const queryStart = path.indexOf("?");
   const pathname = queryStart >= 0 ? path.slice(0, queryStart) : path;
   const params = new URLSearchParams(queryStart >= 0 ? path.slice(queryStart + 1) : "");
-  if (version) {
-    params.set("version", version);
-  }
-  if (file) {
-    params.set("file", file);
-  }
+  params.set("version", version);
   return `${pathname}?${params.toString()}`;
 }
 
@@ -73,7 +65,7 @@ function factoryOwnedWorkspaceAppPath(
 ): string {
   const runId = firstNonEmpty(pinned.runId);
   const nodeId = firstNonEmpty(pinned.nodeId);
-  const wantsEditor = Boolean(pinned.edit || nodeId || pinned.sidebar || firstNonEmpty(pinned.file));
+  const wantsEditor = Boolean(pinned.edit || nodeId || pinned.sidebar);
 
   if (runId && !wantsEditor) {
     return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId }), pinned);

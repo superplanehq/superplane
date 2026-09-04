@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decideClassicAppRouteRedirect, factoryKeyForId } from "./classicAppRouteRedirect";
+import { decideClassicAppRouteRedirect, factoryKeyForId, pinnedSearchFromParams } from "./classicAppRouteRedirect";
 
 const BASE = {
   featureLoading: false,
@@ -87,18 +87,33 @@ describe("decideClassicAppRouteRedirect", () => {
     });
   });
 
-  it("keeps node, version, and file pins on the workspace editor URL", () => {
+  it("keeps node and version pins on the workspace editor URL", () => {
     expect(
       decideClassicAppRouteRedirect({
         ...BASE,
         factoriesEnabled: true,
         factoryOwnedApp: true,
         factoryKey: "RF",
-        pinned: { nodeId: "create-pr", version: "v1", file: "app.yaml", edit: true, sidebar: true },
+        pinned: { nodeId: "create-pr", version: "v1", edit: true, sidebar: true },
       }),
     ).toEqual({
       kind: "redirect",
-      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1&file=app.yaml",
+      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1",
+    });
+  });
+
+  it("drops a file pin because factory apps have no Files surface", () => {
+    expect(
+      decideClassicAppRouteRedirect({
+        ...BASE,
+        factoriesEnabled: true,
+        factoryOwnedApp: true,
+        factoryKey: "RF",
+        pinned: pinnedSearchFromParams(new URLSearchParams("file=app.yaml")),
+      }),
+    ).toEqual({
+      kind: "redirect",
+      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1",
     });
   });
 
