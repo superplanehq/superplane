@@ -743,7 +743,8 @@ CREATE TABLE public.factory_work_order_line_dispatches (
     result character varying(32) DEFAULT ''::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    finished_at timestamp with time zone
+    finished_at timestamp with time zone,
+    model text DEFAULT ''::text NOT NULL
 );
 
 
@@ -4237,7 +4238,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902175657	f
+20260904070917	f
 \.
 
 

@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
@@ -20,6 +20,20 @@ vi.mock("./useSplitRunFooterActions", () => ({
     busy: false,
   }),
 }));
+
+vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
+  useFactoryLineRunnerModels: () => ({
+    data: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }],
+    isLoading: false,
+  }),
+}));
+
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -95,11 +109,39 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
+    expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(within(note).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts a draft with the listed model", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <WorkOrderSplitRunPopup
+                fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
+                onDispatch={onDispatch}
+                canDispatch
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    await user.click(within(note).getByRole("combobox", { name: "Model" }));
+    await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
+    await user.click(within(note).getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
   it("opens Description after To Backlog", async () => {
