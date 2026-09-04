@@ -31,6 +31,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
 	})
 
+	t.Run("known id returns draft start model feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryDraftStartModel)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryDraftStartModel, f.ID)
+		assert.Equal(t, "Draft Start Model", f.Label)
+		assert.Equal(t, "Show a model selector next to Start on a draft task", f.Description)
+	})
+
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
 		f, ok := Get("does-not-exist")
 		assert.False(t, ok)
@@ -48,6 +56,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
+	assert.True(t, Exists(FeatureFactoryDraftStartModel))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

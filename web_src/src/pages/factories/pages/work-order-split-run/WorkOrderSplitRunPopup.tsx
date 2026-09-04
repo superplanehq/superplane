@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+
 import { CopyLinkButton } from "../../CopyLinkButton";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
@@ -221,6 +224,7 @@ export function WorkOrderSplitRunPopup({
   canDispatch?: boolean;
   canUpdate?: boolean;
 }) {
+  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
@@ -296,7 +300,7 @@ export function WorkOrderSplitRunPopup({
         actionBusy={footerActions.busy}
         startDisabled={!canDispatch}
         modelSelect={
-          fixture.footer.kind === "draft" ? (
+          fixture.footer.kind === "draft" && canPickDraftStartModel ? (
             <DraftStartModelSelect
               organizationId={organizationId}
               factoryId={factoryId}
