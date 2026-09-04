@@ -2,12 +2,12 @@ import { useRef, type ReactElement } from "react";
 import { Navigate, useLocation, useParams, useSearchParams } from "react-router";
 
 import { useCanvas, useCanvasConsole } from "@/hooks/useCanvasData";
-import { isFactoryApp } from "@/lib/canvasFlowDirection";
 import { readLastVisitedAppTab, type AppTabId } from "@/lib/lastVisitedAppTab";
 import { Skeleton } from "@/ui/skeleton";
 
 import { AppPage } from "./index";
 import { decideAppDefaultTabGate } from "./appDefaultTabGateDecision";
+import { useClassicAppRouteRedirect } from "./classicAppRouteRedirect";
 import {
   buildAppTabSearchParams,
   resolveDefaultTab,
@@ -20,7 +20,9 @@ import { getWorkflowViewFlagsFromSearchParams, isNonCanvasAppViewParam } from ".
 /**
  * Route-level gate that decides which tab the user should land on for an app
  * URL before AppPage mounts. Priorities:
- * 1. Factory apps are canvas-only — never open Console / Memory / Files.
+ * 1. FEATURE_FACTORIES sends factory-owned apps to the workspace editor
+ *    and leftover classic apps to /workspaces. Flag off bounces factory
+ *    apps to org home.
  * 2. If the URL already pins navigation (tab-selecting `view` or a deep link
  *    like `run`/`version`/`edit`/`sidebar`/`node`/`file`), render AppPage.
  * 3. If localStorage records a last-visited tab, redirect there via Navigate.
@@ -74,7 +76,12 @@ export function AppDefaultTabGate() {
     refetchOnReconnect: false,
     refetchOnMount: false,
   });
-  const factoryOwnedApp = isFactoryApp(canvas?.metadata?.factoryId);
+  const { factoryOwnedApp, classicSurface } = useClassicAppRouteRedirect({
+    organizationId: organizationId ?? "",
+    appId: canvasId,
+    factoryId: canvas?.metadata?.factoryId,
+    runId: searchParams.get("run"),
+  });
 
   const pinned = urlPinsNavigation(searchParams);
   const storedTab = canvasId ? readLastVisitedAppTab(canvasId) : null;
@@ -103,14 +110,13 @@ export function AppDefaultTabGate() {
     alreadyCommitted,
     canvasId,
     pinned,
-    viewParam,
     isNonCanvasView,
     canvasQueryEnabled,
     canvasLoading,
     canvasUndefined: canvas === undefined,
-    factoryOwnedApp,
     storedTab,
     resolution: resolveDefaultTab({ storedTab, liveConsoleQuery }),
+    classicSurface,
   });
 
   return renderAppDefaultTabGateDecision(decision, {
@@ -135,8 +141,8 @@ function renderAppDefaultTabGateDecision(
       return ctx.commit();
     case "skeleton":
       return <AppTabGateSkeleton />;
-    case "factory-canvas":
-      return navigateToFactoryCanvas(ctx.searchParams, ctx.pathname);
+    case "redirect":
+      return <Navigate to={decision.to} replace />;
     case "stored-tab":
       return resolveWithStoredTab(decision.tab, ctx.currentUrlTab, ctx.searchParams, ctx.pathname, ctx.commit);
     case "resolution":
@@ -178,15 +184,6 @@ function renderResolution(
 
 function navigateToTab(tab: AppTabId, searchParams: URLSearchParams, pathname: string): ReactElement {
   const nextParams = buildAppTabSearchParams(tab, searchParams);
-  const search = nextParams.toString();
-  return <Navigate to={{ pathname, search: search ? `?${search}` : "" }} replace />;
-}
-
-/** Drop Console/Memory/Files view params without clearing run/edit deep links. */
-function navigateToFactoryCanvas(searchParams: URLSearchParams, pathname: string): ReactElement {
-  const nextParams = new URLSearchParams(searchParams);
-  nextParams.delete("view");
-  nextParams.delete("file");
   const search = nextParams.toString();
   return <Navigate to={{ pathname, search: search ? `?${search}` : "" }} replace />;
 }
