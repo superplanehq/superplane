@@ -53,6 +53,10 @@ Each push event includes:
 - **push.changes**: Array of reference changes with new/old commit details
 - **actor**: Information about who pushed
 
+A single push can update more than one ref at once (for example `git push --all`, or
+pushing a branch and a tag together). One event is emitted per updated ref that matches
+the configured refs, and `push.changes` holds only the ref that triggered the event.
+
 ### Webhook Setup
 
 This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
