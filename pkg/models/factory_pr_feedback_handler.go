@@ -15,6 +15,7 @@ const (
 	FactoryPRFeedbackHandlerSubjectGitHubPullRequest    = "github-pull-request"
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion = "pull-request-discussion"
 	FactoryPRFeedbackHandlerSourcePullRequestChecks     = "pull-request-checks"
+	FactoryPRFeedbackHandlerSourcePullRequestConflicts  = "pull-request-conflicts"
 
 	factoryPRFeedbackHandlerCanvasUniqueConstraint = "idx_factory_pr_feedback_handlers_canvas_id"
 )
@@ -34,6 +35,7 @@ var factoryPRFeedbackHandlerSubjects = []string{
 var factoryPRFeedbackHandlerSources = []string{
 	FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
 	FactoryPRFeedbackHandlerSourcePullRequestChecks,
+	FactoryPRFeedbackHandlerSourcePullRequestConflicts,
 }
 
 // FactoryPRFeedbackHandler declares that a factory canvas addresses pull
