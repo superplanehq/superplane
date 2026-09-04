@@ -1,12 +1,6 @@
 import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
 import { peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
 
-/**
- * The velocity response, carrying the per-day cost fields the API does not
- * report yet. The generated client parses the body as raw JSON, so the extra
- * fields on each day reach the page unchanged and let the cost chart be
- * designed before the ledger is split by usage kind.
- */
 type VelocityResponse = FactoriesDescribeFactoryVelocityResponse;
 
 /**

@@ -162,48 +162,24 @@ function centsToUsd(value: string | number | undefined): number {
   return parseWorkOrderMetric(value) / 100;
 }
 
-/**
- * Reads a field the generated response type does not declare yet. The API
- * client parses the body as raw JSON, so a field the backend starts to send
- * arrives here before the client is regenerated.
- */
-function readOptional(source: object, key: string): unknown {
-  return Reflect.get(source, key);
-}
-
-function readCents(source: object, key: string): number | undefined {
-  const value = readOptional(source, key);
-  if (typeof value !== "string" && typeof value !== "number") return undefined;
-  return centsToUsd(value);
-}
-
-function readCostSplit(source: object | undefined, prefix: string): VelocityCostSplit {
-  if (!source) return { modelCostUsd: 0, computeCostUsd: 0 };
-
-  return {
-    modelCostUsd: readCents(source, `${prefix}ModelCostCents`) ?? 0,
-    computeCostUsd: readCents(source, `${prefix}ComputeCostCents`) ?? 0,
-  };
-}
+/** The spend bands a day or a window reports. */
+type CostSplitSource = Pick<FactoriesDescribeFactoryVelocityDay, "modelCostCents" | "computeCostCents">;
 
 /**
- * Splits a tracked cost into model spend and runner compute. While the API
- * reports one number for both, the whole amount counts as model spend, so the
- * total a stacked band adds up to stays right and the compute band reads as
- * unknown rather than invented.
+ * Splits a tracked cost into model spend and runner compute.
+ *
+ * A response that reports neither band comes from a server older than the
+ * split, so the whole amount counts as model spend. The stacked bands still
+ * add up to the total, and no compute spend is invented.
  */
-function toCostSplit(source: object | undefined, costUsd: number): VelocityCostSplit {
-  if (!source) return { modelCostUsd: costUsd, computeCostUsd: 0 };
-
-  const computeCostUsd = readCents(source, "computeCostCents");
-  const modelCostUsd = readCents(source, "modelCostCents");
-  if (modelCostUsd === undefined && computeCostUsd === undefined) {
+function toCostSplit(source: CostSplitSource | undefined, costUsd: number): VelocityCostSplit {
+  if (!source || (source.modelCostCents === undefined && source.computeCostCents === undefined)) {
     return { modelCostUsd: costUsd, computeCostUsd: 0 };
   }
 
   return {
-    modelCostUsd: modelCostUsd ?? Math.max(0, costUsd - (computeCostUsd ?? 0)),
-    computeCostUsd: computeCostUsd ?? 0,
+    modelCostUsd: centsToUsd(source.modelCostCents),
+    computeCostUsd: centsToUsd(source.computeCostCents),
   };
 }
 
@@ -258,7 +234,10 @@ function toPoint(point: FactoriesDescribeFactoryVelocityDay): VelocityPoint {
     wasteCostUsd: centsToUsd(point.wasteCostCents),
     tokens: parseWorkOrderMetric(point.tokens),
     cost: toCostSplit(point, costUsd),
-    medianTaskCost: readCostSplit(point, "medianTask"),
+    medianTaskCost: {
+      modelCostUsd: centsToUsd(point.medianTaskModelCostCents),
+      computeCostUsd: centsToUsd(point.medianTaskComputeCostCents),
+    },
     intake,
   };
 }
