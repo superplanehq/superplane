@@ -65,7 +65,15 @@ export function createWithAgentViewFromSession(
       : { kind: "empty" as const };
 
   const serverMessages = (session.messages ?? []).flatMap(planningSessionMessageFromPayload);
-  const pendingLocal = pendingLocalUserMessages(extras.previousMessages ?? [], serverMessages);
+  const previousMessages = extras.previousMessages ?? [];
+  // A stale or out-of-order response (a poll started before a send persisted,
+  // delivered after a newer snapshot) can omit an already-shown message.
+  // Planning messages are append-only, so a persisted message must never
+  // vanish. Re-adding any persisted message the current snapshot dropped keeps
+  // the transcript stable and keeps optimistic-bubble reconciliation correct
+  // when poll and send responses overlap.
+  const persistedMessages = mergePersistedMessages(previousMessages, serverMessages);
+  const pendingLocal = pendingLocalUserMessages(previousMessages, persistedMessages);
 
   return {
     repository: session.repository ?? "",
@@ -73,7 +81,7 @@ export function createWithAgentViewFromSession(
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
-    messages: mergeMessagesByCreatedAt(serverMessages, pendingLocal),
+    messages: orderRenderedMessages(serverMessages, persistedMessages, pendingLocal),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created,
@@ -84,6 +92,30 @@ export function createWithAgentViewFromSession(
 
 function isLocalOptimisticMessage(message: CreateWithAgentMessage): boolean {
   return message.role === "user" && message.id.startsWith("local-");
+}
+
+/** Any message that carries a server identity, i.e. not an optimistic bubble. */
+function isPersistedMessage(message: CreateWithAgentMessage): boolean {
+  return !isLocalOptimisticMessage(message);
+}
+
+/**
+ * The current server messages, unioned with any already-shown persisted
+ * message the current snapshot omits. Prefers the current server copy when an
+ * id appears in both, so the freshest server data wins; falls back to the
+ * previously-rendered copy only to resist stale or out-of-order snapshots.
+ * Because planning messages are append-only, keeping a previously-shown
+ * message can never resurrect one the server meant to drop.
+ */
+function mergePersistedMessages(
+  previousMessages: CreateWithAgentMessage[],
+  serverMessages: CreateWithAgentMessage[],
+): CreateWithAgentMessage[] {
+  const currentIds = new Set(serverMessages.map((message) => message.id));
+  const preserved = previousMessages.filter(
+    (message) => isPersistedMessage(message) && !currentIds.has(message.id),
+  );
+  return preserved.length ? [...serverMessages, ...preserved] : serverMessages;
 }
 
 /** Matches a user bubble to its persisted counterpart by trimmed text and survey origin. */
@@ -98,37 +130,33 @@ function userMessageKey(message: CreateWithAgentMessage): string {
  * bubble from flickering off and back on. Once the server includes a
  * matching message, one local bubble is dropped so there is no duplicate.
  *
- * Reconciliation is by count, not by set membership, so distinct sends that
- * share the same text are not collapsed. A key drops only as many optimistic
- * bubbles as there are newly-persisted server messages for that key: the
- * current server count minus the count already persisted in the previous
- * render. This keeps a repeated message (text that also exists as an older
- * persisted message) and back-to-back identical sends each visible until the
- * server actually persists that specific send.
+ * Reconciliation is by newly-seen server identity, not by set membership, so
+ * distinct sends that share the same text are not collapsed. A server user
+ * message retires an optimistic bubble only when its id was not already shown
+ * in the previous render. Keying off identity (rather than a count delta
+ * against the previous render) means a stale snapshot that re-lists an old
+ * message cannot be mistaken for a fresh persistence, so back-to-back
+ * identical sends each stay visible until the server persists that specific
+ * send, even when poll and send responses overlap.
  */
 function pendingLocalUserMessages(
   previousMessages: CreateWithAgentMessage[],
-  serverMessages: CreateWithAgentMessage[],
+  persistedMessages: CreateWithAgentMessage[],
 ): CreateWithAgentMessage[] {
-  // Server messages that appeared since the previous render, per key. These
-  // are the persisted counterparts that should retire an optimistic bubble.
+  const previousPersistedIds = new Set(
+    previousMessages.filter(isPersistedMessage).map((message) => message.id),
+  );
+  // Server user messages that became visible since the previous render, per
+  // key. A message already shown before (its id is known) is never counted as
+  // newly persisted, so a repeated text that also matches an older persisted
+  // message keeps its optimistic bubble.
   const newlyPersistedByKey = new Map<string, number>();
-  for (const message of serverMessages) {
-    if (message.role !== "user") {
+  for (const message of persistedMessages) {
+    if (message.role !== "user" || previousPersistedIds.has(message.id)) {
       continue;
     }
     const key = userMessageKey(message);
     newlyPersistedByKey.set(key, (newlyPersistedByKey.get(key) ?? 0) + 1);
-  }
-  for (const message of previousMessages) {
-    if (message.role !== "user" || isLocalOptimisticMessage(message)) {
-      continue;
-    }
-    const key = userMessageKey(message);
-    const remaining = newlyPersistedByKey.get(key);
-    if (remaining !== undefined) {
-      newlyPersistedByKey.set(key, remaining - 1);
-    }
   }
   return previousMessages.filter((message) => {
     if (!isLocalOptimisticMessage(message)) {
@@ -145,20 +173,24 @@ function pendingLocalUserMessages(
 }
 
 /**
- * Concatenates server messages with surviving optimistic bubbles and orders
- * the result by createdAtMs. Messages without a createdAtMs (should only be
- * the seed greeting) sort first, preserving server order; optimistic bubbles
+ * Concatenates the persisted messages with surviving optimistic bubbles and
+ * orders the result by createdAtMs. Messages without a createdAtMs (should only
+ * be the seed greeting) sort first, preserving server order; optimistic bubbles
  * always carry Date.now() so they land at the tail without jumping once
- * replaced by the persisted message at the same relative position.
+ * replaced by the persisted message at the same relative position. When nothing
+ * was preserved or kept, the untouched server list is returned so the common
+ * case keeps the server's exact order.
  */
-function mergeMessagesByCreatedAt(
+function orderRenderedMessages(
   serverMessages: CreateWithAgentMessage[],
+  persistedMessages: CreateWithAgentMessage[],
   pendingLocal: CreateWithAgentMessage[],
 ): CreateWithAgentMessage[] {
-  if (!pendingLocal.length) {
+  const preservedCount = persistedMessages.length - serverMessages.length;
+  if (!pendingLocal.length && preservedCount === 0) {
     return serverMessages;
   }
-  return [...serverMessages, ...pendingLocal]
+  return [...persistedMessages, ...pendingLocal]
     .map((message, index) => ({ message, index }))
     .sort((a, b) => {
       const aTime = a.message.createdAtMs ?? -Infinity;
