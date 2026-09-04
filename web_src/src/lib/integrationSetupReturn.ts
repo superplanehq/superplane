@@ -1,6 +1,9 @@
 const STORAGE_PREFIX = "integration-setup-return";
 const MAX_AGE_MS = 15 * 60 * 1000;
 
+/** Sent with the GitHub callback so setup can return to onboarding in one hop. */
+export const INTEGRATION_SETUP_RETURN_COOKIE = "sp_integration_setup_return";
+
 /** Keeps the hosted GitHub account picker on Integrations instead of bouncing back. */
 export const INTEGRATION_SETUP_STAY_PARAM = "setupStay";
 
@@ -33,6 +36,7 @@ export function rememberIntegrationSetupReturn(organizationId: string, path: str
 
   const value: StoredReturn = { path, createdAt: Date.now() };
   window.localStorage.setItem(storageKey(organizationId), JSON.stringify(value));
+  writeSetupReturnCookie(path);
 }
 
 export function peekIntegrationSetupReturn(organizationId: string): string | null {
@@ -62,6 +66,16 @@ export function peekIntegrationSetupReturn(organizationId: string): string | nul
 
 export function consumeIntegrationSetupReturn(organizationId: string): void {
   window.localStorage.removeItem(storageKey(organizationId));
+  clearSetupReturnCookie();
+}
+
+function writeSetupReturnCookie(path: string): void {
+  const maxAge = Math.floor(MAX_AGE_MS / 1000);
+  document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=${encodeURIComponent(path)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+function clearSetupReturnCookie(): void {
+  document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
 }
 
 function pathnameOf(path: string): string {
