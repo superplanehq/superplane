@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	canvasFileName  = "canvas.yaml"
-	consoleFileName = "console.yaml"
+	canvasFileName           = "canvas.yaml"
+	consoleFileName          = "console.yaml"
+	maxInstallationFileBytes = 2 << 20
 )
 
 // errFileNotFound is returned (wrapped) by fetchURL when the upstream
@@ -127,9 +128,12 @@ func fetchURL(rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("fetch %s: unexpected status %d", rawURL, response.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxInstallationFileBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", rawURL, err)
+	}
+	if len(body) > maxInstallationFileBytes {
+		return nil, fmt.Errorf("read %s: file exceeds 2 MiB limit", rawURL)
 	}
 
 	return body, nil
