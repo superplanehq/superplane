@@ -18,14 +18,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import {
-  ArrowRightLeft,
-  LayoutGrid,
-  LogOut,
-  Settings,
-  SunMoon,
-  User as UserIcon,
-} from "lucide-react";
+import { ArrowRightLeft, LayoutGrid, LogOut, Settings, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -160,12 +153,12 @@ function OrganizationMenuHeader({
       >
         <Settings className="size-3.5" aria-hidden />
       </DropdownMenuItem>
-      <OrganizationSwitchSub currentOrganizationSlug={organizationId} />
+      <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
     </div>
   );
 }
 
-function OrganizationSwitchSub({ currentOrganizationSlug }: { currentOrganizationSlug: string }) {
+function OrganizationSwitchSub({ currentOrganizationRouteId }: { currentOrganizationRouteId: string }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
@@ -180,7 +173,10 @@ function OrganizationSwitchSub({ currentOrganizationSlug }: { currentOrganizatio
           className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
           data-testid="factories-sidebar-organization-switch-menu"
         >
-          <OrganizationSwitchMenu currentOrganizationSlug={currentOrganizationSlug} testIdPrefix="factories-sidebar" />
+          <OrganizationSwitchMenu
+            currentOrganizationRouteId={currentOrganizationRouteId}
+            testIdPrefix="factories-sidebar"
+          />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>
