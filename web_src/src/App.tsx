@@ -278,8 +278,6 @@ export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const location = useLocation();
-  useRedirectIntegrationSetupReturn(segment);
-  useConsumeIntegrationSetupReturnOnArrival(segment);
 
   const isReserved = isReservedAppPathSegment(segment);
   // The route param accepts either the org slug or its UID, so resolve it
@@ -289,6 +287,8 @@ export function OrganizationScope() {
   const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
   const resolvedId = organization?.metadata?.id ?? "";
   const resolvedSlug = organization?.metadata?.slug ?? "";
+  useRedirectIntegrationSetupReturn(segment, resolvedSlug);
+  useConsumeIntegrationSetupReturnOnArrival(resolvedSlug || segment);
 
   const uidRedirectPath =
     !isReserved && segment
@@ -306,7 +306,7 @@ export function OrganizationScope() {
       return;
     }
     // Prefer the resolved slug so the last-visited value never carries a UID
-    // forward into a later auto-redirect (see OrganizationSelect).
+    // forward into a later root redirect.
     recordLastVisitedOrganization(account.id, resolvedSlug || segment);
   }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 
