@@ -132,6 +132,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.AddPullRequestReviewers{},
 		&pulls.UpdatePullRequest{},
 		&pulls.FindPullRequest{},
+		&pulls.WaitForPullRequestMergeable{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
