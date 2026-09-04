@@ -10,17 +10,13 @@ export function FirstRunConnectScreen({
   githubConnected,
   connectError,
   chrome,
-  showPrivateApp,
   onConnectGitHub,
-  onCreatePrivateApp,
   onContinue,
 }: {
   githubConnected: boolean;
   connectError?: string;
   chrome?: FirstRunChrome;
-  showPrivateApp?: boolean;
   onConnectGitHub: () => void;
-  onCreatePrivateApp?: () => void;
   onContinue: () => void;
 }) {
   const copy = FIRST_RUN_COPY.connect;
@@ -52,17 +48,6 @@ export function FirstRunConnectScreen({
           </Button>
         )}
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
-        {!githubConnected && showPrivateApp && onCreatePrivateApp ? (
-          <Button
-            type="button"
-            variant="link"
-            className="h-auto p-0 text-[13px] text-muted-foreground"
-            data-testid="first-run-create-private-github-app"
-            onClick={onCreatePrivateApp}
-          >
-            {copy.createPrivateApp}
-          </Button>
-        ) : null}
         {connectError ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>

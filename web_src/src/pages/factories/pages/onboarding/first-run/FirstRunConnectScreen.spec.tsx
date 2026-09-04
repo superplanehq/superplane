@@ -22,40 +22,21 @@ describe("FirstRunConnectScreen", () => {
     expect(onConnectGitHub).toHaveBeenCalled();
   });
 
-  it("offers a private GitHub App when hosted install is the default", async () => {
-    const user = userEvent.setup();
-    const onCreatePrivateApp = vi.fn();
-
-    render(
-      <FirstRunConnectScreen
-        githubConnected={false}
-        showPrivateApp
-        onConnectGitHub={vi.fn()}
-        onCreatePrivateApp={onCreatePrivateApp}
-        onContinue={vi.fn()}
-      />,
+  it("never shows the private GitHub App option, connected or not", () => {
+    const { rerender } = render(
+      <FirstRunConnectScreen githubConnected={false} onConnectGitHub={vi.fn()} onContinue={vi.fn()} />,
     );
+    expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
 
-    expect(screen.getByTestId("first-run-create-private-github-app")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.createPrivateApp,
-    );
-    await user.click(screen.getByTestId("first-run-create-private-github-app"));
-    expect(onCreatePrivateApp).toHaveBeenCalled();
+    rerender(<FirstRunConnectScreen githubConnected onConnectGitHub={vi.fn()} onContinue={vi.fn()} />);
+    expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
   });
 
   it("continues to the repository step after GitHub is connected", async () => {
     const user = userEvent.setup();
     const onContinue = vi.fn();
 
-    render(
-      <FirstRunConnectScreen
-        githubConnected
-        showPrivateApp
-        onConnectGitHub={vi.fn()}
-        onCreatePrivateApp={vi.fn()}
-        onContinue={onContinue}
-      />,
-    );
+    render(<FirstRunConnectScreen githubConnected onConnectGitHub={vi.fn()} onContinue={onContinue} />);
 
     expect(screen.getByTestId("first-run-github-connected")).toHaveTextContent(FIRST_RUN_COPY.connect.connected);
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
