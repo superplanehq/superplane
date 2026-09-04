@@ -91,8 +91,7 @@ git push origin feat/add-new-feature
 ## Title Format Rules
 
 Our CI enforces [semantic pull request](https://github.com/marketplace/actions/semantic-pull-request)
-rules on PR titles. This helps keep with communicating intent, measuring velocity, and publishing new
-releases.
+rules on PR titles. This helps communicate intent, measure velocity, and publish new releases.
 
 - Start the title with a type (feat, fix, chore, docs), followed by a colon and a short description.
 - The rest of the title is free-form; we do not enforce subject casing.
