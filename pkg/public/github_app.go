@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,13 +17,92 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 // HandleGitHubAppSetup finishes a public SuperPlane GitHub App install.
 // GitHub sends every install to this one Setup URL. The CSRF state finds
 // the pending SuperPlane connection.
+//
+// GitHub also sends the browser back to this same URL when a user updates
+// an *already installed* app (for example, granting access to another
+// repository). In that case the connection is already "ready" and its CSRF
+// state has been cleared, so it can no longer be found by state. Fall back
+// to looking the connection up by installation_id in that case.
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
-	s.dispatchGitHubAppByState(w, r)
+	state := r.URL.Query().Get("state")
+	if state != "" {
+		integration, err := models.FindGitHubIntegrationByAppState(database.DB(r.Context()), state)
+		if err == nil {
+			s.dispatchGitHubAppForIntegration(w, r, integration)
+			return
+		}
+
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "integration not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	s.dispatchGitHubAppSetupByInstallation(w, r)
+}
+
+// dispatchGitHubAppSetupByInstallation handles the Setup URL redirect GitHub
+// sends after a user updates repository access for an existing hosted
+// GitHub App installation. There is no usable CSRF state at this point, so
+// the connection is located by installation_id instead.
+func (s *Server) dispatchGitHubAppSetupByInstallation(w http.ResponseWriter, r *http.Request) {
+	installationID := r.URL.Query().Get("installation_id")
+	if installationID == "" {
+		http.Error(w, "missing state", http.StatusBadRequest)
+		return
+	}
+
+	candidates, err := models.ListGitHubIntegrationsByInstallationID(database.DB(r.Context()), installationID)
+	if err != nil {
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	_, hasAccount := middleware.GetEffectiveAccountFromContext(r.Context())
+
+	var integration *models.Integration
+	authStatus := http.StatusNotFound
+	for i := range candidates {
+		candidate := &candidates[i]
+		if !isHostedGitHubApp(candidate) {
+			continue
+		}
+
+		status := authorizeHostedGitHubAppCallback(r.Context(), candidate)
+		if status == 0 {
+			integration = candidate
+			break
+		}
+
+		if status == http.StatusUnauthorized {
+			authStatus = http.StatusUnauthorized
+		} else if authStatus != http.StatusUnauthorized {
+			authStatus = status
+		}
+	}
+
+	if integration == nil {
+		if !hasAccount {
+			writeHostedGitHubAppAuthError(w, http.StatusUnauthorized)
+			return
+		}
+
+		if authStatus == http.StatusUnauthorized || authStatus == http.StatusForbidden {
+			writeHostedGitHubAppAuthError(w, authStatus)
+			return
+		}
+
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	s.dispatchIntegrationRequest(w, r, integration)
 }
 
 func (s *Server) HandleGitHubAppOAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +126,10 @@ func (s *Server) dispatchGitHubAppByState(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	s.dispatchGitHubAppForIntegration(w, r, integration)
+}
+
+func (s *Server) dispatchGitHubAppForIntegration(w http.ResponseWriter, r *http.Request, integration *models.Integration) {
 	if !isHostedGitHubApp(integration) {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return

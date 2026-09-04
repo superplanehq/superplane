@@ -2,6 +2,7 @@ package public
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,9 +11,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/registry"
+	_ "github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
@@ -152,6 +156,112 @@ func Test__dispatchGitHubAppByState_rejectsNonHosted(t *testing.T) {
 	(&Server{}).HandleGitHubAppSetup(rec, req)
 
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func Test__HandleGitHubAppSetup_installationIDFallback(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	reg, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
+	require.NoError(t, err)
+	server := &Server{registry: reg, BaseURL: "https://app.example.com"}
+
+	newReadyIntegration := func(installationID string) *models.Integration {
+		integration, err := models.CreateIntegration(
+			uuid.New(),
+			r.Organization.ID,
+			"github",
+			"github-hosted-"+installationID+"-"+uuid.NewString(),
+			nil,
+		)
+		require.NoError(t, err)
+
+		integration.Metadata = datatypes.NewJSONType(map[string]any{
+			"hostedApp":       true,
+			"installationId":  installationID,
+			"startedByUserID": r.User.String(),
+		})
+		require.NoError(t, database.Conn().Save(integration).Error)
+		return integration
+	}
+
+	t.Run("no state and no installation_id returns missing state", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup", nil)
+		req = req.WithContext(accountContext(r.Account))
+		rec := httptest.NewRecorder()
+
+		server.HandleGitHubAppSetup(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("unknown installation_id returns not found", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?installation_id=999999&setup_action=update", nil)
+		req = req.WithContext(accountContext(r.Account))
+		rec := httptest.NewRecorder()
+
+		server.HandleGitHubAppSetup(rec, req)
+
+		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("no session returns unauthorized", func(t *testing.T) {
+		newReadyIntegration("1001")
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=1001&setup_action=update",
+			nil,
+		)
+		rec := httptest.NewRecorder()
+
+		server.HandleGitHubAppSetup(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("account that did not start the connection is forbidden", func(t *testing.T) {
+		newReadyIntegration("1002")
+
+		teammateAccount, err := models.CreateAccount("gh-teammate", "gh-teammate@example.com")
+		require.NoError(t, err)
+		_, err = models.CreateUser(r.Organization.ID, teammateAccount.ID, teammateAccount.Email, teammateAccount.Name)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=1002&setup_action=update",
+			nil,
+		)
+		req = req.WithContext(accountContext(teammateAccount))
+		rec := httptest.NewRecorder()
+
+		server.HandleGitHubAppSetup(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("authorized user is redirected back to integration settings", func(t *testing.T) {
+		integration := newReadyIntegration("1003")
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/v1/github/app/setup?installation_id=1003&setup_action=update",
+			nil,
+		)
+		req = req.WithContext(accountContext(r.Account))
+		rec := httptest.NewRecorder()
+
+		server.HandleGitHubAppSetup(rec, req)
+
+		require.Equal(t, http.StatusSeeOther, rec.Code)
+		expected := fmt.Sprintf(
+			"https://app.example.com/%s/settings/integrations/%s",
+			r.Organization.ID.String(),
+			integration.ID.String(),
+		)
+		assert.Equal(t, expected, rec.Header().Get("Location"))
+	})
 }
 
 func Test__isHostedGitHubAppBrowserCallback(t *testing.T) {
