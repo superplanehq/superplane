@@ -119,6 +119,20 @@ function setupReturnConfiguration(returnTo?: string): Record<string, unknown> | 
   return { [GITHUB_SETUP_RETURN_PATH]: returnTo };
 }
 
+/** Queue a Connect click until `/me` settles. Fail when that lookup ends with no user id. */
+export function hostedGitHubConnectUserGate(
+  currentUserId: string | undefined,
+  currentUserResolved: boolean,
+): "run" | "queue" | "fail" {
+  if (currentUserId) {
+    return "run";
+  }
+  if (!currentUserResolved) {
+    return "queue";
+  }
+  return "fail";
+}
+
 export function persistGitHubSetupReturnPath(organizationId: string) {
   return async (payload: { id: string; configuration: Record<string, unknown> }) => {
     await organizationsUpdateIntegration(

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  hostedGitHubConnectUserGate,
   isOnboardingSetupReturnPath,
   pendingGitHubAccountPicker,
   pendingGitHubBrowserAction,
@@ -455,5 +456,20 @@ describe("startDirectGitHubConnect", () => {
         create,
       }),
     ).rejects.toThrow("The GitHub App install page did not open.");
+  });
+});
+
+describe("hostedGitHubConnectUserGate", () => {
+  it("runs when the user id is present", () => {
+    expect(hostedGitHubConnectUserGate("user-1", false)).toBe("run");
+    expect(hostedGitHubConnectUserGate("user-1", true)).toBe("run");
+  });
+
+  it("queues while /me is still loading", () => {
+    expect(hostedGitHubConnectUserGate(undefined, false)).toBe("queue");
+  });
+
+  it("fails when /me settled without a user id", () => {
+    expect(hostedGitHubConnectUserGate(undefined, true)).toBe("fail");
   });
 });
