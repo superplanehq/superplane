@@ -116,7 +116,9 @@ describe("WorkOrderSplitRunPopup", () => {
   it("shows tokens and cost on a line-step phase", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
+      "$0.28 · 900 · claude-sonnet-4-6 ·",
+    );
   });
 
   it("does not put an Open task link next to close", () => {

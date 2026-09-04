@@ -79,4 +79,14 @@ describe("SplitRunReview draft model select", () => {
     await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
     expect(onChange).toHaveBeenCalledWith("claude-opus-4-6");
   });
+
+  it("explains Auto on hover", async () => {
+    const user = userEvent.setup();
+    renderDraftFooter(vi.fn());
+
+    await user.hover(screen.getByTestId("split-run-draft-model-wrap"));
+    const help = await screen.findByTestId("split-run-draft-model-help");
+    expect(help).toHaveTextContent("Auto uses the default model on each automation.");
+    expect(help.parentElement).toHaveTextContent("Pick a model to overwrite that default for this start.");
+  });
 });

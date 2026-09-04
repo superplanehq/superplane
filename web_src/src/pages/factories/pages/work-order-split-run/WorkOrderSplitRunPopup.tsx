@@ -8,7 +8,7 @@ import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-r
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
-import { DRAFT_START_MODEL_AUTO, draftStartModelPayload } from "./draftStartModel";
+import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } from "./draftStartModel";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
@@ -167,7 +167,7 @@ export function WorkOrderSplitRunBody({
         {fixture.phases.map((entry) => (
           <li key={entry.id} className="min-w-0 first:mt-3">
             <PhaseLogCard
-              phase={entry}
+              phase={phaseWithRunnerModel(entry, entry.id === selectedPhase?.id ? live.canvas?.nodes : undefined)}
               expanded={entry.id === openPhaseId}
               stream={streams.get(entry.id) ?? entry.stream}
               selectedNodeId={nodeId}
