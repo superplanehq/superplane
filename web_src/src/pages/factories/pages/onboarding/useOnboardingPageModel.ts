@@ -262,7 +262,16 @@ export async function advanceAfterGithubConnect(args: {
   }
 
   seedFactoryQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug, args.factoryId);
-  await args.reresolveWorkspace();
+  try {
+    await args.reresolveWorkspace();
+  } catch {
+    // The organization already renamed, so the mounted wizard is bound to the
+    // now-invalid old slug. Re-resolving in place failed, which would strand
+    // the user on that slug. Fall back to a full reload so the workspace
+    // resolves under the new slug and onboarding can continue.
+    window.location.replace(nextPath);
+    return;
+  }
   invalidateFactoryQueriesForNewSlug(args.queryClient, args.nextSlug, args.factoryId);
   args.navigate(nextPath, { replace: true });
 }

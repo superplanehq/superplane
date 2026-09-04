@@ -91,6 +91,25 @@ describe("advanceAfterGithubConnect", () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
+  it("falls back to a full reload when re-resolving the workspace fails", async () => {
+    const reresolveWorkspace = vi.fn().mockRejectedValue(new Error("re-resolve failed"));
+
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
+      organizationId: oldSlug,
+      nextSlug,
+      factoryId,
+      factoryKey,
+      navigate,
+      reresolveWorkspace,
+      queryClient,
+    });
+
+    expect(reresolveWorkspace).toHaveBeenCalledTimes(1);
+    expect(locationReplace).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("falls back to a full reload when no re-resolution callback is available", async () => {
     await advanceAfterGithubConnect({
       onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
