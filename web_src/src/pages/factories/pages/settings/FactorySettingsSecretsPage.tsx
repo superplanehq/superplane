@@ -287,7 +287,8 @@ function FactorySettingsSecretDetail({ secretId }: { secretId: string }) {
   const keys = secretKeyNames(secret);
   const trimmedRename = renameValue.trim();
   const canSaveRename = Boolean(trimmedRename) && trimmedRename !== secretName(secret);
-  const canAddKey = Boolean(newKeyName.trim() && newKeyValue.trim());
+  const trimmedNewKeyName = newKeyName.trim();
+  const canAddKey = Boolean(trimmedNewKeyName && newKeyValue.trim());
 
   return (
     <FactorySettingsPageFrame title="Secrets" subtitle="Edit this secret and its keys.">
@@ -453,8 +454,12 @@ function FactorySettingsSecretDetail({ secretId }: { secretId: string }) {
               variant="outline"
               disabled={!canUpdate || !canAddKey || setKeyMutation.isPending}
               onClick={() => {
+                if (keys.includes(trimmedNewKeyName)) {
+                  showErrorToast("Key already exists");
+                  return;
+                }
                 void setKeyMutation
-                  .mutateAsync({ keyName: newKeyName.trim(), value: newKeyValue })
+                  .mutateAsync({ keyName: trimmedNewKeyName, value: newKeyValue })
                   .then(() => {
                     showSuccessToast("Key added.");
                     setNewKeyName("");
