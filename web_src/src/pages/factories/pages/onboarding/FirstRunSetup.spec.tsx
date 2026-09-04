@@ -85,9 +85,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
+function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
   render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+    <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
@@ -132,6 +132,15 @@ describe("FirstRunSetup", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("shows a waiting chip when GitHub returned an install request", () => {
+    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request");
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.installRequested,
+    );
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {

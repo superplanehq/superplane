@@ -17,6 +17,9 @@ type Metadata struct {
 	// PendingInstallations is the user-scoped allowlist written after GitHub
 	// App user OAuth. Picker bind accepts only these installation ids.
 	PendingInstallations []PendingInstallation `mapstructure:"pendingInstallations" json:"pendingInstallations,omitempty"`
+	// InstallRequested is true when a non-admin asked a GitHub org admin to
+	// install the app. Setup then returned setup_action=request.
+	InstallRequested bool `mapstructure:"installRequested" json:"installRequested,omitempty"`
 }
 
 type PendingInstallation struct {

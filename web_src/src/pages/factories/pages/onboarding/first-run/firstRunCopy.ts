@@ -19,6 +19,9 @@ export const FIRST_RUN_COPY = {
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
+    installRequested: "Waiting for approval",
+    installRequestedBody: "Ask a GitHub organization admin to approve the SuperPlane GitHub App.",
+    installRequestedNext: "After they approve, click Connect GitHub again.",
   },
   choose: {
     headline: "Choose a repository",
