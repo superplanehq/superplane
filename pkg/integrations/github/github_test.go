@@ -176,6 +176,7 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 	)
 	require.NotNil(t, integration.Metadata)
 	assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
+	assert.Empty(t, integration.Metadata.(common.Metadata).InstallRequestedAccount)
 }
 
 func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {

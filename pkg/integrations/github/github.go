@@ -1093,69 +1093,7 @@ func requestedInstallAccount(ctx core.HTTPRequestContext) string {
 		return metadata.Owner
 	}
 
-	return lookupInstallationRequestAccountFromGitHub(ctx)
-}
-
-func lookupInstallationRequestAccountFromGitHub(ctx core.HTTPRequestContext) string {
-	appID := githubAppIDForRequest(ctx)
-	if appID == 0 {
-		return ""
-	}
-
-	client, err := newClientForApp(ctx.Integration, appID)
-	if err != nil {
-		ctx.Logger.Infof("skip installation request lookup: %v", err)
-		return ""
-	}
-
-	req, err := client.NewRequest("GET", "app/installation-requests", nil)
-	if err != nil {
-		return ""
-	}
-
-	var requests []struct {
-		Account *github.User `json:"account"`
-	}
-	if _, err := client.Do(context.Background(), req, &requests); err != nil {
-		ctx.Logger.Infof("list installation requests: %v", err)
-		return ""
-	}
-
-	for _, request := range requests {
-		if request.Account == nil {
-			continue
-		}
-		login := request.Account.GetLogin()
-		if login != "" {
-			return login
-		}
-	}
-
 	return ""
-}
-
-func githubAppIDForRequest(ctx core.HTTPRequestContext) int64 {
-	metadata := common.Metadata{}
-	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	if metadata.GitHubApp.ID != 0 {
-		return metadata.GitHubApp.ID
-	}
-
-	if hosted, ok := common.HostedAppFromEnv(); ok {
-		return hosted.ID
-	}
-
-	raw, err := ctx.Integration.Properties().GetString(common.PropertyAppID)
-	if err != nil {
-		return 0
-	}
-
-	id, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil {
-		return 0
-	}
-
-	return id
 }
 
 func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
