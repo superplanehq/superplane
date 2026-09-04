@@ -224,14 +224,12 @@ function invalidateFactoryQueriesForNewSlug(queryClient: QueryClient, nextSlug: 
 }
 
 /**
- * Moves the wizard from the vcs step to the repo step after the organization
- * is renamed from the GitHub owner.
+ * Moves the wizard from the vcs step to the repo step after GitHub returns.
  *
- * During initial onboarding the workspace is resolved by
- * `OrganizationOnboardingRedirect` under the organization slug, so renaming
- * the organization invalidates that resolution. Re-resolving the workspace in
- * place (instead of reloading the page) lets the wizard advance with a plain
- * client-side navigation.
+ * Always uses a client-side navigation. A full reload would flash the GitHub
+ * return URL (`step=vcs&pick=newest`) again. Re-resolve the workspace only
+ * when the organization slug changed, and do that after the URL already
+ * points at the repo step so a remount does not re-select the connection.
  */
 export async function advanceAfterGithubConnect(args: {
   onboardingEntryPath?: string | null;
@@ -247,33 +245,22 @@ export async function advanceAfterGithubConnect(args: {
     args.onboardingEntryPath ?? factorySetupPath(args.nextSlug, args.factoryKey),
     "repo",
   );
+  const slugChanged = Boolean(args.onboardingEntryPath) && args.nextSlug !== args.organizationId;
 
-  if (!args.onboardingEntryPath) {
-    args.navigate(nextPath, { replace: true });
-    return;
+  if (slugChanged) {
+    seedFactoryQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug, args.factoryId);
   }
 
-  if (!args.reresolveWorkspace) {
-    // No re-resolution callback is available (for example, in Storybook or a
-    // test that renders the wizard outside the onboarding route). Fall back
-    // to a full reload so the workspace still resolves under the new slug.
-    window.location.replace(nextPath);
-    return;
-  }
+  args.navigate(nextPath, { replace: true });
 
-  seedFactoryQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug, args.factoryId);
+  if (!slugChanged || !args.reresolveWorkspace) return;
+
   try {
     await args.reresolveWorkspace();
   } catch {
-    // The organization already renamed, so the mounted wizard is bound to the
-    // now-invalid old slug. Re-resolving in place failed, which would strand
-    // the user on that slug. Fall back to a full reload so the workspace
-    // resolves under the new slug and onboarding can continue.
-    window.location.replace(nextPath);
-    return;
+    // Stay on this document. The repo step is already visible.
   }
   invalidateFactoryQueriesForNewSlug(args.queryClient, args.nextSlug, args.factoryId);
-  args.navigate(nextPath, { replace: true });
 }
 
 function useOnboardingGithubConnectionSelected(args: {
@@ -306,6 +293,17 @@ function useOnboardingGithubConnectionSelected(args: {
       return;
     }
 
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: args.onboardingEntryPath,
+      organizationId: args.organizationId,
+      nextSlug: args.organizationId,
+      factoryId: args.factoryId,
+      factoryKey: args.factoryKey,
+      navigate,
+      reresolveWorkspace: args.reresolveWorkspace,
+      queryClient,
+    });
+
     const owner = githubIntegrationOwner(integration);
     if (!owner || !shouldNameOrganizationFromGitHub(args.factory, args.selectNewest)) return;
 
@@ -318,7 +316,7 @@ function useOnboardingGithubConnectionSelected(args: {
           return response.data?.organization?.metadata?.slug;
         },
       });
-      if (!nextSlug) return;
+      if (!nextSlug || nextSlug === args.organizationId) return;
 
       await advanceAfterGithubConnect({
         onboardingEntryPath: args.onboardingEntryPath,

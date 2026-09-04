@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   consumeIntegrationSetupReturn,
   consumeIntegrationSetupReturnIfArrived,
+  hasGitHubSetupRequest,
   hasIntegrationSetupStay,
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
+  withGitHubSetupRequest,
 } from "./integrationSetupReturn";
 
 describe("integration setup return", () => {
@@ -37,6 +39,21 @@ describe("integration setup return", () => {
     expect(hasIntegrationSetupStay("setupStay=1")).toBe(true);
     expect(hasIntegrationSetupStay("?setupStay=1")).toBe(true);
     expect(hasIntegrationSetupStay("")).toBe(false);
+  });
+
+  it("copies a GitHub install request onto the stored return path", () => {
+    expect(hasGitHubSetupRequest("githubSetup=request")).toBe(true);
+    expect(hasGitHubSetupRequest("?githubSetup=request")).toBe(true);
+    expect(hasGitHubSetupRequest("")).toBe(false);
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs",
+    );
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request",
+    );
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request&githubOrg=acme")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
   });
 
   it("returns the path regardless of the integration the provider redirects to", () => {
