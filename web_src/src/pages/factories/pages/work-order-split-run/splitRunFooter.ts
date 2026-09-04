@@ -368,6 +368,10 @@ function openDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spli
 }
 
 export function buildSplitRunFooter(input: FooterInput): SplitRunFooter {
+  return buildSplitRunDecisionFooter(input);
+}
+
+function buildSplitRunDecisionFooter(input: FooterInput): SplitRunFooter {
   const note = input.note ? toFooterNote(input.note) : undefined;
   if (input.kind === "running" || input.decision === false) {
     return hiddenDecisionFooter(input, note);

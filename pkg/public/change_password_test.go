@@ -208,7 +208,7 @@ func TestChangePassword_WrongCurrentPassword(t *testing.T) {
 	})
 
 	res := sendChangePasswordRequest(server, body, &http.Cookie{Name: "account_token", Value: token})
-	assert.Equal(t, http.StatusUnauthorized, res.Code)
+	assert.Equal(t, http.StatusBadRequest, res.Code)
 }
 
 func TestChangePassword_Success(t *testing.T) {

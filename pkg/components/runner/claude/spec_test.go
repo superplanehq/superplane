@@ -138,11 +138,12 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 		},
 	}
 
-	task := buildClaudeCodeBrokerTask(spec)
+	task := buildClaudeCodeBrokerTask(spec, "", nil)
 	require.Len(t, task.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
 	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[0].Kind)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, task.Commands[0].Command)
+	assert.Contains(t, task.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
+	assert.Contains(t, task.Commands[0].Command, `export PATH="$SUPERPLANE_TASK_DIR/bin:$PATH"`)
 
 	assert.Equal(t, "Clone repo", task.Commands[1].Name)
 	assert.Equal(t, runner.LiveLogKindBash, task.Commands[1].Kind)
@@ -187,7 +188,44 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, runScript, `"--add-dir"`)
 	assert.Contains(t, runScript, `"--permission-mode"`)
 	assert.Contains(t, runScript, `"acceptEdits"`)
+	// Planning sessions use "default" (not "plan"): plan mode blocks the
+	// planning MCP tools. Read-only is enforced via the allowedTools allowlist.
+	assert.Contains(t, runScript, `return "default"`)
+	assert.NotContains(t, runScript, "bypassPermissions")
+	assert.Contains(t, runScript, "--mcp-config")
+	assert.Contains(t, runScript, "planning_session_mcp.js")
+	assert.Contains(t, runScript, "mcp__superplane__propose_draft")
+	assert.Contains(t, runScript, "mcp__superplane__survey")
+	assert.NotContains(t, runScript, "mcp__superplane__say")
+	assert.NotContains(t, runScript, "mcp__superplane__wait_for_user")
 	assert.NotContains(t, runScript, "workdir")
+}
+
+func TestBuildClaudeCodeBrokerTaskAppliesIntegrationUsageAndSetup(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix the failing tests")},
+		},
+	}
+
+	task := buildClaudeCodeBrokerTask(spec, "The gh CLI is already installed. Use GITHUB_TOKEN.", []runner.IntegrationSetup{
+		{Name: "Set up Semaphore", Script: "echo install-sem-ai"},
+	})
+	require.Len(t, task.Commands, 3)
+	assert.Equal(t, "Prepare Claude Code", task.Commands[0].Name)
+	assert.Equal(t, "Set up Semaphore", task.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, task.Commands[1].Kind)
+	assert.Equal(t, "Fix tests", task.Commands[2].Name)
+	assert.Equal(t, "Fix the failing tests", task.Commands[2].Preview)
+	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, task.Files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nFix the failing tests",
+		requireTaskFile(t, task.Files, "prompts/01-fix-tests.txt").Content,
+	)
 }
 
 func TestClaudeStepSlug(t *testing.T) {
@@ -203,6 +241,46 @@ func TestShellSingleQuote(t *testing.T) {
 
 	assert.Equal(t, `'hello'`, runner.ShellSingleQuote("hello"))
 	assert.Equal(t, `'it'\''s fine'`, runner.ShellSingleQuote("it's fine"))
+}
+
+func TestApplyPlanningFollowUpLeavesLineAutomationsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "sonnet",
+		Steps: []ClaudeCodeStep{
+			{Name: "Fix tests", Type: runner.AgentStepPrompt, Prompt: strPtr("fix"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec, "", nil)
+	got := applyPlanningFollowUp(base, nil, spec)
+	assert.Len(t, got.Commands, len(base.Commands))
+	assert.Len(t, got.Files, len(base.Files))
+}
+
+func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
+	t.Parallel()
+
+	spec := RunClaudeCodeSpec{
+		Model: "opus",
+		Steps: []ClaudeCodeStep{
+			{Name: "Clone", Type: runner.AgentStepBash, Command: strPtr("git clone")},
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet"), WorkingDirectory: "repo"},
+		},
+	}
+	base := buildClaudeCodeBrokerTask(spec, "", nil)
+	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	last := got.Commands[len(got.Commands)-1]
+	assert.Equal(t, "Wait for the next message", last.Name)
+	assert.Equal(t, runner.LiveLogKindPrompt, last.Kind)
+	assert.Contains(t, last.Command, `node "$SUPERPLANE_TASK_DIR/follow_up_loop.js" 'opus'`)
+	assert.Contains(t, last.Command, `cd "$_sp_root"/'repo'`)
+	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {

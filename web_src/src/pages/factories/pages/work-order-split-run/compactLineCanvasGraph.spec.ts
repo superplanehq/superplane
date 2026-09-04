@@ -32,10 +32,10 @@ function messyIfCanvas(): SplitRunCanvasModel {
         component: "runnerClaudeCode",
         position: { x: 220, y: 720 },
       },
-      { id: "artifact", name: "Add Plan Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
+      { id: "artifact", name: "Add Task Artifact", component: "addWorkOrderArtifact", position: { x: -40, y: 900 } },
       {
         id: "false-agent",
-        name: "Agent - No GH Issue Plan",
+        name: "Draft Implementation Plan",
         component: "runnerClaudeCode",
         configuration: {
           steps: [

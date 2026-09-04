@@ -15,20 +15,20 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory velocity feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryVelocity)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryVelocity, f.ID)
-		assert.Equal(t, "Factory Velocity", f.Label)
-		assert.Equal(t, "Show the Velocity view for a factory organization", f.Description)
-	})
-
 	t.Run("known id returns factory sentry intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactorySentryIntake)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureFactorySentryIntake, f.ID)
 		assert.Equal(t, "Factory Sentry Intake", f.Label)
 		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
+	})
+
+	t.Run("known id returns workspace models feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceModels)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceModels, f.ID)
+		assert.Equal(t, "Workspace Models", f.Label)
+		assert.Equal(t, "Show the in-progress workspace Models settings page", f.Description)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -46,8 +46,8 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryVelocity))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

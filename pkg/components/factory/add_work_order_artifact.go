@@ -41,7 +41,7 @@ func (c *AddWorkOrderArtifact) Name() string {
 }
 
 func (c *AddWorkOrderArtifact) Label() string {
-	return "Add Work Order Artifact"
+	return "Add Task Artifact"
 }
 
 func (c *AddWorkOrderArtifact) Description() string {
@@ -49,7 +49,7 @@ func (c *AddWorkOrderArtifact) Description() string {
 }
 
 func (c *AddWorkOrderArtifact) Documentation() string {
-	return `The Add Work Order Artifact component stores a typed artifact against a work order.
+	return `The Add Task Artifact component stores a typed artifact against a work order.
 
 Supported types:
 

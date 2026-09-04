@@ -94,7 +94,7 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, runner.ExecutionModeHost, req.ExecutionMode)
 	require.Len(t, req.Commands, 5)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
+	assert.Contains(t, req.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
 	assert.Equal(t, "Clone", req.Commands[1].Name)
 	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-clone.sh"`)
 	assert.Contains(t, req.Commands[1].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
@@ -118,6 +118,80 @@ func TestRunClaudeCodeExecuteSendsPerStepCommandsToBroker(t *testing.T) {
 	assert.Equal(t, "Fix the failing tests", requireTaskFile(t, req.Files, "prompts/02-fix-tests.txt").Content)
 	assert.Equal(t, "Open a pull request", requireTaskFile(t, req.Files, "prompts/03-open-pr.txt").Content)
 	assert.Equal(t, "git -C /tmp/repo status", requireTaskFile(t, req.Files, "steps/04-status.sh").Content)
+}
+
+func TestRunClaudeCodeExecuteExtendsPromptsWithIntegrationUsageAndSetup(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-usage-1"}`))},
+		},
+	}
+
+	component := &RunClaudeCode{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType": testRunnerMachineType,
+			"model":       "sonnet",
+			"steps": []map[string]any{
+				{"name": "Fix tests", "type": "prompt", "prompt": "Fix the failing tests"},
+			},
+			"credentials": credentialsSecret("anthropic", "api_key"),
+			"environmentFrom": []map[string]any{
+				{"source": "integration", "integration": map[string]any{"name": "github-acme"}},
+				{"source": "integration", "integration": map[string]any{"name": "semaphore-acme"}},
+			},
+		},
+		HTTP: httpContext,
+		Secrets: &contexts.SecretsContext{
+			Values: map[string][]byte{
+				"anthropic/api_key": []byte("sk-test-key"),
+			},
+			IntegrationKeys: map[string]map[string][]byte{
+				"github-acme":    {"GITHUB_TOKEN": []byte("gh-token")},
+				"semaphore-acme": {"SEMAPHORE_API_TOKEN": []byte("sem-token")},
+			},
+			IntegrationUsage: map[string]string{
+				"github-acme":    "The gh CLI is already installed. Use GITHUB_TOKEN.",
+				"semaphore-acme": "Use sem-ai with SEMAPHORE_API_TOKEN.",
+			},
+			IntegrationSetup: map[string]string{
+				"semaphore-acme": "echo install-sem-ai",
+			},
+			IntegrationSetupName: map[string]string{
+				"semaphore-acme": "Set up Semaphore",
+			},
+		},
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req createTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+
+	require.Len(t, req.Commands, 3)
+	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
+	assert.Equal(t, "Set up Semaphore", req.Commands[1].Name)
+	assert.Equal(t, runner.LiveLogKindSetup, req.Commands[1].Kind)
+	assert.Equal(t, "Set up Semaphore", req.Commands[1].Preview)
+	assert.Equal(t, "Fix tests", req.Commands[2].Name)
+	assert.Equal(t, "Fix the failing tests", req.Commands[2].Preview)
+	assert.Equal(t, "gh-token", requireEnvironmentValue(t, req.Environment, "GITHUB_TOKEN"))
+	assert.Equal(t, "sem-token", requireEnvironmentValue(t, req.Environment, "SEMAPHORE_API_TOKEN"))
+	assert.Equal(t, "echo install-sem-ai", requireTaskFile(t, req.Files, "setup/01-set-up-semaphore.sh").Content)
+	assert.Equal(
+		t,
+		"The gh CLI is already installed. Use GITHUB_TOKEN.\n\nUse sem-ai with SEMAPHORE_API_TOKEN.\n\nFix the failing tests",
+		requireTaskFile(t, req.Files, "prompts/01-fix-tests.txt").Content,
+	)
 }
 
 func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
@@ -163,7 +237,7 @@ func TestRunClaudeCodeExecuteMigratesLegacyPromptConfig(t *testing.T) {
 	assert.Empty(t, req.MessageChain)
 	require.Len(t, req.Commands, 4)
 	assert.Equal(t, "Prepare Claude Code", req.Commands[0].Name)
-	assert.Equal(t, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`, req.Commands[0].Command)
+	assert.Contains(t, req.Commands[0].Command, `source "$SUPERPLANE_TASK_DIR/prepare.sh"`)
 	assert.Equal(t, "Setup", req.Commands[1].Name)
 	assert.Contains(t, req.Commands[1].Command, `source "$SUPERPLANE_TASK_DIR/steps/01-setup.sh"`)
 	assert.Equal(t, "Prompt", req.Commands[2].Name)

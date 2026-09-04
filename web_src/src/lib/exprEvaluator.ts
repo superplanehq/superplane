@@ -932,7 +932,7 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
       if (node.name === "app") {
         return () => (context.__app as unknown) ?? null;
       }
-      if (node.name === "order") {
+      if (node.name === "order" || node.name === "task") {
         return () => (context.__order as unknown) ?? null;
       }
       if (node.name in BUILTIN_FUNCTIONS) {

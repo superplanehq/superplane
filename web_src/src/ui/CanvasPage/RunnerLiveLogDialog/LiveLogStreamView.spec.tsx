@@ -63,6 +63,17 @@ describe("LiveLogStreamView", () => {
     expect(screen.queryByText("No log lines yet.")).not.toBeInTheDocument();
   });
 
+  it("passes canvas session ids into the live log hook", () => {
+    render(
+      <LiveLogStreamView execution={startedExecution} session={{ organizationId: "org-1", canvasId: "canvas-1" }} />,
+    );
+
+    expect(useLiveLogStreamMock).toHaveBeenCalledWith("execution-1", true, null, null, {
+      organizationId: "org-1",
+      canvasId: "canvas-1",
+    });
+  });
+
   it("badges kind and lists nested prompt tools", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [

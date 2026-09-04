@@ -573,6 +573,89 @@ service Factories {
     };
   }
 
+  rpc StartPlanningSession(StartPlanningSessionRequest) returns (StartPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start planning session";
+      description: "Starts a new Create with an Agent planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe planning session";
+      description: "Returns a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc EndPlanningSession(EndPlanningSessionRequest) returns (EndPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "End planning session";
+      description: "Stops the planning session machine";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendPlanningSessionMessage(SendPlanningSessionMessageRequest) returns (SendPlanningSessionMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send planning session message";
+      description: "Sends a user message in a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdatePlanningSessionDraft(UpdatePlanningSessionDraftRequest) returns (UpdatePlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update planning session draft";
+      description: "Edits the pending draft on a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreatePlanningSessionWorkOrder(CreatePlanningSessionWorkOrderRequest) returns (CreatePlanningSessionWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create planning session work order";
+      description: "Creates a draft work order from the planning session draft";
+      tags: "Factory";
+    };
+  }
+
+  rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Skip planning session draft";
+      description: "Throws away the pending planning session draft";
+      tags: "Factory";
+    };
+  }
+
 }
 
 // Factories
@@ -691,6 +774,8 @@ message FactoryOnboarding {
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
   string default_branch = 10;
+  // True when account onboarding created this workspace.
+  bool initial = 11;
 }
 
 message Factory {
@@ -735,6 +820,10 @@ message FactoryLine {
   google.protobuf.Timestamp updated_at = 5;
   // Trailing 30-day summary. Unset when the line has no closed work orders in the window.
   optional FactoryLineMetrics metrics = 6;
+  // Board column colors, keyed by column key ("backlog", "phase-<step
+  // index>", "verify", "done"). Value is a color id. Missing keys use the
+  // default color.
+  map<string, string> column_colors = 7;
 }
 
 message CreateFactoryLineRequest {
@@ -752,6 +841,9 @@ message UpdateFactoryLineRequest {
   string line_id = 2;
   optional string name = 3;
   repeated FactoryLine.Step steps = 4;
+  // Full replacement of the board column colors. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, string> column_colors = 5;
 }
 
 message UpdateFactoryLineResponse {
@@ -952,6 +1044,7 @@ message FactoryPRFeedbackHandler {
   enum Source {
     SOURCE_UNSPECIFIED = 0;
     SOURCE_PULL_REQUEST_DISCUSSION = 1;
+    SOURCE_PULL_REQUEST_CHECKS = 2;
   }
 
   message SubjectSettings {
@@ -965,11 +1058,18 @@ message FactoryPRFeedbackHandler {
     repeated string allowed_bots = 3;
   }
 
+  message CheckSettings {
+    repeated string names = 1;
+    optional int32 maximum_attempts = 2;
+    repeated string runner_integration_ids = 3;
+  }
+
   // Settings stored in the canvas graph. This block is a read/write facade
   // over that graph.
   message Settings {
     SubjectSettings subject = 1;
     DiscussionSettings discussion = 2;
+    CheckSettings checks = 3;
   }
 
   string id = 1;
@@ -1034,6 +1134,24 @@ message FactoryPullRequestRun {
   Superplane.Canvases.CanvasRunRef run = 4;
 }
 
+message FactoryPullRequestRevision {
+  string id = 1;
+  string sha = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message FactoryPullRequestActivity {
+  Superplane.Canvases.CanvasRunRef run = 1;
+  string description = 2;
+  optional FactoryPullRequestRevision revision = 3;
+  string access = 4;
+  string state = 5;
+  optional int32 attempt = 6;
+  optional int32 attempt_limit = 7;
+  int64 total_tokens = 8;
+  int64 cost_cents = 9;
+}
+
 message FactoryPullRequest {
   enum Provider {
     PROVIDER_UNSPECIFIED = 0;
@@ -1065,6 +1183,8 @@ message FactoryPullRequest {
   google.protobuf.Timestamp created_at = 14;
   google.protobuf.Timestamp updated_at = 15;
   repeated FactoryPullRequestRun runs = 16;
+  optional FactoryPullRequestRevision current_revision = 17;
+  repeated FactoryPullRequestActivity activities = 18;
 }
 
 message ListFactoryPullRequestsRequest {
@@ -1616,6 +1736,27 @@ message SyncFactoryVelocityResponse {
 }
 
 message DescribeFactoryVelocityRequest {
+  // How the People table is ordered. Values name the column the table sorts
+  // on; the UI's sort keys map to these one-to-one.
+  enum PeopleSort {
+    // Same as PEOPLE_SORT_TOTAL.
+    PEOPLE_SORT_UNSPECIFIED = 0;
+    // authored_merged + factory_merged.
+    PEOPLE_SORT_TOTAL = 1;
+    PEOPLE_SORT_FACTORY_MERGED = 2;
+    PEOPLE_SORT_AUTHORED_MERGED = 3;
+    PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
+    // Sorts on cost_cents.
+    PEOPLE_SORT_COST_USD = 5;
+  }
+
+  enum SortDirection {
+    // Same as SORT_DIRECTION_DESC.
+    SORT_DIRECTION_UNSPECIFIED = 0;
+    SORT_DIRECTION_ASC = 1;
+    SORT_DIRECTION_DESC = 2;
+  }
+
   string factory_id = 1;
   // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
@@ -1624,6 +1765,15 @@ message DescribeFactoryVelocityRequest {
   // response returns SuperPlane data only and sets `has_people_cohort = false`
   // so the UI can hide the People series.
   string repository = 3;
+  // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
+  PeopleSort people_sort = 4;
+  // Defaults to SORT_DIRECTION_DESC.
+  SortDirection people_sort_direction = 5;
+  // Rows per page of the People table. Defaults to 10, and is capped
+  // server-side so a client cannot request the whole table in one call.
+  int32 people_page_size = 6;
+  // 0-based row offset into the sorted People table, for "Load more" paging.
+  int32 people_offset = 7;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1657,6 +1807,12 @@ message DescribeFactoryVelocityResponse {
   // merges yet. SuperPlane counts are still present; the People series is
   // omitted until the sync finishes.
   bool people_sync_pending = 11;
+  // Total people with activity in the window, before `people_offset` and
+  // `people_page_size` are applied. Drives the "N people with activity" count.
+  int32 people_total = 12;
+  // True when `people_offset + len(people) < people_total`, so the UI knows
+  // whether to show "Load more".
+  bool people_has_more = 13;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1734,6 +1890,12 @@ message DescribeFactoryVelocityTotals {
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 8;
+  // Work orders (tasks) that closed in the window. A work order counts once,
+  // even when it opened several pull requests, which is why this differs from
+  // the pull request counts above.
+  int32 tasks_closed = 9;
+  // Part of `tasks_closed` whose pull requests all closed without a merge.
+  int32 tasks_waste = 10;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
@@ -1826,4 +1988,114 @@ message UsageByMachineType {
   string machine_type = 1;
   int64 duration_seconds = 2;
   int64 cost_cents = 3;
+}
+
+message PlanningSessionDraft {
+  string title = 1;
+  string description = 2;
+}
+
+message PlanningSessionCreatedOrder {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message PlanningSessionMessage {
+  string id = 1;
+  string role = 2;
+  string text = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message PlanningSessionSurveyQuestion {
+  string prompt = 1;
+  repeated string options = 2;
+}
+
+message PlanningSessionSurvey {
+  string id = 1;
+  repeated PlanningSessionSurveyQuestion questions = 2;
+}
+
+message PlanningSession {
+  string id = 1;
+  string factory_id = 2;
+  string repository = 3;
+  string state = 4;
+  string canvas_id = 5;
+  string canvas_run_id = 6;
+  repeated PlanningSessionMessage messages = 7;
+  PlanningSessionDraft draft = 8;
+  repeated PlanningSessionCreatedOrder created = 9;
+  string wait_state = 10;
+  string execution_id = 11;
+  PlanningSessionSurvey survey = 12;
+}
+
+message StartPlanningSessionRequest {
+  string factory_id = 1;
+  string repository = 2;
+}
+
+message StartPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message DescribePlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message DescribePlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message EndPlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message EndPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message SendPlanningSessionMessageRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string text = 3;
+}
+
+message SendPlanningSessionMessageResponse {
+  PlanningSession session = 1;
+}
+
+message UpdatePlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message UpdatePlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message CreatePlanningSessionWorkOrderRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message CreatePlanningSessionWorkOrderResponse {
+  PlanningSession session = 1;
+}
+
+message SkipPlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
 }

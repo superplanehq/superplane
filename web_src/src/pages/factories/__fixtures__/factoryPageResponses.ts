@@ -182,6 +182,8 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
       runAppStep("app-refund-implementer", "start-implementation"),
       runAppStep("app-refund-verifier", "start-verification"),
     ],
+    // Exercises hydration of a persisted board color on mount.
+    columnColors: { backlog: "lime" },
   },
   {
     id: REFUND_LINE_HOTFIX_ID,

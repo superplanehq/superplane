@@ -3,30 +3,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Textarea } from "@/components/ui/textarea";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useDeleteFactory, useUpdateFactory } from "@/hooks/useFactoryData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { factoryListPath, factorySettingsGeneralPathAfterKeyChange } from "../../lib/factoryPagePaths";
 import { clearLastVisitedFactory } from "../../lib/lastVisitedFactory";
-import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import {
   WORKSPACE_KEY_MAX_LENGTH,
   WORKSPACE_KEY_MIN_LENGTH,
   isValidWorkspaceKey,
   normalizeWorkspaceKey,
 } from "../../lib/workspaceKey";
+import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { SettingsIdentityField } from "./settingsIdentityField";
 
 const MAX_NAME_LENGTH = 128;
-const MAX_DESCRIPTION_LENGTH = 500;
 
 export function FactorySettingsGeneralPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
@@ -39,7 +37,6 @@ export function FactorySettingsGeneralPage() {
   usePageTitle(["General", "Settings", factory.name ?? "Workspace"]);
 
   const [name, setName] = useState(factory.name ?? "");
-  const [description, setDescription] = useState(factory.description ?? "");
   const [key, setKey] = useState(factory.key ?? "");
   const [nameError, setNameError] = useState("");
   const [keyError, setKeyError] = useState("");
@@ -47,24 +44,21 @@ export function FactorySettingsGeneralPage() {
 
   useEffect(() => {
     setName(factory.name ?? "");
-    setDescription(factory.description ?? "");
     setKey(factory.key ?? "");
     setNameError("");
     setKeyError("");
-  }, [factory.name, factory.description, factory.key]);
+  }, [factory.name, factory.key]);
 
   const canUpdate = canAct("factories", "update");
   const canDelete = canAct("factories", "delete");
-
-  const isDirty =
-    name.trim() !== (factory.name ?? "") ||
-    description.trim() !== (factory.description ?? "") ||
-    key !== (factory.key ?? "");
+  const savedName = factory.name ?? "";
+  const savedKey = factory.key ?? "";
+  const isDirty = name.trim() !== savedName || key !== savedKey;
 
   const handleSave = async () => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setNameError("Name is required");
+      setNameError("Name is required.");
       return;
     }
     if (!isValidWorkspaceKey(key)) {
@@ -72,11 +66,10 @@ export function FactorySettingsGeneralPage() {
       return;
     }
     try {
-      const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, factory.key ?? "", key);
+      const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, savedKey, key);
       await updateFactory.mutateAsync({
         name: trimmedName,
-        description: description.trim(),
-        key: key !== (factory.key ?? "") ? key : undefined,
+        ...(key !== savedKey ? { key } : {}),
       });
       showSuccessToast("Workspace updated.");
       if (nextSettingsPath) {
@@ -84,7 +77,7 @@ export function FactorySettingsGeneralPage() {
       }
     } catch (error) {
       const message = getApiErrorMessage(error, "Failed to update workspace");
-      if (message.toLowerCase().includes("workspace key")) {
+      if (message.toLowerCase().includes("workspace key") || message.toLowerCase().includes("slug")) {
         setKeyError(message);
         return;
       }
@@ -106,10 +99,9 @@ export function FactorySettingsGeneralPage() {
 
   return (
     <>
-      <FactorySettingsPageFrame title="General" subtitle="Name, key, and description for this workspace.">
+      <FactorySettingsPageFrame title="General" subtitle="Name and slug for this workspace.">
         <WorkspaceDetailsSection
           name={name}
-          description={description}
           factoryKey={key}
           nameError={nameError}
           keyError={keyError}
@@ -121,7 +113,6 @@ export function FactorySettingsGeneralPage() {
             setName(next);
             if (nameError) setNameError("");
           }}
-          onDescriptionChange={setDescription}
           onKeyChange={(next) => {
             setKey(normalizeWorkspaceKey(next));
             if (keyError) setKeyError("");
@@ -150,7 +141,6 @@ export function FactorySettingsGeneralPage() {
 
 interface WorkspaceDetailsSectionProps {
   name: string;
-  description: string;
   factoryKey: string;
   nameError: string;
   keyError: string;
@@ -159,14 +149,12 @@ interface WorkspaceDetailsSectionProps {
   isSaving: boolean;
   isDirty: boolean;
   onNameChange: (next: string) => void;
-  onDescriptionChange: (next: string) => void;
   onKeyChange: (next: string) => void;
   onSave: () => Promise<void> | void;
 }
 
 function WorkspaceDetailsSection({
   name,
-  description,
   factoryKey,
   nameError,
   keyError,
@@ -175,76 +163,64 @@ function WorkspaceDetailsSection({
   isSaving,
   isDirty,
   onNameChange,
-  onDescriptionChange,
   onKeyChange,
   onSave,
 }: WorkspaceDetailsSectionProps) {
   return (
-    <section className="space-y-4" data-testid="factory-settings-general-form">
-      <div className="space-y-2">
-        <Label htmlFor="factory-settings-name">Name</Label>
-        <Input
-          id="factory-settings-name"
-          data-testid="factory-settings-name"
-          value={name}
-          onChange={(event) => {
-            if (event.target.value.length <= MAX_NAME_LENGTH) {
-              onNameChange(event.target.value);
-            }
-          }}
+    <FactorySettingsCard
+      title="Workspace information"
+      data-testid="factory-settings-general-form"
+      className="scroll-mt-8"
+      id="factory-settings-general-form"
+    >
+      <div className="space-y-6">
+        <SettingsIdentityField
+          name={name}
+          nameId="factory-settings-name"
+          nameTestId="factory-settings-name"
+          avatarTestId="factory-settings-workspace-avatar"
           maxLength={MAX_NAME_LENGTH}
           disabled={!canUpdate}
+          error={nameError}
+          helperText="This name appears in the sidebar and workspace switcher."
+          onNameChange={onNameChange}
         />
-        {nameError ? <p className="text-[11px] text-destructive">{nameError}</p> : null}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="factory-settings-key">Workspace key</Label>
-        <Input
-          id="factory-settings-key"
-          data-testid="factory-settings-key"
-          value={factoryKey}
-          onChange={(event) => onKeyChange(event.target.value)}
-          maxLength={WORKSPACE_KEY_MAX_LENGTH}
-          disabled={!canUpdate}
-          className="max-w-xs uppercase tracking-wider"
-          autoComplete="off"
-        />
-        <p className="text-[11px] text-muted-foreground">
-          Changing the key updates every task identifier for this workspace. IDs already shared elsewhere will no longer
-          resolve.
-        </p>
-        {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="factory-settings-description">Description</Label>
-        <Textarea
-          id="factory-settings-description"
-          data-testid="factory-settings-description"
-          value={description}
-          onChange={(event) => {
-            if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
-              onDescriptionChange(event.target.value);
-            }
-          }}
-          rows={3}
-          disabled={!canUpdate}
-        />
-      </div>
-      <PermissionTooltip
-        allowed={canUpdate || permissionsLoading}
-        message="You don't have permission to update workspaces."
-      >
-        <LoadingButton
-          disabled={!canUpdate || !name.trim() || !isDirty}
-          loading={isSaving}
-          loadingText="Saving..."
-          onClick={() => void onSave()}
-          data-testid="factory-settings-save"
+
+        <div className="space-y-2 scroll-mt-8" id="factory-settings-key">
+          <Label htmlFor="factory-settings-slug">Slug</Label>
+          <Input
+            id="factory-settings-slug"
+            data-testid="factory-settings-key"
+            value={factoryKey}
+            onChange={(event) => onKeyChange(event.target.value)}
+            maxLength={WORKSPACE_KEY_MAX_LENGTH}
+            disabled={!canUpdate}
+            className="max-w-xs uppercase tracking-wider"
+            autoComplete="off"
+          />
+          <p className="text-[12px] text-muted-foreground">
+            Changing the slug updates every task identifier for this workspace. IDs already shared elsewhere will no
+            longer resolve.
+          </p>
+          {keyError ? <p className="text-[11px] text-destructive">{keyError}</p> : null}
+        </div>
+
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You don't have permission to update workspaces."
         >
-          Save
-        </LoadingButton>
-      </PermissionTooltip>
-    </section>
+          <LoadingButton
+            disabled={!canUpdate || !name.trim() || !isDirty}
+            loading={isSaving}
+            loadingText="Saving..."
+            onClick={() => void onSave()}
+            data-testid="factory-settings-save"
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
+      </div>
+    </FactorySettingsCard>
   );
 }
 
@@ -256,28 +232,26 @@ interface DangerZoneSectionProps {
 
 function DangerZoneSection({ canDelete, permissionsLoading, onOpenDelete }: DangerZoneSectionProps) {
   return (
-    <FactorySettingsCard
-      title="Danger zone"
-      titleClassName="text-destructive"
-      className="border-destructive/40"
-      data-testid="factory-settings-danger-zone"
-    >
-      <p className="text-[13px] text-muted-foreground">
-        Deleting a workspace permanently removes its tasks, lines, and apps.
-      </p>
-      <div className="mt-4">
+    <FactorySettingsCard title="Danger zone" data-testid="factory-settings-danger-zone">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 space-y-0.5">
+          <p className="text-[13px] font-medium text-foreground">Delete workspace</p>
+          <p className="text-[12px] text-muted-foreground">
+            SuperPlane permanently removes the tasks, lines, and apps in this workspace.
+          </p>
+        </div>
         <PermissionTooltip
           allowed={canDelete || permissionsLoading}
           message="You don't have permission to delete workspaces."
         >
           <Button
             type="button"
+            size="sm"
             variant="destructive"
             disabled={!canDelete}
             onClick={onOpenDelete}
             data-testid="factory-settings-delete-button"
           >
-            <Trash2 className="h-4 w-4" aria-hidden />
             Delete workspace
           </Button>
         </PermissionTooltip>

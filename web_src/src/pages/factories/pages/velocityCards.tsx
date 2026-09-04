@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
 
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn } from "@/lib/utils";
 import { SegmentedNav } from "@/ui/SegmentedNav";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 import { formatDurationHours, type FactoryVelocityFlow } from "../lib/factoryVelocityFlow";
 import {
@@ -11,6 +12,7 @@ import {
   VELOCITY_BREAKDOWN_OPTIONS,
   type VelocityBreakdown,
   type VelocityIntakeSeries,
+  type VelocityPeriodDays,
   type VelocityPoint,
   type VelocityTotals,
 } from "../lib/factoryVelocityReport";
@@ -71,16 +73,36 @@ function Metric({
   label,
   value,
   hint,
+  tooltip,
   change,
 }: {
   label: string;
   value: string;
   hint?: string;
+  tooltip?: string;
   change?: MetricChange;
 }) {
   return (
     <div className="min-w-0">
-      <p className="text-[12px] text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-1">
+        <p className="text-[12px] text-muted-foreground">{label}</p>
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+                aria-label={`About ${label}`}
+              >
+                <Info className="size-3.5" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
+      </div>
       <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <p className="text-[30px] leading-none font-semibold tracking-[-0.04em] tabular-nums text-foreground">
           {value}
@@ -119,20 +141,22 @@ function ChartEmptyNote({ children }: { children: ReactNode }) {
  * before this one holds no comparable sample.
  */
 export interface VelocityComparison {
-  merged?: number;
-  wasteRate?: number;
+  tasksClosed?: number;
+  taskWasteRate?: number;
   cycleHours?: number;
-  costPerMerge?: number;
+  costPerTask?: number;
 }
 
 export function SummaryCard({
   totals,
   caption,
+  periodDays,
   medianCycleHours,
   comparison,
 }: {
   totals: VelocityTotals;
   caption: string;
+  periodDays: VelocityPeriodDays;
   /** Median cycle time of the tasks that closed in this window. */
   medianCycleHours?: number;
   comparison?: VelocityComparison;
@@ -142,29 +166,29 @@ export function SummaryCard({
       <p className="text-[12px] text-muted-foreground">{caption}</p>
       <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
         <Metric
-          label="Merged PRs"
-          value={String(totals.merged)}
-          hint="People and SuperPlane"
+          label="Tasks closed"
+          value={String(totals.tasksClosed)}
+          tooltip={`All closed tasks in the last ${periodDays} days`}
           change={
-            comparison?.merged === undefined
+            comparison?.tasksClosed === undefined
               ? undefined
-              : buildChange(comparison.merged, "up", (magnitude) => String(magnitude))
+              : buildChange(comparison.tasksClosed, "up", (magnitude) => String(magnitude))
           }
         />
         <Metric
-          label="SuperPlane waste"
-          value={`${totals.wasteRate}%`}
-          hint={`${totals.waste} ${totals.waste === 1 ? "PR" : "PRs"} closed without merge`}
+          label="Task waste"
+          value={`${totals.taskWasteRate}%`}
+          tooltip={`${totals.tasksWaste} ${totals.tasksWaste === 1 ? "task" : "tasks"} closed without a merge`}
           change={
-            comparison?.wasteRate === undefined
+            comparison?.taskWasteRate === undefined
               ? undefined
-              : buildChange(comparison.wasteRate, "down", (magnitude) => `${magnitude} pp`)
+              : buildChange(comparison.taskWasteRate, "down", (magnitude) => `${magnitude} pp`)
           }
         />
         <Metric
           label="Median cycle time"
           value={medianCycleHours === undefined ? "—" : formatDurationHours(medianCycleHours)}
-          hint="From task start to close"
+          tooltip="From task start to close"
           change={
             comparison?.cycleHours === undefined
               ? undefined
@@ -172,13 +196,13 @@ export function SummaryCard({
           }
         />
         <Metric
-          label="Cost per SuperPlane merge"
-          value={formatUsd(totals.costPerMerge)}
-          hint="Tracked model spend"
+          label="Cost per task"
+          value={formatUsd(totals.costPerTask)}
+          tooltip="Tracked model spend"
           change={
-            comparison?.costPerMerge === undefined
+            comparison?.costPerTask === undefined
               ? undefined
-              : buildChange(comparison.costPerMerge, "down", (magnitude) => `$${magnitude.toFixed(2)}`)
+              : buildChange(comparison.costPerTask, "down", (magnitude) => `$${magnitude.toFixed(2)}`)
           }
         />
       </div>

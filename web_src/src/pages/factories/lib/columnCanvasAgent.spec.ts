@@ -29,7 +29,7 @@ const implementerConfiguration = {
 function agentNode(overrides: Partial<CanvasSpecNode> = {}): CanvasSpecNode {
   return {
     id: "implementation-agent",
-    name: "Agent - Implement from order description",
+    name: "Implement From Task Description",
     type: "TYPE_ACTION",
     component: "runnerClaudeCode",
     concurrency: { max: 5, key: "ci-{{ $.data.branch }}" },
@@ -85,7 +85,7 @@ describe("planningReviewDraftFromCanvas", () => {
     const canvas = canvasWith([triggerNode(), agentNode()]);
     const draft = planningReviewDraftFromCanvas(canvas, "implementation-agent");
 
-    expect(draft?.title).toBe("Agent - Implement from order description");
+    expect(draft?.title).toBe("Implement From Task Description");
     expect(draft?.components).toHaveLength(1);
     expect(draft?.components[0].configuration).toEqual(implementerConfiguration);
     expect(draft?.components[0].configuration.credentials).toEqual({

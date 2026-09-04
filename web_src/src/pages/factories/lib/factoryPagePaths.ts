@@ -81,16 +81,24 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
 /** Opens PR feedback settings on a tab: general or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
 
 export function factoryPRFeedbackPath(
   organizationId: string,
   factoryKey: string,
   lineId?: string | null,
   settingsTab?: string,
+  handlerId?: string,
 ) {
-  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${PR_FEEDBACK_SEARCH_PARAM}=1`;
-  const settingsQuery = settingsTab ? `&${PR_FEEDBACK_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
-  return `${path}${settingsQuery}`;
+  const params = new URLSearchParams();
+  params.set(PR_FEEDBACK_SEARCH_PARAM, "1");
+  if (handlerId) {
+    params.set(PR_FEEDBACK_HANDLER_SEARCH_PARAM, handlerId);
+  }
+  if (settingsTab) {
+    params.set(PR_FEEDBACK_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
 }
 
 export function isPRFeedbackSearchOpen(search: string): boolean {
@@ -101,6 +109,11 @@ export function isPRFeedbackSearchOpen(search: string): boolean {
 export function prFeedbackSettingsTabFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
+}
+
+export function prFeedbackHandlerIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {
@@ -361,6 +374,22 @@ export function organizationSettingsBackPath(organizationId: string, fromFactory
     return factoryDetailPath(organizationId, fromFactoryKey);
   }
   return factoryListPath(organizationId);
+}
+
+/**
+ * Swaps the `/:organizationId` route segment, leaving the rest of the path
+ * untouched so settings (and other workspace pages) stay in context.
+ */
+export function replaceOrganizationSegment(
+  pathname: string,
+  currentOrganizationId: string,
+  nextOrganizationId: string,
+): string {
+  const prefix = `/${currentOrganizationId}`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return factoryListPath(nextOrganizationId);
+  }
+  return `/${nextOrganizationId}${pathname.slice(prefix.length)}`;
 }
 
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */

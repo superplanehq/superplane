@@ -79,7 +79,7 @@ describe("splitRunCanvasForPhase", () => {
 
     const canvas = splitRunCanvasForPhase(implement!);
     expect(canvas.title).toBe("Implement");
-    expect(canvas.nodes.map((node) => node.name)).toContain("Agent - Implement from order description");
+    expect(canvas.nodes.map((node) => node.name)).toContain("Implement From Task Description");
     expect(canvas.nodes.map((node) => node.name)).toContain("Add Branch Artifact");
     expect(canvas.nodes.map((node) => node.name)).toContain("Create Pull Request");
     expect(canvas.nodes.map((node) => node.name)).toContain("Attach PR to Task");
@@ -239,8 +239,8 @@ describe("splitRunCanvasForPhase", () => {
       iconSlug: "funnel",
     });
     expect(created).toMatchObject({
-      componentType: "Create Work Order",
-      componentName: "Create Work Order",
+      componentType: "Create Task",
+      componentName: "Create Task",
       action: "passed",
     });
     expect(idle).toMatchObject({
@@ -263,12 +263,12 @@ describe("splitRunCanvasForPhase", () => {
     });
     const stream = richStreamForCanvas(canvas);
     expect(stream.find((line) => line.id === "add-plan-artifact")).toMatchObject({
-      componentType: "Add Work Order Artifact",
-      componentName: "Add Plan Artifact",
+      componentType: "Add Task Artifact",
+      componentName: "Add Task Artifact",
     });
     expect(stream.find((line) => line.id === "planner-agent-no-issue")).toMatchObject({
       componentType: "Run Claude Code",
-      componentName: "Agent - No GH Issue Plan",
+      componentName: "Draft Implementation Plan",
     });
     const plannerNotes = stream.filter((line) => line.nodeId === "planner-agent-no-issue" && line.note);
     expect(
@@ -398,9 +398,9 @@ describe("splitRunCanvasForPhase", () => {
     });
 
     expect(sentry.title).toBe("Sentry");
-    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Work Order"]);
+    expect(sentry.nodes.map((node) => node.name)).toEqual(["On Issue", "Factory project?", "Create Task"]);
     expect(slack.title).toBe("Slack");
-    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Work Order"]);
+    expect(slack.nodes.map((node) => node.name)).toEqual(["On Mention", "Mentioned the agent?", "Create Task"]);
   });
 
   it("returns an empty canvas when a person created the task", () => {

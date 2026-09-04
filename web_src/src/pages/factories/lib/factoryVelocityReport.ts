@@ -18,15 +18,15 @@ export const VELOCITY_PERIOD_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export const VELOCITY_BREAKDOWN_OPTIONS: { value: VelocityBreakdown; label: string }[] = [
-  { value: "origin", label: "Origin" },
+  { value: "origin", label: "Who created" },
   { value: "outcome", label: "Outcome" },
   { value: "intake", label: "Intake source" },
 ];
 
 export const VELOCITY_BREAKDOWN_COPY: Record<VelocityBreakdown, { title: string; description: string }> = {
   origin: {
-    title: "Merged pull requests by origin",
-    description: "Team output split between people and SuperPlane.",
+    title: "Merged pull requests by who created them",
+    description: "Merged pull requests from people, next to pull requests SuperPlane created.",
   },
   outcome: {
     title: "Pull requests by outcome",
@@ -57,12 +57,21 @@ export interface VelocityTotals {
   peopleMerged: number;
   superplaneMerged: number;
   waste: number;
-  /** Waste as a share of SuperPlane closes, 0-100. */
-  wasteRate: number;
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
-  costPerMerge: number;
+  /**
+   * Tasks that closed in the window, with or without a merge. A task counts
+   * once, however many pull requests it opened, so this differs from the pull
+   * request counts above.
+   */
+  tasksClosed: number;
+  /** Part of `tasksClosed` that closed without a merge. */
+  tasksWaste: number;
+  /** Waste as a share of closed tasks, 0-100. */
+  taskWasteRate: number;
+  /** Tracked model spend divided by the tasks that closed. */
+  costPerTask: number;
 }
 
 export interface VelocityIntakeSeries {
@@ -94,6 +103,10 @@ export interface VelocityReport {
   points: VelocityPoint[];
   intakeSeries: VelocityIntakeSeries[];
   people: VelocityPerson[];
+  /** Total people with activity in the window, before paging. */
+  peopleTotal: number;
+  /** True when the People table has rows beyond the ones already fetched. */
+  peopleHasMore: boolean;
   hasPeopleCohort: boolean;
   /** When the background sync last stored repository merges. */
   peopleSyncedAt?: Date;
@@ -106,10 +119,10 @@ function centsToUsd(value: string | number | undefined): number {
   return parseWorkOrderMetric(value) / 100;
 }
 
-function wasteRate(superplaneMerged: number, waste: number): number {
-  const closes = superplaneMerged + waste;
-  if (closes <= 0) return 0;
-  return Math.round((waste / closes) * 100);
+/** Rounded share of `whole` that `part` holds, 0-100. */
+function sharePct(part: number, whole: number): number {
+  if (whole <= 0) return 0;
+  return Math.round((part / whole) * 100);
 }
 
 function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): VelocityTotals {
@@ -117,17 +130,21 @@ function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): V
   const peopleMerged = totals?.peopleMerged ?? 0;
   const waste = totals?.waste ?? 0;
   const costUsd = centsToUsd(totals?.costCents);
+  const tasksClosed = totals?.tasksClosed ?? 0;
+  const tasksWaste = totals?.tasksWaste ?? 0;
 
   return {
     merged: peopleMerged + superplaneMerged,
     peopleMerged,
     superplaneMerged,
     waste,
-    wasteRate: totals?.wastePct ?? wasteRate(superplaneMerged, waste),
     costUsd,
     wasteCostUsd: centsToUsd(totals?.wasteCostCents),
     tokens: parseWorkOrderMetric(totals?.tokens),
-    costPerMerge: superplaneMerged > 0 ? costUsd / superplaneMerged : 0,
+    tasksClosed,
+    tasksWaste,
+    taskWasteRate: sharePct(tasksWaste, tasksClosed),
+    costPerTask: tasksClosed > 0 ? costUsd / tasksClosed : 0,
   };
 }
 
@@ -181,6 +198,8 @@ export function toVelocityReport(response: FactoriesDescribeFactoryVelocityRespo
     points: (response.points ?? []).map(toPoint),
     intakeSeries,
     people,
+    peopleTotal: response.peopleTotal ?? people.length,
+    peopleHasMore: Boolean(response.peopleHasMore),
     hasPeopleCohort: Boolean(response.hasPeopleCohort),
     peopleSyncedAt: response.peopleSyncedAt ? new Date(response.peopleSyncedAt) : undefined,
     peopleSyncPending: Boolean(response.peopleSyncPending),
@@ -210,8 +229,8 @@ export function velocityBreakdownSeries(
 ): VelocityBreakdownSeries[] {
   if (breakdown === "origin") {
     return [
-      { key: "people", label: "People", color: VELOCITY_ORIGIN_COLORS.people },
-      { key: "superplane", label: "SuperPlane", color: VELOCITY_ORIGIN_COLORS.superplane },
+      { key: "people", label: "Manual work", color: VELOCITY_ORIGIN_COLORS.people },
+      { key: "superplane", label: "Automated via SuperPlane", color: VELOCITY_ORIGIN_COLORS.superplane },
     ];
   }
   if (breakdown === "outcome") {

@@ -61,7 +61,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeRoles = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoles = false, enabled = true) => {
   return useQuery({
     queryKey: includeRoles
       ? [...organizationKeys.users(organizationId), includeRoles]
@@ -80,6 +80,7 @@ export const useOrganizationUsers = (organizationId: string, includeRoles = fals
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId && enabled,
   });
 };
 
@@ -547,15 +548,17 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string }) => {
+    mutationFn: async (params: { name?: string; description?: string; slug?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             organization: {
               metadata: {
                 name: params.name,
                 description: params.description,
+                slug: params.slug,
               },
             },
           },

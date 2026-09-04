@@ -64,7 +64,7 @@ spec:
         'y': 612
       isCollapsed: true
     - id: is-pr-merged
-      name: PR Merged?
+      name: Pull Request Merged?
       type: TYPE_ACTION
       component: if
       configuration:
