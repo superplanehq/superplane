@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"net/url"
 	"testing"
 	"time"
 
@@ -34,6 +35,15 @@ func TestGitHubInstallRequest(t *testing.T) {
 		factory := steps.givenAnIncompleteWorkspaceExists()
 		steps.visitWorkspaceSetupWithInstallRequest(factory)
 		steps.assertTheConnectScreenExplainsThePendingRequest()
+	})
+
+	t.Run("owner approval without state opens the approved page", func(t *testing.T) {
+		steps := &githubInstallRequestSteps{t: t}
+		steps.start()
+		factory := steps.givenAnIncompleteWorkspaceExists()
+		steps.rememberReturnToWorkspaceSetup(factory)
+		steps.whenGitHubReturnsAnOwnerApproval()
+		steps.assertTheOwnerApprovalIsExplained()
 	})
 }
 
@@ -90,9 +100,10 @@ func (s *githubInstallRequestSteps) rememberReturnToWorkspaceSetup(factory *mode
 	s.openConnectScreenIfNeeded()
 
 	now := time.Now().UnixMilli()
+	slugPath := "/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=vcs"
 	returnPaths := map[string]string{
 		s.session.OrgID.String(): "/" + s.session.OrgID.String() + "/workspaces/" + factory.Key + "/setup?step=vcs",
-		s.session.OrgSlug:        "/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=vcs",
+		s.session.OrgSlug:        slugPath,
 	}
 	for organizationID, path := range returnPaths {
 		payload, err := json.Marshal(map[string]any{
@@ -106,6 +117,9 @@ func (s *githubInstallRequestSteps) rememberReturnToWorkspaceSetup(factory *mode
 		})
 		require.NoError(s.t, err)
 	}
+	_, err := s.session.Page().Evaluate(`(cookie) => { document.cookie = cookie; }`,
+		"sp_integration_setup_return="+url.QueryEscape(slugPath)+"; Path=/; Max-Age=900; SameSite=Lax")
+	require.NoError(s.t, err)
 }
 
 func (s *githubInstallRequestSteps) openConnectScreenIfNeeded() {
@@ -123,6 +137,10 @@ func (s *githubInstallRequestSteps) whenGitHubReturnsAnInstallRequest() {
 	s.session.Visit("/api/v1/github/app/setup?state=" + s.state + "&setup_action=request")
 }
 
+func (s *githubInstallRequestSteps) whenGitHubReturnsAnOwnerApproval() {
+	s.session.Visit("/api/v1/github/app/setup?installation_id=159131070&setup_action=install")
+}
+
 func (s *githubInstallRequestSteps) visitWorkspaceSetupWithInstallRequest(factory *models.Factory) {
 	s.session.Visit("/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=vcs&githubSetup=request")
 }
@@ -135,6 +153,8 @@ func (s *githubInstallRequestSteps) assertTheConnectScreenExplainsThePendingRequ
 }
 
 func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
+	require.Contains(s.t, s.session.Page().URL(), "/setup")
+	require.NotContains(s.t, s.session.Page().URL(), "/settings/integrations/")
 	require.NotContains(s.t, s.session.Page().URL(), "invalid installation ID")
 	require.NoError(s.t, s.session.Page().Locator(
 		`[data-testid="first-run-github-install-requested"], [data-testid="github-install-requested"]`,
@@ -144,4 +164,13 @@ func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
 
 func (s *githubInstallRequestSteps) assertPendingRequestCopy() {
 	s.session.AssertText("Waiting for approval")
+}
+
+func (s *githubInstallRequestSteps) assertTheOwnerApprovalIsExplained() {
+	require.Contains(s.t, s.session.Page().URL(), "/github/approved")
+	require.NotContains(s.t, s.session.Page().URL(), "/workspaces/")
+	require.NotContains(s.t, s.session.Page().URL(), "missing state")
+	s.session.AssertVisible(q.TestID("github-install-approved"))
+	s.session.AssertText("Request approved")
+	s.session.AssertText("The SuperPlane GitHub App is approved. The person who asked can click Connect GitHub again.")
 }

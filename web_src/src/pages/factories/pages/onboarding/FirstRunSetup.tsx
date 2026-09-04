@@ -2,9 +2,11 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useDeleteFactory } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
+import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -167,7 +169,8 @@ function AgentScreen({
  * stay presentational, so this hook holds every step that talks to the API.
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory } = useFactoriesLayout();
+  const { factory, organizationId } = useFactoriesLayout();
+  const { data: me } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
 
@@ -238,12 +241,16 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
       .find((account) => account !== "") ||
     "";
+  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
+  // user. The /account id is the account, so a match would hide the picker.
+  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
 
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
     skipAgentScreen,
     installRequested,
     githubOrganization,
+    accountPicker,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -315,6 +322,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         githubConnected={setup.vcsReady}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
+        pendingInstallations={flow.accountPicker?.installations}
+        githubState={flow.accountPicker?.state}
+        githubAppSlug={flow.accountPicker?.appSlug}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onContinue={() => flow.goToScreen("choose")}
