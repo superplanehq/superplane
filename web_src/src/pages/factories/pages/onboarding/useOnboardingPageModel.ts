@@ -18,7 +18,11 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
-import { githubIntegrationOwner, shouldNameOrganizationFromGitHub } from "./initialOnboardingOrganization";
+import {
+  githubIntegrationOwner,
+  nameOrganizationFromGitHubOwner,
+  shouldNameOrganizationFromGitHub,
+} from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -218,12 +222,15 @@ function useOnboardingGithubConnectionSelected(args: {
     const owner = githubIntegrationOwner(integration);
     if (!owner || !shouldNameOrganizationFromGitHub(args.factory, args.selectNewest)) return;
 
-    const slug = owner.toLowerCase();
-    if (slug === args.organizationId) return;
-
     try {
-      const response = await args.updateOrganization.mutateAsync({ name: owner, slug });
-      const nextSlug = response.data?.organization?.metadata?.slug;
+      const nextSlug = await nameOrganizationFromGitHubOwner({
+        owner,
+        currentSlug: args.organizationId,
+        update: async (identity) => {
+          const response = await args.updateOrganization.mutateAsync(identity);
+          return response.data?.organization?.metadata?.slug;
+        },
+      });
       if (!nextSlug) return;
 
       const nextPath = onboardingStepPath(
