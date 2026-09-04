@@ -75,13 +75,14 @@ describe("VelocityAutomationsTable", () => {
     const user = userEvent.setup();
     renderTable();
 
-    const failed = screen.getByRole("button", { name: "Failed" });
+    // `aria-sort` belongs on the column header, not on the button inside it.
+    const failed = screen.getByRole("columnheader", { name: "Failed" });
     expect(failed).toHaveAttribute("aria-sort", "none");
 
-    await user.click(failed);
+    await user.click(within(failed).getByRole("button"));
     expect(failed).toHaveAttribute("aria-sort", "descending");
 
-    await user.click(failed);
+    await user.click(within(failed).getByRole("button"));
     expect(failed).toHaveAttribute("aria-sort", "ascending");
   });
 
