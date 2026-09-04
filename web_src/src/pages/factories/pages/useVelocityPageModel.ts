@@ -130,7 +130,7 @@ export function useVelocityPageModel(
 
   const report = useMemo(() => (velocityResponse ? toVelocityReport(velocityResponse) : undefined), [velocityResponse]);
 
-  const people = useAccumulatedPeople(peopleSort.resetKey, peopleSort.offset, report, Boolean(holdsPreviousReport));
+  const people = useAccumulatedPeople(peopleSort.resetKey, peopleSort.offset, report, holdsPreviousReport);
   const isLoadingMorePeople = velocityFetching && peopleSort.offset > 0;
 
   // Task time is measured from work orders, which carry the execution
@@ -173,7 +173,7 @@ export function useVelocityPageModel(
       sortKey: peopleSort.sortKey,
       sortDirection: peopleSort.sortDirection,
       onSort: peopleSort.onSort,
-      canLoadMore: people.canLoadMore && !Boolean(holdsPreviousReport),
+      canLoadMore: people.canLoadMore && !holdsPreviousReport,
       isLoadingMore: isLoadingMorePeople,
       loadMore: () => {
         if (isLoadingMorePeople || holdsPreviousReport || !people.canLoadMore) return;
