@@ -41,6 +41,45 @@ describe("useOnboardingGithubConnections", () => {
     expect(selectInstance).toHaveBeenCalledWith("github", "github-connection");
   });
 
+  it("advances from vcs to repo on the same slug without re-resolving the workspace", async () => {
+    const selectInstance = vi.fn();
+    const navigate = vi.fn() as unknown as NavigateFunction;
+    const reresolveWorkspace = vi.fn();
+    const locationReplace = vi.fn();
+    vi.stubGlobal("location", { ...window.location, replace: locationReplace });
+
+    const onConnectionSelected = vi.fn(async () =>
+      advanceAfterGithubConnect({
+        onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
+        organizationId: "dev-user",
+        nextSlug: "dev-user",
+        factoryId: "factory-1",
+        factoryKey: "APP",
+        navigate,
+        reresolveWorkspace,
+        queryClient: new QueryClient(),
+      }),
+    );
+
+    renderHook(() =>
+      useOnboardingGithubConnections({
+        integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
+        openSection: "vcs",
+        selectNewest: true,
+        selections: {},
+        selectInstance,
+        onConnectionSelected,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo", { replace: true }),
+    );
+    expect(onConnectionSelected).toHaveBeenCalledTimes(1);
+    expect(reresolveWorkspace).not.toHaveBeenCalled();
+    expect(locationReplace).not.toHaveBeenCalled();
+  });
+
   it("advances from vcs to repo exactly once without a full-page reload", async () => {
     const selectInstance = vi.fn();
     const navigate = vi.fn() as unknown as NavigateFunction;
