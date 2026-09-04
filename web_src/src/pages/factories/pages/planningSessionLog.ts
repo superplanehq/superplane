@@ -515,17 +515,25 @@ function markLiveSurveyReply(notes: SplitRunStreamLine[], submittedReply: string
   if (!prefix) {
     return;
   }
-  const rootPrompts = notes.filter((note) => !note.noteParentId && note.componentType === "prompt");
   const noteText = (note: SplitRunStreamLine): string => `${note.componentName}\n${note.detail ?? ""}`;
-  // When several root prompts merely share the 48-character prefix, the turn
-  // whose live text still spells out the full submitted reply is the real
-  // survey turn. Prefer that exact match so the answer is not attributed to an
-  // earlier, unrelated prompt. Only when no prompt carries the full reply (for
-  // example the live log recorded a truncated preview) do we fall back to the
-  // first prefix match, which stays a single rewrite to avoid duplicating a turn.
-  const target =
-    rootPrompts.find((note) => noteText(note).includes(reply)) ??
-    rootPrompts.find((note) => noteText(note).includes(prefix));
+  // A survey answer belongs to the most recent prompt turn that shares its text.
+  // When several root prompts share the 48-character prefix -- the same survey
+  // was asked more than once, an earlier prompt only shares the prefix while a
+  // later one spells out the full reply, or an earlier prompt happens to contain
+  // the reply verbatim while the real turn kept a truncated preview -- the real
+  // survey turn is the last such match. Rewrite only that one so the answer is
+  // neither duplicated across turns nor attributed to an earlier, unrelated
+  // prompt. Text position alone cannot separate these cases, so we anchor on
+  // chronology: the survey turn is the latest prompt carrying the reply's text.
+  let target: SplitRunStreamLine | undefined;
+  for (const note of notes) {
+    if (note.noteParentId || note.componentType !== "prompt") {
+      continue;
+    }
+    if (noteText(note).includes(prefix)) {
+      target = note;
+    }
+  }
   if (target) {
     target.userTalk = "survey";
     target.componentName = submittedReply;
