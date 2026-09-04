@@ -37,6 +37,7 @@ func UpdateIntegration(
 	if err != nil {
 		return nil, err
 	}
+	orgID = org.String()
 
 	ID, err := uuid.Parse(integrationID)
 	if err != nil {
