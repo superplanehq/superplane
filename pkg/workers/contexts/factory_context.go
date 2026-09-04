@@ -631,6 +631,32 @@ func (c *FactoryContext) FindPullRequest(params core.FindPullRequestParams) (*co
 	return c.pullRequestMatch(pullRequest)
 }
 
+func (c *FactoryContext) ListPullRequests(params core.ListPullRequestsParams) ([]*core.PullRequest, error) {
+	factoryModel, err := c.currentFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	states := params.States
+	if len(states) == 0 {
+		states = []string{models.FactoryPullRequestStateOpen, models.FactoryPullRequestStateDraft}
+	}
+
+	pullRequests, err := factoryModel.ListPullRequests(c.tx, models.FactoryPullRequestFilter{
+		Repository: params.Repository,
+		States:     states,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*core.PullRequest, 0, len(pullRequests))
+	for i := range pullRequests {
+		result = append(result, pullRequestToCore(&pullRequests[i]))
+	}
+	return result, nil
+}
+
 func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
 	if c.execution == nil {
 		return nil, errors.New("run is required to add pull request activity")

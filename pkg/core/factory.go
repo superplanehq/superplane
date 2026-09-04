@@ -47,6 +47,11 @@ type FactoryContext interface {
 	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
 	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
+	// ListPullRequests returns the factory pull requests for a repository,
+	// filtered by state. Used by components that need every matching row,
+	// not a single lookup (e.g. rechecking mergeability after a base branch
+	// push).
+	ListPullRequests(params ListPullRequestsParams) ([]*PullRequest, error)
 	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
 	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
 }
@@ -189,6 +194,14 @@ type FindPullRequestParams struct {
 	Repository string
 	Number     int64
 	URL        string
+}
+
+// ListPullRequestsParams configures FactoryContext.ListPullRequests. States
+// selects which pull request states to include; an empty list defaults to
+// open and draft.
+type ListPullRequestsParams struct {
+	Repository string
+	States     []string
 }
 
 const (

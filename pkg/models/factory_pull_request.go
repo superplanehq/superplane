@@ -162,11 +162,16 @@ type FactoryPullRequestFilter struct {
 	WorkOrderID     *uuid.UUID
 	WorkOrderIDs    []uuid.UUID
 	WorkOrderNumber *int64
-	State           string
-	MergedFrom      *time.Time
-	MergedTo        *time.Time
-	ClosedFrom      *time.Time
-	ClosedTo        *time.Time
+	// Repository matches case-insensitively, same as ListFactoryPullRequestNumbers.
+	Repository string
+	State      string
+	// States lists every state to match, e.g. open and draft together. A
+	// caller normally sets either State or States, not both.
+	States     []string
+	MergedFrom *time.Time
+	MergedTo   *time.Time
+	ClosedFrom *time.Time
+	ClosedTo   *time.Time
 }
 
 func (FactoryPullRequest) TableName() string {
@@ -377,6 +382,17 @@ func (f *Factory) ListPullRequests(tx *gorm.DB, filter FactoryPullRequestFilter)
 			return nil, fmt.Errorf("%w: invalid state filter %q", ErrFactoryPullRequestInvalid, filter.State)
 		}
 		query = query.Where("factory_pull_requests.state = ?", filter.State)
+	}
+	if len(filter.States) > 0 {
+		for _, state := range filter.States {
+			if !factoryPullRequestStates[state] {
+				return nil, fmt.Errorf("%w: invalid state filter %q", ErrFactoryPullRequestInvalid, state)
+			}
+		}
+		query = query.Where("factory_pull_requests.state IN ?", filter.States)
+	}
+	if repository := strings.ToLower(strings.TrimSpace(filter.Repository)); repository != "" {
+		query = query.Where("LOWER(factory_pull_requests.repository) = ?", repository)
 	}
 
 	var pullRequests []FactoryPullRequest

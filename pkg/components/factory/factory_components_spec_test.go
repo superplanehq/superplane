@@ -39,6 +39,11 @@ type fakeFactoryContext struct {
 	setStatusNoteResult *core.WorkOrderStatusNote
 	setStatusNoteErr    error
 
+	listCalls  int
+	listParams core.ListPullRequestsParams
+	listResult []*core.PullRequest
+	listErr    error
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -94,6 +99,12 @@ func (f *fakeFactoryContext) UpdatePullRequest(_ core.UpdatePullRequestParams) (
 
 func (f *fakeFactoryContext) FindPullRequest(_ core.FindPullRequestParams) (*core.PullRequestMatch, error) {
 	return nil, nil
+}
+
+func (f *fakeFactoryContext) ListPullRequests(params core.ListPullRequestsParams) ([]*core.PullRequest, error) {
+	f.listCalls++
+	f.listParams = params
+	return f.listResult, f.listErr
 }
 
 func (f *fakeFactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {

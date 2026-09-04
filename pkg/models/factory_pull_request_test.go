@@ -142,6 +142,53 @@ func Test__FactoryPullRequest(t *testing.T) {
 		assert.Equal(t, int64(21), listed[0].Number)
 	})
 
+	t.Run("lists pull requests by repository and states", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		order := createOrder(t, factoryModel)
+		draftOrder := createOrder(t, factoryModel)
+		otherRepoOrder := createOrder(t, factoryModel)
+		closedOrder := createOrder(t, factoryModel)
+
+		open, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/61", State: models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+		draft, err := draftOrder.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/62", State: models.FactoryPullRequestStateDraft,
+		})
+		require.NoError(t, err)
+		_, err = otherRepoOrder.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/other/pull/63", State: models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+		_, err = closedOrder.CreatePullRequest(db, models.FactoryPullRequestParams{
+			URL: "https://github.com/acme/app/pull/64", State: models.FactoryPullRequestStateClosed,
+		})
+		require.NoError(t, err)
+
+		listed, err := factoryModel.ListPullRequests(db, models.FactoryPullRequestFilter{
+			Repository: "ACME/App",
+			States:     []string{models.FactoryPullRequestStateOpen, models.FactoryPullRequestStateDraft},
+		})
+		require.NoError(t, err)
+		ids := []uuid.UUID{listed[0].ID}
+		for _, pr := range listed[1:] {
+			ids = append(ids, pr.ID)
+		}
+		assert.ElementsMatch(t, []uuid.UUID{open.ID, draft.ID}, ids)
+	})
+
+	t.Run("rejects an invalid state in the states filter", func(t *testing.T) {
+		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		_, err = factoryModel.ListPullRequests(db, models.FactoryPullRequestFilter{
+			States: []string{"bogus"},
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryPullRequestInvalid)
+	})
+
 	t.Run("merged stamps merged_at once and later open does not clear it", func(t *testing.T) {
 		factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
