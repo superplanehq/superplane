@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CircleAlert, CircleCheck, Minus, TriangleAlert } from "lucide-react";
@@ -62,6 +63,7 @@ export function SplitRunReview({
   startBusy = false,
   actionBusy = false,
   startDisabled = false,
+  modelSelect,
 }: {
   footer: SplitRunFooter;
   className?: string;
@@ -76,6 +78,7 @@ export function SplitRunReview({
   startBusy?: boolean;
   actionBusy?: boolean;
   startDisabled?: boolean;
+  modelSelect?: ReactNode;
 }) {
   if (!footer.attentionCard || !footer.note) {
     return null;
@@ -118,6 +121,7 @@ export function SplitRunReview({
         actionBusy={actionBusy}
         startBusy={startBusy}
         startDisabled={startDisabled}
+        modelSelect={modelSelect}
         onAction={onAction}
       />
     </div>
