@@ -34,9 +34,9 @@ describe("organizationIdentityFromOwner", () => {
     expect(organizationIdentityFromOwner("Acme Org")).toEqual({ name: "Acme Org", slug: "acme-org" });
   });
 
-  it("appends a random suffix when the owner is already taken", () => {
+  it("appends a random suffix to the slug only when the owner is already taken", () => {
     expect(organizationIdentityFromOwner("Acme Org", "1ajioa")).toEqual({
-      name: "Acme Org-1ajioa",
+      name: "Acme Org",
       slug: "acme-org-1ajioa",
     });
   });
@@ -70,7 +70,7 @@ describe("nameOrganizationFromGitHubOwner", () => {
     ).resolves.toBe("acme-1ajioa");
 
     expect(update).toHaveBeenNthCalledWith(1, { name: "acme", slug: "acme" });
-    expect(update).toHaveBeenNthCalledWith(2, { name: "acme-1ajioa", slug: "acme-1ajioa" });
+    expect(update).toHaveBeenNthCalledWith(2, { name: "acme", slug: "acme-1ajioa" });
   });
 
   it("retries when the name conflict uses the update error text", async () => {
@@ -87,5 +87,34 @@ describe("nameOrganizationFromGitHubOwner", () => {
         randomSuffix: () => "1ajioa",
       }),
     ).resolves.toBe("acme-1ajioa");
+  });
+
+  it("keeps the plain owner as the name across every retry, only rotating the slug suffix", async () => {
+    const update = vi
+      .fn()
+      .mockRejectedValueOnce({ response: { data: { message: "organization slug is already in use" } } })
+      .mockRejectedValueOnce({ response: { data: { message: "organization slug is already in use" } } })
+      .mockResolvedValueOnce("acme-8f3kd2");
+
+    const suffixes = ["1ajioa", "8f3kd2"];
+    let call = 0;
+
+    await expect(
+      nameOrganizationFromGitHubOwner({
+        owner: "acme",
+        currentSlug: "dev-user",
+        update,
+        randomSuffix: () => suffixes[call++],
+      }),
+    ).resolves.toBe("acme-8f3kd2");
+
+    expect(update).toHaveBeenCalledTimes(3);
+    expect(update).toHaveBeenNthCalledWith(1, { name: "acme", slug: "acme" });
+    expect(update).toHaveBeenNthCalledWith(2, { name: "acme", slug: "acme-1ajioa" });
+    expect(update).toHaveBeenNthCalledWith(3, { name: "acme", slug: "acme-8f3kd2" });
+
+    const names = update.mock.calls.map(([identity]) => identity.name);
+    expect(new Set(names).size).toBe(1);
+    expect(names[0]).toBe("acme");
   });
 });
