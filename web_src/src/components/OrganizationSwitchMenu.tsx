@@ -4,11 +4,7 @@ import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrga
 import { Building2, Check, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 
-import {
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/ui/dropdownMenu";
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/ui/dropdownMenu";
 
 interface OrganizationSwitchMenuProps {
   currentOrganizationRouteId: string;
@@ -37,8 +33,12 @@ export function OrganizationSwitchMenu({
     <>
       <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
       <div>
-        {organizationsQuery.isLoading ? <p className="px-2 py-1 text-sm text-muted-foreground">Loading organizations...</p> : null}
-        {organizationsQuery.isError ? <p className="px-2 py-1 text-sm text-muted-foreground">Could not load organizations.</p> : null}
+        {organizationsQuery.isLoading ? (
+          <p className="px-2 py-1 text-sm text-muted-foreground">Loading organizations...</p>
+        ) : null}
+        {organizationsQuery.isError ? (
+          <p className="px-2 py-1 text-sm text-muted-foreground">Could not load organizations.</p>
+        ) : null}
         {!organizationsQuery.isLoading && !organizationsQuery.isError && organizations.length === 0 ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">No organizations available.</p>
         ) : null}
