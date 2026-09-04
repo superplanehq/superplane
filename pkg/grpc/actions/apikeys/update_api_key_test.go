@@ -6,12 +6,47 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 )
+
+func TestUpdateAPIKeyRejectsDuplicateName(t *testing.T) {
+	r := support.Setup(t)
+	_, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"ci-bot",
+		nil,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	apiKey, err := models.CreateAPIKey(
+		database.Conn(),
+		r.Organization.ID,
+		"deploy-bot",
+		nil,
+		r.User,
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	_, err = UpdateAPIKey(apiKeyContext(r), &pb.UpdateAPIKeyRequest{
+		Id:   apiKey.ID.String(),
+		Name: "ci-bot",
+	})
+
+	require.Error(t, err)
+	require.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
 
 func TestUpdateAPIKeyUpdatesCanvasScopeAndExpiration(t *testing.T) {
 	r := support.Setup(t)
