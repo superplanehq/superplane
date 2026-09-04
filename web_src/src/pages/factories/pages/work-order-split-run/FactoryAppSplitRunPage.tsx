@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 
 import { FactoryAppCanvasHeader } from "../FactoryAppCanvasHeader";
 import { CompactLineCanvas } from "./CompactLineCanvas";
+import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { SplitRunLogHeader } from "./SplitRunLogHeader";
 import { runningSplitRunPhaseId } from "./followLogScroll";
@@ -69,6 +70,7 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
   const follow = useFollowLogScroll<HTMLOListElement>(
     runningSplitRunPhaseId(model.fixture?.phases ?? []),
     model.stream?.length ?? 0,
+    { resumeOnBottom: true },
   );
   return (
     <div className="absolute inset-0 flex flex-col bg-background" data-testid="factory-app-split-run-page">
@@ -89,31 +91,32 @@ function SplitRunLoadedPage({ model }: { model: ReturnType<typeof useFactoryAppS
           style={{ width: `${model.split.percent}%` }}
           aria-label="Automations"
         >
-          <SplitRunLogHeader
-            following={follow.following}
-            onFollowingChange={follow.setFollowing}
-            className="px-4 pt-3 pb-2"
-          />
-          <ol
-            ref={follow.scrollRef}
-            onScroll={follow.onScroll}
-            className="min-h-0 min-w-0 flex-1 list-none overflow-x-hidden overflow-y-auto px-4 pb-3"
-            data-testid="split-run-log-scroll"
-          >
-            <li className="min-w-0">
-              <PhaseLogCard
-                phase={model.phase}
-                expanded
-                collapsible={false}
-                stream={model.stream}
-                selectedNodeId={model.nodeId}
-                onSelectNode={model.setNodeId}
-                organizationId={model.organizationId}
-                canvasId={model.phase.appId}
-                editHref={model.editHref}
-              />
-            </li>
-          </ol>
+          <SplitRunLogHeader className="px-4 pt-3 pb-2" />
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <ol
+              ref={follow.scrollRef}
+              onScroll={follow.onScroll}
+              className="min-h-0 min-w-0 flex-1 list-none overflow-x-hidden overflow-y-auto px-4 pb-3"
+              data-testid="split-run-log-scroll"
+            >
+              <li className="min-w-0">
+                <PhaseLogCard
+                  phase={model.phase}
+                  expanded
+                  collapsible={false}
+                  stream={model.stream}
+                  selectedNodeId={model.nodeId}
+                  onSelectNode={model.setNodeId}
+                  organizationId={model.organizationId}
+                  canvasId={model.phase.appId}
+                  editHref={model.editHref}
+                />
+              </li>
+            </ol>
+            {follow.following ? null : (
+              <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-older" />
+            )}
+          </div>
         </aside>
         <div
           role="separator"

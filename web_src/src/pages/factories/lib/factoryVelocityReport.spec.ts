@@ -165,6 +165,20 @@ describe("toVelocityReport", () => {
     expect(report.hasPeopleCohort).toBe(false);
     expect(report.repository).toBeUndefined();
   });
+
+  it("reports the total people count and whether more pages are available", () => {
+    const report = toVelocityReport({ ...RESPONSE, peopleTotal: 12, peopleHasMore: true });
+
+    expect(report.peopleTotal).toBe(12);
+    expect(report.peopleHasMore).toBe(true);
+  });
+
+  it("falls back the total to the page length when the API omits it", () => {
+    const report = toVelocityReport(RESPONSE);
+
+    expect(report.peopleTotal).toBe(RESPONSE.people?.length);
+    expect(report.peopleHasMore).toBe(false);
+  });
 });
 
 describe("hasVelocityOutput", () => {

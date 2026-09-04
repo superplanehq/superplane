@@ -37,8 +37,8 @@ describe("SidebarUserMenu", () => {
       if (url.includes("/organizations")) {
         return new Response(
           JSON.stringify([
-            { id: FACTORIES_ORGANIZATION_ID, slug: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
-            { id: "org-acme", slug: "org-acme", name: "Acme" },
+            { id: FACTORIES_ORGANIZATION_ID, slug: "superplane", name: "SuperPlane" },
+            { id: "org-acme", slug: "acme", name: "Acme" },
           ]),
           { status: 200, headers: { "Content-Type": "application/json" } },
         );
@@ -83,8 +83,12 @@ describe("SidebarUserMenu", () => {
     await user.click(screen.getByLabelText("Switch organization"));
 
     const menu = await screen.findByTestId("factories-sidebar-organization-switch-menu");
+    expect(menu).toHaveClass("overflow-y-auto");
     expect(within(menu).getByText("SuperPlane")).toBeInTheDocument();
     expect(within(menu).getByText("Acme")).toBeInTheDocument();
+    expect(
+      within(menu).getByTestId(`factories-sidebar-organization-option-${FACTORIES_ORGANIZATION_ID}`),
+    ).toHaveAttribute("aria-checked", "true");
     const items = within(menu).getAllByRole("menuitem");
     expect(items[items.length - 1]).toHaveTextContent("Create new organization");
   });

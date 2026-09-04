@@ -21,6 +21,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, factory.OnboardingCompletedAt)
 		assert.False(t, factory.IsOnboardingComplete())
+		assert.False(t, factory.IsInitialOnboarding())
 		assert.Equal(t, models.FactoryOnboardingConfig{}, factory.OnboardingConfigValue())
 
 		reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
@@ -29,7 +30,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, models.FactoryOnboardingConfig{}, reloaded.OnboardingConfigValue())
 	})
 
-	t.Run("stores the initial onboarding attempt outside the description", func(t *testing.T) {
+	t.Run("stores the initial onboarding attempt internally", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 
@@ -38,10 +39,12 @@ func Test__FactoryOnboarding(t *testing.T) {
 
 		assert.Empty(t, factory.Description)
 		assert.True(t, factory.HasInitialOnboardingAttempt(attemptID))
+		assert.True(t, factory.IsInitialOnboarding())
 
 		reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 		require.NoError(t, err)
 		assert.True(t, reloaded.HasInitialOnboardingAttempt(attemptID))
+		assert.True(t, reloaded.IsInitialOnboarding())
 	})
 
 	t.Run("partial update merges fields", func(t *testing.T) {

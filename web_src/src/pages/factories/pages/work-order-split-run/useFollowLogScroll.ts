@@ -17,7 +17,10 @@ export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
   options?: FollowLogScrollOptions,
 ) {
   const resumeOnBottom = options?.resumeOnBottom === true;
-  const [following, setFollowing] = useState(() => runningPhaseId != null);
+  // Auto-scroll starts on so the log opens pinned to the newest line and the
+  // "Jump to latest" pill stays hidden until the user scrolls up, whether or
+  // not a phase is still running.
+  const [following, setFollowing] = useState(true);
   const followingRef = useRef(following);
   followingRef.current = following;
   const previousRunningPhaseIdRef = useRef(runningPhaseId);

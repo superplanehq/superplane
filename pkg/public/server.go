@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1117,7 +1118,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 }
 
 // createInitialWorkspace provisions the first organization and workspace for
-// an account. The GitHub identity is checked before its display name is used.
+// an account. The GitHub identity is checked before its owner name is used.
 func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
@@ -1147,11 +1148,24 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if organization, workspace, found, err := findIncompleteInitialWorkspace(database.DB(r.Context()), account.ID, attemptID); err != nil {
-		log.WithError(err).WithField("account_id", account.ID).Error("failed to find incomplete initial workspace")
+	creationLock, err := acquireInitialWorkspaceCreationLock(r.Context(), account.ID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock initial workspace creation")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+	defer creationLock.Rollback()
+
+	if organization, workspace, found, err := findInitialWorkspace(creationLock, account.ID, attemptID); err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to find initial workspace")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	} else if found {
+		if err := creationLock.Commit().Error; err != nil {
+			log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace lookup")
+			http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+			return
+		}
 		writeInitialWorkspaceResponse(w, organization, workspace)
 		return
 	}
@@ -1166,9 +1180,15 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	organization, workspace, err := s.createInitialOrganizationAndWorkspace(account, owner, attemptID)
+	organization, workspace, err := s.createInitialOrganizationAndWorkspace(creationLock, account, owner, attemptID)
 	if err != nil {
 		log.WithError(err).WithField("account_id", account.ID).Error("failed to create initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+
+	if err := creationLock.Commit().Error; err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace creation")
 		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
 		return
 	}
@@ -1180,7 +1200,38 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	writeInitialWorkspaceResponse(w, organization, workspace)
 }
 
-func findIncompleteInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
+// acquireInitialWorkspaceCreationLock serializes onboarding for one account.
+// Waiting requests release their database connections between attempts.
+func acquireInitialWorkspaceCreationLock(ctx context.Context, accountID uuid.UUID) (*gorm.DB, error) {
+	lockKey := int64(binary.BigEndian.Uint64(accountID[:8]))
+
+	for {
+		tx := database.DB(ctx).Begin()
+		if tx.Error != nil {
+			return nil, tx.Error
+		}
+
+		var locked bool
+		if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", lockKey).Scan(&locked).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if locked {
+			return tx, nil
+		}
+		if err := tx.Rollback().Error; err != nil {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
 	organizations, err := models.ListOrganizationsCreatedByAccount(tx, accountID)
 	if err != nil {
 		return nil, nil, false, err
@@ -1192,7 +1243,7 @@ func findIncompleteInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID)
 			return nil, nil, false, err
 		}
 		for _, factory := range factories {
-			if factory.HasInitialOnboardingAttempt(attemptID) && !factory.IsOnboardingComplete() {
+			if factory.HasInitialOnboardingAttempt(attemptID) {
 				return &organization, &factory, true, nil
 			}
 		}
@@ -1224,15 +1275,23 @@ func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) b
 	})
 }
 
-func (s *Server) createInitialOrganizationAndWorkspace(account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
+func (s *Server) createInitialOrganizationAndWorkspace(tx *gorm.DB, account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
 	for suffix := 1; suffix <= 100; suffix++ {
 		organizationName := owner
 		if suffix > 1 {
 			organizationName = fmt.Sprintf("%s %d", owner, suffix)
 		}
 
-		organization, workspace, err := s.createInitialOrganizationAttempt(account, organizationName, attemptID)
+		savepoint := fmt.Sprintf("initial_organization_name_%d", suffix)
+		if err := tx.SavePoint(savepoint).Error; err != nil {
+			return nil, nil, fmt.Errorf("create organization savepoint: %w", err)
+		}
+
+		organization, workspace, err := s.createInitialOrganizationAttempt(tx, account, organizationName, attemptID)
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
+			if rollbackErr := tx.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return nil, nil, fmt.Errorf("rollback organization name: %w", rollbackErr)
+			}
 			continue
 		}
 		return organization, workspace, err
@@ -1241,39 +1300,29 @@ func (s *Server) createInitialOrganizationAndWorkspace(account *models.Account, 
 	return nil, nil, fmt.Errorf("could not find an available organization name for %q", owner)
 }
 
-func (s *Server) createInitialOrganizationAttempt(account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
-	tx := database.Conn().Begin()
+func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
 	organization, err := models.CreateOrganizationInTransaction(tx, organizationName, "")
 	if err != nil {
-		tx.Rollback()
 		return nil, nil, err
 	}
 
 	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
-		tx.Rollback()
 		return nil, nil, fmt.Errorf("create organization owner: %w", err)
 	}
 	if err := s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String()); err != nil {
-		tx.Rollback()
 		return nil, nil, fmt.Errorf("set up organization roles: %w", err)
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
-		tx.Rollback()
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
 	if err != nil {
-		tx.Rollback()
 		return nil, nil, fmt.Errorf("create initial workspace: %w", err)
 	}
 	if err := workspace.SetInitialOnboardingAttempt(tx, attemptID); err != nil {
-		tx.Rollback()
 		return nil, nil, fmt.Errorf("set initial workspace onboarding attempt: %w", err)
-	}
-	if err := tx.Commit().Error; err != nil {
-		return nil, nil, fmt.Errorf("commit initial workspace: %w", err)
 	}
 	return organization, workspace, nil
 }

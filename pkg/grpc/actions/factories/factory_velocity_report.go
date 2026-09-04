@@ -314,9 +314,33 @@ func (b *velocityPeopleBuilder) addFactoryOrder(order *velocityOrder) {
 	}
 }
 
-// rowsByMergedDesc returns people with activity, most merged pull requests
-// first. Ties break on name so the order is stable between requests.
-func (b *velocityPeopleBuilder) rowsByMergedDesc() []*velocityPersonRow {
+// velocityPeopleSortKey names the column the People table is ordered by.
+type velocityPeopleSortKey int
+
+const (
+	velocitySortTotal velocityPeopleSortKey = iota
+	velocitySortFactoryMerged
+	velocitySortAuthoredMerged
+	velocitySortMedianCycleHours
+	velocitySortCostUsd
+)
+
+// velocitySortDirection is ascending or descending, applied to the primary
+// sort key only; every tie-break stays in its own fixed direction so paging
+// is stable regardless of which column or direction is active.
+type velocitySortDirection int
+
+const (
+	velocitySortDesc velocitySortDirection = iota
+	velocitySortAsc
+)
+
+// rowsSorted returns people with activity, ordered by key and direction. Ties
+// on the primary key break through total merged, then SuperPlane merged, then
+// name, then id, in that fixed order, so a page requested with an offset never
+// drops or duplicates a row because two requests disagreed on the order of
+// equal rows.
+func (b *velocityPeopleBuilder) rowsSorted(key velocityPeopleSortKey, direction velocitySortDirection) []*velocityPersonRow {
 	rows := make([]*velocityPersonRow, 0, len(b.rows))
 	for _, row := range b.rows {
 		if row.totalMerged() == 0 && row.factoryWaste == 0 {
@@ -325,15 +349,46 @@ func (b *velocityPeopleBuilder) rowsByMergedDesc() []*velocityPersonRow {
 		rows = append(rows, row)
 	}
 
+	// Computed once per row, rather than inside the comparator, so an O(n log n)
+	// sort does not resort to an O(n log n) sort of median computations.
+	medians := make(map[*velocityPersonRow]float64, len(rows))
+	for _, row := range rows {
+		medians[row] = medianFloats(row.cycleHours)
+	}
+
+	primary := func(row *velocityPersonRow) float64 {
+		switch key {
+		case velocitySortFactoryMerged:
+			return float64(row.factoryMerged)
+		case velocitySortAuthoredMerged:
+			return float64(row.authoredMerged)
+		case velocitySortMedianCycleHours:
+			return medians[row]
+		case velocitySortCostUsd:
+			return float64(row.costCents)
+		default:
+			return float64(row.totalMerged())
+		}
+	}
+
 	sort.Slice(rows, func(i, j int) bool {
 		left, right := rows[i], rows[j]
+		if lv, rv := primary(left), primary(right); lv != rv {
+			if direction == velocitySortAsc {
+				return lv < rv
+			}
+			return lv > rv
+		}
 		if left.totalMerged() != right.totalMerged() {
 			return left.totalMerged() > right.totalMerged()
 		}
 		if left.factoryMerged != right.factoryMerged {
 			return left.factoryMerged > right.factoryMerged
 		}
-		return left.name < right.name
+		if left.name != right.name {
+			return left.name < right.name
+		}
+		return left.id < right.id
 	})
 	return rows
 }

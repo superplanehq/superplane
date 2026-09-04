@@ -1,5 +1,5 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
-import { EMPTY_FACTORY_VELOCITY } from "./velocityReportFixtures";
+import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
   defaultFactoriesFixture,
@@ -219,12 +219,13 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const byPeriod = fixture.velocityByFactoryId?.[match[1]];
         const periodDays = Number(url.searchParams.get("periodDays") ?? 14);
         const report = byPeriod?.[periodDays] ?? byPeriod?.[14] ?? EMPTY_FACTORY_VELOCITY;
+        const paged = paginateVelocityPeople(report, url);
 
         // The page follows peopleSyncedAt to know a sync finished, so a report
         // read after a sync must carry the newer time.
         const syncedAt = velocitySyncedAt.get(match[1]);
-        if (!syncedAt) return { json: report };
-        return { json: { ...report, peopleSyncedAt: syncedAt, peopleSyncPending: false } };
+        if (!syncedAt) return { json: paged };
+        return { json: { ...paged, peopleSyncedAt: syncedAt, peopleSyncPending: false } };
       },
     },
     {

@@ -1,6 +1,7 @@
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { pickAutoRedirectOrganization, readLastVisitedOrganization } from "@/lib/lastVisitedOrganization";
 import { Navigate } from "react-router";
@@ -12,11 +13,13 @@ function LoadingView() {
 export function RootOrganizationRedirect() {
   const { account } = useAccount();
   const organizations = useAccountOrganizations();
-  const organizationSlug = pickAutoRedirectOrganization(
-    organizations.data?.map((organization) => ({ id: organization.slug })) ?? [],
+  const organizationRoute = pickAutoRedirectOrganization(
+    organizations.data?.map((organization) => ({ slug: organizationRouteId(organization) })) ?? [],
     account ? readLastVisitedOrganization(account.id) : null,
   );
-  const organization = organizations.data?.find((candidate) => candidate.slug === organizationSlug);
+  const organization = organizations.data?.find((candidate) =>
+    organizationRoute ? organizationMatchesRoute(candidate, organizationRoute) : false,
+  );
   const factories = useExperimentalFeature(organization?.id);
 
   if (organizations.isLoading || !account) return <LoadingView />;
@@ -32,5 +35,6 @@ export function RootOrganizationRedirect() {
   if (!organization) return <Navigate to="/onboarding" replace />;
   if (factories.isLoading) return <LoadingView />;
 
-  return <Navigate to={factories.has(FEATURE_FACTORIES) ? `/${organization.slug}/workspaces` : `/${organization.slug}`} replace />;
+  const routeId = organizationRouteId(organization);
+  return <Navigate to={factories.has(FEATURE_FACTORIES) ? `/${routeId}/workspaces` : `/${routeId}`} replace />;
 }
