@@ -115,3 +115,7 @@ func (c *hostedAllowlistLLM) AssertModelSelectable(_, _, model string) error {
 	}
 	return fmt.Errorf("model %s is not on the selected-model list", model)
 }
+
+func (c *hostedAllowlistLLM) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	return core.DefaultHostedLLMModel{}, nil
+}

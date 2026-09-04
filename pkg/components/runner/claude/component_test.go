@@ -13,7 +13,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -318,17 +317,7 @@ func TestRunClaudeCodeExecuteDoesNotGateBYOKModels(t *testing.T) {
 	assert.Equal(t, "sk-byok", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
-func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-hosted-1"}`))},
-		},
-	}
-
+func TestRunClaudeCodeExecuteRejectsHostedCredentials(t *testing.T) {
 	component := &RunClaudeCode{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
@@ -339,127 +328,15 @@ func TestRunClaudeCodeExecuteInjectsHostedAPIKey(t *testing.T) {
 			},
 			"credentials": map[string]any{"source": "hosted"},
 		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-	var req createTaskRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
-}
-
-func TestRunClaudeCodeExecuteInjectsHostedBaseURL(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-claude-hosted-2"}`))},
-		},
-	}
-
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				BaseURL:       "https://proxy.example/v1",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-	var req createTaskRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
-	assert.Equal(t, "https://proxy.example/v1", requireEnvironmentValue(t, req.Environment, envAnthropicBaseURL))
-}
-
-func TestRunClaudeCodeExecuteRejectsPrivateHostedBaseURL(t *testing.T) {
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    &contexts.HTTPContext{},
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				BaseURL:       "http://127.0.0.1/v1",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
+		HTTP:           &contexts.HTTPContext{},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook:        &contexts.NodeWebhookContext{},
+		HostedLLM:      &contexts.HostedLLMContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Requests:       &contexts.RequestContext{},
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "private")
-}
-
-func TestRunClaudeCodeExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
-	component := &RunClaudeCode{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"model":       "claude-sonnet-4-6",
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-			"credentials": map[string]any{"source": "hosted"},
-		},
-		HTTP:    &contexts.HTTPContext{},
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			CreditErr: models.ErrHostedCreditEmpty,
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
-	})
-	require.Error(t, err)
-	assert.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+	assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 }
 
 func TestRunClaudeCodeProcessTaskStatusIncludesResult(t *testing.T) {

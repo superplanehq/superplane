@@ -132,6 +132,12 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
     node.component = rewrite.component;
     const configuration = node.configuration;
     if (!configuration || typeof configuration !== "object") continue;
+    if (rewrite.component === "runnerSuperPlane") {
+      delete configuration.credentials;
+      delete configuration.model;
+      delete configuration.maxTurns;
+      continue;
+    }
     if (rewrite.credentials.source === "hosted") {
       configuration.credentials = { source: "hosted" };
     } else {

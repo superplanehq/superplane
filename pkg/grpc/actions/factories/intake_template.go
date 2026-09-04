@@ -68,7 +68,8 @@ const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 var intakeAnalysisComponents = intakeAgentComponents()
 
 func intakeAgentComponents() []string {
-	components := make([]string, 0, len(intakeAgentSpecs))
+	components := make([]string, 0, len(intakeAgentSpecs)+1)
+	components = append(components, models.SuperPlaneRunnerComponent)
 	for _, spec := range intakeAgentSpecs {
 		components = append(components, spec.component)
 	}

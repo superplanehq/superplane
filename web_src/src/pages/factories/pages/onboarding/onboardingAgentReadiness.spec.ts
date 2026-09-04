@@ -89,40 +89,32 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  it("uses hosted OpenRouter and the selected allowlist when only credit remains", () => {
+  it("uses hosted SuperPlane when credit remains and a default model is set", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected(),
         remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1"] },
+        defaultHostedProvider: "openrouter",
+        defaultHostedModel: "openai/gpt-4.1",
       }),
     ).toEqual({
-      providerId: "openrouter",
-      component: "runnerOpenRouter",
+      component: "runnerSuperPlane",
       credentialsSource: "hosted",
-      integrationName: "openrouter",
-      harness: "AGENT_HARNESS_CLAUDE_CODE",
-      model: "openai/gpt-4.1",
-      planningModel: "openai/gpt-4.1",
+      harness: "AGENT_HARNESS_SUPERPLANE",
+      model: "",
+      planningModel: "",
     });
   });
 
-  it("uses hosted OpenAI when that provider is the enabled hosted allowlist", () => {
+  it("does not plan SuperPlane when credit remains without a default model", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected(),
         remainingCreditCents: 5000,
         hostedModels: { ...noHostedModels, openai: ["gpt-5", "gpt-4.1"] },
       }),
-    ).toEqual({
-      providerId: "openai",
-      component: "runnerCodex",
-      credentialsSource: "hosted",
-      integrationName: "openai",
-      harness: "AGENT_HARNESS_CODEX",
-      model: "gpt-5",
-      planningModel: "gpt-5",
-    });
+    ).toBeUndefined();
   });
 
   it("prefers a connected provider over hosted credit", () => {
@@ -133,16 +125,6 @@ describe("resolveOnboardingAgent", () => {
         hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
       })?.providerId,
     ).toBe("openai");
-  });
-
-  it("returns undefined when credit remains but no hosted models are enabled", () => {
-    expect(
-      resolveOnboardingAgent({
-        connected: connected(),
-        remainingCreditCents: 5000,
-        hostedModels: noHostedModels,
-      }),
-    ).toBeUndefined();
   });
 });
 
@@ -182,8 +164,19 @@ describe("isHostedAgentReady", () => {
     expect(isHostedAgentReady({ hostedModelsLoading: false, plan: undefined })).toBe(false);
   });
 
-  it("is not ready while hosted models load, because the plan can still change", () => {
-    expect(isHostedAgentReady({ hostedModelsLoading: true, plan: plan("hosted") })).toBe(false);
+  it("is ready for SuperPlane while hosted models are still loading", () => {
+    expect(
+      isHostedAgentReady({
+        hostedModelsLoading: true,
+        plan: {
+          component: "runnerSuperPlane",
+          credentialsSource: "hosted",
+          harness: "AGENT_HARNESS_SUPERPLANE",
+          model: "",
+          planningModel: "",
+        },
+      }),
+    ).toBe(true);
   });
 });
 
@@ -208,14 +201,14 @@ describe("firstWorkOrderAgentError", () => {
     ).toBe("Hosted models are still loading. Try again.");
   });
 
-  it("asks an admin to enable hosted models when credit remains without an allowlist", () => {
+  it("asks an admin to set a SuperPlane agent model when credit remains without a default", () => {
     expect(
       firstWorkOrderAgentError({
         remainingCreditCents: 5000,
         hostedModelsLoading: false,
         plan: undefined,
       }),
-    ).toBe("Ask an installation admin to enable SuperPlane-hosted models.");
+    ).toBe("Ask an installation admin to set a SuperPlane agent model.");
   });
 
   it("returns null when a plan is ready", () => {

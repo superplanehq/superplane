@@ -172,33 +172,21 @@ func intakeAgentFromInstallations(tx *gorm.DB, factory *models.Factory) *intakeA
 // A hosted run needs a model from the allowlist of the provider, so a provider
 // without one cannot serve the intake.
 func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intakeAgent {
-	providers, err := models.ListHostedLLMProviders(tx)
+	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(tx)
 	if err != nil {
-		log.Warnf("factory %s: intake cannot read the hosted providers: %v", factory.ID, err)
+		log.Warnf("factory %s: intake cannot read the SuperPlane agent model: %v", factory.ID, err)
+		return nil
+	}
+	if !defaultModel.IsSet() {
+		return nil
+	}
+	if err := models.AssertDefaultHostedLLMModelAllowed(tx, defaultModel); err != nil {
 		return nil
 	}
 
-	for _, spec := range intakeAgentSpecs {
-		index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
-			return provider.Provider == spec.hostedProvider && provider.OffersHostedModels()
-		})
-		if index < 0 {
-			continue
-		}
-
-		model := hostedIntakeModel(providers[index], spec.hostedModelHint)
-		if model == "" {
-			continue
-		}
-
-		return &intakeAgent{
-			Component:   spec.component,
-			Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
-			Model:       model,
-		}
+	return &intakeAgent{
+		Component: models.SuperPlaneRunnerComponent,
 	}
-
-	return nil
 }
 
 func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
