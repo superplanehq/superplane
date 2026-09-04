@@ -1,6 +1,7 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useDeleteFactory } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
 import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
@@ -166,7 +167,8 @@ function AgentScreen({
  * stay presentational, so this hook holds every step that talks to the API.
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory } = useFactoriesLayout();
+  const { factory, organizationId } = useFactoriesLayout();
+  const { data: me } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
 
@@ -237,10 +239,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
       .find((account) => account !== "") ||
     "";
-  // Do not pass account.id: that id is the account, and startedByUserID is the
-  // user. They do not match, so the picker would stay hidden after GitHub
-  // returns with two installations.
-  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances);
+  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
+  // user. The /account id is the account, so a match would hide the picker.
+  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
 
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
