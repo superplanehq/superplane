@@ -103,23 +103,25 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, org.ID, reloaded.ID)
 	})
 
-	t.Run("update name to one already in use -> invalid argument", func(t *testing.T) {
-		taken, err := models.CreateOrganization("Shared Organization Name", "")
+	t.Run("update name to one already in use by another organization -> success", func(t *testing.T) {
+		// Only the slug must be unique among active organizations. Names may
+		// repeat, for example when onboarding keeps an organization's name
+		// equal to its GitHub owner across slug-collision retries.
+		shared, err := models.CreateOrganization("Shared Organization Name", "")
 		require.NoError(t, err)
 
 		org, err := models.CreateOrganization(support.RandomName("org"), "")
 		require.NoError(t, err)
 
-		_, err = UpdateOrganization(context.Background(), org.ID.String(), &protos.Organization{
+		response, err := UpdateOrganization(context.Background(), org.ID.String(), &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
-				Name: taken.Name,
+				Name: shared.Name,
 			},
 		})
-		require.Error(t, err)
-		code, msg, ok := grpcerrors.HandlerStatus(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, code)
-		assert.Equal(t, "organization name is already in use", msg)
+		require.NoError(t, err)
+		require.NotNil(t, response.Organization)
+		assert.Equal(t, shared.Name, response.Organization.Metadata.Name)
+		assert.NotEqual(t, shared.Slug, response.Organization.Metadata.Slug)
 	})
 
 	t.Run("update slug to one already in use -> invalid argument", func(t *testing.T) {
