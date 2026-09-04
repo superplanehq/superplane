@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -66,6 +67,10 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	defer ticker.Stop()
 
 	for {
+		if r.Context().Err() != nil {
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		}
 		session, err := s.loadPlanningSessionForRunner(r, scope)
 		if err != nil {
 			writeRunnerPlanningError(w, err)
@@ -82,12 +87,19 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 				return
 			}
 			if consumed {
-				writeJSON(w, http.StatusOK, map[string]any{
+				if r.Context().Err() != nil {
+					restorePlanningWait(session, result)
+					writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
+					return
+				}
+				if err := writeJSON(w, http.StatusOK, map[string]any{
 					"status":         result.Kind,
 					"text":           result.Text,
 					"work_order_id":  result.WorkOrderID,
 					"work_order_key": result.WorkOrderKey,
-				})
+				}); err != nil {
+					restorePlanningWait(session, result)
+				}
 				return
 			}
 		}
@@ -168,13 +180,21 @@ func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (m
 	return result, true, nil
 }
 
-func writeJSON(w http.ResponseWriter, status int, body any) {
+func restorePlanningWait(session *models.FactoryPlanningSession, result models.PlanningWaitResult) {
+	if err := session.RestoreWait(database.DB(context.Background()), result); err != nil {
+		log.WithError(err).Error("failed to restore planning wait after a dropped write")
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, body any) error {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		log.WithError(err).Error("failed to encode planning session runner response")
+		return err
 	}
+	return nil
 }
 
 func writeRunnerPlanningError(w http.ResponseWriter, err error) {
