@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  INTEGRATION_SETUP_RETURN_COOKIE,
   consumeIntegrationSetupReturn,
   consumeIntegrationSetupReturnIfArrived,
   hasGitHubSetupRequest,
@@ -10,9 +11,18 @@ import {
   withGitHubSetupRequest,
 } from "./integrationSetupReturn";
 
+function setupReturnCookie(): string | undefined {
+  const prefix = `${INTEGRATION_SETUP_RETURN_COOKIE}=`;
+  return document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length);
+}
+
 describe("integration setup return", () => {
   afterEach(() => {
     window.localStorage.clear();
+    document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=; Path=/; Max-Age=0`;
     vi.useRealTimers();
   });
 
@@ -23,6 +33,13 @@ describe("integration setup return", () => {
 
     consumeIntegrationSetupReturn("org-1");
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
+    expect(setupReturnCookie()).toBeUndefined();
+  });
+
+  it("mirrors the return path in a cookie for the GitHub callback", () => {
+    rememberIntegrationSetupReturn("org-1", "/org-1/workspaces/APP/setup?step=vcs&pick=newest");
+
+    expect(decodeURIComponent(setupReturnCookie() ?? "")).toBe("/org-1/workspaces/APP/setup?step=vcs&pick=newest");
   });
 
   it("consumes the marker only after the browser arrives on the stored page", () => {

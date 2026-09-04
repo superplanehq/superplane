@@ -10,7 +10,7 @@ import {
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
-import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 
@@ -61,7 +61,7 @@ export function useIntegrationConnectDialog({
   /** Configuration field names the create dialog never shows, keyed by integration name. */
   hiddenConfigurationFields?: Record<string, string[]>;
 }) {
-  const { data: me } = useMe();
+  const { data: me } = useMe(true, organizationId);
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
@@ -143,6 +143,7 @@ export function useIntegrationConnectDialog({
             const response = await createIntegrationMutation.mutateAsync(payload);
             return response.data;
           },
+          update: persistGitHubSetupReturnPath(organizationId),
         });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
