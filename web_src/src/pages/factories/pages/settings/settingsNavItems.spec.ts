@@ -38,7 +38,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Repository",
       "Automations",
       "Models",
-      "Spending",
       "General",
       "Members",
       "Integrations",
@@ -75,16 +74,12 @@ describe("filterFactorySettingsNavGroups", () => {
       "workspace-repository",
       "workspace-automations",
       "workspace-models",
-      "workspace-spending",
     ]);
   });
 
   it("matches keyword aliases such as billing", () => {
     const filtered = filterFactorySettingsNavGroups(FACTORY_SETTINGS_NAV_GROUPS, "billing");
-    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual([
-      "workspace-spending",
-      "organization-spending",
-    ]);
+    expect(filtered.flatMap((group) => group.items.map((item) => item.id))).toEqual(["organization-spending"]);
   });
 
   it("drops groups that have no matching items", () => {

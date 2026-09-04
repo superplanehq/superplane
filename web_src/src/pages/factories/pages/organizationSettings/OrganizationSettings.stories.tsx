@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { EMPTY_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
+import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
@@ -62,92 +62,7 @@ export const SpendingEmpty: Story = {
   render: () => (
     <FactoriesHarness
       pathSuffix={organizationSettingsPath("spending")}
-      factoriesFixture={{ ...defaultFactoriesFixture, organizationWorkspaceUsage: EMPTY_USAGE_REPORT }}
-    />
-  ),
-};
-
-export const SpendingBilling: Story = {
-  name: "Spending (add hosted credit)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={organizationSettingsPath("spending")}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        organizationWorkspaceUsage: {
-          ...EMPTY_USAGE_REPORT,
-          remainingCreditCents: "0",
-          grantTotalCents: "0",
-          hostedBilledCents: "0",
-          remainingCreditWarning: true,
-          billingEnabled: true,
-          hasBillingCustomer: false,
-        },
-        hostedCreditProducts: [
-          { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
-          { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
-          { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
-        ],
-      }}
-    />
-  ),
-};
-
-export const SpendingBillingInvoices: Story = {
-  name: "Spending (manage invoices)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={organizationSettingsPath("spending")}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        organizationWorkspaceUsage: {
-          ...EMPTY_USAGE_REPORT,
-          remainingCreditCents: "14630",
-          grantTotalCents: "15000",
-          superplaneGrantCents: "5000",
-          purchasedCreditCents: "10000",
-          hostedBilledCents: "370",
-          remainingCreditWarning: false,
-          billingEnabled: true,
-          hasBillingCustomer: true,
-          invoices: [
-            {
-              id: "ord_100",
-              createdAt: "2026-08-27T12:00:00Z",
-              amountCents: "10000",
-              status: "paid",
-              productName: "$100 pack",
-            },
-          ],
-        },
-        hostedCreditProducts: [
-          { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
-          { id: "prod-25", name: "Hosted credit 25", amountCents: "2500" },
-          { id: "prod-100", name: "Hosted credit 100", amountCents: "10000" },
-        ],
-      }}
-    />
-  ),
-};
-
-export const SpendingCreditAdded: Story = {
-  name: "Spending (credit added)",
-  render: () => (
-    <FactoriesHarness
-      pathSuffix={`${organizationSettingsPath("spending")}?credit=added`}
-      factoriesFixture={{
-        ...defaultFactoriesFixture,
-        organizationWorkspaceUsage: {
-          ...EMPTY_USAGE_REPORT,
-          remainingCreditCents: "2500",
-          grantTotalCents: "2500",
-          hostedBilledCents: "0",
-          remainingCreditWarning: false,
-          billingEnabled: true,
-          hasBillingCustomer: true,
-        },
-        hostedCreditProducts: [{ id: "prod-25", name: "Hosted credit 25", amountCents: "2500" }],
-      }}
+      factoriesFixture={{ ...defaultFactoriesFixture, organizationSpendingReport: EMPTY_ORG_SPENDING_REPORT }}
     />
   ),
 };

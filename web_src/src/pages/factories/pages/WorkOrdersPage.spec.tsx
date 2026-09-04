@@ -44,7 +44,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Hosted credit is empty");
     expect(banner).toHaveTextContent("Add hosted credit to start SuperPlane-hosted runs.");
-    expect(screen.getByRole("link", { name: "Add hosted credit" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View spending" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "spending"),
     );

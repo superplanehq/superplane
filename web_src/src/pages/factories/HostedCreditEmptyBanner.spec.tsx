@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 describe("HostedCreditEmptyBanner", () => {
-  it("links to spending with an add-credit action when billing is on", () => {
+  it("links to spending with a view action when billing is on", () => {
     render(
       <MemoryRouter>
         <HostedCreditEmptyBanner billingEnabled spendingHref="/org/workspaces/RF/settings/organization/spending" />
@@ -16,7 +16,7 @@ describe("HostedCreditEmptyBanner", () => {
     expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent(
       "Add hosted credit to start SuperPlane-hosted runs.",
     );
-    expect(screen.getByRole("link", { name: "Add hosted credit" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View spending" })).toHaveAttribute(
       "href",
       "/org/workspaces/RF/settings/organization/spending",
     );
@@ -38,7 +38,7 @@ describe("HostedCreditEmptyBanner", () => {
     );
   });
 
-  it("shows View spending instead of Add hosted credit for a non-owner when billing is on", () => {
+  it("shows View spending for a non-owner when billing is on", () => {
     render(
       <MemoryRouter>
         <HostedCreditEmptyBanner
