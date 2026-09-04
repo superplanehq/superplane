@@ -145,6 +145,26 @@ describe("pendingGitHubInstallPicker", () => {
     ).toBeUndefined();
   });
 
+  it("returns undefined when the current user is not loaded yet", () => {
+    expect(
+      pendingGitHubAccountPicker([
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              startedByUserID: "user-1",
+              pendingInstallations: [
+                { id: "11", accountLogin: "acme" },
+                { id: "22", accountLogin: "octo" },
+              ],
+            },
+          },
+        },
+      ]),
+    ).toBeUndefined();
+  });
+
   it("returns undefined when the picker belongs to a teammate", () => {
     expect(
       pendingGitHubInstallPicker(

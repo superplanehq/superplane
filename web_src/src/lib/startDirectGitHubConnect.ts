@@ -76,6 +76,10 @@ export function pendingGitHubAccountPicker(
   connected: OrganizationsIntegration[],
   currentUserId?: string,
 ): PendingGitHubAccountPicker | undefined {
+  if (!currentUserId) {
+    return undefined;
+  }
+
   const pending = connected.find((item) => {
     if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
       return false;
