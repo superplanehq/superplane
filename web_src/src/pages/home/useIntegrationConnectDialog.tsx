@@ -116,6 +116,7 @@ export function useIntegrationConnectDialog({
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
+      returnTo,
       availableIntegrations,
       connected,
       pendingConnectKeyRef,
