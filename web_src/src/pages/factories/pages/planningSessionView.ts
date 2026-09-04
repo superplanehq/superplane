@@ -37,7 +37,14 @@ export type PlanningSessionSurveyPayload = {
 
 export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
-  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
+  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen"> & {
+    /**
+     * The view's messages before this rebuild. Used to keep optimistic
+     * "local-" user bubbles alive across a poll that has not yet observed
+     * the persisted message, so sending a message does not flicker.
+     */
+    previousMessages?: CreateWithAgentMessage[];
+  },
 ): CreateWithAgentView {
   const created: CreateWithAgentCreatedOrder[] = (session.created ?? [])
     .filter((order): order is { id: string; key: string; title: string; description?: string } =>
@@ -57,19 +64,86 @@ export function createWithAgentViewFromSession(
       ? extras.right
       : { kind: "empty" as const };
 
+  const serverMessages = (session.messages ?? []).flatMap(planningSessionMessageFromPayload);
+  const pendingLocal = pendingLocalUserMessages(extras.previousMessages ?? [], serverMessages);
+
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
-    messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
+    messages: mergeMessagesByCreatedAt(serverMessages, pendingLocal),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
     created,
     right,
     endConfirmOpen: extras.endConfirmOpen,
   };
+}
+
+function isLocalOptimisticMessage(message: CreateWithAgentMessage): boolean {
+  return message.role === "user" && message.id.startsWith("local-");
+}
+
+/** Matches a user bubble to its persisted counterpart by trimmed text and survey origin. */
+function userMessageKey(message: CreateWithAgentMessage): string {
+  return `${message.origin === "survey" ? "survey" : "message"}:${message.text.trim()}`;
+}
+
+/**
+ * Optimistic "local-" user bubbles that the server payload does not (yet)
+ * contain. A poll that races the send round-trip returns a payload without
+ * the just-sent message; keeping these alive across that poll prevents the
+ * bubble from flickering off and back on. Once the server includes a
+ * matching message, the local bubble is dropped so there is no duplicate.
+ */
+function pendingLocalUserMessages(
+  previousMessages: CreateWithAgentMessage[],
+  serverMessages: CreateWithAgentMessage[],
+): CreateWithAgentMessage[] {
+  const serverKeys = new Set(
+    serverMessages.filter((message) => message.role === "user").map(userMessageKey),
+  );
+  const seenLocalKeys = new Set<string>();
+  return previousMessages.filter((message) => {
+    if (!isLocalOptimisticMessage(message)) {
+      return false;
+    }
+    const key = userMessageKey(message);
+    if (serverKeys.has(key) || seenLocalKeys.has(key)) {
+      return false;
+    }
+    seenLocalKeys.add(key);
+    return true;
+  });
+}
+
+/**
+ * Concatenates server messages with surviving optimistic bubbles and orders
+ * the result by createdAtMs. Messages without a createdAtMs (should only be
+ * the seed greeting) sort first, preserving server order; optimistic bubbles
+ * always carry Date.now() so they land at the tail without jumping once
+ * replaced by the persisted message at the same relative position.
+ */
+function mergeMessagesByCreatedAt(
+  serverMessages: CreateWithAgentMessage[],
+  pendingLocal: CreateWithAgentMessage[],
+): CreateWithAgentMessage[] {
+  if (!pendingLocal.length) {
+    return serverMessages;
+  }
+  return [...serverMessages, ...pendingLocal]
+    .map((message, index) => ({ message, index }))
+    .sort((a, b) => {
+      const aTime = a.message.createdAtMs ?? -Infinity;
+      const bTime = b.message.createdAtMs ?? -Infinity;
+      if (aTime !== bTime) {
+        return aTime - bTime;
+      }
+      return a.index - b.index;
+    })
+    .map(({ message }) => message);
 }
 
 function planningSessionSurveyFromPayload(
