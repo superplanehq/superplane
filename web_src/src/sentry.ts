@@ -14,6 +14,10 @@ export const IGNORED_CONSOLE_MESSAGES = [
   // Vue Devtools browser extension warns when multiple versions are installed.
   // Our app is React-only; this noise originates from the user's extensions.
   /^Another version of Vue Devtools/,
+  // LocatorJS browser extension/tool warns when it inspects a production React
+  // build it can't hook into. This originates from the user's extension, not
+  // our app code.
+  /^\[locatorjs\]: loading: Unsupported React renderer/,
 ];
 
 // True when a console message matches a known third-party pattern we ignore.
