@@ -13,6 +13,7 @@ const { spawn } = require("child_process");
 
 const HOLD_SECONDS = 45;
 const WAIT_RETRY_SECONDS = 1;
+const FOLLOW_UP_CMD_INDEX_BASE = 1000;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -135,11 +136,46 @@ function defaultSleep(ms) {
   });
 }
 
+function writeLiveLogRecord(rec) {
+  process.stdout.write(`${JSON.stringify(rec)}\n`);
+}
+
+function emitFollowUpCommandStart(text, index, startedAt, writeRecord) {
+  writeRecord({
+    type: "cmd_start",
+    index,
+    text,
+    kind: "prompt",
+    preview: text,
+    started_at: startedAt,
+  });
+}
+
+function emitFollowUpCommandEnd(index, code, startedAt, now, writeRecord) {
+  writeRecord({
+    type: "cmd_end",
+    index,
+    status: code === 0 ? "passed" : "failed",
+    duration_ms: Math.max(0, now - startedAt),
+  });
+}
+
+async function runFollowUpPrompt(text, helpers, followUpIndex) {
+  const writeRecord = helpers.writeLiveLogRecord || writeLiveLogRecord;
+  const now = helpers.now || Date.now;
+  const index = FOLLOW_UP_CMD_INDEX_BASE + followUpIndex;
+  const startedAt = now();
+  emitFollowUpCommandStart(text, index, startedAt, writeRecord);
+  const code = await helpers.runPrompt(text);
+  emitFollowUpCommandEnd(index, code, startedAt, now(), writeRecord);
+  return code;
+}
+
 async function runLoop(helpers) {
   const wait = helpers.waitOnce;
-  const runPrompt = helpers.runPrompt;
   const sleep = helpers.sleep || defaultSleep;
   const log = helpers.log || ((msg) => process.stderr.write(msg));
+  let followUpIndex = 0;
   while (true) {
     const result = await wait();
     const action = nextAction(result);
@@ -150,7 +186,8 @@ async function runLoop(helpers) {
       await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
-    const code = await runPrompt(action.text);
+    const code = await runFollowUpPrompt(action.text, helpers, followUpIndex);
+    followUpIndex += 1;
     if (code !== 0) {
       log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
     }
@@ -172,10 +209,12 @@ async function main() {
 }
 
 module.exports = {
+  FOLLOW_UP_CMD_INDEX_BASE,
   interpretWaitResponse,
   nextAction,
   runLoop,
   safeWaitRequest,
+  writeLiveLogRecord,
   writePrompt,
   runPromptFile,
 };
