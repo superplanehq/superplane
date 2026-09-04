@@ -68,6 +68,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
   const sessionIdRef = useRef("");
   const openRef = useRef(false);
   const startGenerationRef = useRef(0);
+  const localMessageIdRef = useRef(0);
   sessionIdRef.current = sessionId;
   openRef.current = open;
 
@@ -164,6 +165,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
       organizationId,
       factoryId,
       startGenerationRef,
+      localMessageIdRef,
       setView,
       applySession,
     });
@@ -220,6 +222,7 @@ function applyPlanningSession({
       composer: current.composer,
       right: current.right,
       endConfirmOpen: current.endConfirmOpen,
+      previousMessages: current.messages,
     }),
   );
 }
@@ -350,6 +353,7 @@ function sendPlanningText({
   organizationId,
   factoryId,
   startGenerationRef,
+  localMessageIdRef,
   setView,
   applySession,
 }: {
@@ -359,6 +363,7 @@ function sendPlanningText({
   organizationId: string;
   factoryId: string;
   startGenerationRef: { current: number };
+  localMessageIdRef: { current: number };
   setView: (updater: (current: CreateWithAgentView) => CreateWithAgentView) => void;
   applySession: (session: PlanningSessionPayload, generation: number) => void;
 }) {
@@ -367,18 +372,22 @@ function sendPlanningText({
     return;
   }
   const generation = startGenerationRef.current;
+  localMessageIdRef.current += 1;
   setView((current) => ({
     ...setCreateWithAgentComposer(current, ""),
     survey: undefined,
     messages: [
       ...current.messages,
       {
-        id: `local-${current.messages.length + 1}`,
+        id: `local-${localMessageIdRef.current}`,
         kind: "text",
         role: "user",
         text: body,
-        // Sorts to the end immediately. The server round-trip replaces this
-        // with the persisted message, whose created_at keeps the same
+        // Sorts to the end immediately. createWithAgentViewFromSession keeps
+        // this optimistic bubble alive across any poll that has not yet
+        // observed the persisted message (matched by trimmed text and
+        // survey origin), so an interleaved poll no longer drops it. Once
+        // the server includes the message, its created_at keeps the same
         // relative position so there is no visible jump.
         createdAtMs: Date.now(),
         ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
