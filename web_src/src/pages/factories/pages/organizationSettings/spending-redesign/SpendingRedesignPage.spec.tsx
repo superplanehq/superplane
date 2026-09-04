@@ -9,7 +9,20 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID, STORYBOOK_ME_USER_NAME } from "../../../__fixtures__/factoryPageIds";
 import { SpendingRedesignPage } from "./SpendingRedesignPage";
 import { SPENDING_CATALOGS, SPENDING_CREDIT, SPENDING_LEDGER, SPENDING_REDESIGN_NOW } from "./spendingRedesignMocks";
-import { EMPTY_SPENDING_FILTERS, formatSpendingRangeCaption, rangeForPreset } from "./spendingRedesignLib";
+import {
+  EMPTY_SPENDING_FILTERS,
+  formatSpendingRangeCaption,
+  rangeForPreset,
+  type SpendingReport,
+} from "./spendingRedesignLib";
+
+const FAKE_REPORT: SpendingReport = {
+  range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+  totals: { costCents: 100, tokens: 10, durationSeconds: 5, hostedCostCents: 100, byokCostCents: 0 },
+  series: [],
+  seriesKeys: [],
+  breakdown: [],
+};
 
 function renderPage(props?: Partial<ComponentProps<typeof SpendingRedesignPage>>) {
   return render(
@@ -293,5 +306,48 @@ describe("SpendingRedesignPage", () => {
     expect(within(models).getByTestId("spending-model-filter-users")).toHaveTextContent(STORYBOOK_ME_USER_NAME);
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Semaphore");
     expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("User")).toBeInTheDocument();
+  });
+
+  describe("loading and refetch indicator", () => {
+    it("shows the full-page loading message on the true first load, before any report exists", () => {
+      renderPage({ isLoading: true, modelReport: undefined, machineReport: undefined });
+
+      expect(screen.getByText("Loading spending...")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-redesign-page")).toHaveTextContent("Loading spending...");
+    });
+
+    it("keeps rendering a previously loaded report instead of the full-page message, even if isLoading is still true", () => {
+      renderPage({ isLoading: true, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByText("Loading spending...")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Spending" })).toBeInTheDocument();
+    });
+
+    it("keeps the full-page loading message while only one report has resolved on the first load", () => {
+      renderPage({ isLoading: true, isFetching: true, modelReport: FAKE_REPORT, machineReport: undefined });
+
+      expect(screen.getByText("Loading spending...")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
+
+    it("shows a quiet top-right indicator while a report refetches over existing data", () => {
+      renderPage({ isLoading: false, isFetching: true, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByText("Loading spending...")).not.toBeInTheDocument();
+      expect(screen.getByTestId("spending-refetch-indicator")).toBeInTheDocument();
+    });
+
+    it("hides the refetch indicator once the background fetch settles", () => {
+      renderPage({ isLoading: false, isFetching: false, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
+
+    it("does not show the quiet indicator underneath the full-page loading message", () => {
+      renderPage({ isLoading: true, isFetching: true, modelReport: undefined, machineReport: undefined });
+
+      expect(screen.getByText("Loading spending...")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
   });
 });
