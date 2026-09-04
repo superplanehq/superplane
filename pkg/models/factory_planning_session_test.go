@@ -126,6 +126,29 @@ func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 	assert.Equal(t, "Add refund retries", session.Wait().Text)
 }
 
+func TestFactoryPlanningSession_RestoreWaitKeepsQueuedUserMessage(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-restore-queue")
+	db := database.Conn()
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "Add refund retries"))
+	result, err := session.ConsumeWait(db)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+
+	require.NoError(t, session.SendUserMessage(db, "Add a puppy color field"))
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+
+	require.NoError(t, session.RestoreWait(db, result))
+	assert.Equal(t, PlanningWaitIdle, session.WaitState)
+
+	require.NoError(t, session.BeginWait(db))
+	assert.Equal(t, PlanningWaitResolved, session.WaitState)
+	assert.Equal(t, PlanningWaitKindMessage, session.Wait().Kind)
+	assert.Equal(t, "Add a puppy color field", session.Wait().Text)
+}
+
 func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-queue")

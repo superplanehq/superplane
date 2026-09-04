@@ -55,6 +55,13 @@ func (s *FactoryPlanningSession) RestoreWait(tx *gorm.DB, result PlanningWaitRes
 		if err := s.guardOpen(); err != nil {
 			return err
 		}
+		_, found, err := s.nextUndeliveredUserMessage(inner)
+		if err != nil {
+			return err
+		}
+		if found {
+			return nil
+		}
 		s.resolveWait(result)
 		return s.saveWait(inner)
 	})
