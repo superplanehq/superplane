@@ -26,6 +26,7 @@ export function buildStorybookMeUser(orgId: string) {
       "canvases",
       "integrations",
       "secrets",
+      "api_keys",
       "groups",
       "users",
       "roles",
@@ -189,8 +190,8 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       pattern: re("/organizations"),
       resolve: () => ({
         json: [
-          { id: orgId, name: fixture.organizationName },
-          { id: "org-storybook-acme", name: "Acme" },
+          { id: orgId, slug: fixture.organizationSlug ?? "superplane", name: fixture.organizationName },
+          { id: "org-storybook-acme", slug: "acme", name: "Acme" },
         ],
       }),
     },

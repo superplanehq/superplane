@@ -12,6 +12,7 @@ import {
   VELOCITY_BREAKDOWN_OPTIONS,
   type VelocityBreakdown,
   type VelocityIntakeSeries,
+  type VelocityPeriodDays,
   type VelocityPoint,
   type VelocityTotals,
 } from "../lib/factoryVelocityReport";
@@ -149,11 +150,13 @@ export interface VelocityComparison {
 export function SummaryCard({
   totals,
   caption,
+  periodDays,
   medianCycleHours,
   comparison,
 }: {
   totals: VelocityTotals;
   caption: string;
+  periodDays: VelocityPeriodDays;
   /** Median cycle time of the tasks that closed in this window. */
   medianCycleHours?: number;
   comparison?: VelocityComparison;
@@ -165,7 +168,7 @@ export function SummaryCard({
         <Metric
           label="Tasks closed"
           value={String(totals.tasksClosed)}
-          tooltip="Finished, with or without a result"
+          tooltip={`All closed tasks in the last ${periodDays} days`}
           change={
             comparison?.tasksClosed === undefined
               ? undefined

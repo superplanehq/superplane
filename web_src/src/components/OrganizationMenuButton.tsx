@@ -3,6 +3,7 @@ import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useAccount } from "@/contexts/useAccount";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
+import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
@@ -299,11 +300,11 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                         <p className="px-1.5 py-1 text-sm text-gray-500">No organizations available.</p>
                       ) : null}
                       {accountOrganizations.map((accountOrganization) => {
-                        const isCurrent = accountOrganization.slug === organizationId;
+                        const isCurrent = organizationMatchesRoute(accountOrganization, organizationId ?? "");
                         return (
                           <Link
                             key={accountOrganization.id}
-                            to={`/${accountOrganization.slug}`}
+                            to={`/${organizationRouteId(accountOrganization)}`}
                             onClick={() => setIsMenuOpen(false)}
                             data-testid={`legacy-organization-option-${accountOrganization.id}`}
                             className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100"

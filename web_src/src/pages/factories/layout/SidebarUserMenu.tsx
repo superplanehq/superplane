@@ -160,12 +160,12 @@ function OrganizationMenuHeader({
       >
         <Settings className="size-3.5" aria-hidden />
       </DropdownMenuItem>
-      <OrganizationSwitchSub currentOrganizationSlug={organizationId} />
+      <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
     </div>
   );
 }
 
-function OrganizationSwitchSub({ currentOrganizationSlug }: { currentOrganizationSlug: string }) {
+function OrganizationSwitchSub({ currentOrganizationRouteId }: { currentOrganizationRouteId: string }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
@@ -180,7 +180,7 @@ function OrganizationSwitchSub({ currentOrganizationSlug }: { currentOrganizatio
           className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
           data-testid="factories-sidebar-organization-switch-menu"
         >
-          <OrganizationSwitchMenu currentOrganizationSlug={currentOrganizationSlug} testIdPrefix="factories-sidebar" />
+          <OrganizationSwitchMenu currentOrganizationRouteId={currentOrganizationRouteId} testIdPrefix="factories-sidebar" />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>

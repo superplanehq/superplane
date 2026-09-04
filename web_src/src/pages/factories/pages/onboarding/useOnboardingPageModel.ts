@@ -18,6 +18,7 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
+import { githubIntegrationOwner, shouldNameOrganizationFromGitHub } from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -186,29 +187,10 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   };
 }
 
-function githubIntegrationOwner(integration: OrganizationsIntegration): string | undefined {
-  const owner = integration.status?.metadata?.owner;
-  return typeof owner === "string" && owner.trim() ? owner.trim() : undefined;
-}
-
-function shouldNameOrganizationFromGitHub(args: {
-  factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
-  selectNewest: boolean;
-}): boolean {
-  return (
-    args.selectNewest &&
-    args.factory?.name === "New workspace" &&
-    args.factories.length === 1 &&
-    !args.factory.onboarding?.vcsIntegrationId
-  );
-}
-
 function useOnboardingGithubConnectionSelected(args: {
   organizationId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
   selectNewest: boolean;
   setup: OnboardingSetupApi;
   setOpenSection: (section: WizardStepId) => void;
@@ -232,7 +214,7 @@ function useOnboardingGithubConnectionSelected(args: {
     }
 
     const owner = githubIntegrationOwner(integration);
-    if (!owner || !shouldNameOrganizationFromGitHub(args)) return;
+    if (!owner || !shouldNameOrganizationFromGitHub(args.factory, args.selectNewest)) return;
 
     const slug = owner.toLowerCase();
     if (slug === args.organizationId) return;
@@ -252,7 +234,6 @@ function useOnboardingGithubConnectionsForPage(args: {
   organizationId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
-  factories: FactoriesFactory[];
   searchParams: URLSearchParams;
   setup: OnboardingSetupApi;
   openSection: WizardStepId;
