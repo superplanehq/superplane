@@ -244,7 +244,6 @@ spec:
         component: "runnerSuperPlane",
         model: "",
         planningModel: "",
-        credentials: { source: "hosted" },
       },
     });
 

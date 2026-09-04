@@ -3,6 +3,7 @@ package models_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -165,6 +166,31 @@ func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, models.SuperPlaneRunnerReadinessError(db, r.Organization.ID, nil))
+}
+
+func Test__AnnotateSuperPlaneRunnerNodes(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+
+	t.Run("stamps a missing instance model", func(t *testing.T) {
+		nodes := []models.Node{{
+			ID:  "agent-1",
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}},
+		}}
+		require.NoError(t, models.AnnotateSuperPlaneRunnerNodes(db, r.Organization.ID, nil, nodes))
+		require.NotNil(t, nodes[0].ErrorMessage)
+		assert.Equal(t, models.SuperPlaneRunnerNoModelMessage, *nodes[0].ErrorMessage)
+	})
+
+	t.Run("returns unexpected errors instead of painting them on the node", func(t *testing.T) {
+		nodes := []models.Node{{
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: models.SuperPlaneRunnerComponent}},
+		}}
+		err := models.AnnotateSuperPlaneRunnerNodes(db, uuid.Nil, nil, nodes)
+		require.Error(t, err)
+		assert.Nil(t, nodes[0].ErrorMessage)
+	})
 }
 
 func stringPtr(value string) *string {

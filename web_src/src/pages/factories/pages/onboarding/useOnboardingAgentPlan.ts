@@ -42,12 +42,11 @@ export function agentRewriteFromPlan(
   plan: OnboardingAgentPlan,
   selections: IntegrationSelections,
 ): FactoryAgentRewrite {
-  if (plan.component === "runnerSuperPlane" || plan.credentialsSource === "hosted") {
+  if (plan.component === "runnerSuperPlane") {
     return {
       component: "runnerSuperPlane",
       model: "",
       planningModel: "",
-      credentials: { source: "hosted" },
     };
   }
   const integrationName = plan.integrationName;

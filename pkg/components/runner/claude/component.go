@@ -99,7 +99,6 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			SecretLabel:      "Anthropic API Key",
 			IntegrationName:  "claude",
 			IntegrationLabel: "Integration",
-			AllowHosted:      false,
 		}),
 		runner.AgentModelField("anthropic", "Claude model id.", "sonnet"),
 		runner.AgentStepsField(

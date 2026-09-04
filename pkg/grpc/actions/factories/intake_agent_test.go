@@ -206,26 +206,6 @@ func Test__IntakeAgentModel(t *testing.T) {
 	})
 }
 
-func Test__HostedIntakeModel(t *testing.T) {
-	t.Run("prefers the model the hint names", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"gpt-5-mini", "gpt-4.1"},
-		}
-		assert.Equal(t, "gpt-5-mini", hostedIntakeModel(provider, "gpt-5"))
-	})
-
-	t.Run("takes the first model when the hint misses", func(t *testing.T) {
-		provider := models.HostedLLMProvider{
-			AllowedModels: datatypes.JSONSlice[string]{"  ", "z-model", "a-model"},
-		}
-		assert.Equal(t, "a-model", hostedIntakeModel(provider, "sonnet"))
-	})
-
-	t.Run("reports no model for an empty allowlist", func(t *testing.T) {
-		assert.Empty(t, hostedIntakeModel(models.HostedLLMProvider{}, "sonnet"))
-	})
-}
-
 func integrationName(t *testing.T, organizationID uuid.UUID, integrationID string) string {
 	t.Helper()
 

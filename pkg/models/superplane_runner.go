@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -44,9 +45,8 @@ func (d DefaultHostedLLMModel) IsSet() bool {
 	return strings.TrimSpace(d.Provider) != "" && strings.TrimSpace(d.Model) != ""
 }
 
-// RewriteHostedProviderRunnerToSuperPlane converts a leftover hosted
-// Claude, Codex, or OpenRouter node into runnerSuperPlane. Integration and
-// secret nodes stay unchanged.
+// RewriteHostedProviderRunnerToSuperPlane converts leftover hosted Claude,
+// Codex, or OpenRouter nodes to runnerSuperPlane. BYOK nodes stay unchanged.
 func RewriteHostedProviderRunnerToSuperPlane(node *Node) bool {
 	if node == nil {
 		return false
@@ -127,8 +127,8 @@ func AssertDefaultHostedLLMModelAllowed(tx *gorm.DB, defaultModel DefaultHostedL
 	return nil
 }
 
-// SyncDefaultHostedLLMModelAfterProviderChange clears an invalid default when
-// no hosted models remain. It rejects the change when other models still exist.
+// SyncDefaultHostedLLMModelAfterProviderChange clears the default when no
+// hosted models remain. It rejects the change when other models still exist.
 func SyncDefaultHostedLLMModelAfterProviderChange(tx *gorm.DB) error {
 	defaultModel, err := GetInstallationDefaultHostedLLMModel(tx)
 	if err != nil {
@@ -174,7 +174,10 @@ func SuperPlaneRunnerReadinessError(tx *gorm.DB, orgID uuid.UUID, factoryID *uui
 		return ErrSuperPlaneRunnerNoModel
 	}
 	if err := AssertDefaultHostedLLMModelAllowed(tx, defaultModel); err != nil {
-		return ErrSuperPlaneRunnerNoModel
+		if errors.Is(err, ErrDefaultHostedModelNotOnAllowlist) {
+			return ErrSuperPlaneRunnerNoModel
+		}
+		return err
 	}
 
 	allowed, err := ModelIsSelectable(tx, orgID, factoryID, defaultModel.Provider, UsageFundingSourceHosted, defaultModel.Model)
@@ -198,6 +201,9 @@ func AnnotateSuperPlaneRunnerNodes(tx *gorm.DB, orgID uuid.UUID, factoryID *uuid
 		if !checked {
 			readiness = SuperPlaneRunnerReadinessError(tx, orgID, factoryID)
 			checked = true
+			if readiness != nil && !isSuperPlaneReadinessError(readiness) {
+				return readiness
+			}
 		}
 		if readiness != nil {
 			message := SuperPlaneRunnerReadinessMessage(readiness)
@@ -226,6 +232,14 @@ func SuperPlaneRunnerReadinessMessage(err error) string {
 	}
 }
 
+func isSuperPlaneReadinessError(err error) bool {
+	return errors.Is(err, ErrSuperPlaneRunnerNoCredit) ||
+		errors.Is(err, ErrSuperPlaneRunnerNoFactoryBudget) ||
+		errors.Is(err, ErrFactoryHostedBudgetEmpty) ||
+		errors.Is(err, ErrSuperPlaneRunnerNoModel) ||
+		errors.Is(err, ErrSuperPlaneRunnerModelNotAllowed)
+}
+
 func isSuperPlaneReadinessMessage(message string) bool {
 	switch strings.TrimSpace(message) {
 	case SuperPlaneRunnerNoCreditMessage,
@@ -239,12 +253,7 @@ func isSuperPlaneReadinessMessage(message string) bool {
 }
 
 func isHostedProviderRunnerComponent(name string) bool {
-	for _, component := range hostedProviderRunnerComponents {
-		if name == component {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(hostedProviderRunnerComponents, name)
 }
 
 func nodeHasHostedCredentials(configuration map[string]any) bool {

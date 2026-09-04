@@ -103,19 +103,6 @@ func InjectHostedCredentials(environment []BrokerEnvironmentVariable, apiKeyEnv,
 	return InjectHostedAPIKey(environment, apiKeyEnv, apiKey, extra...)
 }
 
-// ValidateHostedAgentSpec rejects hosted nodes that omit the model or try to
-// override reserved provider env vars. environmentFrom can still import those
-// names from a secret; InjectHostedCredentials strips them at execute time.
-func ValidateHostedAgentSpec(credentials AgentCredentials, model string, environment []EnvironmentVariable, reservedEnvNames ...string) error {
-	if !IsHostedCredentials(credentials.Source) {
-		return nil
-	}
-	if strings.TrimSpace(model) == "" {
-		return fmt.Errorf("model is required for SuperPlane-hosted credentials")
-	}
-	return ValidateReservedEnvironmentNames(environment, reservedEnvNames...)
-}
-
 func dropEnvironmentNames(environment []BrokerEnvironmentVariable, names ...string) []BrokerEnvironmentVariable {
 	deny := make(map[string]struct{}, len(names))
 	for _, name := range names {

@@ -117,13 +117,8 @@ const PLANNING_AGENT_NODE_ID = "planner-agent-no-issue";
 export type FactoryAgentRewrite = {
   component: string;
   model: string;
-  /**
-   * Model for the planning agent, which weighs evidence rather than writes
-   * code. Hosted runs reject a model that is not on the allowlist, so the
-   * caller resolves this against the same list as `model`.
-   */
   planningModel?: string;
-  credentials: { source: "hosted" } | { source: "integration"; name: string };
+  credentials?: { source: "integration"; name: string };
 };
 
 function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
@@ -138,9 +133,7 @@ function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewri
       delete configuration.maxTurns;
       continue;
     }
-    if (rewrite.credentials.source === "hosted") {
-      configuration.credentials = { source: "hosted" };
-    } else {
+    if (rewrite.credentials?.source === "integration") {
       configuration.credentials = {
         source: "integration",
         integration: { name: rewrite.credentials.name },

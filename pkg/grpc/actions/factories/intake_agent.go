@@ -11,56 +11,33 @@ import (
 	"gorm.io/gorm"
 )
 
-// intakeAgentSpec pairs one runner component with the installation and the
-// SuperPlane-hosted provider that can authenticate it. The order of the list is
-// the order an intake prefers, and it follows the order the workspace setup
-// offers the providers in.
+// intakeAgentSpec pairs a BYOK runner with its integration. List order is the
+// intake preference.
 type intakeAgentSpec struct {
 	component      string
 	integrationApp string
-	hostedProvider string
-	// hostedModelHint is the part of a model id an intake looks for first on a
-	// hosted allowlist. An allowlist without it falls back to its first model.
-	hostedModelHint string
-	// model is the model the generated nodes name. A runner has a default of
-	// its own, but a node that leaves the field empty shows the user no model
-	// and runs on whatever the agent CLI picks, so each spec names one.
-	//
-	// The Backlog scorer and the PR feedback runner weigh evidence rather than
-	// write code: the analysis scores a work order, and the PR feedback runner
-	// judges which review requests are safe to apply. Anthropic therefore
-	// reaches for Opus, the way the planning agent of the factory line does,
-	// while the implementation agent stays on Sonnet.
-	model string
+	model          string
 }
 
 var intakeAgentSpecs = []intakeAgentSpec{
 	{
-		component:       "runnerClaudeCode",
-		integrationApp:  "claude",
-		hostedProvider:  models.UsageProviderAnthropic,
-		hostedModelHint: "opus",
-		model:           "opus",
+		component:      "runnerClaudeCode",
+		integrationApp: "claude",
+		model:          "opus",
 	},
 	{
-		component:       "runnerCodex",
-		integrationApp:  "openai",
-		hostedProvider:  models.UsageProviderOpenAI,
-		hostedModelHint: "gpt-5",
-		model:           "gpt-5",
+		component:      "runnerCodex",
+		integrationApp: "openai",
+		model:          "gpt-5",
 	},
 	{
-		component:       "runnerOpenRouter",
-		integrationApp:  "openrouter",
-		hostedProvider:  models.UsageProviderOpenRouter,
-		hostedModelHint: "sonnet",
-		model:           "anthropic/claude-sonnet-4-6",
+		component:      "runnerOpenRouter",
+		integrationApp: "openrouter",
+		model:          "anthropic/claude-sonnet-4-6",
 	},
 }
 
-// intakeAgent is the runner the generated analysis node scores with, together
-// with the credentials it authenticates by. A runner node without credentials
-// cannot run, so an intake takes the agent the workspace already uses.
+// intakeAgent is the runner a generated analysis node uses.
 type intakeAgent struct {
 	Component   string
 	Credentials map[string]any
@@ -81,10 +58,10 @@ func (a *intakeAgent) credentials() map[string]any {
 	return a.Credentials
 }
 
-// model is the model the generated node names. An agent that carries no model
-// of its own takes the default of its runner, so the node always shows the
-// model the analysis runs on.
 func (a *intakeAgent) model() string {
+	if a != nil && a.Component == models.SuperPlaneRunnerComponent {
+		return ""
+	}
 	if a != nil && a.Model != "" {
 		return a.Model
 	}
@@ -101,12 +78,8 @@ func defaultIntakeAgentModel(component string) string {
 	return intakeAgentSpecs[index].model
 }
 
-// resolveIntakeAgent picks the runner and the credentials of the Backlog
-// analysis node. The workspace setup records the coding agent of the
-// workspace, so scoring uses the same one. A workspace that named no agent
-// still has its installations and the hosted providers to fall back on. A
-// graph that finds nothing keeps an incomplete analysis node, and the user
-// completes it in the canvas.
+// resolveIntakeAgent picks the workspace agent. Credit without an installation
+// uses Run SuperPlane Agent.
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
 	if agent := intakeAgentFromSetup(tx, factory, config.AgentIntegrationID); agent != nil {
@@ -120,10 +93,7 @@ func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	return intakeAgentFromHostedProvider(tx, factory)
 }
 
-// intakeAgentFromSetup reads the agent the workspace setup recorded. A setup
-// that used hosted credentials records no installation, and a setup that used
-// an agent without a runner component (such as Cursor) records one an intake
-// cannot score with, so both fall through to the other sources.
+// intakeAgentFromSetup reads the agent recorded in workspace setup.
 func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID string) *intakeAgent {
 	if strings.TrimSpace(integrationID) == "" {
 		return nil
@@ -144,9 +114,7 @@ func intakeAgentFromSetup(tx *gorm.DB, factory *models.Factory, integrationID st
 	return intakeAgentFromIntegration(integration)
 }
 
-// intakeAgentFromInstallations takes the first agent installation the
-// organization has, in the order an intake prefers. A workspace set up before
-// setup recorded its agent reaches its agent this way.
+// intakeAgentFromInstallations takes the first ready agent installation.
 func intakeAgentFromInstallations(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	integrations, err := models.ListIntegrations(tx, factory.OrganizationID)
 	if err != nil {
@@ -168,9 +136,8 @@ func intakeAgentFromInstallations(tx *gorm.DB, factory *models.Factory) *intakeA
 	return nil
 }
 
-// intakeAgentFromHostedProvider falls back to SuperPlane-hosted credentials.
-// A hosted run needs a model from the allowlist of the provider, so a provider
-// without one cannot serve the intake.
+// intakeAgentFromHostedProvider uses Run SuperPlane Agent when no integration
+// is available and the instance has a SuperPlane agent model.
 func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(tx)
 	if err != nil {
@@ -209,29 +176,4 @@ func intakeAgentFromIntegration(integration *models.Integration) *intakeAgent {
 		},
 		Model: intakeAgentSpecs[index].model,
 	}
-}
-
-// hostedIntakeModel picks the model an intake scores with from an allowlist.
-// The list is free-form, so the hint only expresses a preference: any
-// allowlisted model can run the analysis. The choice is stable, because an
-// intake that is created twice has to produce the same graph.
-func hostedIntakeModel(provider models.HostedLLMProvider, hint string) string {
-	allowed := []string{}
-	for _, model := range provider.AllowedModels {
-		if trimmed := strings.TrimSpace(model); trimmed != "" {
-			allowed = append(allowed, trimmed)
-		}
-	}
-	if len(allowed) == 0 {
-		return ""
-	}
-
-	slices.Sort(allowed)
-	for _, model := range allowed {
-		if strings.Contains(strings.ToLower(model), hint) {
-			return model
-		}
-	}
-
-	return allowed[0]
 }

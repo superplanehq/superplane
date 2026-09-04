@@ -291,7 +291,7 @@ export function useOnboardingPageModel(args: {
     setup,
     // True when hosted credentials cover the agent, so setup can skip the
     // agent screen and provision from the ticket screen.
-    hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
+    hostedAgentReady: isHostedAgentReady(agent.plan),
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,

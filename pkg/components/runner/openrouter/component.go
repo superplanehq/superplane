@@ -90,7 +90,6 @@ func (c *RunOpenRouter) Configuration() []configuration.Field {
 			SecretLabel:      "OpenRouter API Key",
 			IntegrationName:  "openrouter",
 			IntegrationLabel: "Integration",
-			AllowHosted:      false,
 		}),
 		model,
 		runner.AgentStepsField(

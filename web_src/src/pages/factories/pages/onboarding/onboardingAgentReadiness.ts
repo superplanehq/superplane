@@ -110,17 +110,11 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
 }
 
 /**
- * Hosted credentials answer the agent question for the whole organization, so
- * setup has nothing left to ask about the agent. A plan that still loads can
- * become a plan that needs a key, so setup waits for the hosted models.
+ * Hosted credit answers the agent question for the organization, so setup has
+ * nothing left to ask about the agent.
  */
-export function isHostedAgentReady(args: {
-  hostedModelsLoading: boolean;
-  plan: OnboardingAgentPlan | undefined;
-}): boolean {
-  if (args.plan?.component === "runnerSuperPlane") return true;
-  if (args.hostedModelsLoading) return false;
-  return args.plan?.credentialsSource === "hosted";
+export function isHostedAgentReady(plan: OnboardingAgentPlan | undefined): boolean {
+  return plan?.component === "runnerSuperPlane";
 }
 
 export function firstWorkOrderAgentError(args: {

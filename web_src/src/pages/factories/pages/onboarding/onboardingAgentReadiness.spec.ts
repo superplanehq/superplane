@@ -9,7 +9,6 @@ import {
   isHostedAgentReady,
   resolveOnboardingAgent,
   shouldShowHostedCreditGrant,
-  type OnboardingAgentPlan,
 } from "./onboardingAgentReadiness";
 
 function connected(...ids: IntegrationId[]): Set<IntegrationId> {
@@ -140,43 +139,34 @@ describe("hostedModelsQueriesLoading", () => {
 });
 
 describe("isHostedAgentReady", () => {
-  function plan(credentialsSource: OnboardingAgentPlan["credentialsSource"]): OnboardingAgentPlan {
-    return {
-      providerId: "openrouter",
-      component: "runnerOpenRouter",
-      credentialsSource,
-      integrationName: "openrouter",
-      harness: "AGENT_HARNESS_CLAUDE_CODE",
-      model: "openai/gpt-4.1",
-      planningModel: "openai/gpt-4.1",
-    };
-  }
-
-  it("is ready when the plan runs on hosted credentials", () => {
-    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: plan("hosted") })).toBe(true);
+  it("is ready when the plan is Run SuperPlane Agent", () => {
+    expect(
+      isHostedAgentReady({
+        component: "runnerSuperPlane",
+        credentialsSource: "hosted",
+        harness: "AGENT_HARNESS_SUPERPLANE",
+        model: "",
+        planningModel: "",
+      }),
+    ).toBe(true);
   });
 
   it("is not ready when the plan needs a connected provider", () => {
-    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: plan("integration") })).toBe(false);
+    expect(
+      isHostedAgentReady({
+        providerId: "openrouter",
+        component: "runnerOpenRouter",
+        credentialsSource: "integration",
+        integrationName: "openrouter",
+        harness: "AGENT_HARNESS_CLAUDE_CODE",
+        model: "openai/gpt-4.1",
+        planningModel: "openai/gpt-4.1",
+      }),
+    ).toBe(false);
   });
 
   it("is not ready without a plan", () => {
-    expect(isHostedAgentReady({ hostedModelsLoading: false, plan: undefined })).toBe(false);
-  });
-
-  it("is ready for SuperPlane while hosted models are still loading", () => {
-    expect(
-      isHostedAgentReady({
-        hostedModelsLoading: true,
-        plan: {
-          component: "runnerSuperPlane",
-          credentialsSource: "hosted",
-          harness: "AGENT_HARNESS_SUPERPLANE",
-          model: "",
-          planningModel: "",
-        },
-      }),
-    ).toBe(true);
+    expect(isHostedAgentReady(undefined)).toBe(false);
   });
 });
 

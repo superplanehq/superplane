@@ -87,7 +87,6 @@ func (c *RunCodex) Configuration() []configuration.Field {
 			SecretLabel:      "OpenAI API Key",
 			IntegrationName:  "openai",
 			IntegrationLabel: "Integration",
-			AllowHosted:      false,
 		}),
 		runner.AgentModelField("openai", "Codex model id.", "gpt-5"),
 		runner.AgentStepsField(

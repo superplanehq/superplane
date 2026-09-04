@@ -25,7 +25,7 @@ var reservedHostedEnvNames = []string{
 	envOpenRouterBaseURL,
 }
 
-var unsupportedSuperPlaneFields = []string{"credentials", "model", "maxTurns"}
+var unsupportedSuperPlaneFields = []string{"credentials", "model", "maxTurns", "hostedProvider"}
 
 type RunSuperPlaneSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
@@ -37,7 +37,17 @@ type RunSuperPlaneSpec struct {
 }
 
 func decodeRunSuperPlaneSpec(raw any) (RunSuperPlaneSpec, error) {
-	if err := rejectUnsupportedSuperPlaneFields(raw); err != nil {
+	return decodeRunSuperPlaneSpecWithSidecar(raw, false)
+}
+
+func decodeRunSuperPlaneSpecForExecute(raw any) (RunSuperPlaneSpec, error) {
+	return decodeRunSuperPlaneSpecWithSidecar(raw, true)
+}
+
+func decodeRunSuperPlaneSpecWithSidecar(raw any, stripSidecar bool) (RunSuperPlaneSpec, error) {
+	if stripSidecar {
+		stripSuperPlaneSidecarFields(raw)
+	} else if err := rejectUnsupportedSuperPlaneFields(raw); err != nil {
 		return RunSuperPlaneSpec{}, err
 	}
 
@@ -90,4 +100,14 @@ func rejectUnsupportedSuperPlaneFields(raw any) error {
 		}
 	}
 	return nil
+}
+
+func stripSuperPlaneSidecarFields(raw any) {
+	cfg, ok := raw.(map[string]any)
+	if !ok {
+		return
+	}
+	for _, key := range unsupportedSuperPlaneFields {
+		delete(cfg, key)
+	}
 }

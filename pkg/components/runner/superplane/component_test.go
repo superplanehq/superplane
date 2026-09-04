@@ -148,6 +148,47 @@ func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, ac
 	return req
 }
 
+func TestRunSuperPlaneExecuteAcceptsPersistedUsageSidecar(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-superplane-1"}`))},
+		},
+	}
+
+	component := &RunSuperPlane{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"machineType":    testRunnerMachineType,
+			"hostedProvider": models.UsageProviderAnthropic,
+			"model":          "claude-sonnet-4-6",
+			"credentials":    map[string]any{"source": "hosted"},
+			"steps": []map[string]any{
+				{"name": "Hello", "type": "prompt", "prompt": "hello"},
+			},
+		},
+		HTTP:    httpContext,
+		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook: &contexts.NodeWebhookContext{},
+		HostedLLM: &contexts.HostedLLMContext{
+			Default: core.DefaultHostedLLMModel{
+				Provider: models.UsageProviderAnthropic,
+				Model:    "claude-sonnet-4-6",
+			},
+			Access: core.HostedLLMAccess{
+				APIKey:        "sk-hosted",
+				AllowedModels: []string{"claude-sonnet-4-6"},
+			},
+		},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+	require.NoError(t, err)
+}
+
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {
 	t.Helper()
 	for _, variable := range environment {

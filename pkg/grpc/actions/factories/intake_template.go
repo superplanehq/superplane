@@ -241,10 +241,8 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration configures the runner that scores a work order.
-// The runner components reject a node without a machine type or credentials, so
-// the generated node names the machine and the credentials of the workspace
-// agent.
+// intakeAnalysisConfiguration sets the machine and steps. BYOK agents also
+// receive credentials and a model.
 func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
 	configuration := map[string]any{
 		"machineType": intakeAnalysisMachineType,

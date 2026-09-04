@@ -34,45 +34,6 @@ func TestInjectHostedCredentialsStripsExistingBaseURL(t *testing.T) {
 	}, got)
 }
 
-func TestValidateHostedAgentSpecRequiresModel(t *testing.T) {
-	t.Parallel()
-
-	err := ValidateHostedAgentSpec(AgentCredentials{Source: CredentialsSourceHosted}, "", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "model is required")
-
-	require.NoError(t, ValidateHostedAgentSpec(
-		AgentCredentials{Source: CredentialsSourceHosted},
-		"claude-sonnet-4-6",
-		nil,
-	))
-	require.NoError(t, ValidateHostedAgentSpec(
-		AgentCredentials{Source: CredentialsSourceSecret},
-		"",
-		nil,
-	))
-}
-
-func TestValidateHostedAgentSpecRejectsReservedBaseURL(t *testing.T) {
-	t.Parallel()
-
-	err := ValidateHostedAgentSpec(
-		AgentCredentials{Source: CredentialsSourceHosted},
-		"claude-sonnet-4-6",
-		[]EnvironmentVariable{{Name: "ANTHROPIC_BASE_URL"}},
-		"ANTHROPIC_BASE_URL",
-	)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "ANTHROPIC_BASE_URL")
-
-	require.NoError(t, ValidateHostedAgentSpec(
-		AgentCredentials{Source: CredentialsSourceSecret},
-		"",
-		[]EnvironmentVariable{{Name: "ANTHROPIC_BASE_URL"}},
-		"ANTHROPIC_BASE_URL",
-	))
-}
-
 func TestPrepareHostedRunChecksFactoryAllowlist(t *testing.T) {
 	t.Parallel()
 

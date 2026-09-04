@@ -23,7 +23,7 @@ func TestValidateRunSuperPlaneSpecRejectsUnsupportedFields(t *testing.T) {
 	_, err := decodeRunSuperPlaneSpec(base)
 	require.NoError(t, err)
 
-	for _, key := range []string{"credentials", "model", "maxTurns"} {
+	for _, key := range []string{"credentials", "model", "maxTurns", "hostedProvider"} {
 		cfg := cloneConfig(base)
 		cfg[key] = "not-allowed"
 		_, err := decodeRunSuperPlaneSpec(cfg)
