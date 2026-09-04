@@ -2854,6 +2854,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_webhooks_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhooks_pending ON public.webhooks USING btree (created_at) WHERE (((state)::text = 'pending'::text) AND (deleted_at IS NULL));
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4237,7 +4244,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902175657	f
+20260903195934	f
 \.
 
 
