@@ -1,9 +1,16 @@
 import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { HostedLLMSettings } from "./HostedLLMSettings";
 import type { InstallationLLMSettings } from "./hostedLLMSettingsApi";
+
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
 
 const settingsWithOpenRouterModels: InstallationLLMSettings = {
   welcome_grant_cents: 5000,
@@ -71,6 +78,23 @@ describe("HostedLLMSettings", () => {
     expect(screen.getByText("No models match this search.")).toBeInTheDocument();
   });
 
+  it("lists SuperPlane agent models from a saved OpenRouter allowlist when the switch is off", async () => {
+    mockSettingsFetch({
+      ...settingsWithOpenRouterModels,
+      providers: settingsWithOpenRouterModels.providers.map((provider) =>
+        provider.provider === "openrouter" ? { ...provider, enabled: false } : provider,
+      ),
+    });
+
+    render(<HostedLLMSettings />);
+
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    expect(trigger).toHaveTextContent("No SuperPlane agent model");
+    await userEvent.click(trigger);
+    expect(await screen.findByRole("option", { name: "OpenRouter - openai/gpt-4.1" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" })).toBeInTheDocument();
+  });
+
   it("lists SuperPlane agent models as provider - model", async () => {
     mockSettingsFetch({
       ...settingsWithOpenRouterModels,
@@ -80,9 +104,10 @@ describe("HostedLLMSettings", () => {
 
     render(<HostedLLMSettings />);
 
-    const select = await screen.findByTestId("installation-llm-default-model");
-    expect(select).toHaveValue("openrouter::openai/gpt-4.1");
-    expect(screen.getByRole("option", { name: "OpenRouter - openai/gpt-4.1" })).toBeInTheDocument();
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    expect(trigger).toHaveTextContent("OpenRouter - openai/gpt-4.1");
+    await userEvent.click(trigger);
+    expect(await screen.findByRole("option", { name: "OpenRouter - openai/gpt-4.1" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" })).toBeInTheDocument();
   });
 
@@ -111,8 +136,9 @@ describe("HostedLLMSettings", () => {
 
     render(<HostedLLMSettings />);
 
-    const select = await screen.findByTestId("installation-llm-default-model");
-    await user.selectOptions(select, "openrouter::anthropic/claude-sonnet-4");
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    await user.click(trigger);
+    await user.click(await screen.findByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" }));
     await user.click(screen.getByTestId("installation-llm-default-model-save"));
 
     await waitFor(() => {

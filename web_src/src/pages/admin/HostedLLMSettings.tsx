@@ -175,7 +175,7 @@ function useHostedLLMSettings() {
       percentInputToBps(markupPercent) !== settings.markup_bps ||
       percentInputToBps(warningPercent) !== settings.warning_threshold_bps);
   const savedDefaultModelKey = defaultModelKeyFromSettings(settings);
-  const defaultModelOptions = hostedDefaultModelOptions(settings?.providers ?? []);
+  const defaultModelOptions = hostedDefaultModelOptions(settings?.providers ?? [], providers);
   const defaultModelChanged = defaultModelKey !== savedDefaultModelKey;
 
   return {

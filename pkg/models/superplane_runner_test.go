@@ -113,7 +113,7 @@ func Test__NormalizeDefaultHostedLLMModel(t *testing.T) {
 func Test__InstallationDefaultHostedLLMModel(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	_ = r
 
 	t.Cleanup(func() {
@@ -179,7 +179,7 @@ func Test__SuperPlaneRunnerReadinessMessage(t *testing.T) {
 func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	t.Cleanup(func() {
 		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
@@ -210,7 +210,7 @@ func Test__SuperPlaneRunnerReadinessError(t *testing.T) {
 func Test__AnnotateSuperPlaneRunnerNodes(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	t.Run("stamps a missing instance model", func(t *testing.T) {
 		nodes := []models.Node{{

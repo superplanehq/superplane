@@ -37,7 +37,7 @@ SET nodes = COALESCE((
         )
       ELSE elem
     END
-  )
+    )
   FROM jsonb_array_elements(nodes) AS elem
 ), '[]'::jsonb)
 WHERE jsonb_typeof(nodes) = 'array';
