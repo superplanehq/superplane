@@ -9,6 +9,7 @@ import type { FactoryVelocityParams } from "@/hooks/useFactoryVelocity";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY, REFUND_FACTORY } from "../__fixtures__/factoryPageResponses";
+import { PEOPLE_FIRST_PAGE_SIZE, PEOPLE_LOAD_MORE_SIZE, peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { VelocityPage } from "./VelocityPage";
 
@@ -22,9 +23,14 @@ interface VelocityHookState {
   /**
    * The whole People cohort behind the mock's paging, sorted the way the
    * backend would return it. Defaults to `data.people` when unset, which is
-   * enough for tests with fewer than 10 people.
+   * enough for tests with fewer than one page of people.
    */
   allPeople?: VelocityPerson[];
+  /**
+   * Holds the report of the previous offset, the way the query does while the
+   * next page loads.
+   */
+  holdsPreviousReport?: boolean;
 }
 
 interface WorkOrdersHookState {
@@ -68,8 +74,11 @@ vi.mock("@/hooks/useFactoryVelocity", () => ({
 
     const base = velocityHookState.data;
     const allPeople = velocityHookState.allPeople ?? base?.people ?? [];
-    const offset = params.peopleOffset ?? 0;
-    const pageSize = params.peoplePageSize ?? 10;
+    const holdsPreviousReport = velocityHookState.holdsPreviousReport ?? false;
+    const offset = holdsPreviousReport ? 0 : (params.peopleOffset ?? 0);
+    const pageSize = holdsPreviousReport
+      ? PEOPLE_FIRST_PAGE_SIZE
+      : (params.peoplePageSize ?? peoplePageSizeForOffset(offset));
     const page = allPeople.slice(offset, offset + pageSize);
 
     return {
@@ -83,6 +92,7 @@ vi.mock("@/hooks/useFactoryVelocity", () => ({
         : undefined,
       isLoading: velocityHookState.isLoading ?? false,
       isFetching: velocityHookState.isFetching ?? false,
+      isPlaceholderData: holdsPreviousReport,
       error: velocityHookState.error ?? null,
       refetch: vi.fn(),
     };
@@ -160,6 +170,7 @@ function resetState() {
   velocityHookState.isFetching = false;
   velocityHookState.error = null;
   velocityHookState.allPeople = undefined;
+  velocityHookState.holdsPreviousReport = false;
   velocityHookCalls.length = 0;
   workOrdersHookState.data = [];
   workOrdersHookState.isLoading = false;
@@ -378,7 +389,7 @@ describe("VelocityPage shell", () => {
     expect(people).toHaveTextContent("1 person with activity in this period");
   });
 
-  it("shows only the first 10 people and the true total, with a Load more control", () => {
+  it("shows only the first page of people and the true total, with a Show more control", () => {
     resetState();
     velocityHookState.data = populatedResponse();
     velocityHookState.allPeople = manyPeople(12);
@@ -387,10 +398,27 @@ describe("VelocityPage shell", () => {
 
     const people = screen.getByTestId("velocity-people");
     expect(people).toHaveTextContent("12 people with activity in this period");
-    expect(within(people).getAllByRole("row")).toHaveLength(1 + 10); // header row + 10 people
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE);
     expect(within(people).getByText("Contributor 01", { selector: "p" })).toBeInTheDocument();
-    expect(within(people).queryByText("Contributor 11", { selector: "p" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+    expect(within(people).queryByText("Contributor 06", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+  });
+
+  it("keeps the report and the rows already shown while the next page loads", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+
+    velocityHookState.holdsPreviousReport = true;
+    velocityHookState.isFetching = true;
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+
+    const people = screen.getByTestId("velocity-people");
+    expect(screen.queryByTestId("velocity-loading-state")).not.toBeInTheDocument();
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE);
   });
 
   it("loads more people, keeping ranks sequential, and hides the control once every row is shown", async () => {
@@ -400,18 +428,45 @@ describe("VelocityPage shell", () => {
     const user = userEvent.setup();
 
     renderShell();
-    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await user.click(screen.getByRole("button", { name: /show more/i }));
 
     const people = screen.getByTestId("velocity-people");
     expect(within(people).getByText("Contributor 12", { selector: "p" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /load more/i })).not.toBeInTheDocument();
-    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 10 });
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
 
     const ranks = within(people)
       .getAllByRole("row")
       .slice(1)
       .map((row) => within(row).getAllByRole("cell")[0]?.textContent);
     expect(ranks).toEqual(Array.from({ length: 12 }, (_, index) => String(index + 1)));
+  });
+
+  it("asks for 20 more people on each Show more click after the first page", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(50);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
+
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(velocityHookCalls.at(-1)).toMatchObject({
+      peopleOffset: PEOPLE_FIRST_PAGE_SIZE + PEOPLE_LOAD_MORE_SIZE,
+      peoplePageSize: PEOPLE_LOAD_MORE_SIZE,
+    });
+
+    const people = screen.getByTestId("velocity-people");
+    expect(within(people).getAllByRole("row")).toHaveLength(1 + PEOPLE_FIRST_PAGE_SIZE + PEOPLE_LOAD_MORE_SIZE * 2);
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
   });
 
   it("sorts through the backend and resets paging to the first page", async () => {
@@ -421,7 +476,7 @@ describe("VelocityPage shell", () => {
     const user = userEvent.setup();
 
     renderShell();
-    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await user.click(screen.getByRole("button", { name: /show more/i }));
     expect(screen.getByTestId("velocity-people")).toHaveTextContent("Contributor 12");
 
     await user.click(screen.getByRole("button", { name: "Costs" }));
@@ -432,7 +487,7 @@ describe("VelocityPage shell", () => {
       peopleOffset: 0,
     });
     // Paging restarted, so the control is back and the second page is gone.
-    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
     expect(screen.getByTestId("velocity-people")).not.toHaveTextContent("Contributor 12");
 
     await user.click(screen.getByRole("button", { name: "Costs" }));

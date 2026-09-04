@@ -189,7 +189,7 @@ export function VelocityPeopleTable({
             ) : (
               <ChevronDown className="size-3" aria-hidden />
             )}
-            Load more
+            Show more
           </Button>
         </div>
       ) : null}
