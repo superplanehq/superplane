@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { organizationsDescribeOrganizationSpendingReport } from "@/api-client";
 import type { OrganizationsDescribeOrganizationSpendingReportResponse } from "@/api-client";
@@ -59,5 +59,9 @@ export function useOrganizationSpendingReport(query: OrganizationSpendingReportQ
     },
     enabled: enabled && Boolean(organizationId),
     staleTime: 30 * 1000,
+    // Keep the previously loaded report visible while a new filter/grouping
+    // combination is fetching, instead of flipping back to "no data" and
+    // making the whole page unmount/remount for a moment.
+    placeholderData: keepPreviousData,
   });
 }
