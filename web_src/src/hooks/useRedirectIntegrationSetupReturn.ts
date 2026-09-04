@@ -21,21 +21,25 @@ function isLegacyIntegrationDetailsPath(organizationId: string, pathname: string
  * Returns a provider callback to its initiating page before legacy settings
  * redirects can replace the integration details route.
  */
-export function useRedirectIntegrationSetupReturn(organizationId: string | undefined): void {
+export function useRedirectIntegrationSetupReturn(
+  routeOrganizationId: string | undefined,
+  storageOrganizationId = routeOrganizationId,
+): void {
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!organizationId || !isLegacyIntegrationDetailsPath(organizationId, location.pathname)) return;
+    if (!routeOrganizationId || !storageOrganizationId) return;
+    if (!isLegacyIntegrationDetailsPath(routeOrganizationId, location.pathname)) return;
     if (hasIntegrationSetupStay(location.search)) return;
 
-    const returnTo = peekIntegrationSetupReturn(organizationId);
+    const returnTo = peekIntegrationSetupReturn(storageOrganizationId);
     if (!returnTo) return;
 
     // The provider can finish on a later callback after setup has already
     // completed. Consume this one-shot return before navigating so that late
     // callbacks cannot reopen the setup wizard.
-    consumeIntegrationSetupReturn(organizationId);
+    consumeIntegrationSetupReturn(storageOrganizationId);
     navigate(returnTo, { replace: true });
-  }, [location.pathname, location.search, navigate, organizationId]);
+  }, [location.pathname, location.search, navigate, routeOrganizationId, storageOrganizationId]);
 }
