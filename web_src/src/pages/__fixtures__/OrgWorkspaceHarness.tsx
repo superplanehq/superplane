@@ -387,7 +387,6 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
 
   return (
     <Routes>
-      <Route path="create" element={<div data-testid="organization-create-page">Create a new organization</div>} />
       <Route
         path=":organizationId"
         element={

@@ -236,6 +236,7 @@ func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 	var organizations []Organization
 	err := tx.
 		Where("created_by_account_id = ?", accountID).
+		Order("created_at DESC").
 		Find(&organizations).
 		Error
 	return organizations, err
