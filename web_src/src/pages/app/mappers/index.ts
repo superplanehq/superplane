@@ -140,6 +140,11 @@ import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index
 import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
+  componentMappers as jenkinsComponentMappers,
+  triggerRenderers as jenkinsTriggerRenderers,
+  eventStateRegistry as jenkinsEventStateRegistry,
+} from "./jenkins/index";
+import {
   componentMappers as jfrogArtifactoryComponentMappers,
   triggerRenderers as jfrogArtifactoryTriggerRenderers,
   eventStateRegistry as jfrogArtifactoryEventStateRegistry,
@@ -367,6 +372,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   coolify: coolifyComponentMappers,
   hetzner: hetznerComponentMappers,
+  jenkins: jenkinsComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
@@ -417,6 +423,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   bitbucket: bitbucketTriggerRenderers,
   prometheus: prometheusTriggerRenderers,
   cursor: cursorTriggerRenderers,
+  jenkins: jenkinsTriggerRenderers,
   jfrogArtifactory: jfrogArtifactoryTriggerRenderers,
   statuspage: statuspageTriggerRenderers,
   dockerhub: dockerhubTriggerRenderers,
@@ -467,6 +474,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   gitlab: gitlabEventStateRegistry,
   jira: jiraEventStateRegistry,
   linear: linearEventStateRegistry,
+  jenkins: jenkinsEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,

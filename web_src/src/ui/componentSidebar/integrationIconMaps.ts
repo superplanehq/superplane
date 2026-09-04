@@ -59,6 +59,7 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
+import jenkinsIcon from "@/assets/icons/integrations/jenkins.svg";
 import jfrogArtifactoryIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import harnessIcon from "@/assets/icons/integrations/harness.svg";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
@@ -88,6 +89,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jenkins: jenkinsIcon,
   jfrogartifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
@@ -141,6 +143,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   github: githubIcon,
   gitlab: gitlabIcon,
   hetzner: hetznerIcon,
+  jenkins: jenkinsIcon,
   jfrogArtifactory: jfrogArtifactoryIcon,
   grafana: grafanaIcon,
   jira: jiraIcon,
