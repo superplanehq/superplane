@@ -47,7 +47,10 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 	err = tx.Save(organization).Error
 	if err != nil {
 		if isTakenOrganizationIdentityError(err) {
-			return nil, grpcerrors.InvalidArgument(err, "organization name is already in use")
+			// Names are not required to be unique; only the slug still has a
+			// database-level uniqueness constraint, so any collision that
+			// reaches this point is a slug collision.
+			return nil, grpcerrors.InvalidArgument(err, "organization slug is already in use")
 		}
 
 		log.Errorf("Error updating organization %s: %v", orgID, err)
@@ -117,10 +120,10 @@ func applyOrganizationSlugUpdate(tx *gorm.DB, organization *models.Organization,
 }
 
 func isTakenOrganizationIdentityError(err error) bool {
-	if errors.Is(err, models.ErrNameAlreadyUsed) || errors.Is(err, models.ErrSlugAlreadyUsed) {
+	if errors.Is(err, models.ErrSlugAlreadyUsed) {
 		return true
 	}
 
 	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "organizations_name_key") || strings.Contains(message, "duplicate key")
+	return strings.Contains(message, "duplicate key")
 }
