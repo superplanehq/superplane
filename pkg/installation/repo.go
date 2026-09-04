@@ -23,8 +23,8 @@ func ParseRepository(raw string) (*Repository, error) {
 
 	trimmed = strings.TrimPrefix(trimmed, "https://")
 	trimmed = strings.TrimPrefix(trimmed, "http://")
-	trimmed = strings.TrimSuffix(trimmed, ".git")
 	trimmed = strings.Trim(trimmed, "/")
+	trimmed = strings.TrimSuffix(trimmed, ".git")
 
 	if strings.HasPrefix(trimmed, "github.com/") {
 		trimmed = strings.TrimPrefix(trimmed, "github.com/")
