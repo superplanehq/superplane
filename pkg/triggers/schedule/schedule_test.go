@@ -125,7 +125,7 @@ func TestGetNextTrigger(t *testing.T) {
 			expectNext: mustParseTime("2025-01-01T11:45:00Z"),
 		},
 		{
-			name: "days configuration",
+			name: "days configuration (time not yet passed, fires today)",
 			config: Configuration{
 				Type:         TypeDays,
 				DaysInterval: intPtr(1),
@@ -133,7 +133,40 @@ func TestGetNextTrigger(t *testing.T) {
 				Minute:       intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-01T14:30:00Z"),
+		},
+		{
+			name: "days configuration (time already passed, fires next interval)",
+			config: Configuration{
+				Type:         TypeDays,
+				DaysInterval: intPtr(1),
+				Hour:         intPtr(14),
+				Minute:       intPtr(30),
+			},
+			now:        mustParseTime("2025-01-01T16:00:00Z"),
 			expectNext: mustParseTime("2025-01-02T14:30:00Z"),
+		},
+		{
+			name: "days configuration (exactly at trigger time, fires next interval)",
+			config: Configuration{
+				Type:         TypeDays,
+				DaysInterval: intPtr(1),
+				Hour:         intPtr(14),
+				Minute:       intPtr(30),
+			},
+			now:        mustParseTime("2025-01-01T14:30:00Z"),
+			expectNext: mustParseTime("2025-01-02T14:30:00Z"),
+		},
+		{
+			name: "days configuration with interval > 1 (time not yet passed, fires today)",
+			config: Configuration{
+				Type:         TypeDays,
+				DaysInterval: intPtr(3),
+				Hour:         intPtr(9),
+				Minute:       intPtr(0),
+			},
+			now:        mustParseTime("2025-01-01T08:00:00Z"),
+			expectNext: mustParseTime("2025-01-01T09:00:00Z"),
 		},
 		{
 			name: "weeks configuration",
@@ -148,7 +181,7 @@ func TestGetNextTrigger(t *testing.T) {
 			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
 		},
 		{
-			name: "months configuration",
+			name: "months configuration (day not yet passed, fires this month)",
 			config: Configuration{
 				Type:           TypeMonths,
 				MonthsInterval: intPtr(1),
@@ -157,6 +190,30 @@ func TestGetNextTrigger(t *testing.T) {
 				Minute:         intPtr(30),
 			},
 			now:        mustParseTime("2025-01-01T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-15T14:30:00Z"),
+		},
+		{
+			name: "months configuration (day already passed, fires next interval)",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-01-20T10:00:00Z"),
+			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
+		},
+		{
+			name: "months configuration (exactly at trigger time, fires next interval)",
+			config: Configuration{
+				Type:           TypeMonths,
+				MonthsInterval: intPtr(1),
+				DayOfMonth:     intPtr(15),
+				Hour:           intPtr(14),
+				Minute:         intPtr(30),
+			},
+			now:        mustParseTime("2025-01-15T14:30:00Z"),
 			expectNext: mustParseTime("2025-02-15T14:30:00Z"),
 		},
 		{
@@ -365,7 +422,7 @@ func TestTimezoneHandling(t *testing.T) {
 			expectNext: mustParseTime("2025-01-01T07:01:00Z"), // 4:01 AM GMT-3 (7:01 AM UTC), minute 1 not yet passed
 		},
 		{
-			name: "day schedule in GMT+5 timezone",
+			name: "day schedule in GMT+5 timezone (time not yet passed, fires today)",
 			config: Configuration{
 				Type:         TypeDays,
 				DaysInterval: intPtr(1),
@@ -374,7 +431,7 @@ func TestTimezoneHandling(t *testing.T) {
 				Timezone:     stringPtr("5"), // GMT+5
 			},
 			now:        mustParseTime("2025-01-01T08:00:00Z"), // 1 PM GMT+5 (8 AM UTC)
-			expectNext: mustParseTime("2025-01-02T09:30:00Z"), // 2:30 PM GMT+5 (9:30 AM UTC)
+			expectNext: mustParseTime("2025-01-01T09:30:00Z"), // 2:30 PM GMT+5 same day (9:30 AM UTC)
 		},
 		{
 			name: "week schedule in GMT-8 timezone (PST)",
@@ -390,7 +447,7 @@ func TestTimezoneHandling(t *testing.T) {
 			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
 		},
 		{
-			name: "month schedule in GMT+9 timezone (JST)",
+			name: "month schedule in GMT+9 timezone (JST, day not yet passed, fires this month)",
 			config: Configuration{
 				Type:           TypeMonths,
 				MonthsInterval: intPtr(1),
@@ -400,7 +457,7 @@ func TestTimezoneHandling(t *testing.T) {
 				Timezone:       stringPtr("9"), // GMT+9 (JST)
 			},
 			now:        mustParseTime("2025-01-01T02:00:00Z"), // Jan 1st 11 AM JST (2 AM UTC)
-			expectNext: mustParseTime("2025-02-15T03:00:00Z"), // Jan 15th Noon JST (3 AM UTC) of the next month
+			expectNext: mustParseTime("2025-01-15T03:00:00Z"), // Jan 15th Noon JST (3 AM UTC) of the current month
 		},
 		{
 			name: "minutes schedule timezone should not affect calculation",
