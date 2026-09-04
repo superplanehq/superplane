@@ -54,9 +54,7 @@ export const ConnectError: Story = {
       githubConnected={false}
       connectError={FIRST_RUN_COPY.connect.connectError}
       chrome={firstRunStoryChrome(1)}
-      showPrivateApp
       onConnectGitHub={() => undefined}
-      onCreatePrivateApp={() => undefined}
       onContinue={() => undefined}
     />
   ),

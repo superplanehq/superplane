@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { factoriesDescribeFactoryVelocity, factoriesSyncFactoryVelocity } from "@/api-client";
 import type {
@@ -8,9 +8,9 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
-  PEOPLE_PAGE_SIZE,
   PEOPLE_SORT_DEFAULT_DIRECTION,
   PEOPLE_SORT_DEFAULT_KEY,
+  peoplePageSizeForOffset,
   peopleSortDirectionParam,
   peopleSortParam,
   type PeopleSortDirection,
@@ -28,7 +28,7 @@ export interface FactoryVelocityParams {
   peopleSortDirection?: PeopleSortDirection;
   /** 0-based row offset into the sorted People table. Defaults to 0. */
   peopleOffset?: number;
-  /** Rows per page of the People table. Defaults to `PEOPLE_PAGE_SIZE`. */
+  /** Rows per page of the People table. Defaults from the offset: 5, then 20. */
   peoplePageSize?: number;
 }
 
@@ -36,7 +36,7 @@ export function useFactoryVelocity(organizationId: string, factoryId: string, pa
   const peopleSort = params.peopleSort ?? PEOPLE_SORT_DEFAULT_KEY;
   const peopleSortDirection = params.peopleSortDirection ?? PEOPLE_SORT_DEFAULT_DIRECTION;
   const peopleOffset = params.peopleOffset ?? 0;
-  const peoplePageSize = params.peoplePageSize ?? PEOPLE_PAGE_SIZE;
+  const peoplePageSize = params.peoplePageSize ?? peoplePageSizeForOffset(peopleOffset);
 
   return useQuery({
     queryKey: factoryQueryKeys.velocity(organizationId, factoryId, {
@@ -71,6 +71,10 @@ export function useFactoryVelocity(organizationId: string, factoryId: string, pa
     },
     enabled: Boolean(organizationId && factoryId),
     staleTime: 60 * 1000,
+    // The People sort and offset are part of the key, so "Show more" and a new
+    // sort start a query with an empty cache. Hold the report that is on screen
+    // until the next one arrives, or the page blanks into its loading state.
+    placeholderData: keepPreviousData,
   });
 }
 
