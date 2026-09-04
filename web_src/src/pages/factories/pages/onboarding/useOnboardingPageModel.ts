@@ -44,6 +44,18 @@ import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
 
+// Build the path setup should return to after a provider round trip, keeping
+// the current wizard step (and, for the VCS step, the "pick newest" hint).
+function setupStepReturnPath(
+  args: { organizationId: string; factoryKey: string; onboardingEntryPath?: string | null },
+  openSection: WizardStepId,
+): string {
+  return onboardingStepPath(
+    args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
+    openSection,
+  );
+}
+
 /**
  * Sends the browser to the GitHub App installation settings page so the user
  * can grant access to more repositories, remembering where to return once
@@ -327,14 +339,10 @@ export function useOnboardingPageModel(args: {
     const requestedStep = searchParams.get("step");
     return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
   });
-  // Return to this step after the provider round trip.
-  const setupReturnTo = onboardingStepPath(
-    args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
-    openSection,
-  );
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
-    returnTo: setupReturnTo,
+    // Return to this step after the provider round trip.
+    returnTo: setupStepReturnPath(args, openSection),
     integrationNames: ONBOARDING_INTEGRATIONS,
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
@@ -426,7 +434,7 @@ export function useOnboardingPageModel(args: {
       // Manage which repositories the GitHub App can access, on GitHub itself.
       requestGitHubInstallationConfigure({
         organizationId: args.organizationId,
-        returnTo: setupReturnTo,
+        returnTo: setupStepReturnPath(args, openSection),
         integration: github.githubIntegration.data,
       });
     },
