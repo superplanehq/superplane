@@ -9,13 +9,13 @@ export type AgentProviderId = (typeof AGENT_PROVIDER_IDS)[number];
 
 export type HostedLLMProviderId = "anthropic" | "openai" | "openrouter";
 
-export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNESS_CODEX";
+export type OnboardingAgentHarness = "AGENT_HARNESS_CLAUDE_CODE" | "AGENT_HARNESS_CODEX" | "AGENT_HARNESS_SUPERPLANE";
 
 export type OnboardingAgentPlan = {
-  providerId: AgentProviderId;
-  component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter";
+  providerId?: AgentProviderId;
+  component: "runnerClaudeCode" | "runnerCodex" | "runnerOpenRouter" | "runnerSuperPlane";
   credentialsSource: "integration" | "hosted";
-  integrationName: AgentProviderId;
+  integrationName?: AgentProviderId;
   harness: OnboardingAgentHarness;
   model: string;
   /** Model for agents that weigh evidence rather than write code, such as planning. */
@@ -82,6 +82,8 @@ export function resolveOnboardingAgent(args: {
   connected: Set<IntegrationId>;
   remainingCreditCents: number;
   hostedModels: HostedModelsByProvider;
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
@@ -90,23 +92,17 @@ export function resolveOnboardingAgent(args: {
 
   if (args.remainingCreditCents <= 0) return undefined;
 
-  for (const providerId of AGENT_PROVIDER_IDS) {
-    const spec = AGENT_PROVIDER_SPECS[providerId];
-    const modelIds = args.hostedModels[spec.hostedProvider];
-    const model = pickHostedModel(spec.hostedProvider, modelIds);
-    if (!model) continue;
-    return {
-      providerId,
-      component: spec.component,
-      credentialsSource: "hosted",
-      integrationName: providerId,
-      harness: spec.harness,
-      model,
-      planningModel: planningModelFor(spec, modelIds, model),
-    };
-  }
+  const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
+  const defaultModel = args.defaultHostedModel?.trim() ?? "";
+  if (!defaultProvider || !defaultModel) return undefined;
 
-  return undefined;
+  return {
+    component: "runnerSuperPlane",
+    credentialsSource: "hosted",
+    harness: "AGENT_HARNESS_SUPERPLANE",
+    model: "",
+    planningModel: "",
+  };
 }
 
 export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{ isFetched: boolean }>): boolean {
@@ -122,6 +118,7 @@ export function isHostedAgentReady(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
 }): boolean {
+  if (args.plan?.component === "runnerSuperPlane") return true;
   if (args.hostedModelsLoading) return false;
   return args.plan?.credentialsSource === "hosted";
 }
@@ -131,6 +128,7 @@ export function firstWorkOrderAgentError(args: {
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
 }): string | null {
+  if (args.plan?.component === "runnerSuperPlane") return null;
   if (args.hostedModelsLoading) {
     return "Hosted models are still loading. Try again.";
   }
@@ -138,7 +136,7 @@ export function firstWorkOrderAgentError(args: {
   if (args.remainingCreditCents <= 0) {
     return "Connect Anthropic, OpenAI, or OpenRouter, or use hosted credit.";
   }
-  return "Ask an installation admin to enable SuperPlane-hosted models.";
+  return "Ask an installation admin to set a SuperPlane agent model.";
 }
 
 export function shouldShowHostedCreditGrant(grantTotalCents: number): boolean {

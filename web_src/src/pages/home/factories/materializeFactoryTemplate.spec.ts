@@ -231,6 +231,36 @@ spec:
     });
   });
 
+  it("materializes hosted SuperPlane agents without credentials or model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("software-factory"),
+      canvasName: "My Factory",
+      canvasId: "canvas-123",
+      installParams: { repository: "acme/web" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+        credentials: { source: "hosted" },
+      },
+    });
+
+    const doc = yaml.load(canvasYaml) as {
+      spec?: { nodes?: Array<{ component?: string; configuration?: Record<string, unknown> }> };
+    };
+    const agents = (doc.spec?.nodes ?? []).filter((node) => node.component === "runnerSuperPlane");
+    expect(agents.length).toBeGreaterThan(0);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+    for (const agent of agents) {
+      expect(agent.configuration?.credentials).toBeUndefined();
+      expect(agent.configuration?.model).toBeUndefined();
+      expect(agent.configuration?.maxTurns).toBeUndefined();
+    }
+  });
+
   it("exposes separate app and backlog install params on the bundled definition", () => {
     const definition = getFactoryDefinition("software-factory");
     expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);

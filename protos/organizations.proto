@@ -475,6 +475,8 @@ message DescribeOrganizationWorkspaceUsageResponse {
   repeated HostedCreditInvoice invoices = 13;
   int64 total_duration_seconds = 14;
   repeated UsageByMachineType by_machine_type = 15;
+  string default_hosted_provider = 16;
+  string default_hosted_model = 17;
 }
 
 message HostedCreditInvoice {

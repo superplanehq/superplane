@@ -20,6 +20,7 @@ const (
 	FactoryOnboardingAgentHarnessClaudeCode = "claude-code"
 	FactoryOnboardingAgentHarnessCursor     = "cursor"
 	FactoryOnboardingAgentHarnessCodex      = "codex"
+	FactoryOnboardingAgentHarnessSuperPlane = "superplane"
 )
 
 var (
@@ -90,7 +91,8 @@ func ValidateFactoryOnboardingAgentHarness(harness string) error {
 	case "",
 		FactoryOnboardingAgentHarnessClaudeCode,
 		FactoryOnboardingAgentHarnessCursor,
-		FactoryOnboardingAgentHarnessCodex:
+		FactoryOnboardingAgentHarnessCodex,
+		FactoryOnboardingAgentHarnessSuperPlane:
 		return nil
 	default:
 		return ErrFactoryOnboardingInvalidAgentHarness

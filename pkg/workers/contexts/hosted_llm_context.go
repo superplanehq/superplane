@@ -73,3 +73,14 @@ func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
 	return models.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
 }
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(c.tx)
+	if err != nil {
+		return core.DefaultHostedLLMModel{}, err
+	}
+	return core.DefaultHostedLLMModel{
+		Provider: defaultModel.Provider,
+		Model:    defaultModel.Model,
+	}, nil
+}

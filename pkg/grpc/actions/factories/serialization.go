@@ -90,6 +90,8 @@ func serializeFactoryOnboardingAgentHarness(harness string) pb.FactoryOnboarding
 		return pb.FactoryOnboarding_AGENT_HARNESS_CURSOR
 	case models.FactoryOnboardingAgentHarnessCodex:
 		return pb.FactoryOnboarding_AGENT_HARNESS_CODEX
+	case models.FactoryOnboardingAgentHarnessSuperPlane:
+		return pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE
 	default:
 		return pb.FactoryOnboarding_AGENT_HARNESS_UNSPECIFIED
 	}

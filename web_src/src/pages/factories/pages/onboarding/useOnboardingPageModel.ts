@@ -164,7 +164,10 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
+  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents, {
+    provider: spend.data?.defaultHostedProvider,
+    model: spend.data?.defaultHostedModel,
+  });
 }
 
 function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: string) {

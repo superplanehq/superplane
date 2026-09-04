@@ -15,6 +15,13 @@ type AgentCredentials struct {
 	Integration configuration.IntegrationRef `mapstructure:"integration"`
 }
 
+func RejectHostedCredentials(credentials AgentCredentials) error {
+	if IsHostedCredentials(credentials.Source) {
+		return fmt.Errorf("hosted credentials are not supported; use Run SuperPlane Agent")
+	}
+	return nil
+}
+
 func ValidateAgentCredentials(credentials AgentCredentials, integrationRequired bool) error {
 	switch credentials.Source {
 	case CredentialsSourceSecret:
