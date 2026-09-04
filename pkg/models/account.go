@@ -59,16 +59,16 @@ func (a *Account) MarkPasswordChangedInTransaction(tx *gorm.DB, now time.Time) e
 	return nil
 }
 
-func PromoteToInstallationAdmin(accountID string) error {
-	return database.Conn().
+func PromoteToInstallationAdmin(tx *gorm.DB, accountID string) error {
+	return tx.
 		Model(&Account{}).
 		Where("id = ?", accountID).
 		Update("installation_admin", true).
 		Error
 }
 
-func DemoteFromInstallationAdmin(accountID string) error {
-	return database.Conn().
+func DemoteFromInstallationAdmin(tx *gorm.DB, accountID string) error {
+	return tx.
 		Model(&Account{}).
 		Where("id = ?", accountID).
 		Update("installation_admin", false).
