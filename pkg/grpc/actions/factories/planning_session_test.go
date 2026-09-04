@@ -244,7 +244,7 @@ func Test__StartPlanningSession__RejectsEleventhSessionAtDefaultCap(t *testing.T
 	require.Error(t, err)
 }
 
-func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
+func Test__StartPlanningSession__UsesSuperPlaneAndDefaultParallelism(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	setupPlanningStart(t, r.Organization.ID)
@@ -260,19 +260,19 @@ func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
 	require.NoError(t, err)
 	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
 	require.NoError(t, err)
-	foundClaude := false
+	foundAgent := false
 	for _, node := range nodes {
 		if node.Type == models.NodeTypeComponent {
-			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 			require.NotNil(t, node.ConcurrencyMax)
 			assert.Equal(t, models.DefaultFactoryLineStepMaxParallelism, *node.ConcurrencyMax)
-			foundClaude = true
+			foundAgent = true
 		}
 	}
-	assert.True(t, foundClaude)
+	assert.True(t, foundAgent)
 }
 
-func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
+func Test__StartPlanningSession__UsesSuperPlaneWhenSetupIsCodex(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
@@ -295,7 +295,7 @@ func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
 	require.NoError(t, err)
 	for _, node := range nodes {
 		if node.Type == models.NodeTypeComponent {
-			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 			return
 		}
 	}

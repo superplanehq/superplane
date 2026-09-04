@@ -835,6 +835,9 @@ CREATE TABLE public.installation_llm_settings (
     warning_threshold_bps integer DEFAULT 2000 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    default_hosted_provider text,
+    default_hosted_model text,
+    CONSTRAINT installation_llm_settings_default_model_pair CHECK ((((default_hosted_provider IS NULL) AND (default_hosted_model IS NULL)) OR ((default_hosted_provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])) AND (default_hosted_model IS NOT NULL) AND (btrim(default_hosted_model) <> ''::text)))),
     CONSTRAINT installation_llm_settings_markup_non_negative CHECK ((markup_bps >= 0)),
     CONSTRAINT installation_llm_settings_singleton CHECK ((id = 1)),
     CONSTRAINT installation_llm_settings_warning_range CHECK (((warning_threshold_bps >= 0) AND (warning_threshold_bps <= 10000))),
@@ -4238,7 +4241,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260904070917	f
+20260904131457	f
 \.
 
 
