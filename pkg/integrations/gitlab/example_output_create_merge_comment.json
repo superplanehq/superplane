@@ -15,7 +15,10 @@
     "system": false,
     "noteable_id": 3,
     "noteable_iid": 1,
-    "noteable_type": "MergeRequest"
+    "noteable_type": "MergeRequest",
+    "resolvable": true,
+    "confidential": false,
+    "internal": false
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.createMergeComment"
