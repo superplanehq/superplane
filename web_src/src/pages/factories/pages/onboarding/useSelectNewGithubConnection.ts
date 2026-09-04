@@ -22,7 +22,7 @@ export function useOnboardingGithubConnections(args: {
   selectNewest: boolean;
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
-  onConnectionSelected: () => void;
+  onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
 }): IntegrationInstanceSummary {
   const githubConnections =
     args.integrationData.find((integration) => integration.name === "github") ?? EMPTY_GITHUB_CONNECTIONS;
@@ -61,7 +61,7 @@ function useSelectNewGithubConnection(args: {
   readyInstances: IntegrationInstanceSummary["readyInstances"];
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
-  onConnectionSelected: () => void;
+  onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
 }) {
   const selectedNewConnection = useRef(false);
   const { openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected } = args;
@@ -76,6 +76,6 @@ function useSelectNewGithubConnection(args: {
 
     selectedNewConnection.current = true;
     if (selections.github?.id !== id) selectInstance("github", id);
-    onConnectionSelected();
+    void onConnectionSelected(newest);
   }, [openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected]);
 }
