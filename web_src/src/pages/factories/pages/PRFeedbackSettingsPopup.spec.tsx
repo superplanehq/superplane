@@ -42,6 +42,7 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    baseBranch: "main",
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -57,6 +58,23 @@ function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedba
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    baseBranch: "main",
+    runnerIntegrationIds: [],
+    ...overrides,
+  };
+}
+
+function conflictsDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedbackDraftSettings {
+  return {
+    source: "conflicts",
+    name: "Resolve pull request conflicts",
+    repository: "acme/app",
+    mention: "",
+    ignoreBots: false,
+    allowedBots: [],
+    checkNames: [],
+    maximumAttempts: 3,
+    baseBranch: "main",
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -82,6 +100,21 @@ function renderChecksPopup(
           onClose={vi.fn()}
           fixed={false}
         />
+      </QueryClientProvider>
+    </MemoryRouter>,
+  );
+  return { onSave };
+}
+
+function renderConflictsPopup(
+  onSave = vi.fn(),
+  settings: PRFeedbackDraftSettings = conflictsDraft(),
+  healthy = true,
+) {
+  render(
+    <MemoryRouter>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <PRFeedbackSettingsPopup settings={settings} healthy={healthy} onSave={onSave} onClose={vi.fn()} fixed={false} />
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -209,6 +242,48 @@ describe("PRFeedbackSettingsPopup check names", () => {
     expect(within(names).getAllByRole("listitem")).toHaveLength(1);
     expect(names).toHaveTextContent("unit");
     expect(names).not.toHaveTextContent("lint, typecheck");
+  });
+});
+
+describe("PRFeedbackSettingsPopup conflicts", () => {
+  it("shows the base branch field and the conflict-specific health copy", () => {
+    renderConflictsPopup();
+
+    expect(screen.getByTestId("pr-feedback-base-branch")).toHaveValue("main");
+    expect(screen.getByText("This automation can wait for merge conflicts and start a fix.")).toBeInTheDocument();
+    expect(
+      screen.getByText("SuperPlane pauses automatic conflict fixes after this many consecutive attempts."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-mention")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-check-names")).not.toBeInTheDocument();
+  });
+
+  it("saves the base branch and maximum attempts", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderConflictsPopup();
+
+    const baseBranch = screen.getByTestId("pr-feedback-base-branch");
+    await user.clear(baseBranch);
+    await user.type(baseBranch, "develop");
+    await user.click(screen.getByTestId("pr-feedback-settings-save"));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "conflicts",
+        baseBranch: "develop",
+        maximumAttempts: 3,
+      }),
+    );
+  });
+
+  it("disables save when the base branch is empty", async () => {
+    const user = userEvent.setup();
+    renderConflictsPopup();
+
+    const baseBranch = screen.getByTestId("pr-feedback-base-branch");
+    await user.clear(baseBranch);
+
+    expect(screen.getByTestId("pr-feedback-settings-save")).toBeDisabled();
   });
 });
 

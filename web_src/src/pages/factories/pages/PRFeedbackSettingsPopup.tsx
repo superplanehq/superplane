@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
 import {
   PRFeedbackChecksFields,
+  PRFeedbackConflictsFields,
   PRFeedbackDiscussionFields,
   PRFeedbackHealthSection,
   PRFeedbackTextField,
@@ -15,6 +16,7 @@ import {
   appendUniqueTrimmedString,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
+  type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -140,6 +142,7 @@ function PRFeedbackGeneralTab({
   onClose: () => void;
 }) {
   const checks = draft.source === "checks";
+  const conflicts = draft.source === "conflicts";
   const [checkNameInput, setCheckNameInput] = useState("");
   const addCheckName = () => {
     onUpdate("checkNames", appendUniqueTrimmedString(draft.checkNames, checkNameInput));
@@ -150,7 +153,7 @@ function PRFeedbackGeneralTab({
     <>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-          <PRFeedbackHealthSection healthy={healthy} checks={checks} />
+          <PRFeedbackHealthSection healthy={healthy} source={draft.source} />
           <PRFeedbackTextField
             id="pr-feedback-name"
             label={PR_FEEDBACK_SETTINGS_COPY.nameLabel}
@@ -161,9 +164,7 @@ function PRFeedbackGeneralTab({
           <PRFeedbackTextField
             id="pr-feedback-repository"
             label={PR_FEEDBACK_SETTINGS_COPY.repositoryLabel}
-            helper={
-              checks ? PR_FEEDBACK_SETTINGS_COPY.checksRepositoryHelper : PR_FEEDBACK_SETTINGS_COPY.repositoryHelper
-            }
+            helper={prFeedbackRepositoryHelper(draft.source)}
             value={draft.repository}
             onChange={(value) => onUpdate("repository", value)}
           />
@@ -176,6 +177,8 @@ function PRFeedbackGeneralTab({
               onInputChange={setCheckNameInput}
               onAdd={addCheckName}
             />
+          ) : conflicts ? (
+            <PRFeedbackConflictsFields draft={draft} onUpdate={onUpdate} />
           ) : (
             <PRFeedbackDiscussionFields draft={draft} onUpdate={onUpdate} />
           )}
@@ -195,4 +198,14 @@ function PRFeedbackGeneralTab({
       />
     </>
   );
+}
+
+function prFeedbackRepositoryHelper(source: PRFeedbackSourceId): string {
+  if (source === "checks") {
+    return PR_FEEDBACK_SETTINGS_COPY.checksRepositoryHelper;
+  }
+  if (source === "conflicts") {
+    return PR_FEEDBACK_SETTINGS_COPY.conflictsRepositoryHelper;
+  }
+  return PR_FEEDBACK_SETTINGS_COPY.repositoryHelper;
 }

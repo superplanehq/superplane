@@ -8,11 +8,13 @@ import {
   activePRFeedbackWorkOrderIds,
   addressingFeedbackLabelsByWorkOrder,
   addressingFeedbackWorkOrderIds,
+  apiPRFeedbackSource,
   checksPassedWorkOrderIds,
   fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
   hasAvailablePRFeedbackSource,
+  PR_FEEDBACK_SOURCES,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
   oldestActivePRFeedbackRun,
@@ -22,6 +24,7 @@ import {
   prFeedbackDraftIsValid,
   prFeedbackListenTitle,
   prFeedbackSettingsToApi,
+  prFeedbackSourceId,
   type PRFeedbackDraftSettings,
 } from "./prFeedbackSettingsModel";
 function run(overrides: CanvasesCanvasRunRef): CanvasesCanvasRunRef {
@@ -38,6 +41,7 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     allowedBots: [],
     checkNames: [],
     maximumAttempts: 3,
+    baseBranch: "main",
     runnerIntegrationIds: [],
     ...overrides,
   };
@@ -263,16 +267,29 @@ describe("prFeedbackActivityAttemptLabel", () => {
   });
 });
 
+describe("PR_FEEDBACK_SOURCES", () => {
+  it("offers discussion, checks, and conflicts", () => {
+    expect(PR_FEEDBACK_SOURCES.map((source) => source.id)).toEqual(["discussion", "checks", "conflicts"]);
+  });
+
+  it("round-trips the conflicts source through the API enum", () => {
+    expect(prFeedbackSourceId("SOURCE_PULL_REQUEST_CONFLICTS")).toBe("conflicts");
+    expect(apiPRFeedbackSource("conflicts")).toBe("SOURCE_PULL_REQUEST_CONFLICTS");
+  });
+});
+
 describe("takenPRFeedbackSourceIds", () => {
   it("collects sources that already have a handler", () => {
     expect(
       takenPRFeedbackSourceIds([
         { source: "SOURCE_PULL_REQUEST_DISCUSSION" },
         { source: "SOURCE_PULL_REQUEST_CHECKS" },
+        { source: "SOURCE_PULL_REQUEST_CONFLICTS" },
       ]),
-    ).toEqual(["discussion", "checks"]);
+    ).toEqual(["discussion", "checks", "conflicts"]);
     expect(hasAvailablePRFeedbackSource(["discussion"])).toBe(true);
-    expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(false);
+    expect(hasAvailablePRFeedbackSource(["discussion", "checks"])).toBe(true);
+    expect(hasAvailablePRFeedbackSource(["discussion", "checks", "conflicts"])).toBe(false);
   });
 });
 
@@ -280,6 +297,7 @@ describe("prFeedbackListenTitle", () => {
   it("names the listener from the source", () => {
     expect(prFeedbackListenTitle("SOURCE_PULL_REQUEST_DISCUSSION")).toBe("Listening to pull request comments");
     expect(prFeedbackListenTitle("SOURCE_PULL_REQUEST_CHECKS")).toBe("Monitoring pull request checks");
+    expect(prFeedbackListenTitle("SOURCE_PULL_REQUEST_CONFLICTS")).toBe("Monitoring pull request conflicts");
   });
 });
 
@@ -311,6 +329,42 @@ describe("prFeedbackDraftIsValid", () => {
           name: "Fix pull request checks",
           mention: "",
           maximumAttempts: 0,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("requires a base branch and a valid attempt limit for conflicts", () => {
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "conflicts",
+          name: "Resolve pull request conflicts",
+          mention: "",
+          maximumAttempts: 3,
+          baseBranch: "main",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "conflicts",
+          name: "Resolve pull request conflicts",
+          mention: "",
+          maximumAttempts: 3,
+          baseBranch: "",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "conflicts",
+          name: "Resolve pull request conflicts",
+          mention: "",
+          maximumAttempts: 0,
+          baseBranch: "main",
         }),
       ),
     ).toBe(false);
@@ -357,6 +411,33 @@ describe("prFeedbackDraftFromHandler", () => {
       runnerIntegrationIds: ["int-1"],
     });
   });
+
+  it("reads conflict settings", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Resolve pull request conflicts",
+      source: "SOURCE_PULL_REQUEST_CONFLICTS",
+      settings: {
+        subject: { repository: "acme/app" },
+        conflicts: { baseBranch: "develop", maximumAttempts: 5 },
+      },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler)).toMatchObject({
+      source: "conflicts",
+      baseBranch: "develop",
+      maximumAttempts: 5,
+    });
+  });
+
+  it("defaults the base branch to main", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Resolve pull request conflicts",
+      source: "SOURCE_PULL_REQUEST_CONFLICTS",
+      settings: { subject: { repository: "acme/app" } },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).baseBranch).toBe("main");
+  });
 });
 
 describe("appendUniqueTrimmedString", () => {
@@ -399,6 +480,18 @@ describe("prFeedbackSettingsToApi", () => {
     ).toEqual({
       subject: { repository: "acme/app" },
       checks: { names: ["lint"], maximumAttempts: 4, runnerIntegrationIds: ["int-1"] },
+    });
+    expect(
+      prFeedbackSettingsToApi(
+        discussionDraft({
+          source: "conflicts",
+          baseBranch: "develop",
+          maximumAttempts: 5,
+        }),
+      ),
+    ).toEqual({
+      subject: { repository: "acme/app" },
+      conflicts: { maximumAttempts: 5, baseBranch: "develop" },
     });
   });
 });

@@ -1,17 +1,14 @@
 import type {
-  CanvasesCanvasRunRef,
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPrFeedbackHandlerSettings,
   FactoriesFactoryPrFeedbackHandlerSource,
-  FactoriesFactoryPullRequest,
-  FactoriesFactoryPullRequestActivity,
+  FactoryPrFeedbackHandlerCheckSettings,
+  FactoryPrFeedbackHandlerConflictSettings,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
-
 export type PRFeedbackSettingsTab = "general" | "automation";
-export type PRFeedbackSourceId = "discussion" | "checks";
+export type PRFeedbackSourceId = "discussion" | "checks" | "conflicts";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
   return value === "general" || value === "automation";
@@ -46,6 +43,15 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
     iconAlt: "GitHub",
     defaultName: "Fix pull request checks",
   },
+  {
+    id: "conflicts",
+    name: "Pull request conflicts",
+    description: "Wait for merge conflicts and start one agent run when GitHub reports a conflict.",
+    listenTitle: "Monitoring pull request conflicts",
+    iconSrc: githubIcon,
+    iconAlt: "GitHub",
+    defaultName: "Resolve pull request conflicts",
+  },
 ];
 
 export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource | undefined {
@@ -53,11 +59,23 @@ export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource |
 }
 
 export function prFeedbackSourceId(source?: FactoriesFactoryPrFeedbackHandlerSource): PRFeedbackSourceId {
-  return source === "SOURCE_PULL_REQUEST_CHECKS" ? "checks" : "discussion";
+  if (source === "SOURCE_PULL_REQUEST_CHECKS") {
+    return "checks";
+  }
+  if (source === "SOURCE_PULL_REQUEST_CONFLICTS") {
+    return "conflicts";
+  }
+  return "discussion";
 }
 
 export function apiPRFeedbackSource(sourceId: PRFeedbackSourceId): FactoriesFactoryPrFeedbackHandlerSource {
-  return sourceId === "checks" ? "SOURCE_PULL_REQUEST_CHECKS" : "SOURCE_PULL_REQUEST_DISCUSSION";
+  if (sourceId === "checks") {
+    return "SOURCE_PULL_REQUEST_CHECKS";
+  }
+  if (sourceId === "conflicts") {
+    return "SOURCE_PULL_REQUEST_CONFLICTS";
+  }
+  return "SOURCE_PULL_REQUEST_DISCUSSION";
 }
 
 export function takenPRFeedbackSourceIds(
@@ -79,6 +97,7 @@ export interface PRFeedbackDraftSettings {
   allowedBots: string[];
   checkNames: string[];
   maximumAttempts: number;
+  baseBranch: string;
   runnerIntegrationIds: string[];
 }
 
@@ -91,6 +110,7 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   repositoryLabel: "Repository",
   repositoryHelper: "Listen for mentions on pull requests in this repository.",
   checksRepositoryHelper: "Wait for checks on pull requests in this repository.",
+  conflictsRepositoryHelper: "Watch pull requests in this repository for merge conflicts.",
   mentionLabel: "Mention",
   mentionHelper: "Use an exact GitHub mention, for example @superplaneagent.",
   ignoreBotsLabel: "Ignore bot comments",
@@ -105,6 +125,9 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   maximumAttemptsLabel: "Maximum automatic fix attempts",
   maximumAttemptsHelper:
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
+  conflictsMaximumAttemptsHelper: "SuperPlane pauses automatic conflict fixes after this many consecutive attempts.",
+  baseBranchLabel: "Base branch",
+  baseBranchHelper: "SuperPlane rechecks open factory pull requests when this branch receives a push.",
   integrationsLabel: "Additional integration access",
   integrationsHelper: "Give the agent access to CI logs from other connected integrations.",
   integrationsMissingBefore: "If this list does not include the integration you need, go to the ",
@@ -115,6 +138,7 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   healthNeedsRepair: "Needs repair",
   healthReadyHelper: "This automation can receive a mention and address it.",
   healthChecksReadyHelper: "This automation can wait for checks and start a fix.",
+  healthConflictsReadyHelper: "This automation can wait for merge conflicts and start a fix.",
   healthNeedsRepairHelper: "Open the Automation tab and repair the canvas.",
   save: "Save",
   saving: "Saving",
@@ -140,13 +164,13 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   automationError: "Could not load the canvas.",
   retryAutomation: "Retry",
   editAutomation: "Edit automation",
-  waitingForAccess: "Waiting for another pull request activity",
 } as const;
 
 export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHandler): PRFeedbackDraftSettings {
   const source = prFeedbackSourceId(handler.source);
   const discussion = handler.settings?.discussion;
   const checks = handler.settings?.checks;
+  const conflicts = handler.settings?.conflicts;
   return {
     source,
     name: handlerDraftName(handler.name, source),
@@ -155,9 +179,19 @@ export function prFeedbackDraftFromHandler(handler: FactoriesFactoryPrFeedbackHa
     ignoreBots: discussion?.ignoreBots !== false,
     allowedBots: discussion?.allowedBots ?? [],
     checkNames: checks?.names ?? [],
-    maximumAttempts: checks?.maximumAttempts ?? 3,
+    maximumAttempts: handlerDraftMaximumAttempts(source, checks, conflicts),
+    baseBranch: handlerDraftBaseBranch(conflicts?.baseBranch),
     runnerIntegrationIds: checks?.runnerIntegrationIds ?? [],
   };
+}
+
+function handlerDraftMaximumAttempts(
+  source: PRFeedbackSourceId,
+  checks: FactoryPrFeedbackHandlerCheckSettings | undefined,
+  conflicts: FactoryPrFeedbackHandlerConflictSettings | undefined,
+): number {
+  const configured = source === "conflicts" ? conflicts?.maximumAttempts : checks?.maximumAttempts;
+  return configured ?? 3;
 }
 
 function handlerDraftName(name: string | undefined, source: PRFeedbackSourceId): string {
@@ -180,8 +214,17 @@ function handlerDraftMention(mention: string | undefined): string {
   return "@superplaneagent";
 }
 
+function handlerDraftBaseBranch(baseBranch: string | undefined): string {
+  const trimmed = baseBranch?.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+  return "main";
+}
+
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {
-  const sourceId = source === "discussion" || source === "checks" ? source : prFeedbackSourceId(source);
+  const sourceId =
+    source === "discussion" || source === "checks" || source === "conflicts" ? source : prFeedbackSourceId(source);
   return prFeedbackSourceById(sourceId)?.listenTitle ?? "Listening to pull request comments";
 }
 
@@ -195,6 +238,7 @@ export function normalizePRFeedbackDraft(draft: PRFeedbackDraftSettings): PRFeed
     allowedBots: normalizeAllowedBots(draft.allowedBots),
     checkNames: normalizeUniqueStrings(draft.checkNames),
     maximumAttempts: draft.maximumAttempts,
+    baseBranch: draft.baseBranch.trim(),
     runnerIntegrationIds: normalizeUniqueStrings(draft.runnerIntegrationIds),
   };
 }
@@ -252,6 +296,9 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
   if (next.source === "checks") {
     return next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
   }
+  if (next.source === "conflicts") {
+    return next.baseBranch.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
+  }
   return next.mention.startsWith("@");
 }
 
@@ -266,6 +313,15 @@ export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): Factori
       },
     };
   }
+  if (draft.source === "conflicts") {
+    return {
+      subject: { repository: draft.repository },
+      conflicts: {
+        maximumAttempts: draft.maximumAttempts,
+        baseBranch: draft.baseBranch,
+      },
+    };
+  }
   return {
     subject: { repository: draft.repository },
     discussion: {
@@ -276,238 +332,6 @@ export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): Factori
   };
 }
 
-export function isActivePRFeedbackRun(run: CanvasesCanvasRunRef | undefined): boolean {
-  return isActiveCanvasRun(run);
-}
-
-export function isActivePRFeedbackActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
-  return activity?.state === "active" && isActiveCanvasRun(activity.run);
-}
-
-const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for checks\b/i;
-const CHECKS_PASSED_DESCRIPTION = /^Checks passed\b/i;
-
-/** Concurrent check-wait: SuperPlane watches CI and does not address comments yet. */
-export function isWaitingOnChecksActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
-  if (!activity || !isActivePRFeedbackActivity(activity)) {
-    return false;
-  }
-  if (activity.access === "concurrent") {
-    return true;
-  }
-  if (activity.access === "exclusive" || activity.access === "waiting") {
-    return false;
-  }
-  return WAITING_ON_CHECKS_DESCRIPTION.test(activity.description ?? "");
-}
-
-export function isAddressingFeedbackActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
-  return isActivePRFeedbackActivity(activity) && !isWaitingOnChecksActivity(activity);
-}
-
-export function addressingFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
-  return new Set(addressingFeedbackLabelsByWorkOrder(pullRequests).keys());
-}
-
-const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
-
-export function addressingFeedbackLabelsByWorkOrder(
-  pullRequests: FactoriesFactoryPullRequest[],
-): ReadonlyMap<string, string> {
-  const labels = new Map<string, string>();
-  for (const pullRequest of pullRequests) {
-    const workOrderId = pullRequest.workOrderId?.trim();
-    if (!workOrderId) {
-      continue;
-    }
-    const activity = latestAddressingActivity(pullRequest);
-    if (activity) {
-      labels.set(workOrderId, addressingFeedbackCardLabel(activity));
-      continue;
-    }
-    if (
-      (pullRequest.activities ?? []).length === 0 &&
-      (pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))
-    ) {
-      labels.set(workOrderId, "Addressing user feedback");
-    }
-  }
-  return labels;
-}
-
-function latestAddressingActivity(
-  pullRequest: FactoriesFactoryPullRequest,
-): FactoriesFactoryPullRequestActivity | undefined {
-  const active = (pullRequest.activities ?? []).filter((activity) => isAddressingFeedbackActivity(activity));
-  if (active.length === 0) {
-    return undefined;
-  }
-  return [...active].sort(
-    (left, right) => Date.parse(right.run?.createdAt ?? "") - Date.parse(left.run?.createdAt ?? ""),
-  )[0];
-}
-
-function addressingFeedbackCardLabel(activity: FactoriesFactoryPullRequestActivity): string {
-  const description = activity.description?.trim() ?? "";
-  if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(description)) {
-    return prFeedbackActivityLabel(activity);
-  }
-  return "Addressing user feedback";
-}
-
-export function waitingOnChecksWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
-  return prFeedbackWorkOrderIds(pullRequests, "checks-wait");
-}
-
-export function isChecksPassedActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
-  if (!activity || isActivePRFeedbackActivity(activity)) {
-    return false;
-  }
-  return CHECKS_PASSED_DESCRIPTION.test(activity.description ?? "");
-}
-
-/** Latest finished passed check wait. Active waits and repairs win. */
-export function checksPassedWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
-  const waiting = waitingOnChecksWorkOrderIds(pullRequests);
-  const addressing = addressingFeedbackWorkOrderIds(pullRequests);
-  const paused = fixesPausedWorkOrderIds(pullRequests);
-  const ids = new Set<string>();
-  for (const pullRequest of pullRequests) {
-    const workOrderId = pullRequest.workOrderId?.trim();
-    if (!workOrderId || waiting.has(workOrderId) || addressing.has(workOrderId) || paused.has(workOrderId)) {
-      continue;
-    }
-    if (isChecksPassedActivity(latestCheckActivity(pullRequest.activities ?? []))) {
-      ids.add(workOrderId);
-    }
-  }
-  return ids;
-}
-
-export function isFixesPausedActivity(activity: FactoriesFactoryPullRequestActivity | undefined): boolean {
-  return activity?.state === "limit_reached";
-}
-
-/** Latest check activity stopped because the attempt limit was reached. */
-export function fixesPausedWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
-  const waiting = waitingOnChecksWorkOrderIds(pullRequests);
-  const addressing = addressingFeedbackWorkOrderIds(pullRequests);
-  const ids = new Set<string>();
-  for (const pullRequest of pullRequests) {
-    const workOrderId = pullRequest.workOrderId?.trim();
-    if (!workOrderId || waiting.has(workOrderId) || addressing.has(workOrderId)) {
-      continue;
-    }
-    if (isFixesPausedActivity(latestCheckActivity(pullRequest.activities ?? []))) {
-      ids.add(workOrderId);
-    }
-  }
-  return ids;
-}
-
-function latestCheckActivity(
-  activities: FactoriesFactoryPullRequestActivity[],
-): FactoriesFactoryPullRequestActivity | undefined {
-  const related = activities.filter((activity) => isCheckRelatedActivity(activity));
-  if (related.length === 0) {
-    return undefined;
-  }
-  return [...related].sort(
-    (left, right) => Date.parse(right.run?.createdAt ?? "") - Date.parse(left.run?.createdAt ?? ""),
-  )[0];
-}
-
-function isCheckRelatedActivity(activity: FactoriesFactoryPullRequestActivity): boolean {
-  if (activity.state === "limit_reached" || activity.revision) {
-    return true;
-  }
-  const description = activity.description ?? "";
-  return (
-    WAITING_ON_CHECKS_DESCRIPTION.test(description) ||
-    CHECKS_PASSED_DESCRIPTION.test(description) ||
-    FIXING_CHECKS_DESCRIPTION.test(description)
-  );
-}
-
-/** Tasks with an active discussion or exclusive-repair run. */
-export function activePRFeedbackWorkOrderIds(pullRequests: FactoriesFactoryPullRequest[]): ReadonlySet<string> {
-  return addressingFeedbackWorkOrderIds(pullRequests);
-}
-
-function prFeedbackWorkOrderIds(
-  pullRequests: FactoriesFactoryPullRequest[],
-  kind: "addressing" | "checks-wait",
-): ReadonlySet<string> {
-  const ids = new Set<string>();
-  for (const pullRequest of pullRequests) {
-    const workOrderId = pullRequest.workOrderId?.trim();
-    if (!workOrderId) {
-      continue;
-    }
-    const activities = pullRequest.activities ?? [];
-    if (activities.length > 0) {
-      const matches =
-        kind === "checks-wait"
-          ? activities.some((activity) => isWaitingOnChecksActivity(activity))
-          : activities.some((activity) => isAddressingFeedbackActivity(activity));
-      if (matches) {
-        ids.add(workOrderId);
-      }
-      continue;
-    }
-    if (kind === "addressing" && (pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))) {
-      ids.add(workOrderId);
-    }
-  }
-  return ids;
-}
-
-export function prFeedbackActivityLabel(activity: FactoriesFactoryPullRequestActivity): string {
-  if (activity.state === "limit_reached") {
-    const limit = activity.attemptLimit ?? activity.attempt ?? 3;
-    return (
-      activity.description?.trim() || `Automatic fixes paused after ${limit} ${limit === 1 ? "attempt" : "attempts"}`
-    );
-  }
-  if (activity.access === "waiting") {
-    return PR_FEEDBACK_SETTINGS_COPY.waitingForAccess;
-  }
-  return activity.description?.trim() || "Pull request activity";
-}
-
-export function prFeedbackActivityAttemptLabel(activity: FactoriesFactoryPullRequestActivity): string | undefined {
-  if (!activity.attempt || activity.attempt < 1) {
-    return undefined;
-  }
-  const limit = activity.attemptLimit && activity.attemptLimit > 0 ? activity.attemptLimit : 3;
-  return `Attempt ${activity.attempt} of ${limit}`;
-}
-
-export type PRFeedbackActivityKind = "checks-wait" | "addressing" | "fixes-paused";
-
-export type PRFeedbackLogRun = {
-  canvasId: string;
-  handlerName?: string;
-  pullRequestNumber?: string;
-  description?: string;
-  attemptLabel?: string;
-  costCents?: string;
-  totalTokens?: string;
-  kind?: PRFeedbackActivityKind;
-  run: CanvasesCanvasRunRef;
-};
-
-export function prFeedbackActivityKind(activity: FactoriesFactoryPullRequestActivity): PRFeedbackActivityKind {
-  if (isFixesPausedActivity(activity)) {
-    return "fixes-paused";
-  }
-  return isWaitingOnChecksActivity(activity) ? "checks-wait" : "addressing";
-}
-
-export function oldestActivePRFeedbackRun(runs: CanvasesCanvasRunRef[]): CanvasesCanvasRunRef | undefined {
-  const active = runs.filter((run) => isActiveCanvasRun(run));
-  if (active.length === 0) {
-    return undefined;
-  }
-  return [...active].sort((left, right) => Date.parse(left.createdAt ?? "") - Date.parse(right.createdAt ?? ""))[0];
-}
+// Work-order card labels and activity kinds live in a separate module so
+// this file stays focused on draft settings and the API mapping.
+export * from "./prFeedbackActivityLabels";

@@ -10,7 +10,7 @@ function renderPicker(onSelect = vi.fn(), onClose = vi.fn()) {
 }
 
 describe("AddPRFeedbackPicker", () => {
-  it("offers discussion and check cards", () => {
+  it("offers discussion, check, and conflict cards", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-pr-feedback-picker");
@@ -19,6 +19,9 @@ describe("AddPRFeedbackPicker", () => {
       "Pull request discussion",
     );
     expect(within(picker).getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+    expect(within(picker).getByTestId("add-pr-feedback-template-conflicts")).toHaveTextContent(
+      "Pull request conflicts",
+    );
   });
 
   it("reports the chosen source to the caller", async () => {

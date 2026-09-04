@@ -11,14 +11,14 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import {
+  PR_FEEDBACK_SETTINGS_COPY,
+  type PRFeedbackDraftSettings,
+  type PRFeedbackSourceId,
+} from "./prFeedbackSettingsModel";
 
-export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
-  const helper = healthy
-    ? checks
-      ? PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper
-      : PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper
-    : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper;
+export function PRFeedbackHealthSection({ healthy, source }: { healthy: boolean; source: PRFeedbackSourceId }) {
+  const helper = healthy ? healthReadyHelper(source) : PR_FEEDBACK_SETTINGS_COPY.healthNeedsRepairHelper;
 
   return (
     <section>
@@ -31,6 +31,16 @@ export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean;
       <p className="workspace-body-text mt-1 text-muted-foreground">{helper}</p>
     </section>
   );
+}
+
+function healthReadyHelper(source: PRFeedbackSourceId): string {
+  if (source === "checks") {
+    return PR_FEEDBACK_SETTINGS_COPY.healthChecksReadyHelper;
+  }
+  if (source === "conflicts") {
+    return PR_FEEDBACK_SETTINGS_COPY.healthConflictsReadyHelper;
+  }
+  return PR_FEEDBACK_SETTINGS_COPY.healthReadyHelper;
 }
 
 export function PRFeedbackTextField({
@@ -161,6 +171,36 @@ export function PRFeedbackDiscussionFields({
         placeholder="coderabbitai, bugbot"
         value={draft.allowedBots}
         onChange={(value) => onUpdate("allowedBots", value)}
+      />
+    </>
+  );
+}
+
+export function PRFeedbackConflictsFields({
+  draft,
+  onUpdate,
+}: {
+  draft: PRFeedbackDraftSettings;
+  onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
+}) {
+  return (
+    <>
+      <PRFeedbackTextField
+        id="pr-feedback-base-branch"
+        label={PR_FEEDBACK_SETTINGS_COPY.baseBranchLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.baseBranchHelper}
+        value={draft.baseBranch}
+        onChange={(value) => onUpdate("baseBranch", value)}
+      />
+      <PRFeedbackTextField
+        id="pr-feedback-maximum-attempts"
+        label={PR_FEEDBACK_SETTINGS_COPY.maximumAttemptsLabel}
+        helper={PR_FEEDBACK_SETTINGS_COPY.conflictsMaximumAttemptsHelper}
+        value={String(draft.maximumAttempts)}
+        type="number"
+        min={1}
+        max={10}
+        onChange={(value) => onUpdate("maximumAttempts", Number(value))}
       />
     </>
   );

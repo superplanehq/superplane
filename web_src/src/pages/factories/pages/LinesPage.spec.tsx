@@ -412,11 +412,24 @@ describe("LinesPage board", () => {
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
         { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+        { id: "handler-conflicts", source: "SOURCE_PULL_REQUEST_CONFLICTS", healthy: true },
       ],
     });
     renderLinesBoard();
 
     expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+  });
+
+  it("keeps add available while a source remains untaken", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+    });
+    renderLinesBoard();
+
+    expect(screen.getByTestId("lines-verify-add-pr-feedback")).toBeInTheDocument();
   });
 
   it("does not offer a source that already has a handler", async () => {
@@ -429,6 +442,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
     expect(screen.getByTestId("add-pr-feedback-template-discussion")).toBeDisabled();
     expect(screen.getByTestId("add-pr-feedback-template-checks")).toBeEnabled();
+    expect(screen.getByTestId("add-pr-feedback-template-conflicts")).toBeEnabled();
   });
 
   it("lists two intakes on the same source", () => {
