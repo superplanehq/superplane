@@ -33,6 +33,7 @@ export interface LogCounts {
 export interface CanvasLogSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  rightOffset?: number;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
@@ -74,6 +75,7 @@ function formatLogTimestamp(value: string) {
 export function CanvasLogSidebar({
   isOpen,
   onClose,
+  rightOffset = 0,
   height,
   defaultHeight = 320,
   minHeight = 240,
@@ -235,7 +237,10 @@ export function CanvasLogSidebar({
   const searchPlaceholder = activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
-    <aside className="ph-no-capture absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
+    <aside
+      className="ph-no-capture absolute left-0 bottom-0 z-31 pointer-events-auto"
+      style={{ right: rightOffset }}
+    >
       <div
         className={cn("flex flex-col border-t bg-white dark:bg-gray-900", appDarkModeClasses.sidebarEdge)}
         style={{ height: sidebarHeight, minHeight, maxHeight }}
