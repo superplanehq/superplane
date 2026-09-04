@@ -12,6 +12,58 @@ const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
 
+const PLANNING_SYSTEM_PROMPT =
+  "This is a SuperPlane planning session. Call the propose_draft tool only when the user asked for a task in this turn. " +
+  "Call the survey tool to ask questions. SuperPlane waits after you stop. Do not create work orders yourself. " +
+  "When the user creates or skips a draft, acknowledge that in one short sentence and ask what they want to do next. " +
+  "Do not call propose_draft unless they ask for a task. When the user starts a refine, read the current task, tell " +
+  "them you are ready, and ask what they want to change. Do not call propose_draft until they say what to change. " +
+  "Write to the user in plain text. Only explore the repository (read files, search, run read-only commands); do not " +
+  "edit or write any files.";
+
+function envFlag(env, name) {
+  return Boolean(String((env && env[name]) || "").trim());
+}
+
+function planningEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_PLANNING_SESSION_ID");
+}
+
+// Codex `exec` has no --ask-for-approval flag; approval_policy is set via a
+// `-c` config override instead. `--sandbox read-only` still allows Bash/Read
+// style exploration (shell commands, file reads) but rejects file writes, so
+// planning sessions stay read-only without disabling tool use entirely.
+function codexExecArgs(env = process.env, model, mcpScriptPath) {
+  const args = ["exec", "--json", "--skip-git-repo-check"];
+  if (planningEnabled(env)) {
+    args.push("--sandbox", "read-only", "-c", "approval_policy=\"never\"");
+    args.push(...mcpConfigOverrides(mcpScriptPath));
+  } else {
+    args.push("--dangerously-bypass-approvals-and-sandbox");
+  }
+  if (model) {
+    args.push("-m", model);
+  }
+  return args;
+}
+
+function mcpConfigOverrides(mcpScriptPath) {
+  return [
+    "-c",
+    `mcp_servers.superplane.command=${tomlString("node")}`,
+    "-c",
+    `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+  ];
+}
+
+function tomlString(value) {
+  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function tomlStringArray(values) {
+  return `[${values.map(tomlString).join(", ")}]`;
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -36,13 +88,17 @@ async function runPrompt(promptFile, model) {
     throw new Error("SUPERPLANE_RESULT_FILE is required");
   }
 
-  const prompt = fs.readFileSync(promptFile, "utf8");
+  let prompt = fs.readFileSync(promptFile, "utf8");
   const promptCountPath = path.join(sp, "prompt_count");
   const promptCount = Number.parseInt(fs.readFileSync(promptCountPath, "utf8").trim(), 10) || 0;
 
-  const codexArgs = ["exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox"];
-  if (model) {
-    codexArgs.push("-m", model);
+  const startedAt = Date.now();
+  const planning = planningEnabled();
+  const codexArgs = codexExecArgs(process.env, model, path.join(sp, "planning_session_mcp.js"));
+  if (planning) {
+    process.stdout.write("Planning session tools enabled\n");
+    process.stdout.write("sandbox: read-only\n");
+    prompt = `${prompt}\n\n${PLANNING_SYSTEM_PROMPT}`;
   }
   if (promptCount > 0) {
     process.stdout.write("Continuing Codex session in the current directory\n");
@@ -98,6 +154,11 @@ async function runPrompt(promptFile, model) {
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  formatTurnResult({
+    is_error: exitCode !== 0,
+    num_turns: 1,
+    duration_ms: Date.now() - startedAt,
+  });
   return exitCode;
 }
 
@@ -326,6 +387,26 @@ function toolFailed(item) {
   return Number.isFinite(exit) && exit !== 0;
 }
 
+function formatTurnResult(event) {
+  const isError = Boolean(event && event.is_error);
+  const status = isError ? "failed" : "done";
+  const parts = [isError ? `✗ ${status}` : `✓ ${status}`];
+  if (event && event.num_turns != null) {
+    parts.push(`${event.num_turns} turns`);
+  }
+  if (event && event.total_cost_usd != null) {
+    const cost = Number(event.total_cost_usd);
+    parts.push(Number.isFinite(cost) ? `$${cost.toFixed(4)}` : `$${event.total_cost_usd}`);
+  }
+  if (event && event.duration_ms != null) {
+    const ms = Number(event.duration_ms);
+    if (Number.isFinite(ms)) {
+      parts.push(`${(ms / 1000).toFixed(1)}s`);
+    }
+  }
+  process.stdout.write(`${parts.join(" · ")}\n`);
+}
+
 function formatCodexJsonLines(rawLines) {
   const formatter = createCodexFormatter();
   for (const line of rawLines) {
@@ -346,4 +427,11 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { formatCodexJsonLines, createCodexFormatter, normalizeCodexToolKind };
+module.exports = {
+  formatCodexJsonLines,
+  formatTurnResult,
+  createCodexFormatter,
+  normalizeCodexToolKind,
+  codexExecArgs,
+  planningEnabled,
+};

@@ -7,7 +7,7 @@ import {
   useFactoryWorkOrders,
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
-import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Clock, MoreHorizontal, Pencil } from "lucide-react";
+import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
@@ -29,6 +29,7 @@ import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { AddIntakePicker } from "./AddIntakePicker";
+import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
 import {
@@ -96,6 +97,7 @@ import {
   intakeSettingsTabFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
+  prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
@@ -120,11 +122,24 @@ import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
-import { isPRFeedbackSettingsTab, prFeedbackListenTitle } from "./prFeedbackSettingsModel";
+import {
+  PR_FEEDBACK_SETTINGS_COPY,
+  apiPRFeedbackSource,
+  hasAvailablePRFeedbackSource,
+  isPRFeedbackSettingsTab,
+  prFeedbackListenTitle,
+  takenPRFeedbackSourceIds,
+  type PRFeedbackSource,
+} from "./prFeedbackSettingsModel";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { useActivePRFeedbackWorkOrderIds, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
-import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
+import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
+import {
+  normalizeColumnColors,
+  serializeColumnColors,
+  lineBoardColumnLaneClassName,
+  type LineBoardColumnColorId,
+} from "./lineBoardColumnColors";
 
 function applyVisibleWorkOrders(
   workOrders: FactoriesWorkOrder[],
@@ -162,6 +177,7 @@ export function LinesPage() {
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
+  const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const { data: workOrders = [], isLoading: workOrdersLoading } = useFactoryWorkOrders(organizationId, factoryId);
   const { data: pullRequests = [] } = useFactoryPullRequests(organizationId, factoryId);
   const { data: factoryApps = [] } = useFactoryApps(organizationId, factoryId);
@@ -170,6 +186,7 @@ export function LinesPage() {
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
+  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const canAddSentryIntake = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_SENTRY_INTAKE);
@@ -178,9 +195,16 @@ export function LinesPage() {
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
   }, [canAddSentryIntake]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
-  const addressingFeedbackOrderIds = useActivePRFeedbackWorkOrderIds(pullRequests);
+  const {
+    addressingFeedbackOrderIds,
+    addressingFeedbackLabels,
+    waitingOnChecksOrderIds,
+    checksPassedOrderIds,
+    fixesPausedOrderIds,
+  } = usePRFeedbackWorkOrderAttention(pullRequests);
 
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
@@ -240,17 +264,45 @@ export function LinesPage() {
     onAddIntake: () => setAddIntakeOpen(true),
   };
 
-  const prFeedbackHandler = prFeedbackHandlers[0];
-  const verifyListener: LaneListener = {
-    id: "pr-feedback",
-    title: prFeedbackListenTitle(),
-    iconSrc: githubIcon,
-    iconAlt: "GitHub",
-    healthy: prFeedbackHandler ? prFeedbackHandler.healthy !== false : true,
-    needsRepairLabel: "Needs repair",
-    settingsLabel: "Open PR feedback settings",
-    testId: "lines-verify-listener-pr-feedback",
-    onOpenSettings: () => navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id)),
+  const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
+  const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+
+  const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
+    if (!handler.id) {
+      return [];
+    }
+    return [
+      {
+        id: handler.id,
+        title: prFeedbackListenTitle(handler.source),
+        iconSrc: githubIcon,
+        iconAlt: "GitHub",
+        healthy: handler.healthy !== false,
+        needsRepairLabel: "Needs repair",
+        settingsLabel: "Open PR feedback settings",
+        testId: `lines-verify-listener-${handler.id}`,
+        onOpenSettings: () =>
+          navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id)),
+      },
+    ];
+  });
+
+  const createPRFeedbackFromSource = (source: PRFeedbackSource) => {
+    if (takenPRFeedbackSources.includes(source.id)) {
+      return;
+    }
+    setAddPRFeedbackOpen(false);
+    createPRFeedbackHandler
+      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
+      .then((handler) => {
+        if (!handler.id) {
+          return;
+        }
+        navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id));
+      })
+      .catch((error) => {
+        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
+      });
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
@@ -325,6 +377,12 @@ export function LinesPage() {
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
       />
+      <AddPRFeedbackPicker
+        open={addPRFeedbackOpen}
+        onClose={() => setAddPRFeedbackOpen(false)}
+        onSelect={createPRFeedbackFromSource}
+        takenSourceIds={takenPRFeedbackSources}
+      />
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
@@ -332,7 +390,13 @@ export function LinesPage() {
           factoryKey={factoryKey}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
+          handlerId={prFeedbackHandlerId}
           initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
+          onCreated={(handlerId) =>
+            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId), {
+              replace: true,
+            })
+          }
           onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
         />
       ) : null}
@@ -362,7 +426,8 @@ export function LinesPage() {
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
             onAddIntake={canAddSentryIntake ? () => setAddIntakeOpen(true) : undefined}
-            verifyListener={verifyListener}
+            verifyListeners={verifyListeners}
+            onAddPRFeedback={canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined}
             workOrderCardContext={{
               organizationId,
               factoryId,
@@ -372,6 +437,10 @@ export function LinesPage() {
               preferredLineName: selectedLine.name,
               canAssign: canUpdateWorkOrders,
               addressingFeedbackOrderIds,
+              addressingFeedbackLabels,
+              waitingOnChecksOrderIds,
+              checksPassedOrderIds,
+              fixesPausedOrderIds,
               ...cardActions,
             }}
             peekOrder={peekOrder ?? undefined}
@@ -477,7 +546,8 @@ function LineDetail({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
-  verifyListener,
+  verifyListeners,
+  onAddPRFeedback,
   workOrderCardContext,
   peekOrder,
   onOpenWorkOrder,
@@ -494,7 +564,8 @@ function LineDetail({
   onCreateWorkOrder: () => void;
   intakePanel: BacklogIntakePanel;
   onAddIntake?: () => void;
-  verifyListener: LaneListener;
+  verifyListeners: LaneListener[];
+  onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
@@ -532,7 +603,8 @@ function LineDetail({
           onCreateWorkOrder={onCreateWorkOrder}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
-          verifyListener={verifyListener}
+          verifyListeners={verifyListeners}
+          onAddPRFeedback={onAddPRFeedback}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={backlogAnalysis.analyzingOrderIds}
@@ -742,7 +814,8 @@ function PhaseBoard({
   onCreateWorkOrder,
   intakePanel,
   onAddIntake,
-  verifyListener,
+  verifyListeners,
+  onAddPRFeedback,
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
@@ -761,12 +834,16 @@ function PhaseBoard({
   onCreateWorkOrder: () => void;
   intakePanel: BacklogIntakePanel;
   onAddIntake?: () => void;
-  verifyListener: LaneListener;
+  verifyListeners: LaneListener[];
+  onAddPRFeedback?: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   analyzingOrderIds: ReadonlySet<string>;
 }) {
-  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>({});
+  const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
+    normalizeColumnColors(line.columnColors),
+  );
+  const columnColorsRef = useRef(columnColors);
   const [columnTitles, setColumnTitles] = useState<Record<string, string>>({});
   const [backlogSize, setBacklogSize] = useState<number | null>(null);
   const [backlogSettingsOpen, setBacklogSettingsOpen] = useState(false);
@@ -782,9 +859,50 @@ function PhaseBoard({
         })
       : undefined;
 
-  const setColumnColor = useCallback((columnKey: string, colorId: LineBoardColumnColorId | null) => {
-    setColumnColors((current) => ({ ...current, [columnKey]: colorId }));
-  }, []);
+  // The line query is the source of truth for persisted colors. Resync when
+  // it changes, but skip while a color save is in flight so a stale refetch
+  // cannot wipe the optimistic lane color. Do not depend on isPending here:
+  // when a save finishes, isPending flips before the factory query refetch
+  // lands and would briefly restore the previous color.
+  useEffect(() => {
+    if (updateLine.isPending) {
+      return;
+    }
+    const next = normalizeColumnColors(line.columnColors);
+    if (serializeColumnColors(next) === serializeColumnColors(columnColorsRef.current)) {
+      return;
+    }
+    columnColorsRef.current = next;
+    setColumnColors(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isPending must not trigger resync; see comment above
+  }, [line.columnColors]);
+
+  const setColumnColor = useCallback(
+    async (columnKey: string, colorId: LineBoardColumnColorId | null) => {
+      const previousColors = columnColorsRef.current;
+      const nextColors = { ...previousColors, [columnKey]: colorId };
+      columnColorsRef.current = nextColors;
+      setColumnColors(nextColors);
+
+      if (!lineId) {
+        return;
+      }
+      try {
+        const updatedLine = await updateLine.mutateAsync({
+          lineId,
+          columnColors: serializeColumnColors(nextColors),
+        });
+        const persisted = normalizeColumnColors(updatedLine.columnColors);
+        columnColorsRef.current = persisted;
+        setColumnColors(persisted);
+      } catch (error) {
+        columnColorsRef.current = previousColors;
+        setColumnColors(previousColors);
+        showErrorToast(getApiErrorMessage(error, "Failed to update column color"));
+      }
+    },
+    [lineId, updateLine],
+  );
 
   const setColumnTitle = useCallback((columnKey: string, title: string) => {
     setColumnTitles((current) => ({ ...current, [columnKey]: title }));
@@ -832,7 +950,7 @@ function PhaseBoard({
             setBacklogSettingsOpen(false);
           }}
           colorId={columnColors.backlog ?? null}
-          onColorChange={(colorId) => setColumnColor("backlog", colorId)}
+          onColorChange={(colorId) => void setColumnColor("backlog", colorId)}
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
@@ -864,7 +982,7 @@ function PhaseBoard({
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
               colorId={columnColors[columnKey] ?? null}
-              onColorChange={(colorId) => setColumnColor(columnKey, colorId)}
+              onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
               onRename={(title) => setColumnTitle(columnKey, title)}
               workOrderCardContext={workOrderCardContext}
@@ -878,9 +996,10 @@ function PhaseBoard({
         <VerifyColumn
           orders={verifyOrders}
           title={columnTitles.verify ?? "Verify"}
-          listener={verifyListener}
+          listeners={verifyListeners}
+          onAdd={onAddPRFeedback}
           colorId={columnColors.verify ?? null}
-          onColorChange={(colorId) => setColumnColor("verify", colorId)}
+          onColorChange={(colorId) => void setColumnColor("verify", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("verify", title)}
           workOrderCardContext={workOrderCardContext}
@@ -893,7 +1012,7 @@ function PhaseBoard({
           orders={doneOrders}
           title={columnTitles.done ?? "Done"}
           colorId={columnColors.done ?? null}
-          onColorChange={(colorId) => setColumnColor("done", colorId)}
+          onColorChange={(colorId) => void setColumnColor("done", colorId)}
           canRename={canRename}
           onRename={(title) => setColumnTitle("done", title)}
           workOrderCardContext={workOrderCardContext}
@@ -907,7 +1026,8 @@ function PhaseBoard({
 function VerifyColumn({
   orders,
   title,
-  listener,
+  listeners,
+  onAdd,
   colorId,
   onColorChange,
   canRename,
@@ -917,7 +1037,8 @@ function VerifyColumn({
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
-  listener: LaneListener;
+  listeners: LaneListener[];
+  onAdd?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
@@ -940,9 +1061,23 @@ function VerifyColumn({
       emptyDescription="No tasks in Verify."
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
-        <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          {onAdd ? (
+            <button
+              type="button"
+              aria-label={PR_FEEDBACK_SETTINGS_COPY.addHandler}
+              title={PR_FEEDBACK_SETTINGS_COPY.addHandler}
+              data-testid="lines-verify-add-pr-feedback"
+              onClick={onAdd}
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Plus className="size-3.5" aria-hidden />
+            </button>
+          ) : null}
+          <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
+        </div>
       }
-      banner={<LaneListenerList listeners={[listener]} testId="lines-verify-listeners" />}
+      banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
       testId="lines-verify-column"
     >
       <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-verify-column-scroll">

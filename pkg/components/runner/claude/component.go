@@ -137,12 +137,12 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
+	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
 
-	environment, err = c.injectCredentials(ctx, environment, spec.Credentials, spec.Model)
+	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
 	if err != nil {
 		return err
 	}
@@ -161,8 +161,14 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
+	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+
 	// command_list tasks only accept commands (+ optional files).
-	task := buildClaudeCodeBrokerTask(spec)
+	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups)
+	task = applyPlanningFollowUp(task, environment, spec)
+	if runner.HasPlanningSessionToken(environment) {
+		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
+	}
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,

@@ -14,6 +14,10 @@ import { onCommitStatusTriggerRenderer } from "./on_commit_status";
 import { onCheckRunTriggerRenderer } from "./on_check_run";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
+import {
+  WAIT_FOR_PULL_REQUEST_CHECKS_STATE_REGISTRY,
+  waitForPullRequestChecksMapper,
+} from "./wait_for_pull_request_checks";
 import { publishCommitStatusMapper } from "./publish_commit_status";
 import { createDeploymentMapper } from "./create_deployment";
 import { createDeploymentStatusMapper } from "./create_deployment_status";
@@ -30,6 +34,7 @@ import { mergePullRequestMapper } from "./merge_pull_request";
 import { markPullRequestReadyForReviewMapper } from "./mark_pull_request_ready_for_review";
 import { addPullRequestReviewersMapper } from "./add_pull_request_reviewers";
 import { updatePullRequestMapper } from "./update_pull_request";
+import { FIND_PULL_REQUEST_STATE_REGISTRY, findPullRequestMapper } from "./find_pull_request";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
 import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
@@ -39,6 +44,7 @@ import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   runWorkflow: RUN_WORKFLOW_STATE_REGISTRY,
+  waitForPullRequestChecks: WAIT_FOR_PULL_REQUEST_CHECKS_STATE_REGISTRY,
   createIssue: buildActionStateRegistry("created"),
   createIssueComment: buildActionStateRegistry("created"),
   updateIssueComment: buildActionStateRegistry("updated"),
@@ -50,6 +56,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   markPullRequestReadyForReview: buildActionStateRegistry("marked ready"),
   addPullRequestReviewers: buildActionStateRegistry("added"),
   updatePullRequest: buildActionStateRegistry("updated"),
+  findPullRequest: FIND_PULL_REQUEST_STATE_REGISTRY,
   publishCommitStatus: buildActionStateRegistry("published"),
   createDeployment: buildActionStateRegistry("created"),
   createDeploymentStatus: buildActionStateRegistry("created"),
@@ -80,7 +87,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   markPullRequestReadyForReview: markPullRequestReadyForReviewMapper,
   addPullRequestReviewers: addPullRequestReviewersMapper,
   updatePullRequest: updatePullRequestMapper,
+  findPullRequest: findPullRequestMapper,
   runWorkflow: runWorkflowMapper,
+  waitForPullRequestChecks: waitForPullRequestChecksMapper,
   publishCommitStatus: publishCommitStatusMapper,
   createDeployment: createDeploymentMapper,
   createDeploymentStatus: createDeploymentStatusMapper,

@@ -53,7 +53,7 @@ spec:
         'y': 258
       isCollapsed: false
     - id: assigned-to-agent
-      name: Assigned to agent?
+      name: Assigned To Agent?
       type: TYPE_ACTION
       component: filter
       configuration:
@@ -63,7 +63,7 @@ spec:
         'y': 618
       isCollapsed: false
     - id: create-work-order
-      name: Create Work Order
+      name: Create Task
       type: TYPE_ACTION
       component: createWorkOrder
       configuration:

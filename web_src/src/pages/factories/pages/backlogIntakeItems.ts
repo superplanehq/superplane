@@ -5,6 +5,9 @@ import { lineIntakeSourceForApiSource } from "./lineIntakeModel";
 export const BACKLOG_CREATE_COPY = {
   createWorkOrder: "Create task",
   createManually: "Create task manually",
+  createManuallyHint: "Write the title and details.",
+  createWithAgent: "Create with an Agent",
+  createWithAgentHint: "Ask an agent to draft a task.",
   empty: "No matching items.",
   loading: "Loading items.",
   loadingMore: "Loading more items.",

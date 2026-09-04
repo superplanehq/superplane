@@ -13,10 +13,12 @@ import {
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
+  prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
+  replaceOrganizationSegment,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
@@ -97,6 +99,13 @@ describe("factoryPRFeedbackPath", () => {
     expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
     expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
   });
+
+  it("opens a specific handler", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", undefined, "handler-1")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackHandler=handler-1",
+    );
+    expect(prFeedbackHandlerIdFromSearch("?prFeedback=1&prFeedbackHandler=handler-1")).toBe("handler-1");
+  });
 });
 
 describe("firstFactoryLineId", () => {
@@ -162,6 +171,24 @@ describe("factoryAppPath", () => {
     expect(factoryAppPath("org-1", "SP", "app-1", { from: "work-order", orderNumber: "42" })).toBe(
       "/org-1/workspaces/SP/apps/app-1?from=work-order&orderNumber=42",
     );
+  });
+});
+
+describe("replaceOrganizationSegment", () => {
+  it("keeps the settings path when switching organization", () => {
+    expect(replaceOrganizationSegment("/demo/workspaces/RF/settings/organization/general", "demo", "acme")).toBe(
+      "/acme/workspaces/RF/settings/organization/general",
+    );
+  });
+
+  it("keeps the settings path when the current URL uses the organization id", () => {
+    expect(
+      replaceOrganizationSegment("/org-uuid/workspaces/RF/settings/organization/integrations", "org-uuid", "acme"),
+    ).toBe("/acme/workspaces/RF/settings/organization/integrations");
+  });
+
+  it("opens the workspace list when the path is not under the current organization", () => {
+    expect(replaceOrganizationSegment("/other/workspaces", "demo", "acme")).toBe("/acme/workspaces");
   });
 });
 

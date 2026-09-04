@@ -19,6 +19,10 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: [] }),
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
     has: () => false,

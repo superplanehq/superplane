@@ -7,8 +7,8 @@ export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 /** Organization experimental feature: SetupProvider wizard for GitHub and similar integrations. */
 export const FEATURE_NEW_INTEGRATION_SETUP_FLOW = "new_integration_setup_flow";
 
-/** Organization experimental feature: Velocity rail link and page for factories. */
-export const FEATURE_FACTORY_VELOCITY = "factory_velocity";
-
 /** Organization experimental feature: manual "Add intake" entry for Sentry in the Backlog column menu. */
 export const FEATURE_FACTORY_SENTRY_INTAKE = "factory_sentry_intake";
+
+/** Organization experimental feature: in-progress workspace Models settings page. */
+export const FEATURE_WORKSPACE_MODELS = "workspace_models";

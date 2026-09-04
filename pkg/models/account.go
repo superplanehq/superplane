@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,7 @@ type Account struct {
 	BlockedAt         *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
+	DeletedAt         gorm.DeletedAt `gorm:"index"`
 }
 
 func (a *Account) IsInstallationAdmin() bool {
@@ -193,10 +195,10 @@ func FindAccountByEmail(email string) (*Account, error) {
 	return &account, nil
 }
 
-func (a *Account) GetAccountProviders() ([]AccountProvider, error) {
+func (a *Account) GetAccountProviders(tx *gorm.DB) ([]AccountProvider, error) {
 	providers := []AccountProvider{}
 
-	err := database.Conn().
+	err := tx.
 		Where("account_id = ?", a.ID).
 		Find(&providers).
 		Error
@@ -211,7 +213,7 @@ func (a *Account) GetAccountProviders() ([]AccountProvider, error) {
 func (a *Account) GetAccountProvider(provider string) (*AccountProvider, error) {
 	var account AccountProvider
 	err := database.Conn().
-		Where("account_id = ?", a.ID, provider).
+		Where("account_id = ?", a.ID).
 		Where("provider = ?", provider).
 		First(&account).
 		Error
@@ -253,6 +255,100 @@ func FindAccountByProvider(provider, providerID string) (*Account, error) {
 	}
 
 	return FindAccountByID(accountProvider.AccountID.String())
+}
+
+func CountActiveInstallationAdmins(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Model(&Account{}).
+		Where("installation_admin = ?", true).
+		Where("blocked_at IS NULL").
+		Count(&count).
+		Error
+	return count, err
+}
+
+func (a *Account) UpdateName(tx *gorm.DB, name string) error {
+	err := tx.Model(a).Update("name", name).Error
+	if err != nil {
+		return err
+	}
+
+	err = tx.Model(&User{}).
+		Where("account_id = ?", a.ID).
+		Where("type = ?", UserTypeHuman).
+		Where("deleted_at IS NULL").
+		Update("name", name).
+		Error
+	if err != nil {
+		return err
+	}
+
+	a.Name = name
+	return nil
+}
+
+func (a *Account) SignInEmails(tx *gorm.DB) ([]string, error) {
+	emails := []string{}
+	if a.Email != "" {
+		emails = append(emails, utils.NormalizeEmail(a.Email))
+	}
+
+	providers, err := a.GetAccountProviders(tx)
+	if err != nil {
+		return nil, err
+	}
+	for _, provider := range providers {
+		email := utils.NormalizeEmail(provider.Email)
+		if email != "" && !slices.Contains(emails, email) {
+			emails = append(emails, email)
+		}
+	}
+	return emails, nil
+}
+
+func (a *Account) SetEmail(tx *gorm.DB, email string) error {
+	normalized := utils.NormalizeEmail(email)
+	if normalized == "" {
+		return ErrAccountEmailNotFromSignInMethod
+	}
+
+	if err := a.ensurePasswordSignInEmail(tx); err != nil {
+		return err
+	}
+
+	allowed, err := a.SignInEmails(tx)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(allowed, normalized) {
+		return ErrAccountEmailNotFromSignInMethod
+	}
+
+	var other Account
+	err = tx.Where("email = ?", normalized).Where("id <> ?", a.ID).First(&other).Error
+	if err == nil {
+		return ErrAccountEmailInUse
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	err = tx.Model(a).Update("email", normalized).Error
+	if err != nil {
+		return err
+	}
+	err = tx.Model(&User{}).
+		Where("account_id = ?", a.ID).
+		Where("type = ?", UserTypeHuman).
+		Where("deleted_at IS NULL").
+		Update("email", normalized).
+		Error
+	if err != nil {
+		return err
+	}
+
+	a.Email = normalized
+	return nil
 }
 
 func (a *Account) UpdateEmail(newEmail string) error {
@@ -316,4 +412,33 @@ func (a *Account) UpdateEmailForProvider(newEmail, provider, providerID string) 
 	}
 
 	return err
+}
+
+func (a *Account) ensurePasswordSignInEmail(tx *gorm.DB) error {
+	hasPassword, err := AccountHasPassword(tx, a.ID)
+	if err != nil || !hasPassword {
+		return err
+	}
+
+	email := utils.NormalizeEmail(a.Email)
+	if email == "" {
+		return nil
+	}
+
+	var existing AccountProvider
+	err = tx.Where("account_id = ?", a.ID).Where("provider = ?", ProviderPassword).First(&existing).Error
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	return tx.Create(&AccountProvider{
+		AccountID:  a.ID,
+		Provider:   ProviderPassword,
+		ProviderID: a.ID.String(),
+		Email:      email,
+		Name:       a.Name,
+	}).Error
 }

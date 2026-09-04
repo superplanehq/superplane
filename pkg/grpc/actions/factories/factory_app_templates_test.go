@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -49,9 +50,21 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	}, agent.Configuration["credentials"])
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
-	assert.Equal(t, "{{ order().repository }}", createPR.Configuration["repository"])
-	assert.Equal(t, "{{ order().default_branch }}", createPR.Configuration["base"])
+	assert.Equal(t, "{{ task().repository }}", createPR.Configuration["repository"])
+	assert.Equal(t, "{{ task().default_branch }}", createPR.Configuration["base"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, createPR.Integration)
+
+	body, ok := createPR.Configuration["body"].(string)
+	require.True(t, ok, "expected create-pr body to be a string")
+	assert.Contains(t, body, `task().origin != nil ? "Closes " + task().origin.label : ""`)
+	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
+	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
+	assert.NotContains(t, body, "[Task](")
+
+	updatePR := findYAMLNode(t, canvas, "update-pr")
+	updateBody, ok := updatePR.Configuration["body"].(string)
+	require.True(t, ok, "expected update-pr body to be a string")
+	assert.Contains(t, updateBody, `task().origin != nil ? "Closes " + task().origin.label : ""`)
 
 	console, err := yaml.ConsoleFromYML([]byte(result.consoleYAML))
 	require.NoError(t, err)
@@ -101,6 +114,31 @@ func TestMaterializePlanningTemplateUsesPlanningModel(t *testing.T) {
 	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
 	assert.Equal(t, "claude-opus-4-6", findYAMLNode(t, canvas, "planner-agent-no-issue").Configuration["model"])
+}
+
+func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
+	result, err := materializeFactoryTemplate("create-with-agent", factoryTemplateInput{
+		appID:   "app-1",
+		appName: "Create with an Agent",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+		},
+		agent: &factoryTemplateAgent{
+			component:        "runnerClaudeCode",
+			model:            "claude-sonnet-4-6",
+			planningModel:    "claude-opus-4-6",
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Create with an Agent", canvas.Metadata.Name)
+	agent := findYAMLNode(t, canvas, "planning-agent")
+	assert.Equal(t, "claude-opus-4-6", agent.Configuration["model"])
+	require.NotNil(t, agent.Concurrency)
+	require.NotNil(t, agent.Concurrency.Max)
+	assert.Equal(t, 10, *agent.Concurrency.Max)
 }
 
 func TestMaterializeIntakeDefaults(t *testing.T) {

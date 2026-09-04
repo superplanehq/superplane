@@ -130,7 +130,7 @@ function notifyCiLoopStream(): SplitRunStreamLine[] {
     streamLine({
       id: "ci-report-check",
       at: "20:02:50",
-      componentType: "Report Work Order Check",
+      componentType: "Report Task Check",
       componentName: "Report CI Check",
       action: "passed",
       iconSlug: "factory",
@@ -224,7 +224,7 @@ function notifyUiPreviewStream(): SplitRunStreamLine[] {
     streamLine({
       id: "preview-report-coverage",
       at: "20:03:58",
-      componentType: "Report Work Order Check",
+      componentType: "Report Task Check",
       componentName: "Report Coverage Check",
       action: "passed",
       iconSlug: "factory",
@@ -302,7 +302,7 @@ function notifyPrCreationStream(pr: FactoriesFactoryPullRequest): SplitRunStream
       id: "set-pr-closure-note",
       at: "19:52:39",
       componentType: "setWorkOrderStatusNote",
-      componentName: "Set PR closure note",
+      componentName: "Set Closure Note",
       action: "passed",
       iconSlug: "box",
       duration: "1s",

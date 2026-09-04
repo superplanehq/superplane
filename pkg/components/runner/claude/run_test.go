@@ -11,6 +11,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAllowedClaudeToolsAllowsPlanningSessionTools(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+		"SUPERPLANE_RUN_TOKEN":           "token",
+		"SUPERPLANE_BASE_URL":            "http://localhost:8000",
+	})
+
+	assert.Contains(t, tools, "Read")
+	assert.Contains(t, tools, "Bash")
+	assert.Contains(t, tools, "mcp__superplane")
+	assert.Contains(t, tools, "mcp__superplane__propose_draft")
+	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.NotContains(t, tools, "Edit")
+	assert.NotContains(t, tools, "Write")
+	assert.NotContains(t, tools, "mcp__superplane__say")
+	assert.NotContains(t, tools, "mcp__superplane__wait_for_user")
+	assert.NotContains(t, tools, "mcp__superplane__ask")
+}
+
+func TestAllowedClaudeToolsAllowsFullAccessOutsidePlanning(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{})
+	assert.Equal(t, "Bash,Read,Edit,Write", tools)
+}
+
+func TestClaudePermissionModeUsesDefaultModeWhenPlanningSessionIsAttached(t *testing.T) {
+	// Planning sessions must use "default" (not "plan"): plan mode blocks the
+	// planning MCP tools, breaking propose_draft/survey. Read-only is enforced
+	// by allowedClaudeTools dropping Edit/Write instead.
+	assert.Equal(t, "default", claudePermissionModeFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	}))
+	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{
+		"SUPERPLANE_RUN_TOKEN": "token",
+		"SUPERPLANE_BASE_URL":  "http://localhost:8000",
+	}))
+	assert.Equal(t, "acceptEdits", claudePermissionModeFromScript(t, map[string]string{}))
+}
+
 func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {
 	output := runClaudeFormatter(t, []string{
 		`{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"git status"}}]}}`,
@@ -48,6 +86,30 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Equal(t, "read", records[3]["kind"])
 	assert.Equal(t, "passed", records[3]["status"])
 	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
+}
+
+func claudePermissionModeFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { claudePermissionMode } = require(process.argv[1]); process.stdout.write(claudePermissionMode(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func allowedClaudeToolsFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { allowedClaudeTools } = require(process.argv[1]); process.stdout.write(allowedClaudeTools(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
 }
 
 func runClaudeFormatter(t *testing.T, lines []string) string {

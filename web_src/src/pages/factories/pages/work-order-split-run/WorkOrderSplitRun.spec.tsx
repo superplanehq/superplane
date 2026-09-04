@@ -178,7 +178,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-log-scroll")).toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
 
@@ -200,7 +201,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start Implementation").length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
@@ -447,7 +448,8 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
   it("pins a review note and keeps Update manually off the note", () => {
@@ -799,6 +801,18 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
     expect(coverage).toHaveAttribute("open");
+  });
+
+  it("shows the full check summary without a one-line clamp", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
+    expect(summary.tagName).toBe("P");
+    expect(summary).not.toHaveClass("truncate");
+    expect(summary).toHaveClass("break-words");
   });
 
   it("keeps description checks collapsed when the task is not a draft", async () => {

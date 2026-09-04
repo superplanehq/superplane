@@ -843,6 +843,93 @@ describe("line board work-order examples", () => {
     expect(fixture.waitingNotes[0]?.cta?.label).toBe("Review PR #6812");
   });
 
+  it("shows a paused-fixes footer after automatic fixes pause", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-checks",
+          pullRequestNumber: "6812",
+          description: "Automatic fixes paused after 3 attempts",
+          kind: "fixes-paused",
+          run: {
+            id: "run-paused",
+            canvasId: "canvas-checks",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.footer.attentionCard).toBe(true);
+    expect(fixture.footer.note?.headline).toBe("Automatic fixes did not succeed");
+    expect(fixture.footer.note?.text).toContain("Review the pull request");
+    expect(fixture.footer.note?.cta?.label).toBe("Review PR #6812");
+    expect(fixture.waitingNotes[0]?.headline).toBe("Automatic fixes did not succeed");
+  });
+
+  it("uses the written status note after automatic fixes pause", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...LINE_BOARD_VERIFY_PR_REVIEW_ORDER,
+        statusNotes: [
+          {
+            key: "pr-closure",
+            kind: "info",
+            headline: "Automatic fixes did not succeed",
+            body: "SuperPlane paused automatic fixes after 3 attempts. Review the pull request and fix the remaining checks.",
+            ctaLabel: "Review PR #6812",
+            ctaUrl: "https://github.com/superplanehq/superplane/pull/6812",
+          },
+        ],
+      },
+      {
+        prFeedbackRuns: [
+          {
+            canvasId: "canvas-checks",
+            pullRequestNumber: "6812",
+            description: "Automatic fixes paused after 3 attempts",
+            kind: "fixes-paused",
+            run: {
+              id: "run-paused",
+              canvasId: "canvas-checks",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+              createdAt: "2026-08-26T12:00:00Z",
+            },
+          },
+        ],
+      },
+    );
+    expect(fixture.footer.note?.text).toContain("after 3 attempts");
+    expect(fixture.footer.note?.cta?.label).toBe("Review PR #6812");
+  });
+
+  it("hides the waiting review footer while checks are still running", () => {
+    const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
+      prFeedbackRuns: [
+        {
+          canvasId: "canvas-checks",
+          pullRequestNumber: "6812",
+          description: "Waiting for checks on a82fd91",
+          kind: "checks-wait",
+          run: {
+            id: "run-checks",
+            canvasId: "canvas-checks",
+            state: "STATE_STARTED",
+            createdAt: "2026-08-26T12:00:00Z",
+          },
+        },
+      ],
+    });
+    expect(fixture.waitingNotes).toEqual([]);
+    expect(fixture.footer.attentionCard).toBeUndefined();
+    expect(fixture.footer.note).toBeUndefined();
+    expect(fixture.phases.find((phase) => phase.id === "pr-feedback-run-checks")?.name).toBe(
+      "Waiting for checks on a82fd91",
+    );
+  });
+
   it("hides the waiting review note while a PR feedback run is active", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
@@ -1255,7 +1342,7 @@ describe("line board work-order examples", () => {
       ["19:52:37", "github.createPullRequest", "Create Draft Pull Request", "passed"],
       ["19:52:38", "github.addIssueLabel", "Add Label to Pull Request", "passed"],
       ["19:52:39", "Add Pull Request", "Attach PR to Task", "passed"],
-      ["19:52:39", "setWorkOrderStatusNote", "Set PR closure note", "passed"],
+      ["19:52:39", "setWorkOrderStatusNote", "Set Closure Note", "passed"],
     ]);
     expect(prStream.find((line) => line.componentName === "Attach PR to Task")?.pullRequest).toMatchObject({
       number: "6837",
@@ -1265,7 +1352,7 @@ describe("line board work-order examples", () => {
     const verifyStream = fixture.phases.find((phase) => phase.id === "ci-loop-3")?.stream ?? [];
     expect(verifyStream.map((line) => [line.at, line.componentType, line.componentName, line.action])).toEqual([
       ["19:52:40", "On Run", "CI verification", "triggered"],
-      ["20:02:50", "Report Work Order Check", "Report CI Check", "passed"],
+      ["20:02:50", "Report Task Check", "Report CI Check", "passed"],
       ["20:02:50", "github.markPullRequestReadyForReview", "Mark Pull Request Ready", "passed"],
       ["19:52:40", "loop", "loop", "passed"],
       ["19:52:40", "semaphore.runWorkflow", "Run Semaphore CI", "passed"],
@@ -1278,7 +1365,7 @@ describe("line board work-order examples", () => {
       ["20:03:23", "Run Claude Code", "Assess Storybook Coverage", "passed"],
       ["20:03:57", "Run JavaScript", "Format Coverage Review", "passed"],
       ["20:03:23", "Run Bash", "Deploy Storybook", "passed"],
-      ["20:03:58", "Report Work Order Check", "Report Coverage Check", "passed"],
+      ["20:03:58", "Report Task Check", "Report Coverage Check", "passed"],
       ["20:04:46", "github.updatePullRequest", "Update PR with preview links", "passed"],
     ]);
   });

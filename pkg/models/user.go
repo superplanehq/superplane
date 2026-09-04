@@ -51,13 +51,20 @@ func (u *User) GetEmail() string {
 }
 
 func (u *User) Delete() error {
-	now := time.Now()
-	return database.Conn().Unscoped().
-		Model(u).
-		Update("deleted_at", now).
-		Update("updated_at", now).
-		Update("token_hash", nil).
-		Error
+	return u.SoftDelete(database.Conn(), time.Now(), "")
+}
+
+func (u *User) SoftDelete(tx *gorm.DB, now time.Time, tombstoneEmail string) error {
+	updates := map[string]any{
+		"deleted_at": now,
+		"updated_at": now,
+		"token_hash": nil,
+	}
+	if tombstoneEmail != "" {
+		updates["email"] = tombstoneEmail
+	}
+
+	return tx.Unscoped().Model(u).Updates(updates).Error
 }
 
 func (u *User) Restore() error {
@@ -324,6 +331,16 @@ func FindActiveUserByIDAnyOrg(tx *gorm.DB, id uuid.UUID) (*User, error) {
 	return &user, nil
 }
 
+func ListActiveHumanUsersForAccount(tx *gorm.DB, accountID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("account_id = ?", accountID).
+		Where("type = ?", UserTypeHuman).
+		Find(&users).
+		Error
+	return users, err
+}
+
 func FindActiveHumanUserByAccountAndOrganization(tx *gorm.DB, orgID, accountID uuid.UUID) (*User, error) {
 	var user User
 
@@ -473,11 +490,7 @@ func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string)
 	return count, nil
 }
 
-func CountOrganizationsByBillingAccount(accountID string) (int64, error) {
-	return CountOrganizationsByBillingAccountInTransaction(database.Conn(), accountID)
-}
-
-func CountOrganizationsByBillingAccountInTransaction(tx *gorm.DB, accountID string) (int64, error) {
+func CountOrganizationsByBillingAccount(tx *gorm.DB, accountID string) (int64, error) {
 	subquery := tx.
 		Table("users").
 		Select("DISTINCT ON (organization_id) organization_id, account_id").

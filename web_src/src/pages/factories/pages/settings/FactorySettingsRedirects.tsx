@@ -24,7 +24,9 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   spending: { scope: "workspace", section: "spending" },
   repositories: { scope: "workspace", section: "repository" },
   repository: { scope: "workspace", section: "repository" },
-  profile: { scope: "account", section: "general" },
+  profile: { scope: "account", section: "profile" },
+  security: { scope: "account", section: "profile" },
+  "linked-accounts": { scope: "account", section: "profile" },
   notifications: { scope: "account", section: "notifications" },
   members: { scope: "organization", section: "members" },
   integrations: { scope: "organization", section: "integrations" },
@@ -159,4 +161,10 @@ export function LegacyFactorySettingsIndexRedirect() {
   return (
     <Navigate to={`${factorySettingsWorkspaceGeneralPath(organizationId, factoryKey)}${location.search}`} replace />
   );
+}
+
+/** Old Linked accounts URL. Send the user to Profile. */
+export function AccountLinkedAccountsRedirect() {
+  const { pathname, search } = useLocation();
+  return <Navigate to={`${pathname.replace(/\/linked-accounts\/?$/, "/profile")}${search}`} replace />;
 }
