@@ -117,6 +117,22 @@ describe("decideClassicAppRouteRedirect", () => {
     });
   });
 
+  it("keeps run, node, and edit pins together", () => {
+    expect(
+      decideClassicAppRouteRedirect({
+        ...BASE,
+        factoriesEnabled: true,
+        factoryOwnedApp: true,
+        factoryKey: "RF",
+        runId: "run-9",
+        pinned: { runId: "run-9", nodeId: "create-pr", edit: true, sidebar: true },
+      }),
+    ).toEqual({
+      kind: "redirect",
+      to: "/org-1/workspaces/RF/apps/canvas-1?run=run-9&configure=1&agent=1&sidebar=1&node=create-pr",
+    });
+  });
+
   it("keeps a run pin together with a node pin", () => {
     expect(
       decideClassicAppRouteRedirect({

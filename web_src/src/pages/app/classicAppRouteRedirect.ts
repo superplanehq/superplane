@@ -71,14 +71,19 @@ function factoryOwnedWorkspaceAppPath(
     return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId }), pinned);
   }
 
-  if (runId && nodeId && !pinned.edit) {
-    return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId, nodeId }), pinned);
+  if (runId) {
+    return appendPreservedClassicSearch(
+      factoryAppPath(organizationId, factoryKey, appId, {
+        runId,
+        nodeId,
+        configure: pinned.edit || undefined,
+        agent: pinned.edit || undefined,
+      }),
+      pinned,
+    );
   }
 
-  return appendPreservedClassicSearch(
-    factoryAppConfigurePath(organizationId, factoryKey, appId, { nodeId, runId }),
-    pinned,
-  );
+  return appendPreservedClassicSearch(factoryAppConfigurePath(organizationId, factoryKey, appId, { nodeId }), pinned);
 }
 
 /**
