@@ -29,7 +29,13 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.dispatchGitHubAppByState(w, r)
+	// Owner-approve has no SuperPlane session. A request with CSRF state is
+	// the member who started Connect, so load that account before bind.
+	if s.jwt == nil {
+		s.dispatchGitHubAppByState(w, r)
+		return
+	}
+	middleware.AccountAuthMiddleware(s.jwt)(http.HandlerFunc(s.dispatchGitHubAppByState)).ServeHTTP(w, r)
 }
 
 // isGitHubOwnerApprovedSetup is the GitHub admin-approve callback. GitHub

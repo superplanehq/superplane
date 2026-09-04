@@ -173,8 +173,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { data: me } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
+  const setOpenSection = model.setOpenSection;
 
   const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => {
+    if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
+      return "connect";
+    }
     const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
     return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
   });
@@ -196,7 +200,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     if (step) {
       // Keeps the provider return URL on the step the user is answering.
       openStep.current = step;
-      model.setOpenSection(step);
+      setOpenSection(step);
     }
     setOpenedScreen(next);
   };
@@ -235,6 +239,14 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const installRequested =
     searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
     model.githubConnections.allInstances.some((instance) => hostedGitHubInstallRequested(instance.status?.metadata));
+
+  useEffect(() => {
+    if (!installRequested || openedScreen !== "welcome") return;
+    openStep.current = "vcs";
+    setOpenSection("vcs");
+    setOpenedScreen("connect");
+  }, [installRequested, openedScreen, setOpenSection]);
+
   const githubOrganization =
     searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
     model.githubConnections.allInstances

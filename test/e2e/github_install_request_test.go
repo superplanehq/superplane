@@ -23,7 +23,7 @@ func TestGitHubInstallRequest(t *testing.T) {
 		steps := &githubInstallRequestSteps{t: t}
 		steps.start()
 		factory := steps.givenAnIncompleteWorkspaceExists()
-		steps.givenAPendingHostedGitHubConnectionExists()
+		steps.givenAPendingHostedGitHubConnectionExists(factory)
 		steps.rememberReturnToWorkspaceSetup(factory)
 		steps.whenGitHubReturnsAnInstallRequest()
 		steps.assertThePendingRequestIsExplained()
@@ -67,7 +67,7 @@ func (s *githubInstallRequestSteps) givenAnIncompleteWorkspaceExists() *models.F
 	return factory
 }
 
-func (s *githubInstallRequestSteps) givenAPendingHostedGitHubConnectionExists() {
+func (s *githubInstallRequestSteps) givenAPendingHostedGitHubConnectionExists(factory *models.Factory) {
 	user, err := models.FindActiveHumanUserByAccountAndOrganization(
 		database.DB(s.t.Context()),
 		s.session.OrgID,
@@ -89,6 +89,7 @@ func (s *githubInstallRequestSteps) givenAPendingHostedGitHubConnectionExists() 
 		"state":           s.state,
 		"hostedApp":       true,
 		"startedByUserID": user.ID.String(),
+		"setupReturnPath": "/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=vcs",
 	})
 	require.NoError(s.t, database.Conn().Save(integration).Error)
 	s.integration = integration
@@ -156,6 +157,7 @@ func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
 	require.Contains(s.t, s.session.Page().URL(), "/setup")
 	require.NotContains(s.t, s.session.Page().URL(), "/settings/integrations/")
 	require.NotContains(s.t, s.session.Page().URL(), "invalid installation ID")
+	s.openConnectScreenIfNeeded()
 	require.NoError(s.t, s.session.Page().Locator(
 		`[data-testid="first-run-github-install-requested"], [data-testid="github-install-requested"]`,
 	).First().WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))

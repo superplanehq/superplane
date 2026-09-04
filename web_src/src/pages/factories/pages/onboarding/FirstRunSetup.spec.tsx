@@ -214,6 +214,14 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
+  it("opens Connect when GitHub returned an install request without a step", () => {
+    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
+
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+  });
+
   it("shows a waiting chip when GitHub returned an install request", () => {
     renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request");
 
