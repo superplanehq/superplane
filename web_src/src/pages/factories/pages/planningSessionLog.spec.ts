@@ -567,4 +567,39 @@ describe("mergePlanningSessionNotes", () => {
     expect(merged[1]?.userTalk).not.toBe("survey");
     expect(merged[1]?.componentName).toBe("Which framework should we use for the new service? (asked again)");
   });
+
+  it("labels the prompt that carries the full reply when an earlier prompt only shares the prefix", () => {
+    // An earlier prompt coincidentally shares the 48-character prefix, but the
+    // real survey turn is the later prompt whose live text still spells out the
+    // full submitted reply. The full-text match must win so the answer is not
+    // attributed to the earlier, unrelated prompt.
+    const surveyReply = "Which framework should we use for the new service? React";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (still deciding)",
+      }),
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: surveyReply,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-1", "agent-step-2"]);
+    expect(merged[0]?.userTalk).not.toBe("survey");
+    expect(merged[0]?.componentName).toBe("Which framework should we use for the new service? (still deciding)");
+    expect(merged[1]?.userTalk).toBe("survey");
+    expect(merged[1]?.componentName).toBe(surveyReply);
+  });
 });
