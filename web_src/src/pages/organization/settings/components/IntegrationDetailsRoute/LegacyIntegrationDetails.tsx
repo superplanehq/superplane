@@ -9,6 +9,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
+import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubAppSlug, hostedGitHubState, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
@@ -25,7 +26,12 @@ import { DeleteModal } from "../CapabilityBasedIntegrationDetails/DeleteModal";
 import { Header } from "../CapabilityBasedIntegrationDetails/Header";
 import { UsageTab } from "../CapabilityBasedIntegrationDetails/UsageTab";
 import { getActiveTabClass, groupNodeRefsByCanvas } from "../CapabilityBasedIntegrationDetails/lib";
-import { editableConfigurationField, editableConfigurationValue, nextConfigurationValue } from "./legacyConfiguration";
+import {
+  configurationSubmitPayload,
+  editableConfigurationField,
+  editableConfigurationValue,
+  nextConfigurationValue,
+} from "./legacyConfiguration";
 
 interface LegacyIntegrationDetailsProps {
   organizationId: string;
@@ -102,6 +108,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
   const pendingInstallState = hostedGitHubState(integration.status?.metadata);
   const showInstallPicker =
     pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
+  const browserAction = integration.status?.browserAction;
   const instructions = integrationDef?.instructions?.trim();
   const hasChanges =
     integrationName.trim() !== savedIntegrationName ||
@@ -117,7 +124,10 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     }
 
     try {
-      await updateMutation.mutateAsync({ name, configuration });
+      await updateMutation.mutateAsync({
+        name,
+        configuration: configurationSubmitPayload(integrationDef?.configuration, configuration),
+      });
       setSavedIntegrationName(name);
       setSavedConfiguration(configuration);
       showSuccessToast("Integration saved");
@@ -162,8 +172,12 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
             state={pendingInstallState}
             appSlug={hostedGitHubAppSlug(integration.status?.metadata)}
           />
-        ) : integration.status?.browserAction ? (
-          <IntegrationInstructions description={integration.status.browserAction.description} tone="settings" />
+        ) : browserAction ? (
+          <IntegrationInstructions
+            description={browserAction.description}
+            tone="settings"
+            onContinue={browserAction.url ? () => followBrowserAction(browserAction) : undefined}
+          />
         ) : null}
 
         {instructions ? <IntegrationInstructions description={instructions} tone="settings" /> : null}
