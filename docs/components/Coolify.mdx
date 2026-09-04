@@ -21,7 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 **Setup steps:**
 
 1. **Base URL:** Use your Coolify instance URL (for example `https://coolify.example.com` for self-hosted, or `https://app.coolify.io` for Coolify Cloud).
-2. **API Token:** In Coolify, go to **Keys & Tokens → API tokens**, click **Create new token**, give it a name, select the required permissions (read + write), and copy the generated token.
+2. **API Token:** In Coolify, go to **Keys & Tokens → API tokens**, click **Create new token**, give it a name, select the **read** and **deploy** permissions (deploying and controlling applications/services requires `deploy`, not `write`), and copy the generated token.
 3. The API token is **team-scoped** — SuperPlane will see all applications and services available to that team.
 
 <a id="control-application"></a>
@@ -34,7 +34,7 @@ The Control Application component invokes a lifecycle operation on a Coolify app
 
 ### How It Works
 
-1. Calls `GET /api/v1/applications/{uuid}/{operation}` on the configured Coolify instance
+1. Calls `POST /api/v1/applications/{uuid}/{operation}` on the configured Coolify instance
 2. Emits the API confirmation message on the default output channel
 
 ### Configuration
@@ -66,7 +66,7 @@ The Control Service component invokes a lifecycle operation on a Coolify service
 
 ### How It Works
 
-1. Calls `GET /api/v1/services/{uuid}/{operation}` on the configured Coolify instance
+1. Calls `POST /api/v1/services/{uuid}/{operation}` on the configured Coolify instance
 2. Emits the API confirmation message on the default output channel
 
 ### Configuration
@@ -98,7 +98,7 @@ The Deploy Application component queues a deployment for a Coolify application. 
 
 ### How It Works
 
-1. Calls `GET /api/v1/deploy?uuid={uuid}&force={force}` on the configured Coolify instance
+1. Calls `POST /api/v1/deploy?uuid={uuid}&force={force}` on the configured Coolify instance
 2. Emits the queued deployment metadata (deployment UUID, message) on the default output channel and finishes immediately
 
 ### Configuration
