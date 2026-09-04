@@ -24,12 +24,15 @@ import { presentWorkOrderStatusNotes } from "../lib/workOrderStatusNote";
 import { factoryContentBodyClassName } from "./factoryPageLayoutStyles";
 import { LinesPage } from "./LinesPage";
 
-/** Canonical `/work-order/:orderNumber` opens the line board with the popup. */
+/** Canonical `/task/:orderNumber` opens the line board with the popup. */
 export function WorkOrderDetailPage() {
   return <LinesPage />;
 }
 
-/** Legacy `/work-orders/:orderId` bookmarks go to the canonical permalink. */
+/**
+ * Legacy id-based `/tasks/:orderId` bookmarks (including old `/work-orders/:orderId`
+ * links, forwarded here by the App-level redirect) go to the canonical permalink.
+ */
 export function LegacyWorkOrderDetailRedirect() {
   const { orderId } = useParams<{ orderId: string }>();
   const { organizationId, factoryId, factoryKey, factory } = useFactoriesLayout();

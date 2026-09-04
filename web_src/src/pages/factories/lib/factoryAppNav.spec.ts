@@ -37,19 +37,24 @@ describe("resolveFactoryAppBackNav", () => {
     });
   });
 
-  it("returns the work-order permalink when from=work-order has a number", () => {
-    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42", lineId: "line-1" })).toEqual(
-      {
-        label: "Back",
-        href: "/org/workspaces/fac/work-order/42",
-      },
-    );
+  it("returns the task permalink when from=task has a number", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "task", orderNumber: "42", lineId: "line-1" })).toEqual({
+      label: "Back",
+      href: "/org/workspaces/fac/task/42",
+    });
   });
 
-  it("falls back to the workspace index when from=work-order has no line", () => {
-    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order" })).toEqual({
+  it("falls back to the workspace index when from=task has no line", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "task" })).toEqual({
       label: "Back",
       href: "/org/workspaces/fac",
+    });
+  });
+
+  it("still resolves the task permalink for the legacy from=work-order value", () => {
+    expect(resolveFactoryAppBackNav("org", "fac", { from: "work-order", orderNumber: "42" })).toEqual({
+      label: "Back",
+      href: "/org/workspaces/fac/task/42",
     });
   });
 });
