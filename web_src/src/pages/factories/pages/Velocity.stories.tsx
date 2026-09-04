@@ -78,11 +78,11 @@ export const EarlyUsage: Story = {
 };
 
 /**
- * A cohort of 14 people: the People table shows its first 10 rows and a
- * "Load more" control that fetches the rest, sorted and paged by the backend.
+ * A cohort of 14 people: the People table shows its first 5 rows and a
+ * "Show more" control that fetches the next 20, sorted and paged by the backend.
  */
 export const PeopleLoadMore: Story = {
-  name: "People load more",
+  name: "People show more",
   render: () =>
     renderVelocity({
       [PRIMARY_FACTORY_ID]: PEOPLE_LOAD_MORE_FACTORY_VELOCITY,
