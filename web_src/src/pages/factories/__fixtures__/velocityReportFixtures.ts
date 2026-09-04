@@ -2,6 +2,14 @@ import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
 import { peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
 
 /**
+ * The velocity response, carrying the per-day cost fields the API does not
+ * report yet. The generated client parses the body as raw JSON, so the extra
+ * fields on each day reach the page unchanged and let the cost chart be
+ * designed before the ledger is split by usage kind.
+ */
+type VelocityResponse = FactoriesDescribeFactoryVelocityResponse;
+
+/**
  * Storybook payloads for the workspace Velocity report. The series drift on
  * purpose: SuperPlane output climbs while review time grows, so the page shows
  * a mixed result instead of every metric improving at once.
@@ -103,6 +111,18 @@ function intakeCounts(superplane: number) {
 
 function buildDay({ index, periodDays, people, superplane, waste }: VelocityDaySeed) {
   const costCents = Math.round(superplane * 214 + waste * 185);
+  /* Compute takes a bigger cut on days with long reruns, so the band breathes. */
+  const computeShare = 0.18 + (index % 4) * 0.03;
+  const computeCostCents = Math.round(costCents * computeShare);
+
+  /* Medians move day to day, so neither line reads as a constant. */
+  const drift = 1 + 0.18 * Math.sin(index * 0.7);
+
+  /* A few long reruns pull the mean above the median, so the median sits under it. */
+  const tasksClosed = superplane + waste;
+  const medianTaskCostCents = tasksClosed > 0 ? Math.round((costCents / tasksClosed) * 0.78 * drift) : 0;
+  const medianTaskComputeCostCents = Math.round(medianTaskCostCents * computeShare);
+
   return {
     day: dayLabel(index, periodDays),
     superplaneMerged: superplane,
@@ -110,6 +130,10 @@ function buildDay({ index, periodDays, people, superplane, waste }: VelocityDayS
     waste,
     intake: intakeCounts(superplane),
     costCents: String(costCents),
+    modelCostCents: String(costCents - computeCostCents),
+    computeCostCents: String(computeCostCents),
+    medianTaskModelCostCents: String(medianTaskCostCents - medianTaskComputeCostCents),
+    medianTaskComputeCostCents: String(medianTaskComputeCostCents),
     tokens: String(superplane * 18_500 + waste * 12_400),
     wasteCostCents: String(waste * 185),
   };
@@ -132,6 +156,8 @@ function sumTotals(points: Point[]) {
   const peopleMerged = points.reduce((total, point) => total + point.peopleMerged, 0);
   const waste = points.reduce((total, point) => total + point.waste, 0);
   const costCents = points.reduce((total, point) => total + Number(point.costCents), 0);
+  const modelCostCents = points.reduce((total, point) => total + Number(point.modelCostCents ?? 0), 0);
+  const computeCostCents = points.reduce((total, point) => total + Number(point.computeCostCents ?? 0), 0);
   const tokens = points.reduce((total, point) => total + Number(point.tokens), 0);
   const wasteCostCents = points.reduce((total, point) => total + Number(point.wasteCostCents), 0);
   const merged = superplaneMerged + peopleMerged;
@@ -143,6 +169,8 @@ function sumTotals(points: Point[]) {
     superplaneSharePct: merged > 0 ? Math.round((superplaneMerged / merged) * 100) : 0,
     wastePct: superplaneMerged + waste > 0 ? Math.round((waste / (superplaneMerged + waste)) * 100) : 0,
     costCents: String(costCents),
+    modelCostCents: String(modelCostCents),
+    computeCostCents: String(computeCostCents),
     tokens: String(tokens),
     wasteCostCents: String(wasteCostCents),
     // Every pull request of these payloads comes from a task of its own.
@@ -224,7 +252,7 @@ function buildReport(
   periodDays: number,
   withComparison: boolean,
   authors: Author[] = PEOPLE_AUTHORS,
-): FactoriesDescribeFactoryVelocityResponse {
+): VelocityResponse {
   const points = buildPoints(periodDays, periodDays);
   const totals = sumTotals(points);
   const previous = sumTotals(buildPoints(periodDays, 0));
@@ -246,13 +274,13 @@ function buildReport(
   };
 }
 
-export const DEFAULT_FACTORY_VELOCITY: Record<number, FactoriesDescribeFactoryVelocityResponse> = {
+export const DEFAULT_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
   14: buildReport(14, true),
   30: buildReport(30, true),
 };
 
 /** A new workspace: nothing merged, nothing closed, nothing spent. */
-export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = {
+export const EMPTY_FACTORY_VELOCITY: VelocityResponse = {
   yesterday: { superplaneMerged: 0, waste: 0 },
   totals: {
     superplaneMerged: 0,
@@ -284,7 +312,7 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
  * the whole period, because Velocity reads repository history, but SuperPlane
  * has one day of output. There is no earlier period to compare with.
  */
-export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = (() => {
+export const EARLY_USAGE_FACTORY_VELOCITY: VelocityResponse = (() => {
   const report = buildReport(14, false);
   const points = (report.points ?? []).map((point, index, all) => {
     const isLastDay = index === all.length - 1;
@@ -295,6 +323,10 @@ export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityRespo
       waste: 0,
       intake: [],
       costCents: "0",
+      modelCostCents: "0",
+      computeCostCents: "0",
+      medianTaskModelCostCents: "0",
+      medianTaskComputeCostCents: "0",
       tokens: "0",
       wasteCostCents: "0",
     };
@@ -317,7 +349,7 @@ export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityRespo
  * there, but the background sync has not stored the repository history yet, so
  * the People series and the SuperPlane share are withheld.
  */
-export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = (() => {
+export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: VelocityResponse = (() => {
   const report = buildReport(14, true);
   const points = (report.points ?? []).map((point) => ({ ...point, peopleMerged: 0 }));
   const totals = sumTotals(points as Point[]);
@@ -338,7 +370,7 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVeloc
  * something to load. Every other fixture keeps the small default cohort so its
  * story keeps rendering one page with no control.
  */
-export const PEOPLE_LOAD_MORE_FACTORY_VELOCITY: Record<number, FactoriesDescribeFactoryVelocityResponse> = {
+export const PEOPLE_LOAD_MORE_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
   14: buildReport(14, true, MANY_PEOPLE_AUTHORS),
   30: buildReport(30, true, MANY_PEOPLE_AUTHORS),
 };
@@ -362,10 +394,7 @@ const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => numb
  * `peopleOffset`/`peoplePageSize`, so Storybook and the mock server exercise
  * the same "Show more" contract the real API does.
  */
-export function paginateVelocityPeople(
-  report: FactoriesDescribeFactoryVelocityResponse,
-  url: URL,
-): FactoriesDescribeFactoryVelocityResponse {
+export function paginateVelocityPeople(report: VelocityResponse, url: URL): VelocityResponse {
   const people = [...(report.people ?? [])];
   const valueOf = PEOPLE_SORT_VALUE[url.searchParams.get("peopleSort") ?? ""] ?? totalMergedOf;
   const ascending = url.searchParams.get("peopleSortDirection") === "SORT_DIRECTION_ASC";
