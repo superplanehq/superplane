@@ -11,7 +11,13 @@ import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } 
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
-import { hostedGitHubAppSlug, hostedGitHubState, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
+import {
+  hostedGitHubAppSlug,
+  hostedGitHubInstallRequested,
+  hostedGitHubState,
+  pendingGitHubInstallations,
+} from "@/lib/hostedGitHubInstall";
+import { GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_REQUEST_VALUE } from "@/lib/integrationSetupReturn";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { cn } from "@/lib/utils";
 import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
@@ -20,7 +26,7 @@ import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { CircleX, Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DeleteModal } from "../CapabilityBasedIntegrationDetails/DeleteModal";
 import { Header } from "../CapabilityBasedIntegrationDetails/Header";
@@ -67,6 +73,7 @@ function TabButton({
 
 export function LegacyIntegrationDetails({ organizationId, integration }: LegacyIntegrationDetailsProps) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const integrationsHref = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [activeTab, setActiveTab] = useState<LegacyIntegrationTab>("configuration");
@@ -106,6 +113,9 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
   );
   const pendingInstallations = pendingGitHubInstallations(integration.status?.metadata);
   const pendingInstallState = hostedGitHubState(integration.status?.metadata);
+  const installRequested =
+    searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
+    hostedGitHubInstallRequested(integration.status?.metadata);
   const showInstallPicker =
     pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
   const browserAction = integration.status?.browserAction;
@@ -158,6 +168,16 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       />
 
       <div className="space-y-6">
+        {installRequested && integration.status?.state !== "ready" ? (
+          <Alert data-testid="github-install-requested">
+            <AlertTitle>Waiting for GitHub approval</AlertTitle>
+            <AlertDescription>
+              <p>Ask a GitHub organization admin to approve the SuperPlane GitHub App.</p>
+              <p>After they approve, click Connect GitHub again.</p>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         {integration.status?.state === "error" && integration.status.stateDescription ? (
           <Alert className="border-destructive/40 bg-destructive/10 text-destructive [&>svg+div]:translate-y-0 [&>svg]:top-[14px] [&>svg]:text-destructive">
             <CircleX className="size-4" />

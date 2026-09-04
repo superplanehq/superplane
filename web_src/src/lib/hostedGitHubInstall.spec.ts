@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   hostedGitHubAppSlug,
   hostedGitHubBindPath,
+  hostedGitHubInstallRequested,
   hostedGitHubInstallURL,
   hostedGitHubState,
   pendingGitHubInstallations,
@@ -43,5 +44,12 @@ describe("hosted GitHub URLs", () => {
   it("reads state and slug", () => {
     expect(hostedGitHubState({ state: "csrf" })).toBe("csrf");
     expect(hostedGitHubAppSlug({ githubApp: { slug: "superplane" } })).toBe("superplane");
+  });
+
+  it("reads a pending GitHub install request", () => {
+    expect(hostedGitHubInstallRequested({ installRequested: true })).toBe(true);
+    expect(hostedGitHubInstallRequested({ installRequested: false })).toBe(false);
+    expect(hostedGitHubInstallRequested({})).toBe(false);
+    expect(hostedGitHubInstallRequested(undefined)).toBe(false);
   });
 });

@@ -60,6 +60,19 @@ export const ConnectError: Story = {
   ),
 };
 
+export const ConnectInstallRequested: Story = {
+  name: "2d Connect GitHub (waiting for approval)",
+  render: () => (
+    <FirstRunConnectScreen
+      githubConnected={false}
+      installRequested
+      chrome={firstRunStoryChrome(1)}
+      onConnectGitHub={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
+};
+
 export const Choose: Story = {
   name: "3 Choose repository",
   render: () => <FirstRunFlow firstName="Ada" initialScreen="choose" />,
