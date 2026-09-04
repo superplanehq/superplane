@@ -2,6 +2,8 @@ import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from ".
 import { buildActionStateRegistry } from "../utils";
 import { acceptMergeRequestMapper } from "./accept_merge_request";
 import { addIssueLabelMapper } from "./add_issue_label";
+import { addIssueAssigneeMapper } from "./add_issue_assignee";
+import { removeIssueAssigneeMapper } from "./remove_issue_assignee";
 import { addMergeRequestReviewersMapper } from "./add_merge_request_reviewers";
 import { addReactionMapper } from "./add_reaction";
 import { approveMergeRequestMapper } from "./approve_merge_request";
@@ -61,6 +63,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createIssueComment: buildActionStateRegistry("created"),
   updateIssueComment: buildActionStateRegistry("updated"),
   addIssueLabel: buildActionStateRegistry("added"),
+  addIssueAssignee: buildActionStateRegistry("updated"),
+  removeIssueAssignee: buildActionStateRegistry("updated"),
   markMergeRequestReadyForReview: buildActionStateRegistry("marked ready"),
   createRelease: buildActionStateRegistry("created"),
   updateRelease: buildActionStateRegistry("updated"),
@@ -92,6 +96,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssueComment: createIssueCommentMapper,
   updateIssueComment: updateIssueCommentMapper,
   addIssueLabel: addIssueLabelMapper,
+  addIssueAssignee: addIssueAssigneeMapper,
+  removeIssueAssignee: removeIssueAssigneeMapper,
   markMergeRequestReadyForReview: markMergeRequestReadyForReviewMapper,
   createRelease: createReleaseMapper,
   updateRelease: updateReleaseMapper,
