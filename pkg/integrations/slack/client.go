@@ -7,9 +7,25 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+const (
+	// requestTimeout bounds a single Slack API call. http.DefaultClient has no
+	// timeout, so without this a stalled connection blocks the worker running
+	// the component forever.
+	requestTimeout = 30 * time.Second
+
+	// maxResponseSize bounds how much of a response we buffer in memory. Slack
+	// API responses are far smaller than this (conversations.list pages at 100
+	// channels), so the cap only guards against a runaway response.
+	maxResponseSize = 4 * 1024 * 1024 // 4MB
+)
+
+// httpClient is shared by all requests so connections are reused across calls.
+var httpClient = &http.Client{Timeout: requestTimeout}
 
 type Client struct {
 	BotToken string
@@ -176,16 +192,19 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.BotToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if len(responseBody) > maxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
 	}
 
 	return responseBody, nil
