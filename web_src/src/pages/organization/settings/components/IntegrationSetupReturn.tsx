@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { hasIntegrationSetupStay, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import {
+  hasIntegrationSetupStay,
+  peekIntegrationSetupReturn,
+  withGitHubSetupRequest,
+} from "@/lib/integrationSetupReturn";
 
 interface IntegrationSetupReturnProps {
   organizationId: string;
@@ -27,7 +31,8 @@ export function IntegrationSetupReturn({ organizationId, children }: Integration
   // Peek on each render because provider callbacks use the organization UID.
   // OrganizationScope later replaces that UID with the slug that keys storage.
   // The destination page deletes the marker after navigation.
-  const returnTo = peekIntegrationSetupReturn(organizationId);
+  const storedReturn = peekIntegrationSetupReturn(organizationId);
+  const returnTo = storedReturn ? withGitHubSetupRequest(storedReturn, searchParams.toString()) : null;
 
   useEffect(() => {
     if (!returnTo || stayOnPage) return;

@@ -50,6 +50,8 @@ func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata co
 	metadata.Repositories = repos
 	metadata.State = ""
 	metadata.PendingInstallations = nil
+	metadata.InstallRequested = false
+	metadata.InstallRequestedAccount = ""
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()
