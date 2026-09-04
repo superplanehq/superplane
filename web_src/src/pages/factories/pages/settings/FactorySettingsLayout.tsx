@@ -1,43 +1,27 @@
 import type { FactoriesFactory } from "@/api-client";
+import { Avatar } from "@/components/Avatar/avatar";
 import { Input } from "@/components/ui/input";
 import { useAccount } from "@/contexts/useAccount";
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import {
-  organizationMatchesRoute,
-  organizationRouteId,
-  selectedOrganizationRouteId,
-  type AccountOrganization,
-} from "@/lib/accountOrganizations";
 import { FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
-import { ArrowLeft, Check, ChevronDown, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, Navigate, NavLink, Outlet, useLocation, useParams, useSearchParams } from "react-router";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
-import {
-  factoryDetailPath,
-  factoryListPath,
-  factorySettingsSectionPath,
-  replaceOrganizationSegment,
-} from "../../lib/factoryPagePaths";
+import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
+import { initialsForName } from "../../layout/factoriesRail";
+import { factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
@@ -135,7 +119,8 @@ function FactorySettingsLayoutContent({
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
   const settingsNavGroups = useFactorySettingsNavGroups();
-  const { data: factory, isLoading, error } = useFactory(organizationId, factoryId);
+  const { data: describedFactory, isLoading, error } = useFactory(organizationId, factoryId);
+  const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const [navQuery, setNavQuery] = useState("");
@@ -186,15 +171,17 @@ function FactorySettingsLayoutContent({
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
       <OrganizationSettingsPathsProvider paths={organizationSettingsPaths}>
         <IntegrationsBasePathProvider basePath={integrationsPath}>
-          <div
-            className="flex h-full min-h-0 w-full bg-background text-foreground"
-            data-testid="factory-settings-layout"
-          >
-            <FactorySettingsSidebar
+          <div className="flex h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
+            <FactoriesSidebar
               organizationId={organizationId}
               factoryKey={factoryKey}
               factory={factory}
               factories={factories}
+            />
+            <FactorySettingsSidebar
+              organizationId={organizationId}
+              factoryKey={factoryKey}
+              factory={factory}
               navQuery={navQuery}
               onNavQueryChange={setNavQuery}
               isSearching={isSearching}
@@ -223,7 +210,6 @@ function FactorySettingsSidebar({
   organizationId,
   factoryKey,
   factory,
-  factories,
   navQuery,
   onNavQueryChange,
   isSearching,
@@ -233,7 +219,6 @@ function FactorySettingsSidebar({
   organizationId: string;
   factoryKey: string;
   factory: FactoriesFactory;
-  factories: FactoriesFactory[];
   navQuery: string;
   onNavQueryChange: (query: string) => void;
   isSearching: boolean;
@@ -242,7 +227,6 @@ function FactorySettingsSidebar({
 }) {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId);
-  const { data: organizations = [] } = useAccountOrganizations();
   const accountLabel = account?.name?.trim() || "Account";
   const organizationName = organization?.metadata?.name?.trim() || "Organization";
   const workspaceName = factory.name?.trim() || "Workspace";
@@ -253,16 +237,6 @@ function FactorySettingsSidebar({
       className="flex h-full w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
       data-testid="factory-settings-sidebar"
     >
-      <div className="border-b border-sidebar-border px-3 py-3">
-        <NavLink
-          to={factoryDetailPath(organizationId, factoryKey)}
-          className="inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] tracking-[-0.01em] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
-          data-testid="factory-settings-back"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          Back to workspace
-        </NavLink>
-      </div>
       <div className="px-3 pt-3">
         <label className="sr-only" htmlFor="factory-settings-find">
           Find settings
@@ -292,10 +266,8 @@ function FactorySettingsSidebar({
               key={group.id}
               organizationId={organizationId}
               factoryKey={factoryKey}
-              factory={factory}
-              factories={factories}
-              organizations={organizations}
               accountLabel={accountLabel}
+              accountAvatarUrl={account?.avatar_url}
               organizationName={organizationName}
               workspaceName={workspaceName}
               workspaceKey={workspaceKey}
@@ -359,10 +331,8 @@ function SettingsSearchResults({
 function SettingsNavGroup({
   organizationId,
   factoryKey,
-  factory,
-  factories,
-  organizations,
   accountLabel,
+  accountAvatarUrl,
   organizationName,
   workspaceName,
   workspaceKey,
@@ -370,127 +340,69 @@ function SettingsNavGroup({
 }: {
   organizationId: string;
   factoryKey: string;
-  factory: FactoriesFactory;
-  factories: FactoriesFactory[];
-  organizations: AccountOrganization[];
   accountLabel: string;
+  accountAvatarUrl?: string | null;
   organizationName: string;
   workspaceName: string;
   workspaceKey: string;
   group: FactorySettingsNavGroup;
 }) {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const currentOrganizationRouteId = selectedOrganizationRouteId(organizations, organizationId);
-
   return (
     <section data-testid={`factory-settings-${group.id}-nav`}>
       {group.id === "workspace" ? (
-        <SettingsEntitySwitcher
-          ariaLabel={`Switch workspace, ${workspaceName}`}
+        <SettingsNavGroupHeading
           name={workspaceName}
           helper={`Workspace · ${workspaceKey}`}
-          menuLabel="Switch workspace"
-          selectedId={factory.id ?? ""}
-          options={factories.flatMap((item) =>
-            item.id && item.key ? [{ id: item.id, name: item.name?.trim() || item.key, detail: item.key }] : [],
-          )}
-          onChange={(nextId) => {
-            const nextFactory = factories.find((item) => item.id === nextId);
-            if (!nextFactory?.key || nextFactory.key === factoryKey) {
-              return;
-            }
-            navigate(replaceFactoryKeySegment(pathname, organizationId, factoryKey, nextFactory.key));
-          }}
-          testId="factory-settings-workspace-switcher"
+          square
+          testId="factory-settings-workspace-heading"
         />
       ) : group.id === "organization" ? (
-        <SettingsEntitySwitcher
-          ariaLabel={`Switch organization, ${organizationName}`}
+        <SettingsNavGroupHeading
           name={organizationName}
           helper="Organization"
-          menuLabel="Switch organization"
-          selectedId={currentOrganizationRouteId}
-          options={organizations.map((item) => ({
-            id: organizationRouteId(item),
-            name: item.name,
-            detail: "",
-          }))}
-          onChange={(nextRouteId) => {
-            const nextOrganization = organizations.find((item) => organizationRouteId(item) === nextRouteId);
-            if (!nextOrganization || organizationMatchesRoute(nextOrganization, organizationId)) {
-              return;
-            }
-            navigate(replaceOrganizationSegment(pathname, organizationId, organizationRouteId(nextOrganization)));
-          }}
-          testId="factory-settings-organization-switcher"
+          square
+          testId="factory-settings-organization-heading"
         />
       ) : (
-        <div className="px-2.5 pb-1">
-          <h2 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">{accountLabel}</h2>
-        </div>
+        <SettingsNavGroupHeading
+          name={accountLabel}
+          avatarSrc={accountAvatarUrl}
+          testId="factory-settings-account-heading"
+        />
       )}
       <SettingsNavItems organizationId={organizationId} factoryKey={factoryKey} items={group.items} />
     </section>
   );
 }
 
-function SettingsEntitySwitcher({
-  ariaLabel,
+function SettingsNavGroupHeading({
   name,
   helper,
-  menuLabel,
-  selectedId,
-  options,
-  onChange,
+  avatarSrc,
+  square = false,
   testId,
 }: {
-  ariaLabel: string;
   name: string;
-  helper: string;
-  menuLabel: string;
-  selectedId: string;
-  options: Array<{ id: string; name: string; detail: string }>;
-  onChange: (id: string) => void;
-  testId: string;
+  helper?: string;
+  avatarSrc?: string | null;
+  square?: boolean;
+  testId?: string;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          className="mb-1 flex w-full items-start justify-between gap-2 rounded-md px-2.5 py-1 text-left hover:bg-sidebar-accent"
-          data-testid={testId}
-        >
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">{helper}</span>
-          </span>
-          <ChevronDown className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel>{menuLabel}</DropdownMenuLabel>
-        {options.map((option) => {
-          const isCurrent = option.id === selectedId;
-          return (
-            <DropdownMenuItem
-              key={option.id}
-              onClick={() => onChange(option.id)}
-              aria-checked={isCurrent}
-              data-testid={`${testId}-option-${option.id}`}
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {option.name}
-                {option.detail ? <span className="text-muted-foreground"> · {option.detail}</span> : null}
-              </span>
-              {isCurrent ? <Check className="ml-auto size-3.5 shrink-0" aria-hidden /> : null}
-            </DropdownMenuItem>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="mb-1 flex items-center gap-2 px-2.5 py-1" data-testid={testId}>
+      <Avatar
+        src={avatarSrc || undefined}
+        initials={avatarSrc ? undefined : initialsForName(name)}
+        square={square}
+        alt=""
+        className="size-6 bg-sidebar-accent text-[10px] text-foreground"
+        data-testid={testId ? `${testId}-avatar` : undefined}
+      />
+      <div className="min-w-0">
+        <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</h2>
+        {helper ? <p className="truncate text-[11px] text-muted-foreground">{helper}</p> : null}
+      </div>
+    </div>
   );
 }
 

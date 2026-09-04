@@ -1,3 +1,5 @@
+import { replaceFactoryKeySegment } from "./factoryKeyResolution";
+
 export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
@@ -38,6 +40,46 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
     return factoryLineDetailPath(organizationId, factoryKey, lineId);
   }
   return factoryDetailPath(organizationId, factoryKey);
+}
+
+const WORKSPACE_PAGES_TO_KEEP = ["/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
+
+function workspacePageToKeep(pathnameRest: string): boolean {
+  if (WORKSPACE_LIST_PAGES_TO_KEEP.includes(pathnameRest)) {
+    return true;
+  }
+  return WORKSPACE_PAGES_TO_KEEP.some((prefix) => pathnameRest === prefix || pathnameRest.startsWith(`${prefix}/`));
+}
+
+/**
+ * Path after a workspace switch. Keeps settings, Velocity, and other pages
+ * that exist in every workspace. A line board, task, or app URL opens the
+ * new workspace home — those identifiers belong to one workspace.
+ */
+export function pathAfterWorkspaceSwitch({
+  pathname,
+  organizationId,
+  currentFactoryKey,
+  nextFactory,
+}: {
+  pathname: string;
+  organizationId: string;
+  currentFactoryKey: string;
+  nextFactory: { key?: string; lines?: Array<{ id?: string }> | null };
+}): string {
+  const nextKey = nextFactory.key;
+  if (!nextKey) {
+    return pathname;
+  }
+
+  const prefix = `/${organizationId}/workspaces/${currentFactoryKey}`;
+  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+  if (workspacePageToKeep(rest)) {
+    return replaceFactoryKeySegment(pathname, organizationId, currentFactoryKey, nextKey);
+  }
+
+  return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */
