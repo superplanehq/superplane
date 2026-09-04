@@ -279,9 +279,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunConnectScreen
         githubConnected={setup.vcsReady}
         chrome={chromeFor("connect")}
-        showPrivateApp={model.offersPrivateGitHubAppSetup}
         onConnectGitHub={() => model.requestConnect("github")}
-        onCreatePrivateApp={model.requestPrivateGitHubConnect}
         onContinue={() => flow.goToScreen("choose")}
       />
     );
