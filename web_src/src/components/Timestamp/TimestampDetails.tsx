@@ -32,13 +32,13 @@ export function TimestampDetails({ date, fallback = null, copyTestId = "timestam
   if (!resolved) return <>{fallback}</>;
   const iso = formatISO(resolved);
   return (
-    <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1.5 text-sm">
+    <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-0.5 text-[13px]">
       <DetailRow label="Local">{formatAbsolute(resolved)}</DetailRow>
       <DetailRow label="UTC">{formatUTC(resolved)}</DetailRow>
       <DetailRow label="Relative">{formatRelative(resolved)}</DetailRow>
       <DetailRow label="Timestamp">
         <div className="flex items-center gap-1.5">
-          <span className="min-w-0 truncate font-mono text-xs">{iso}</span>
+          <span className="min-w-0 truncate font-mono">{iso}</span>
           <CopyButton text={iso} data-testid={copyTestId} />
         </div>
       </DetailRow>
