@@ -1910,14 +1910,6 @@ ALTER TABLE ONLY public.organization_llm_settings
 
 
 --
--- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organizations
-    ADD CONSTRAINT organizations_name_key UNIQUE (name);
-
-
---
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4237,7 +4229,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260902175657	f
+20260904054345	f
 \.
 
 
