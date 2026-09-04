@@ -160,7 +160,7 @@ func (steps *TestHomePageSteps) AssertUpdatePermissionToast() {
 }
 
 func (steps *TestHomePageSteps) ClickNewApp() {
-	steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
+	// An empty org opens /apps/new. The home toolbar is not on that page.
 	steps.session.WaitForBrowserPath("/" + steps.session.OrgSlug + "/apps/new")
 	steps.ClickStartFromScratch()
 	steps.session.Sleep(2500)
