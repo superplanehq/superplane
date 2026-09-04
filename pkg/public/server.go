@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -1126,7 +1127,7 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 }
 
 // createInitialWorkspace provisions the first organization and workspace for
-// an account. The GitHub identity is checked before its owner name is used.
+// an account. GitHub is optional: the account name is enough to start setup.
 func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
@@ -1140,9 +1141,9 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	owner := strings.TrimSpace(req.Owner)
+	owner := initialOrganizationName(account, req.Owner)
 	if owner == "" {
-		http.Error(w, "GitHub account is required", http.StatusBadRequest)
+		http.Error(w, "Organization name is required", http.StatusBadRequest)
 		return
 	}
 	attemptID, err := uuid.Parse(req.AttemptID)
@@ -1151,8 +1152,8 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if !accountOwnsGitHubName(database.DB(r.Context()), account, owner) {
-		http.Error(w, "GitHub account does not match this account", http.StatusForbidden)
+	if !accountMayNameOrganization(database.DB(r.Context()), account, owner) {
+		http.Error(w, "Organization name does not match this account", http.StatusForbidden)
 		return
 	}
 
@@ -1268,6 +1269,21 @@ func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.O
 	})
 }
 
+func initialOrganizationName(account *models.Account, requested string) string {
+	name := strings.TrimSpace(requested)
+	if name != "" {
+		return name
+	}
+	return strings.TrimSpace(account.Name)
+}
+
+func accountMayNameOrganization(tx *gorm.DB, account *models.Account, name string) bool {
+	if name == strings.TrimSpace(account.Name) {
+		return true
+	}
+	return accountOwnsGitHubName(tx, account, name)
+}
+
 func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) bool {
 	linkedAccount, err := models.FindAccountLinkedAccount(tx, account.ID, models.ProviderGitHub)
 	if err == nil && (owner == linkedAccount.Name || owner == linkedAccount.Username) {
@@ -1284,19 +1300,23 @@ func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) b
 }
 
 func (s *Server) createInitialOrganizationAndWorkspace(tx *gorm.DB, account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
-	for suffix := 1; suffix <= 100; suffix++ {
+	for attempt := 1; attempt <= 100; attempt++ {
 		organizationName := owner
-		if suffix > 1 {
-			organizationName = fmt.Sprintf("%s %d", owner, suffix)
+		if attempt > 1 {
+			suffix, err := randomOrganizationSuffix()
+			if err != nil {
+				return nil, nil, err
+			}
+			organizationName = fmt.Sprintf("%s-%s", owner, suffix)
 		}
 
-		savepoint := fmt.Sprintf("initial_organization_name_%d", suffix)
+		savepoint := fmt.Sprintf("initial_organization_name_%d", attempt)
 		if err := tx.SavePoint(savepoint).Error; err != nil {
 			return nil, nil, fmt.Errorf("create organization savepoint: %w", err)
 		}
 
 		organization, workspace, err := s.createInitialOrganizationAttempt(tx, account, organizationName, attemptID)
-		if errors.Is(err, models.ErrNameAlreadyUsed) {
+		if errors.Is(err, models.ErrNameAlreadyUsed) || errors.Is(err, models.ErrSlugAlreadyUsed) {
 			if rollbackErr := tx.RollbackTo(savepoint).Error; rollbackErr != nil {
 				return nil, nil, fmt.Errorf("rollback organization name: %w", rollbackErr)
 			}
@@ -1306,6 +1326,21 @@ func (s *Server) createInitialOrganizationAndWorkspace(tx *gorm.DB, account *mod
 	}
 
 	return nil, nil, fmt.Errorf("could not find an available organization name for %q", owner)
+}
+
+const organizationSuffixAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+func randomOrganizationSuffix() (string, error) {
+	bytes := make([]byte, 6)
+	if _, err := cryptorand.Read(bytes); err != nil {
+		return "", fmt.Errorf("generate organization suffix: %w", err)
+	}
+
+	suffix := make([]byte, len(bytes))
+	for index, value := range bytes {
+		suffix[index] = organizationSuffixAlphabet[int(value)%len(organizationSuffixAlphabet)]
+	}
+	return string(suffix), nil
 }
 
 func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
