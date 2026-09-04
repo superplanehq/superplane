@@ -232,7 +232,7 @@ func CreateCanvasWithSeedFiles(
 		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
-	proto, err := SerializeCanvas(&canvas, liveVersion, user, nil)
+	proto, err := serializePreparedCanvas(database.DB(ctx), &canvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, err
 	}

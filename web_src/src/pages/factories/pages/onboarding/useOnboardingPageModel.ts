@@ -167,7 +167,10 @@ function canConfigureWorkspace(canAct: (resource: string, action: string) => boo
 function useOnboardingAgentContext(organizationId: string, connected: Set<IntegrationId>) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
-  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents);
+  return useOnboardingAgentPlan(organizationId, connected, remainingCreditCents, {
+    provider: spend.data?.defaultHostedProvider,
+    model: spend.data?.defaultHostedModel,
+  });
 }
 
 function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: string) {
@@ -378,7 +381,7 @@ export function useOnboardingPageModel(args: {
     setup,
     // True when hosted credentials cover the agent, so setup can skip the
     // agent screen and provision from the ticket screen.
-    hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
+    hostedAgentReady: isHostedAgentReady(agent.plan),
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,

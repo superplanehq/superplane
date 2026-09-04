@@ -29,7 +29,7 @@ func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
 	assert.Contains(t, err.Error(), "prompt")
 }
 
-func TestValidateRunCodexSpecAcceptsHostedCredentials(t *testing.T) {
+func TestValidateRunCodexSpecRejectsHostedCredentials(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
@@ -41,44 +41,9 @@ func TestValidateRunCodexSpecAcceptsHostedCredentials(t *testing.T) {
 		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
 		Model:       "gpt-5",
 	}
-	require.NoError(t, validateRunCodexSpec(spec))
-}
-
-func TestValidateRunCodexSpecRequiresModelForHostedCredentials(t *testing.T) {
-	t.Parallel()
-
-	prompt := "fix tests"
-	spec := RunCodexSpec{
-		MachineType: "e1-large-amd64",
-		Steps: []runner.AgentStep{
-			{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt},
-		},
-		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
-	}
 	err := validateRunCodexSpec(spec)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "model is required")
-}
-
-func TestValidateRunCodexSpecRejectsHostedBaseURLEnv(t *testing.T) {
-	t.Parallel()
-
-	prompt := "fix tests"
-	value := "https://attacker.example"
-	spec := RunCodexSpec{
-		MachineType: "e1-large-amd64",
-		Steps: []runner.AgentStep{
-			{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt},
-		},
-		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
-		Model:       "gpt-5",
-		Environment: []runner.EnvironmentVariable{
-			{Name: envOpenAIBaseURL, ValueSource: runner.EnvironmentValueSourceLiteral, Value: &value},
-		},
-	}
-	err := validateRunCodexSpec(spec)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), envOpenAIBaseURL)
+	assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 }
 
 func TestValidateRunCodexSpecRejectsReservedEnv(t *testing.T) {

@@ -2,12 +2,10 @@ package factories
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/datatypes"
@@ -153,8 +151,11 @@ func requirePlanningGitHub(tx *gorm.DB, factoryModel *models.Factory) error {
 }
 
 func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) (*intakeAgent, error) {
-	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil && agent.component() == "runnerClaudeCode" {
-		return agent, nil
+	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil {
+		switch agent.component() {
+		case "runnerClaudeCode", models.SuperPlaneRunnerComponent:
+			return agent, nil
+		}
 	}
 	if agent := resolveClaudePlanningAgent(tx, factoryModel); agent != nil {
 		return agent, nil
@@ -174,28 +175,16 @@ func resolveClaudePlanningAgent(tx *gorm.DB, factoryModel *models.Factory) *inta
 			}
 		}
 	}
-	providers, err := models.ListHostedLLMProviders(tx)
-	if err != nil {
-		return nil
-	}
-	index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
-		return provider.Provider == models.UsageProviderAnthropic && provider.OffersHostedModels()
-	})
-	if index < 0 {
-		return nil
-	}
-	model := hostedIntakeModel(providers[index], "opus")
-	if model == "" {
-		return nil
-	}
-	return &intakeAgent{
-		Component:   "runnerClaudeCode",
-		Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
-		Model:       model,
-	}
+	return intakeAgentFromHostedProvider(tx, factoryModel)
 }
 
 func planningTemplateAgent(agent *intakeAgent) *factoryTemplateAgent {
+	if agent.component() == models.SuperPlaneRunnerComponent {
+		return &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		}
+	}
 	out := &factoryTemplateAgent{
 		component: "runnerClaudeCode",
 		model:     agent.model(),
