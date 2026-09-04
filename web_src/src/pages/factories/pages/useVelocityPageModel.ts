@@ -173,10 +173,10 @@ export function useVelocityPageModel(
       sortKey: peopleSort.sortKey,
       sortDirection: peopleSort.sortDirection,
       onSort: peopleSort.onSort,
-      canLoadMore: people.canLoadMore,
+      canLoadMore: people.canLoadMore && !Boolean(holdsPreviousReport),
       isLoadingMore: isLoadingMorePeople,
       loadMore: () => {
-        if (isLoadingMorePeople || !people.canLoadMore) return;
+        if (isLoadingMorePeople || holdsPreviousReport || !people.canLoadMore) return;
         peopleSort.loadMore();
       },
     },

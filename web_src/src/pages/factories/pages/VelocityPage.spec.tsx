@@ -494,6 +494,24 @@ describe("VelocityPage shell", () => {
     expect(velocityHookCalls.at(-1)).toMatchObject({ peopleSort: "costUsd", peopleSortDirection: "asc" });
   });
 
+  it("hides Show more while a sort reset still holds the previous report", async () => {
+    resetState();
+    velocityHookState.data = populatedResponse();
+    velocityHookState.allPeople = manyPeople(12);
+    const user = userEvent.setup();
+
+    renderShell();
+    await user.click(screen.getByRole("button", { name: /show more/i }));
+    expect(screen.getByTestId("velocity-people")).toHaveTextContent("Contributor 12");
+
+    velocityHookState.holdsPreviousReport = true;
+    velocityHookState.isFetching = true;
+    await user.click(screen.getByRole("button", { name: "Costs" }));
+
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(velocityHookCalls.at(-1)).toMatchObject({ peopleOffset: 0, peopleSort: "costUsd" });
+  });
+
   it("explains an empty Manual work column when GitHub is not connected", () => {
     resetState();
     velocityHookState.data = populatedResponse({
