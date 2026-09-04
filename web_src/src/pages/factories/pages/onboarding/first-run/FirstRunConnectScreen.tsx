@@ -69,7 +69,7 @@ export function FirstRunConnectScreen({
             <p className="text-[13px] text-muted-foreground">{copy.installRequestedNext}</p>
           </>
         ) : null}
-        {connectError ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
+        {connectError && !waitingForApproval ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>
   );

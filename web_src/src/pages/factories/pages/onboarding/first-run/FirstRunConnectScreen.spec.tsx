@@ -58,6 +58,22 @@ describe("FirstRunConnectScreen", () => {
     expect(onConnectGitHub).toHaveBeenCalled();
   });
 
+  it("hides a connect error while the install request is waiting", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        connectError={FIRST_RUN_COPY.connect.connectError}
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
+    expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
+  });
+
   it("continues to the repository step after GitHub is connected", async () => {
     const user = userEvent.setup();
     const onContinue = vi.fn();

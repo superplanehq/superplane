@@ -174,6 +174,8 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request",
 		rec.Header().Get("Location"),
 	)
+	require.NotNil(t, integration.Metadata)
+	assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
 }
 
 func Test__ownerFromRepositories(t *testing.T) {

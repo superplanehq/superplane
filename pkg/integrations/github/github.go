@@ -786,6 +786,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 			return
 		}
+		persistInstallRequested(ctx)
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
@@ -870,6 +871,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	clearInstallRequested(ctx)
 	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App - installation=%s", installationID)
@@ -918,8 +920,7 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 			return
 		}
-		metadata.InstallRequested = true
-		ctx.Integration.SetMetadata(metadata)
+		persistInstallRequested(ctx)
 		redirectToIntegrationSettingsRequested(ctx)
 		return
 	}
@@ -1050,6 +1051,25 @@ func isPendingInstallationSetupAction(setupAction string) bool {
 
 func isInstallationRequestSetupAction(setupAction string) bool {
 	return setupAction == "request"
+}
+
+func persistInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	metadata.InstallRequested = true
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func clearInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return
+	}
+	if !metadata.InstallRequested {
+		return
+	}
+	metadata.InstallRequested = false
+	ctx.Integration.SetMetadata(metadata)
 }
 
 func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
