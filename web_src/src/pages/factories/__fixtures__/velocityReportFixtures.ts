@@ -30,6 +30,51 @@ const INTAKE_SHARES = [
   { key: "automation", label: "Automation", share: 0.12 },
 ];
 
+/** Automations of the fixture workspace, with the run rate each one holds. */
+const AUTOMATION_SEEDS = [
+  { id: "app-refund-planner", name: "Refund Planner", runsPerDay: 4.1, failureRate: 0.04, hours: 0.35, costUsd: 1.42 },
+  {
+    id: "app-refund-implementer",
+    name: "Refund Implementer",
+    runsPerDay: 3.4,
+    failureRate: 0.09,
+    hours: 1.65,
+    costUsd: 2.86,
+  },
+  {
+    id: "app-refund-verifier",
+    name: "Refund Verifier",
+    runsPerDay: 3.1,
+    failureRate: 0.13,
+    hours: 0.62,
+    costUsd: 0.74,
+  },
+  { id: "app-pr-closure", name: "PR Closure", runsPerDay: 2.4, failureRate: 0.01, hours: 0.05, costUsd: 0.08 },
+  {
+    id: "app-github-issues-intake",
+    name: "GitHub issue intake",
+    runsPerDay: 5.2,
+    failureRate: 0.02,
+    hours: 0.03,
+    costUsd: 0.04,
+  },
+];
+
+/** Busiest automation first, so the rows that carry the spend read first. */
+function buildAutomations(periodDays: number) {
+  return AUTOMATION_SEEDS.map((seed) => {
+    const runs = Math.round(seed.runsPerDay * periodDays);
+    return {
+      id: seed.id,
+      name: seed.name,
+      runs,
+      failed: Math.round(runs * seed.failureRate),
+      averageDurationHours: seed.hours,
+      costCents: String(Math.round(runs * seed.costUsd * 100)),
+    };
+  }).sort((left, right) => right.runs - left.runs);
+}
+
 interface VelocityDaySeed {
   index: number;
   periodDays: number;
@@ -197,6 +242,7 @@ function buildReport(
     hasPreviousWindow: withComparison,
     intakeSources: intakeSources(points),
     people: buildPeople(totals, authors),
+    automations: buildAutomations(periodDays),
   };
 }
 
@@ -230,6 +276,7 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
   hasPreviousWindow: false,
   intakeSources: [],
   people: [],
+  automations: [],
 };
 
 /**

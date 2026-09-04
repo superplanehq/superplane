@@ -96,6 +96,18 @@ export interface VelocityPerson {
   costUsd: number;
 }
 
+/** One automation of the workspace, summed over the reported window. */
+export interface VelocityAutomation {
+  /** Canvas id of the automation, used to link to its detail page. */
+  id: string;
+  name: string;
+  runs: number;
+  failed: number;
+  averageDurationHours: number;
+  averageCostUsd: number;
+  totalCostUsd: number;
+}
+
 export interface VelocityReport {
   totals: VelocityTotals;
   /** Totals of the window before this one, when it holds comparable output. */
@@ -107,6 +119,8 @@ export interface VelocityReport {
   peopleTotal: number;
   /** True when the People table has rows beyond the ones already fetched. */
   peopleHasMore: boolean;
+  /** Automations with runs in the window, busiest first. */
+  automations: VelocityAutomation[];
   hasPeopleCohort: boolean;
   /** When the background sync last stored repository merges. */
   peopleSyncedAt?: Date;
@@ -192,11 +206,27 @@ export function toVelocityReport(response: FactoriesDescribeFactoryVelocityRespo
     costUsd: centsToUsd(person.costCents),
   }));
 
+  const automations: VelocityAutomation[] = (response.automations ?? []).map((automation) => {
+    const runs = automation.runs ?? 0;
+    const totalCostUsd = centsToUsd(automation.costCents);
+
+    return {
+      id: automation.id ?? "",
+      name: automation.name || "Unnamed automation",
+      runs,
+      failed: automation.failed ?? 0,
+      averageDurationHours: automation.averageDurationHours ?? 0,
+      averageCostUsd: runs > 0 ? totalCostUsd / runs : 0,
+      totalCostUsd,
+    };
+  });
+
   return {
     totals: toTotals(response.totals),
     previous: response.hasPreviousWindow ? toTotals(response.previousTotals) : undefined,
     points: (response.points ?? []).map(toPoint),
     intakeSeries,
+    automations,
     people,
     peopleTotal: response.peopleTotal ?? people.length,
     peopleHasMore: Boolean(response.peopleHasMore),
