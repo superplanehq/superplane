@@ -27,7 +27,7 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast: (...args: unknown[]) => showErrorToast(...args),
 }));
 
-const session = (id: string) => ({
+const session = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
   factoryId: "factory-1",
   canvasId: `canvas-${id}`,
@@ -35,6 +35,7 @@ const session = (id: string) => ({
   state: "running",
   messages: [],
   created: [],
+  ...overrides,
 });
 
 describe("useCreateWithAgentSession", () => {
@@ -285,5 +286,69 @@ describe("useCreateWithAgentSession", () => {
     });
     expect(result.current.open).toBe(false);
     expect(result.current.view.canvasId).toBe("");
+  });
+
+  it("keeps the optimistic You bubble across a poll that has not persisted the message yet", async () => {
+    vi.useFakeTimers();
+    startPlanningSession.mockResolvedValue(session("session-1"));
+    // The background poll returns a payload that does not yet include the
+    // just-sent message, simulating the race the flicker regression hit.
+    describePlanningSession.mockResolvedValue(session("session-1"));
+    let resolveSend: ((value: ReturnType<typeof session>) => void) | undefined;
+    sendPlanningSessionMessage.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.view.canvasId).toBe("canvas-session-1");
+
+    act(() => {
+      result.current.onComposerChange("What about staging?");
+    });
+    act(() => {
+      result.current.onSend();
+    });
+
+    expect(result.current.view.messages).toEqual([
+      expect.objectContaining({ role: "user", text: "What about staging?" }),
+    ]);
+    const optimisticId = result.current.view.messages[0]?.id;
+    expect(optimisticId).toMatch(/^local-/);
+
+    // A poll fires before the backend has persisted the message. The
+    // optimistic bubble must survive it with no flicker.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1500);
+    });
+    expect(result.current.view.messages).toEqual([
+      expect.objectContaining({ id: optimisticId, role: "user", text: "What about staging?" }),
+    ]);
+
+    // The backend finally persists the message; the optimistic bubble is
+    // deduped against the server copy with no duplicate.
+    await act(async () => {
+      resolveSend?.(
+        session("session-1", {
+          messages: [{ id: "msg-1", role: "user", text: "What about staging?", createdAt: "2026-09-03T10:00:00Z" }],
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(result.current.view.messages).toEqual([
+      expect.objectContaining({ id: "msg-1", role: "user", text: "What about staging?" }),
+    ]);
+    expect(result.current.view.messages.some((message) => message.id.startsWith("local-"))).toBe(false);
+
+    vi.useRealTimers();
   });
 });
