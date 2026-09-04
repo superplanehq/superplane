@@ -35,6 +35,14 @@ export function pendingGitHubInstallations(metadata: unknown): PendingGitHubInst
   });
 }
 
+export function hostedGitHubInstallRequested(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+
+  return (metadata as { installRequested?: unknown }).installRequested === true;
+}
+
 export function hostedGitHubState(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";
