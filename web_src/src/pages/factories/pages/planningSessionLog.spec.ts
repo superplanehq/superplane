@@ -532,4 +532,39 @@ describe("mergePlanningSessionNotes", () => {
 
     expect(merged[0]?.componentName).toBe(CREATE_WITH_AGENT_COPY.surveySkipped);
   });
+
+  it("rewrites only the first live prompt that matches a survey reply prefix", () => {
+    // Two separate root prompts happen to share the same 48-character prefix as
+    // the submitted reply. Only the turn that actually was the survey reply
+    // should be rewritten and labeled; the other prompt must stay untouched so a
+    // second transcript turn is not duplicated or mislabeled.
+    const surveyReply = "Which framework should we use for the new service? React";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (still deciding)",
+      }),
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (asked again)",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-1", "agent-step-2"]);
+    expect(merged[0]?.userTalk).toBe("survey");
+    expect(merged[0]?.componentName).toBe(surveyReply);
+    expect(merged[1]?.userTalk).not.toBe("survey");
+    expect(merged[1]?.componentName).toBe("Which framework should we use for the new service? (asked again)");
+  });
 });

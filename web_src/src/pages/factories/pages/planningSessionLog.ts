@@ -521,6 +521,7 @@ function markLiveSurveyReply(notes: SplitRunStreamLine[], submittedReply: string
     if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
       note.userTalk = "survey";
       note.componentName = submittedReply;
+      return;
     }
   }
 }
