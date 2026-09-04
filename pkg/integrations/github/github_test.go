@@ -97,6 +97,39 @@ func Test__GitHub__Sync(t *testing.T) {
 		assert.Equal(t, "starter-user", metadata.StartedByUserID)
 		assert.NotEmpty(t, metadata.State)
 		assert.Empty(t, metadata.InstallationID)
+		assert.Empty(t, metadata.SetupReturnPath)
+	})
+
+	t.Run("hosted public app stores a safe setup return path", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			ActorUserID:    "starter-user",
+			Configuration:  Configuration{SetupReturnPath: "/onboarding?attempt=1&step=vcs"},
+			Integration:    integrationCtx,
+		}))
+
+		metadata := integrationCtx.Metadata.(common.Metadata)
+		assert.Equal(t, "/onboarding?attempt=1&step=vcs", metadata.SetupReturnPath)
+	})
+
+	t.Run("hosted public app ignores an unsafe setup return path", func(t *testing.T) {
+		setHostedAppEnv(t)
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+
+		integrationCtx := &contexts.IntegrationContext{}
+		require.NoError(t, g.Sync(core.SyncContext{
+			OrganizationID: "11111111-1111-1111-1111-111111111111",
+			Configuration:  Configuration{SetupReturnPath: "https://evil.example"},
+			Integration:    integrationCtx,
+		}))
+
+		assert.Empty(t, integrationCtx.Metadata.(common.Metadata).SetupReturnPath)
 	})
 
 	t.Run("hosted env with privateApp keeps manifest flow", func(t *testing.T) {
@@ -203,6 +236,76 @@ func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {
 	)
 	require.NotNil(t, integration.Metadata)
 	assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+}
+
+func Test__isSafeIntegrationSetupReturnPath(t *testing.T) {
+	assert.True(t, isSafeIntegrationSetupReturnPath("/org-1/workspaces/APP/setup?step=vcs"))
+	assert.True(t, isSafeIntegrationSetupReturnPath("/onboarding?attempt=1&step=vcs"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("//evil.example/phishing"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("https://evil.example"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("/org-1"))
+	assert.False(t, isSafeIntegrationSetupReturnPath(""))
+}
+
+func Test__redirectToIntegrationSettingsURL(t *testing.T) {
+	integration := pendingHostedIntegration("csrf")
+
+	t.Run("prefers metadata path over cookie", func(t *testing.T) {
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+		}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+		ctx.Request.AddCookie(&http.Cookie{
+			Name:  integrationSetupReturnCookie,
+			Value: "/org-1/workspaces/APP/setup?step=vcs",
+		})
+
+		redirectToIntegrationSettingsURL(ctx, "")
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
+	})
+
+	t.Run("uses cookie when metadata is empty", func(t *testing.T) {
+		integration.Metadata = common.Metadata{State: "csrf", HostedApp: true}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+		ctx.Request.AddCookie(&http.Cookie{
+			Name:  integrationSetupReturnCookie,
+			Value: "/org-1/workspaces/APP/setup?step=vcs",
+		})
+
+		redirectToIntegrationSettingsURL(ctx, "")
+
+		assert.Equal(t, "https://app.example/org-1/workspaces/APP/setup?step=vcs", rec.Header().Get("Location"))
+	})
+
+	t.Run("factories without a stored path go to onboarding", func(t *testing.T) {
+		restore := withFactoriesEnabledForTest(func(string) bool { return true })
+		t.Cleanup(restore)
+		integration.Metadata = common.Metadata{State: "csrf", HostedApp: true}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+
+		redirectToIntegrationSettingsURL(ctx, "githubSetup=request")
+
+		assert.Equal(t, "https://app.example/onboarding?githubSetup=request", rec.Header().Get("Location"))
+	})
+
+	t.Run("classic settings when factories are off", func(t *testing.T) {
+		restore := withFactoriesEnabledForTest(func(string) bool { return false })
+		t.Cleanup(restore)
+		integration.Metadata = common.Metadata{State: "csrf", HostedApp: true}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/setup", nil)
+
+		redirectToIntegrationSettingsURL(ctx, "")
+
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111",
+			rec.Header().Get("Location"),
+		)
+	})
 }
 
 func Test__ownerFromRepositories(t *testing.T) {

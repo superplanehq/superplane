@@ -27,7 +27,11 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "user-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+  useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => ({ data: { id: "user-1" } }),
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
@@ -139,6 +143,83 @@ describe("FirstRunSetup", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("shows the GitHub account picker on the connect screen", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [],
+          allInstances: [
+            {
+              metadata: { id: "int-1", integrationName: "github" },
+              status: {
+                state: "pending",
+                metadata: {
+                  startedByUserID: "user-1",
+                  state: "csrf",
+                  githubApp: { slug: "superplane" },
+                  pendingInstallations: [
+                    { id: "11", accountLogin: "acme" },
+                    { id: "22", accountLogin: "octo" },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.selectAccount,
+    );
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
+  it("does not show another member's GitHub account picker", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [],
+          allInstances: [
+            {
+              metadata: { id: "int-1", integrationName: "github" },
+              status: {
+                state: "pending",
+                metadata: {
+                  startedByUserID: "some-other-user",
+                  state: "csrf",
+                  githubApp: { slug: "superplane" },
+                  pendingInstallations: [
+                    { id: "11", accountLogin: "acme" },
+                    { id: "22", accountLogin: "octo" },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+  });
+
+  it("opens Connect when GitHub returned an install request without a step", () => {
+    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
+
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
   });
 
   it("shows a waiting chip when GitHub returned an install request", () => {

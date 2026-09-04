@@ -30,6 +30,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "install", attributes: {} };
   }
 
+  if (first === "github" && second === "approved") {
+    return { pageKey: "githubInstallApproved", attributes: {} };
+  }
+
   if (first === "invite" && second) {
     return { pageKey: "inviteAccept", attributes: { invite_token: second } };
   }
