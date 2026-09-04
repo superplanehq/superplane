@@ -67,6 +67,11 @@ vi.mock("@/hooks/useSecrets", () => ({
     data: secrets.find((secret) => secret.metadata?.id === secretId) ?? null,
     isLoading: false,
     error: null,
+    // Reads the current `secrets` at call time so tests can simulate another
+    // client mutating the secret after the page loaded.
+    refetch: vi.fn(async () => ({
+      data: secrets.find((secret) => secret.metadata?.id === secretId) ?? null,
+    })),
   }),
   useSetSecretKey: () => ({ mutateAsync: setKeyMutateAsync, isPending: false }),
   useDeleteSecretKey: () => ({ mutateAsync: deleteKeyMutateAsync, isPending: false }),
@@ -148,5 +153,35 @@ describe("FactorySettingsSecretsPage - add key", () => {
     expect(setKeyMutateAsync).toHaveBeenCalledWith({ keyName: "BAR", value: "new-value" });
     expect(showSuccessToast).toHaveBeenCalledWith("Key added.");
     expect(showErrorToast).not.toHaveBeenCalled();
+  });
+
+  it("blocks the mutation when the key was added by another client after the page loaded", async () => {
+    const user = userEvent.setup();
+    // The page loads with a secret that does not yet contain BAR.
+    secrets = [
+      {
+        ...SECRET_WITH_FOO,
+        spec: { ...SECRET_WITH_FOO.spec, local: { data: {} } },
+      },
+    ];
+    renderPage("/org-1/workspaces/RF/settings/organization/secrets/secret-1");
+
+    await user.type(screen.getByLabelText("Key name"), "BAR");
+    await user.type(screen.getByLabelText("Value"), "new-value");
+
+    // Another client adds BAR after the page loaded; the stale snapshot still
+    // shows no keys, but the refetch before adding sees the fresh value.
+    secrets = [
+      {
+        ...SECRET_WITH_FOO,
+        spec: { ...SECRET_WITH_FOO.spec, local: { data: { BAR: "existing" } } },
+      },
+    ];
+
+    await user.click(screen.getByRole("button", { name: "Add key" }));
+
+    expect(showErrorToast).toHaveBeenCalledWith("Key already exists");
+    expect(setKeyMutateAsync).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 });
