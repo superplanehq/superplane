@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChangeEvent } from "react";
 
 import type { ConfigurationField } from "@/api-client";
@@ -83,6 +83,16 @@ function ControlledText({
     />
   );
 }
+
+afterEach(async () => {
+  // Radix FocusScope schedules setTimeout(0) on unmount to restore focus.
+  // Flush that timer while this file's jsdom is still alive. If it fires
+  // during environment teardown, dispatchEvent throws and fails the shard.
+  cleanup();
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+});
 
 describe("TextFieldRenderer plain textarea expansion", () => {
   it("shows an accessible expand button next to plain multiline inputs", () => {
