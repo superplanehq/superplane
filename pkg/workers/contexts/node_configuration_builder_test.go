@@ -351,6 +351,7 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		assert.NotContains(t, payload, "artifacts")
 		assert.NotContains(t, payload, "comments")
 		assert.NotContains(t, payload, "assignees")
+		assert.NotContains(t, payload, "origin")
 
 		source, ok := payload["source"].(map[string]any)
 		require.True(t, ok)
@@ -358,6 +359,38 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, float64(42), issue["number"])
 		assert.Equal(t, "Fix login", issue["title"])
+
+		closingLine, err := builder.Build(map[string]any{
+			"body": `{{ task().origin != nil ? "Closes " + task().origin.label : "" }}`,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "", closingLine["body"])
+	})
+
+	t.Run("exposes origin for GitHub closing keywords", func(t *testing.T) {
+		originURL := "https://github.com/acme/payments/issues/12"
+		originLabel := "acme/payments#12"
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"origin_url":   originURL,
+			"origin_label": originLabel,
+		}).Error)
+
+		result, err := builder.ResolveExpression(`task().origin`)
+		require.NoError(t, err)
+		origin, ok := result.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, originURL, origin["url"])
+		assert.Equal(t, originLabel, origin["label"])
+
+		label, err := builder.ResolveExpression(`task().origin.label`)
+		require.NoError(t, err)
+		assert.Equal(t, originLabel, label)
+
+		built, err := builder.Build(map[string]any{
+			"body": `{{ task().origin != nil ? "Closes " + task().origin.label : "" }}`,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "Closes acme/payments#12", built["body"])
 	})
 
 	t.Run("uses workspace values for legacy work orders", func(t *testing.T) {

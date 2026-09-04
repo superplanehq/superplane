@@ -72,6 +72,34 @@ describe("notesFromLiveLogSections", () => {
     expect(notes[3]?.noteParentId).toBe("agent-step-5");
   });
 
+  it("keeps the full multi-line preview for bash and prompt step titles", () => {
+    const notes = notesFromLiveLogSections("agent", [
+      {
+        ...bashSection(),
+        preview: 'set -e\necho "line one"\necho "line two"',
+      },
+      {
+        ...promptSection(),
+        preview: "You are implementing a fix.\n\nRead the ticket first.",
+      },
+    ]);
+
+    expect(notes[0]?.componentName).toBe('set -e\necho "line one"\necho "line two"');
+    expect(notes[1]?.componentName).toBe("You are implementing a fix.\n\nRead the ticket first.");
+  });
+
+  it("tags the section, its notes, and its tools with the section start time", () => {
+    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: 5_000 }]);
+
+    expect(notes.map((note) => note.orderKey)).toEqual([5_000, 5_000, 5_000]);
+  });
+
+  it("leaves orderKey undefined when the section has no start time", () => {
+    const notes = notesFromLiveLogSections("agent", [{ ...promptSection(), started_at: null }]);
+
+    expect(notes.every((note) => note.orderKey === undefined)).toBe(true);
+  });
+
   it("falls back to parseClaudeCodeLog for old -> [Tool] lines", () => {
     const notes = notesFromLiveLogSections("agent", [
       {

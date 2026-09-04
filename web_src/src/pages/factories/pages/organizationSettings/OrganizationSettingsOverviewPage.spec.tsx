@@ -53,17 +53,20 @@ describe("OrganizationSettingsOverviewPage", () => {
     mutateAsync.mockResolvedValue({});
   });
 
-  it("renders the current slug and keeps the name read-only", () => {
+  it("shows a character avatar, editable name, and slug in a profile-style card", () => {
     renderPage();
 
-    expect(screen.getByTestId("organization-settings-overview-name")).toHaveTextContent("Acme");
+    expect(screen.getByTestId("organization-settings-overview-avatar")).toHaveTextContent("A");
+    expect(screen.getByTestId("organization-settings-overview-name")).toHaveValue("Acme");
+    expect(screen.getByLabelText("Slug")).toHaveValue("acme");
     expect(screen.getByTestId("organization-settings-overview-slug-input")).toHaveValue("acme");
   });
 
-  it("disables the slug input and Save button without update permission", () => {
+  it("disables the name, slug, and Save controls without update permission", () => {
     canUpdateOrg = false;
     renderPage();
 
+    expect(screen.getByTestId("organization-settings-overview-name")).toBeDisabled();
     expect(screen.getByTestId("organization-settings-overview-slug-input")).toBeDisabled();
     expect(screen.getByTestId("organization-settings-overview-save")).toBeDisabled();
   });
@@ -96,5 +99,17 @@ describe("OrganizationSettingsOverviewPage", () => {
     await user.click(screen.getByTestId("organization-settings-overview-save"));
 
     expect(await screen.findByText("Slug is already in use")).toBeInTheDocument();
+  });
+
+  it("saves a name change and updates the avatar initials", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.clear(screen.getByTestId("organization-settings-overview-name"));
+    await user.type(screen.getByTestId("organization-settings-overview-name"), "Acme Labs");
+    await user.click(screen.getByTestId("organization-settings-overview-save"));
+
+    expect(mutateAsync).toHaveBeenCalledWith({ name: "Acme Labs" });
+    expect(screen.getByTestId("organization-settings-overview-avatar")).toHaveTextContent("AL");
   });
 });

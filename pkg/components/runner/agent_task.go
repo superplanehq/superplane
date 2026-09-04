@@ -83,7 +83,7 @@ func BuildIntegrationSetupCommands(setups []IntegrationSetup) (commands []Broker
 			Name:    name,
 			Command: WrapAgentStepCommand(fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/%s"`, path)),
 			Kind:    LiveLogKindSetup,
-			Preview: LiveLogPreview(name),
+			Preview: LiveLogText(name),
 		})
 	}
 	return commands, files
@@ -107,7 +107,7 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, usage,
 				Name:    AgentStepLabel(step.Name, scriptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 				Kind:    LiveLogKindBash,
-				Preview: LiveLogPreview(command),
+				Preview: LiveLogText(command),
 			}
 	default:
 		prompt := ""
@@ -123,7 +123,7 @@ func buildAgentStep(stepNumber int, step AgentStep, nodeWorkingDirectory, usage,
 				Name:    AgentStepLabel(step.Name, promptName),
 				Command: WrapAgentStepCommand(WrapCommandInWorkingDirectory(workingDirectory, promptCommand(promptName, model))),
 				Kind:    LiveLogKindPrompt,
-				Preview: LiveLogPreview(prompt),
+				Preview: LiveLogText(prompt),
 			}
 	}
 }

@@ -167,7 +167,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	task := buildClaudeCodeBrokerTask(spec, resolved.Usage, resolved.Setups)
 	task = applyPlanningFollowUp(task, environment, spec)
 	if runner.HasPlanningSessionToken(environment) {
-		task.Files = append(task.Files, planningSessionMCPFiles()...)
+		task.Files = append(task.Files, runner.PlanningSessionMCPFiles()...)
 	}
 	params := runner.CreateTaskParams{
 		MachineType:    spec.MachineType,

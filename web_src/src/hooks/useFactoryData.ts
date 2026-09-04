@@ -72,8 +72,30 @@ export const factoryQueryKeys = {
   pullRequests: (organizationId: string, factoryId: string, filters: NormalizedFactoryPullRequestFilters) =>
     ["factories", organizationId, factoryId, "pull-requests", filters.order ?? "", ...filters.workOrderIds] as const,
   apps: (organizationId: string, factoryId: string) => ["factories", organizationId, factoryId, "apps"] as const,
-  velocity: (organizationId: string, factoryId: string, periodDays: number, repository: string) =>
-    ["factories", organizationId, factoryId, "velocity", periodDays, repository] as const,
+  velocity: (
+    organizationId: string,
+    factoryId: string,
+    params: {
+      periodDays: number;
+      repository: string;
+      peopleSort: string;
+      peopleSortDirection: string;
+      peopleOffset: number;
+      peoplePageSize: number;
+    },
+  ) =>
+    [
+      "factories",
+      organizationId,
+      factoryId,
+      "velocity",
+      params.periodDays,
+      params.repository,
+      params.peopleSort,
+      params.peopleSortDirection,
+      params.peopleOffset,
+      params.peoplePageSize,
+    ] as const,
   /** Every period and repository of one workspace, for refreshing after a sync. */
   velocityAll: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "velocity"] as const,
