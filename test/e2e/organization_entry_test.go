@@ -46,10 +46,11 @@ func TestOrganizationEntry(t *testing.T) {
 		session.Login()
 
 		session.Visit("/")
-		waitErr := session.Page().WaitForURL("**/workspaces/*/setup**", pw.PageWaitForURLOptions{
+		waitErr := session.Page().WaitForURL("**/onboarding?attempt=*", pw.PageWaitForURLOptions{
 			Timeout: pw.Float(30000),
 		})
 		require.NoError(t, waitErr)
+		session.AssertVisible(q.TestID("workspace-setup"))
 
 		organization, err := models.FindOrganizationByName("GitHub Owner")
 		require.NoError(t, err)
@@ -82,10 +83,11 @@ func TestOrganizationEntry(t *testing.T) {
 		session.Click(q.TestID("legacy-organization-menu"))
 		session.Click(q.TestID("legacy-organization-switch"))
 		session.Click(q.TestID("legacy-organization-create"))
-		waitErr := session.Page().WaitForURL("**/workspaces/*/setup**", pw.PageWaitForURLOptions{
+		waitErr := session.Page().WaitForURL("**/onboarding?attempt=*", pw.PageWaitForURLOptions{
 			Timeout: pw.Float(30000),
 		})
 		require.NoError(t, waitErr)
+		session.AssertVisible(q.TestID("workspace-setup"))
 	})
 }
 

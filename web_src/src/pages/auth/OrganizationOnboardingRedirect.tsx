@@ -1,21 +1,26 @@
 import { useAccount } from "@/contexts/useAccount";
 import { getGitHubAccountLinkHref } from "./githubAccountLinkHref";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-type ProvisionedWorkspace = {
+export type ProvisionedWorkspace = {
   organizationSlug: string;
   workspaceKey: string;
 };
 
-/** Provisions an organization, then opens the existing factory setup wizard. */
-export function OrganizationOnboardingRedirect() {
+interface OrganizationOnboardingRedirectProps {
+  renderWorkspace: (workspace: ProvisionedWorkspace, entryPath: string) => ReactNode;
+}
+
+/** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
+export function OrganizationOnboardingRedirect({ renderWorkspace }: OrganizationOnboardingRedirectProps) {
   const { account } = useAccount();
   const hasStartedProvisioning = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<ProvisionedWorkspace | null>(null);
   const githubAccount = account?.linked_accounts?.find((candidate) => candidate.provider === "github");
   const githubProvider = account?.providers?.find((candidate) => candidate.provider === "github");
   const owner = githubAccount?.name || githubAccount?.username || githubProvider?.username || "";
-  const onboardingAttemptID = useRef(getOnboardingAttemptID());
+  const onboardingAttempt = useRef(getOnboardingAttempt());
 
   useEffect(() => {
     if (!account || hasStartedProvisioning.current) return;
@@ -26,10 +31,16 @@ export function OrganizationOnboardingRedirect() {
     }
 
     hasStartedProvisioning.current = true;
-    void provisionWorkspace(owner, onboardingAttemptID.current).catch((provisioningError: unknown) => {
-      setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
-    });
+    void provisionWorkspace(owner, onboardingAttempt.current.id)
+      .then(setWorkspace)
+      .catch((provisioningError: unknown) => {
+        setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
+      });
   }, [account, owner]);
+
+  if (workspace) {
+    return renderWorkspace(workspace, onboardingAttempt.current.entryPath);
+  }
 
   if (!error) return null;
 
@@ -40,18 +51,23 @@ export function OrganizationOnboardingRedirect() {
   );
 }
 
-function getOnboardingAttemptID() {
+function getOnboardingAttempt(): { id: string; entryPath: string } {
   const searchParams = new URLSearchParams(window.location.search);
-  const attemptID = searchParams.get("attempt");
-  if (attemptID) return attemptID;
+  let attemptID = searchParams.get("attempt");
 
-  const createdAttemptID = crypto.randomUUID();
-  searchParams.set("attempt", createdAttemptID);
-  window.history.replaceState(null, "", `${window.location.pathname}?${searchParams}`);
-  return createdAttemptID;
+  if (!attemptID) {
+    attemptID = crypto.randomUUID();
+    searchParams.set("attempt", attemptID);
+    window.history.replaceState(null, "", `${window.location.pathname}?${searchParams}`);
+  }
+
+  return {
+    id: attemptID,
+    entryPath: `${window.location.pathname}?${searchParams}`,
+  };
 }
 
-async function provisionWorkspace(owner: string, attemptID: string) {
+async function provisionWorkspace(owner: string, attemptID: string): Promise<ProvisionedWorkspace> {
   const response = await fetch("/account/onboarding", {
     method: "POST",
     credentials: "include",
@@ -62,6 +78,5 @@ async function provisionWorkspace(owner: string, attemptID: string) {
     throw new Error(await response.text());
   }
 
-  const result = (await response.json()) as ProvisionedWorkspace;
-  window.location.replace(`/${result.organizationSlug}/workspaces/${result.workspaceKey}/setup`);
+  return (await response.json()) as ProvisionedWorkspace;
 }

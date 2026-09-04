@@ -19,6 +19,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
   apiIssuesSource,
@@ -282,6 +283,7 @@ export function useOnboardingPageModel(args: {
   factoryKey: string;
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
+  onboardingEntryPath?: string | null;
 }) {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
@@ -301,9 +303,10 @@ export function useOnboardingPageModel(args: {
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
     // Return to this step after the provider round trip.
-    returnTo: `${factorySetupPath(args.organizationId, args.factoryKey)}?step=${openSection}${
-      openSection === "vcs" ? "&pick=newest" : ""
-    }`,
+    returnTo: onboardingStepPath(
+      args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
+      openSection,
+    ),
     integrationNames: ONBOARDING_INTEGRATIONS,
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
@@ -317,7 +320,7 @@ export function useOnboardingPageModel(args: {
   const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
   const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
   const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(args.organizationId, args.factoryId);
-  const installer = useInstallFactory();
+  const installer = useInstallFactory({ organizationId: args.organizationId });
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,

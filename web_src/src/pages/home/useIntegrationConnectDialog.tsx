@@ -65,7 +65,10 @@ export function useIntegrationConnectDialog({
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
-  const { data: availableIntegrations = [] } = useAvailableIntegrations({ enabled: !!organizationId });
+  const { data: availableIntegrations = [] } = useAvailableIntegrations({
+    enabled: !!organizationId,
+    organizationId,
+  });
   const createIntegrationMutation = useCreateIntegration(organizationId, "install_wizard");
   const navigate = useNavigate();
   const [dialogIntegrationName, setDialogIntegrationName] = useState<string | null>(null);

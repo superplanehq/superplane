@@ -60,6 +60,8 @@ import {
   WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
+import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import {
   AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
@@ -233,7 +235,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRedirect)} />
+              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
@@ -252,6 +254,18 @@ function AppRouter() {
         </div>
       </div>
     </BrowserRouter>
+  );
+}
+
+function OrganizationOnboardingRoute() {
+  return (
+    <OrganizationOnboardingRedirect
+      renderWorkspace={(workspace, entryPath) => (
+        <OnboardingEntryPathProvider path={entryPath}>
+          <InitialWorkspaceOnboarding organizationId={workspace.organizationSlug} factoryKey={workspace.workspaceKey} />
+        </OnboardingEntryPathProvider>
+      )}
+    />
   );
 }
 
