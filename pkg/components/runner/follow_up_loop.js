@@ -12,8 +12,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const HOLD_SECONDS = 45;
-const MAX_RETRY_WAIT_SECONDS = 60;
-const DEFAULT_RETRY_WAIT_SECONDS = 1;
+const WAIT_RETRY_SECONDS = 1;
+const WAIT_ABORT_SLACK_SECONDS = 5;
 
 function nextAction(result) {
   const status = result && result.status ? String(result.status) : "";
@@ -52,17 +52,19 @@ function readEnv(name) {
   return value;
 }
 
-async function requestJSON(method, urlPath) {
-  const baseURL = readEnv("SUPERPLANE_BASE_URL").replace(/\/$/, "");
-  const token = readEnv("SUPERPLANE_RUN_TOKEN");
-  const response = await fetch(`${baseURL}${urlPath}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
-  const text = await response.text();
+function waitAbortSignal() {
+  return AbortSignal.timeout((HOLD_SECONDS + WAIT_ABORT_SLACK_SECONDS) * 1000);
+}
+
+async function safeWaitRequest(doFetch) {
+  let response;
+  let text;
+  try {
+    response = await doFetch();
+    text = await response.text();
+  } catch {
+    return { status: "pending" };
+  }
   let parsed = {};
   if (text) {
     try {
@@ -74,19 +76,26 @@ async function requestJSON(method, urlPath) {
   return interpretWaitResponse(response.status, parsed, text);
 }
 
+async function requestJSON(method, urlPath) {
+  const baseURL = readEnv("SUPERPLANE_BASE_URL").replace(/\/$/, "");
+  const token = readEnv("SUPERPLANE_RUN_TOKEN");
+  return safeWaitRequest(() =>
+    fetch(`${baseURL}${urlPath}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      signal: waitAbortSignal(),
+    }),
+  );
+}
+
 function isTransientWaitFailure(status, parsed) {
   if (status === 429 || status === 502 || status === 503 || status === 504) {
     return true;
   }
   return Boolean(parsed && (parsed.retryable === true || parsed.cloudflare_error === true));
-}
-
-function retryWaitSeconds(parsed) {
-  const n = Number(parsed && parsed.retry_after);
-  if (!Number.isFinite(n) || n < 1) {
-    return DEFAULT_RETRY_WAIT_SECONDS;
-  }
-  return Math.min(MAX_RETRY_WAIT_SECONDS, Math.floor(n));
 }
 
 function interpretWaitResponse(status, parsed, text) {
@@ -97,7 +106,7 @@ function interpretWaitResponse(status, parsed, text) {
     return parsed && typeof parsed === "object" ? parsed : {};
   }
   if (isTransientWaitFailure(status, parsed)) {
-    return { status: "pending", retry_after: retryWaitSeconds(parsed), transient: true };
+    return { status: "pending" };
   }
   throw new Error((parsed && (parsed.message || parsed.error)) || text || `HTTP ${status}`);
 }
@@ -144,11 +153,7 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
-      const seconds = retryWaitSeconds(result);
-      if (result && result.transient) {
-        log(`planning wait hit a transient error; retrying in ${seconds}s\n`);
-      }
-      await sleep(seconds * 1000);
+      await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
     const code = await runPrompt(action.text);
@@ -172,7 +177,14 @@ async function main() {
   process.exit(code);
 }
 
-module.exports = { interpretWaitResponse, nextAction, runLoop, writePrompt, runPromptFile };
+module.exports = {
+  interpretWaitResponse,
+  nextAction,
+  runLoop,
+  safeWaitRequest,
+  writePrompt,
+  runPromptFile,
+};
 
 if (require.main === module) {
   main().catch((err) => {
