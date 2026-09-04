@@ -133,4 +133,22 @@ describe("ListFieldRenderer", () => {
 
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
+
+  it("forwards payload source metadata to nested expression fields", () => {
+    const field = parameterListField();
+    field.typeOptions!.list!.accordion = false;
+
+    render(
+      <ListFieldRenderer
+        field={field}
+        value={[{ name: "first", type: "string" }]}
+        onChange={vi.fn()}
+        allowExpressions
+        autocompleteExampleObj={{ __root: { data: { name: "DCO" } } }}
+        payloadSourceLabel="Latest real payload"
+      />,
+    );
+
+    expect(screen.getByTestId("autocomplete-payload-source")).toHaveTextContent("Latest real payload");
+  });
 });

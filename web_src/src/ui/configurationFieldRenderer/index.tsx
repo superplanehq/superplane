@@ -111,6 +111,8 @@ export const ConfigurationFieldRenderer = ({
   realtimeValidationErrors,
   enableRealtimeValidation = false,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   allowExpressions = false,
   readOnly = false,
   expressionPreviewContext,
@@ -277,6 +279,8 @@ export const ConfigurationFieldRenderer = ({
     allValues,
     hasError: hasFieldError,
     autocompleteExampleObj: resolvedAutocompleteExampleObj,
+    payloadSourceLabel,
+    payloadSourceIsExample,
     integrationId,
     organizationId,
     allowExpressions: fieldAllowsExpressions,
@@ -317,6 +321,8 @@ export const ConfigurationFieldRenderer = ({
       organizationId={organizationId}
       allowExpressions={allowExpressions}
       autocompleteExampleObj={autocompleteExampleObj}
+      payloadSourceLabel={payloadSourceLabel}
+      payloadSourceIsExample={payloadSourceIsExample}
       isRequired={isRequired}
       validationErrors={validationErrors}
       fieldPath={fieldPath}

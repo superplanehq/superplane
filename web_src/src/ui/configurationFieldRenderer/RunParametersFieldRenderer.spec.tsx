@@ -152,4 +152,21 @@ describe("RunParametersFieldRenderer", () => {
       expect(screen.queryByTestId("string-field-message")).toBeNull();
     });
   });
+
+  it("forwards payload source metadata to nested expression fields", async () => {
+    renderWithTheme(
+      <RunParametersFieldRenderer
+        field={parametersField()}
+        value={{ message: "hello" }}
+        onChange={vi.fn()}
+        allValues={{ app: "canvas_target", node: "on-run" }}
+        organizationId="org-1"
+        allowExpressions
+        autocompleteExampleObj={{ __root: { data: { name: "DCO" } } }}
+        payloadSourceLabel="Latest real payload"
+      />,
+    );
+
+    expect(await screen.findByTestId("autocomplete-payload-source")).toHaveTextContent("Latest real payload");
+  });
 });
