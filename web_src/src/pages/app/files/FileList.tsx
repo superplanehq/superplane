@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/contexts/useTheme";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
 import { useEffect, useMemo, useRef } from "react";
-import type { ContextMenuItem, ContextMenuOpenContext } from "@pierre/trees";
+import type { ContextMenuItem, ContextMenuOpenContext, GitStatusEntry } from "@pierre/trees";
 
 import { getRepositoryFileTreeStyle } from "./types";
 
@@ -19,6 +19,7 @@ export function FileList({
   onNewFileCommit,
   onNewFilePathChange,
   onSelect,
+  gitStatus,
 }: {
   paths: string[];
   selectedPath: string | null;
@@ -32,6 +33,7 @@ export function FileList({
   onNewFileCommit: () => void;
   onNewFilePathChange: (path: string) => void;
   onSelect: (path: string) => void;
+  gitStatus: GitStatusEntry[];
 }) {
   if (loading) {
     return <div className="flex-1 p-4 text-sm text-slate-500 dark:text-gray-400">Loading files...</div>;
@@ -62,6 +64,7 @@ export function FileList({
         readOnlyPaths={readOnlyPaths}
         onDelete={onDelete}
         onSelect={onSelect}
+        gitStatus={gitStatus}
       />
     </div>
   );
@@ -128,6 +131,7 @@ function RepositoryFileTree({
   readOnlyPaths,
   onDelete,
   onSelect,
+  gitStatus,
 }: {
   paths: string[];
   selectedPath: string | null;
@@ -135,6 +139,7 @@ function RepositoryFileTree({
   readOnlyPaths: Set<string>;
   onDelete: (path: string) => void;
   onSelect: (path: string) => void;
+  gitStatus: GitStatusEntry[];
 }) {
   const filePathSetRef = useRef(new Set(paths));
   const readOnlyPathSetRef = useRef(readOnlyPaths);
@@ -163,6 +168,7 @@ function RepositoryFileTree({
 
   const { model } = useFileTree({
     paths,
+    gitStatus,
     density: "compact",
     flattenEmptyDirectories: true,
     icons: { set: "minimal", colored: false },
@@ -173,6 +179,11 @@ function RepositoryFileTree({
       [data-file-tree-virtualized-scroll='true'] {
         scrollbar-gutter: auto;
         padding-inline-end: 0;
+      }
+      [data-item-git-status='deleted'] > [data-item-section='content'] {
+        text-decoration: line-through;
+        text-decoration-color: currentColor;
+        text-decoration-thickness: 1px;
       }
     `,
     onSelectionChange: (selectedPaths) => {
@@ -185,6 +196,10 @@ function RepositoryFileTree({
   useEffect(() => {
     model.resetPaths(paths);
   }, [model, paths]);
+
+  useEffect(() => {
+    model.setGitStatus(gitStatus);
+  }, [gitStatus, model]);
 
   useEffect(() => {
     const selectedPaths = model.getSelectedPaths();

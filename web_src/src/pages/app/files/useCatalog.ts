@@ -49,11 +49,7 @@ export function useRepositoryPathLists(
 ) {
   const repositoryAndPendingPaths = useMemo(() => {
     return Array.from(
-      new Set([
-        ...repositoryPaths,
-        ...stagedRepositoryPaths,
-        ...pendingChanges.filter((change) => change.type === "added").map((change) => change.path),
-      ]),
+      new Set([...repositoryPaths, ...stagedRepositoryPaths, ...pendingChanges.map((change) => change.path)]),
     ).sort();
   }, [pendingChanges, repositoryPaths, stagedRepositoryPaths]);
   const allPaths = useMemo(
@@ -81,7 +77,9 @@ type UseRepositorySelectedFileQueryOptions = {
   canvasId?: string;
   selectedPath: string | null;
   repositoryPathSet: Set<string>;
+  committedRepositoryPathSet: Set<string>;
   generatedFilesByPath: Map<string, AppFile>;
+  selectedChange?: PendingFileChange;
   versionId?: string;
   stage?: boolean;
 };
@@ -90,18 +88,23 @@ export function useRepositorySelectedFileQuery({
   canvasId,
   selectedPath,
   repositoryPathSet,
+  committedRepositoryPathSet,
   generatedFilesByPath,
+  selectedChange,
   versionId,
   stage = false,
 }: UseRepositorySelectedFileQueryOptions) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
-  const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
+  const selectedIsDeleted = selectedChange?.type === "deleted";
+  const selectedPathExistsInRepository = selectedPath
+    ? repositoryPathSet.has(selectedPath) || (selectedIsDeleted && committedRepositoryPathSet.has(selectedPath))
+    : false;
   const selectedFileQuery = useCanvasRepositoryFile(
     canvasId ?? "",
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
     versionId,
-    stage,
+    selectedIsDeleted ? false : stage,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };
