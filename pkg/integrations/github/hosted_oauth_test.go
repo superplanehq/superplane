@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -260,6 +261,31 @@ func Test__afterAppInstallationLegacy_installRequest(t *testing.T) {
 			rec.Header().Get("Location"),
 		)
 		assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	})
+
+	t.Run("returns to the stored onboarding path instead of settings", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+		ctx.Request.AddCookie(&http.Cookie{
+			Name:  integrationSetupReturnCookie,
+			Value: "/org-1/workspaces/APP/setup?step=vcs&pick=newest",
+		})
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		location, err := url.Parse(rec.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, "/org-1/workspaces/APP/setup", location.Path)
+		assert.Equal(t, "vcs", location.Query().Get("step"))
+		assert.Equal(t, "newest", location.Query().Get("pick"))
+		assert.Equal(t, "request", location.Query().Get("githubSetup"))
+		assert.Equal(t, "acme", location.Query().Get("githubOrg"))
+		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
 	})
 
 	t.Run("rejects request with a mismatched state", func(t *testing.T) {

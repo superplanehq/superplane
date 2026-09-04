@@ -1110,14 +1110,95 @@ func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
 	redirectToIntegrationSettingsURL(ctx, query)
 }
 
+const integrationSetupReturnCookie = "sp_integration_setup_return"
+
 func redirectToIntegrationSettingsURL(ctx core.HTTPRequestContext, rawQuery string) {
 	location := fmt.Sprintf(
 		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 	)
-	if rawQuery != "" {
+	if returnPath := integrationSetupReturnPath(ctx.Request); returnPath != "" {
+		location = strings.TrimRight(ctx.BaseURL, "/") + mergeSetupReturnQuery(returnPath, rawQuery)
+		clearIntegrationSetupReturnCookie(ctx.Response)
+	} else if rawQuery != "" {
 		location = location + "?" + rawQuery
 	}
 	http.Redirect(ctx.Response, ctx.Request, location, http.StatusSeeOther)
+}
+
+func integrationSetupReturnPath(request *http.Request) string {
+	if request == nil {
+		return ""
+	}
+
+	cookie, err := request.Cookie(integrationSetupReturnCookie)
+	if err != nil || cookie == nil {
+		return ""
+	}
+
+	path, err := url.QueryUnescape(strings.TrimSpace(cookie.Value))
+	if err != nil || !isSafeIntegrationSetupReturnPath(path) {
+		return ""
+	}
+
+	return path
+}
+
+func isSafeIntegrationSetupReturnPath(path string) bool {
+	if path == "" || strings.Contains(path, "://") || strings.ContainsAny(path, "\\\t\r\n ") {
+		return false
+	}
+
+	pathname, _, _ := strings.Cut(path, "?")
+	if pathname == "/onboarding" {
+		return true
+	}
+	if !strings.HasPrefix(pathname, "/") || strings.HasPrefix(pathname, "//") {
+		return false
+	}
+
+	rest := strings.TrimPrefix(pathname, "/")
+	organization, after, ok := strings.Cut(rest, "/")
+	return ok && organization != "" && after != ""
+}
+
+func mergeSetupReturnQuery(path, rawQuery string) string {
+	if rawQuery == "" {
+		return path
+	}
+
+	pathname, existing, _ := strings.Cut(path, "?")
+	params, err := url.ParseQuery(existing)
+	if err != nil {
+		params = url.Values{}
+	}
+	extra, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path
+	}
+	for key, values := range extra {
+		if len(values) == 0 {
+			continue
+		}
+		params.Set(key, values[len(values)-1])
+	}
+	encoded := params.Encode()
+	if encoded == "" {
+		return pathname
+	}
+	return pathname + "?" + encoded
+}
+
+func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
+	if response == nil {
+		return
+	}
+
+	http.SetCookie(response, &http.Cookie{
+		Name:   integrationSetupReturnCookie,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
 }
 
 func ownerFromRepositories(repos []common.Repository) string {

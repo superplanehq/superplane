@@ -205,6 +205,15 @@ func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {
 	assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
 }
 
+func Test__isSafeIntegrationSetupReturnPath(t *testing.T) {
+	assert.True(t, isSafeIntegrationSetupReturnPath("/org-1/workspaces/APP/setup?step=vcs"))
+	assert.True(t, isSafeIntegrationSetupReturnPath("/onboarding?attempt=1&step=vcs"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("//evil.example/phishing"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("https://evil.example"))
+	assert.False(t, isSafeIntegrationSetupReturnPath("/org-1"))
+	assert.False(t, isSafeIntegrationSetupReturnPath(""))
+}
+
 func Test__ownerFromRepositories(t *testing.T) {
 	assert.Equal(t, "acme", ownerFromRepositories([]common.Repository{
 		{URL: "https://github.com/acme/payments"},
