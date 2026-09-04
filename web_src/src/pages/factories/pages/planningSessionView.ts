@@ -96,25 +96,50 @@ function userMessageKey(message: CreateWithAgentMessage): string {
  * contain. A poll that races the send round-trip returns a payload without
  * the just-sent message; keeping these alive across that poll prevents the
  * bubble from flickering off and back on. Once the server includes a
- * matching message, the local bubble is dropped so there is no duplicate.
+ * matching message, one local bubble is dropped so there is no duplicate.
+ *
+ * Reconciliation is by count, not by set membership, so distinct sends that
+ * share the same text are not collapsed. A key drops only as many optimistic
+ * bubbles as there are newly-persisted server messages for that key: the
+ * current server count minus the count already persisted in the previous
+ * render. This keeps a repeated message (text that also exists as an older
+ * persisted message) and back-to-back identical sends each visible until the
+ * server actually persists that specific send.
  */
 function pendingLocalUserMessages(
   previousMessages: CreateWithAgentMessage[],
   serverMessages: CreateWithAgentMessage[],
 ): CreateWithAgentMessage[] {
-  const serverKeys = new Set(
-    serverMessages.filter((message) => message.role === "user").map(userMessageKey),
-  );
-  const seenLocalKeys = new Set<string>();
+  // Server messages that appeared since the previous render, per key. These
+  // are the persisted counterparts that should retire an optimistic bubble.
+  const newlyPersistedByKey = new Map<string, number>();
+  for (const message of serverMessages) {
+    if (message.role !== "user") {
+      continue;
+    }
+    const key = userMessageKey(message);
+    newlyPersistedByKey.set(key, (newlyPersistedByKey.get(key) ?? 0) + 1);
+  }
+  for (const message of previousMessages) {
+    if (message.role !== "user" || isLocalOptimisticMessage(message)) {
+      continue;
+    }
+    const key = userMessageKey(message);
+    const remaining = newlyPersistedByKey.get(key);
+    if (remaining !== undefined) {
+      newlyPersistedByKey.set(key, remaining - 1);
+    }
+  }
   return previousMessages.filter((message) => {
     if (!isLocalOptimisticMessage(message)) {
       return false;
     }
     const key = userMessageKey(message);
-    if (serverKeys.has(key) || seenLocalKeys.has(key)) {
+    const remaining = newlyPersistedByKey.get(key) ?? 0;
+    if (remaining > 0) {
+      newlyPersistedByKey.set(key, remaining - 1);
       return false;
     }
-    seenLocalKeys.add(key);
     return true;
   });
 }

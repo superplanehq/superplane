@@ -357,7 +357,7 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.messages.map((message) => message.id)).toEqual(["greet", "reply", "local-1"]);
   });
 
-  it("does not stack duplicate optimistic bubbles from a double send", () => {
+  it("keeps both optimistic bubbles from a double send until each is persisted", () => {
     const localA = {
       id: "local-1",
       kind: "text" as const,
@@ -382,6 +382,106 @@ describe("createWithAgentViewFromSession", () => {
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [localA, localB] },
     );
 
-    expect(view.messages).toHaveLength(1);
+    expect(view.messages.map((message) => message.id)).toEqual(["local-1", "local-2"]);
+  });
+
+  it("retires one bubble per newly persisted message from a double send", () => {
+    const localA = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    const localB = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:01Z"),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T11:59:59Z" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [localA, localB] },
+    );
+
+    // The first send is now persisted (msg-1); the second send is still pending.
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "local-2"]);
+  });
+
+  it("keeps a repeated message that matches an older persisted message", () => {
+    const persisted = {
+      id: "msg-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+    };
+    const local = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    // A poll that races the second send still only shows the older message.
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T10:00:00Z" }],
+      },
+      {
+        composer: "",
+        right: { kind: "empty" },
+        endConfirmOpen: false,
+        previousMessages: [persisted, local],
+      },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "local-2"]);
+  });
+
+  it("drops the repeated optimistic bubble once its own send is persisted", () => {
+    const persisted = {
+      id: "msg-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+    };
+    const local = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T10:00:00Z" },
+          { id: "msg-2", role: "user", text: "Retry please", createdAt: "2026-09-03T12:00:00Z" },
+        ],
+      },
+      {
+        composer: "",
+        right: { kind: "empty" },
+        endConfirmOpen: false,
+        previousMessages: [persisted, local],
+      },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "msg-2"]);
+    expect(view.messages.some((message) => message.id.startsWith("local-"))).toBe(false);
   });
 });
