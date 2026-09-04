@@ -446,6 +446,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
       lineName: string;
       startStepIndex?: number;
       replaceActive?: boolean;
+      model?: string;
     }) => {
       const response = await factoriesDispatchWorkOrder(
         withOrganizationHeader({
@@ -455,6 +456,7 @@ export function useDispatchWorkOrder(organizationId: string, factoryId: string) 
             lineName: input.lineName,
             startStepIndex: input.startStepIndex,
             replaceActive: input.replaceActive,
+            model: input.model,
           },
         }),
       );
