@@ -18,7 +18,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, LayoutGrid, LogOut, Settings, SunMoon, User as UserIcon } from "lucide-react";
+import { ArrowRightLeft, LogOut, Settings, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -53,7 +53,6 @@ export function SidebarUserMenu({
   defaultOpen = false,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
-  const homeHref = `/${organizationId}`;
   const profileHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
     : `/${organizationId}/settings/profile`;
@@ -95,14 +94,6 @@ export function SidebarUserMenu({
             organizationHref={organizationHref}
           />
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className={MENU_ITEM_CLASS}
-            onClick={() => navigate(homeHref)}
-            data-testid="factories-sidebar-back-to-apps"
-          >
-            <LayoutGrid aria-hidden />
-            Back to Apps
-          </DropdownMenuItem>
           <DropdownMenuItem
             className={MENU_ITEM_CLASS}
             onClick={() => navigate(profileHref)}
