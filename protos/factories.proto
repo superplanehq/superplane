@@ -774,6 +774,8 @@ message FactoryOnboarding {
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
   string default_branch = 10;
+  // True when account onboarding created this workspace.
+  bool initial = 11;
 }
 
 message Factory {

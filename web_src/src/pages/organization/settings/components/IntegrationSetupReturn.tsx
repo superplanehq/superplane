@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { hasIntegrationSetupStay, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
@@ -24,9 +24,10 @@ export function IntegrationSetupReturn({ organizationId, children }: Integration
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const stayOnPage = hasIntegrationSetupStay(searchParams.toString());
-  // Peek only. The destination page deletes the marker, so a Strict Mode remount
-  // still finds the path and can navigate again.
-  const [returnTo] = useState(() => peekIntegrationSetupReturn(organizationId));
+  // Peek on each render because provider callbacks use the organization UID.
+  // OrganizationScope later replaces that UID with the slug that keys storage.
+  // The destination page deletes the marker after navigation.
+  const returnTo = peekIntegrationSetupReturn(organizationId);
 
   useEffect(() => {
     if (!returnTo || stayOnPage) return;
