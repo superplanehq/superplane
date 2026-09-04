@@ -98,9 +98,10 @@ func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "organization",
-			Label:       "Organization",
+			Label:       "GitHub Organization",
 			Type:        configuration.FieldTypeString,
-			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+			Description: "Name of the GitHub organization to install the app into, as it appears in its URL (github.com/your-org). Leave empty to install the app into your personal GitHub account.",
+			Placeholder: "your-org",
 		},
 	}
 }
