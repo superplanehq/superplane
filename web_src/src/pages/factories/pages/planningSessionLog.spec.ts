@@ -35,6 +35,13 @@ describe("isPlanningSessionNoise", () => {
     expect(isPlanningSessionNoise("The repository is ready. What do you want to do?")).toBe(false);
   });
 
+  it("hides runner done and failed footers", () => {
+    expect(isPlanningSessionNoise("✓ done · 1 turns · $0.0018 · 1.5s")).toBe(true);
+    expect(isPlanningSessionNoise("✓ done · 1 turns · 1.6s")).toBe(true);
+    expect(isPlanningSessionNoise("✓ done · 2 turns · $0.0020 · 2.2s")).toBe(true);
+    expect(isPlanningSessionNoise("✗ failed · 1 turns · $0.0020 · 0.9s")).toBe(true);
+  });
+
   it("treats survey JSON as a tool payload", () => {
     expect(isPlanningSessionToolPayload('{"questions":[{"prompt":"Priority?","options":["High"]}]}')).toBe(true);
     expect(isPlanningSessionToolPayload('{"status":"shown"}')).toBe(true);
@@ -359,13 +366,13 @@ describe("mergePlanningSessionNotes", () => {
 
     expect(talk.map((line) => line.componentName)).toEqual([
       "Hi! I'm ready to help you plan work in this repo. Tell me what you'd like to do.",
-      "I want to add color to puppies",
       'Let me take a look at the repo to understand what "puppies" refers to here.',
       "Got it. This is a small Express + EJS CRUD app where a Puppy currently has just a name.",
       "I've asked a few scoping questions above. Once you answer, I'll have what I need to draft the task.",
+      "I want to add color to puppies",
       surveyReply,
     ]);
-    expect(talk[1]?.userTalk).toBe("message");
+    expect(talk[4]?.userTalk).toBe("message");
     expect(talk[5]?.userTalk).toBe("survey");
   });
 
@@ -413,8 +420,8 @@ describe("mergePlanningSessionNotes", () => {
 
     expect(merged.map((line) => line.id)).toEqual([
       "wait",
-      "user-1",
       "asked",
+      "user-1",
       "user-survey",
       "later-turn",
       "later-note",
