@@ -254,7 +254,7 @@ function partitionPlanningExtras(
   for (const line of extra) {
     if (streamNoteHasText(merged, line.componentName)) {
       if (line.userTalk === "survey") {
-        markLiveUserTalk(merged, line.componentName, "survey");
+        markLiveSurveyReply(merged, line.componentName);
       }
       // Live notes only carry the coarse section start time, which every note
       // in an agent turn shares. Stamp the matching live note with the agent
@@ -504,18 +504,31 @@ function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderK
   }
 }
 
-function markLiveUserTalk(notes: SplitRunStreamLine[], text: string, userTalk: "survey"): void {
-  const prefix = text.trim().slice(0, 48);
+// A survey reply is the source of truth for what the user answered. The live
+// runner log only proves that the reply reached the agent; its own rendering
+// of that turn (for example a truncated preview) is not guaranteed to spell
+// out the chosen answer, so the matching live note is rewritten to show the
+// submitted reply text instead of whatever the live log recorded for it.
+function markLiveSurveyReply(notes: SplitRunStreamLine[], submittedReply: string): void {
+  const reply = submittedReply.trim();
+  const prefix = reply.slice(0, 48);
   if (!prefix) {
     return;
   }
-  for (const note of notes) {
-    if (note.noteParentId || note.componentType !== "prompt") {
-      continue;
-    }
-    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
-      note.userTalk = userTalk;
-    }
+  const rootPrompts = notes.filter((note) => !note.noteParentId && note.componentType === "prompt");
+  const noteText = (note: SplitRunStreamLine): string => `${note.componentName}\n${note.detail ?? ""}`;
+  // When several root prompts merely share the 48-character prefix, the turn
+  // whose live text still spells out the full submitted reply is the real
+  // survey turn. Prefer that exact match so the answer is not attributed to an
+  // earlier, unrelated prompt. Only when no prompt carries the full reply (for
+  // example the live log recorded a truncated preview) do we fall back to the
+  // first prefix match, which stays a single rewrite to avoid duplicating a turn.
+  const target =
+    rootPrompts.find((note) => noteText(note).includes(reply)) ??
+    rootPrompts.find((note) => noteText(note).includes(prefix));
+  if (target) {
+    target.userTalk = "survey";
+    target.componentName = submittedReply;
   }
 }
 
