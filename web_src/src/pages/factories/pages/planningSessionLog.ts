@@ -231,9 +231,10 @@ export function mergePlanningSessionNotes(
 
   const merged = live.map((line) => ({ ...line }));
   const { unmatchedUsers, unmatchedOthers } = partitionPlanningExtras(merged, extra);
+  const hasLiveOrder = merged.some((line) => typeof line.orderKey === "number");
   const emptyWaits = merged.map((line, index) => ({ line, index })).filter(({ line }) => isEmptyWaitSlot(line));
   const slots = consumeMatchedWaitSlots(extra, unmatchedUsers, emptyWaits);
-  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots);
+  const placed = placeUnmatchedUserExtras(merged, unmatchedUsers, emptyWaits, slots, hasLiveOrder);
   placed.insertions.sort((left, right) => right.afterIndex - left.afterIndex || right.order - left.order);
   for (const insertion of placed.insertions) {
     merged.splice(insertion.afterIndex + 1, 0, insertion.line);
@@ -254,6 +255,13 @@ function partitionPlanningExtras(
     if (streamNoteHasText(merged, line.componentName)) {
       if (line.userTalk === "survey") {
         markLiveSurveyReply(merged, line.componentName);
+      }
+      // Live notes only carry the coarse section start time, which every note
+      // in an agent turn shares. Stamp the matching live note with the agent
+      // message's own created_at so a later user reply can interleave by true
+      // chronology instead of landing after the whole turn.
+      if (!isSessionUserExtra(line) && typeof line.orderKey === "number") {
+        stampLiveNoteOrderKey(merged, line.componentName, line.orderKey);
       }
       continue;
     }
@@ -285,34 +293,142 @@ function consumeMatchedWaitSlots(
   return { waitCursor, lastWait };
 }
 
+type UserPlacementState = {
+  merged: SplitRunStreamLine[];
+  emptyWaits: WaitSlot[];
+  waitCursor: number;
+  lastWait?: WaitSlot;
+  turnEnds: number[];
+  turnEndCursor: number;
+  hasLiveOrder: boolean;
+  insertOrder: number;
+};
+
 function placeUnmatchedUserExtras(
   merged: SplitRunStreamLine[],
   unmatchedUsers: SplitRunStreamLine[],
   emptyWaits: WaitSlot[],
   slots: { waitCursor: number; lastWait?: WaitSlot },
+  hasLiveOrder: boolean,
 ): { insertions: NoteInsertion[]; trailing: SplitRunStreamLine[] } {
   const insertions: NoteInsertion[] = [];
   const trailing: SplitRunStreamLine[] = [];
-  let waitCursor = slots.waitCursor;
-  let lastWait = slots.lastWait;
-  let insertOrder = 0;
+  const state: UserPlacementState = {
+    merged,
+    emptyWaits,
+    waitCursor: slots.waitCursor,
+    lastWait: slots.lastWait,
+    turnEnds: turnEndIndexes(merged),
+    turnEndCursor: 0,
+    hasLiveOrder,
+    insertOrder: 0,
+  };
   for (const line of unmatchedUsers) {
-    const slot = emptyWaits[waitCursor];
-    if (slot) {
-      lastWait = slot;
-      waitCursor += 1;
-      insertions.push(userExtraInsertion(line, slot.index, insertOrder, slot.line.id));
-      insertOrder += 1;
+    const insertion = nextUserPlacement(state, line);
+    if (!insertion) {
+      trailing.push(line);
       continue;
     }
-    if (lastWait) {
-      insertions.push(userExtraInsertion(line, lastWaitGroupEndIndex(merged, lastWait), insertOrder, lastWait.line.id));
-      insertOrder += 1;
-      continue;
-    }
-    trailing.push(line);
+    insertions.push(insertion);
+    state.insertOrder += 1;
   }
   return { insertions, trailing };
+}
+
+function nextUserPlacement(state: UserPlacementState, line: SplitRunStreamLine): NoteInsertion | undefined {
+  const turnEnd = state.turnEnds[state.turnEndCursor];
+  if (turnEnd !== undefined) {
+    state.turnEndCursor += 1;
+    return userExtraInsertion(line, turnEnd, state.insertOrder, turnEndParent(state.merged, turnEnd));
+  }
+  if (state.hasLiveOrder && typeof line.orderKey === "number") {
+    return orderKeyUserInsertion(state.merged, line, line.orderKey, state.insertOrder);
+  }
+  return waitSlotUserInsertion(state, line);
+}
+
+function orderKeyUserInsertion(
+  merged: SplitRunStreamLine[],
+  line: SplitRunStreamLine,
+  orderKey: number,
+  order: number,
+): NoteInsertion {
+  const afterIndex = insertionIndexByOrderKey(merged, orderKey);
+  const parentId = orderKeyInsertionParent(merged, afterIndex);
+  if (!parentId) {
+    return { afterIndex, order, line: { ...line } };
+  }
+  return userExtraInsertion(line, afterIndex, order, parentId);
+}
+
+function waitSlotUserInsertion(state: UserPlacementState, line: SplitRunStreamLine): NoteInsertion | undefined {
+  const slot = state.emptyWaits[state.waitCursor];
+  if (slot) {
+    state.lastWait = slot;
+    state.waitCursor += 1;
+    return userExtraInsertion(line, slot.index, state.insertOrder, slot.line.id);
+  }
+  if (!state.lastWait) {
+    return undefined;
+  }
+  return userExtraInsertion(
+    line,
+    lastWaitGroupEndIndex(state.merged, state.lastWait),
+    state.insertOrder,
+    state.lastWait.line.id,
+  );
+}
+
+/**
+ * Finds the index to insert after so a line with `orderKey` lands in true
+ * chronological order. Live notes carry mixed granularity: an agent reply
+ * gets its own message time, while the "done" stat and tool notes around it
+ * keep the coarser section start time. Tracking the running maximum lets those
+ * trailing coarse notes inherit the turn's real time, so a later user message
+ * is not pulled back in front of them. Ties resolve to the later index, and a
+ * return of -1 means every timestamped line comes after `orderKey`.
+ */
+function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number): number {
+  let index = -1;
+  let runningMax = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < merged.length; i += 1) {
+    const key = merged[i]?.orderKey;
+    if (typeof key === "number" && key > runningMax) {
+      runningMax = key;
+    }
+    if (runningMax !== Number.NEGATIVE_INFINITY && runningMax <= orderKey) {
+      index = i;
+    }
+  }
+  return index;
+}
+
+function turnEndIndexes(merged: SplitRunStreamLine[]): number[] {
+  const indexes: number[] = [];
+  for (let i = 0; i < merged.length; i += 1) {
+    if (isPlanningSessionTurnEnd(merged[i]?.componentName ?? "")) {
+      indexes.push(i);
+    }
+  }
+  return indexes;
+}
+
+function isPlanningSessionTurnEnd(text: string): boolean {
+  const line = text.trim();
+  return line.startsWith("✓ done") || line.startsWith("✗ failed");
+}
+
+function turnEndParent(merged: SplitRunStreamLine[], afterIndex: number): string {
+  return orderKeyInsertionParent(merged, afterIndex) ?? merged[afterIndex]?.id ?? "";
+}
+
+/** The note/step group a chronologically placed insertion should nest under. */
+function orderKeyInsertionParent(merged: SplitRunStreamLine[], afterIndex: number): string | undefined {
+  const target = merged[afterIndex];
+  if (!target) {
+    return undefined;
+  }
+  return target.noteParentId ?? target.id;
 }
 
 function userExtraInsertion(
@@ -365,6 +481,27 @@ function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
   }
   const prefix = needle.slice(0, 48);
   return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+}
+
+/**
+ * Copies an agent message's created_at onto the live note that already renders
+ * its text, so the note is ordered by when it was said rather than by the
+ * section it streamed under. Only the first matching agent note is stamped.
+ */
+function stampLiveNoteOrderKey(notes: SplitRunStreamLine[], text: string, orderKey: number): void {
+  const prefix = text.trim().slice(0, 48);
+  if (!prefix) {
+    return;
+  }
+  for (const note of notes) {
+    if (note.componentType === "prompt") {
+      continue;
+    }
+    if (`${note.componentName}\n${note.detail ?? ""}`.includes(prefix)) {
+      note.orderKey = orderKey;
+      return;
+    }
+  }
 }
 
 // A survey reply is the source of truth for what the user answered. The live

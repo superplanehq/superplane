@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -568,6 +569,169 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.People[0].Id)
 	assert.Equal(t, int32(1), resp.People[0].FactoryMerged)
 	assert.Equal(t, int32(0), resp.People[0].AuthoredMerged)
+}
+
+// TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize covers a cohort
+// larger than one page: the response caps at 10 rows, reports the true total,
+// and says more rows are available.
+func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+
+	require.Len(t, resp.People, 10, "the People table caps at 10 rows by default")
+	assert.Equal(t, int32(12), resp.PeopleTotal, "the total counts the whole cohort, not just the page")
+	assert.True(t, resp.PeopleHasMore)
+	assert.Equal(t, "Contributor 01", resp.People[0].Name)
+	assert.Equal(t, "Contributor 10", resp.People[9].Name)
+}
+
+// TestDescribeFactoryVelocity_PagesPeopleWithOffset covers "Load more": a
+// later offset returns the next slice, the last page reports no more rows,
+// and an offset past the end returns an empty page with the correct total.
+func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	secondPage, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:    factoryModel.ID.String(),
+		PeriodDays:   7,
+		Repository:   "example/repo",
+		PeopleOffset: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, secondPage.People, 2, "the last page holds the remaining people")
+	assert.Equal(t, int32(12), secondPage.PeopleTotal)
+	assert.False(t, secondPage.PeopleHasMore, "there is nothing left after the last page")
+	assert.Equal(t, "Contributor 11", secondPage.People[0].Name)
+	assert.Equal(t, "Contributor 12", secondPage.People[1].Name)
+
+	pastTheEnd, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:    factoryModel.ID.String(),
+		PeriodDays:   7,
+		Repository:   "example/repo",
+		PeopleOffset: 100,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, pastTheEnd.People, "an offset beyond the cohort returns no rows, not an error")
+	assert.Equal(t, int32(12), pastTheEnd.PeopleTotal)
+	assert.False(t, pastTheEnd.PeopleHasMore)
+}
+
+// TestDescribeFactoryVelocity_ClampsPeoplePageSize covers the page size guard
+// rails: non-positive defaults to 10, and a request above the max is capped.
+func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		numberedContributorSeeds(12, time.Now())...,
+	)
+
+	for _, tt := range []struct {
+		name     string
+		pageSize int32
+		expected int
+	}{
+		{"defaults to 10 when zero", 0, 10},
+		{"defaults to 10 when negative", -5, 10},
+		{"honors a page size within range", 5, 5},
+		{"caps above the max", 1000, 12},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+				FactoryId:      factoryModel.ID.String(),
+				PeriodDays:     7,
+				Repository:     "example/repo",
+				PeoplePageSize: tt.pageSize,
+			})
+			require.NoError(t, err)
+			assert.Len(t, resp.People, tt.expected)
+		})
+	}
+}
+
+// TestDescribeFactoryVelocity_SortsPeopleByRequestedKey covers the sort
+// parameter end to end: a client asking for the median cycle time ascending
+// gets a different order than the default total-descending sort.
+func TestDescribeFactoryVelocity_SortsPeopleByRequestedKey(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	seedSyncedRepositoryMerges(t, r.Organization.ID, factoryModel.ID, "example/repo",
+		repositoryMergeSeed{number: 1, login: "amy", name: "Amy", mergedAt: now.Add(-1 * time.Hour)},
+		repositoryMergeSeed{number: 2, login: "amy", name: "Amy", mergedAt: now.Add(-2 * time.Hour)},
+		repositoryMergeSeed{number: 3, login: "amy", name: "Amy", mergedAt: now.Add(-3 * time.Hour)},
+		repositoryMergeSeed{number: 4, login: "ben", name: "Ben", mergedAt: now.Add(-4 * time.Hour)},
+	)
+
+	desc, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+	require.Len(t, desc.People, 2)
+	assert.Equal(t, "Amy", desc.People[0].Name, "default sort is total merged, descending")
+
+	asc, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:           factoryModel.ID.String(),
+		PeriodDays:          7,
+		Repository:          "example/repo",
+		PeopleSort:          pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_AUTHORED_MERGED,
+		PeopleSortDirection: pb.DescribeFactoryVelocityRequest_SORT_DIRECTION_ASC,
+	})
+	require.NoError(t, err)
+	require.Len(t, asc.People, 2)
+	assert.Equal(t, "Ben", asc.People[0].Name, "ascending authored merges puts the single-merge author first")
+}
+
+// numberedContributorSeeds builds a run of distinct authors with one merge
+// each, named so alphabetical order matches insertion order. Every seed ties
+// on merge count, which makes the name tie-break (and therefore paging)
+// deterministic in tests.
+func numberedContributorSeeds(count int, at time.Time) []repositoryMergeSeed {
+	seeds := make([]repositoryMergeSeed, 0, count)
+	for i := 1; i <= count; i++ {
+		seeds = append(seeds, repositoryMergeSeed{
+			number:   int64(100 + i),
+			login:    fmt.Sprintf("contributor-%02d", i),
+			name:     fmt.Sprintf("Contributor %02d", i),
+			mergedAt: at.Add(-time.Duration(i) * time.Hour),
+		})
+	}
+	return seeds
 }
 
 func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) {

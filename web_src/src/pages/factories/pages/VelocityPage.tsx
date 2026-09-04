@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from "react";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -71,6 +72,7 @@ function VelocityReportView({ model, report }: { model: VelocityPageModel; repor
       <SummaryCard
         totals={report.totals}
         caption={summaryCaption(model.periodLabel, model.periodDays, Boolean(report.previous))}
+        periodDays={model.periodDays}
         medianCycleHours={flow && flow.sampleSize > 0 ? flow.medianCycleHours : undefined}
         comparison={model.comparison}
       />
@@ -81,11 +83,18 @@ function VelocityReportView({ model, report }: { model: VelocityPageModel; repor
         intakeSeries={report.intakeSeries}
         hasOutput={report.totals.merged > 0 || report.totals.waste > 0}
       />
-      {report.people.length > 0 ? (
+      {model.people.total > 0 ? (
         <VelocityPeopleTable
-          people={report.people}
+          people={model.people.list}
+          total={model.people.total}
           periodLabel={model.periodLabel}
           emptyAuthorship={peopleEmptyAuthorship(report, model)}
+          sortKey={model.people.sortKey}
+          sortDirection={model.people.sortDirection}
+          onSort={model.people.onSort}
+          canLoadMore={model.people.canLoadMore}
+          isLoadingMore={model.people.isLoadingMore}
+          onLoadMore={model.people.loadMore}
         />
       ) : null}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -103,13 +112,13 @@ function summaryCaption(periodLabel: string, periodDays: VelocityPeriodDays, has
   return `${periodLabel}. There is no earlier period to compare with yet.`;
 }
 
-/** Explains a People table that lists SuperPlane work but no direct authorship. */
+/** Explains a People table that lists SuperPlane work but no manual work yet. */
 function peopleEmptyAuthorship(report: VelocityReport, model: VelocityPageModel): string | undefined {
   if (report.hasPeopleCohort) return undefined;
-  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people merged.";
-  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people merged.";
+  if (!model.integrationId) return "Connect GitHub in workspace setup to count the pull requests people created.";
+  if (!model.repository) return "Select a repository in workspace setup to count the pull requests people created.";
   if (model.velocity.peopleSyncPending) {
-    return "SuperPlane is collecting merges from GitHub. The Authored column fills in after the first sync.";
+    return "SuperPlane is collecting merges from GitHub. The Manual work column fills in after the first sync.";
   }
   return undefined;
 }
@@ -145,7 +154,6 @@ function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
       }
       actions={
         <div className="flex items-center gap-2">
-          <VelocitySyncButton model={model} />
           <SegmentedNav
             ariaLabel="Velocity period in days"
             size="xs"
@@ -156,6 +164,7 @@ function VelocityHeaderBar({ model }: { model: VelocityPageModel }) {
             }}
             options={VELOCITY_PERIOD_OPTIONS}
           />
+          <VelocityOverflowMenu model={model} />
         </div>
       }
     />
@@ -187,26 +196,40 @@ function VelocitySyncProgress() {
  * time, so a merge made moments ago is not on the page yet. This asks for a
  * fresh read instead of leaving the user to wait for the next scheduled sync.
  */
-function VelocitySyncButton({ model }: { model: VelocityPageModel }) {
+function VelocityOverflowMenu({ model }: { model: VelocityPageModel }) {
   if (model.sync.isUnavailable) return null;
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="xs"
-      onClick={model.sync.start}
-      disabled={model.sync.isSyncing}
-      title={syncButtonTitle(model.velocity.syncedAt)}
-      data-testid="velocity-sync-button"
-    >
-      <RefreshCw className={cn("size-3.5", model.sync.isSyncing && "animate-spin")} aria-hidden />
-      {model.sync.isSyncing ? "Syncing…" : "Sync now"}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label="Velocity menu"
+          data-testid="velocity-overflow-menu"
+        >
+          <MoreHorizontal className="size-3.5" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={6} className="min-w-[12rem] rounded-xl border-border p-1 shadow-lg">
+        <DropdownMenuItem
+          className="cursor-pointer rounded-md px-2 py-1.5 text-[13px] [&_svg]:size-3.5"
+          onClick={model.sync.start}
+          disabled={model.sync.isSyncing}
+          title={refreshDataTitle(model.velocity.syncedAt)}
+          data-testid="velocity-refresh-data"
+        >
+          <RefreshCw className={cn(model.sync.isSyncing && "animate-spin")} aria-hidden />
+          Refresh data
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-function syncButtonTitle(syncedAt?: Date): string {
+function refreshDataTitle(syncedAt?: Date): string {
   const action = "Read the merges of the last 60 days from GitHub.";
   if (!syncedAt) return action;
   return `${action} Last synced ${syncedAt.toLocaleString()}.`;

@@ -16,7 +16,12 @@ describe("useAccountOrganizations", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", async () => {
       return new Response(
-        JSON.stringify([{ id: "org-1", name: "SuperPlane" }, { id: 2, name: "skip-me" }, { name: "missing-id" }]),
+        JSON.stringify([
+          { id: "org-uuid", slug: "demo", name: "Demo" },
+          { id: "org-1", name: "SuperPlane" },
+          { id: 2, name: "skip-me" },
+          { name: "missing-id" },
+        ]),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
@@ -33,6 +38,9 @@ describe("useAccountOrganizations", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(result.current.data).toEqual([{ id: "org-1", name: "SuperPlane" }]);
+    expect(result.current.data).toEqual([
+      { id: "org-uuid", slug: "demo", name: "Demo" },
+      { id: "org-1", name: "SuperPlane" },
+    ]);
   });
 });

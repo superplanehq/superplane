@@ -319,6 +319,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         if (orgsResponse.ok) {
           const organizations = (await orgsResponse.json()) as Array<{ id?: string; slug?: string }>;
           if (organizations.length === 1) {
+            // Prefer the slug so the address bar never shows the org UID.
+            // The UID fallback only fires for an organization without a
+            // slug yet; OrganizationScope corrects that case on arrival.
             const orgRef = organizations[0].slug || organizations[0].id;
             if (orgRef) {
               window.location.href = `/${orgRef}`;

@@ -23,6 +23,12 @@ export type CreateWithAgentMessage = {
   role: "user" | "agent";
   text: string;
   origin?: "survey";
+  /**
+   * Epoch ms this message was created, when known. Lets the transcript
+   * merge order this message against agent notes by true chronology
+   * instead of guessing from wait-slot position.
+   */
+  createdAtMs?: number;
 };
 
 export type CreateWithAgentSurveyQuestion = {

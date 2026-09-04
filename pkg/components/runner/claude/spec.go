@@ -157,11 +157,7 @@ func applyPlanningFollowUp(task ClaudeCodeBrokerTask, environment []runner.Broke
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
 	}
-	task.Files = append(task.Files, runner.BrokerTaskFile{
-		Path:    "follow_up_loop.js",
-		Content: followUpLoopScript,
-		Mode:    "0644",
-	})
+	task.Files = append(task.Files, runner.FollowUpLoopFile())
 	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
 	return task
 }
@@ -189,13 +185,6 @@ func planningFollowUpWorkingDirectory(spec RunClaudeCodeSpec) string {
 		}
 	}
 	return strings.TrimSpace(spec.WorkingDirectory)
-}
-
-func planningSessionMCPFiles() []runner.BrokerTaskFile {
-	return []runner.BrokerTaskFile{
-		{Path: "planning_session_mcp.js", Content: planningSessionMCPScript, Mode: "0644"},
-		{Path: "mcp.json", Content: planningSessionMCPConfig, Mode: "0644"},
-	}
 }
 
 func buildClaudeCodeStep(stepNumber int, step ClaudeCodeStep, usage, model, nodeWorkingDirectory string) (runner.BrokerTaskFile, runner.BrokerCommand) {
@@ -256,7 +245,7 @@ func claudeBashStepBrokerCommand(stepName, scriptName, command, workingDirectory
 		Name:    runner.AgentStepLabel(stepName, scriptName),
 		Command: runner.WrapAgentStepCommand(runner.WrapCommandInWorkingDirectory(workingDirectory, fmt.Sprintf(`source "$SUPERPLANE_TASK_DIR/steps/%s"`, scriptName))),
 		Kind:    runner.LiveLogKindBash,
-		Preview: runner.LiveLogPreview(command),
+		Preview: runner.LiveLogText(command),
 	}
 }
 
@@ -274,6 +263,6 @@ func claudePromptStepBrokerCommand(stepName, promptName, prompt, model, workingD
 			),
 		),
 		Kind:    runner.LiveLogKindPrompt,
-		Preview: runner.LiveLogPreview(prompt),
+		Preview: runner.LiveLogText(prompt),
 	}
 }

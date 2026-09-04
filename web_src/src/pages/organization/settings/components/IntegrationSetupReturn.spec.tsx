@@ -22,6 +22,20 @@ function renderAt(path: string, children: React.ReactNode) {
   );
 }
 
+function returnRoute(organizationId: string, children: React.ReactNode) {
+  return (
+    <MemoryRouter initialEntries={["/organization-uid/settings/integrations/github-connection"]}>
+      <Routes>
+        <Route
+          path="/:organizationId/settings/integrations/:integrationId"
+          element={<IntegrationSetupReturn organizationId={organizationId}>{children}</IntegrationSetupReturn>}
+        />
+        <Route path="/org-1/workspaces/APP/setup" element={<div>workspace setup</div>} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe("IntegrationSetupReturn", () => {
   afterEach(() => {
     window.localStorage.clear();
@@ -47,6 +61,18 @@ describe("IntegrationSetupReturn", () => {
     renderAt("/org-1/settings/integrations/an-id-created-during-setup", <div>integration details</div>);
     expect(await screen.findByText("workspace setup")).toBeInTheDocument();
     expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBe(SETUP_PATH);
+  });
+
+  it("checks the slug marker after the callback UID is canonicalized", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    const page = render(returnRoute("organization-uid", <div>integration details</div>));
+    expect(screen.getByText("integration details")).toBeInTheDocument();
+
+    page.rerender(returnRoute(ORGANIZATION_ID, <div>integration details</div>));
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
   it("stays on the integration page when setupStay is set", async () => {
