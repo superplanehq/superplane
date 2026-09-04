@@ -89,6 +89,16 @@ describe("OrganizationOnboardingRedirect", () => {
     );
   });
 
+  it("shows an error when the account has no name", async () => {
+    accountState.account.name = "";
+    accountState.account.email = "";
+
+    renderOnboarding();
+
+    expect(await screen.findByText(/Could not start workspace setup/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("starts workspace setup without GitHub authorization", async () => {
     accountState.account.linked_accounts = [];
     accountState.account.providers = [];

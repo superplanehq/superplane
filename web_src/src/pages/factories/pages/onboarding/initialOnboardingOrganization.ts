@@ -29,7 +29,12 @@ export function organizationIdentityFromOwner(owner: string, suffix?: string): {
 
 export function isOrganizationIdentityTaken(message: string): boolean {
   const normalized = message.toLowerCase();
-  return normalized.includes("already in use") || normalized.includes("already used");
+  return (
+    normalized.includes("already in use") ||
+    normalized.includes("already used") ||
+    normalized.includes("invalid organization update") ||
+    normalized.includes("duplicate key")
+  );
 }
 
 export async function nameOrganizationFromGitHubOwner(args: {

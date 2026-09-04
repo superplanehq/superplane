@@ -22,7 +22,11 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
   const onboardingAttempt = useRef(getOnboardingAttempt());
 
   useEffect(() => {
-    if (!account || hasStartedProvisioning.current || !owner) return;
+    if (!account || hasStartedProvisioning.current) return;
+    if (!owner) {
+      setError("Could not start workspace setup. Add a name to your SuperPlane account and try again.");
+      return;
+    }
 
     hasStartedProvisioning.current = true;
     void provisionWorkspace(owner, onboardingAttempt.current.id)

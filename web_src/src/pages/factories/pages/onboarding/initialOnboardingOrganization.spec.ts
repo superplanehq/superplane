@@ -45,7 +45,10 @@ describe("organizationIdentityFromOwner", () => {
 describe("isOrganizationIdentityTaken", () => {
   it("detects a taken slug or name", () => {
     expect(isOrganizationIdentityTaken("organization slug is already in use")).toBe(true);
+    expect(isOrganizationIdentityTaken("organization name is already in use")).toBe(true);
     expect(isOrganizationIdentityTaken("name already used")).toBe(true);
+    expect(isOrganizationIdentityTaken("invalid organization update")).toBe(true);
+    expect(isOrganizationIdentityTaken("duplicate key value violates unique constraint")).toBe(true);
     expect(isOrganizationIdentityTaken("Could not save the organization")).toBe(false);
   });
 });
@@ -68,5 +71,21 @@ describe("nameOrganizationFromGitHubOwner", () => {
 
     expect(update).toHaveBeenNthCalledWith(1, { name: "acme", slug: "acme" });
     expect(update).toHaveBeenNthCalledWith(2, { name: "acme-1ajioa", slug: "acme-1ajioa" });
+  });
+
+  it("retries when the name conflict uses the update error text", async () => {
+    const update = vi
+      .fn()
+      .mockRejectedValueOnce({ error: { message: "invalid organization update" } })
+      .mockResolvedValueOnce("acme-1ajioa");
+
+    await expect(
+      nameOrganizationFromGitHubOwner({
+        owner: "acme",
+        currentSlug: "dev-user",
+        update,
+        randomSuffix: () => "1ajioa",
+      }),
+    ).resolves.toBe("acme-1ajioa");
   });
 });

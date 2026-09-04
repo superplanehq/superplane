@@ -17,4 +17,19 @@ describe("organizationNameFromAccount", () => {
       }),
     ).toBe("Dev User");
   });
+
+  it("uses the email local part when the account name is empty", () => {
+    expect(
+      organizationNameFromAccount({
+        id: "account-1",
+        name: "   ",
+        email: "dev@superplane.local",
+        avatar_url: "",
+        installation_admin: false,
+        has_password: true,
+        linked_accounts: [],
+        providers: [],
+      }),
+    ).toBe("dev");
+  });
 });
