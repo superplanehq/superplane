@@ -100,6 +100,6 @@ again in the runner repository. Check tools with `make doctor-local`.
 - **[Component Implementation](docs/contributing/component-implementations.md)** — Step-by-step instructions for creating new components or triggers
 - **[Component Customization](docs/contributing/component-customization.md)** — Guide for customizing existing components or building behaviors
 - **[Templates](docs/contributing/templates.md)** — Guide for creating and adding new workflow templates
-- **[Integrations Board](https://github.com/orgs/superplanehq/projects/2/views/17)** — View all integration-related work on the SuperPlane Board
+- **[Integrations Board](https://github.com/orgs/superplanehq/projects/2)** — View all integration-related work on the SuperPlane Board
 - **[Integration bounties](docs/contributing/bounties.md)** — How to claim, work on, and get paid for bounties via BountyHub; review and dispute process
 - **[Connecting to Third-Party Services during Development](docs/contributing/connecting-to-3rdparty-services-from-development.md)**
