@@ -21,7 +21,7 @@ type FactoryCleanupWorker struct {
 
 func NewFactoryCleanupWorker() *FactoryCleanupWorker {
 	return &FactoryCleanupWorker{
-		semaphore:           semaphore.NewWeighted(10),
+		semaphore:           semaphore.NewWeighted(maxConcurrentCleanupTasks),
 		logger:              log.WithFields(log.Fields{"worker": "FactoryCleanupWorker"}),
 		maxResourcesPerTick: 500,
 	}
@@ -34,6 +34,7 @@ func (w *FactoryCleanupWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentCleanupTasks)
 			return
 		case tickTime := <-ticker.C:
 			factories, err := models.ListDeletedFactories(database.Conn())
@@ -47,6 +48,15 @@ func (w *FactoryCleanupWorker) Start(ctx context.Context) {
 			for _, factory := range factories {
 				if !factory.DeletedAt.Valid || deletedResourceWithinGracePeriod(factory.DeletedAt.Time, tickTime) {
 					continue
+				}
+
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
 				}
 
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {

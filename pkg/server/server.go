@@ -2,15 +2,18 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
 	// Registers pprof handlers on http.DefaultServeMux, served by startPprofServer.
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -114,7 +117,22 @@ func buildAgentService(authService authorization.Authorization) (agents.Provider
 	return provider, service
 }
 
+// startWorker runs a worker's Start loop under ctx and records it in wg, so
+// Start can wait for the loop to return before the process exits. Every worker
+// loop already returns on ctx.Done; before this they were given
+// context.Background() and so were never told to stop.
+func startWorker(ctx context.Context, wg *sync.WaitGroup, start func(context.Context)) {
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		start(ctx)
+	}()
+}
+
 func startWorkers(
+	ctx context.Context,
+	wg *sync.WaitGroup,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
@@ -131,21 +149,21 @@ func startWorkers(
 	}
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
-		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
+		startEmailConsumers(ctx, wg, rabbitMQURL, encryptor, baseURL)
 	}
 
 	if os.Getenv("START_WORKFLOW_EVENT_ROUTER") == "yes" || os.Getenv("START_EVENT_ROUTER") == "yes" {
 		log.Println("Starting Event Router")
 
 		w := workers.NewEventRouter(rabbitMQURL)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_RUN_FINALIZER") == "yes" {
 		log.Println("Starting Run Finalizer")
 
 		w := workers.NewRunFinalizer(rabbitMQURL, registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_WORKFLOW_NODE_EXECUTOR") == "yes" || os.Getenv("START_NODE_EXECUTOR") == "yes" {
@@ -153,14 +171,14 @@ func startWorkers(
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewNodeExecutor(encryptor, registry, gitProvider, oidcProvider, baseURL, webhookBaseURL, rabbitMQURL, authService)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_EXECUTION_TERMINATOR") == "yes" {
 		log.Println("Starting Execution Terminator")
 
 		w := workers.NewExecutionTerminator(rabbitMQURL, authService, encryptor, registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_NODE_REQUEST_WORKER") == "yes" {
@@ -168,20 +186,20 @@ func startWorkers(
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewNodeRequestWorker(encryptor, registry, gitProvider, webhookBaseURL, authService)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_APP_MESSAGE_WORKER") == "yes" {
 		log.Println("Starting App Message Worker")
 
 		w := workers.NewAppMessageWorker(registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_RUN_INITIALIZER") == "yes" {
 		log.Println("Starting Run Initializer")
 		w := workers.NewRunInitializer(rabbitMQURL, registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_APP_INSTALLATION_REQUEST_WORKER") == "yes" || os.Getenv("START_INTEGRATION_REQUEST_WORKER") == "yes" {
@@ -189,14 +207,14 @@ func startWorkers(
 
 		webhooksBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewIntegrationRequestWorker(encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_WORKFLOW_NODE_QUEUE_WORKER") == "yes" || os.Getenv("START_NODE_QUEUE_WORKER") == "yes" {
 		log.Println("Starting Node Queue Worker")
 
 		w := workers.NewNodeQueueWorker(registry, gitProvider, rabbitMQURL)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	// Start Webhook Provisioner when internal API runs so integration webhooks (e.g. GCP On VM Created) get provisioned.
@@ -207,41 +225,41 @@ func startWorkers(
 		}
 		webhookBaseURL := getWebhookBaseURL(baseURL)
 		w := workers.NewWebhookProvisioner(webhookBaseURL, encryptor, registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_WEBHOOK_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Webhook Cleanup Worker")
 
 		w := workers.NewWebhookCleanupWorker(encryptor, registry, baseURL)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_INSTALLATION_CLEANUP_WORKER") == "yes" || os.Getenv("START_INTEGRATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Integration Cleanup Worker")
 
 		w := workers.NewIntegrationCleanupWorker(registry, encryptor, baseURL)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
 		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_NODE_REQUEST_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Node Request Cleanup Worker")
 
 		w := workers.NewNodeRequestCleanupWorker()
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
 		log.Println("Starting Repository Provisioner")
 		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	var workerUsageService usage.Service
@@ -277,28 +295,28 @@ func startWorkers(
 		log.Println("Starting Organization Cleanup Worker")
 
 		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_FACTORY_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Factory Cleanup Worker")
 
 		w := workers.NewFactoryCleanupWorker()
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_FACTORY_VELOCITY_SYNC_WORKER") == "yes" {
 		log.Println("Starting Factory Velocity Sync Worker")
 
 		w := workers.NewFactoryVelocitySyncWorker(rabbitMQURL, encryptor, registry)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Planning Session Cleanup Worker")
 
 		w := workers.NewPlanningSessionCleanupWorker()
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
@@ -317,7 +335,7 @@ func startWorkers(
 			getOptionalWorkerUsageService(),
 			agentToolRegistry,
 		)
-		go w.Start(context.Background())
+		startWorker(ctx, wg, w.Start)
 	}
 
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
@@ -326,19 +344,19 @@ func startWorkers(
 		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Event Retention Worker")
 			w := workers.NewEventRetentionWorker(usageService)
-			go w.Start(context.Background())
+			startWorker(ctx, wg, w.Start)
 		}
 
 		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Usage Sync Worker")
 			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
-			go w.Start(context.Background())
+			startWorker(ctx, wg, w.Start)
 		}
 	}
 
 }
 
-func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
+func startEmailConsumers(ctx context.Context, wg *sync.WaitGroup, rabbitMQURL string, encryptor crypto.Encryptor, baseURL string) {
 	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
 		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
 		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
@@ -351,17 +369,74 @@ func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL
 		return
 	}
 
-	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL)
+	startEmailConsumersWithService(ctx, wg, rabbitMQURL, emailService, baseURL)
 }
 
-func startEmailConsumersWithService(rabbitMQURL string, emailService services.EmailService, baseURL string) {
+func startEmailConsumersWithService(ctx context.Context, wg *sync.WaitGroup, rabbitMQURL string, emailService services.EmailService, baseURL string) {
 	log.Println("Starting Magic Code Email Consumer")
 	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
-	go magicCodeEmailConsumer.Start()
+	startConsumer(ctx, wg, "Magic Code Email Consumer", magicCodeEmailConsumer.Start, magicCodeEmailConsumer.Stop)
 
 	log.Println("Starting Factory Notification Consumer")
 	factoryNotificationConsumer := workers.NewFactoryNotificationConsumer(rabbitMQURL, emailService, baseURL)
-	go factoryNotificationConsumer.Start()
+	startConsumer(ctx, wg, "Factory Notification Consumer", factoryNotificationConsumer.Start, factoryNotificationConsumer.Stop)
+}
+
+// stopRetryInterval is how often shutdown re-attempts a consumer's Stop while
+// the consumer is still opening its connection.
+const stopRetryInterval = 50 * time.Millisecond
+
+// startConsumer runs a RabbitMQ consumer and closes it when ctx is cancelled.
+// Cancellation reaches the consumer two ways, and it needs both: ctx ends the
+// reconnect loop, and Stop closes a connection that is already listening.
+func startConsumer(ctx context.Context, wg *sync.WaitGroup, name string, start func(context.Context) error, stop func()) {
+	finished := make(chan struct{})
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		defer close(finished)
+
+		if err := start(ctx); err != nil {
+			log.Errorf("%s stopped: %v", name, err)
+		}
+	}()
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		select {
+		case <-finished:
+			// The consumer returned on its own, so there is nothing to stop.
+			return
+		case <-ctx.Done():
+		}
+
+		log.Printf("Stopping %s", name)
+
+		//
+		// tackle's Stop does nothing while the consumer is still connecting,
+		// because it only closes a connection in the listening state. A single
+		// Stop can therefore land in that window and be lost, leaving the
+		// consumer blocked on its shutdown channel with nobody left to close it.
+		// Keep asking until the consumer loop returns.
+		//
+		ticker := time.NewTicker(stopRetryInterval)
+		defer ticker.Stop()
+
+		for {
+			stop()
+
+			select {
+			case <-finished:
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 }
 
 func buildGRPCServices(
@@ -392,6 +467,7 @@ func buildGRPCServices(
 }
 
 func startPublicAPI(
+	ctx context.Context,
 	baseURL, basePath string,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -435,6 +511,14 @@ func startPublicAPI(
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
 		log.Println("Starting Event Distributer Worker")
 		eventDistributer := workers.NewEventDistributer(server.WebsocketHub())
+
+		//
+		// Deliberately outside the drain. Start blocks on its own channel while
+		// the real work happens in per-route consumers that consumeMessages
+		// creates inside a loop, so there is no handle to stop them. Joining the
+		// drain would report every worker stopped while those consumers still
+		// run. Giving them a lifecycle needs its own change.
+		//
 		go eventDistributer.Start()
 	} else {
 		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
@@ -467,8 +551,40 @@ func startPublicAPI(
 		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
+	//
+	// Drain the HTTP server when the process is shutting down, so in-flight
+	// requests finish instead of dying with the connection.
+	//
+	go func() {
+		<-ctx.Done()
+
+		//
+		// Keep serving for a moment first. Kubernetes removes the pod from the
+		// Endpoints list asynchronously, so kube-proxy still routes here for a
+		// short while after SIGTERM. Closing the listener immediately would turn
+		// those requests into connection refused, which is worse than the abrupt
+		// stop this change replaces.
+		//
+		if delay := drainDelay(); delay > 0 {
+			log.Printf("Draining Public API traffic for %s before shutdown", delay)
+			time.Sleep(delay)
+		}
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
+		defer cancel()
+
+		log.Println("Shutting down Public API")
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Errorf("Error shutting down Public API: %v", err)
+		}
+	}()
+
+	//
+	// Shutdown makes ListenAndServe return ErrServerClosed. That is the normal
+	// end of a graceful stop, not a failure.
+	//
 	err = server.Serve("0.0.0.0", lookupPublicAPIPort())
-	if err != nil {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 }
@@ -567,6 +683,15 @@ func startPprofServer() {
 }
 
 func Start() {
+	//
+	// Cancelled on SIGINT/SIGTERM. Every worker loop, the public API server and
+	// the RabbitMQ consumers stop when this context is done.
+	//
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	var wg sync.WaitGroup
+
 	configureLogging()
 	setupOtel()
 	startPprofServer()
@@ -692,20 +817,29 @@ func Start() {
 		}
 		grpcServices = services
 
-		go startPublicAPI(
-			baseURL,
-			basePath,
-			encryptorInstance,
-			registry,
-			jwtSigner,
-			oidcProvider,
-			authService,
-			gitProvider,
-			grpcServices,
-		)
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			startPublicAPI(
+				ctx,
+				baseURL,
+				basePath,
+				encryptorInstance,
+				registry,
+				jwtSigner,
+				oidcProvider,
+				authService,
+				gitProvider,
+				grpcServices,
+			)
+		}()
 	}
 
 	startWorkers(
+		ctx,
+		&wg,
 		encryptorInstance,
 		registry,
 		oidcProvider,
@@ -717,7 +851,124 @@ func Start() {
 
 	log.Println("SuperPlane is UP.")
 
-	select {}
+	<-ctx.Done()
+
+	//
+	// Restore the default signal behaviour, so a second SIGTERM during a slow
+	// drain kills the process instead of being swallowed.
+	//
+	stop()
+	log.Println("Shutdown signal received, stopping SuperPlane...")
+
+	//
+	// One deadline covers the whole sequence. Giving each step its own full
+	// timeout would let a slow drain plus a slow telemetry flush run for several
+	// times the grace period, and SIGKILL would then cut the process off with no
+	// chance to log why.
+	//
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout())
+	defer cancelShutdown()
+
+	drained := waitForShutdown(shutdownCtx, &wg)
+
+	if err := telemetry.ShutdownTracing(shutdownCtx); err != nil {
+		log.Warnf("Error shutting down tracing: %v", err)
+	}
+	telemetry.FlushSentry(timeLeft(shutdownCtx))
+
+	if !drained {
+		log.Warn("SuperPlane is DOWN, with work still in flight.")
+		return
+	}
+
+	log.Println("SuperPlane is DOWN.")
+}
+
+// timeLeft reports how much of ctx's deadline remains, for the steps that take a
+// duration rather than a context. It never returns a negative value.
+func timeLeft(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+
+	if left := time.Until(deadline); left > 0 {
+		return left
+	}
+
+	return 0
+}
+
+// defaultShutdownTimeout bounds the entire shutdown: the worker drain, the
+// tracing shutdown and the Sentry flush share it. It stays below the Kubernetes
+// default termination grace period of 30s, which the Helm chart does not
+// override, so the process finishes before SIGKILL arrives.
+// Raise SHUTDOWN_TIMEOUT and terminationGracePeriodSeconds together.
+const defaultShutdownTimeout = 25 * time.Second
+
+func shutdownTimeout() time.Duration {
+	value := os.Getenv("SHUTDOWN_TIMEOUT")
+	if value == "" {
+		return defaultShutdownTimeout
+	}
+
+	timeout, err := time.ParseDuration(value)
+	if err != nil {
+		log.Warnf("Invalid SHUTDOWN_TIMEOUT %q, using %s: %v", value, defaultShutdownTimeout, err)
+		return defaultShutdownTimeout
+	}
+
+	return timeout
+}
+
+// defaultDrainDelay is how long the public API keeps serving after the
+// termination signal, so that Kubernetes has time to stop routing new requests
+// here. It is deliberately shorter than the readiness probe period: the point
+// is to outlast kube-proxy's endpoint update, not to wait for a probe.
+const defaultDrainDelay = 5 * time.Second
+
+// drainDelay returns the wait before the public API stops listening.
+// Development restarts skip it, because a five second pause on every local
+// restart pushes people towards killing the process instead.
+func drainDelay() time.Duration {
+	if os.Getenv("APP_ENV") == "development" {
+		return 0
+	}
+
+	value := os.Getenv("SHUTDOWN_DRAIN_DELAY")
+	if value == "" {
+		return defaultDrainDelay
+	}
+
+	delay, err := time.ParseDuration(value)
+	if err != nil {
+		log.Warnf("Invalid SHUTDOWN_DRAIN_DELAY %q, using %s: %v", value, defaultDrainDelay, err)
+		return defaultDrainDelay
+	}
+
+	return delay
+}
+
+// waitForShutdown waits for every tracked goroutine to return, and gives up when
+// ctx expires so a stuck worker cannot hold the process open forever. It reports
+// whether every goroutine finished, so the caller does not announce a clean stop
+// after abandoning work.
+func waitForShutdown(ctx context.Context, wg *sync.WaitGroup) bool {
+	done := make(chan struct{})
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("All workers stopped")
+		return true
+	case <-ctx.Done():
+		log.Warn("Shutdown deadline expired, exiting with work still in flight")
+		return false
+	}
 }
 
 // getWebhookBaseURL returns the webhook base URL, using the same pattern as SyncContext.
