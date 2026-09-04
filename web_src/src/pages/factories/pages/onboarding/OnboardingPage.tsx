@@ -4,12 +4,14 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
 import { useOnboardingEntryPath } from "./useOnboardingEntryPath";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
+import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
 
 export function OnboardingPage() {
   const layout = useFactoriesLayout();
   const onboardingEntryPath = useOnboardingEntryPath();
+  const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
-  const model = useOnboardingPageModel({ ...layout, onboardingEntryPath });
+  const model = useOnboardingPageModel({ ...layout, onboardingEntryPath, reresolveWorkspace });
 
   if (!model.canConfigureWorkspace) {
     return (

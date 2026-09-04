@@ -561,6 +561,17 @@ service Factories {
     };
   }
 
+  rpc ListFactoryLineRunnerModels(ListFactoryLineRunnerModelsRequest) returns (ListFactoryLineRunnerModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/line-runner-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List line runner models";
+      description: "Returns the models a draft task can pick for the runner agents on one factory line";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryLLMModels(UpdateFactoryLLMModelsRequest) returns (UpdateFactoryLLMModelsResponse) {
     option (google.api.http) = {
       put: "/api/v1/factories/{factory_id}/llm-models"
@@ -1435,6 +1446,9 @@ message WorkOrderLineDispatch {
   // its maxParallelism. A dispatch waits at no more than one step at a
   // time; no run or step execution exists for a queued step yet.
   optional WorkOrderQueueItem queue_item = 9;
+  // Model chosen at Start. Empty means Auto: each runner keeps the model
+  // stored on the live automation canvas.
+  string model = 10;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -1538,6 +1552,8 @@ message DispatchWorkOrderRequest {
   string line_name = 3;
   int32 start_step_index = 4;
   bool replace_active = 5;
+  // Optional model override for this start. Empty means Auto.
+  string model = 6;
 }
 
 message DispatchWorkOrderResponse {
@@ -1946,6 +1962,15 @@ message DescribeFactoryUsageResponse {
   bool factory_remaining_credit_warning = 12;
   int64 total_duration_seconds = 13;
   repeated UsageByMachineType by_machine_type = 14;
+}
+
+message ListFactoryLineRunnerModelsRequest {
+  string factory_id = 1;
+  string line_name = 2;
+}
+
+message ListFactoryLineRunnerModelsResponse {
+  repeated FactoryLLMModel models = 1;
 }
 
 message ListFactoryLLMModelsRequest {

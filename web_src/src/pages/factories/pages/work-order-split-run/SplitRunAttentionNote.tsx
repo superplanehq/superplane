@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Bug, CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, Loader2, RotateCcw, Undo2 } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
@@ -65,6 +66,7 @@ export function SplitRunAttentionNote({
   actionBusy = false,
   startBusy = false,
   startDisabled = false,
+  modelSelect,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -74,6 +76,7 @@ export function SplitRunAttentionNote({
   actionBusy?: boolean;
   startBusy?: boolean;
   startDisabled?: boolean;
+  modelSelect?: ReactNode;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const visual = TONE[tone];
@@ -110,6 +113,7 @@ export function SplitRunAttentionNote({
           actionBusy={actionBusy}
           startBusy={startBusy}
           startDisabled={startDisabled}
+          modelSelect={modelSelect}
           onAction={onAction}
         />
       </div>
@@ -124,6 +128,7 @@ function NoteActionRow({
   actionBusy,
   startBusy,
   startDisabled,
+  modelSelect,
   onAction,
 }: {
   note: SplitRunFooterNote;
@@ -132,16 +137,18 @@ function NoteActionRow({
   actionBusy: boolean;
   startBusy: boolean;
   startDisabled: boolean;
+  modelSelect?: ReactNode;
   onAction?: (action: SplitRunFooterAction) => void;
 }) {
   const href = note.cta?.href ?? runHref ?? undefined;
   const showCta = Boolean(note.cta && href);
-  if (!showCta && actions.length === 0) {
+  if (!showCta && actions.length === 0 && !modelSelect) {
     return null;
   }
 
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      {modelSelect}
       {showCta && href && note.cta ? <NoteCta label={note.cta.label} href={href} icon={note.cta.icon} /> : null}
       {actions.map((action) => (
         <NoteAction

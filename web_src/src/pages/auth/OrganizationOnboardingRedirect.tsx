@@ -1,6 +1,7 @@
 import { useAccount } from "@/contexts/useAccount";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+import type { OnboardingWorkspaceResolution } from "../factories/pages/onboarding/onboardingWorkspaceResolutionContext";
 import { organizationNameFromAccount } from "./organizationNameFromAccount";
 
 export type ProvisionedWorkspace = {
@@ -9,7 +10,11 @@ export type ProvisionedWorkspace = {
 };
 
 interface OrganizationOnboardingRedirectProps {
-  renderWorkspace: (workspace: ProvisionedWorkspace, entryPath: string) => ReactNode;
+  renderWorkspace: (
+    workspace: ProvisionedWorkspace,
+    entryPath: string,
+    reresolveWorkspace: OnboardingWorkspaceResolution,
+  ) => ReactNode;
 }
 
 /** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
@@ -36,8 +41,17 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
       });
   }, [account, owner]);
 
+  // Re-runs the retry-safe onboarding endpoint for the same attempt, so a
+  // workspace can move to a new organization slug (for example, after the
+  // organization is renamed from the GitHub owner) without a page reload.
+  const reresolveWorkspace = useCallback(async () => {
+    if (!owner) return;
+    const result = await provisionWorkspace(owner, onboardingAttempt.current.id);
+    setWorkspace(result);
+  }, [owner]);
+
   if (workspace) {
-    return renderWorkspace(workspace, onboardingAttempt.current.entryPath);
+    return renderWorkspace(workspace, onboardingAttempt.current.entryPath, reresolveWorkspace);
   }
 
   if (!error) return null;

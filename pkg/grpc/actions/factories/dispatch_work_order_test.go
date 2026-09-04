@@ -49,6 +49,7 @@ func Test__DispatchWorkOrder__CreatesLineDispatchWithSnapshot(t *testing.T) {
 	dispatch := resp.Order.LineDispatches[0]
 	assert.Equal(t, pb.WorkOrderLineDispatch_STATE_ACTIVE, dispatch.State)
 	assert.Equal(t, line.Name, dispatch.Line.Name)
+	assert.Empty(t, dispatch.Model)
 	require.Len(t, dispatch.Steps, 1)
 	assert.Equal(t, app.Name, dispatch.Steps[0].Name)
 	require.Len(t, dispatch.StepExecutions, 1)
@@ -310,4 +311,64 @@ func Test__DispatchWorkOrder__ReturnsOwnerNameAfterStart(t *testing.T) {
 	assert.Equal(t, r.User.String(), resp.Order.Assignees[0].Id)
 	assert.Equal(t, r.UserModel.Name, resp.Order.Assignees[0].Name)
 	assert.NotEqual(t, r.User.String(), resp.Order.Assignees[0].Name)
+}
+
+func Test__DispatchWorkOrder__PersistsChosenModel(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6", "claude-opus-4-6")
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	resp, err := DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+		Model:     "claude-opus-4-6",
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Order.LineDispatches, 1)
+	assert.Equal(t, "claude-opus-4-6", resp.Order.LineDispatches[0].Model)
+
+	active, err := order.FindActiveLineDispatch(db)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-opus-4-6", active.Model)
+}
+
+func Test__DispatchWorkOrder__RejectsModelNotOnLine(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	seedHostedModels(t, db, models.UsageProviderAnthropic, "claude-sonnet-4-6")
+	seedHostedModels(t, db, models.UsageProviderOpenAI, "gpt-5")
+
+	app := createLineAppWithRunner(t, r, factoryModel.ID, runnerClaudeCode, "hosted", "claude-sonnet-4-6")
+	order, err := factoryModel.CreateWorkOrder(db, "Ship it", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	line, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: "start"},
+	})
+	require.NoError(t, err)
+
+	_, err = DispatchWorkOrder(ctx, r.Organization.ID.String(), &pb.DispatchWorkOrderRequest{
+		FactoryId: factoryModel.ID.String(),
+		OrderId:   order.ID.String(),
+		LineName:  line.Name,
+		Model:     "gpt-5",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 }

@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -80,6 +81,17 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return models.ErrFactoryLineHasNoSteps
 		}
 
+		model := strings.TrimSpace(req.GetModel())
+		if model != "" {
+			allowed, err := listLineRunnerModels(tx, orgID, factoryID, lineName)
+			if err != nil {
+				return err
+			}
+			if !slices.Contains(allowed, model) {
+				return invalidArgument("model is not available on this line")
+			}
+		}
+
 		startIndex := int(req.GetStartStepIndex())
 		fromState = order.State
 		if err := order.TransitionOnDispatch(tx, actor); err != nil {
@@ -110,7 +122,7 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 			return err
 		}
 
-		_, result, err := line.DispatchFrom(tx, order, startIndex)
+		_, result, err := line.DispatchFromWithModel(tx, order, startIndex, model)
 		if err != nil {
 			return err
 		}

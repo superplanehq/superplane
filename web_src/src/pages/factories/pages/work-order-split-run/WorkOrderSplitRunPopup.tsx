@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
+
 import { CopyLinkButton } from "../../CopyLinkButton";
 import { workOrderDetailPath } from "../../lib/factoryPagePaths";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
+import { DraftStartModelSelect } from "./DraftStartModelSelect";
+import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } from "./draftStartModel";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream } from "./attachStreamArtifacts";
 import { emptySplitRunCanvas } from "./splitRunCanvases";
@@ -165,7 +170,7 @@ export function WorkOrderSplitRunBody({
         {fixture.phases.map((entry) => (
           <li key={entry.id} className="min-w-0 first:mt-3">
             <PhaseLogCard
-              phase={entry}
+              phase={phaseWithRunnerModel(entry, entry.id === selectedPhase?.id ? live.canvas?.nodes : undefined)}
               expanded={entry.id === openPhaseId}
               stream={streams.get(entry.id) ?? entry.stream}
               selectedNodeId={nodeId}
@@ -214,11 +219,12 @@ export function WorkOrderSplitRunPopup({
 }: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
   fixed?: boolean;
-  onDispatch?: () => Promise<void>;
+  onDispatch?: (model?: string) => Promise<void>;
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
 }) {
+  const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
@@ -236,7 +242,8 @@ export function WorkOrderSplitRunPopup({
   const initialTab = defaultSplitRunPopupTab(fixture);
   const [tab, setTab] = useState(initialTab);
   const [fullPage, setFullPage] = useState(false);
-  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"));
+  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
+  const draftStart = draftStartAction(fixture.footer.kind, onDispatch, () => setTab("log"), draftModel);
   const backToDraft = returnToBacklogAction(mutations.onBackToDraft, () => setTab("description"));
 
   return (
@@ -292,6 +299,18 @@ export function WorkOrderSplitRunPopup({
         startBusy={isDispatching}
         actionBusy={footerActions.busy}
         startDisabled={!canDispatch}
+        modelSelect={
+          fixture.footer.kind === "draft" && canPickDraftStartModel ? (
+            <DraftStartModelSelect
+              organizationId={organizationId}
+              factoryId={factoryId}
+              lineName={fixture.lineName}
+              value={draftModel}
+              onChange={setDraftModel}
+              disabled={isDispatching}
+            />
+          ) : undefined
+        }
       />
     </PopupShell>
   );
@@ -299,14 +318,15 @@ export function WorkOrderSplitRunPopup({
 
 function draftStartAction(
   kind: SplitRunFixture["footer"]["kind"],
-  onDispatch: (() => Promise<void>) | undefined,
+  onDispatch: ((model?: string) => Promise<void>) | undefined,
   openAutomations: () => void,
+  selectedModel: string,
 ) {
   if (kind !== "draft") {
     return undefined;
   }
   return async () => {
-    await onDispatch?.();
+    await onDispatch?.(draftStartModelPayload(selectedModel));
     openAutomations();
   };
 }
