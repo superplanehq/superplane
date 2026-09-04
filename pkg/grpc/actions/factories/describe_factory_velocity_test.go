@@ -543,8 +543,7 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 }
 
 func TestFillBuckets_SplitsSpendAndKeepsTaskSamples(t *testing.T) {
-	loc := time.Local
-	now := time.Date(2026, 8, 17, 15, 0, 0, 0, loc)
+	now := time.Now().In(time.Local)
 	buckets := buildDayBuckets(now, 7)
 	window := velocityWindow{start: buckets[0].start, end: buckets[len(buckets)-1].end}
 

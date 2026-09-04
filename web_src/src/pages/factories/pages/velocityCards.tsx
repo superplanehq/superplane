@@ -365,6 +365,11 @@ export function CostCard({ totals, points }: { totals: VelocityTotals; points: V
  * "what did we spend"; this one answers "is a task getting cheaper".
  */
 export function TaskCostCard({ points }: { points: VelocityPoint[] }) {
+  /*
+   * Tasks can close with nothing tracked, on a plan that reports no cost or
+   * on spend below a cent. The chart then has no line to draw, so the note
+   * speaks about the missing spend rather than claiming no task closed.
+   */
   const hasMedian = points.some(
     (point) => point.medianTaskCost.modelCostUsd > 0 || point.medianTaskCost.computeCostUsd > 0,
   );
@@ -381,7 +386,7 @@ export function TaskCostCard({ points }: { points: VelocityPoint[] }) {
           <TaskCostChart points={points} />
         </div>
       ) : (
-        <ChartEmptyNote>No tasks closed in this period.</ChartEmptyNote>
+        <ChartEmptyNote>No tracked spend for closed tasks in this period.</ChartEmptyNote>
       )}
     </section>
   );
