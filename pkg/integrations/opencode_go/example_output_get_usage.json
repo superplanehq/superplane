@@ -1,0 +1,20 @@
+{
+    "type": "opencodego.getUsage.result",
+    "data": {
+        "rollingStatus": "ok",
+        "rollingPercent": 0,
+        "rollingResetsAt": "2026-08-22T23:29:53.432Z",
+        "weeklyStatus": "ok",
+        "weeklyPercent": 51,
+        "weeklyResetsAt": "2026-08-24T00:00:00.432Z",
+        "monthlyStatus": "ok",
+        "monthlyPercent": 48,
+        "monthlyResetsAt": "2026-09-16T15:27:05.432Z",
+        "response": {
+            "rolling": {"status": "ok", "percent": 0, "resetsAt": "2026-08-22T23:29:53.432Z"},
+            "weekly": {"status": "ok", "percent": 51, "resetsAt": "2026-08-24T00:00:00.432Z"},
+            "monthly": {"status": "ok", "percent": 48, "resetsAt": "2026-09-16T15:27:05.432Z"}
+        }
+    },
+    "timestamp": "2026-08-22T18:29:53Z"
+}

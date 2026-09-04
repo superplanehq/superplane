@@ -1,0 +1,36 @@
+{
+    "type": "opencodego.chatCompletion.result",
+    "data": {
+        "id": "chatcmpl-20260818-0001",
+        "model": "glm-5.2",
+        "text": "Hello, world!",
+        "finishReason": "stop",
+        "usage": {
+            "prompt_tokens": 14,
+            "completion_tokens": 9,
+            "total_tokens": 23
+        },
+        "response": {
+            "id": "chatcmpl-20260818-0001",
+            "object": "chat.completion",
+            "created": 1787263920,
+            "model": "glm-5.2",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello, world!"
+                    }
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 14,
+                "completion_tokens": 9,
+                "total_tokens": 23
+            }
+        }
+    },
+    "timestamp": "2026-08-18T12:00:00Z"
+}
