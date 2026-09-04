@@ -131,7 +131,7 @@ export function persistGitHubSetupReturnPath(organizationId: string) {
   };
 }
 
-export async function startDirectGitHubConnect(args: {
+type StartDirectGitHubConnectArgs = {
   organizationId: string;
   returnTo?: string;
   integrationsBasePath?: string;
@@ -146,35 +146,43 @@ export async function startDirectGitHubConnect(args: {
   }) => Promise<OrganizationsCreateIntegrationResponse>;
   update?: (payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>;
   goTo?: (path: string) => void;
-}): Promise<boolean> {
+};
+
+async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
+  const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId);
+  if (picker) {
+    rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
+    if (isOnboardingSetupReturnPath(args.returnTo)) {
+      return true;
+    }
+
+    const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);
+    if (args.goTo) {
+      args.goTo(path);
+      return true;
+    }
+    window.location.assign(path);
+    return true;
+  }
+
+  const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId);
+  const pendingAction = pending?.status?.browserAction;
+  if (!pendingAction) {
+    return false;
+  }
+
+  rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
+  await persistSetupReturnPath(args.update, pending.metadata?.id, args.returnTo);
+  return followBrowserAction(pendingAction);
+}
+
+export async function startDirectGitHubConnect(args: StartDirectGitHubConnectArgs): Promise<boolean> {
   if (!args.forceNew && !args.currentUserId) {
     return false;
   }
 
-  if (!args.forceNew) {
-    const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId);
-    if (picker) {
-      rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-      if (isOnboardingSetupReturnPath(args.returnTo)) {
-        return true;
-      }
-
-      const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);
-      if (args.goTo) {
-        args.goTo(path);
-        return true;
-      }
-      window.location.assign(path);
-      return true;
-    }
-
-    const pending = pendingOwnGitHubWithAction(args.connected, args.currentUserId);
-    const pendingAction = pending?.status?.browserAction;
-    if (pendingAction) {
-      rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
-      await persistSetupReturnPath(args.update, pending.metadata?.id, args.returnTo);
-      return followBrowserAction(pendingAction);
-    }
+  if (!args.forceNew && (await resumePendingGitHubConnect(args))) {
+    return true;
   }
 
   const { result } = await createWithGeneratedName({

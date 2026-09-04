@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import type { IntegrationsIntegrationDefinition, OrganizationsIntegration } from "@/api-client";
+import type {
+  IntegrationsIntegrationDefinition,
+  OrganizationsCreateIntegrationResponse,
+  OrganizationsIntegration,
+} from "@/api-client";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -76,7 +80,6 @@ export function useIntegrationConnectDialog({
   const [dialogMode, setDialogMode] = useState<"create" | "resume">("resume");
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const pendingConnectKeyRef = useRef<string | null>(null);
-  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean }>(false);
 
   const existingIntegrationNames = useMemo(
     () => new Set(connected.map((i) => i.metadata?.name?.trim()).filter((n): n is string => Boolean(n))),
@@ -129,45 +132,14 @@ export function useIntegrationConnectDialog({
       setConfigureIntegrationId,
     });
 
-  const connectGitHubWithoutDialog = useCallback(
-    async (forceNew = false) => {
-      if (!me?.id) {
-        pendingGitHubConnectRef.current = { forceNew };
-        return;
-      }
-
-      pendingGitHubConnectRef.current = false;
-      try {
-        await startDirectGitHubConnect({
-          organizationId,
-          returnTo,
-          existingNames: existingIntegrationNames,
-          connected,
-          currentUserId: me.id,
-          forceNew,
-          goTo: navigate,
-          create: async (payload) => {
-            const response = await createIntegrationMutation.mutateAsync(payload);
-            return response.data;
-          },
-          update: persistGitHubSetupReturnPath(organizationId),
-        });
-      } catch (error) {
-        showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
-      }
-    },
-    [connected, createIntegrationMutation, existingIntegrationNames, me?.id, navigate, organizationId, returnTo],
-  );
-
-  useEffect(() => {
-    if (!me?.id || !pendingGitHubConnectRef.current) {
-      return;
-    }
-
-    const { forceNew } = pendingGitHubConnectRef.current;
-    pendingGitHubConnectRef.current = false;
-    void connectGitHubWithoutDialog(forceNew);
-  }, [connectGitHubWithoutDialog, me?.id]);
+  const connectGitHubWithoutDialog = useHostedGitHubConnect({
+    organizationId,
+    returnTo,
+    connected,
+    existingIntegrationNames,
+    currentUserId: me?.id,
+    createIntegration: createIntegrationMutation.mutateAsync,
+  });
 
   const requestConnect = (integrationName: string) => {
     if (integrationName === "github" && githubConnect.hosted) {
@@ -280,4 +252,69 @@ function githubConnectFlags(availableIntegrations: IntegrationsIntegrationDefini
     privateApp: offersPrivateGitHubAppSetup(githubDefinition),
     useWizard: usesPrivateGitHubAppWizard(githubDefinition),
   };
+}
+
+function useHostedGitHubConnect({
+  organizationId,
+  returnTo,
+  connected,
+  existingIntegrationNames,
+  currentUserId,
+  createIntegration,
+}: {
+  organizationId: string;
+  returnTo?: string;
+  connected: OrganizationsIntegration[];
+  existingIntegrationNames: Set<string>;
+  currentUserId?: string;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  const navigate = useNavigate();
+  const pendingGitHubConnectRef = useRef<false | { forceNew: boolean }>(false);
+
+  const connectGitHubWithoutDialog = useCallback(
+    async (forceNew = false) => {
+      if (!currentUserId) {
+        pendingGitHubConnectRef.current = { forceNew };
+        return;
+      }
+
+      pendingGitHubConnectRef.current = false;
+      try {
+        await startDirectGitHubConnect({
+          organizationId,
+          returnTo,
+          existingNames: existingIntegrationNames,
+          connected,
+          currentUserId,
+          forceNew,
+          goTo: navigate,
+          create: async (payload) => {
+            const response = await createIntegration(payload);
+            return response.data;
+          },
+          update: persistGitHubSetupReturnPath(organizationId),
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to connect GitHub"));
+      }
+    },
+    [connected, createIntegration, currentUserId, existingIntegrationNames, navigate, organizationId, returnTo],
+  );
+
+  useEffect(() => {
+    if (!currentUserId || !pendingGitHubConnectRef.current) {
+      return;
+    }
+
+    const { forceNew } = pendingGitHubConnectRef.current;
+    pendingGitHubConnectRef.current = false;
+    void connectGitHubWithoutDialog(forceNew);
+  }, [connectGitHubWithoutDialog, currentUserId]);
+
+  return connectGitHubWithoutDialog;
 }
