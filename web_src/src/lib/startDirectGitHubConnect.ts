@@ -34,7 +34,7 @@ function startedByUserID(item: OrganizationsIntegration): string {
 function isOwnPendingGitHub(item: OrganizationsIntegration, currentUserId?: string): boolean {
   const startedBy = startedByUserID(item);
   if (!currentUserId) {
-    return true;
+    return false;
   }
 
   return startedBy === "" || startedBy === currentUserId;
@@ -147,6 +147,10 @@ export async function startDirectGitHubConnect(args: {
   update?: (payload: { id: string; configuration: Record<string, unknown> }) => Promise<void>;
   goTo?: (path: string) => void;
 }): Promise<boolean> {
+  if (!args.forceNew && !args.currentUserId) {
+    return false;
+  }
+
   if (!args.forceNew) {
     const picker = pendingGitHubAccountPicker(args.connected, args.currentUserId);
     if (picker) {

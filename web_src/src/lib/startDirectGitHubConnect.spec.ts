@@ -64,7 +64,7 @@ describe("pendingGitHubBrowserAction", () => {
     ).toBeUndefined();
   });
 
-  it("reuses a pending action when the current user is not loaded yet", () => {
+  it("returns undefined when the current user is not loaded yet", () => {
     const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
     expect(
       pendingGitHubBrowserAction([
@@ -73,7 +73,7 @@ describe("pendingGitHubBrowserAction", () => {
           status: { state: "pending", browserAction: action, metadata: { startedByUserID: "user-1" } },
         },
       ]),
-    ).toEqual(action);
+    ).toBeUndefined();
   });
 });
 
@@ -337,11 +337,12 @@ describe("startDirectGitHubConnect", () => {
     expect(follow).toHaveBeenCalledWith(action);
   });
 
-  it("reuses a pending action when the current user is not loaded yet", async () => {
+  it("does not resume or create when the current user is not loaded yet", async () => {
     const action = { method: "GET", url: "https://github.com/apps/superplane/installations/new" };
     const create = vi.fn();
+    const update = vi.fn();
 
-    await startDirectGitHubConnect({
+    const started = await startDirectGitHubConnect({
       organizationId: "org-1",
       returnTo: "/onboarding?attempt=1&step=vcs",
       existingNames: new Set(),
@@ -352,10 +353,13 @@ describe("startDirectGitHubConnect", () => {
         },
       ],
       create,
+      update,
     });
 
+    expect(started).toBe(false);
     expect(create).not.toHaveBeenCalled();
-    expect(follow).toHaveBeenCalledWith(action);
+    expect(update).not.toHaveBeenCalled();
+    expect(follow).not.toHaveBeenCalled();
   });
 
   it("creates a new connection when forceNew is set", async () => {
@@ -424,6 +428,7 @@ describe("startDirectGitHubConnect", () => {
       returnTo: "/org-1/settings/integrations",
       existingNames: new Set(["github"]),
       connected: [],
+      currentUserId: "user-1",
       create,
     });
 
@@ -446,6 +451,7 @@ describe("startDirectGitHubConnect", () => {
         organizationId: "org-1",
         existingNames: new Set(),
         connected: [],
+        currentUserId: "user-1",
         create,
       }),
     ).rejects.toThrow("The GitHub App install page did not open.");
