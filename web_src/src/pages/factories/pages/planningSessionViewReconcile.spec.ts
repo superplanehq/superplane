@@ -6,10 +6,12 @@ import { createWithAgentViewFromSession } from "./planningSessionView";
 const base = { repository: "acme/payments", canvasId: "canvas-1", executionId: "exec-1" };
 
 function rebuild(messages: unknown[], previousMessages: CreateWithAgentMessage[]) {
-  return createWithAgentViewFromSession(
-    { ...base, messages } as Parameters<typeof createWithAgentViewFromSession>[0],
-    { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages },
-  );
+  return createWithAgentViewFromSession({ ...base, messages } as Parameters<typeof createWithAgentViewFromSession>[0], {
+    composer: "",
+    right: { kind: "empty" },
+    endConfirmOpen: false,
+    previousMessages,
+  });
 }
 
 function userMessage(id: string, iso: string): CreateWithAgentMessage {
@@ -33,7 +35,10 @@ describe("createWithAgentViewFromSession stale-snapshot reconciliation", () => {
     // msg-1, the second still pending as local-9. An out-of-order snapshot
     // interleaves before the second send persists.
     const msg1 = { id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T10:00:00Z" };
-    const afterSecondSend = [userMessage("msg-1", "2026-09-03T10:00:00Z"), userMessage("local-9", "2026-09-03T12:00:00Z")];
+    const afterSecondSend = [
+      userMessage("msg-1", "2026-09-03T10:00:00Z"),
+      userMessage("local-9", "2026-09-03T12:00:00Z"),
+    ];
 
     // A stale snapshot (predates msg-1) omits it entirely.
     const afterStale = rebuild([], afterSecondSend);

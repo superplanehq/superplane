@@ -112,9 +112,7 @@ function mergePersistedMessages(
   serverMessages: CreateWithAgentMessage[],
 ): CreateWithAgentMessage[] {
   const currentIds = new Set(serverMessages.map((message) => message.id));
-  const preserved = previousMessages.filter(
-    (message) => isPersistedMessage(message) && !currentIds.has(message.id),
-  );
+  const preserved = previousMessages.filter((message) => isPersistedMessage(message) && !currentIds.has(message.id));
   return preserved.length ? [...serverMessages, ...preserved] : serverMessages;
 }
 
@@ -143,9 +141,7 @@ function pendingLocalUserMessages(
   previousMessages: CreateWithAgentMessage[],
   persistedMessages: CreateWithAgentMessage[],
 ): CreateWithAgentMessage[] {
-  const previousPersistedIds = new Set(
-    previousMessages.filter(isPersistedMessage).map((message) => message.id),
-  );
+  const previousPersistedIds = new Set(previousMessages.filter(isPersistedMessage).map((message) => message.id));
   // Server user messages that became visible since the previous render, per
   // key. A message already shown before (its id is known) is never counted as
   // newly persisted, so a repeated text that also matches an older persisted
