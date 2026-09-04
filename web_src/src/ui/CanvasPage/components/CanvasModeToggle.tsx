@@ -1,6 +1,6 @@
 import { appPath } from "@/lib/appPaths";
 import { isNormalClick } from "@/lib/linkHelpers";
-import { segmentedNavTabClassName } from "@/lib/segmentedNav";
+import { SEGMENTED_NAV_TAB_ACTIVE_CLASSES, segmentedNavTabClassName } from "@/lib/segmentedNav";
 import { cn } from "@/lib/utils";
 import { Link, useParams } from "react-router";
 
@@ -48,17 +48,17 @@ function modeToTab(mode: string): string {
 
 /** Edit-mode nav background tinted to match edit-session chrome. */
 function editingNavClassName(): string {
-  return "bg-orange-200";
+  return "bg-orange-200 dark:bg-orange-950";
 }
 
 /** Edit-mode inactive tab text on the orange nav track. */
 function editingInactiveClassName(): string {
-  return "bg-transparent text-orange-950/80 hover:text-orange-950 transition-none";
+  return "bg-transparent text-orange-950/80 hover:text-orange-950 dark:text-orange-200/80 dark:hover:text-orange-200 transition-none";
 }
 
-/** Active edit tab — white pill on the orange nav track in light mode. */
+/** Active edit tab — white pill in light mode, cream in dark; gray would clash with the orange track. */
 function editingActiveClassName(): string {
-  return "rounded-full bg-white text-gray-800 shadow-sm dark:bg-gray-800 dark:text-gray-100 dark:shadow-none";
+  return cn(SEGMENTED_NAV_TAB_ACTIVE_CLASSES, "dark:bg-orange-200 dark:text-orange-950");
 }
 
 function tabClasses(selected: string, value: string, editing: boolean) {
