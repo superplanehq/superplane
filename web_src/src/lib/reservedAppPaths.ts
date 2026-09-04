@@ -8,6 +8,7 @@ const RESERVED_APP_PATH_SEGMENTS = new Set([
   "login",
   "signup",
   "welcome",
+  "onboarding",
   "create",
   "setup",
   "invite",
