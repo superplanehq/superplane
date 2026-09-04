@@ -12,3 +12,6 @@ export const FEATURE_FACTORY_SENTRY_INTAKE = "factory_sentry_intake";
 
 /** Organization experimental feature: in-progress workspace Models settings page. */
 export const FEATURE_WORKSPACE_MODELS = "workspace_models";
+
+/** Organization experimental feature: model selector next to Start on a draft task. */
+export const FEATURE_FACTORY_DRAFT_START_MODEL = "factory_draft_start_model";

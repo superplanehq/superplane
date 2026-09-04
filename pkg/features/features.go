@@ -32,6 +32,10 @@ const FeatureFactorySentryIntake = "factory_sentry_intake"
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
 
+// FeatureFactoryDraftStartModel gates the model selector next to Start on
+// a draft task until the flow is generally available.
+const FeatureFactoryDraftStartModel = "factory_draft_start_model"
+
 func released() *bool {
 	v := true
 	return &v
@@ -43,6 +47,7 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
+	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
 }
 
 func All() []Feature {
