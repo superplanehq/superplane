@@ -181,6 +181,40 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
+  it("shows the personal account when an organization request is still waiting", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [],
+          allInstances: [
+            {
+              metadata: { id: "int-1", integrationName: "github" },
+              status: {
+                state: "pending",
+                metadata: {
+                  startedByUserID: "user-1",
+                  state: "csrf",
+                  installRequested: true,
+                  installRequestedAccount: "acme",
+                  githubApp: { slug: "superplane" },
+                  pendingInstallations: [{ id: "22", accountLogin: "octo" }],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("acme");
+    expect(screen.getByTestId("first-run-github-cancel-request")).toBeInTheDocument();
+  });
+
   it("does not show another member's GitHub account picker", () => {
     renderSetup(
       pageModel({

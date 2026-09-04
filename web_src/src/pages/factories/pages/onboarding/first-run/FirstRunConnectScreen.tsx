@@ -51,10 +51,12 @@ function FirstRunGitHubAccountPicker({
   installations,
   githubState,
   githubAppSlug,
+  installRequested,
 }: {
   installations: PendingGitHubInstallation[];
   githubState: string;
   githubAppSlug: string;
+  installRequested: boolean;
 }) {
   return (
     <div className="space-y-3" data-testid="first-run-github-account-picker">
@@ -75,6 +77,15 @@ function FirstRunGitHubAccountPicker({
           {copy.useAccount(installation.accountLogin)}
         </Button>
       ))}
+      {githubAppSlug !== "" && installRequested ? (
+        <a
+          href={hostedGitHubInstallURL(githubAppSlug, githubState)}
+          className="inline-block text-[13px] text-primary hover:underline"
+          data-testid="first-run-github-cancel-request"
+        >
+          {copy.cancelRequest}
+        </a>
+      ) : null}
       {githubAppSlug !== "" ? (
         <a
           href={hostedGitHubInstallURL(githubAppSlug, githubState)}
@@ -112,7 +123,10 @@ export function FirstRunConnectScreen({
   onContinue: () => void;
 }) {
   const waitingForApproval = installRequested && !githubConnected;
-  const showAccountPicker = !githubConnected && pendingInstallations.length >= 2 && githubState !== "";
+  const showAccountPicker =
+    !githubConnected &&
+    githubState !== "" &&
+    (pendingInstallations.length >= 2 || (pendingInstallations.length >= 1 && installRequested));
 
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
@@ -134,6 +148,15 @@ export function FirstRunConnectScreen({
             <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
               {copy.continue}
             </Button>
+            {githubAppSlug !== "" ? (
+              <a
+                href={hostedGitHubInstallURL(githubAppSlug, githubState)}
+                className="inline-block text-[13px] text-primary hover:underline"
+                data-testid="first-run-github-manage-accounts"
+              >
+                {copy.manageAccounts}
+              </a>
+            ) : null}
           </>
         ) : (
           <>
@@ -143,6 +166,7 @@ export function FirstRunConnectScreen({
                 installations={pendingInstallations}
                 githubState={githubState}
                 githubAppSlug={githubAppSlug}
+                installRequested={installRequested}
               />
             ) : (
               <Button
