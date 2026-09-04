@@ -278,7 +278,7 @@ function FactoriesSidebar({
   );
 }
 
-function FactoriesLayoutLoading() {
+export function FactoriesLayoutLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
       <p className="text-[13px] text-muted-foreground">Loading workspace…</p>
@@ -286,7 +286,7 @@ function FactoriesLayoutLoading() {
   );
 }
 
-function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
+export function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground"

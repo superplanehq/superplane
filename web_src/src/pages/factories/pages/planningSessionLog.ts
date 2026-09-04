@@ -21,6 +21,9 @@ export function isPlanningSessionNoise(text: string): boolean {
   if (!line) {
     return false;
   }
+  if (isPlanningSessionTurnEnd(line)) {
+    return true;
+  }
   return PLANNING_SESSION_NOISE_PREFIXES.some((prefix) => line === prefix || line.startsWith(prefix));
 }
 
@@ -298,8 +301,6 @@ type UserPlacementState = {
   emptyWaits: WaitSlot[];
   waitCursor: number;
   lastWait?: WaitSlot;
-  turnEnds: number[];
-  turnEndCursor: number;
   hasLiveOrder: boolean;
   insertOrder: number;
 };
@@ -318,8 +319,6 @@ function placeUnmatchedUserExtras(
     emptyWaits,
     waitCursor: slots.waitCursor,
     lastWait: slots.lastWait,
-    turnEnds: turnEndIndexes(merged),
-    turnEndCursor: 0,
     hasLiveOrder,
     insertOrder: 0,
   };
@@ -336,11 +335,6 @@ function placeUnmatchedUserExtras(
 }
 
 function nextUserPlacement(state: UserPlacementState, line: SplitRunStreamLine): NoteInsertion | undefined {
-  const turnEnd = state.turnEnds[state.turnEndCursor];
-  if (turnEnd !== undefined) {
-    state.turnEndCursor += 1;
-    return userExtraInsertion(line, turnEnd, state.insertOrder, turnEndParent(state.merged, turnEnd));
-  }
   if (state.hasLiveOrder && typeof line.orderKey === "number") {
     return orderKeyUserInsertion(state.merged, line, line.orderKey, state.insertOrder);
   }
@@ -366,7 +360,7 @@ function waitSlotUserInsertion(state: UserPlacementState, line: SplitRunStreamLi
   if (slot) {
     state.lastWait = slot;
     state.waitCursor += 1;
-    return userExtraInsertion(line, slot.index, state.insertOrder, slot.line.id);
+    return userExtraInsertion(line, lastWaitGroupEndIndex(state.merged, slot), state.insertOrder, slot.line.id);
   }
   if (!state.lastWait) {
     return undefined;
@@ -403,23 +397,9 @@ function insertionIndexByOrderKey(merged: SplitRunStreamLine[], orderKey: number
   return index;
 }
 
-function turnEndIndexes(merged: SplitRunStreamLine[]): number[] {
-  const indexes: number[] = [];
-  for (let i = 0; i < merged.length; i += 1) {
-    if (isPlanningSessionTurnEnd(merged[i]?.componentName ?? "")) {
-      indexes.push(i);
-    }
-  }
-  return indexes;
-}
-
 function isPlanningSessionTurnEnd(text: string): boolean {
   const line = text.trim();
   return line.startsWith("✓ done") || line.startsWith("✗ failed");
-}
-
-function turnEndParent(merged: SplitRunStreamLine[], afterIndex: number): string {
-  return orderKeyInsertionParent(merged, afterIndex) ?? merged[afterIndex]?.id ?? "";
 }
 
 /** The note/step group a chronologically placed insertion should nest under. */

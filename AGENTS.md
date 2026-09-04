@@ -1,11 +1,40 @@
 # Repository Guidelines
 
 Guidance for AI coding agents and human contributors working in this repository.
-Read this top-to-bottom: what the project is, how to set it up, how to build and
-test, the conventions to follow, what not to touch, and how to submit changes.
-For UI-specific work, also read [web_src/AGENTS.md](web_src/AGENTS.md),
-[.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
-[.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md).
+
+**Read this file in full.** Do not truncate it with `head`, `sed`, or a partial
+Read. Facts you need after setup (generated files, CI path, what not to commit)
+are in this file. A prefix is not enough.
+
+Read more only when the task needs it:
+
+- UI: [web_src/AGENTS.md](web_src/AGENTS.md),
+  [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
+  [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
+- `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
+
+## Read this first
+
+### Generated files are not in Git
+
+`make pb.gen` writes the paths below. Git ignores them. They will not appear in
+`git status` or `git diff`. Do not search Git history or the working tree for
+them as tracked changes. Do not commit them. Do not hand-edit them. Edit
+`protos/` and run `make pb.gen` again.
+
+- `pkg/protos/` — Go code from `protos/*.proto`
+- `pkg/openapi_client/` — generated Go SDK for the CLI
+- `web_src/src/api-client/` — generated TypeScript SDK for the UI
+- `api/` — generated OpenAPI/swagger spec
+
+A clean clone does not contain these files until `make dev.setup` or
+`make pb.gen` runs. CI is Semaphore (`.semaphore/`), not GitHub Actions. CI
+runs `make dev.setup`, which includes `pb.gen`.
+
+### Do not rediscover the build system
+
+Use the `make` targets in this file. Do not probe for `.github/workflows` or
+raw `docker compose` file names.
 
 ## Project Overview
 
@@ -24,17 +53,19 @@ approvals, and an operational UI.
 - `cmd/` — Go entrypoints (server, workers, CLI).
 - `pkg/` — Go application code. Notable packages:
   - `pkg/grpc/actions` — gRPC API implementation.
-  - `pkg/models` — database models.
+  - `pkg/models` — database models (see [pkg/models/AGENTS.md](pkg/models/AGENTS.md)).
   - `pkg/workers` — background workers.
   - `pkg/integrations/<integration>/` — integration component implementations.
 - `web_src/` — TypeScript/React frontend (Vite). UI component mappers live in
   `web_src/src/pages/app/mappers/<integration>/`.
-- `protos/` — protobuf definitions for the API.
+- `protos/` — protobuf definitions for the API. Generated output is gitignored
+  (see [Read this first](#read-this-first)).
 - `db/` — database structure and migrations.
 - `scripts/` — codegen, DB, and CI helper scripts.
 - `test/` — backend and end-to-end tests.
 - `docs/` — Markdown documentation (see `docs/contributing/`).
 - `Makefile` — the entrypoint for all common tasks.
+- `.semaphore/` — CI pipelines. There is no `.github/workflows/` directory.
 
 ## Prerequisites & Setup
 
@@ -87,14 +118,18 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
 - Targeted E2E tests: `E2E_TEST_PACKAGES=./test/e2e/workflows make test.e2e`
   (or `make test.e2e FILE=test/e2e/foo_test.go LINE=19` for a single test).
 - After editing Go code: `make format.go`, then `make lint && make check.build.app`.
+  Do not run `go build ./...` — `scripts/` has more than one `main` package.
+  Use `make check.build.app`.
 - After editing JS/TS code: `make format.js`, then `make check.lint.ui` and
   `make check.build.ui`. Run `make check.lint.ui` locally before you open a
   pull request. CI fails when the ESLint budget grows.
 - After updating `protos/`: regenerate protos, the OpenAPI spec, and the CLI/UI
   SDKs with `make pb.gen` (requires a running `app` container from `make dev.up`).
-  After removing proto fields, renumber remaining fields so message field numbers
-  stay contiguous (no gaps or `reserved` markers — these protos are used for JSON
-  conversion, not wire compatibility), then run `make check.proto.field.numbers`.
+  Generated files stay gitignored; a clean `git status` after `pb.gen` is
+  expected. After removing proto fields, renumber remaining fields so message
+  field numbers stay contiguous (no gaps or `reserved` markers — these protos
+  are used for JSON conversion, not wire compatibility), then run
+  `make check.proto.field.numbers`.
 - **NEVER MANUALLY CREATE MIGRATION FILES.** Use `make db.migration.create NAME=<name>`
   (dashes, not underscores). We do not write rollbacks, so leave `*.down.sql`
   empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` where
@@ -114,6 +149,7 @@ Cross-cutting rules when extending the backend:
 
 Further reading:
 
+- Models and transactions: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
 - E2E test authoring: [docs/contributing/e2e-tests.md](docs/contributing/e2e-tests.md)
 - Dev server profiling: [docs/contributing/profiling.md](docs/contributing/profiling.md)
 - New components/triggers: [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
@@ -139,124 +175,10 @@ Further reading:
   shared non-React helpers in `web_src/src/lib/`, and React-specific reusable
   logic in `web_src/src/hooks/`.
 
-## Database Transaction Guidelines
-
-We are moving away from `database.Conn()` inside `pkg/models` and from the
-`FindX` / `FindXInTransaction` dual API. CI tracks remaining legacy usage via
-`make check.models.tx.debt`; do not add new `*InTransaction` definitions or
-`database.Conn()` call sites in `pkg/models`.
-
-**Why:**
-
-- Calling `database.Conn()` inside model code breaks transaction isolation when
-  the caller already holds a `tx`.
-- Conn wrappers plus `*InTransaction` methods duplicate API surface without
-  adding behavior.
-
-**Preferred pattern:** pass an explicit `*gorm.DB` as the first parameter.
-Callers outside `pkg/models` obtain it with `database.DB(ctx)` (request-scoped,
-attaches OpenTelemetry trace context).
-
-```go
-func FindCanvas(tx *gorm.DB, orgID, id uuid.UUID) (*Canvas, error) {
-    var canvas Canvas
-    err := tx.Where("organization_id = ? AND id = ?", orgID, id).First(&canvas).Error
-    if err != nil {
-        return nil, err
-    }
-    return &canvas, nil
-}
-
-// Handler (no surrounding transaction):
-canvas, err := models.FindCanvas(database.DB(ctx), orgID, canvasID)
-
-// Inside an existing transaction:
-err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-    canvas, err := models.FindCanvas(tx, orgID, canvasID)
-    return err
-})
-```
-
-Rules:
-
-- **NEVER** call `database.Conn()` inside `pkg/models` — pass the `*gorm.DB` from
-  the caller instead.
-- **NEVER** call a model function that uses `database.Conn()` internally while you
-  already hold a `tx`.
-- **Always propagate** the `*gorm.DB` through the entire call chain — pass it as
-  the first parameter to functions that need database access.
-- **Do not add** new `FindX` + `FindXInTransaction` pairs or conn wrappers; use a
-  single function with an explicit `*gorm.DB` parameter.
-- **Context constructors** that perform database queries must accept `tx *gorm.DB`
-  as their first parameter.
-
-When touching legacy `*InTransaction` or conn-wrapper code, migrate to the
-explicit-parameter pattern when practical and update the debt baseline with
-`make check.models.tx.debt.baseline.update`.
-
-### Model file layout (`pkg/models`)
-
-Order declarations in each model file as follows:
-
-1. **Struct** — package constants used by the model, then the struct type.
-2. **Constructors** — `New…` functions that build values for the model (including
-   name/ID helpers).
-3. **Getters** — methods on the struct (e.g. `TableName()`, computed accessors).
-4. **Database access** — functions whose first parameter is `tx *gorm.DB` (or
-   `db *gorm.DB`).
-
-Place private helpers after the public API in the file.
-
-### Models API shape (`pkg/models`)
-
-Choose one style per concern and stick to it. Prefer object style when you
-already have a model handle; do not invent free functions that re-take IDs you
-already hold.
-
-| Situation | Prefer | Example |
-| --- | --- | --- |
-| Operation on a loaded model | Method on the struct | `node.HardDelete(tx)` |
-| Multi-step / configurable DB work for a model | Package constructor + collaborator/builder | `NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(n).Run()` |
-| Lookup / list when you do **not** have a handle | Package function with `tx` first | `ListDeletedCanvasNodes(tx, …)`, `FindCanvas(tx, …)` |
-
-Rules:
-
-- **Do not** add `models.HardDeleteCanvasNode(tx, orgID, nodeID)` (or similar)
-  when the caller already has `*CanvasNode` — that forces an extra find and mixes
-  procedural style with OO for the same concern.
-- **Do not** hang multi-step cleanup/publish logic as a thick method chain on the
-  aggregate when a dedicated collaborator is clearer (`NodeResourceCleaner`,
-  canvas publisher patterns).
-- Keep SQL / GORM deletes and queries in `pkg/models`. Workers and gRPC actions
-  **orchestrate** (lock → clean → hard-delete); they do not own batched delete
-  queries.
-- Receivers on model methods should use a short name consistent with the type
-  (`c` for `*CanvasNode`, etc.), matching nearby code in the file.
-
-```go
-// Good: handle already loaded
-if err := node.HardDelete(tx); err != nil {
-    return err
-}
-
-// Good: multi-step cleanup as a collaborator
-n, err := NewNodeResourceCleaner(tx, node).ForUnreferenced().WithLimit(batchSize).Run()
-
-// Good: no handle yet — package function
-nodes, err := ListDeletedCanvasNodes(tx, before, limit)
-
-// Avoid: free function that re-keys a node you already have
-_ = HardDeleteCanvasNode(tx, node.OrganizationID, node.ID)
-```
-
 ## Files & Directories Not to Modify by Hand
 
-- **Generated code — regenerate, never hand-edit** (all produced by `make pb.gen`):
-  - `pkg/protos/` — Go generated from `protos/*.proto`.
-  - `pkg/openapi_client/` — generated Go SDK for the CLI.
-  - `web_src/src/api-client/` — generated TypeScript SDK for the UI.
-  - `api/` — generated OpenAPI/swagger spec.
-  Edit the source (`protos/`) and rerun `make pb.gen` instead.
+- **Generated code** — see [Read this first](#read-this-first). All produced by
+  `make pb.gen`. Git ignores the output. Never hand-edit it.
 - **Database migrations** — never create or edit migration files by hand; use
   `make db.migration.create NAME=<name>` (see the Build section).
 - **Secrets & local config** — never commit real secrets. `.env.example` and
@@ -302,17 +224,4 @@ For user-facing UI strings while designing or implementing frontend work, follow
 [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md) together with
 the STE skill above.
 
-## Cursor Cloud Environment Notes
-
-These apply only to Docker-in-Docker cloud VMs (e.g. Cursor Cloud); skip them on
-a normal workstation with Docker already running.
-
-- Run all `make` commands from the repository root.
-- The Docker daemon must be started manually:
-  `sudo dockerd &>/tmp/dockerd.log &` — wait ~3-4 seconds before issuing Docker
-  commands, then make the socket accessible with
-  `sudo chmod 666 /var/run/docker.sock`.
-- Docker needs the `fuse-overlayfs` storage driver and `iptables-legacy` for
-  nested-container support.
-- The `app` container starts with `sleep infinity`; you must explicitly run
-  `make dev.server` to start the API + UI stack.
+Cursor Cloud VMs only: [docs/contributing/cursor-cloud.md](docs/contributing/cursor-cloud.md).

@@ -47,6 +47,7 @@ func Test__Slugify(t *testing.T) {
 func Test__IsReservedOrganizationSlug(t *testing.T) {
 	assert.True(t, IsReservedOrganizationSlug("admin"))
 	assert.True(t, IsReservedOrganizationSlug("login"))
+	assert.True(t, IsReservedOrganizationSlug("onboarding"))
 	assert.True(t, IsReservedOrganizationSlug("api"))
 	assert.False(t, IsReservedOrganizationSlug("acme-corp"))
 }

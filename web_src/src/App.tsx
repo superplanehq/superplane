@@ -5,8 +5,11 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useOrganization } from "./hooks/useOrganizationData";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -20,9 +23,9 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
-import OrganizationCreate from "./pages/auth/OrganizationCreate";
-import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
@@ -57,6 +60,8 @@ import {
   WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
+import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
 import {
   AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
@@ -230,7 +235,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
@@ -239,7 +244,7 @@ function AppRouter() {
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
-              <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
               {organizationScopedRouteTree()}
@@ -252,24 +257,65 @@ function AppRouter() {
   );
 }
 
+function OrganizationOnboardingRoute() {
+  return (
+    <OrganizationOnboardingRedirect
+      renderWorkspace={(workspace, entryPath) => (
+        <OnboardingEntryPathProvider path={entryPath}>
+          <InitialWorkspaceOnboarding organizationId={workspace.organizationSlug} factoryKey={workspace.workspaceKey} />
+        </OnboardingEntryPathProvider>
+      )}
+    />
+  );
+}
+
 function PageObservabilityScope() {
   usePageObservability();
   return null;
 }
 
-function OrganizationScope() {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function OrganizationScope() {
+  const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
-  useConsumeIntegrationSetupReturnOnArrival(organizationId);
+  const location = useLocation();
 
+  const isReserved = isReservedAppPathSegment(segment);
+  // The route param accepts either the org slug or its UID, so resolve it
+  // once here and self-correct any UID URL to the slug below. Every other
+  // in-app link reuses this same `:organizationId` URL segment, so fixing
+  // it at this single boundary keeps the rest of the app slug-only.
+  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const resolvedId = organization?.metadata?.id ?? "";
+  const resolvedSlug = organization?.metadata?.slug ?? "";
+  useRedirectIntegrationSetupReturn(segment, resolvedSlug);
+  useConsumeIntegrationSetupReturnOnArrival(resolvedSlug || segment);
+
+  const uidRedirectPath =
+    !isReserved && segment
+      ? resolveOrganizationUidRedirect({
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+          segment,
+          organizationId: resolvedId,
+          organizationSlug: resolvedSlug,
+        })
+      : null;
   useEffect(() => {
-    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
-      recordLastVisitedOrganization(account.id, organizationId);
+    if (!account?.id || !segment || isReserved || uidRedirectPath) {
+      return;
     }
-  }, [account?.id, organizationId]);
+    // Prefer the resolved slug so the last-visited value never carries a UID
+    // forward into a later root redirect.
+    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
+  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 
-  if (isReservedAppPathSegment(organizationId)) {
+  if (isReserved) {
     return <Navigate to="/" replace />;
+  }
+
+  if (uidRedirectPath) {
+    return <Navigate to={uidRedirectPath} replace />;
   }
 
   return (

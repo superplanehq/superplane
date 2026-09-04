@@ -1,14 +1,15 @@
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 
 import { Avatar } from "@/components/Avatar/avatar";
+import { Button } from "@/components/ui/button";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
 import type { VelocityPerson } from "../lib/factoryVelocityReport";
+import type { PeopleSortDirection, PeopleSortKey } from "../lib/velocityPeopleSort";
 
-type SortKey = "total" | "factoryMerged" | "authoredMerged" | "medianCycleHours" | "costUsd";
+type SortKey = PeopleSortKey;
 
 /** Members without a connected account photo still need a stable, legible avatar. */
 const AVATAR_COLORS = [
@@ -72,28 +73,33 @@ function totalMerged(person: VelocityPerson): number {
   return person.authoredMerged + person.factoryMerged;
 }
 
-function sortValue(person: VelocityPerson, key: SortKey): number {
-  if (key === "total") return totalMerged(person);
-  return person[key];
-}
-
 export function VelocityPeopleTable({
   people,
+  total,
   periodLabel,
   emptyAuthorship,
+  sortKey,
+  sortDirection,
+  onSort,
+  canLoadMore,
+  isLoadingMore,
+  onLoadMore,
 }: {
+  /** Rows fetched so far, already sorted and paged by the backend. */
   people: VelocityPerson[];
+  /** Total people with activity in the period, across every page. */
+  total: number;
   periodLabel: string;
   /** Names why the Manual work column is empty, when the cohort is unavailable. */
   emptyAuthorship?: string;
+  sortKey: SortKey;
+  sortDirection: PeopleSortDirection;
+  /** Sorts by `key`. The caller toggles direction when `key` is already active. */
+  onSort: (key: SortKey) => void;
+  canLoadMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("total");
-
-  const sorted = useMemo(
-    () => [...people].sort((a, b) => sortValue(b, sortKey) - sortValue(a, sortKey)),
-    [people, sortKey],
-  );
-
   return (
     <section
       className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
@@ -103,7 +109,7 @@ export function VelocityPeopleTable({
         <div>
           <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">People</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            {people.length} {people.length === 1 ? "person" : "people"} with activity in this period
+            {total} {total === 1 ? "person" : "people"} with activity in this period
           </p>
         </div>
         <p className="text-[12px] text-muted-foreground">{periodLabel}</p>
@@ -124,13 +130,14 @@ export function VelocityPeopleTable({
                   key={column.key}
                   column={column}
                   isActive={sortKey === column.key}
-                  onSort={() => setSortKey(column.key)}
+                  direction={sortDirection}
+                  onSort={() => onSort(column.key)}
                 />
               ))}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((person, index) => (
+            {people.map((person, index) => (
               <tr key={person.id} className="border-b border-border/60 last:border-b-0">
                 <td className="py-3 text-[12px] tabular-nums text-muted-foreground">{index + 1}</td>
                 <td className="py-3 pr-6">
@@ -164,25 +171,50 @@ export function VelocityPeopleTable({
         </table>
       </div>
 
+      {canLoadMore ? (
+        <div className="mt-4 flex flex-col items-center gap-1.5">
+          <Button type="button" variant="outline" size="sm" onClick={onLoadMore} disabled={isLoadingMore}>
+            {isLoadingMore ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
+            Load more
+          </Button>
+          <p className="text-[12px] text-muted-foreground">
+            Showing {people.length} of {total}
+          </p>
+        </div>
+      ) : null}
+
       {emptyAuthorship ? <p className="mt-4 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
     </section>
   );
 }
 
-function SortableHeader({ column, isActive, onSort }: { column: Column; isActive: boolean; onSort: () => void }) {
+function SortableHeader({
+  column,
+  isActive,
+  direction,
+  onSort,
+}: {
+  column: Column;
+  isActive: boolean;
+  direction: PeopleSortDirection;
+  onSort: () => void;
+}) {
+  const ariaSort = isActive ? (direction === "asc" ? "ascending" : "descending") : "none";
+  const Icon = isActive && direction === "asc" ? ArrowUp : ArrowDown;
+
   return (
     <th scope="col" className="pb-2 pl-6 text-right text-[12px] font-normal">
       <button
         type="button"
         onClick={onSort}
         title={column.hint}
-        aria-sort={isActive ? "descending" : "none"}
+        aria-sort={ariaSort}
         className={cn(
           "inline-flex items-center gap-1 transition-colors hover:text-foreground",
           isActive ? "text-foreground" : "text-muted-foreground",
         )}
       >
-        {isActive ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3 opacity-0" aria-hidden />}
+        <Icon className={cn("size-3", !isActive && "opacity-0")} aria-hidden />
         {column.label}
       </button>
     </th>

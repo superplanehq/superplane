@@ -1,21 +1,63 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { factoriesDescribeFactoryVelocity, factoriesSyncFactoryVelocity } from "@/api-client";
-import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
+import type {
+  DescribeFactoryVelocityRequestPeopleSort,
+  DescribeFactoryVelocityRequestSortDirection,
+  FactoriesDescribeFactoryVelocityResponse,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import {
+  PEOPLE_PAGE_SIZE,
+  PEOPLE_SORT_DEFAULT_DIRECTION,
+  PEOPLE_SORT_DEFAULT_KEY,
+  peopleSortDirectionParam,
+  peopleSortParam,
+  type PeopleSortDirection,
+  type PeopleSortKey,
+} from "@/pages/factories/lib/velocityPeopleSort";
 
 import { factoryQueryKeys } from "./useFactoryData";
 
 export interface FactoryVelocityParams {
   periodDays: number;
   repository?: string;
+  /** Column the People table sorts on. Defaults to `"total"`. */
+  peopleSort?: PeopleSortKey;
+  /** Defaults to `"desc"`. */
+  peopleSortDirection?: PeopleSortDirection;
+  /** 0-based row offset into the sorted People table. Defaults to 0. */
+  peopleOffset?: number;
+  /** Rows per page of the People table. Defaults to `PEOPLE_PAGE_SIZE`. */
+  peoplePageSize?: number;
 }
 
 export function useFactoryVelocity(organizationId: string, factoryId: string, params: FactoryVelocityParams) {
+  const peopleSort = params.peopleSort ?? PEOPLE_SORT_DEFAULT_KEY;
+  const peopleSortDirection = params.peopleSortDirection ?? PEOPLE_SORT_DEFAULT_DIRECTION;
+  const peopleOffset = params.peopleOffset ?? 0;
+  const peoplePageSize = params.peoplePageSize ?? PEOPLE_PAGE_SIZE;
+
   return useQuery({
-    queryKey: factoryQueryKeys.velocity(organizationId, factoryId, params.periodDays, params.repository ?? ""),
+    queryKey: factoryQueryKeys.velocity(organizationId, factoryId, {
+      periodDays: params.periodDays,
+      repository: params.repository ?? "",
+      peopleSort,
+      peopleSortDirection,
+      peopleOffset,
+      peoplePageSize,
+    }),
     queryFn: async (): Promise<FactoriesDescribeFactoryVelocityResponse> => {
-      const query: Record<string, string | number> = { periodDays: params.periodDays };
+      const query: Record<
+        string,
+        string | number | DescribeFactoryVelocityRequestPeopleSort | DescribeFactoryVelocityRequestSortDirection
+      > = {
+        periodDays: params.periodDays,
+        peopleSort: peopleSortParam(peopleSort),
+        peopleSortDirection: peopleSortDirectionParam(peopleSortDirection),
+        peopleOffset,
+        peoplePageSize,
+      };
       if (params.repository) query.repository = params.repository;
 
       const response = await factoriesDescribeFactoryVelocity(
