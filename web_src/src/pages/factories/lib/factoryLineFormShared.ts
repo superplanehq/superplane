@@ -81,6 +81,13 @@ export function replaceLineStepParallelism(
   return draftStepsToProto(drafts);
 }
 
+export function removeLineStep(steps: FactoryLineStep[] | undefined, stepIndex: number): FactoryLineStep[] {
+  if (!steps?.length || stepIndex < 0 || stepIndex >= steps.length) {
+    return draftStepsToProto(draftStepsFromLine(steps));
+  }
+  return draftStepsToProto(draftStepsFromLine(steps).filter((_, index) => index !== stepIndex));
+}
+
 // Null keeps the server default (10).
 function draftMaxParallelism(step: DraftStep): number | null {
   const parsed = Number.parseInt(step.maxParallelism.trim(), 10);

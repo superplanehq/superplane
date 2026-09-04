@@ -5,6 +5,7 @@ import {
   clampLineStepParallelism,
   DEFAULT_LINE_STEP_PARALLELISM,
   lineStepParallelism,
+  removeLineStep,
   replaceLineStepParallelism,
 } from "./factoryLineFormShared";
 
@@ -37,5 +38,27 @@ describe("lineStepParallelism", () => {
 
     expect(steps[0]?.maxParallelism).toBe(20);
     expect(steps[1]?.maxParallelism).toBe(4);
+  });
+
+  it("drops one step and keeps the others", () => {
+    const steps = removeLineStep(
+      [
+        { type: "runApp", app: { app: "app-plan", entrypoint: "start-plan" } },
+        { type: "runApp", app: { app: "app-impl", entrypoint: "start-impl" }, maxParallelism: 4 },
+        { type: "runApp", app: { app: "app-review", entrypoint: "start-review" } },
+      ],
+      1,
+    );
+
+    expect(steps).toEqual([
+      { type: "runApp", app: { app: "app-plan", entrypoint: "start-plan" } },
+      { type: "runApp", app: { app: "app-review", entrypoint: "start-review" } },
+    ]);
+  });
+
+  it("returns the original steps when the index is out of range", () => {
+    const original = [{ type: "runApp", app: { app: "app-plan", entrypoint: "start-plan" } }];
+    expect(removeLineStep(original, 4)).toEqual(original);
+    expect(removeLineStep(original, -1)).toEqual(original);
   });
 });

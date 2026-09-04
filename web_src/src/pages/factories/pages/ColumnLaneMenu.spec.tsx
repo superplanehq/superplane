@@ -256,4 +256,46 @@ describe("ColumnLaneMenu", () => {
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.queryByTestId("lines-backlog-menu-edit-automation")).not.toBeInTheDocument();
   });
+
+  it("offers Archive Step as the last item after Set color", async () => {
+    const onArchiveStep = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Plan"
+          testId="lines-phase-menu-0"
+          onSetParallelism={vi.fn()}
+          onArchiveStep={onArchiveStep}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    const archive = screen.getByTestId("lines-phase-menu-0-archive");
+    expect(archive).toHaveTextContent("Archive Step");
+    expect(
+      screen.getByTestId("lines-phase-menu-0-color-picker").compareDocumentPosition(archive) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(archive);
+    expect(onArchiveStep).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Archive Step when the callback is not supplied", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu title="Plan" testId="lines-phase-menu-0" colorId={null} onColorChange={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.queryByTestId("lines-phase-menu-0-archive")).not.toBeInTheDocument();
+  });
 });

@@ -65,3 +65,33 @@ export function serializeColumnColors(
   }
   return serialized;
 }
+
+const PHASE_COLUMN_KEY_PREFIX = "phase-";
+
+/**
+ * After a line step is removed, shift later phase color keys down so
+ * `phase-2` becomes `phase-1`. Fixed bookends (backlog, verify, done)
+ * keep their keys. The removed phase color is dropped.
+ */
+export function remapColumnColorsAfterRemovedStep(
+  columnColors: Record<string, LineBoardColumnColorId | null>,
+  removedStepIndex: number,
+): Record<string, LineBoardColumnColorId | null> {
+  const remapped: Record<string, LineBoardColumnColorId | null> = {};
+  for (const [key, value] of Object.entries(columnColors)) {
+    if (!key.startsWith(PHASE_COLUMN_KEY_PREFIX)) {
+      remapped[key] = value;
+      continue;
+    }
+    const index = Number.parseInt(key.slice(PHASE_COLUMN_KEY_PREFIX.length), 10);
+    if (Number.isNaN(index) || index === removedStepIndex) {
+      continue;
+    }
+    if (index > removedStepIndex) {
+      remapped[`${PHASE_COLUMN_KEY_PREFIX}${index - 1}`] = value;
+      continue;
+    }
+    remapped[key] = value;
+  }
+  return remapped;
+}

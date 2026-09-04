@@ -106,7 +106,8 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
-import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
+import { removeLineStep, replaceLineStepParallelism } from "../lib/factoryLineFormShared";
+import { ArchiveStepDialog } from "./ArchiveStepDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
@@ -136,6 +137,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import {
   normalizeColumnColors,
+  remapColumnColorsAfterRemovedStep,
   serializeColumnColors,
   lineBoardColumnLaneClassName,
   type LineBoardColumnColorId,
@@ -934,6 +936,39 @@ function PhaseBoard({
     [line.id, line.steps, updateLine],
   );
 
+  const archiveStep = useCallback(
+    async (stepIndex: number) => {
+      if (!line.id) {
+        return;
+      }
+      const nextSteps = removeLineStep(line.steps, stepIndex);
+      if (nextSteps.length === 0) {
+        return;
+      }
+      const previousColors = columnColorsRef.current;
+      const nextColors = remapColumnColorsAfterRemovedStep(previousColors, stepIndex);
+      columnColorsRef.current = nextColors;
+      setColumnColors(nextColors);
+      try {
+        const updatedLine = await updateLine.mutateAsync({
+          lineId: line.id,
+          steps: nextSteps,
+          columnColors: serializeColumnColors(nextColors),
+        });
+        const persisted = normalizeColumnColors(updatedLine.columnColors);
+        columnColorsRef.current = persisted;
+        setColumnColors(persisted);
+      } catch (error) {
+        columnColorsRef.current = previousColors;
+        setColumnColors(previousColors);
+        showErrorToast(getApiErrorMessage(error, "Failed to archive step"));
+      }
+    },
+    [line.id, line.steps, updateLine],
+  );
+
+  const canArchiveStep = (line.steps?.length ?? 0) > 1;
+
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
@@ -984,6 +1019,7 @@ function PhaseBoard({
               title={columnTitles[columnKey] ?? column.stepName}
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
+              onArchiveStep={canArchiveStep ? () => void archiveStep(column.stepIndex) : undefined}
               colorId={columnColors[columnKey] ?? null}
               onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
@@ -1195,6 +1231,7 @@ function PhaseColumn({
   title,
   parallelism,
   onSaveParallelism,
+  onArchiveStep,
   colorId,
   onColorChange,
   canRename,
@@ -1209,6 +1246,7 @@ function PhaseColumn({
   title: string;
   parallelism: number;
   onSaveParallelism: (value: number) => void;
+  onArchiveStep?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
@@ -1219,6 +1257,7 @@ function PhaseColumn({
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
   const [parallelismOpen, setParallelismOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const agentEditor = useColumnCanvasAgentEditor(organizationId, column.appId);
   const totalRuns = column.runs.length;
   const hasMore = visibleCount < totalRuns;
@@ -1267,6 +1306,7 @@ function PhaseColumn({
             editLabel={configureHref ? "Edit Automation" : undefined}
             onEditAgent={agentEditor.openEditor}
             onSetParallelism={configureHref ? () => setParallelismOpen(true) : undefined}
+            onArchiveStep={onArchiveStep ? () => setArchiveOpen(true) : undefined}
             parallelism={parallelism}
             colorId={colorId}
             onColorChange={onColorChange}
@@ -1294,6 +1334,16 @@ function PhaseColumn({
           setParallelismOpen(false);
         }}
         onClose={() => setParallelismOpen(false)}
+      />
+      <ArchiveStepDialog
+        open={archiveOpen}
+        stepName={title}
+        hasTasks={totalRuns > 0}
+        onOpenChange={setArchiveOpen}
+        onConfirm={() => {
+          onArchiveStep?.();
+          setArchiveOpen(false);
+        }}
       />
       {agentEditor.editorOpen ? (
         <PlanningReviewPopup

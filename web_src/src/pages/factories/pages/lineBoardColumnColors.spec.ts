@@ -5,6 +5,7 @@ import {
   lineBoardColumnColorById,
   lineBoardColumnLaneClassName,
   normalizeColumnColors,
+  remapColumnColorsAfterRemovedStep,
   serializeColumnColors,
 } from "./lineBoardColumnColors";
 
@@ -30,6 +31,21 @@ describe("lineBoardColumnColors", () => {
     expect(serializeColumnColors({ backlog: "lime", verify: null, done: "teal" })).toEqual({
       backlog: "lime",
       done: "teal",
+    });
+  });
+
+  it("shifts later phase colors down after a step is removed", () => {
+    expect(
+      remapColumnColorsAfterRemovedStep(
+        { backlog: "lime", "phase-0": "sky", "phase-1": "teal", "phase-2": "purple", verify: "yellow", done: "slate" },
+        1,
+      ),
+    ).toEqual({
+      backlog: "lime",
+      "phase-0": "sky",
+      "phase-1": "purple",
+      verify: "yellow",
+      done: "slate",
     });
   });
 });

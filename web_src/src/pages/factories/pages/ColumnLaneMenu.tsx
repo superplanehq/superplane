@@ -1,4 +1,4 @@
-import { Bot, Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
+import { Archive, Bot, Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ interface ColumnLaneMenuProps {
   parallelism?: number;
   /** Opens the Add intake picker. Leads the menu when set. */
   onAddIntake?: () => void;
+  /** Opens the archive-step dialog. Last item when set. */
+  onArchiveStep?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -50,6 +52,7 @@ export function ColumnLaneMenu({
   onSetParallelism,
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   onAddIntake,
+  onArchiveStep,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
@@ -158,6 +161,21 @@ export function ColumnLaneMenu({
             </button>
           ) : null}
         </div>
+        {onArchiveStep ? (
+          <>
+            <DropdownMenuSeparator className="my-0" />
+            <div className="p-1">
+              <DropdownMenuItem
+                onSelect={onArchiveStep}
+                className="text-destructive focus:text-destructive"
+                data-testid={`${testId}-archive`}
+              >
+                <Archive className="h-3.5 w-3.5" aria-hidden />
+                Archive Step
+              </DropdownMenuItem>
+            </div>
+          </>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -18,6 +18,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { planLineActiveDispatch } from "../__fixtures__/lineMetricsPlanLine";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
@@ -702,6 +703,7 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-edit-automation")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-backlog-menu-archive")).not.toBeInTheDocument();
   });
 
   it("offers Edit automation on the Backlog menu when a Backlog automation app exists", async () => {
@@ -848,6 +850,88 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByTestId("lines-done-menu"));
     expect(screen.queryByTestId("lines-done-menu-edit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-done-create")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-done-menu-archive")).not.toBeInTheDocument();
+  });
+
+  it("archives an empty phase column and remaps later phase colors", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValueOnce({
+      id: REFUND_LINE_PLAN_ID,
+      columnColors: { backlog: "lime", "phase-0": "teal" },
+    });
+    const user = userEvent.setup();
+    const factoryWithPhaseColors: FactoriesFactory = {
+      ...REFUND_FACTORY,
+      lines: REFUND_FACTORY.lines?.map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? { ...line, columnColors: { backlog: "lime", "phase-0": "sky", "phase-1": "teal" } }
+          : line,
+      ),
+    };
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      vi.fn(),
+      factoryWithPhaseColors,
+    );
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-archive"));
+    expect(screen.getByRole("heading", { name: "Archive this step?" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-archive-step-confirm"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        steps: [{ type: "runApp", app: { app: "app-refund-verifier", entrypoint: "start-verification" } }],
+        columnColors: { backlog: "lime", "phase-0": "teal" },
+      });
+    });
+  });
+
+  it("does not archive a phase column that still has tasks", async () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-running-implement",
+          number: "201",
+          key: "RF-201",
+          title: "Running implement task",
+          state: "STATE_OPEN",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-01T00:00:00Z",
+          lineDispatches: [
+            planLineActiveDispatch("wo-running-implement", [
+              {
+                id: "exec-running-implement",
+                step: "Implement",
+                stepIndex: 0,
+                state: "STATE_RUNNING",
+                result: "RESULT_UNSPECIFIED",
+                createdAt: "2026-01-01T00:00:00Z",
+                updatedAt: "2026-01-01T00:00:00Z",
+                run: { id: "run-running", appId: "app-refund-implementer", appName: "Implement" },
+              },
+            ]),
+          ],
+        },
+      ],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-archive"));
+    expect(screen.getByText("Make sure that the column does not have any tasks in it.")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-archive-step-confirm")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-archive-step-close"));
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("hides Archive Step when the line has only one step", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`);
+
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    expect(screen.queryByTestId("lines-phase-menu-0-archive")).not.toBeInTheDocument();
   });
 
   it("hides the phase path and shows work-order filters", async () => {
