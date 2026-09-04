@@ -178,6 +178,7 @@ import { syncRunInspectionViewportTransition } from "./lib/run-inspection-viewpo
 import {
   clearRunDetailNodeSearchParams,
   buildCanvasLogEntries,
+  edgeExists,
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
   getRunningRunsCount,
@@ -2703,11 +2704,15 @@ export function AppPage({
 
       // Save snapshot before making changes
 
+      const channel = sourceHandle || "default";
+
+      if (edgeExists(canvas.spec?.edges, sourceId, targetId, channel)) return;
+
       // Create the new edge
       const newEdge: ComponentsEdge = {
         sourceId,
         targetId,
-        channel: sourceHandle || "default",
+        channel,
       };
 
       analytics.edgeCreate(organizationId);

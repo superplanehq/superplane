@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
+  edgeExists,
   isValidRunId,
   prepareCanvasLogNodes,
   shouldClearRunDetailNode,
@@ -288,5 +289,29 @@ describe("prepareCanvasLogNodes", () => {
     );
 
     expect(logNodes).toEqual([source, target]);
+  });
+});
+
+describe("edgeExists", () => {
+  const edges = [
+    makeEdge({ sourceId: "source", targetId: "target", channel: "success" }),
+    makeEdge({ sourceId: "source", targetId: "other", channel: "default" }),
+  ];
+
+  it("detects an already connected source, target and channel", () => {
+    expect(edgeExists(edges, "source", "target", "success")).toBe(true);
+  });
+
+  it("allows the same nodes on a different channel", () => {
+    expect(edgeExists(edges, "source", "target", "failure")).toBe(false);
+  });
+
+  it("allows a new target", () => {
+    expect(edgeExists(edges, "source", "new-target", "success")).toBe(false);
+  });
+
+  it("treats a canvas without edges as unconnected", () => {
+    expect(edgeExists(undefined, "source", "target", "default")).toBe(false);
+    expect(edgeExists([], "source", "target", "default")).toBe(false);
   });
 });

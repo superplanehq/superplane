@@ -413,6 +413,8 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 	//
 	// Validate edges
 	//
+	edgeKeys := make(map[string]bool)
+
 	for i, edge := range c.Spec.Edges {
 		if edge.SourceID == "" || edge.TargetID == "" {
 			return nil, nil, fmt.Errorf("edge %d: source and target are required", i)
@@ -437,6 +439,15 @@ func (c *Canvas) Parse(registry *registry.Registry, orgID string) ([]models.Node
 		if nodeTypeByID[edge.TargetID] == NodeTypeWidget {
 			return nil, nil, fmt.Errorf("edge %d: widget nodes cannot be used as target nodes", i)
 		}
+
+		edgeKey := edge.SourceID + "|" + edge.TargetID + "|" + c.Spec.Edges[i].Channel
+		if edgeKeys[edgeKey] {
+			return nil, nil, fmt.Errorf(
+				"edge %d: duplicate edge from %s to %s on channel %s",
+				i, edge.SourceID, edge.TargetID, c.Spec.Edges[i].Channel,
+			)
+		}
+		edgeKeys[edgeKey] = true
 
 		if err := changesets.ValidateSourceNodeOutputChannel(
 			registry,
