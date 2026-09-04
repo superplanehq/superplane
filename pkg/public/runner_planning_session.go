@@ -101,6 +101,7 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 		}
 		select {
 		case <-r.Context().Done():
+			writeJSON(w, http.StatusOK, map[string]any{"status": "pending"})
 			return
 		case <-ticker.C:
 		}

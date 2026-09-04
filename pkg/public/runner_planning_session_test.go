@@ -2,6 +2,7 @@ package public
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -174,6 +175,35 @@ func TestRunnerPlanningWaitDoubleConsumeReturnsPending(t *testing.T) {
 	assert.Equal(t, 1, createdCount)
 }
 
+func TestRunnerPlanningWaitContextCancelReturnsPending(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=60", nil)
+	req = req.WithContext(ctx)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		server.Router.ServeHTTP(rec, req)
+	}()
+
+	requirePlanningWaitPending(t, db, session)
+	cancel()
+	<-done
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "pending", body["status"])
+}
+
 func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Server, *models.FactoryPlanningSession, *models.Factory, string) {
 	t.Helper()
 	server, signer := mustRunnerLiveLogServer(t, r)
@@ -214,4 +244,18 @@ func requireResolvedCreatedWait(t *testing.T, db *gorm.DB, session *models.Facto
 	_, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
 	require.NoError(t, err)
 	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+}
+
+func requirePlanningWaitPending(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+		require.NoError(t, err)
+		if reloaded.WaitState == models.PlanningWaitPending {
+			return
+		}
+		require.True(t, time.Now().Before(deadline), "planning wait did not become pending")
+		time.Sleep(20 * time.Millisecond)
+	}
 }
