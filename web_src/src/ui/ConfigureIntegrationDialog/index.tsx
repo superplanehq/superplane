@@ -32,7 +32,10 @@ export function ConfigureIntegrationDialog({
 }: ConfigureIntegrationDialogProps) {
   const { data: integration, isLoading } = useIntegration(organizationId, integrationId ?? "");
   const updateMutation = useUpdateIntegration(organizationId, integrationId ?? "");
-  const { data: availableIntegrations } = useAvailableIntegrations();
+  const { data: availableIntegrations } = useAvailableIntegrations({
+    enabled: !!integrationId,
+    organizationId,
+  });
 
   const definition = useMemo(
     () =>

@@ -3,9 +3,9 @@ import { resolvePageObservability } from "@/lib/pageObservability";
 
 describe("resolvePageObservability", () => {
   it("maps top-level routes", () => {
-    expect(resolvePageObservability("/")).toEqual({ pageKey: "organizationSelect", attributes: {} });
+    expect(resolvePageObservability("/")).toEqual({ pageKey: "rootOrganizationRedirect", attributes: {} });
     expect(resolvePageObservability("/login")).toEqual({ pageKey: "login", attributes: {} });
-    expect(resolvePageObservability("/create")).toEqual({ pageKey: "organizationCreate", attributes: {} });
+    expect(resolvePageObservability("/onboarding")).toEqual({ pageKey: "organizationOnboarding", attributes: {} });
     expect(resolvePageObservability("/setup")).toEqual({ pageKey: "ownerSetup", attributes: {} });
     expect(resolvePageObservability("/install")).toEqual({ pageKey: "install", attributes: {} });
   });

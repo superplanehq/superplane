@@ -58,13 +58,13 @@ describe("pickAutoRedirectOrganization", () => {
     expect(pickAutoRedirectOrganization(organizations, "org-b")).toBe("org-b");
   });
 
-  it("ignores a last visited organization the account no longer belongs to", () => {
+  it("uses the first organization when the account no longer belongs to the last visited organization", () => {
     const organizations = [{ slug: "org-a" }, { slug: "org-b" }];
-    expect(pickAutoRedirectOrganization(organizations, "org-gone")).toBeNull();
+    expect(pickAutoRedirectOrganization(organizations, "org-gone")).toBe("org-a");
   });
 
-  it("returns null with multiple organizations and no last visited entry", () => {
-    expect(pickAutoRedirectOrganization([{ slug: "org-a" }, { slug: "org-b" }], null)).toBeNull();
+  it("returns the first organization with multiple organizations and no last visited entry", () => {
+    expect(pickAutoRedirectOrganization([{ slug: "org-a" }, { slug: "org-b" }], null)).toBe("org-a");
   });
 
   it("returns null when there are no organizations", () => {

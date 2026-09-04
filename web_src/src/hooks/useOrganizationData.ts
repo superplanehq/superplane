@@ -551,6 +551,7 @@ export const useUpdateOrganization = (organizationId: string) => {
     mutationFn: async (params: { name?: string; description?: string; slug?: string }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
           body: {
             organization: {
