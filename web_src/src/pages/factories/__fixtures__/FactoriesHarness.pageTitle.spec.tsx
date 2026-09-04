@@ -59,7 +59,7 @@ describe("client-side navigation updates document.title", () => {
       />,
     );
 
-    expect(await screen.findByTestId("work-orders-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("work-orders-header", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(document.title).toBe("Tasks · Semaphore · SuperPlane");
   }, 15000);
 
