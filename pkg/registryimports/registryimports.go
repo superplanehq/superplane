@@ -66,6 +66,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/perplexity"
+	_ "github.com/superplanehq/superplane/pkg/integrations/posthog"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"

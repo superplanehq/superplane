@@ -1,0 +1,230 @@
+---
+title: "PostHog"
+---
+
+React to product analytics events and query data in PostHog
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Event" href="#on-event" description="Listen to product analytics events captured by PostHog" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Run Query" href="#run-query" description="Run a HogQL query against a PostHog project" />
+</CardGrid>
+
+## Instructions
+
+SuperPlane connects to PostHog with a personal API key.
+
+1. In PostHog, open [Settings > Personal API keys](https://us.posthog.com/settings/user-api-keys) and click **Create personal API key**.
+2. Give the key a name and scope it to the projects SuperPlane should access.
+3. Grant these scopes:
+   - **Project**: Read — to list the projects you can pick from.
+   - **Event Definition**: Read — to suggest event names on the On Event trigger.
+   - **Hog Function**: Write — to create and remove the webhook destination used by the On Event trigger.
+   - **Query**: Read — to run the Run Query action.
+4. Copy the key (it is shown only once) and paste it below.
+5. Set **Host** to the region your project lives in: `https://us.posthog.com` or `https://eu.posthog.com`, or your own address if you self-host.
+
+<a id="on-event"></a>
+
+## On Event
+
+**Trigger key:** `posthog.onEvent`
+
+The On Event trigger starts a workflow execution when PostHog captures a matching event.
+
+### Use Cases
+
+- **Activation workflows**: Kick off onboarding when a user reaches a milestone event
+- **Incident response**: React to error or failure events captured from your product
+- **Revenue automation**: Run a workflow when a purchase or upgrade event lands
+- **Data pipelines**: Forward selected product events to other systems as they happen
+
+### Configuration
+
+- **Project**: The PostHog project to listen to.
+- **Events**: The event names to listen for. Leave empty to receive every event in the project.
+- **Ignore test accounts**: Applies the project's "internal and test users" filter, so events from your own team do not start workflows. Enabled by default.
+
+### Webhook Setup
+
+The webhook is created automatically in PostHog when you save the canvas. No manual setup is required.
+
+SuperPlane uses the PostHog API (with your configured personal API key) to create a
+**webhook destination** in the selected project, filtered to the events you chose. The
+destination is removed again when the trigger is deleted.
+
+PostHog does not sign webhook payloads. SuperPlane therefore generates a random secret per
+webhook, stores it encrypted, and sets it as a request header on the destination. Deliveries
+that do not present that secret are rejected.
+
+### Event Data
+
+The payload contains the PostHog event, the person it is attributed to, and the project it
+came from:
+
+- `event` — the captured event, including `event` (its name), `uuid`, `distinct_id`, `timestamp`, `properties`, and `url`
+- `person` — the person the event belongs to, including their `properties`
+- `project` — the `id`, `name`, and `url` of the PostHog project
+
+### Notes
+
+- Webhook destinations run on PostHog's data pipeline, which is a paid feature on PostHog
+  Cloud. Check your plan before relying on this trigger.
+- Events are filtered inside PostHog, so only matching events are ever sent to SuperPlane.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "event": {
+      "distinct_id": "user_84f21c",
+      "event": "subscription upgraded",
+      "properties": {
+        "$browser": "Chrome",
+        "$current_url": "https://example.com/settings/billing",
+        "$lib": "web",
+        "$os": "Mac OS X",
+        "mrr": 2250,
+        "plan": "enterprise",
+        "previous_plan": "team",
+        "seats": 45
+      },
+      "timestamp": "2024-08-14T09:31:12.482000Z",
+      "url": "https://us.posthog.com/project/12345/events/01912f3a-4b5c-7d8e-9f01-23456789abcd",
+      "uuid": "01912f3a-4b5c-7d8e-9f01-23456789abcd"
+    },
+    "person": {
+      "id": "01912f39-8a2b-7c4d-8e5f-0123456789ab",
+      "properties": {
+        "$initial_referring_domain": "google.com",
+        "company": "Example Inc",
+        "email": "dana@example.com",
+        "name": "Dana Whitfield"
+      },
+      "url": "https://us.posthog.com/project/12345/person/user_84f21c"
+    },
+    "project": {
+      "id": "12345",
+      "name": "Example Production",
+      "url": "https://us.posthog.com/project/12345"
+    }
+  },
+  "timestamp": "2024-08-14T09:31:12Z",
+  "type": "posthog.event"
+}
+```
+
+<a id="run-query"></a>
+
+## Run Query
+
+**Component key:** `posthog.runQuery`
+
+The Run Query component reads product analytics data from a PostHog project and returns
+the rows it produced. You can either build the query from a few fields or write HogQL yourself.
+
+### Use Cases
+
+- **Pull events on demand**: Fetch the events matching a condition at the moment the workflow runs
+- **Enrichment**: Look up product usage for a person or account before acting on it
+- **Reporting**: Aggregate product metrics and forward them to another system
+- **Guardrails**: Check a metric before a workflow continues to a deployment or rollout step
+
+### Configuration
+
+- **Project**: The PostHog project to query.
+- **Query**: Whether to build the query from fields or write HogQL yourself.
+
+#### Build a query
+
+- **Events**: The events to include, picked from the event names in the project. Leave empty to
+  include every event.
+- **Return**: What you get back.
+  - *Matching events* — one row per event, with its properties
+  - *Count per event* — how many times each event was captured
+  - *Total count* — a single number: how many events matched
+  - *Unique users* — a single number: how many distinct users matched
+- **Time range**: How far back to look, from the last hour up to the last 90 days.
+- **Row limit**: The most rows to return, up to 10000. Ignored by the two single-number options.
+
+Event names you pick are sent to PostHog as query parameters rather than pasted into the query
+text, so a name containing quotes cannot change what the query does.
+
+The builder does not apply the project's "internal and test users" filter. PostHog applies that
+filter only to queries carrying its `{filters}` placeholder, and a query using that
+placeholder cannot also use query parameters - so the builder keeps the parameters. Exclude
+internal traffic with a condition in **Write HogQL** mode when you need it.
+
+#### Write HogQL
+
+HogQL is PostHog's SQL dialect. It reads the same tables you see in the PostHog UI, including
+`events`, `persons`, and `sessions`. Use this mode for anything the builder
+cannot express - joins, window functions, or querying tables other than `events`.
+
+```sql
+SELECT event, distinct_id, timestamp
+FROM events
+WHERE timestamp > now() - INTERVAL 1 DAY
+ORDER BY timestamp DESC
+LIMIT 100
+```
+
+### Output
+
+Returns a single object with the query results:
+
+- `rows` — the result rows, each keyed by column name so expressions can read `row.event`
+- `columns` — the column names, in the order PostHog returned them
+- `rowCount` — how many rows were returned
+- `projectId` — the project the query ran against
+
+### Notes
+
+- The personal API key needs the **Query: Read** scope.
+- Results are returned in full. The builder caps rows for you; in HogQL mode add a
+  `LIMIT` yourself to keep executions small.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "columns": [
+      "event",
+      "distinct_id",
+      "timestamp"
+    ],
+    "projectId": "12345",
+    "rowCount": 3,
+    "rows": [
+      {
+        "distinct_id": "user_84f21c",
+        "event": "subscription upgraded",
+        "timestamp": "2024-08-14T09:31:12.482000Z"
+      },
+      {
+        "distinct_id": "user_1d90ae",
+        "event": "checkout completed",
+        "timestamp": "2024-08-14T09:28:44.117000Z"
+      },
+      {
+        "distinct_id": "user_5c73bb",
+        "event": "trial started",
+        "timestamp": "2024-08-14T09:22:03.905000Z"
+      }
+    ]
+  },
+  "timestamp": "2024-08-14T09:31:12Z",
+  "type": "posthog.queryResult"
+}
+```
+
