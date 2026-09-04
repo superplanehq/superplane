@@ -139,6 +139,12 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 
 	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
 		httpCtx := oauthHTTP(
 			jsonResponse(`{"access_token":"user-token"}`),
 			jsonResponse(`{"installations":[
@@ -151,11 +157,13 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		g.afterHostedAppOAuth(ctx)
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
 		assert.NotEqual(t, "ready", integration.State)
 		assert.Nil(t, integration.BrowserAction)
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Empty(t, metadata.InstallationID)
 		assert.Equal(t, "csrf", metadata.State)
+		assert.Equal(t, "/onboarding?attempt=1&step=vcs", metadata.SetupReturnPath)
 		require.Len(t, metadata.PendingInstallations, 2)
 		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
 		assert.Empty(t, integration.CurrentSecrets)
@@ -412,6 +420,7 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 			State:           "csrf-keep",
 			HostedApp:       true,
 			StartedByUserID: "starter-user",
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
 			PendingInstallations: []common.PendingInstallation{
 				{ID: "11", AccountLogin: "acme"},
 				{ID: "22", AccountLogin: "octo"},
@@ -424,14 +433,39 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		ActorUserID:    "other-user",
 		BaseURL:        "https://app.example",
+		Configuration:  Configuration{SetupReturnPath: "/onboarding?attempt=new&step=vcs"},
 		Integration:    integrationCtx,
 	}))
 
 	metadata := integrationCtx.Metadata.(common.Metadata)
 	assert.Equal(t, "csrf-keep", metadata.State)
 	assert.Equal(t, "starter-user", metadata.StartedByUserID)
+	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 2)
 	assert.Nil(t, integrationCtx.BrowserAction)
+}
+
+func Test__Sync_hostedAppKeepsSetupReturnPathWhenConfigOmitsIt(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:           "csrf-keep",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.Equal(t, "/onboarding?attempt=old&step=vcs", integrationCtx.Metadata.(common.Metadata).SetupReturnPath)
 }
 
 func Test__afterAppInstallationLegacy_afterZeroInstallOAuth(t *testing.T) {

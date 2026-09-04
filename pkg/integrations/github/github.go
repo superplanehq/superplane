@@ -71,8 +71,9 @@ type GitHub struct {
 }
 
 type Configuration struct {
-	Organization string `mapstructure:"organization" json:"organization"`
-	PrivateApp   bool   `mapstructure:"privateApp" json:"privateApp"`
+	Organization    string `mapstructure:"organization" json:"organization"`
+	PrivateApp      bool   `mapstructure:"privateApp" json:"privateApp"`
+	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath"`
 }
 
 func (g *GitHub) Name() string {
@@ -184,7 +185,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	}
 
 	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
-		return g.syncHostedApp(ctx)
+		return g.syncHostedApp(ctx, config)
 	}
 
 	state, err := crypto.Base64String(32)
@@ -210,7 +211,7 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
+func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error {
 	app, ok := common.HostedAppFromEnv()
 	if !ok {
 		return fmt.Errorf("hosted GitHub App is not configured")
@@ -218,7 +219,9 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 
 	var existing common.Metadata
 	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &existing)
+	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.InstallationID == "" && existing.State != "" {
+		existing.SetupReturnPath = returnPath
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
 	}
@@ -237,6 +240,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext) error {
 		State:           state,
 		HostedApp:       true,
 		StartedByUserID: startedBy,
+		SetupReturnPath: returnPath,
 		GitHubApp: common.GitHubAppMetadata{
 			ID:   app.ID,
 			Slug: app.Slug,
@@ -1112,17 +1116,77 @@ func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
 
 const integrationSetupReturnCookie = "sp_integration_setup_return"
 
+type persistentIntegration interface {
+	Persist() error
+}
+
+func persistIntegrationBeforeRedirect(ctx core.HTTPRequestContext) {
+	persister, ok := ctx.Integration.(persistentIntegration)
+	if !ok {
+		return
+	}
+
+	if err := persister.Persist(); err != nil {
+		ctx.Logger.Errorf("failed to persist GitHub integration before redirect: %v", err)
+	}
+}
+
 func redirectToIntegrationSettingsURL(ctx core.HTTPRequestContext, rawQuery string) {
-	location := fmt.Sprintf(
-		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-	)
-	if returnPath := integrationSetupReturnPath(ctx.Request); returnPath != "" {
-		location = strings.TrimRight(ctx.BaseURL, "/") + mergeSetupReturnQuery(returnPath, rawQuery)
+	persistIntegrationBeforeRedirect(ctx)
+	location := integrationCallbackLocation(ctx, rawQuery)
+	if integrationCallbackReturnPath(ctx) != "" {
 		clearIntegrationSetupReturnCookie(ctx.Response)
-	} else if rawQuery != "" {
-		location = location + "?" + rawQuery
 	}
 	http.Redirect(ctx.Response, ctx.Request, location, http.StatusSeeOther)
+}
+
+func integrationCallbackLocation(ctx core.HTTPRequestContext, rawQuery string) string {
+	settings := fmt.Sprintf(
+		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+	)
+	returnPath := integrationCallbackReturnPath(ctx)
+	if returnPath == "" {
+		if rawQuery != "" {
+			return settings + "?" + rawQuery
+		}
+		return settings
+	}
+
+	return strings.TrimRight(ctx.BaseURL, "/") + mergeSetupReturnQuery(returnPath, rawQuery)
+}
+
+func integrationCallbackReturnPath(ctx core.HTTPRequestContext) string {
+	if path := setupReturnPathFromMetadata(ctx); path != "" {
+		return path
+	}
+	if path := integrationSetupReturnPath(ctx.Request); path != "" {
+		return path
+	}
+	if factoriesEnabled(ctx.OrganizationID) {
+		return "/onboarding"
+	}
+
+	return ""
+}
+
+func setupReturnPathFromMetadata(ctx core.HTTPRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	return firstSafeSetupReturnPath(metadata.SetupReturnPath)
+}
+
+func firstSafeSetupReturnPath(paths ...string) string {
+	for _, path := range paths {
+		if isSafeIntegrationSetupReturnPath(path) {
+			return path
+		}
+	}
+
+	return ""
 }
 
 func integrationSetupReturnPath(request *http.Request) string {
