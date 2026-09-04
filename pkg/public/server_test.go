@@ -501,6 +501,13 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 	assert.Equal(t, first, retryResult)
 }
 
+func Test__InitialOrganizationNameUsesEmailWhenAccountNameEmpty(t *testing.T) {
+	account := &models.Account{Name: "  ", Email: "dev@superplane.local"}
+	assert.Equal(t, "dev", initialOrganizationName(account, ""))
+	assert.Equal(t, "dev", initialOrganizationName(account, "dev"))
+	assert.True(t, accountMayNameOrganization(nil, account, "dev"))
+}
+
 func Test__CreateInitialWorkspaceUsesAccountNameWithoutGitHub(t *testing.T) {
 	r := support.Setup(t)
 	account, err := models.CreateAccount("Ada Lovelace", "ada-onboarding@superplane.local")

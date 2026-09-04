@@ -1274,14 +1274,32 @@ func initialOrganizationName(account *models.Account, requested string) string {
 	if name != "" {
 		return name
 	}
-	return strings.TrimSpace(account.Name)
+	if accountName := strings.TrimSpace(account.Name); accountName != "" {
+		return accountName
+	}
+	return accountEmailLocalPart(account.Email)
 }
 
 func accountMayNameOrganization(tx *gorm.DB, account *models.Account, name string) bool {
+	if name == "" {
+		return false
+	}
 	if name == strings.TrimSpace(account.Name) {
 		return true
 	}
+	if name == accountEmailLocalPart(account.Email) {
+		return true
+	}
 	return accountOwnsGitHubName(tx, account, name)
+}
+
+func accountEmailLocalPart(email string) string {
+	email = strings.TrimSpace(email)
+	local, _, found := strings.Cut(email, "@")
+	if !found {
+		return ""
+	}
+	return strings.TrimSpace(local)
 }
 
 func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) bool {
