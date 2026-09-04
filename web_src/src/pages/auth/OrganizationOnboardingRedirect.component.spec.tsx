@@ -41,6 +41,19 @@ function renderOnboarding() {
   );
 }
 
+function renderOnboardingWithReresolve() {
+  let reresolve: (() => Promise<void>) | undefined;
+  const utils = render(
+    <OrganizationOnboardingRedirect
+      renderWorkspace={(workspace, _entryPath, reresolveWorkspace) => {
+        reresolve = reresolveWorkspace;
+        return <div data-testid="internal-workspace-slug">{workspace.organizationSlug}</div>;
+      }}
+    />,
+  );
+  return { ...utils, reresolve: () => reresolve!() };
+}
+
 describe("OrganizationOnboardingRedirect", () => {
   beforeEach(() => {
     accountState.account = {
@@ -97,6 +110,30 @@ describe("OrganizationOnboardingRedirect", () => {
 
     expect(await screen.findByText(/Could not start workspace setup/)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("re-resolves the workspace under a new organization slug without reloading", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ organizationSlug: "dev-user", workspaceKey: "NEWWO" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { reresolve } = renderOnboardingWithReresolve();
+
+    const slug = await screen.findByTestId("internal-workspace-slug");
+    expect(slug).toHaveTextContent("dev-user");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ organizationSlug: "dev-user-x1y2z3", workspaceKey: "NEWWO" }),
+    });
+
+    await reresolve();
+
+    await waitFor(() => expect(screen.getByTestId("internal-workspace-slug")).toHaveTextContent("dev-user-x1y2z3"));
+    expect(location.replace).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("starts workspace setup without GitHub authorization", async () => {
