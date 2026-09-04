@@ -46,15 +46,16 @@ var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
 // FactoryOnboardingConfig stores durable wizard choices and provisioned
 // resource IDs. Empty strings mean the field has not been saved yet.
 type FactoryOnboardingConfig struct {
-	VCSIntegrationID   string `json:"vcs_integration_id,omitempty"`
-	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
-	AppRepository      string `json:"app_repository,omitempty"`
-	BacklogRepository  string `json:"backlog_repository,omitempty"`
-	DefaultBranch      string `json:"default_branch,omitempty"`
-	IssuesSource       string `json:"issues_source,omitempty"`
-	AgentHarness       string `json:"agent_harness,omitempty"`
-	ProvisionedAppID   string `json:"provisioned_app_id,omitempty"`
-	ProvisionedLineID  string `json:"provisioned_line_id,omitempty"`
+	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
+	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
+	AgentIntegrationID         string `json:"agent_integration_id,omitempty"`
+	AppRepository              string `json:"app_repository,omitempty"`
+	BacklogRepository          string `json:"backlog_repository,omitempty"`
+	DefaultBranch              string `json:"default_branch,omitempty"`
+	IssuesSource               string `json:"issues_source,omitempty"`
+	AgentHarness               string `json:"agent_harness,omitempty"`
+	ProvisionedAppID           string `json:"provisioned_app_id,omitempty"`
+	ProvisionedLineID          string `json:"provisioned_line_id,omitempty"`
 }
 
 // FactoryOnboardingPatch carries optional field updates for a partial merge.
@@ -103,12 +104,30 @@ func (f *Factory) IsOnboardingComplete() bool {
 	return f.OnboardingCompletedAt != nil
 }
 
+// IsInitialOnboarding reports whether account onboarding created the workspace.
+func (f *Factory) IsInitialOnboarding() bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID != ""
+}
+
 func (f *Factory) OnboardingConfigValue() FactoryOnboardingConfig {
 	return f.OnboardingConfig.Data()
 }
 
 func (f *Factory) OnboardingConfigAfter(patch FactoryOnboardingPatch) (FactoryOnboardingConfig, error) {
 	return mergeFactoryOnboardingConfig(f.OnboardingConfigValue(), patch)
+}
+
+// SetInitialOnboardingAttempt records the server-owned retry key for a
+// workspace created during account onboarding. It is not part of the
+// user-editable onboarding patch.
+func (f *Factory) SetInitialOnboardingAttempt(tx *gorm.DB, attemptID uuid.UUID) error {
+	config := f.OnboardingConfigValue()
+	config.InitialOnboardingAttemptID = attemptID.String()
+	return f.persistOnboarding(tx, config, f.OnboardingCompletedAt)
+}
+
+func (f *Factory) HasInitialOnboardingAttempt(attemptID uuid.UUID) bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID == attemptID.String()
 }
 
 // UpdateOnboarding merges a partial patch into the stored config. It does not

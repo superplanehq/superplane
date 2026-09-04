@@ -1,262 +1,170 @@
 import type { ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { usePermissions } from "@/contexts/usePermissions";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAvailableIntegrations, useDeleteIntegration, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { Alert, AlertDescription } from "@/ui/alert";
-import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { useIntegrationConfigureOpen } from "@/lib/analytics";
+import { followBrowserAction } from "@/lib/browserAction";
+import { getApiErrorMessage } from "@/lib/errors";
+import { hostedGitHubAppSlug, hostedGitHubState, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
+import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
+import { cn } from "@/lib/utils";
+import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import { getApiErrorMessage } from "@/lib/errors";
-import { appPath } from "@/lib/appPaths";
-import { hostedGitHubAppSlug, hostedGitHubState, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
-import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
-import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { usePageTitle } from "@/hooks/usePageTitle";
-import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
+import { CircleX, Copy } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { useIntegrationConfigureOpen } from "@/lib/analytics";
-import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
+import { useNavigate } from "react-router";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { DeleteModal } from "../CapabilityBasedIntegrationDetails/DeleteModal";
+import { Header } from "../CapabilityBasedIntegrationDetails/Header";
+import { UsageTab } from "../CapabilityBasedIntegrationDetails/UsageTab";
+import { getActiveTabClass, groupNodeRefsByCanvas } from "../CapabilityBasedIntegrationDetails/lib";
+import {
+  configurationSubmitPayload,
+  editableConfigurationField,
+  editableConfigurationValue,
+  nextConfigurationValue,
+} from "./legacyConfiguration";
 
 interface LegacyIntegrationDetailsProps {
   organizationId: string;
   integration: OrganizationsIntegration;
 }
 
+type LegacyIntegrationTab = "configuration" | "usage";
+
+function TabButton({
+  activeTab,
+  value,
+  children,
+  onSelect,
+}: {
+  activeTab: LegacyIntegrationTab;
+  value: LegacyIntegrationTab;
+  children: React.ReactNode;
+  onSelect: (value: LegacyIntegrationTab) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(value)}
+      className={cn(
+        "mr-4 mb-[-1px] border-b py-2 text-sm font-medium transition-colors",
+        getActiveTabClass(activeTab === value),
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function LegacyIntegrationDetails({ organizationId, integration }: LegacyIntegrationDetailsProps) {
   const navigate = useNavigate();
+  const integrationsHref = useIntegrationsBasePath(organizationId);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-
-  usePageTitle(["Integrations", integration?.metadata?.name]);
-
-  const [configValues, setConfigValues] = useState<Record<string, unknown>>({});
-  const [integrationName, setIntegrationName] = useState("");
+  const [activeTab, setActiveTab] = useState<LegacyIntegrationTab>("configuration");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [configuration, setConfiguration] = useState<Record<string, unknown>>({});
+  const [savedConfiguration, setSavedConfiguration] = useState<Record<string, unknown>>({});
+  const [integrationName, setIntegrationName] = useState("");
+  const [savedIntegrationName, setSavedIntegrationName] = useState("");
+
   const canUpdateIntegrations = canAct("integrations", "update");
   const canDeleteIntegrations = canAct("integrations", "delete");
-
+  const integrationId = integration.metadata?.id || "";
+  const providerName = integration.metadata?.integrationName || "";
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
-  const integrationDef = integration
-    ? availableIntegrations.find((i) => i.name === integration.metadata?.integrationName)
-    : undefined;
+  const integrationDef = availableIntegrations.find((definition) => definition.name === providerName);
+  const updateMutation = useUpdateIntegration(organizationId, integrationId);
+  const deleteMutation = useDeleteIntegration(organizationId, integrationId);
 
-  const updateMutation = useUpdateIntegration(organizationId, integration.metadata?.id || "");
-  const deleteMutation = useDeleteIntegration(organizationId, integration.metadata?.id || "");
-  const integrationsHref = useIntegrationsBasePath(organizationId);
-
-  // Initialize config values when installation loads
-  const [configLoaded, setConfigLoaded] = useState(false);
-  useEffect(() => {
-    if (integration?.spec?.configuration) {
-      setConfigValues(integration.spec.configuration);
-      setConfigLoaded(true);
-    }
-  }, [integration]);
-
-  useIntegrationConfigureOpen(integration ?? undefined, integration?.metadata?.id, "integrations_page", organizationId);
+  usePageTitle(["Integrations", integration.metadata?.name]);
+  useIntegrationConfigureOpen(integration, integrationId, "integrations_page", organizationId);
 
   useEffect(() => {
-    setIntegrationName(integration?.metadata?.name || integration?.metadata?.integrationName || "");
-  }, [integration?.metadata?.name, integration?.metadata?.integrationName]);
+    const nextConfiguration = integration.spec?.configuration || {};
+    setConfiguration(nextConfiguration);
+    setSavedConfiguration(nextConfiguration);
+  }, [integration.spec?.configuration]);
 
-  // Full instructions (same for all integrations)
-  const instructionsContent = useMemo(() => {
-    const raw = integrationDef?.instructions?.trim();
-    if (!raw) return null;
-    return <IntegrationInstructions description={raw} />;
-  }, [integrationDef?.instructions]);
+  useEffect(() => {
+    const nextName = integration.metadata?.name || providerName;
+    setIntegrationName(nextName);
+    setSavedIntegrationName(nextName);
+  }, [integration.metadata?.name, providerName]);
 
-  // Webhook block: show when integration exposes a webhook URL in metadata (generic, no integration name check)
-  const webhookSection = useMemo(() => {
-    const webhookUrl =
-      integration?.status?.metadata && typeof integration.status.metadata.webhookUrl === "string"
-        ? integration.status.metadata.webhookUrl
-        : null;
-    if (!webhookUrl) return null;
-    const webhookConfigured =
-      integration?.status?.metadata &&
-      typeof integration.status.metadata.webhookSigningSecretConfigured === "boolean" &&
-      integration.status.metadata.webhookSigningSecretConfigured === true;
-    return (
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
-        <div className="p-6">
-          <h2 className="text-lg font-medium mb-4">Webhook</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-            {webhookConfigured
-              ? "Webhook is configured. You can copy the URL below if needed."
-              : "Add this URL in your external service to receive webhooks. Complete any setup steps described in the instructions above."}
-          </p>
-          <div className="flex items-center gap-2">
-            <Input type="text" value={webhookUrl} readOnly className="font-mono text-sm flex-1" />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                await navigator.clipboard.writeText(webhookUrl);
-                showSuccessToast("Webhook URL copied");
-              }}
-            >
-              Copy
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }, [integration?.status?.metadata]);
-
-  // Group usedIn nodes by workflow
-  const workflowGroups = useMemo(() => {
-    if (!integration?.status?.usedIn) return [];
-
-    const groups = new Map<string, { canvasName: string; nodes: Array<{ nodeId: string; nodeName: string }> }>();
-    integration.status.usedIn.forEach((nodeRef) => {
-      const canvasId = nodeRef.canvasId || "";
-      const canvasName = nodeRef.canvasName || canvasId;
-      const nodeId = nodeRef.nodeId || "";
-      const nodeName = nodeRef.nodeName || nodeId;
-
-      if (!groups.has(canvasId)) {
-        groups.set(canvasId, { canvasName, nodes: [] });
-      }
-      groups.get(canvasId)?.nodes.push({ nodeId, nodeName });
-    });
-
-    return Array.from(groups.entries()).map(([canvasId, data]) => ({
-      canvasId,
-      canvasName: data.canvasName,
-      nodes: data.nodes,
-    }));
-  }, [integration?.status?.usedIn]);
-
+  const workflowGroups = useMemo(
+    () => groupNodeRefsByCanvas(integration.status?.usedIn || []),
+    [integration.status?.usedIn],
+  );
   const pendingInstallations = pendingGitHubInstallations(integration.status?.metadata);
   const pendingInstallState = hostedGitHubState(integration.status?.metadata);
   const showInstallPicker =
     pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
+  const browserAction = integration.status?.browserAction;
+  const instructions = integrationDef?.instructions?.trim();
+  const hasChanges =
+    integrationName.trim() !== savedIntegrationName ||
+    JSON.stringify(configuration) !== JSON.stringify(savedConfiguration);
 
-  const handleConfigSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canUpdateIntegrations) return;
-
-    const nextName = integrationName.trim();
-    if (!nextName) {
+  const handleConfigSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = integrationName.trim();
+    if (!canUpdateIntegrations || !hasChanges) return;
+    if (!name) {
       showErrorToast("Integration name is required");
       return;
     }
 
     try {
       await updateMutation.mutateAsync({
-        name: nextName,
-        configuration: configValues,
+        name,
+        configuration: configurationSubmitPayload(integrationDef?.configuration, configuration),
       });
+      setSavedIntegrationName(name);
+      setSavedConfiguration(configuration);
       showSuccessToast("Integration saved");
-    } catch {
-      showErrorToast("Failed to update integration");
-    }
-  };
-
-  const handleBrowserAction = () => {
-    if (!integration?.status?.browserAction) return;
-
-    const { url, method, formFields } = integration.status.browserAction;
-
-    if (method?.toUpperCase() === "POST" && formFields) {
-      // Create a hidden form and submit it
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = url || "";
-      form.target = "_blank";
-      form.style.display = "none";
-
-      // Add form fields
-      Object.entries(formFields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      form.submit();
-      document.body.removeChild(form);
-    } else {
-      // For GET requests or no form fields, just open the URL
-      if (url) {
-        window.open(url, "_blank");
-      }
+    } catch (error) {
+      showErrorToast(`SuperPlane could not save the integration: ${getApiErrorMessage(error)}`);
     }
   };
 
   const handleDelete = async () => {
     if (!canDeleteIntegrations) return;
     try {
-      await deleteMutation.mutateAsync({ integrationName: integration?.metadata?.integrationName ?? "" });
+      await deleteMutation.mutateAsync({ integrationName: providerName });
       navigate(integrationsHref);
     } catch {
-      showErrorToast("Failed to delete integration");
+      showErrorToast("SuperPlane could not delete the integration. Try again.");
     }
   };
 
   return (
-    <div className="pt-6">
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <Link
-          to={integrationsHref}
-          className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
-          aria-label="Back to integrations"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <IntegrationIcon
-          integrationName={integration?.metadata?.integrationName}
-          iconSlug={integrationDef?.icon}
-          className="w-6 h-6"
-        />
-        <div className="flex-1 min-w-[200px]">
-          <h4 className="text-2xl font-medium">
-            {integration.metadata?.name ||
-              getIntegrationTypeDisplayName(undefined, integration.metadata?.integrationName) ||
-              integration.metadata?.integrationName}
-          </h4>
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <Plug
-            className={`w-4 h-4 ${
-              integration.status?.state === "ready"
-                ? "text-green-500"
-                : integration.status?.state === "error"
-                  ? "text-red-600"
-                  : "text-amber-600"
-            }`}
-          />
-          <span
-            className={`text-sm font-medium ${
-              integration.status?.state === "ready"
-                ? "text-green-500"
-                : integration.status?.state === "error"
-                  ? "text-red-600"
-                  : "text-amber-600"
-            }`}
-          >
-            {(integration.status?.state || "unknown").charAt(0).toUpperCase() +
-              (integration.status?.state || "unknown").slice(1)}
-          </span>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-3xl px-3 pt-14 pb-10">
+      <Header
+        organizationId={organizationId}
+        integration={integration}
+        integrationDef={integrationDef}
+        canDeleteIntegrations={canDeleteIntegrations}
+        permissionsLoading={permissionsLoading}
+        onRequestDelete={() => setShowDeleteConfirm(true)}
+      />
 
       <div className="space-y-6">
-        {integration.status?.state === "error" && integration.status?.stateDescription && (
-          <Alert variant="destructive" className="[&>svg+div]:translate-y-0 [&>svg]:top-[14px]">
-            <CircleX className="h-4 w-4" />
+        {integration.status?.state === "error" && integration.status.stateDescription ? (
+          <Alert className="border-destructive/40 bg-destructive/10 text-destructive [&>svg+div]:translate-y-0 [&>svg]:top-[14px] [&>svg]:text-destructive">
+            <CircleX className="size-4" />
+            <AlertTitle>Connection issue</AlertTitle>
             <AlertDescription>{integration.status.stateDescription}</AlertDescription>
           </Alert>
-        )}
+        ) : null}
 
         {showInstallPicker ? (
           <HostedGitHubInstallPicker
@@ -264,201 +172,161 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
             state={pendingInstallState}
             appSlug={hostedGitHubAppSlug(integration.status?.metadata)}
           />
-        ) : (
-          integration?.status?.browserAction && (
-            <IntegrationInstructions
-              description={integration.status.browserAction.description}
-              onContinue={integration.status.browserAction.url ? handleBrowserAction : undefined}
-            />
-          )
-        )}
+        ) : browserAction ? (
+          <IntegrationInstructions
+            description={browserAction.description}
+            tone="settings"
+            onContinue={browserAction.url ? () => followBrowserAction(browserAction) : undefined}
+          />
+        ) : null}
 
-        {instructionsContent}
+        {instructions ? <IntegrationInstructions description={instructions} tone="settings" /> : null}
 
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
-          <div className="p-6">
-            <h2 className="text-lg font-medium mb-4">Configuration</h2>
-            {integrationDef?.configuration && integrationDef.configuration.length > 0 ? (
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => setActiveTab(value as LegacyIntegrationTab)}
+          className="w-full"
+        >
+          <div className="border-b border-border">
+            <div className="flex flex-wrap px-4">
+              <TabButton activeTab={activeTab} value="configuration" onSelect={setActiveTab}>
+                Configuration
+              </TabButton>
+              <TabButton activeTab={activeTab} value="usage" onSelect={setActiveTab}>
+                Usage
+              </TabButton>
+            </div>
+          </div>
+
+          <TabsContent value="configuration" className="mt-4">
+            <section className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+              <div className="border-b border-border px-6 py-5">
+                <h2 className="text-base font-medium text-foreground">Configuration</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Update the integration name or replace its stored credentials.
+                </p>
+              </div>
+
               <PermissionTooltip
                 allowed={canUpdateIntegrations || permissionsLoading}
-                message="You don't have permission to update integrations."
+                message="You do not have permission to update integrations."
                 className="w-full"
               >
-                <form onSubmit={handleConfigSubmit} className="space-y-4">
-                  <div>
-                    <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                      Integration Name
-                      <span className="text-gray-800 ml-1">*</span>
-                    </Label>
-                    <Input
-                      type="text"
-                      value={integrationName}
-                      onChange={(e) => setIntegrationName(e.target.value)}
-                      placeholder="e.g., my-app-integration"
-                      disabled={!canUpdateIntegrations}
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                <form onSubmit={handleConfigSubmit}>
+                  <div className="max-w-2xl space-y-5 px-6 py-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="legacy-integration-name">
+                        Integration name <span aria-hidden>*</span>
+                      </Label>
+                      <Input
+                        id="legacy-integration-name"
+                        value={integrationName}
+                        onChange={(event) => setIntegrationName(event.target.value)}
+                        disabled={!canUpdateIntegrations}
+                        autoComplete="off"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use a unique name that identifies this connection.
+                      </p>
+                    </div>
+
+                    {integrationDef?.configuration?.length ? (
+                      integrationDef.configuration.map((field: ConfigurationField) => {
+                        if (!field.name) return null;
+                        const storedValue = configuration[field.name];
+                        return (
+                          <ConfigurationFieldRenderer
+                            key={field.name}
+                            field={editableConfigurationField(field, storedValue)}
+                            value={editableConfigurationValue(field, storedValue)}
+                            onChange={(value) =>
+                              setConfiguration((current) => ({
+                                ...current,
+                                [field.name!]: nextConfigurationValue(field, current[field.name!], value),
+                              }))
+                            }
+                            allValues={configuration}
+                            organizationId={organizationId}
+                            integrationId={integrationId}
+                          />
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">This integration has no configuration fields.</p>
+                    )}
                   </div>
 
-                  {configLoaded &&
-                    integrationDef.configuration.map((field: ConfigurationField) => (
-                      <ConfigurationFieldRenderer
-                        key={field.name}
-                        field={field}
-                        value={configValues[field.name!]}
-                        onChange={(value) => setConfigValues({ ...configValues, [field.name!]: value })}
-                        allValues={configValues}
-                        organizationId={organizationId}
-                        integrationId={integration?.metadata?.id}
-                      />
-                    ))}
-
-                  <div className="flex items-center gap-3 pt-4">
+                  <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted/40 px-6 py-4">
                     <LoadingButton
                       type="submit"
                       color="blue"
-                      disabled={!integrationName.trim() || !canUpdateIntegrations}
+                      disabled={!integrationName.trim() || !canUpdateIntegrations || !hasChanges}
                       loading={updateMutation.isPending}
                       loadingText="Saving..."
                     >
-                      Save
+                      Save changes
                     </LoadingButton>
-                    {updateMutation.isError && (
-                      <span className="text-sm text-red-600 dark:text-red-400">
-                        Failed to update integration: {getApiErrorMessage(updateMutation.error)}
-                      </span>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!hasChanges || updateMutation.isPending}
+                      onClick={() => {
+                        setIntegrationName(savedIntegrationName);
+                        setConfiguration(savedConfiguration);
+                      }}
+                    >
+                      Reset
+                    </Button>
+                    {updateMutation.isError ? (
+                      <p className="text-sm text-destructive">
+                        SuperPlane could not save the integration. {getApiErrorMessage(updateMutation.error)}
+                      </p>
+                    ) : null}
                   </div>
                 </form>
               </PermissionTooltip>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">No configuration fields available.</p>
-            )}
-          </div>
-        </div>
+            </section>
 
-        {webhookSection}
-
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
-          <div className="p-6">
-            <h2 className="text-lg font-medium mb-4">Integration Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Integration ID</h3>
-                <p className="text-sm text-gray-800 dark:text-gray-100 font-mono">{integration.metadata?.id}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Used By */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
-          <div className="p-6">
-            <h2 className="text-lg font-medium mb-4">Used By</h2>
-            {workflowGroups.length > 0 ? (
-              <>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                  This integration is currently used in the following canvases:
+            {typeof integration.status?.metadata?.webhookUrl === "string" ? (
+              <section className="mt-4 rounded-lg border border-border bg-card p-6 text-card-foreground">
+                <h2 className="text-base font-medium text-foreground">Webhook URL</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add this URL to the external service that sends webhook events.
                 </p>
-                <div className="space-y-2">
-                  {workflowGroups.map((group) => (
-                    <button
-                      key={group.canvasId}
-                      onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
-                      className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                          Canvas: {group.canvasName}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Used in {group.nodes.length} node{group.nodes.length !== 1 ? "s" : ""}:{" "}
-                          {group.nodes.map((node) => node.nodeName).join(", ")}
-                        </p>
-                      </div>
-                      <ExternalLink className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                    </button>
-                  ))}
+                <div className="mt-4 flex max-w-2xl items-center gap-2">
+                  <Input value={integration.status.metadata.webhookUrl} readOnly className="font-mono text-sm" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(integration.status!.metadata!.webhookUrl as string);
+                      showSuccessToast("Webhook URL copied");
+                    }}
+                  >
+                    <Copy className="size-4" aria-hidden />
+                    Copy
+                  </Button>
                 </div>
-              </>
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                This integration is not used in any workflow yet.
-              </p>
-            )}
-          </div>
-        </div>
+              </section>
+            ) : null}
+          </TabsContent>
 
-        {/* Danger Zone */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-red-200 dark:border-red-800">
-          <div className="p-6">
-            <h2 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">Danger Zone</h2>
-            <p className="text-sm text-gray-800 dark:text-gray-100 mb-4">
-              Once you delete this integration, all its data will be permanently deleted. This action cannot be undone.
-            </p>
-            <PermissionTooltip
-              allowed={canDeleteIntegrations || permissionsLoading}
-              message="You don't have permission to delete integrations."
-            >
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (!canDeleteIntegrations) return;
-                  setShowDeleteConfirm(true);
-                }}
-                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 gap-1"
-                disabled={!canDeleteIntegrations}
-                data-testid="integration-detail-delete"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Integration
-              </Button>
-            </PermissionTooltip>
-          </div>
-        </div>
+          <TabsContent value="usage" className="mt-4">
+            <UsageTab organizationId={organizationId} workflowGroups={workflowGroups} />
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
-                Delete {integration?.metadata?.name || "integration"}?
-              </h3>
-              <p className="text-sm text-gray-800 dark:text-gray-100 mb-6">
-                This cannot be undone. All data will be permanently deleted.
-              </p>
-              <div className="flex justify-start gap-3">
-                <LoadingButton
-                  color="blue"
-                  onClick={handleDelete}
-                  disabled={!canDeleteIntegrations}
-                  loading={deleteMutation.isPending}
-                  loadingText="Deleting..."
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700"
-                >
-                  Delete
-                </LoadingButton>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {deleteMutation.isError && (
-                <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Failed to delete integration. Please try again.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteModal
+        open={showDeleteConfirm}
+        integrationName={integration.metadata?.name}
+        canDeleteIntegrations={canDeleteIntegrations}
+        isDeleting={deleteMutation.isPending}
+        hasDeleteError={deleteMutation.isError}
+        onDelete={handleDelete}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

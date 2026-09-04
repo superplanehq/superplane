@@ -17,7 +17,9 @@ function storageKey(organizationId: string): string {
 }
 
 function isSafePath(path: string, organizationId: string): boolean {
-  return path.startsWith(`/${organizationId}/`) && !path.startsWith("//");
+  const pathname = path.split("?")[0] ?? path;
+  const isOrganizationPath = path.startsWith(`/${organizationId}/`);
+  return (isOrganizationPath || pathname === "/onboarding") && !path.startsWith("//");
 }
 
 export function rememberIntegrationSetupReturn(organizationId: string, path: string | undefined): void {

@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ConfigurationField } from "@/api-client";
 import { describe, expect, it, vi } from "vitest";
 import { ConfigurationFieldRenderer } from "./index";
@@ -48,6 +49,23 @@ describe("ConfigurationFieldRenderer togglable Claude admin key", () => {
     );
 
     expect(screen.getByTestId("string-field-adminkey")).toBeInTheDocument();
+  });
+
+  it("turns the optional admin key off", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      React.createElement(ConfigurationFieldRenderer, {
+        field: adminKeyField,
+        value: "",
+        onChange,
+      }),
+    );
+
+    await user.click(screen.getByRole("switch"));
+
+    expect(onChange).toHaveBeenCalledWith(null);
   });
 });
 

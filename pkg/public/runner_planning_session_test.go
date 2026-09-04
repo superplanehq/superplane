@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -202,6 +203,78 @@ func TestRunnerPlanningWaitContextCancelReturnsPending(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.Equal(t, "pending", body["status"])
+}
+
+func TestRunnerPlanningWaitCancelDoesNotConsumeUserMessage(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "hello"))
+	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=60", nil)
+	req = req.WithContext(ctx)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "pending", body["status"])
+
+	held, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitResolved, held.WaitState)
+
+	live := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	live.Header.Set("Authorization", "Bearer "+token)
+	liveRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(liveRec, live)
+	require.Equal(t, http.StatusOK, liveRec.Code, liveRec.Body.String())
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(liveRec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "hello", delivered["text"])
+}
+
+func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
+	r := support.Setup(t)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "hello"))
+	require.Equal(t, models.PlanningWaitResolved, session.WaitState)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(failingResponseWriter{ResponseWriter: rec}, req)
+
+	held, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningWaitResolved, held.WaitState)
+
+	live := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	live.Header.Set("Authorization", "Bearer "+token)
+	liveRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(liveRec, live)
+	require.Equal(t, http.StatusOK, liveRec.Code, liveRec.Body.String())
+	var delivered map[string]any
+	require.NoError(t, json.Unmarshal(liveRec.Body.Bytes(), &delivered))
+	assert.Equal(t, models.PlanningWaitKindMessage, delivered["status"])
+	assert.Equal(t, "hello", delivered["text"])
+}
+
+type failingResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (w failingResponseWriter) Write(p []byte) (int, error) {
+	return 0, errors.New("client gone")
 }
 
 func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Server, *models.FactoryPlanningSession, *models.Factory, string) {

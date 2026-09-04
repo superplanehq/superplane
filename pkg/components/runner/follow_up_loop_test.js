@@ -5,7 +5,14 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { interpretWaitResponse, nextAction, runLoop, runPromptFile, safeWaitRequest } = require("./follow_up_loop.js");
+const {
+  FOLLOW_UP_CMD_INDEX_BASE,
+  interpretWaitResponse,
+  nextAction,
+  runLoop,
+  runPromptFile,
+  safeWaitRequest,
+} = require("./follow_up_loop.js");
 
 const CLOUDFLARE_502 = {
   error: "An error occurred with your request. Please try again.",
@@ -57,6 +64,7 @@ test("runLoop runs the user prompt then exits on ended", async () => {
       return 0;
     },
     sleep: async () => {},
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
@@ -75,6 +83,7 @@ test("runLoop prompts after create or skip", async () => {
       prompts.push(text);
       return 0;
     },
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.equal(prompts.length, 2);
@@ -126,6 +135,7 @@ test("runLoop sleeps 1s with no log after a Cloudflare 502, then runs the next m
       sleeps.push(ms);
     },
     log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000]);
@@ -146,6 +156,7 @@ test("runLoop sleeps 1s with no log when a transient wait has no retry_after", a
       sleeps.push(ms);
     },
     log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000]);
@@ -165,6 +176,7 @@ test("runLoop ignores a large retry_after and stays silent", async () => {
       sleeps.push(ms);
     },
     log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000]);
@@ -188,6 +200,7 @@ test("runLoop backs off silently on idle pending and empty-message waits", async
       sleeps.push(ms);
     },
     log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000, 1000]);
@@ -210,6 +223,14 @@ test("safeWaitRequest treats an abort as pending", async () => {
   assert.deepEqual(got, { status: "pending" });
 });
 
+test("safeWaitRequest keeps a delivered user message", async () => {
+  const got = await safeWaitRequest(async () => ({
+    status: 200,
+    text: async () => JSON.stringify({ status: "message", text: "hello" }),
+  }));
+  assert.deepEqual(got, { status: "message", text: "hello" });
+});
+
 test("safeWaitRequest still throws on 401", async () => {
   await assert.rejects(
     () =>
@@ -219,6 +240,31 @@ test("safeWaitRequest still throws on 401", async () => {
       })),
     /unauthorized/,
   );
+});
+
+test("runLoop runs a user message after a dropped wait", async () => {
+  const prompts = [];
+  const logs = [];
+  const results = [
+    await safeWaitRequest(async () => {
+      throw new TypeError("fetch failed");
+    }),
+    { status: "message", text: "hello" },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async (text) => {
+      prompts.push(text);
+      return 0;
+    },
+    sleep: async () => {},
+    log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["hello"]);
+  assert.deepEqual(logs, []);
 });
 
 test("runLoop stays alive when waitOnce returns pending after a fetch throw", async () => {
@@ -234,10 +280,75 @@ test("runLoop stays alive when waitOnce returns pending after a fetch throw", as
       sleeps.push(ms);
     },
     log: (msg) => logs.push(msg),
+    writeLiveLogRecord: () => {},
   });
   assert.equal(code, 0);
   assert.deepEqual(sleeps, [1000]);
   assert.deepEqual(logs, []);
+});
+
+test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () => {
+  const records = [];
+  const nowValues = [5_000, 5_250, 6_000, 6_400];
+  const results = [
+    { status: "message", text: "Add color" },
+    { status: "created", work_order_key: "NEWWO-12" },
+    { status: "ended" },
+  ];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => 0,
+    writeLiveLogRecord: (rec) => records.push(rec),
+    now: () => nowValues.shift(),
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(records, [
+    {
+      type: "cmd_start",
+      index: FOLLOW_UP_CMD_INDEX_BASE,
+      text: "Add color",
+      kind: "prompt",
+      preview: "Add color",
+      started_at: 5_000,
+    },
+    {
+      type: "cmd_end",
+      index: FOLLOW_UP_CMD_INDEX_BASE,
+      status: "passed",
+      duration_ms: 250,
+    },
+    {
+      type: "cmd_start",
+      index: FOLLOW_UP_CMD_INDEX_BASE + 1,
+      text: nextAction({ status: "created", work_order_key: "NEWWO-12" }).text,
+      kind: "prompt",
+      preview: nextAction({ status: "created", work_order_key: "NEWWO-12" }).text,
+      started_at: 6_000,
+    },
+    {
+      type: "cmd_end",
+      index: FOLLOW_UP_CMD_INDEX_BASE + 1,
+      status: "passed",
+      duration_ms: 400,
+    },
+  ]);
+});
+
+test("runLoop marks a failed follow-up cmd_end and keeps waiting", async () => {
+  const records = [];
+  const results = [{ status: "message", text: "hello" }, { status: "ended" }];
+  const logs = [];
+  const code = await runLoop({
+    waitOnce: async () => results.shift(),
+    runPrompt: async () => 2,
+    writeLiveLogRecord: (rec) => records.push(rec),
+    now: () => 1_000,
+    log: (msg) => logs.push(msg),
+  });
+  assert.equal(code, 0);
+  assert.equal(records[1].type, "cmd_end");
+  assert.equal(records[1].status, "failed");
+  assert.match(logs[0], /follow-up prompt failed with exit 2/);
 });
 
 test("runPromptFile forwards extra argv to run.js", async () => {

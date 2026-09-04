@@ -60,6 +60,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
 		ProvisionedAppId:   config.ProvisionedAppID,
 		ProvisionedLineId:  config.ProvisionedLineID,
+		Initial:            factory.IsInitialOnboarding(),
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
