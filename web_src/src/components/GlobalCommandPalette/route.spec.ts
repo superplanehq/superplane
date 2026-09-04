@@ -37,6 +37,7 @@ describe("getRouteContext", () => {
       "/invite/token-1",
       "/install",
       "/login",
+      "/onboarding",
       "/setup",
       "/signup",
       "/welcome",

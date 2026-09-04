@@ -8,16 +8,16 @@ import { useRedirectIntegrationSetupReturn } from "./useRedirectIntegrationSetup
 const ORGANIZATION_ID = "org-1";
 const SETUP_PATH = "/org-1/workspaces/APP/setup?step=vcs&pick=newest";
 
-function ProviderReturnGuard() {
-  useRedirectIntegrationSetupReturn(ORGANIZATION_ID);
+function ProviderReturnGuard({ routeOrganizationId = ORGANIZATION_ID }: { routeOrganizationId?: string }) {
+  useRedirectIntegrationSetupReturn(routeOrganizationId, ORGANIZATION_ID);
   return <Outlet />;
 }
 
-function renderAt(path: string) {
+function renderAt(path: string, routeOrganizationId = ORGANIZATION_ID) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route element={<ProviderReturnGuard />}>
+        <Route element={<ProviderReturnGuard routeOrganizationId={routeOrganizationId} />}>
           <Route
             path="/:organizationId/settings/integrations/:integrationId"
             element={<div>integration details</div>}
@@ -42,6 +42,15 @@ describe("useRedirectIntegrationSetupReturn", () => {
 
     expect(await screen.findByText("workspace setup")).toBeInTheDocument();
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+    expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull();
+  });
+
+  it("returns a callback that uses the organization UID to a slug route", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/organization-uid/settings/integrations/github-connection", "organization-uid");
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
     expect(peekIntegrationSetupReturn(ORGANIZATION_ID)).toBeNull();
   });
 
