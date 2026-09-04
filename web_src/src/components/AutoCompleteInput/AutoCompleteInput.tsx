@@ -977,13 +977,15 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       };
 
       setDropdownPosition(
-        calculateDropdownPosition({
-          cursor,
-          viewportWidth: window.innerWidth,
-          dropdownWidth,
-          valuePreviewWidth,
-          showValuePreview,
-        }),
+      calculateDropdownPosition({
+  cursor,
+  viewportWidth: window.innerWidth,
+  viewportHeight: window.innerHeight,
+  dropdownWidth,
+  dropdownHeight: SUGGESTION_LIST_MAX_HEIGHT_PX,
+  valuePreviewWidth,
+  showValuePreview,
+}),
       );
     }, [inputValue, cursorPosition, dropdownWidth, showValuePreview]);
 
