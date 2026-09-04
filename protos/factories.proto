@@ -1785,7 +1785,7 @@ message DescribeFactoryVelocityRequest {
   PeopleSort people_sort = 4;
   // Defaults to SORT_DIRECTION_DESC.
   SortDirection people_sort_direction = 5;
-  // Rows per page of the People table. Defaults to 10, and is capped
+  // Rows per page of the People table. Defaults to 5, and is capped
   // server-side so a client cannot request the whole table in one call.
   int32 people_page_size = 6;
   // 0-based row offset into the sorted People table, for "Load more" paging.

@@ -1,4 +1,5 @@
 import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
+import { peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
 
 /**
  * Storybook payloads for the workspace Velocity report. The series drift on
@@ -147,7 +148,7 @@ function buildPeople(totals: ReturnType<typeof sumTotals>, authors: Author[] = P
 }
 
 /**
- * A cohort large enough that the People table's "Load more" control has
+ * A cohort large enough that the People table's "Show more" control has
  * something to show. Named so the alphabetical order matches the default
  * total-merged-descending sort closely enough for the Storybook fixture to
  * read as a believable, stable first page.
@@ -286,7 +287,7 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVeloc
 })();
 
 /**
- * Fourteen people with activity, so the People table's "Load more" control has
+ * Fourteen people with activity, so the People table's "Show more" control has
  * something to load. Every other fixture keeps the small default cohort so its
  * story keeps rendering one page with no control.
  */
@@ -312,7 +313,7 @@ const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => numb
  * Stands in for the backend's sort-then-page step: orders `report.people` by
  * the request's `peopleSort`/`peopleSortDirection`, then slices to
  * `peopleOffset`/`peoplePageSize`, so Storybook and the mock server exercise
- * the same "Load more" contract the real API does.
+ * the same "Show more" contract the real API does.
  */
 export function paginateVelocityPeople(
   report: FactoriesDescribeFactoryVelocityResponse,
@@ -329,7 +330,7 @@ export function paginateVelocityPeople(
   });
 
   const offset = Number(url.searchParams.get("peopleOffset") ?? 0);
-  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? 10);
+  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? peoplePageSizeForOffset(offset));
   const page = people.slice(offset, offset + pageSize);
 
   return {
