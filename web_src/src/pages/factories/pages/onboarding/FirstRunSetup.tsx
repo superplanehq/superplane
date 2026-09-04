@@ -2,8 +2,12 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { hostedGitHubInstallRequested } from "@/lib/hostedGitHubInstall";
-import { GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_REQUEST_VALUE } from "@/lib/integrationSetupReturn";
+import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
+import {
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_REQUEST_PARAM,
+  GITHUB_SETUP_REQUEST_VALUE,
+} from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
 import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
@@ -226,11 +230,18 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const installRequested =
     searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
     model.githubConnections.allInstances.some((instance) => hostedGitHubInstallRequested(instance.status?.metadata));
+  const githubOrganization =
+    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
+    model.githubConnections.allInstances
+      .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
+      .find((account) => account !== "") ||
+    "";
 
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
     skipAgentScreen,
     installRequested,
+    githubOrganization,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -286,6 +297,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunConnectScreen
         githubConnected={setup.vcsReady}
         installRequested={flow.installRequested}
+        githubOrganization={flow.githubOrganization}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onContinue={() => flow.goToScreen("choose")}

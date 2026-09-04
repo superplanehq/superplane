@@ -66,6 +66,7 @@ export const ConnectInstallRequested: Story = {
     <FirstRunConnectScreen
       githubConnected={false}
       installRequested
+      githubOrganization="acme"
       chrome={firstRunStoryChrome(1)}
       onConnectGitHub={() => undefined}
       onContinue={() => undefined}

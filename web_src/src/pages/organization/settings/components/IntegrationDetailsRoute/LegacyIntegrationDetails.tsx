@@ -12,12 +12,22 @@ import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
 import {
+  GITHUB_INSTALL_REQUEST_NEXT,
+  githubInstallRequestBody,
+  githubInstallRequestSettingsTitle,
+} from "@/lib/githubInstallRequestCopy";
+import {
   hostedGitHubAppSlug,
   hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
   hostedGitHubState,
   pendingGitHubInstallations,
 } from "@/lib/hostedGitHubInstall";
-import { GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_REQUEST_VALUE } from "@/lib/integrationSetupReturn";
+import {
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_REQUEST_PARAM,
+  GITHUB_SETUP_REQUEST_VALUE,
+} from "@/lib/integrationSetupReturn";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { cn } from "@/lib/utils";
 import { HostedGitHubInstallPicker } from "@/pages/organization/settings/components/HostedGitHubInstallPicker";
@@ -116,6 +126,9 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
   const installRequested =
     searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
     hostedGitHubInstallRequested(integration.status?.metadata);
+  const installRequestedOrganization =
+    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
+    hostedGitHubInstallRequestedAccount(integration.status?.metadata);
   const showInstallPicker =
     pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
   const browserAction = integration.status?.browserAction;
@@ -170,10 +183,10 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       <div className="space-y-6">
         {installRequested && integration.status?.state !== "ready" ? (
           <Alert data-testid="github-install-requested">
-            <AlertTitle>Waiting for GitHub approval</AlertTitle>
+            <AlertTitle>{githubInstallRequestSettingsTitle(installRequestedOrganization)}</AlertTitle>
             <AlertDescription>
-              <p>Ask a GitHub organization admin to approve the SuperPlane GitHub App.</p>
-              <p>After they approve, click Connect GitHub again.</p>
+              <p>{githubInstallRequestBody(installRequestedOrganization)}</p>
+              <p>{GITHUB_INSTALL_REQUEST_NEXT}</p>
             </AlertDescription>
           </Alert>
         ) : null}

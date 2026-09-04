@@ -143,6 +143,6 @@ func (s *githubInstallRequestSteps) assertThePendingRequestIsExplained() {
 }
 
 func (s *githubInstallRequestSteps) assertPendingRequestCopy() {
-	s.session.AssertText("Ask a GitHub organization admin to approve the SuperPlane GitHub App.")
+	s.session.AssertText("Waiting for approval")
 	s.session.AssertText("After they approve, click Connect GitHub again.")
 }

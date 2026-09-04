@@ -7,6 +7,8 @@ export const INTEGRATION_SETUP_STAY_PARAM = "setupStay";
 /** GitHub returned setup_action=request. A GitHub admin must approve the install. */
 export const GITHUB_SETUP_REQUEST_PARAM = "githubSetup";
 export const GITHUB_SETUP_REQUEST_VALUE = "request";
+/** GitHub organization the member asked an admin to approve. */
+export const GITHUB_SETUP_ORG_PARAM = "githubOrg";
 
 interface StoredReturn {
   path: string;
@@ -84,6 +86,11 @@ export function hasGitHubSetupRequest(search: string): boolean {
   return new URLSearchParams(query).get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
 }
 
+export function githubSetupRequestedOrganization(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(GITHUB_SETUP_ORG_PARAM)?.trim() ?? "";
+}
+
 /** Copies githubSetup=request from the provider callback onto the stored return path. */
 export function withGitHubSetupRequest(path: string, search: string): string {
   if (!hasGitHubSetupRequest(search)) return path;
@@ -91,5 +98,9 @@ export function withGitHubSetupRequest(path: string, search: string): string {
   const [pathname, existing = ""] = path.split("?");
   const params = new URLSearchParams(existing);
   params.set(GITHUB_SETUP_REQUEST_PARAM, GITHUB_SETUP_REQUEST_VALUE);
+  const organization = githubSetupRequestedOrganization(search);
+  if (organization !== "") {
+    params.set(GITHUB_SETUP_ORG_PARAM, organization);
+  }
   return `${pathname}?${params.toString()}`;
 }

@@ -43,6 +43,20 @@ export function hostedGitHubInstallRequested(metadata: unknown): boolean {
   return (metadata as { installRequested?: unknown }).installRequested === true;
 }
 
+export function hostedGitHubInstallRequestedAccount(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const requested = (metadata as { installRequestedAccount?: unknown }).installRequestedAccount;
+  if (typeof requested === "string" && requested !== "") {
+    return requested;
+  }
+
+  const owner = (metadata as { owner?: unknown }).owner;
+  return typeof owner === "string" ? owner : "";
+}
+
 export function hostedGitHubState(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";

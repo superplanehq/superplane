@@ -20,6 +20,9 @@ type Metadata struct {
 	// InstallRequested is true when a non-admin asked a GitHub org admin to
 	// install the app. Setup then returned setup_action=request.
 	InstallRequested bool `mapstructure:"installRequested" json:"installRequested,omitempty"`
+	// InstallRequestedAccount is the GitHub organization (or user) login the
+	// member asked an admin to approve.
+	InstallRequestedAccount string `mapstructure:"installRequestedAccount" json:"installRequestedAccount,omitempty"`
 }
 
 type PendingInstallation struct {

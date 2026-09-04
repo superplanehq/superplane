@@ -4,6 +4,7 @@ import {
   hostedGitHubAppSlug,
   hostedGitHubBindPath,
   hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
   hostedGitHubInstallURL,
   hostedGitHubState,
   pendingGitHubInstallations,
@@ -51,5 +52,12 @@ describe("hosted GitHub URLs", () => {
     expect(hostedGitHubInstallRequested({ installRequested: false })).toBe(false);
     expect(hostedGitHubInstallRequested({})).toBe(false);
     expect(hostedGitHubInstallRequested(undefined)).toBe(false);
+  });
+
+  it("reads the organization waiting for approval", () => {
+    expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({ owner: "acme" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({ installRequestedAccount: "acme", owner: "other" })).toBe("acme");
+    expect(hostedGitHubInstallRequestedAccount({})).toBe("");
   });
 });

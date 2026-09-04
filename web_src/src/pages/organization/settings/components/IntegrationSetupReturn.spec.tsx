@@ -95,6 +95,16 @@ describe("IntegrationSetupReturn", () => {
     expect(screen.queryByText("integration details")).not.toBeInTheDocument();
   });
 
+  it("forwards the GitHub organization waiting for approval", async () => {
+    rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
+
+    renderAt("/org-1/settings/integrations/abc?githubSetup=request&githubOrg=acme", <div>integration details</div>);
+
+    expect(await screen.findByText("workspace setup")).toBeInTheDocument();
+    expect(screen.getByText("githubSetup=request&githubOrg=acme")).toBeInTheDocument();
+    expect(screen.queryByText("integration details")).not.toBeInTheDocument();
+  });
+
   it("stays on the integration page when setupStay is set", async () => {
     rememberIntegrationSetupReturn(ORGANIZATION_ID, SETUP_PATH);
 

@@ -51,6 +51,9 @@ describe("integration setup return", () => {
     expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request")).toBe(
       "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request",
     );
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request&githubOrg=acme")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
   });
 
   it("returns the path regardless of the integration the provider redirects to", () => {

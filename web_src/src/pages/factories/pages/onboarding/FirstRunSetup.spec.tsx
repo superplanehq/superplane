@@ -143,6 +143,16 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
+  it("names the GitHub organization from the return query", () => {
+    renderSetup(
+      pageModel({ openSection: "vcs" }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
+
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).toBeInTheDocument();
+  });
+
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
     renderSetup(pageModel({ hostedAgentReady: true }));
 

@@ -243,6 +243,25 @@ func Test__afterAppInstallationLegacy_installRequest(t *testing.T) {
 		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
 	})
 
+	t.Run("persists the requested GitHub organization", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubOrg=acme",
+			rec.Header().Get("Location"),
+		)
+		assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	})
+
 	t.Run("rejects request with a mismatched state", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
 		ctx, rec := hostedRequestContext(
