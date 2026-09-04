@@ -1,8 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { getGitHubAccountConnectHref, githubOnboardingAuthErrorMessage } from "./githubAccountLinkHref";
+import { organizationNameFromAccount } from "./organizationNameFromAccount";
 
 export type ProvisionedWorkspace = {
   organizationSlug: string;
@@ -17,19 +16,15 @@ interface OrganizationOnboardingRedirectProps {
 export function OrganizationOnboardingRedirect({ renderWorkspace }: OrganizationOnboardingRedirectProps) {
   const { account } = useAccount();
   const hasStartedProvisioning = useRef(false);
-  const githubAuthError = useRef(consumeOnboardingAuthError()).current;
-  const [error, setError] = useState<string | null>(githubOnboardingAuthErrorMessage(githubAuthError));
+  const [error, setError] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<ProvisionedWorkspace | null>(null);
-  const githubAccount = account?.linked_accounts?.find((candidate) => candidate.provider === "github");
-  const githubProvider = account?.providers?.find((candidate) => candidate.provider === "github");
-  const owner = githubAccount?.name || githubAccount?.username || githubProvider?.username || "";
+  const owner = organizationNameFromAccount(account);
   const onboardingAttempt = useRef(getOnboardingAttempt());
 
   useEffect(() => {
-    if (!account || hasStartedProvisioning.current || githubAuthError) return;
-
+    if (!account || hasStartedProvisioning.current) return;
     if (!owner) {
-      window.location.replace(getGitHubAccountConnectHref());
+      setError("Could not start workspace setup. Add a name to your SuperPlane account and try again.");
       return;
     }
 
@@ -39,7 +34,7 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
       .catch((provisioningError: unknown) => {
         setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
       });
-  }, [account, githubAuthError, owner]);
+  }, [account, owner]);
 
   if (workspace) {
     return renderWorkspace(workspace, onboardingAttempt.current.entryPath);
@@ -48,42 +43,26 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
   if (!error) return null;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-foreground">
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
       <p className="text-sm text-destructive">{error}</p>
-      {githubAuthError ? (
-        <Button type="button" onClick={() => window.location.assign(getGitHubAccountConnectHref())}>
-          Connect GitHub
-        </Button>
-      ) : null}
     </main>
   );
 }
 
-function consumeOnboardingAuthError(): string | null {
+function getOnboardingAttempt(): { id: string; entryPath: string } {
   const searchParams = new URLSearchParams(window.location.search);
-  const error = searchParams.get("auth_error");
-  if (!error) {
-    return null;
-  }
-
   searchParams.delete("auth_error");
   searchParams.delete("auth_link_result");
   searchParams.delete("linked_account");
   searchParams.delete("provider");
-  const search = searchParams.toString();
-  window.history.replaceState(null, "", search ? `${window.location.pathname}?${search}` : window.location.pathname);
-  return error;
-}
-
-function getOnboardingAttempt(): { id: string; entryPath: string } {
-  const searchParams = new URLSearchParams(window.location.search);
   let attemptID = searchParams.get("attempt");
 
   if (!attemptID) {
     attemptID = crypto.randomUUID();
     searchParams.set("attempt", attemptID);
-    window.history.replaceState(null, "", `${window.location.pathname}?${searchParams}`);
   }
+
+  window.history.replaceState(null, "", `${window.location.pathname}?${searchParams}`);
 
   return {
     id: attemptID,
