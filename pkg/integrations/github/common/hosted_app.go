@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/config"
@@ -56,7 +57,25 @@ func HostedAppConfigured() bool {
 }
 
 func HostedAppInstallURL(slug, state string) string {
-	return fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", slug, url.QueryEscape(state))
+	return HostedAppInstallURLForAccount(slug, state, 0)
+}
+
+func HostedAppInstallURLForAccount(slug, state string, targetID int64) string {
+	values := url.Values{}
+	if state != "" {
+		values.Set("state", state)
+	}
+	if targetID > 0 {
+		values.Set("target_id", strconv.FormatInt(targetID, 10))
+	}
+
+	path := fmt.Sprintf("https://github.com/apps/%s/installations/new", slug)
+	encoded := values.Encode()
+	if encoded == "" {
+		return path
+	}
+
+	return path + "?" + encoded
 }
 
 func HostedAppOAuthCallbackURL(baseURL string) string {

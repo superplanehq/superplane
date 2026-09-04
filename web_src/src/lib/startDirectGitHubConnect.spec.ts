@@ -124,6 +124,8 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
+      githubUserId: "",
+      githubUserLogin: "",
       installations: [
         { id: "11", accountLogin: "acme" },
         { id: "22", accountLogin: "octo" },
@@ -156,6 +158,8 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
+      githubUserId: "",
+      githubUserLogin: "",
       installations: [{ id: "22", accountLogin: "octo" }],
     });
   });

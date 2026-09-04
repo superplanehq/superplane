@@ -25,6 +25,7 @@ export const FIRST_RUN_COPY = {
     selectAccount: "Select a GitHub account",
     selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
     useAccount: (account: string) => `Use ${account}`,
+    usePersonal: (account: string) => `Use personal account (${account})`,
     installDifferentAccount: "Install on a different account",
     cancelRequest: "Cancel the request on GitHub",
     manageAccounts: "Manage GitHub accounts",

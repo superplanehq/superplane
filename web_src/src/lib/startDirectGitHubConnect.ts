@@ -11,7 +11,10 @@ import {
   hostedGitHubAppSlug,
   hostedGitHubInstallRequested,
   hostedGitHubState,
+  hostedGitHubUserId,
+  hostedGitHubUserLogin,
   pendingGitHubInstallations,
+  sortGitHubInstallations,
   type PendingGitHubInstallation,
 } from "@/lib/hostedGitHubInstall";
 import { integrationDetailPath, legacySettingsIntegrationsPath } from "@/lib/integrationSettingsPaths";
@@ -25,6 +28,8 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
+  githubUserId: string;
+  githubUserLogin: string;
 };
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -100,11 +105,16 @@ export function pendingGitHubAccountPicker(
     return undefined;
   }
 
+  const metadata = pending.status?.metadata;
+  const githubUserLogin = hostedGitHubUserLogin(metadata);
+
   return {
     id: pending.metadata.id,
-    installations: pendingGitHubInstallations(pending.status?.metadata),
-    state: hostedGitHubState(pending.status?.metadata),
-    appSlug: hostedGitHubAppSlug(pending.status?.metadata),
+    installations: sortGitHubInstallations(pendingGitHubInstallations(metadata), githubUserLogin),
+    state: hostedGitHubState(metadata),
+    appSlug: hostedGitHubAppSlug(metadata),
+    githubUserId: hostedGitHubUserId(metadata),
+    githubUserLogin,
   };
 }
 

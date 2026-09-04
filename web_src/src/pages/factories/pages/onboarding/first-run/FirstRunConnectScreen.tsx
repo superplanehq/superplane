@@ -5,6 +5,8 @@ import { Check, Clock } from "lucide-react";
 import {
   hostedGitHubBindPath,
   hostedGitHubInstallURL,
+  isPersonalGitHubAccount,
+  sortGitHubInstallations,
   type PendingGitHubInstallation,
 } from "@/lib/hostedGitHubInstall";
 
@@ -52,19 +54,26 @@ function FirstRunGitHubAccountPicker({
   githubState,
   githubAppSlug,
   installRequested,
+  githubUserId,
+  githubUserLogin,
 }: {
   installations: PendingGitHubInstallation[];
   githubState: string;
   githubAppSlug: string;
   installRequested: boolean;
+  githubUserId: string;
+  githubUserLogin: string;
 }) {
+  const ordered = sortGitHubInstallations(installations, githubUserLogin);
+  const hasPersonalInstall = ordered.some((installation) => isPersonalGitHubAccount(installation, githubUserLogin));
+
   return (
     <div className="space-y-3" data-testid="first-run-github-account-picker">
       <FirstRunPanel>
         <p className="text-[13px] font-medium">{copy.selectAccount}</p>
         <p className="mt-0.5 text-[13px] text-muted-foreground">{copy.selectAccountBody}</p>
       </FirstRunPanel>
-      {installations.map((installation) => (
+      {ordered.map((installation) => (
         <Button
           key={installation.id}
           type="button"
@@ -74,9 +83,23 @@ function FirstRunGitHubAccountPicker({
             window.location.assign(hostedGitHubBindPath(githubState, installation.id));
           }}
         >
-          {copy.useAccount(installation.accountLogin)}
+          {isPersonalGitHubAccount(installation, githubUserLogin)
+            ? copy.usePersonal(installation.accountLogin)
+            : copy.useAccount(installation.accountLogin)}
         </Button>
       ))}
+      {!hasPersonalInstall && githubAppSlug !== "" && githubUserId !== "" ? (
+        <Button
+          type="button"
+          className="w-full justify-start"
+          data-testid="first-run-github-use-personal"
+          onClick={() => {
+            window.location.assign(hostedGitHubInstallURL(githubAppSlug, githubState, githubUserId));
+          }}
+        >
+          {copy.usePersonal(githubUserLogin || "GitHub")}
+        </Button>
+      ) : null}
       {githubAppSlug !== "" && installRequested ? (
         <a
           href={hostedGitHubInstallURL(githubAppSlug, githubState)}
@@ -106,6 +129,8 @@ export function FirstRunConnectScreen({
   pendingInstallations = [],
   githubState = "",
   githubAppSlug = "",
+  githubUserId = "",
+  githubUserLogin = "",
   connectError,
   chrome,
   onConnectGitHub,
@@ -117,6 +142,8 @@ export function FirstRunConnectScreen({
   pendingInstallations?: PendingGitHubInstallation[];
   githubState?: string;
   githubAppSlug?: string;
+  githubUserId?: string;
+  githubUserLogin?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
@@ -167,6 +194,8 @@ export function FirstRunConnectScreen({
                 githubState={githubState}
                 githubAppSlug={githubAppSlug}
                 installRequested={installRequested}
+                githubUserId={githubUserId}
+                githubUserLogin={githubUserLogin}
               />
             ) : (
               <Button

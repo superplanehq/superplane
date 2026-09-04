@@ -199,7 +199,8 @@ describe("FirstRunSetup", () => {
                   installRequested: true,
                   installRequestedAccount: "acme",
                   githubApp: { slug: "superplane" },
-                  pendingInstallations: [{ id: "22", accountLogin: "octo" }],
+                  pendingInstallations: [{ id: "22", accountLogin: "octo", accountType: "User" }],
+                  githubUserLogin: "octo",
                 },
               },
             },
@@ -210,7 +211,7 @@ describe("FirstRunSetup", () => {
     );
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.usePersonal("octo") })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent("acme");
     expect(screen.getByTestId("first-run-github-cancel-request")).toBeInTheDocument();
   });
