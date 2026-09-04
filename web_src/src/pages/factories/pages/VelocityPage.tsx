@@ -17,6 +17,8 @@ import {
   type VelocityReport,
 } from "../lib/factoryVelocityReport";
 import { factoryCenteredSectionBodyClassName, factoryCenteredSectionHeaderClassName } from "./factoryPageLayoutStyles";
+import { AUTOMATION_RUNS_BY_PERIOD } from "./velocityAutomationsMockData";
+import { VelocityAutomationsTable } from "./VelocityAutomationsTable";
 import { CostCard, DeliveryCard, SummaryCard, TaskTimeCard } from "./velocityCards";
 import { VelocityPeopleTable } from "./VelocityPeopleTable";
 import { VelocityZeroState } from "./VelocityZeroState";
@@ -44,7 +46,15 @@ export function VelocityPage() {
     return renderShell(header, <VelocityZeroState tasksHref={workOrdersPath(organizationId, factoryKey)} />);
   }
 
-  return renderShell(header, <VelocityReportView model={model} report={model.velocity.report} />);
+  return renderShell(
+    header,
+    <VelocityReportView
+      model={model}
+      report={model.velocity.report}
+      organizationId={organizationId}
+      factoryKey={factoryKey}
+    />,
+  );
 }
 
 /**
@@ -63,9 +73,20 @@ function renderShell(header: ReactNode, body: ReactNode) {
   );
 }
 
-function VelocityReportView({ model, report }: { model: VelocityPageModel; report: VelocityReport }) {
+function VelocityReportView({
+  model,
+  report,
+  organizationId,
+  factoryKey,
+}: {
+  model: VelocityPageModel;
+  report: VelocityReport;
+  organizationId: string;
+  factoryKey: string;
+}) {
   const [breakdown, setBreakdown] = useState<VelocityBreakdown>("origin");
   const flow = model.taskTime.flow;
+  const automations = AUTOMATION_RUNS_BY_PERIOD[model.periodDays];
 
   return (
     <>
@@ -95,6 +116,14 @@ function VelocityReportView({ model, report }: { model: VelocityPageModel; repor
           canLoadMore={model.people.canLoadMore}
           isLoadingMore={model.people.isLoadingMore}
           onLoadMore={model.people.loadMore}
+        />
+      ) : null}
+      {automations.length > 0 ? (
+        <VelocityAutomationsTable
+          automations={automations}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          periodLabel={model.periodLabel}
         />
       ) : null}
       <div className="grid gap-5 lg:grid-cols-2">
