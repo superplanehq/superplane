@@ -32,6 +32,65 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
   });
 
+  it("explains a pending GitHub install request without treating it as an error", async () => {
+    const user = userEvent.setup();
+    const onConnectGitHub = vi.fn();
+
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        onConnectGitHub={onConnectGitHub}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.installRequested,
+    );
+    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody())).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedNext)).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-install-org")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
+    expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-connect-github"));
+    expect(onConnectGitHub).toHaveBeenCalled();
+  });
+
+  it("hides a connect error while the install request is waiting", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        connectError={FIRST_RUN_COPY.connect.connectError}
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.connectError)).not.toBeInTheDocument();
+    expect(document.querySelector(".text-destructive")).not.toBeInTheDocument();
+  });
+
+  it("names the GitHub organization that is waiting for approval", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="acme"
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.getByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody())).not.toBeInTheDocument();
+  });
+
   it("continues to the repository step after GitHub is connected", async () => {
     const user = userEvent.setup();
     const onContinue = vi.fn();

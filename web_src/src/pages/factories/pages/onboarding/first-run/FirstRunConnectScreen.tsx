@@ -1,25 +1,30 @@
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, Clock } from "lucide-react";
 
 import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 export function FirstRunConnectScreen({
   githubConnected,
+  installRequested = false,
+  githubOrganization = "",
   connectError,
   chrome,
   onConnectGitHub,
   onContinue,
 }: {
   githubConnected: boolean;
+  installRequested?: boolean;
+  githubOrganization?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onContinue: () => void;
 }) {
   const copy = FIRST_RUN_COPY.connect;
+  const waitingForApproval = installRequested && !githubConnected;
 
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
@@ -43,12 +48,37 @@ export function FirstRunConnectScreen({
             </Button>
           </>
         ) : (
-          <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
-            {copy.connectGitHub}
-          </Button>
+          <>
+            {waitingForApproval ? (
+              <FirstRunPanel>
+                <div className="flex items-start gap-3" data-testid="first-run-github-install-requested">
+                  <IntegrationChoiceIcon name="github" />
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="text-[13px] font-medium">{copy.installRequested}</p>
+                    {githubOrganization ? (
+                      <p
+                        className="mt-0.5 text-[13px] text-muted-foreground"
+                        data-testid="first-run-github-install-org"
+                      >
+                        {githubOrganization}
+                      </p>
+                    ) : null}
+                  </div>
+                  <Clock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                </div>
+                <div className="mt-3 space-y-1 border-t border-border pt-3 text-left">
+                  <p className="text-[13px] text-muted-foreground">{copy.installRequestedBody(githubOrganization)}</p>
+                  <p className="text-[13px] text-muted-foreground">{copy.installRequestedNext}</p>
+                </div>
+              </FirstRunPanel>
+            ) : null}
+            <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
+              {copy.connectGitHub}
+            </Button>
+          </>
         )}
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
-        {connectError ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
+        {connectError && !waitingForApproval ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>
   );
