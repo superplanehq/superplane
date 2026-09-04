@@ -752,7 +752,7 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.NotEmpty(t, roles)
 	})
 
-	t.Run("organization creation fails with 409 when name already exists", func(t *testing.T) {
+	t.Run("organizations with a duplicate name are both created and get distinct slugs", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
 		account, err := models.CreateAccount("duplicate@example.com", "Duplicate User")
@@ -774,6 +774,10 @@ func Test__CreateOrganization(t *testing.T) {
 
 		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})
 		require.NoError(t, err)
+
+		//
+		// The first creation succeeds.
+		//
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        "/organizations",
@@ -781,8 +785,18 @@ func Test__CreateOrganization(t *testing.T) {
 			authCookie:  token,
 			contentType: "application/json",
 		})
-		assert.Equal(t, http.StatusOK, response.Code)
+		require.Equal(t, http.StatusOK, response.Code)
 
+		var firstData map[string]interface{}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &firstData))
+		firstOrg, err := models.FindOrganizationByID(firstData["id"].(string))
+		require.NoError(t, err)
+
+		//
+		// Names are no longer required to be unique, so a second organization
+		// with the same name is also created. Only the slug must stay unique,
+		// so the second organization gets a distinct slug.
+		//
 		response = execRequest(server, requestParams{
 			method:      "POST",
 			path:        "/organizations",
@@ -790,8 +804,17 @@ func Test__CreateOrganization(t *testing.T) {
 			authCookie:  token,
 			contentType: "application/json",
 		})
-		assert.Equal(t, http.StatusConflict, response.Code)
-		assert.Contains(t, response.Body.String(), "Organization name already in use")
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var secondData map[string]interface{}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &secondData))
+		secondOrg, err := models.FindOrganizationByID(secondData["id"].(string))
+		require.NoError(t, err)
+
+		assert.Equal(t, "Duplicate Organization", firstOrg.Name)
+		assert.Equal(t, "Duplicate Organization", secondOrg.Name)
+		assert.NotEqual(t, firstOrg.ID, secondOrg.ID)
+		assert.NotEqual(t, firstOrg.Slug, secondOrg.Slug)
 	})
 
 	t.Run("organization creation returns 429 when account limit is reached", func(t *testing.T) {
