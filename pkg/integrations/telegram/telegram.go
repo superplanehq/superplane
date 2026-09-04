@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -179,22 +180,7 @@ func (t *Telegram) HandleRequest(ctx core.HTTPRequestContext) {
 		}
 	}
 
-	isMention := false
-	botUsername := "@" + metadata.Username
-
-	// Check for mentions in entities
-	for _, entity := range update.Message.Entities {
-		if entity.Type == "mention" {
-			// Extract the mentioned username from the message text
-			mentionedText := update.Message.Text[entity.Offset : entity.Offset+entity.Length]
-			if strings.EqualFold(mentionedText, botUsername) {
-				isMention = true
-				break
-			}
-		}
-	}
-
-	if !isMention {
+	if !mentionsBot(update.Message, metadata.Username) {
 		ctx.Response.WriteHeader(200)
 		return
 	}
@@ -261,6 +247,38 @@ func (t *Telegram) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Response.WriteHeader(200)
+}
+
+// mentionsBot reports whether one of the message's mention entities names the bot.
+//
+// Telegram counts entity offsets and lengths in UTF-16 code units, so the text is
+// converted before slicing. Indexing the Go string directly misplaces the slice as
+// soon as an earlier character is not a single UTF-8 byte, which silently loses the
+// mention.
+func mentionsBot(message *TelegramMessage, botUsername string) bool {
+	if botUsername == "" {
+		return false
+	}
+
+	mention := "@" + botUsername
+	text := utf16.Encode([]rune(message.Text))
+
+	for _, entity := range message.Entities {
+		if entity.Type != "mention" {
+			continue
+		}
+
+		if entity.Offset < 0 || entity.Length < 0 || entity.Offset+entity.Length > len(text) {
+			continue
+		}
+
+		mentioned := string(utf16.Decode(text[entity.Offset : entity.Offset+entity.Length]))
+		if strings.EqualFold(mentioned, mention) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (t *Telegram) Cleanup(ctx core.IntegrationCleanupContext) error {
