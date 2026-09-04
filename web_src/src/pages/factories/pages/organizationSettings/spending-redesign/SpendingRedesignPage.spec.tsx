@@ -9,7 +9,7 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID, STORYBOOK_ME_USER_NAME } from "../../../__fixtures__/factoryPageIds";
 import { SpendingRedesignPage } from "./SpendingRedesignPage";
 import { SPENDING_CATALOGS, SPENDING_CREDIT, SPENDING_LEDGER, SPENDING_REDESIGN_NOW } from "./spendingRedesignMocks";
-import { EMPTY_SPENDING_FILTERS, rangeForPreset } from "./spendingRedesignLib";
+import { EMPTY_SPENDING_FILTERS, formatSpendingRangeCaption, rangeForPreset } from "./spendingRedesignLib";
 
 function renderPage(props?: Partial<ComponentProps<typeof SpendingRedesignPage>>) {
   return render(
@@ -48,7 +48,9 @@ describe("SpendingRedesignPage", () => {
     expect(screen.getByTestId("spending-kpi-tokens")).toHaveTextContent("Tokens");
     expect(screen.getByTestId("spending-kpi-vm")).toHaveTextContent("VM time");
     expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
-    expect(screen.getByRole("tab", { name: "Month", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 30 days");
+    expect(screen.queryByRole("tab", { name: "Custom" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Custom range" })).not.toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
         "Semaphore",
@@ -77,12 +79,26 @@ describe("SpendingRedesignPage", () => {
   it("renders the KPI summary below the range control and above the usage sections", () => {
     renderPage();
 
-    const range = screen.getByRole("tablist", { name: "Spending time range" });
+    const range = screen.getByTestId("spending-period");
     const kpi = screen.getByTestId("spending-kpi-spend");
     const models = screen.getByTestId("spending-model-usage");
 
     expect(range.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(kpi.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens presets and a calendar in one period picker", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId("spending-period"));
+
+    expect(screen.getByRole("radio", { name: "Last 30 days", checked: true })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 7 days" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 24 hours" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 12 months" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Custom" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("spending-period-picker")).toBeInTheDocument();
   });
 
   it("keeps model filters and VM filters on their own explorers", () => {
@@ -154,13 +170,14 @@ describe("SpendingRedesignPage", () => {
     expect(screen.queryByRole("menuitemradio", { name: "Models" })).not.toBeInTheDocument();
   });
 
-  it("narrows totals when the Week range is selected", async () => {
+  it("narrows totals when the last 7 days are selected", async () => {
     const user = userEvent.setup();
     renderPage();
 
     const monthSpend = screen.getByTestId("spending-kpi-spend").textContent;
-    await user.click(screen.getByRole("tab", { name: "Week" }));
-    expect(screen.getByRole("tab", { name: "Week", selected: true })).toBeInTheDocument();
+    await user.click(screen.getByTestId("spending-period"));
+    await user.click(screen.getByRole("radio", { name: "Last 7 days" }));
+    expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 7 days");
     expect(screen.getByTestId("spending-kpi-spend").textContent).not.toBe(monthSpend);
   });
 
@@ -269,7 +286,9 @@ describe("SpendingRedesignPage", () => {
     });
 
     const models = screen.getByTestId("spending-model-usage");
-    expect(screen.getByRole("tab", { name: "Custom", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-period")).toHaveTextContent(
+      formatSpendingRangeCaption(rangeForPreset("week", SPENDING_REDESIGN_NOW)),
+    );
     expect(within(models).getByTestId("spending-model-group-by")).toHaveTextContent("Group by Users");
     expect(within(models).getByTestId("spending-model-filter-users")).toHaveTextContent(STORYBOOK_ME_USER_NAME);
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Semaphore");

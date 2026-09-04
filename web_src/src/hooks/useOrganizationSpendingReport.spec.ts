@@ -46,40 +46,59 @@ describe("useOrganizationSpendingReport", () => {
   });
 
   /**
-   * The filters and group-by are part of the query key, so switching either
-   * one starts a new query. Without the previous report to hold, the page has
-   * no data to render for a moment and drops every panel into its loading
-   * state, which reads as the whole settings page reloading.
+   * The filters, group-by, and time range are part of the query key, so
+   * switching any of them starts a new query. Without the previous report to
+   * hold, the page has no data to render for a moment and drops every panel
+   * into its loading state, which reads as the whole settings page reloading.
    */
   it("keeps the previous report visible while a new filter is loading", async () => {
-    let resolveNextReport: ((page: unknown) => void) | undefined;
-    organizationsDescribeOrganizationSpendingReport
-      .mockResolvedValueOnce(reportResponse({ costCents: "100" }))
-      .mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            resolveNextReport = resolve;
-          }),
-      );
-
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { result, rerender } = renderHook(
-      ({ query }: { query: OrganizationSpendingReportQuery }) => useOrganizationSpendingReport(query),
-      { initialProps: { query: baseQuery() }, wrapper: createWrapper(queryClient) },
+    await expectPreviousReportWhileNextLoads(
+      baseQuery(),
+      baseQuery({ filters: { ...EMPTY_SPENDING_FILTERS, workspaceId: "workspace-1" } }),
     );
+  });
 
-    await waitFor(() => expect(result.current.data?.explorerTotals?.costCents).toBe("100"));
-
-    rerender({ query: baseQuery({ filters: { ...EMPTY_SPENDING_FILTERS, workspaceId: "workspace-1" } }) });
-
-    await waitFor(() => expect(result.current.isFetching).toBe(true));
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.data?.explorerTotals?.costCents).toBe("100");
-    expect(result.current.isPlaceholderData).toBe(true);
-
-    resolveNextReport?.(reportResponse({ costCents: "250" }));
-
-    await waitFor(() => expect(result.current.data?.explorerTotals?.costCents).toBe("250"));
-    expect(result.current.isPlaceholderData).toBe(false);
+  it("keeps the previous report visible while a new time range is loading", async () => {
+    await expectPreviousReportWhileNextLoads(
+      baseQuery(),
+      baseQuery({
+        range: { start: new Date("2026-02-01T00:00:00Z"), end: new Date("2026-03-01T00:00:00Z") },
+      }),
+    );
   });
 });
+
+async function expectPreviousReportWhileNextLoads(
+  initialQuery: OrganizationSpendingReportQuery,
+  nextQuery: OrganizationSpendingReportQuery,
+) {
+  let resolveNextReport: ((page: unknown) => void) | undefined;
+  organizationsDescribeOrganizationSpendingReport
+    .mockResolvedValueOnce(reportResponse({ costCents: "100" }))
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveNextReport = resolve;
+        }),
+    );
+
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { result, rerender } = renderHook(
+    ({ query }: { query: OrganizationSpendingReportQuery }) => useOrganizationSpendingReport(query),
+    { initialProps: { query: initialQuery }, wrapper: createWrapper(queryClient) },
+  );
+
+  await waitFor(() => expect(result.current.data?.explorerTotals?.costCents).toBe("100"));
+
+  rerender({ query: nextQuery });
+
+  await waitFor(() => expect(result.current.isFetching).toBe(true));
+  expect(result.current.isLoading).toBe(false);
+  expect(result.current.data?.explorerTotals?.costCents).toBe("100");
+  expect(result.current.isPlaceholderData).toBe(true);
+
+  resolveNextReport?.(reportResponse({ costCents: "250" }));
+
+  await waitFor(() => expect(result.current.data?.explorerTotals?.costCents).toBe("250"));
+  expect(result.current.isPlaceholderData).toBe(false);
+}
