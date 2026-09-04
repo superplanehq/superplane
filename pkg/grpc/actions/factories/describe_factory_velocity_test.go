@@ -572,7 +572,7 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 }
 
 // TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize covers a cohort
-// larger than one page: the response caps at 10 rows, reports the true total,
+// larger than one page: the response caps at 5 rows, reports the true total,
 // and says more rows are available.
 func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
 	r := support.Setup(t)
@@ -593,11 +593,11 @@ func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, resp.People, 10, "the People table caps at 10 rows by default")
+	require.Len(t, resp.People, 5, "the People table caps at 5 rows by default")
 	assert.Equal(t, int32(12), resp.PeopleTotal, "the total counts the whole cohort, not just the page")
 	assert.True(t, resp.PeopleHasMore)
 	assert.Equal(t, "Contributor 01", resp.People[0].Name)
-	assert.Equal(t, "Contributor 10", resp.People[9].Name)
+	assert.Equal(t, "Contributor 05", resp.People[4].Name)
 }
 
 // TestDescribeFactoryVelocity_PagesPeopleWithOffset covers "Load more": a
@@ -616,17 +616,18 @@ func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
 	)
 
 	secondPage, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
-		FactoryId:    factoryModel.ID.String(),
-		PeriodDays:   7,
-		Repository:   "example/repo",
-		PeopleOffset: 10,
+		FactoryId:      factoryModel.ID.String(),
+		PeriodDays:     7,
+		Repository:     "example/repo",
+		PeopleOffset:   5,
+		PeoplePageSize: 20,
 	})
 	require.NoError(t, err)
-	require.Len(t, secondPage.People, 2, "the last page holds the remaining people")
+	require.Len(t, secondPage.People, 7, "the last page holds the remaining people")
 	assert.Equal(t, int32(12), secondPage.PeopleTotal)
 	assert.False(t, secondPage.PeopleHasMore, "there is nothing left after the last page")
-	assert.Equal(t, "Contributor 11", secondPage.People[0].Name)
-	assert.Equal(t, "Contributor 12", secondPage.People[1].Name)
+	assert.Equal(t, "Contributor 06", secondPage.People[0].Name)
+	assert.Equal(t, "Contributor 12", secondPage.People[6].Name)
 
 	pastTheEnd, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
 		FactoryId:    factoryModel.ID.String(),
@@ -641,7 +642,7 @@ func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
 }
 
 // TestDescribeFactoryVelocity_ClampsPeoplePageSize covers the page size guard
-// rails: non-positive defaults to 10, and a request above the max is capped.
+// rails: non-positive defaults to 5, and a request above the max is capped.
 func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -659,8 +660,8 @@ func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
 		pageSize int32
 		expected int
 	}{
-		{"defaults to 10 when zero", 0, 10},
-		{"defaults to 10 when negative", -5, 10},
+		{"defaults to 5 when zero", 0, 5},
+		{"defaults to 5 when negative", -5, 5},
 		{"honors a page size within range", 5, 5},
 		{"caps above the max", 1000, 12},
 	} {

@@ -15,8 +15,21 @@ export type PeopleSortDirection = "asc" | "desc";
 export const PEOPLE_SORT_DEFAULT_KEY: PeopleSortKey = "total";
 export const PEOPLE_SORT_DEFAULT_DIRECTION: PeopleSortDirection = "desc";
 
-/** Rows fetched for the first page, and for every "Load more" page after it. */
-export const PEOPLE_PAGE_SIZE = 10;
+/** Rows fetched for the first People page. */
+export const PEOPLE_FIRST_PAGE_SIZE = 5;
+
+/** Rows fetched on every "Show more" click after the first page. */
+export const PEOPLE_LOAD_MORE_SIZE = 20;
+
+/** Page size for a given offset: 6 on the first page, 20 after that. */
+export function peoplePageSizeForOffset(offset: number): number {
+  return offset <= 0 ? PEOPLE_FIRST_PAGE_SIZE : PEOPLE_LOAD_MORE_SIZE;
+}
+
+/** Offset of the next People page after the page that starts at `offset`. */
+export function nextPeopleOffset(offset: number): number {
+  return offset + peoplePageSizeForOffset(offset);
+}
 
 const PEOPLE_SORT_PARAM: Record<PeopleSortKey, DescribeFactoryVelocityRequestPeopleSort> = {
   total: "PEOPLE_SORT_TOTAL",

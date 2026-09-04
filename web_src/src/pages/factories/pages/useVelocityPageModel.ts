@@ -17,9 +17,10 @@ import {
   type VelocityReport,
 } from "../lib/factoryVelocityReport";
 import {
-  PEOPLE_PAGE_SIZE,
   PEOPLE_SORT_DEFAULT_DIRECTION,
   PEOPLE_SORT_DEFAULT_KEY,
+  nextPeopleOffset,
+  peoplePageSizeForOffset,
   type PeopleSortDirection,
   type PeopleSortKey,
 } from "../lib/velocityPeopleSort";
@@ -53,7 +54,7 @@ export interface VelocityPageModel {
   /**
    * The People table's rows, sorting, and paging. Sorting happens on the
    * backend, so changing the column or its direction refetches from the
-   * first page. "Load more" appends the next page to what is already shown.
+   * first page. "Show more" appends the next page to what is already shown.
    */
   people: {
     /** Rows fetched so far, in backend-sorted order, ranked from the top. */
@@ -103,6 +104,7 @@ export function useVelocityPageModel(
     data: velocityResponse,
     isLoading: velocityLoading,
     isFetching: velocityFetching,
+    isPlaceholderData: holdsPreviousReport,
     error: velocityError,
     refetch: refetchVelocity,
   } = useFactoryVelocity(organizationId, factoryId, {
@@ -111,6 +113,7 @@ export function useVelocityPageModel(
     peopleSort: peopleSort.sortKey,
     peopleSortDirection: peopleSort.sortDirection,
     peopleOffset: peopleSort.offset,
+    peoplePageSize: peoplePageSizeForOffset(peopleSort.offset),
   });
 
   const syncVelocity = useSyncFactoryVelocity(organizationId, factoryId);
@@ -127,7 +130,7 @@ export function useVelocityPageModel(
 
   const report = useMemo(() => (velocityResponse ? toVelocityReport(velocityResponse) : undefined), [velocityResponse]);
 
-  const people = useAccumulatedPeople(peopleSort.resetKey, peopleSort.offset, report);
+  const people = useAccumulatedPeople(peopleSort.resetKey, peopleSort.offset, report, Boolean(holdsPreviousReport));
   const isLoadingMorePeople = velocityFetching && peopleSort.offset > 0;
 
   // Task time is measured from work orders, which carry the execution
@@ -170,10 +173,10 @@ export function useVelocityPageModel(
       sortKey: peopleSort.sortKey,
       sortDirection: peopleSort.sortDirection,
       onSort: peopleSort.onSort,
-      canLoadMore: people.canLoadMore,
+      canLoadMore: people.canLoadMore && !Boolean(holdsPreviousReport),
       isLoadingMore: isLoadingMorePeople,
       loadMore: () => {
-        if (isLoadingMorePeople || !people.canLoadMore) return;
+        if (isLoadingMorePeople || holdsPreviousReport || !people.canLoadMore) return;
         peopleSort.loadMore();
       },
     },
@@ -223,7 +226,7 @@ function usePeopleSortAndPaging(periodDays: VelocityPeriodDays, repository: stri
     setSortDirection(PEOPLE_SORT_DEFAULT_DIRECTION);
   };
 
-  const loadMore = () => setOffset((current) => current + PEOPLE_PAGE_SIZE);
+  const loadMore = () => setOffset((current) => nextPeopleOffset(current));
 
   return { sortKey, sortDirection, offset, resetKey, onSort, loadMore };
 }
@@ -234,18 +237,27 @@ function usePeopleSortAndPaging(periodDays: VelocityPeriodDays, repository: stri
  * in place instead of duplicating it, while a genuinely new page (a fresh
  * offset, sort, period, or repository) is appended, or replaces everything
  * when it is the first page.
+ *
+ * While the next page loads, the query still answers with the report that is
+ * on screen. That report belongs to the previous offset, so `holdsPreviousReport`
+ * keeps it out of the list until the requested page arrives.
  */
-function useAccumulatedPeople(resetKey: string, offset: number, report: VelocityReport | undefined) {
+function useAccumulatedPeople(
+  resetKey: string,
+  offset: number,
+  report: VelocityReport | undefined,
+  holdsPreviousReport: boolean,
+) {
   const [list, setList] = useState<VelocityPerson[]>([]);
   const appliedPageRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!report) return;
+    if (!report || holdsPreviousReport) return;
     const pageKey = `${resetKey}|${offset}`;
     if (appliedPageRef.current === pageKey) return;
     appliedPageRef.current = pageKey;
     setList((prev) => (offset === 0 ? report.people : [...prev, ...report.people]));
-  }, [report, resetKey, offset]);
+  }, [report, resetKey, offset, holdsPreviousReport]);
 
   const total = report?.peopleTotal ?? list.length;
   const canLoadMore = list.length < total;
