@@ -705,6 +705,21 @@ function parseDateString(value: string): ExprDate | null {
   return new ExprDate(date);
 }
 
+/**
+ * Orders two values the way expr-lang's `runtime.Less` does: numbers compare
+ * numerically and strings lexicographically. Values it cannot order are left
+ * in place, so a preview never throws on a mixed array.
+ */
+function compareExprValues(a: unknown, b: unknown): number {
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b;
+  }
+  if (typeof a === "string" && typeof b === "string") {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  return 0;
+}
+
 // Built-in functions
 const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
   // String functions
@@ -813,16 +828,17 @@ const BUILTIN_FUNCTIONS: Record<string, (...args: unknown[]) => unknown> = {
     if (Array.isArray(arr)) return [...arr].reverse();
     return arr;
   },
-  sort: (arr: unknown) => {
-    if (Array.isArray(arr)) return [...arr].sort();
-    return arr;
+  sort: (arr: unknown, order?: unknown) => {
+    if (!Array.isArray(arr)) return arr;
+    const desc = order !== undefined && String(order) === "desc";
+    return [...arr].sort((a, b) => (desc ? compareExprValues(b, a) : compareExprValues(a, b)));
   },
   uniq: (arr: unknown) => {
     if (Array.isArray(arr)) return [...new Set(arr)];
     return arr;
   },
   flatten: (arr: unknown) => {
-    if (Array.isArray(arr)) return arr.flat();
+    if (Array.isArray(arr)) return arr.flat(Infinity);
     return arr;
   },
   concat: (...arrays: unknown[]) => {
