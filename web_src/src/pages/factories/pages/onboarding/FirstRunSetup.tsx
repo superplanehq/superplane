@@ -3,6 +3,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
+import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -236,12 +237,17 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
       .find((account) => account !== "") ||
     "";
+  // Do not pass account.id: that id is the account, and startedByUserID is the
+  // user. They do not match, so the picker would stay hidden after GitHub
+  // returns with two installations.
+  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances);
 
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
     skipAgentScreen,
     installRequested,
     githubOrganization,
+    accountPicker,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -298,6 +304,9 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         githubConnected={setup.vcsReady}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
+        pendingInstallations={flow.accountPicker?.installations}
+        githubState={flow.accountPicker?.state}
+        githubAppSlug={flow.accountPicker?.appSlug}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onContinue={() => flow.goToScreen("choose")}
