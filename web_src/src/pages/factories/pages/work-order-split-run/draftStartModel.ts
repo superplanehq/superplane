@@ -31,9 +31,18 @@ export function joinRunnerModels(ids: Array<string | undefined>): string {
   return unique.join(" · ");
 }
 
-export function runnerModelsFromCanvasNodes(
-  nodes?: Array<{ configuration?: { model?: unknown } | Record<string, unknown> }>,
-): string {
+type RunnerCanvasNode = {
+  component?: string;
+  configuration?: { model?: unknown } | Record<string, unknown>;
+};
+
+const RUNNER_PROVIDER: Record<string, string> = {
+  runnerClaudeCode: "anthropic",
+  runnerCodex: "openai",
+  runnerOpenRouter: "openrouter",
+};
+
+export function runnerModelsFromCanvasNodes(nodes?: RunnerCanvasNode[]): string {
   return joinRunnerModels(
     (nodes ?? []).map((node) => {
       const model = node.configuration && "model" in node.configuration ? node.configuration.model : undefined;
@@ -42,13 +51,55 @@ export function runnerModelsFromCanvasNodes(
   );
 }
 
-export function phaseWithRunnerModel<T extends { model?: string }>(
-  phase: T,
-  nodes?: Array<{ configuration?: { model?: unknown } | Record<string, unknown> }>,
-): T {
-  if (phase.model?.trim()) {
+function runnerAcceptsStartModel(component: string | undefined, model: string): boolean {
+  const trimmed = model.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const runner = RUNNER_PROVIDER[component ?? ""];
+  if (!runner) {
+    return false;
+  }
+  if (runner === "openrouter") {
+    return true;
+  }
+  const hint = startModelProvider(trimmed);
+  return hint == null || hint === runner;
+}
+
+export function phaseWithRunnerModel<T extends { model?: string }>(phase: T, nodes?: RunnerCanvasNode[]): T {
+  const start = phase.model?.trim();
+  const fromCanvas = runnerModelsFromCanvasNodes(nodes);
+  if (start && canvasRunnersAcceptStartModel(nodes, start)) {
     return phase;
   }
-  const fromCanvas = runnerModelsFromCanvasNodes(nodes);
-  return fromCanvas ? { ...phase, model: fromCanvas } : phase;
+  if (fromCanvas) {
+    return { ...phase, model: fromCanvas };
+  }
+  if (start) {
+    return { ...phase, model: undefined };
+  }
+  return phase;
+}
+
+function canvasRunnersAcceptStartModel(nodes: RunnerCanvasNode[] | undefined, model: string): boolean {
+  const runners = (nodes ?? []).filter((node) => RUNNER_PROVIDER[node.component ?? ""]);
+  if (runners.length === 0) {
+    return true;
+  }
+  return runners.some((node) => runnerAcceptsStartModel(node.component, model));
+}
+
+function startModelProvider(model: string): string | undefined {
+  const id = model.toLowerCase();
+  if (id.startsWith("anthropic/") || id.includes("claude")) {
+    return "anthropic";
+  }
+  if (id.startsWith("openai/") || id.includes("codex") || /(^|\/)gpt-/.test(id) || /(^|\/)o[1-9]/.test(id)) {
+    return "openai";
+  }
+  if (id.includes("/")) {
+    return "openrouter";
+  }
+  return undefined;
 }

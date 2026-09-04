@@ -50,4 +50,20 @@ describe("phaseWithRunnerModel", () => {
   it("fills Auto from the canvas when the phase has no model", () => {
     expect(phaseWithRunnerModel({}, [{ configuration: { model: "opus" } }]).model).toBe("opus");
   });
+
+  it("keeps a start model the canvas runners can use", () => {
+    expect(
+      phaseWithRunnerModel({ model: "claude-opus-4-6" }, [
+        { component: "runnerClaudeCode", configuration: { model: "claude-sonnet-4-6" } },
+      ]).model,
+    ).toBe("claude-opus-4-6");
+  });
+
+  it("uses the canvas model when the start model is for another runner", () => {
+    expect(
+      phaseWithRunnerModel({ model: "claude-opus-4-6" }, [
+        { component: "runnerCodex", configuration: { model: "gpt-5" } },
+      ]).model,
+    ).toBe("gpt-5");
+  });
 });

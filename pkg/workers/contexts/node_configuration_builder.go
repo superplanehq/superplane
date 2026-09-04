@@ -2219,7 +2219,7 @@ func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]an
 		return resolved, nil
 	}
 
-	ok, err := b.nodeAcceptsDispatchModel(resolved, override, dispatch)
+	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
 	if err != nil || !ok {
 		return resolved, err
 	}
@@ -2263,7 +2263,6 @@ func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineD
 func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 	resolved map[string]any,
 	model string,
-	dispatch *models.FactoryWorkOrderLineDispatch,
 ) (bool, error) {
 	if b.nodeID == "" {
 		return false, nil
@@ -2287,7 +2286,7 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
-	selectable, err := models.ModelIsSelectable(
+	return models.ModelIsSelectable(
 		b.tx,
 		workflow.OrganizationID,
 		workflow.FactoryID,
@@ -2295,54 +2294,6 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		runnerFundingSourceFromConfig(resolved),
 		model,
 	)
-	if err != nil || selectable {
-		return selectable, err
-	}
-
-	return b.sameProviderLineStoresModel(dispatch, provider, model)
-}
-
-func (b *NodeConfigurationBuilder) sameProviderLineStoresModel(
-	dispatch *models.FactoryWorkOrderLineDispatch,
-	provider string,
-	model string,
-) (bool, error) {
-	if dispatch == nil {
-		return false, nil
-	}
-
-	var line models.FactoryLine
-	err := b.tx.Where("id = ?", dispatch.LineID).First(&line).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	for _, step := range line.Steps {
-		if step.AppID == uuid.Nil {
-			continue
-		}
-		version, err := models.FindLiveCanvasVersionInTransaction(b.tx, step.AppID)
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			return false, err
-		}
-		for _, node := range []models.Node(version.Nodes) {
-			nodeProvider, ok := runnerProviderForComponent(node.ComponentName())
-			if !ok || nodeProvider != provider {
-				continue
-			}
-			stored, _ := node.Configuration["model"].(string)
-			if strings.TrimSpace(stored) == model {
-				return true, nil
-			}
-		}
-	}
-	return false, nil
 }
 
 func runnerProviderForComponent(component string) (string, bool) {

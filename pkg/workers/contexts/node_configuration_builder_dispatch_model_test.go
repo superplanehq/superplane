@@ -148,7 +148,7 @@ func Test__Build__SkipsOverrideWhenModelIsNotOnNodeProvider(t *testing.T) {
 	assert.Equal(t, "claude-sonnet-4-6", resolved["model"])
 }
 
-func Test__Build__OverlaysCanvasModelFromSameProviderOnTheLine(t *testing.T) {
+func Test__Build__DoesNotOverlaySiblingCanvasModel(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
@@ -193,7 +193,7 @@ func Test__Build__OverlaysCanvasModelFromSameProviderOnTheLine(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "sonnet", resolved["model"])
+	assert.Equal(t, "opus", resolved["model"])
 }
 
 func setupRunnerAppExecution(
