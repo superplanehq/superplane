@@ -83,8 +83,12 @@ describe("SidebarUserMenu", () => {
     await user.click(screen.getByLabelText("Switch organization"));
 
     const menu = await screen.findByTestId("factories-sidebar-organization-switch-menu");
+    expect(menu).toHaveClass("overflow-y-auto");
     expect(within(menu).getByText("SuperPlane")).toBeInTheDocument();
     expect(within(menu).getByText("Acme")).toBeInTheDocument();
+    expect(
+      within(menu).getByTestId(`factories-sidebar-organization-option-${FACTORIES_ORGANIZATION_ID}`),
+    ).toHaveAttribute("aria-checked", "true");
     const items = within(menu).getAllByRole("menuitem");
     expect(items[items.length - 1]).toHaveTextContent("Create new organization");
   });

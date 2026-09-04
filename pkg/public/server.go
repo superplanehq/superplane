@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -65,6 +67,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
+	"gorm.io/gorm"
 )
 
 const (
@@ -688,6 +691,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account/providers/{provider}", s.disconnectAccountProvider).Methods("DELETE")
 	accountRoute.HandleFunc("/account/linked-accounts/{provider}", s.disconnectLinkedAccount).Methods("DELETE")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
+	accountRoute.HandleFunc("/account/onboarding", s.createInitialWorkspace).Methods("POST")
 	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
@@ -848,6 +852,16 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 
 type OrganizationCreationRequest struct {
 	Name string `json:"name"`
+}
+
+type initialWorkspaceRequest struct {
+	Owner     string `json:"owner"`
+	AttemptID string `json:"attemptID"`
+}
+
+type initialWorkspaceResponse struct {
+	OrganizationSlug string `json:"organizationSlug"`
+	WorkspaceKey     string `json:"workspaceKey"`
 }
 
 type organizationCreationStatusResponse struct {
@@ -1101,6 +1115,216 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	response["slug"] = organization.Slug
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// createInitialWorkspace provisions the first organization and workspace for
+// an account. The GitHub identity is checked before its owner name is used.
+func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	var req initialWorkspaceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	owner := strings.TrimSpace(req.Owner)
+	if owner == "" {
+		http.Error(w, "GitHub account is required", http.StatusBadRequest)
+		return
+	}
+	attemptID, err := uuid.Parse(req.AttemptID)
+	if err != nil {
+		http.Error(w, "Invalid onboarding attempt", http.StatusBadRequest)
+		return
+	}
+
+	if !accountOwnsGitHubName(database.DB(r.Context()), account, owner) {
+		http.Error(w, "GitHub account does not match this account", http.StatusForbidden)
+		return
+	}
+
+	creationLock, err := acquireInitialWorkspaceCreationLock(r.Context(), account.ID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to lock initial workspace creation")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+	defer creationLock.Rollback()
+
+	if organization, workspace, found, err := findInitialWorkspace(creationLock, account.ID, attemptID); err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to find initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	} else if found {
+		if err := creationLock.Commit().Error; err != nil {
+			log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace lookup")
+			http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+			return
+		}
+		writeInitialWorkspaceResponse(w, organization, workspace)
+		return
+	}
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		writeOrganizationCreationStatusError(w, "Failed to create workspace", err)
+		return
+	}
+	if !creationStatus.Allowed {
+		http.Error(w, creationStatus.Message, http.StatusTooManyRequests)
+		return
+	}
+
+	organization, workspace, err := s.createInitialOrganizationAndWorkspace(creationLock, account, owner, attemptID)
+	if err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to create initial workspace")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+
+	if err := creationLock.Commit().Error; err != nil {
+		log.WithError(err).WithField("account_id", account.ID).Error("failed to finish initial workspace creation")
+		http.Error(w, "Failed to create workspace", http.StatusInternalServerError)
+		return
+	}
+
+	if err := messages.NewOrganizationCreatedMessage(organization.ID.String()).Publish(); err != nil {
+		log.WithError(err).WithField("organization_id", organization.ID).Error("failed to publish organization created message")
+	}
+
+	writeInitialWorkspaceResponse(w, organization, workspace)
+}
+
+// acquireInitialWorkspaceCreationLock serializes onboarding for one account.
+// Waiting requests release their database connections between attempts.
+func acquireInitialWorkspaceCreationLock(ctx context.Context, accountID uuid.UUID) (*gorm.DB, error) {
+	lockKey := int64(binary.BigEndian.Uint64(accountID[:8]))
+
+	for {
+		tx := database.DB(ctx).Begin()
+		if tx.Error != nil {
+			return nil, tx.Error
+		}
+
+		var locked bool
+		if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", lockKey).Scan(&locked).Error; err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+		if locked {
+			return tx, nil
+		}
+		if err := tx.Rollback().Error; err != nil {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.Organization, *models.Factory, bool, error) {
+	organizations, err := models.ListOrganizationsCreatedByAccount(tx, accountID)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	for _, organization := range organizations {
+		factories, err := models.ListFactories(tx, organization.ID)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		for _, factory := range factories {
+			if factory.HasInitialOnboardingAttempt(attemptID) {
+				return &organization, &factory, true, nil
+			}
+		}
+	}
+
+	return nil, nil, false, nil
+}
+
+func writeInitialWorkspaceResponse(w http.ResponseWriter, organization *models.Organization, workspace *models.Factory) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(initialWorkspaceResponse{
+		OrganizationSlug: organization.Slug,
+		WorkspaceKey:     workspace.Key,
+	})
+}
+
+func accountOwnsGitHubName(tx *gorm.DB, account *models.Account, owner string) bool {
+	linkedAccount, err := models.FindAccountLinkedAccount(tx, account.ID, models.ProviderGitHub)
+	if err == nil && (owner == linkedAccount.Name || owner == linkedAccount.Username) {
+		return true
+	}
+
+	providers, err := account.GetAccountProviders(tx)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(providers, func(provider models.AccountProvider) bool {
+		return provider.Provider == models.ProviderGitHub && owner == provider.Username
+	})
+}
+
+func (s *Server) createInitialOrganizationAndWorkspace(tx *gorm.DB, account *models.Account, owner string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
+	for suffix := 1; suffix <= 100; suffix++ {
+		organizationName := owner
+		if suffix > 1 {
+			organizationName = fmt.Sprintf("%s %d", owner, suffix)
+		}
+
+		savepoint := fmt.Sprintf("initial_organization_name_%d", suffix)
+		if err := tx.SavePoint(savepoint).Error; err != nil {
+			return nil, nil, fmt.Errorf("create organization savepoint: %w", err)
+		}
+
+		organization, workspace, err := s.createInitialOrganizationAttempt(tx, account, organizationName, attemptID)
+		if errors.Is(err, models.ErrNameAlreadyUsed) {
+			if rollbackErr := tx.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return nil, nil, fmt.Errorf("rollback organization name: %w", rollbackErr)
+			}
+			continue
+		}
+		return organization, workspace, err
+	}
+
+	return nil, nil, fmt.Errorf("could not find an available organization name for %q", owner)
+}
+
+func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.Account, organizationName string, attemptID uuid.UUID) (*models.Organization, *models.Factory, error) {
+	organization, err := models.CreateOrganizationInTransaction(tx, organizationName, "")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, err := models.CreateUserInTransaction(tx, organization.ID, account.ID, account.Email, account.Name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create organization owner: %w", err)
+	}
+	if err := s.authService.SetupOrganization(tx, organization.ID.String(), user.ID.String()); err != nil {
+		return nil, nil, fmt.Errorf("set up organization roles: %w", err)
+	}
+	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
+		return nil, nil, fmt.Errorf("set organization creator: %w", err)
+	}
+
+	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("create initial workspace: %w", err)
+	}
+	if err := workspace.SetInitialOnboardingAttempt(tx, attemptID); err != nil {
+		return nil, nil, fmt.Errorf("set initial workspace onboarding attempt: %w", err)
+	}
+	return organization, workspace, nil
 }
 
 type AccountImpersonation struct {
