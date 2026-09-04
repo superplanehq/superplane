@@ -56,6 +56,13 @@ func CreateFactoryPRFeedbackHandler(
 
 	settings := parsePRFeedbackSettings(defaultPRFeedbackSettings(), req.GetSettings())
 	settings.Repository = repository
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
+		baseBranch := strings.TrimSpace(settings.BaseBranch)
+		if baseBranch == "" {
+			baseBranch = strings.TrimSpace(factory.OnboardingConfigValue().DefaultBranch)
+		}
+		settings.BaseBranch = conflictsBaseBranch(baseBranch)
+	}
 	if err := validatePRFeedbackSettingsForSource(db, orgID, source, settings, req.GetSettings()); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
@@ -65,9 +72,12 @@ func CreateFactoryPRFeedbackHandler(
 
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
-		if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		switch source {
+		case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 			name = prFeedbackChecksDefaultName
-		} else {
+		case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+			name = prFeedbackConflictsDefaultName
+		default:
 			name = prFeedbackDefaultName
 		}
 	}
@@ -86,7 +96,8 @@ func CreateFactoryPRFeedbackHandler(
 		discardIntakeCanvas(db, orgID, canvasID)
 		return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
 	}
-	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks ||
+		source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
 		if err := handler.SetMaximumAttempts(db, settings.MaximumAttempts); err != nil {
 			discardIntakeCanvas(db, orgID, canvasID)
 			return nil, factoryErrorToStatus(err, "failed to create factory PR feedback handler")
@@ -125,14 +136,18 @@ func createPRFeedbackCanvas(
 		AllowedBots:            settings.AllowedBots,
 		CheckNames:             settings.CheckNames,
 		MaximumAttempts:        settings.MaximumAttempts,
+		BaseBranch:             settings.BaseBranch,
 		RunnerIntegrationNames: settings.RunnerIntegrationNames,
 		Binding:                binding,
 		Agent:                  resolveIntakeAgent(db, factory),
 	}
 	var canvasDoc *yaml.Canvas
-	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+	switch source {
+	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 		canvasDoc = buildChecksPRFeedbackCanvas(request)
-	} else {
+	case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+		canvasDoc = buildConflictsPRFeedbackCanvas(request)
+	default:
 		canvasDoc = buildDiscussionPRFeedbackCanvas(request)
 	}
 

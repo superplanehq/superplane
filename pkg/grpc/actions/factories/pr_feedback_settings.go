@@ -16,6 +16,7 @@ type prFeedbackSettings struct {
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
+	BaseBranch             string
 	RunnerIntegrationIDs   []string
 	RunnerIntegrationNames []string
 }
@@ -36,6 +37,7 @@ func (s prFeedbackSettings) normalized() prFeedbackSettings {
 	}
 	s.AllowedBots = normalizedAllowedBots(s.AllowedBots)
 	s.CheckNames = normalizedCheckNames(s.CheckNames)
+	s.BaseBranch = strings.TrimSpace(s.BaseBranch)
 	s.RunnerIntegrationIDs = normalizedUniqueStrings(s.RunnerIntegrationIDs)
 	s.RunnerIntegrationNames = normalizedUniqueStrings(s.RunnerIntegrationNames)
 	return s
@@ -120,6 +122,14 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		settings.RunnerIntegrationNames = runnerExtraIntegrationNames(findIntakeNode(spec.Nodes, graph.RunnerNodeID))
 	}
 
+	if graph.isConflicts() {
+		wait := findIntakeNode(spec.Nodes, graph.WaitMergeableNodeID)
+		if settings.Repository == "" {
+			settings.Repository = strings.TrimSpace(prFeedbackNodeString(wait, "repository"))
+		}
+		settings.BaseBranch = conflictsBaseBranch(conflictsBaseBranchFromPushNode(findIntakeNode(spec.Nodes, graph.PushTriggerNodeID)))
+	}
+
 	return settings.normalized()
 }
 
@@ -172,6 +182,10 @@ func serializePRFeedbackSettings(settings prFeedbackSettings) *pb.FactoryPRFeedb
 			MaximumAttempts:      &maximumAttempts,
 			RunnerIntegrationIds: settings.RunnerIntegrationIDs,
 		},
+		Conflicts: &pb.FactoryPRFeedbackHandler_ConflictSettings{
+			MaximumAttempts: &maximumAttempts,
+			BaseBranch:      settings.BaseBranch,
+		},
 	}
 }
 
@@ -186,8 +200,30 @@ func validatePRFeedbackSettingsForSource(
 		if requested != nil && requested.GetChecks() != nil && len(requested.GetChecks().GetRunnerIntegrationIds()) > 0 {
 			return invalidArgument("discussion handlers do not accept runner integrations")
 		}
+		if requested != nil && requested.GetConflicts() != nil && strings.TrimSpace(requested.GetConflicts().GetBaseBranch()) != "" {
+			return invalidArgument("discussion handlers do not accept a base branch")
+		}
 		if strings.TrimSpace(settings.Mention) == "" {
 			return invalidArgument("mention cannot be empty")
+		}
+		return nil
+	}
+
+	if source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
+		if requested != nil && requested.GetDiscussion() != nil && strings.TrimSpace(requested.GetDiscussion().GetMention()) != "" {
+			return invalidArgument("conflict handlers do not accept a mention")
+		}
+		if requested != nil && requested.GetChecks() != nil && len(requested.GetChecks().GetNames()) > 0 {
+			return invalidArgument("conflict handlers do not accept check names")
+		}
+		if requested != nil && requested.GetChecks() != nil && len(requested.GetChecks().GetRunnerIntegrationIds()) > 0 {
+			return invalidArgument("conflict handlers do not accept runner integrations")
+		}
+		if settings.MaximumAttempts < prFeedbackMaximumAttemptsMin || settings.MaximumAttempts > prFeedbackMaximumAttemptsMax {
+			return invalidArgument("maximum attempts must be between 1 and 10")
+		}
+		if strings.TrimSpace(settings.BaseBranch) == "" {
+			return invalidArgument("base branch cannot be empty")
 		}
 		return nil
 	}
@@ -266,6 +302,12 @@ func parsePRFeedbackSettings(current prFeedbackSettings, requested *pb.FactoryPR
 			updated.MaximumAttempts = int(requested.GetChecks().GetMaximumAttempts())
 		}
 		updated.RunnerIntegrationIDs = requested.GetChecks().GetRunnerIntegrationIds()
+	}
+	if requested.GetConflicts() != nil {
+		updated.BaseBranch = strings.TrimSpace(requested.GetConflicts().GetBaseBranch())
+		if requested.GetConflicts().MaximumAttempts != nil {
+			updated.MaximumAttempts = int(requested.GetConflicts().GetMaximumAttempts())
+		}
 	}
 	return updated.normalized()
 }

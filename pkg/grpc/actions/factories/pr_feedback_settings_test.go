@@ -33,7 +33,7 @@ func Test__PRFeedbackSettings__Normalized(t *testing.T) {
 
 func Test__PRFeedbackSettingsFromGraph__ReadsAllowedBots(t *testing.T) {
 	spec := prFeedbackSpecFromTemplate(t, "acme/app")
-	graph := resolvePRFeedbackGraph(spec)
+	graph := resolvePRFeedbackGraph(models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, spec)
 
 	for i := range spec.Nodes {
 		if spec.Nodes[i].ID == graph.CommentTriggerNodeID {
@@ -123,7 +123,7 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 
 	t.Run("reads check names from a generated graph", func(t *testing.T) {
 		spec := prFeedbackChecksSpecFromTemplate(t, "acme/app")
-		graph := resolvePRFeedbackGraph(spec)
+		graph := resolvePRFeedbackGraph(models.FactoryPRFeedbackHandlerSourcePullRequestChecks, spec)
 		for i := range spec.Nodes {
 			if spec.Nodes[i].ID == graph.WaitChecksNodeID {
 				spec.Nodes[i].Configuration["checkNames"] = []any{"lint", "unit"}

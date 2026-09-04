@@ -194,7 +194,7 @@ func serializeFactoryPRFeedbackHandlers(tx *gorm.DB, orgID uuid.UUID, handlers [
 }
 
 func serializeFactoryPRFeedbackHandler(tx *gorm.DB, orgID uuid.UUID, handler *models.FactoryPRFeedbackHandler, spec models.LiveCanvasSpec) *pb.FactoryPRFeedbackHandler {
-	graph := resolvePRFeedbackGraph(spec)
+	graph := resolvePRFeedbackGraph(handler.Source, spec)
 	settings := prFeedbackSettingsFromGraph(graph, spec)
 	if handler.MaximumAttempts != nil {
 		settings.MaximumAttempts = *handler.MaximumAttempts
@@ -238,6 +238,8 @@ func serializeFactoryPRFeedbackHandlerSource(source string) pb.FactoryPRFeedback
 		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION
 	case models.FactoryPRFeedbackHandlerSourcePullRequestChecks:
 		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS
+	case models.FactoryPRFeedbackHandlerSourcePullRequestConflicts:
+		return pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CONFLICTS
 	default:
 		return pb.FactoryPRFeedbackHandler_SOURCE_UNSPECIFIED
 	}
@@ -258,6 +260,8 @@ func parseFactoryPRFeedbackHandlerSource(source pb.FactoryPRFeedbackHandler_Sour
 		return models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion, nil
 	case pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CHECKS:
 		return models.FactoryPRFeedbackHandlerSourcePullRequestChecks, nil
+	case pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_CONFLICTS:
+		return models.FactoryPRFeedbackHandlerSourcePullRequestConflicts, nil
 	default:
 		return "", invalidArgument("PR feedback handler source is not supported")
 	}

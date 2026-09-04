@@ -233,54 +233,8 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps() []any {
-	return []any{
-		map[string]any{
-			"name": "Set Up Git User",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"git config --global user.email \"superplaneagent@superplane.com\"",
-				"git config --global user.name \"SuperPlane Agent\"",
-			}, "\n"),
-		},
-		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				`git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}" | jq -r .head.ref)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "pull/${PR_NUMBER}/head:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
-		},
-		map[string]any{
-			"name":             "Set Up DCO Signing",
-			"type":             "bash",
-			"workingDirectory": "repo",
-			"command": strings.Join([]string{
-				"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
-				`git interpret-trailers --in-place --if-exists doNothing \`,
-				`  --trailer "Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>" "$1"`,
-				"",
-				`printf '%s\n' "${COAUTHORS:-}" | while IFS= read -r trailer; do`,
-				`  if [ -n "$trailer" ]; then`,
-				`    git interpret-trailers --in-place --if-exists addIfDifferent --trailer "$trailer" "$1"`,
-				"  fi",
-				"done",
-				"",
-				"exit 0",
-				"HOOK",
-				"",
-				"chmod +x .git/hooks/prepare-commit-msg",
-			}, "\n"),
-		},
+	steps := prFeedbackCheckoutAndDCOSteps()
+	return append(steps,
 		map[string]any{
 			"name":             "Fix Failed Checks",
 			"type":             "prompt",
@@ -309,7 +263,7 @@ func prFeedbackChecksRunnerSteps() []any {
 				"fi",
 			}, "\n"),
 		},
-	}
+	)
 }
 
 func prFeedbackChecksPrompt() string {

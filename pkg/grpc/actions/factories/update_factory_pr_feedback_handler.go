@@ -105,7 +105,7 @@ func applyPRFeedbackSettings(
 		}
 
 		spec := models.LiveCanvasSpec{Nodes: liveVersion.Nodes, Edges: liveVersion.Edges}
-		graph := resolvePRFeedbackGraph(spec)
+		graph := resolvePRFeedbackGraph(handler.Source, spec)
 		if strings.TrimSpace(settings.GetSubject().GetRepository()) == "" {
 			return invalidArgument("repository cannot be empty")
 		}
@@ -114,6 +114,9 @@ func applyPRFeedbackSettings(
 			updated.MaximumAttempts = *handler.MaximumAttempts
 			if settings.GetChecks() != nil && settings.GetChecks().MaximumAttempts != nil {
 				updated.MaximumAttempts = int(settings.GetChecks().GetMaximumAttempts())
+			}
+			if settings.GetConflicts() != nil && settings.GetConflicts().MaximumAttempts != nil {
+				updated.MaximumAttempts = int(settings.GetConflicts().GetMaximumAttempts())
 			}
 		}
 		if err := validatePRFeedbackSettingsForSource(tx, canvas.OrganizationID, handler.Source, updated, settings); err != nil {
@@ -135,25 +138,22 @@ func applyPRFeedbackSettings(
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
-			if triggerIDs[nodes[i].ID] {
-				configuration := maps.Clone(nodes[i].Configuration)
-				if configuration == nil {
-					configuration = map[string]any{}
-				}
+			switch {
+			case triggerIDs[nodes[i].ID]:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
 				configuration["repository"] = updated.Repository
-				if !graph.isChecks() {
+				switch {
+				case graph.isConflicts() && nodes[i].ID == graph.PushTriggerNodeID:
+					configuration["refs"] = conflictsPushRefsNodeValue(updated.BaseBranch)
+				case !graph.isChecks() && !graph.isConflicts():
 					configuration["contentFilter"] = updated.Mention
 					configuration["ignoreBots"] = updated.IgnoreBots
 					configuration["allowedBots"] = allowedBotsNodeValue(updated.AllowedBots)
 				}
 				nodes[i].Configuration = configuration
-				continue
-			}
-			if nodes[i].ID == graph.WaitChecksNodeID {
-				configuration := maps.Clone(nodes[i].Configuration)
-				if configuration == nil {
-					configuration = map[string]any{}
-				}
+
+			case nodes[i].ID == graph.WaitChecksNodeID:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
 				configuration["repository"] = updated.Repository
 				if len(updated.CheckNames) > 0 {
 					configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
@@ -161,13 +161,14 @@ func applyPRFeedbackSettings(
 					delete(configuration, "checkNames")
 				}
 				nodes[i].Configuration = configuration
-				continue
-			}
-			if nodes[i].ID == graph.RunnerNodeID {
-				configuration := maps.Clone(nodes[i].Configuration)
-				if configuration == nil {
-					configuration = map[string]any{}
-				}
+
+			case nodes[i].ID == graph.ListNodeID || nodes[i].ID == graph.WaitMergeableNodeID:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
+				configuration["repository"] = updated.Repository
+				nodes[i].Configuration = configuration
+
+			case nodes[i].ID == graph.RunnerNodeID:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
 				factory, err := models.FindFactory(tx, canvas.OrganizationID, handler.FactoryID)
 				if err != nil {
 					return err
@@ -177,35 +178,37 @@ func applyPRFeedbackSettings(
 					updated.RunnerIntegrationNames,
 				)
 				nodes[i].Configuration = configuration
-				continue
-			}
-			if nodes[i].ID == graph.PauseFixesNodeID {
-				configuration := maps.Clone(nodes[i].Configuration)
-				if configuration == nil {
-					configuration = map[string]any{}
+
+			case nodes[i].ID == graph.PauseFixesNodeID:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
+				if graph.isConflicts() {
+					configuration["description"] = prFeedbackConflictsLimitDescriptionExpression(updated.MaximumAttempts)
+				} else {
+					configuration["description"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
 				}
-				configuration["description"] = prFeedbackChecksLimitDescriptionExpression(updated.MaximumAttempts)
 				nodes[i].Configuration = configuration
-				continue
+
+			case nodes[i].ID == graph.AnnounceLimitNodeID:
+				if graph.isConflicts() {
+					nodes[i].Configuration = prFeedbackConflictsLimitStatusNoteConfiguration(updated.MaximumAttempts)
+				} else {
+					nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
+				}
+
+			case nodes[i].ID == graph.ActivityNodeID || nodes[i].ComponentName() == prFeedbackActivityComponent:
+				configuration := cloneOrEmptyConfiguration(nodes[i].Configuration)
+				switch {
+				case graph.isConflicts():
+					configuration["description"] = prFeedbackConflictsRepairDescriptionExpression()
+				case !graph.isChecks():
+					configuration["description"] = prFeedbackActivityDescriptionExpression()
+				}
+				nodes[i].Configuration = configuration
 			}
-			if nodes[i].ID == graph.AnnounceLimitNodeID {
-				nodes[i].Configuration = prFeedbackChecksLimitStatusNoteConfiguration(updated.MaximumAttempts)
-				continue
-			}
-			if nodes[i].ID != graph.ActivityNodeID && nodes[i].ComponentName() != prFeedbackActivityComponent {
-				continue
-			}
-			configuration := maps.Clone(nodes[i].Configuration)
-			if configuration == nil {
-				configuration = map[string]any{}
-			}
-			if !graph.isChecks() {
-				configuration["description"] = prFeedbackActivityDescriptionExpression()
-			}
-			nodes[i].Configuration = configuration
 		}
 
-		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks ||
+			handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestConflicts {
 			if err := handler.SetMaximumAttempts(tx, updated.MaximumAttempts); err != nil {
 				return err
 			}
@@ -251,11 +254,16 @@ func ensureChecksAnnounceLimitNode(
 	graph prFeedbackGraph,
 	maximumAttempts int,
 ) ([]models.Node, []models.Edge) {
-	if !graph.isChecks() || graph.PauseFixesNodeID == "" {
+	if (!graph.isChecks() && !graph.isConflicts()) || graph.PauseFixesNodeID == "" {
 		return nodes, edges
 	}
 	if findIntakeNode(nodes, prFeedbackAnnounceLimitNodeID) != nil {
 		return nodes, edges
+	}
+
+	statusNoteConfiguration := prFeedbackChecksLimitStatusNoteConfiguration(maximumAttempts)
+	if graph.isConflicts() {
+		statusNoteConfiguration = prFeedbackConflictsLimitStatusNoteConfiguration(maximumAttempts)
 	}
 
 	nodes = append(nodes, models.Node{
@@ -263,7 +271,7 @@ func ensureChecksAnnounceLimitNode(
 		Name:          "Set Fixes Paused Note",
 		Type:          "TYPE_ACTION",
 		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: prFeedbackSetStatusNoteComponent}},
-		Configuration: prFeedbackChecksLimitStatusNoteConfiguration(maximumAttempts),
+		Configuration: statusNoteConfiguration,
 		Position:      models.Position{X: 1180, Y: 400},
 	})
 	edges = append(edges, models.Edge{
@@ -272,4 +280,15 @@ func ensureChecksAnnounceLimitNode(
 		TargetID: prFeedbackAnnounceLimitNodeID,
 	})
 	return nodes, edges
+}
+
+// cloneOrEmptyConfiguration copies a node's configuration map so mutations
+// during an update never alias the live version's stored map, returning an
+// empty map instead of nil when the node had none.
+func cloneOrEmptyConfiguration(configuration map[string]any) map[string]any {
+	cloned := maps.Clone(configuration)
+	if cloned == nil {
+		cloned = map[string]any{}
+	}
+	return cloned
 }

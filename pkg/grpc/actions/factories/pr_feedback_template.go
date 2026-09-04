@@ -46,6 +46,7 @@ type prFeedbackBuildRequest struct {
 	AllowedBots            []string
 	CheckNames             []string
 	MaximumAttempts        int
+	BaseBranch             string
 	RunnerIntegrationNames []string
 	Binding                *intakeBinding
 	Agent                  *intakeAgent
@@ -268,7 +269,12 @@ func prFeedbackEnvironmentFrom(binding *intakeBinding, extraIntegrationNames []s
 	return entries
 }
 
-func prFeedbackRunnerSteps() []any {
+// prFeedbackCheckoutAndDCOSteps returns the runner steps every PR feedback
+// source shares: a git identity, a checkout of the pull request head branch
+// (resolving it through the GitHub API when the trigger payload did not name
+// it), and a DCO sign-off hook for the agent's commits. Callers append their
+// own prompt and commit-and-push steps.
+func prFeedbackCheckoutAndDCOSteps() []any {
 	return []any{
 		map[string]any{
 			"name": "Set Up Git User",
@@ -317,6 +323,12 @@ func prFeedbackRunnerSteps() []any {
 				"chmod +x .git/hooks/prepare-commit-msg",
 			}, "\n"),
 		},
+	}
+}
+
+func prFeedbackRunnerSteps() []any {
+	steps := prFeedbackCheckoutAndDCOSteps()
+	return append(steps,
 		map[string]any{
 			"name":             "Address PR feedback",
 			"type":             "prompt",
@@ -336,7 +348,7 @@ func prFeedbackRunnerSteps() []any {
 				"fi",
 			}, "\n"),
 		},
-	}
+	)
 }
 
 func prFeedbackPrompt() string {
