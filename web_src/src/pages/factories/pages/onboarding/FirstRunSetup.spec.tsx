@@ -226,7 +226,10 @@ describe("FirstRunSetup", () => {
 
   it("shows the close control when another organization exists, even with no other workspace here", () => {
     factories = [factory];
-    accountOrganizations = [{ id: "org-1", name: "Acme" }, { id: "org-2", name: "Other Co" }];
+    accountOrganizations = [
+      { id: "org-1", name: "Acme" },
+      { id: "org-2", name: "Other Co" },
+    ];
 
     renderSetup(pageModel());
 
@@ -236,7 +239,10 @@ describe("FirstRunSetup", () => {
 
   it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
     factories = [factory];
-    accountOrganizations = [{ id: "org-1", name: "Acme" }, { id: "org-2", name: "Other Co", slug: "other-co" }];
+    accountOrganizations = [
+      { id: "org-1", name: "Acme" },
+      { id: "org-2", name: "Other Co", slug: "other-co" },
+    ];
     const user = userEvent.setup();
 
     renderSetup(pageModel());
