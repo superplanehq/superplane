@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -17,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
 type EventRouter struct {
@@ -170,6 +172,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 
 	var createdQueueItems []models.CanvasNodeQueueItem
 	var runID uuid.UUID
+	messageCollector := NewMessageCollector(event.WorkflowID, logger)
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockCanvasEvent(tx, event.ID)
 		if err != nil {
@@ -179,7 +182,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 			return nil
 		}
 
-		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent)
+		createdQueueItems, runID, err = w.processEvent(tx, logger, lockedEvent, messageCollector)
 		if err != nil {
 			outcome = executorOutcomeFailed
 			reason = classifyProcessError(err)
@@ -196,6 +199,8 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	if outcome == executorOutcomeSkipped {
 		return nil
 	}
+
+	messageCollector.Publish()
 
 	if len(createdQueueItems) > 0 {
 		for _, queueItem := range createdQueueItems {
@@ -233,7 +238,12 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	return nil
 }
 
-func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processEvent(
+	tx *gorm.DB,
+	logger *log.Entry,
+	event *models.CanvasEvent,
+	collector *MessageCollector,
+) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, event.WorkflowID)
 	if err != nil {
 		return nil, uuid.Nil, err
@@ -245,7 +255,7 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 	}
 
 	if event.ExecutionID == nil {
-		return w.processRootEvent(tx, canvas, liveEdges, event)
+		return w.processRootEvent(tx, canvas, liveEdges, event, collector)
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(tx, event.WorkflowID, *event.ExecutionID)
@@ -253,7 +263,7 @@ func (w *EventRouter) processEvent(tx *gorm.DB, logger *log.Entry, event *models
 		return nil, uuid.Nil, err
 	}
 
-	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event)
+	queueItems, err := w.processExecutionEvent(tx, logger, canvas, liveEdges, execution, event, collector)
 	return queueItems, execution.RunID, err
 }
 
@@ -268,7 +278,13 @@ func findOutgoingEdges(edges []models.Edge, sourceID string, channel string) []m
 	return matches
 }
 
-func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges []models.Edge, event *models.CanvasEvent) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
+func (w *EventRouter) processRootEvent(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	edges []models.Edge,
+	event *models.CanvasEvent,
+	collector *MessageCollector,
+) ([]models.CanvasNodeQueueItem, uuid.UUID, error) {
 	now := time.Now()
 
 	w.logger.Infof("Processing root event %s", event.ID)
@@ -303,6 +319,17 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			if err := w.recordInvalidTargetExecution(
+				tx,
+				targetNode,
+				event.ID,
+				run.ID,
+				event,
+				collector,
+			); err != nil {
+				return nil, uuid.Nil, err
+			}
+
 			continue
 		}
 
@@ -337,6 +364,7 @@ func (w *EventRouter) processExecutionEvent(
 	edges []models.Edge,
 	execution *models.CanvasNodeExecution,
 	event *models.CanvasEvent,
+	collector *MessageCollector,
 ) ([]models.CanvasNodeQueueItem, error) {
 	run, err := models.FindCanvasRunInTransaction(tx, execution.WorkflowID, execution.RunID)
 	if err != nil {
@@ -364,6 +392,17 @@ func (w *EventRouter) processExecutionEvent(
 		}
 
 		if targetNode.State == models.CanvasNodeStateError {
+			if err := w.recordInvalidTargetExecution(
+				tx,
+				targetNode,
+				execution.RootEventID,
+				execution.RunID,
+				event,
+				collector,
+			); err != nil {
+				return nil, err
+			}
+
 			continue
 		}
 
@@ -388,4 +427,48 @@ func (w *EventRouter) processExecutionEvent(
 	}
 
 	return createdQueueItems, nil
+}
+
+func (w *EventRouter) recordInvalidTargetExecution(
+	tx *gorm.DB,
+	node *models.CanvasNode,
+	rootEventID uuid.UUID,
+	runID uuid.UUID,
+	event *models.CanvasEvent,
+	collector *MessageCollector,
+) error {
+	resultMessage := "node configuration is invalid"
+	if node.StateReason != nil && strings.TrimSpace(*node.StateReason) != "" {
+		resultMessage = *node.StateReason
+	}
+
+	now := time.Now()
+	execution := models.CanvasNodeExecution{
+		WorkflowID:          node.WorkflowID,
+		NodeID:              node.NodeID,
+		RootEventID:         rootEventID,
+		RunID:               runID,
+		EventID:             event.ID,
+		PreviousExecutionID: event.ExecutionID,
+		State:               models.CanvasNodeExecutionStateFinished,
+		Configuration:       node.Configuration,
+		Result:              models.CanvasNodeExecutionResultFailed,
+		ResultReason:        models.CanvasNodeExecutionResultReasonError,
+		ResultMessage:       resultMessage,
+		CreatedAt:           &now,
+		UpdatedAt:           &now,
+	}
+
+	if err := tx.Create(&execution).Error; err != nil {
+		return err
+	}
+
+	w.logger.WithFields(log.Fields{
+		"node_id":      node.NodeID,
+		"execution_id": execution.ID,
+	}).Warn("Recording failed execution for invalid target node")
+
+	contexts.DispatchOnError(tx, &execution, collector.OnNewEvents)
+	collector.AddExecutionID(&execution.ID)
+	return nil
 }
