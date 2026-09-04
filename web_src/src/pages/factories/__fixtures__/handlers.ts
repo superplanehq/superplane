@@ -70,6 +70,7 @@ interface RequestBody {
   start_step_index?: unknown;
   replaceActive?: unknown;
   replace_active?: unknown;
+  model?: unknown;
   result?: unknown;
   state?: unknown;
   steps?: unknown;
@@ -234,6 +235,17 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         velocitySynced(match[1]);
         return { json: { started: true } };
       },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),
+      resolve: () => ({
+        json: {
+          models: [
+            { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+            { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          ],
+        },
+      }),
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/llm-models"),
@@ -402,6 +414,7 @@ function buildDispatchedLineDispatch(
   now: string,
   apps: Array<{ id?: string; name?: string }> = [],
   startStepIndex = 0,
+  model = "",
 ): FactoriesWorkOrderLineDispatch {
   const stepIndex = Math.max(0, startStepIndex);
   const firstStep = line?.steps?.[stepIndex] ?? line?.steps?.[0];
@@ -417,6 +430,7 @@ function buildDispatchedLineDispatch(
     state: "STATE_ACTIVE",
     result: "RESULT_UNKNOWN",
     createdAt: now,
+    model,
     stepExecutions: [
       {
         id: `exec-${Date.now()}`,
@@ -449,6 +463,7 @@ function dispatchRequestOptions(request: RequestBody) {
     lineName: stringOrEmpty(request.lineName ?? request.line_name),
     startStepIndex: Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0,
     replaceActive: request.replaceActive === true || request.replace_active === true,
+    model: stringOrEmpty(request.model),
   };
 }
 
@@ -468,7 +483,14 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   if (options.replaceActive) {
     cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex);
+  const newDispatch = buildDispatchedLineDispatch(
+    line,
+    options.lineName,
+    now,
+    apps,
+    options.startStepIndex,
+    options.model,
+  );
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
