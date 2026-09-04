@@ -87,6 +87,37 @@ describe("decideClassicAppRouteRedirect", () => {
     });
   });
 
+  it("keeps node, version, and file pins on the workspace editor URL", () => {
+    expect(
+      decideClassicAppRouteRedirect({
+        ...BASE,
+        factoriesEnabled: true,
+        factoryOwnedApp: true,
+        factoryKey: "RF",
+        pinned: { nodeId: "create-pr", version: "v1", file: "app.yaml", edit: true, sidebar: true },
+      }),
+    ).toEqual({
+      kind: "redirect",
+      to: "/org-1/workspaces/RF/apps/canvas-1?configure=1&agent=1&sidebar=1&node=create-pr&version=v1&file=app.yaml",
+    });
+  });
+
+  it("keeps a run pin together with a node pin", () => {
+    expect(
+      decideClassicAppRouteRedirect({
+        ...BASE,
+        factoriesEnabled: true,
+        factoryOwnedApp: true,
+        factoryKey: "RF",
+        runId: "run-9",
+        pinned: { runId: "run-9", nodeId: "create-pr", sidebar: true },
+      }),
+    ).toEqual({
+      kind: "redirect",
+      to: "/org-1/workspaces/RF/apps/canvas-1?run=run-9&sidebar=1&node=create-pr",
+    });
+  });
+
   it("sends factory-owned apps to /workspaces when the factory key cannot be resolved", () => {
     expect(
       decideClassicAppRouteRedirect({

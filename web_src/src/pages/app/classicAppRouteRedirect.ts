@@ -6,6 +6,15 @@ import { factoryAppConfigurePath, factoryAppPath, factoryListPath } from "@/page
 
 export type ClassicAppRouteRedirect = { kind: "none" } | { kind: "wait" } | { kind: "redirect"; to: string };
 
+export type ClassicAppPinnedSearch = {
+  runId?: string | null;
+  nodeId?: string | null;
+  version?: string | null;
+  file?: string | null;
+  edit?: boolean;
+  sidebar?: boolean;
+};
+
 export function factoryKeyForId(
   factories: Array<{ id?: string; key?: string }>,
   factoryId?: string | null,
@@ -14,6 +23,70 @@ export function factoryKeyForId(
     return undefined;
   }
   return factories.find((factory) => factory.id === factoryId)?.key;
+}
+
+export function pinnedSearchFromParams(searchParams: URLSearchParams): ClassicAppPinnedSearch {
+  return {
+    runId: searchParams.get("run"),
+    nodeId: searchParams.get("node"),
+    version: searchParams.get("version"),
+    file: searchParams.get("file"),
+    edit: searchParams.get("edit") === "1",
+    sidebar: searchParams.get("sidebar") === "1",
+  };
+}
+
+function firstNonEmpty(...values: Array<string | null | undefined>): string | undefined {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return undefined;
+}
+
+function appendPreservedClassicSearch(path: string, pinned: ClassicAppPinnedSearch): string {
+  const version = pinned.version?.trim();
+  const file = pinned.file?.trim();
+  if (!version && !file) {
+    return path;
+  }
+
+  const queryStart = path.indexOf("?");
+  const pathname = queryStart >= 0 ? path.slice(0, queryStart) : path;
+  const params = new URLSearchParams(queryStart >= 0 ? path.slice(queryStart + 1) : "");
+  if (version) {
+    params.set("version", version);
+  }
+  if (file) {
+    params.set("file", file);
+  }
+  return `${pathname}?${params.toString()}`;
+}
+
+function factoryOwnedWorkspaceAppPath(
+  organizationId: string,
+  factoryKey: string,
+  appId: string,
+  pinned: ClassicAppPinnedSearch,
+): string {
+  const runId = firstNonEmpty(pinned.runId);
+  const nodeId = firstNonEmpty(pinned.nodeId);
+  const wantsEditor = Boolean(pinned.edit || nodeId || pinned.sidebar || firstNonEmpty(pinned.file));
+
+  if (runId && !wantsEditor) {
+    return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId }), pinned);
+  }
+
+  if (runId && nodeId && !pinned.edit) {
+    return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId, nodeId }), pinned);
+  }
+
+  return appendPreservedClassicSearch(
+    factoryAppConfigurePath(organizationId, factoryKey, appId, { nodeId, runId }),
+    pinned,
+  );
 }
 
 /**
@@ -29,6 +102,7 @@ export function decideClassicAppRouteRedirect({
   organizationId,
   appId,
   runId,
+  pinned = {},
 }: {
   featureLoading: boolean;
   factoriesEnabled: boolean;
@@ -38,6 +112,7 @@ export function decideClassicAppRouteRedirect({
   organizationId: string;
   appId: string;
   runId: string | null;
+  pinned?: ClassicAppPinnedSearch;
 }): ClassicAppRouteRedirect {
   if (!organizationId || !appId) {
     return { kind: "none" };
@@ -57,10 +132,10 @@ export function decideClassicAppRouteRedirect({
     if (!factoryKey) {
       return { kind: "redirect", to: factoryListPath(organizationId) };
     }
-    if (runId) {
-      return { kind: "redirect", to: factoryAppPath(organizationId, factoryKey, appId, { runId }) };
-    }
-    return { kind: "redirect", to: factoryAppConfigurePath(organizationId, factoryKey, appId) };
+    return {
+      kind: "redirect",
+      to: factoryOwnedWorkspaceAppPath(organizationId, factoryKey, appId, { ...pinned, runId: pinned.runId ?? runId }),
+    };
   }
 
   if (factoriesEnabled) {
@@ -74,18 +149,19 @@ export function useClassicAppRouteRedirect({
   organizationId,
   appId,
   factoryId,
-  runId,
+  searchParams,
 }: {
   organizationId: string;
   appId: string;
   factoryId?: string | null;
-  runId: string | null;
+  searchParams: URLSearchParams;
 }): { factoryOwnedApp: boolean; classicSurface: ClassicAppRouteRedirect } {
   const factoryOwnedApp = isFactoryApp(factoryId);
   const { has, isLoading: featureLoading } = useExperimentalFeature(organizationId);
   const factoriesEnabled = has(FEATURE_FACTORIES);
   const factoriesQueryEnabled = Boolean(organizationId && factoriesEnabled && factoryOwnedApp);
   const { data: factories = [], isLoading: factoriesLoading } = useFactories(organizationId, factoriesQueryEnabled);
+  const pinned = pinnedSearchFromParams(searchParams);
 
   return {
     factoryOwnedApp,
@@ -97,7 +173,8 @@ export function useClassicAppRouteRedirect({
       factoryKey: factoryKeyForId(factories, factoryId),
       organizationId,
       appId,
-      runId,
+      runId: pinned.runId ?? null,
+      pinned,
     }),
   };
 }

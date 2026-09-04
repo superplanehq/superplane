@@ -80,7 +80,7 @@ export function AppDefaultTabGate() {
     organizationId: organizationId ?? "",
     appId: canvasId,
     factoryId: canvas?.metadata?.factoryId,
-    runId: searchParams.get("run"),
+    searchParams,
   });
 
   const pinned = urlPinsNavigation(searchParams);
