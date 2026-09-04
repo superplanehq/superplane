@@ -83,57 +83,11 @@ export function hostedGitHubBindPath(state: string, installationId: string): str
   return `/api/v1/github/app/bind?${params.toString()}`;
 }
 
-export function hostedGitHubInstallURL(slug: string, state: string, targetId = ""): string {
+export function hostedGitHubInstallURL(slug: string, state: string): string {
   const path = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new`;
-  const params = new URLSearchParams();
-  if (state) {
-    params.set("state", state);
-  }
-  if (targetId) {
-    params.set("target_id", targetId);
+  if (!state) {
+    return path;
   }
 
-  const query = params.toString();
-  return query ? `${path}?${query}` : path;
-}
-
-export function isPersonalGitHubAccount(installation: PendingGitHubInstallation, personalLogin = ""): boolean {
-  if (installation.accountType === "User") {
-    return true;
-  }
-
-  return personalLogin !== "" && installation.accountLogin === personalLogin;
-}
-
-export function sortGitHubInstallations(
-  installations: PendingGitHubInstallation[],
-  personalLogin = "",
-): PendingGitHubInstallation[] {
-  return [...installations].sort((left, right) => {
-    const leftPersonal = isPersonalGitHubAccount(left, personalLogin);
-    const rightPersonal = isPersonalGitHubAccount(right, personalLogin);
-    if (leftPersonal === rightPersonal) {
-      return 0;
-    }
-
-    return leftPersonal ? -1 : 1;
-  });
-}
-
-export function hostedGitHubUserId(metadata: unknown): string {
-  if (!metadata || typeof metadata !== "object") {
-    return "";
-  }
-
-  const id = (metadata as { githubUserId?: unknown }).githubUserId;
-  return typeof id === "string" ? id : "";
-}
-
-export function hostedGitHubUserLogin(metadata: unknown): string {
-  if (!metadata || typeof metadata !== "object") {
-    return "";
-  }
-
-  const login = (metadata as { githubUserLogin?: unknown }).githubUserLogin;
-  return typeof login === "string" ? login : "";
+  return `${path}?state=${encodeURIComponent(state)}`;
 }

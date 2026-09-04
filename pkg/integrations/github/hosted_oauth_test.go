@@ -94,15 +94,13 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 
 	t.Run("zero installs redirects to install URL", func(t *testing.T) {
 		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthWithUserHTTP(`{"installations":[]}`)
+		httpCtx := oauthHTTP(jsonResponse(`{"access_token":"user-token"}`), jsonResponse(`{"installations":[]}`))
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Contains(t, rec.Header().Get("Location"), "https://github.com/apps/superplane/installations/new?")
-		assert.Contains(t, rec.Header().Get("Location"), "state=csrf")
-		assert.Contains(t, rec.Header().Get("Location"), "target_id=7")
+		assert.Contains(t, rec.Header().Get("Location"), "https://github.com/apps/superplane/installations/new?state=csrf")
 		assert.Equal(t, "pending", integration.State)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
@@ -120,7 +118,10 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		}
 
 		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthWithUserHTTP(`{"installations":[{"id":11,"account":{"login":"acme","type":"Organization"}}]}`)
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":11,"account":{"login":"acme","type":"Organization"}}]}`),
+		)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
@@ -146,7 +147,10 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 			SetupReturnPath:         "/onboarding?attempt=1&step=vcs",
 			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 		}
-		httpCtx := oauthWithUserHTTP(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`)
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`),
+		)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
@@ -171,10 +175,13 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
 			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 		}
-		httpCtx := oauthWithUserHTTP(`{"installations":[
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[
 				{"id":11,"account":{"login":"acme","type":"Organization"}},
 				{"id":22,"account":{"login":"octo","type":"User"}}
-			]}`)
+			]}`),
+		)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
 		g.afterHostedAppOAuth(ctx)
@@ -188,17 +195,12 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assert.Equal(t, "csrf", metadata.State)
 		assert.Equal(t, "/onboarding?attempt=1&step=vcs", metadata.SetupReturnPath)
 		require.Len(t, metadata.PendingInstallations, 2)
-		assert.Equal(t, "22", metadata.PendingInstallations[0].ID)
-		assert.Equal(t, "octo", metadata.PendingInstallations[0].AccountLogin)
-		assert.Equal(t, "11", metadata.PendingInstallations[1].ID)
-		assert.Equal(t, "7", metadata.GitHubUserID)
-		assert.Equal(t, "octo", metadata.GitHubUserLogin)
+		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
-		require.Len(t, httpCtx.Requests, 3)
-		assert.Equal(t, "/user", httpCtx.Requests[1].URL.Path)
-		assert.Equal(t, "/user/installations", httpCtx.Requests[2].URL.Path)
-		assert.NotContains(t, httpCtx.Requests[2].URL.Path, "/app/installations")
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "/user/installations", httpCtx.Requests[1].URL.Path)
+		assert.NotContains(t, httpCtx.Requests[1].URL.Path, "/app/installations")
 	})
 }
 
@@ -563,14 +565,6 @@ func hostedRequestContext(integration *contexts.IntegrationContext, path string,
 
 func oauthHTTP(responses ...*http.Response) *contexts.HTTPContext {
 	return &contexts.HTTPContext{Responses: responses}
-}
-
-func oauthWithUserHTTP(installationsJSON string) *contexts.HTTPContext {
-	return oauthHTTP(
-		jsonResponse(`{"access_token":"user-token"}`),
-		jsonResponse(`{"id":7,"login":"octo"}`),
-		jsonResponse(installationsJSON),
-	)
 }
 
 func jsonResponse(body string) *http.Response {

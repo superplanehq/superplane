@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -17,7 +16,6 @@ import (
 
 const (
 	githubOAuthTokenURL        = "https://github.com/login/oauth/access_token"
-	githubUserURL              = "https://api.github.com/user"
 	githubUserInstallationsURL = "https://api.github.com/user/installations"
 )
 
@@ -38,11 +36,6 @@ type githubUserInstallation struct {
 		Login string `json:"login"`
 		Type  string `json:"type"`
 	} `json:"account"`
-}
-
-type githubUser struct {
-	ID    int64  `json:"id"`
-	Login string `json:"login"`
 }
 
 func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
@@ -94,20 +87,12 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if user, err := fetchGitHubUser(ctx.HTTP, token); err != nil {
-		ctx.Logger.Errorf("failed to load GitHub user: %v", err)
-	} else {
-		metadata.GitHubUserID = strconv.FormatInt(user.ID, 10)
-		metadata.GitHubUserLogin = user.Login
-	}
-
 	installations, err := listUserAppInstallations(ctx.HTTP, token, app.ID)
 	if err != nil {
 		ctx.Logger.Errorf("failed to list user GitHub App installations: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	installations = preferPersonalInstallations(metadata.GitHubUserLogin, installations)
 
 	switch {
 	case len(installations) == 0:
@@ -160,26 +145,9 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 	redirectToIntegrationSettings(ctx)
 }
 
-func preferPersonalInstallations(personalLogin string, installations []common.PendingInstallation) []common.PendingInstallation {
-	sorted := append([]common.PendingInstallation(nil), installations...)
-	sort.SliceStable(sorted, func(i, j int) bool {
-		return isPersonalGitHubAccount(sorted[i], personalLogin) && !isPersonalGitHubAccount(sorted[j], personalLogin)
-	})
-	return sorted
-}
-
-func isPersonalGitHubAccount(installation common.PendingInstallation, personalLogin string) bool {
-	if installation.AccountType == "User" {
-		return true
-	}
-
-	return personalLogin != "" && installation.AccountLogin == personalLogin
-}
-
 func (g *GitHub) redirectToHostedInstall(ctx core.HTTPRequestContext, metadata common.Metadata, slug string) {
 	metadata.PendingInstallations = nil
-	targetID, _ := strconv.ParseInt(metadata.GitHubUserID, 10, 64)
-	installURL := common.HostedAppInstallURLForAccount(slug, metadata.State, targetID)
+	installURL := common.HostedAppInstallURL(slug, metadata.State)
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: hostedInstallDescription,
 		URL:         installURL,
@@ -240,43 +208,6 @@ func exchangeGitHubUserOAuthToken(httpCtx core.HTTPContext, clientID, clientSecr
 	}
 
 	return token.AccessToken, nil
-}
-
-func fetchGitHubUser(httpCtx core.HTTPContext, token string) (githubUser, error) {
-	if httpCtx == nil {
-		return githubUser{}, fmt.Errorf("HTTP context is required")
-	}
-
-	req, err := http.NewRequest(http.MethodGet, githubUserURL, nil)
-	if err != nil {
-		return githubUser{}, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	response, err := httpCtx.Do(req)
-	if err != nil {
-		return githubUser{}, err
-	}
-	defer response.Body.Close()
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return githubUser{}, err
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return githubUser{}, fmt.Errorf("GitHub user request failed: status %d", response.StatusCode)
-	}
-
-	var user githubUser
-	if err := json.Unmarshal(body, &user); err != nil {
-		return githubUser{}, err
-	}
-	if user.ID == 0 || user.Login == "" {
-		return githubUser{}, fmt.Errorf("GitHub user request failed")
-	}
-
-	return user, nil
 }
 
 func listUserAppInstallations(httpCtx core.HTTPContext, token string, appID int64) ([]common.PendingInstallation, error) {

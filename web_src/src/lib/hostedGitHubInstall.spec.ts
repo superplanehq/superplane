@@ -8,7 +8,6 @@ import {
   hostedGitHubInstallURL,
   hostedGitHubState,
   pendingGitHubInstallations,
-  sortGitHubInstallations,
 } from "./hostedGitHubInstall";
 
 describe("pendingGitHubInstallations", () => {
@@ -42,21 +41,6 @@ describe("hosted GitHub URLs", () => {
       "https://github.com/apps/superplane/installations/new?state=csrf",
     );
     expect(hostedGitHubInstallURL("superplane", "")).toBe("https://github.com/apps/superplane/installations/new");
-    expect(hostedGitHubInstallURL("superplane", "csrf", "7")).toBe(
-      "https://github.com/apps/superplane/installations/new?state=csrf&target_id=7",
-    );
-  });
-
-  it("puts the personal GitHub account first", () => {
-    expect(
-      sortGitHubInstallations(
-        [
-          { id: "11", accountLogin: "acme", accountType: "Organization" },
-          { id: "22", accountLogin: "octo", accountType: "User" },
-        ],
-        "octo",
-      ).map((item) => item.accountLogin),
-    ).toEqual(["octo", "acme"]);
   });
 
   it("reads state and slug", () => {

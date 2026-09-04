@@ -120,10 +120,9 @@ describe("FirstRunConnectScreen", () => {
       <FirstRunConnectScreen
         githubConnected={false}
         pendingInstallations={[
-          { id: "11", accountLogin: "acme", accountType: "Organization" },
-          { id: "22", accountLogin: "octo", accountType: "User" },
+          { id: "11", accountLogin: "acme" },
+          { id: "22", accountLogin: "octo" },
         ]}
-        githubUserLogin="octo"
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
@@ -131,7 +130,6 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.usePersonal("octo") })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
       FIRST_RUN_COPY.connect.selectAccount,
     );
@@ -155,10 +153,9 @@ describe("FirstRunConnectScreen", () => {
         githubConnected={false}
         installRequested
         githubOrganization="acme"
-        pendingInstallations={[{ id: "22", accountLogin: "octo", accountType: "User" }]}
+        pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
         githubState="csrf"
         githubAppSlug="superplane"
-        githubUserLogin="octo"
         onConnectGitHub={vi.fn()}
         onContinue={vi.fn()}
       />,
@@ -166,7 +163,7 @@ describe("FirstRunConnectScreen", () => {
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.usePersonal("octo") })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-cancel-request")).toHaveAttribute(
       "href",
       "https://github.com/apps/superplane/installations/new?state=csrf",

@@ -336,8 +336,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         pendingInstallations={flow.accountPicker?.installations}
         githubState={flow.accountPicker?.state}
         githubAppSlug={flow.githubAppSlug}
-        githubUserId={flow.accountPicker?.githubUserId}
-        githubUserLogin={flow.accountPicker?.githubUserLogin}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onContinue={() => flow.goToScreen("choose")}

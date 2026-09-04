@@ -51,11 +51,6 @@ func Test__HostedAppInstallURL(t *testing.T) {
 		"https://github.com/apps/superplane/installations/new?state=abc",
 		HostedAppInstallURL("superplane", "abc"),
 	)
-	assert.Equal(
-		t,
-		"https://github.com/apps/superplane/installations/new?state=abc&target_id=7",
-		HostedAppInstallURLForAccount("superplane", "abc", 7),
-	)
 }
 
 func Test__HostedAppAuthorizeURL(t *testing.T) {
