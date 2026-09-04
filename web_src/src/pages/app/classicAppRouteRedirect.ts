@@ -65,22 +65,9 @@ function factoryOwnedWorkspaceAppPath(
 ): string {
   const runId = firstNonEmpty(pinned.runId);
   const nodeId = firstNonEmpty(pinned.nodeId);
-  const wantsEditor = Boolean(pinned.edit || nodeId || pinned.sidebar);
-
-  if (runId && !wantsEditor) {
-    return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId }), pinned);
-  }
 
   if (runId) {
-    return appendPreservedClassicSearch(
-      factoryAppPath(organizationId, factoryKey, appId, {
-        runId,
-        nodeId,
-        configure: pinned.edit || undefined,
-        agent: pinned.edit || undefined,
-      }),
-      pinned,
-    );
+    return appendPreservedClassicSearch(factoryAppPath(organizationId, factoryKey, appId, { runId, nodeId }), pinned);
   }
 
   return appendPreservedClassicSearch(factoryAppConfigurePath(organizationId, factoryKey, appId, { nodeId }), pinned);
@@ -94,6 +81,7 @@ export function decideClassicAppRouteRedirect({
   featureLoading,
   factoriesEnabled,
   factoriesLoading,
+  factoriesError = false,
   factoryOwnedApp,
   factoryKey,
   organizationId,
@@ -104,6 +92,7 @@ export function decideClassicAppRouteRedirect({
   featureLoading: boolean;
   factoriesEnabled: boolean;
   factoriesLoading: boolean;
+  factoriesError?: boolean;
   factoryOwnedApp: boolean;
   factoryKey: string | undefined;
   organizationId: string;
@@ -123,7 +112,7 @@ export function decideClassicAppRouteRedirect({
     if (!factoriesEnabled) {
       return { kind: "redirect", to: `/${organizationId}` };
     }
-    if (factoriesLoading) {
+    if (factoriesLoading || factoriesError) {
       return { kind: "wait" };
     }
     if (!factoryKey) {
@@ -157,7 +146,11 @@ export function useClassicAppRouteRedirect({
   const { has, isLoading: featureLoading } = useExperimentalFeature(organizationId);
   const factoriesEnabled = has(FEATURE_FACTORIES);
   const factoriesQueryEnabled = Boolean(organizationId && factoriesEnabled && factoryOwnedApp);
-  const { data: factories = [], isLoading: factoriesLoading } = useFactories(organizationId, factoriesQueryEnabled);
+  const {
+    data: factories = [],
+    isLoading: factoriesLoading,
+    isError: factoriesError,
+  } = useFactories(organizationId, factoriesQueryEnabled);
   const pinned = pinnedSearchFromParams(searchParams);
 
   return {
@@ -166,6 +159,7 @@ export function useClassicAppRouteRedirect({
       featureLoading,
       factoriesEnabled,
       factoriesLoading: factoriesQueryEnabled && factoriesLoading,
+      factoriesError: factoriesQueryEnabled && factoriesError,
       factoryOwnedApp,
       factoryKey: factoryKeyForId(factories, factoryId),
       organizationId,
