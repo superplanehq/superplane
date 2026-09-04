@@ -1,6 +1,6 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
-import { fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
+import { factoryQueryKeys, fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
@@ -14,7 +14,9 @@ import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSect
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
 import { useEffect, useMemo, useState } from "react";
+import type { NavigateFunction } from "react-router";
 import { useNavigate, useSearchParams } from "react-router";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
@@ -24,6 +26,7 @@ import {
   shouldNameOrganizationFromGitHub,
 } from "./initialOnboardingOrganization";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
+import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
@@ -195,11 +198,94 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   };
 }
 
+/**
+ * Copies the cached factory list and factory detail from the old organization
+ * slug to the new one, so the wizard does not fall back to a full-screen
+ * loading state while the workspace re-resolves under the new slug.
+ */
+function seedFactoryQueriesForNewSlug(
+  queryClient: QueryClient,
+  oldSlug: string,
+  nextSlug: string,
+  factoryId: string,
+): void {
+  const list = queryClient.getQueryData(factoryQueryKeys.list(oldSlug));
+  if (list !== undefined) {
+    queryClient.setQueryData(factoryQueryKeys.list(nextSlug), list);
+  }
+
+  const detail = queryClient.getQueryData(factoryQueryKeys.detail(oldSlug, factoryId));
+  if (detail !== undefined) {
+    queryClient.setQueryData(factoryQueryKeys.detail(nextSlug, factoryId), detail);
+  }
+}
+
+/** Marks the seeded queries stale, so they refetch in the background under the new slug. */
+function invalidateFactoryQueriesForNewSlug(queryClient: QueryClient, nextSlug: string, factoryId: string): void {
+  void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.list(nextSlug) });
+  void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.detail(nextSlug, factoryId) });
+}
+
+/**
+ * Moves the wizard from the vcs step to the repo step after the organization
+ * is renamed from the GitHub owner.
+ *
+ * During initial onboarding the workspace is resolved by
+ * `OrganizationOnboardingRedirect` under the organization slug, so renaming
+ * the organization invalidates that resolution. Re-resolving the workspace in
+ * place (instead of reloading the page) lets the wizard advance with a plain
+ * client-side navigation.
+ */
+export async function advanceAfterGithubConnect(args: {
+  onboardingEntryPath?: string | null;
+  organizationId: string;
+  nextSlug: string;
+  factoryId: string;
+  factoryKey: string;
+  navigate: NavigateFunction;
+  reresolveWorkspace: OnboardingWorkspaceResolution | null;
+  queryClient: QueryClient;
+}): Promise<void> {
+  const nextPath = onboardingStepPath(
+    args.onboardingEntryPath ?? factorySetupPath(args.nextSlug, args.factoryKey),
+    "repo",
+  );
+
+  if (!args.onboardingEntryPath) {
+    args.navigate(nextPath, { replace: true });
+    return;
+  }
+
+  if (!args.reresolveWorkspace) {
+    // No re-resolution callback is available (for example, in Storybook or a
+    // test that renders the wizard outside the onboarding route). Fall back
+    // to a full reload so the workspace still resolves under the new slug.
+    window.location.replace(nextPath);
+    return;
+  }
+
+  seedFactoryQueriesForNewSlug(args.queryClient, args.organizationId, args.nextSlug, args.factoryId);
+  try {
+    await args.reresolveWorkspace();
+  } catch {
+    // The organization already renamed, so the mounted wizard is bound to the
+    // now-invalid old slug. Re-resolving in place failed, which would strand
+    // the user on that slug. Fall back to a full reload so the workspace
+    // resolves under the new slug and onboarding can continue.
+    window.location.replace(nextPath);
+    return;
+  }
+  invalidateFactoryQueriesForNewSlug(args.queryClient, args.nextSlug, args.factoryId);
+  args.navigate(nextPath, { replace: true });
+}
+
 function useOnboardingGithubConnectionSelected(args: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
   onboardingEntryPath?: string | null;
+  reresolveWorkspace: OnboardingWorkspaceResolution | null;
   selectNewest: boolean;
   setup: OnboardingSetupApi;
   setOpenSection: (section: WizardStepId) => void;
@@ -207,6 +293,7 @@ function useOnboardingGithubConnectionSelected(args: {
   updateOrganization: ReturnType<typeof useUpdateOrganization>;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   return async (integration: OrganizationsIntegration) => {
     args.setup.selectVcsHost("github");
@@ -236,18 +323,16 @@ function useOnboardingGithubConnectionSelected(args: {
       });
       if (!nextSlug) return;
 
-      const nextPath = onboardingStepPath(
-        args.onboardingEntryPath ?? factorySetupPath(nextSlug, args.factoryKey),
-        "repo",
-      );
-      if (args.onboardingEntryPath) {
-        // Reload so the retry-safe onboarding endpoint resolves the workspace
-        // with its new organization slug without exposing the internal route.
-        window.location.replace(nextPath);
-        return;
-      }
-
-      navigate(nextPath, { replace: true });
+      await advanceAfterGithubConnect({
+        onboardingEntryPath: args.onboardingEntryPath,
+        organizationId: args.organizationId,
+        nextSlug,
+        factoryId: args.factoryId,
+        factoryKey: args.factoryKey,
+        navigate,
+        reresolveWorkspace: args.reresolveWorkspace,
+        queryClient,
+      });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
     }
@@ -256,8 +341,11 @@ function useOnboardingGithubConnectionSelected(args: {
 
 function useOnboardingGithubConnectionsForPage(args: {
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  onboardingEntryPath?: string | null;
+  reresolveWorkspace: OnboardingWorkspaceResolution | null;
   searchParams: URLSearchParams;
   setup: OnboardingSetupApi;
   openSection: WizardStepId;
@@ -288,6 +376,7 @@ export function useOnboardingPageModel(args: {
   factory: FactoriesFactory | null;
   factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
+  reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }) {
   const { canAct } = usePermissions();
   const onboarding = args.factory?.onboarding;
@@ -328,6 +417,7 @@ export function useOnboardingPageModel(args: {
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
+    reresolveWorkspace: args.reresolveWorkspace ?? null,
     searchParams,
     setup,
     openSection,

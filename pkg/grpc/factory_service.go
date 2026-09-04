@@ -268,6 +268,11 @@ func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListF
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryLineRunnerModels(ctx context.Context, req *pb.ListFactoryLineRunnerModelsRequest) (*pb.ListFactoryLineRunnerModelsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryLineRunnerModels(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.UpdateFactoryLLMModelsRequest) (*pb.UpdateFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)

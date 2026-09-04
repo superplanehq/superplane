@@ -62,6 +62,7 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
+import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
 import {
   AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
@@ -260,9 +261,14 @@ function AppRouter() {
 function OrganizationOnboardingRoute() {
   return (
     <OrganizationOnboardingRedirect
-      renderWorkspace={(workspace, entryPath) => (
+      renderWorkspace={(workspace, entryPath, reresolveWorkspace) => (
         <OnboardingEntryPathProvider path={entryPath}>
-          <InitialWorkspaceOnboarding organizationId={workspace.organizationSlug} factoryKey={workspace.workspaceKey} />
+          <OnboardingWorkspaceResolutionProvider resolve={reresolveWorkspace}>
+            <InitialWorkspaceOnboarding
+              organizationId={workspace.organizationSlug}
+              factoryKey={workspace.workspaceKey}
+            />
+          </OnboardingWorkspaceResolutionProvider>
         </OnboardingEntryPathProvider>
       )}
     />
