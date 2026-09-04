@@ -466,4 +466,184 @@ describe("mergePlanningSessionNotes", () => {
     expect(merged.map((line) => line.id)).toEqual(["agent-step-7", "look", "agent-step-8"]);
     expect(merged[2]?.userTalk).toBe("survey");
   });
+
+  it("renders the submitted answer, not the live log's own wording, for a matched survey reply", () => {
+    // The live runner log can summarize a user turn in its own words (for
+    // example a truncated preview). That summary is not guaranteed to spell
+    // out the chosen answer, so the merge must prefer the text the user
+    // actually submitted once it recognizes the turn as a survey reply.
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "What is the priority? High (agent noted the rest of the form was skipped)",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: "What is the priority? High",
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-8"]);
+    expect(merged[0]?.userTalk).toBe("survey");
+    expect(merged[0]?.componentName).toBe("What is the priority? High");
+    expect(merged[0]?.componentName).not.toContain("skipped");
+  });
+
+  it("keeps a partially answered multi-question reply intact when it matches the live log", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: "Which ORM? skipped\nWhich auth library? Passport",
+      }),
+    ];
+
+    const surveyReply = "Which ORM? skipped\nWhich auth library? Passport";
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged[0]?.componentName).toBe(surveyReply);
+    expect(merged[0]?.componentName).toContain("Passport");
+  });
+
+  it("keeps the skipped label when every answer in the reply was empty", () => {
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-8",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: CREATE_WITH_AGENT_COPY.surveySkipped,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged[0]?.componentName).toBe(CREATE_WITH_AGENT_COPY.surveySkipped);
+  });
+
+  it("rewrites only the latest live prompt that matches a survey reply prefix", () => {
+    // Two separate root prompts share the same 48-character prefix as the
+    // submitted reply, for example the same survey was re-asked. Only one turn
+    // may be rewritten and labeled so a second transcript turn is not duplicated
+    // or mislabeled. The answer belongs to the most recent matching turn -- the
+    // user answered after being "asked again" -- so the later prompt wins.
+    const surveyReply = "Which framework should we use for the new service? React";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (still deciding)",
+      }),
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (asked again)",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-1", "agent-step-2"]);
+    expect(merged[1]?.userTalk).toBe("survey");
+    expect(merged[1]?.componentName).toBe(surveyReply);
+    expect(merged[0]?.userTalk).not.toBe("survey");
+    expect(merged[0]?.componentName).toBe("Which framework should we use for the new service? (still deciding)");
+  });
+
+  it("labels the later survey turn even when an earlier prompt carries the full reply verbatim", () => {
+    // An earlier, unrelated prompt happens to contain the complete submitted
+    // reply, while the actual later survey turn kept only a truncated preview.
+    // Anchoring on chronology, the last prompt that shares the survey prefix is
+    // the real turn, so the answer is not attributed to the earlier prompt and
+    // the truncated preview is rewritten to the full submitted answer.
+    const surveyReply = "Which framework should we use for the new service? React";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: `A while ago you told me: "${surveyReply}" -- still true?`,
+      }),
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (preview truncated…",
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-1", "agent-step-2"]);
+    expect(merged[0]?.userTalk).not.toBe("survey");
+    expect(merged[0]?.componentName).toBe(`A while ago you told me: "${surveyReply}" -- still true?`);
+    expect(merged[1]?.userTalk).toBe("survey");
+    expect(merged[1]?.componentName).toBe(surveyReply);
+  });
+
+  it("labels the prompt that carries the full reply when an earlier prompt only shares the prefix", () => {
+    // An earlier prompt coincidentally shares the 48-character prefix, but the
+    // real survey turn is the later prompt whose live text still spells out the
+    // full submitted reply. The full-text match must win so the answer is not
+    // attributed to the earlier, unrelated prompt.
+    const surveyReply = "Which framework should we use for the new service? React";
+    const live: SplitRunStreamLine[] = [
+      note({
+        id: "agent-step-1",
+        componentType: "prompt",
+        componentName: "Which framework should we use for the new service? (still deciding)",
+      }),
+      note({
+        id: "agent-step-2",
+        componentType: "prompt",
+        componentName: surveyReply,
+      }),
+    ];
+
+    const merged = mergePlanningSessionNotes(live, [
+      note({
+        id: "user-survey",
+        componentType: "prompt",
+        componentName: surveyReply,
+        userTalk: "survey",
+      }),
+    ]);
+
+    expect(merged.map((line) => line.id)).toEqual(["agent-step-1", "agent-step-2"]);
+    expect(merged[0]?.userTalk).not.toBe("survey");
+    expect(merged[0]?.componentName).toBe("Which framework should we use for the new service? (still deciding)");
+    expect(merged[1]?.userTalk).toBe("survey");
+    expect(merged[1]?.componentName).toBe(surveyReply);
+  });
 });

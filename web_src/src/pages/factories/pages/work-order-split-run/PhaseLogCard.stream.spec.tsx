@@ -47,6 +47,69 @@ describe("PhaseLogCard stream details", () => {
     expect(userNote).toHaveTextContent("What is the priority? High");
   });
 
+  it("shows the submitted survey answer, not the live log's own wording, in the transcript", () => {
+    // The live runner log recognizes the turn as the user's survey reply
+    // (so it should be labeled "You (survey response)"), but its own text
+    // for that turn is a summary that buries the chosen answer behind the
+    // word "skipped". The transcript must still show the answer the user
+    // actually picked.
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 0,
+          text: "What is the priority? High",
+          kind: "prompt",
+          preview: "What is the priority? High (rest marked as skipped)",
+          lines: [],
+          events: [],
+          status: "passed",
+          duration_ms: 10,
+          started_at: 1,
+          collapsed: false,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+          line({
+            id: "user-survey",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            userTalk: "survey",
+            componentName: "What is the priority? High",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You (survey response)");
+    expect(userNote).toHaveTextContent("What is the priority? High");
+    expect(userNote).not.toHaveTextContent("skipped");
+  });
+
   it("keeps yaml notes when live sections are only setup", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [
