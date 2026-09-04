@@ -136,7 +136,11 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import {
+  componentMappers as bitbucketComponentMappers,
+  triggerRenderers as bitbucketTriggerRenderers,
+  eventStateRegistry as bitbucketEventStateRegistry,
+} from "./bitbucket/index";
 import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
@@ -327,6 +331,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
+  bitbucket: bitbucketComponentMappers,
   cloudflare: cloudflareComponentMappers,
   cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
@@ -428,6 +433,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
+  bitbucket: bitbucketEventStateRegistry,
   cloudflare: cloudflareEventStateRegistry,
   cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
