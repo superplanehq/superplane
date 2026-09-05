@@ -31,6 +31,7 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
+        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -39,6 +40,76 @@ describe("useOnboardingGithubConnections", () => {
 
     await waitFor(() => expect(onConnectionSelected).toHaveBeenCalledWith(githubConnection));
     expect(selectInstance).toHaveBeenCalledWith("github", "github-connection");
+  });
+
+  it("selects the single ready connection on initial onboarding without the URL hint", async () => {
+    const selectInstance = vi.fn();
+    const onConnectionSelected = vi.fn();
+
+    renderHook(() =>
+      useOnboardingGithubConnections({
+        integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
+        openSection: "vcs",
+        selectNewest: false,
+        selectSingleInitial: true,
+        selections: {},
+        selectInstance,
+        onConnectionSelected,
+      }),
+    );
+
+    await waitFor(() => expect(onConnectionSelected).toHaveBeenCalledWith(githubConnection));
+    expect(selectInstance).toHaveBeenCalledWith("github", "github-connection");
+  });
+
+  it("does not auto-select without the URL hint outside initial onboarding", () => {
+    const selectInstance = vi.fn();
+    const onConnectionSelected = vi.fn();
+
+    renderHook(() =>
+      useOnboardingGithubConnections({
+        integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
+        openSection: "vcs",
+        selectNewest: false,
+        selectSingleInitial: false,
+        selections: {},
+        selectInstance,
+        onConnectionSelected,
+      }),
+    );
+
+    expect(onConnectionSelected).not.toHaveBeenCalled();
+    expect(selectInstance).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-select on initial onboarding when several connections are ready", () => {
+    const selectInstance = vi.fn();
+    const onConnectionSelected = vi.fn();
+    const otherConnection: OrganizationsIntegration = {
+      metadata: { id: "older-connection", integrationName: "github", createdAt: "2026-09-01T00:00:00Z" },
+      status: { state: "ready", metadata: { owner: "acme" } },
+    };
+
+    renderHook(() =>
+      useOnboardingGithubConnections({
+        integrationData: [
+          {
+            name: "github",
+            allInstances: [githubConnection, otherConnection],
+            readyInstances: [githubConnection, otherConnection],
+          },
+        ],
+        openSection: "vcs",
+        selectNewest: false,
+        selectSingleInitial: true,
+        selections: {},
+        selectInstance,
+        onConnectionSelected,
+      }),
+    );
+
+    expect(onConnectionSelected).not.toHaveBeenCalled();
+    expect(selectInstance).not.toHaveBeenCalled();
   });
 
   it("advances from vcs to repo on the same slug without re-resolving the workspace", async () => {
@@ -66,6 +137,7 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
+        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -105,6 +177,7 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
+        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,

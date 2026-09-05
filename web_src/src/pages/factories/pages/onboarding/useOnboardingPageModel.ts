@@ -270,7 +270,6 @@ function useOnboardingGithubConnectionSelected(args: {
   factory: FactoriesFactory | null;
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
-  selectNewest: boolean;
   setup: OnboardingSetupApi;
   setOpenSection: (section: WizardStepId) => void;
   updateOnboarding: UpdateOnboarding;
@@ -305,7 +304,7 @@ function useOnboardingGithubConnectionSelected(args: {
     });
 
     const owner = githubIntegrationOwner(integration);
-    if (!owner || !shouldNameOrganizationFromGitHub(args.factory, args.selectNewest)) return;
+    if (!owner || !shouldNameOrganizationFromGitHub(args.factory)) return;
 
     try {
       const nextSlug = await nameOrganizationFromGitHubOwner({
@@ -352,12 +351,17 @@ function useOnboardingGithubConnectionsForPage(args: {
   selectInstance: (integrationName: string, integrationId: string) => void;
 }) {
   const selectNewest = args.searchParams.get("pick") === "newest";
-  const onConnectionSelected = useOnboardingGithubConnectionSelected({ ...args, selectNewest });
+  const onConnectionSelected = useOnboardingGithubConnectionSelected(args);
 
   return useOnboardingGithubConnections({
     integrationData: args.integrationData,
     openSection: args.openSection,
     selectNewest,
+    // An install request approved on GitHub binds the connection outside the
+    // wizard round trip, so the `pick=newest` hint is gone when the user
+    // returns. Initial onboarding still selects the single ready connection,
+    // which also names the organization after the GitHub account.
+    selectSingleInitial: args.factory?.onboarding?.initial === true,
     selections: args.selections,
     selectInstance: args.selectInstance,
     onConnectionSelected,
