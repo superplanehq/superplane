@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -29,27 +30,31 @@ vi.mock("@/contexts/useAccount", () => ({
   }),
 }));
 
-function renderOnboarding() {
+function renderOnboarding(queryClient = new QueryClient()) {
   return render(
-    <OrganizationOnboardingRedirect
-      renderWorkspace={(workspace, entryPath) => (
-        <div data-entry-path={entryPath} data-testid="internal-workspace-key">
-          {workspace.workspaceKey}
-        </div>
-      )}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <OrganizationOnboardingRedirect
+        renderWorkspace={(workspace, entryPath) => (
+          <div data-entry-path={entryPath} data-testid="internal-workspace-key">
+            {workspace.workspaceKey}
+          </div>
+        )}
+      />
+    </QueryClientProvider>,
   );
 }
 
-function renderOnboardingWithReresolve() {
+function renderOnboardingWithReresolve(queryClient = new QueryClient()) {
   let reresolve: (() => Promise<void>) | undefined;
   const utils = render(
-    <OrganizationOnboardingRedirect
-      renderWorkspace={(workspace, _entryPath, reresolveWorkspace) => {
-        reresolve = reresolveWorkspace;
-        return <div data-testid="internal-workspace-slug">{workspace.organizationSlug}</div>;
-      }}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <OrganizationOnboardingRedirect
+        renderWorkspace={(workspace, _entryPath, reresolveWorkspace) => {
+          reresolve = reresolveWorkspace;
+          return <div data-testid="internal-workspace-slug">{workspace.organizationSlug}</div>;
+        }}
+      />
+    </QueryClientProvider>,
   );
   return { ...utils, reresolve: () => reresolve!() };
 }
@@ -134,6 +139,35 @@ describe("OrganizationOnboardingRedirect", () => {
     await waitFor(() => expect(screen.getByTestId("internal-workspace-slug")).toHaveTextContent("dev-user-x1y2z3"));
     expect(location.replace).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops cached queries for the provisioned slug so a reused slug starts setup fresh", async () => {
+    const queryClient = new QueryClient();
+    // Cache left behind by an earlier onboarding organization that held the
+    // "dev-user" slug before it was renamed.
+    queryClient.setQueryData(["factories", "dev-user"], [{ id: "old-factory", onboarding: { step: "repo" } }]);
+    queryClient.setQueryData(["integrations", "connected", "dev-user"], [{ metadata: { id: "old-integration" } }]);
+    queryClient.setQueryData(["factories", "other-org"], [{ id: "other-factory" }]);
+
+    renderOnboarding(queryClient);
+
+    await screen.findByTestId("internal-workspace-key");
+    expect(queryClient.getQueryData(["factories", "dev-user"])).toBeUndefined();
+    expect(queryClient.getQueryData(["integrations", "connected", "dev-user"])).toBeUndefined();
+    expect(queryClient.getQueryData(["factories", "other-org"])).toBeDefined();
+  });
+
+  it("keeps cached queries when a re-resolve returns the same slug", async () => {
+    const queryClient = new QueryClient();
+    const { reresolve } = renderOnboardingWithReresolve(queryClient);
+
+    await screen.findByTestId("internal-workspace-slug");
+    // Cache written by the wizard itself after the workspace was adopted.
+    queryClient.setQueryData(["factories", "dev-user"], [{ id: "current-factory" }]);
+
+    await reresolve();
+
+    expect(queryClient.getQueryData(["factories", "dev-user"])).toBeDefined();
   });
 
   it("starts workspace setup without GitHub authorization", async () => {
