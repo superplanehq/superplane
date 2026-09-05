@@ -13,10 +13,11 @@ import (
 )
 
 var (
-	newInstallationClient = newClientForAppInstallation
-	newAppJWTClient       = newClientForApp
-	listInstallationRepos = listInstallationRepositories
-	listAppInstallations  = listAppInstallationsFromGitHub
+	newInstallationClient       = newClientForAppInstallation
+	newAppJWTClient             = newClientForApp
+	listInstallationRepos       = listInstallationRepositories
+	listAppInstallations        = listAppInstallationsFromGitHub
+	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 )
 
 func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
@@ -80,15 +81,27 @@ func (g *GitHub) bindHostedInstallationWith(
 // was approved on GitHub. The approve callback carries no CSRF state and the
 // installation webhook cannot find a connection without an installation id,
 // so Sync asks GitHub whether the requested account has the App installed.
-func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) (bool, error) {
-	account := strings.TrimSpace(metadata.InstallRequestedAccount)
-	if account == "" {
-		return false, nil
-	}
-
+//
+// The request callback from GitHub also does not name the requested account,
+// so when it is unknown Sync finds the member's open install request on
+// GitHub and records the account on the metadata for the next sync and the
+// waiting screen.
+func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.HostedApp, metadata *common.Metadata) (bool, error) {
 	client, err := newAppJWTClient(ctx.Integration, app.ID)
 	if err != nil {
 		return false, fmt.Errorf("failed to create app client: %w", err)
+	}
+
+	account := strings.TrimSpace(metadata.InstallRequestedAccount)
+	if account == "" {
+		account, err = listAppInstallationRequests(context.Background(), client, metadata.StartedByGitHubLogin)
+		if err != nil {
+			return false, fmt.Errorf("failed to list app installation requests: %w", err)
+		}
+		if account == "" {
+			return false, nil
+		}
+		metadata.InstallRequestedAccount = account
 	}
 
 	installationID, err := listAppInstallations(context.Background(), client, account)
@@ -99,10 +112,38 @@ func (g *GitHub) adoptRequestedInstallation(ctx core.SyncContext, app common.Hos
 		return false, nil
 	}
 
-	if err := g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID); err != nil {
+	if err := g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, *metadata, installationID); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// listAppInstallationRequestsFromGitHub returns the account login of the open
+// App install request made by the requester, or an empty string when the
+// requester has no open request.
+func listAppInstallationRequestsFromGitHub(ctx context.Context, client *github.Client, requesterLogin string) (string, error) {
+	if strings.TrimSpace(requesterLogin) == "" {
+		return "", nil
+	}
+
+	opts := &github.ListOptions{PerPage: 100}
+	for {
+		requests, response, err := client.Apps.ListInstallationRequests(ctx, opts)
+		if err != nil {
+			return "", err
+		}
+
+		for _, request := range requests {
+			if strings.EqualFold(request.GetRequester().GetLogin(), requesterLogin) {
+				return request.GetAccount().GetLogin(), nil
+			}
+		}
+
+		if response == nil || response.NextPage == 0 {
+			return "", nil
+		}
+		opts.Page = response.NextPage
+	}
 }
 
 // listAppInstallationsFromGitHub returns the id of the App installation owned
