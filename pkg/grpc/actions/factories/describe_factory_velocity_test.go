@@ -73,6 +73,105 @@ func TestDescribeFactoryVelocity_ClampsPeriodDays(t *testing.T) {
 	}
 }
 
+func TestDescribeFactoryVelocity_Automations(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	planner, plannerEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Planner", "start")
+	closure, closureEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Closure", "start")
+
+	now := time.Now()
+	plannerRun := seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultPassed, now.Add(-2*time.Hour), 30*time.Minute)
+	seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultFailed, now.Add(-3*time.Hour), 90*time.Minute)
+	seedAutomationRun(t, closure, closureEntry, models.CanvasRunResultPassed, now.Add(-4*time.Hour), 10*time.Minute)
+	seedAutomationRun(t, planner, plannerEntry, models.CanvasRunResultPassed, now.AddDate(0, 0, -20), time.Hour)
+
+	seedAutomationRunCost(t, plannerRun, 2_000_000)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 14,
+	})
+	require.NoError(t, err)
+	require.Len(t, resp.Automations, 2, "one row per automation that ran inside the window")
+
+	busiest := resp.Automations[0]
+	assert.Equal(t, planner.ID.String(), busiest.Id)
+	assert.Equal(t, planner.Name, busiest.Name)
+	assert.Equal(t, int32(2), busiest.Runs, "the run from 20 days ago is outside the window")
+	assert.Equal(t, int32(1), busiest.Failed)
+	assert.InDelta(t, 1.0, busiest.AverageDurationHours, 0.01, "mean of a 30 and a 90 minute run")
+	assert.Equal(t, int64(200), busiest.CostCents)
+
+	quietest := resp.Automations[1]
+	assert.Equal(t, closure.ID.String(), quietest.Id)
+	assert.Equal(t, int32(1), quietest.Runs)
+	assert.Equal(t, int32(0), quietest.Failed)
+	assert.Equal(t, int64(0), quietest.CostCents)
+}
+
+func TestDescribeFactoryVelocity_AutomationsEmptyWithoutRuns(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "Planner", "start")
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 14,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Automations, "an automation that never ran is not a row")
+}
+
+// seedAutomationRun stores one finished run of a factory canvas, started at
+// `startedAt` and lasting `duration`.
+func seedAutomationRun(
+	t *testing.T,
+	canvas *models.Canvas,
+	entrypoint string,
+	result string,
+	startedAt time.Time,
+	duration time.Duration,
+) *models.CanvasRun {
+	t.Helper()
+	db := database.DB(t.Context())
+
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, entrypoint, models.CanvasRunStateFinished, result)
+	require.NoError(t, err)
+
+	finishedAt := startedAt.Add(duration)
+	require.NoError(t, db.Model(run).Updates(map[string]any{
+		"created_at":  startedAt,
+		"finished_at": finishedAt,
+	}).Error)
+
+	return run
+}
+
+func seedAutomationRunCost(t *testing.T, run *models.CanvasRun, costMicros int64) {
+	t.Helper()
+
+	require.NoError(t, models.RecordUsage(database.DB(t.Context()), models.WorkspaceUsageEventInput{
+		OrganizationID:  uuid.Nil,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000,
+		TotalTokens:     1_000,
+		CostMicros:      &costMicros,
+		IdempotencyKey:  run.ID.String(),
+	}))
+}
+
 func TestDescribeFactoryVelocity_FactoryNotFound(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -572,7 +671,7 @@ func TestDescribeFactoryVelocity_ReportsIntakeAndPeople(t *testing.T) {
 }
 
 // TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize covers a cohort
-// larger than one page: the response caps at 10 rows, reports the true total,
+// larger than one page: the response caps at 5 rows, reports the true total,
 // and says more rows are available.
 func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
 	r := support.Setup(t)
@@ -593,11 +692,11 @@ func TestDescribeFactoryVelocity_CapsPeopleAtTheDefaultPageSize(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, resp.People, 10, "the People table caps at 10 rows by default")
+	require.Len(t, resp.People, 5, "the People table caps at 5 rows by default")
 	assert.Equal(t, int32(12), resp.PeopleTotal, "the total counts the whole cohort, not just the page")
 	assert.True(t, resp.PeopleHasMore)
 	assert.Equal(t, "Contributor 01", resp.People[0].Name)
-	assert.Equal(t, "Contributor 10", resp.People[9].Name)
+	assert.Equal(t, "Contributor 05", resp.People[4].Name)
 }
 
 // TestDescribeFactoryVelocity_PagesPeopleWithOffset covers "Load more": a
@@ -616,17 +715,18 @@ func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
 	)
 
 	secondPage, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
-		FactoryId:    factoryModel.ID.String(),
-		PeriodDays:   7,
-		Repository:   "example/repo",
-		PeopleOffset: 10,
+		FactoryId:      factoryModel.ID.String(),
+		PeriodDays:     7,
+		Repository:     "example/repo",
+		PeopleOffset:   5,
+		PeoplePageSize: 20,
 	})
 	require.NoError(t, err)
-	require.Len(t, secondPage.People, 2, "the last page holds the remaining people")
+	require.Len(t, secondPage.People, 7, "the last page holds the remaining people")
 	assert.Equal(t, int32(12), secondPage.PeopleTotal)
 	assert.False(t, secondPage.PeopleHasMore, "there is nothing left after the last page")
-	assert.Equal(t, "Contributor 11", secondPage.People[0].Name)
-	assert.Equal(t, "Contributor 12", secondPage.People[1].Name)
+	assert.Equal(t, "Contributor 06", secondPage.People[0].Name)
+	assert.Equal(t, "Contributor 12", secondPage.People[6].Name)
 
 	pastTheEnd, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
 		FactoryId:    factoryModel.ID.String(),
@@ -641,7 +741,7 @@ func TestDescribeFactoryVelocity_PagesPeopleWithOffset(t *testing.T) {
 }
 
 // TestDescribeFactoryVelocity_ClampsPeoplePageSize covers the page size guard
-// rails: non-positive defaults to 10, and a request above the max is capped.
+// rails: non-positive defaults to 5, and a request above the max is capped.
 func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -659,8 +759,8 @@ func TestDescribeFactoryVelocity_ClampsPeoplePageSize(t *testing.T) {
 		pageSize int32
 		expected int
 	}{
-		{"defaults to 10 when zero", 0, 10},
-		{"defaults to 10 when negative", -5, 10},
+		{"defaults to 5 when zero", 0, 5},
+		{"defaults to 5 when negative", -5, 5},
 		{"honors a page size within range", 5, 5},
 		{"caps above the max", 1000, 12},
 	} {

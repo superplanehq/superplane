@@ -1,4 +1,5 @@
 import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
+import { peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
 
 /**
  * Storybook payloads for the workspace Velocity report. The series drift on
@@ -28,6 +29,51 @@ const INTAKE_SHARES = [
   { key: "manual", label: "Manually created", share: 0.18 },
   { key: "automation", label: "Automation", share: 0.12 },
 ];
+
+/** Automations of the fixture workspace, with the run rate each one holds. */
+const AUTOMATION_SEEDS = [
+  { id: "app-refund-planner", name: "Refund Planner", runsPerDay: 4.1, failureRate: 0.04, hours: 0.35, costUsd: 1.42 },
+  {
+    id: "app-refund-implementer",
+    name: "Refund Implementer",
+    runsPerDay: 3.4,
+    failureRate: 0.09,
+    hours: 1.65,
+    costUsd: 2.86,
+  },
+  {
+    id: "app-refund-verifier",
+    name: "Refund Verifier",
+    runsPerDay: 3.1,
+    failureRate: 0.13,
+    hours: 0.62,
+    costUsd: 0.74,
+  },
+  { id: "app-pr-closure", name: "PR Closure", runsPerDay: 2.4, failureRate: 0.01, hours: 0.05, costUsd: 0.08 },
+  {
+    id: "app-github-issues-intake",
+    name: "GitHub issue intake",
+    runsPerDay: 5.2,
+    failureRate: 0.02,
+    hours: 0.03,
+    costUsd: 0.04,
+  },
+];
+
+/** Busiest automation first, so the rows that carry the spend read first. */
+function buildAutomations(periodDays: number) {
+  return AUTOMATION_SEEDS.map((seed) => {
+    const runs = Math.round(seed.runsPerDay * periodDays);
+    return {
+      id: seed.id,
+      name: seed.name,
+      runs,
+      failed: Math.round(runs * seed.failureRate),
+      averageDurationHours: seed.hours,
+      costCents: String(Math.round(runs * seed.costUsd * 100)),
+    };
+  }).sort((left, right) => right.runs - left.runs);
+}
 
 interface VelocityDaySeed {
   index: number;
@@ -147,7 +193,7 @@ function buildPeople(totals: ReturnType<typeof sumTotals>, authors: Author[] = P
 }
 
 /**
- * A cohort large enough that the People table's "Load more" control has
+ * A cohort large enough that the People table's "Show more" control has
  * something to show. Named so the alphabetical order matches the default
  * total-merged-descending sort closely enough for the Storybook fixture to
  * read as a believable, stable first page.
@@ -196,6 +242,7 @@ function buildReport(
     hasPreviousWindow: withComparison,
     intakeSources: intakeSources(points),
     people: buildPeople(totals, authors),
+    automations: buildAutomations(periodDays),
   };
 }
 
@@ -229,6 +276,7 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
   hasPreviousWindow: false,
   intakeSources: [],
   people: [],
+  automations: [],
 };
 
 /**
@@ -286,7 +334,7 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVeloc
 })();
 
 /**
- * Fourteen people with activity, so the People table's "Load more" control has
+ * Fourteen people with activity, so the People table's "Show more" control has
  * something to load. Every other fixture keeps the small default cohort so its
  * story keeps rendering one page with no control.
  */
@@ -312,7 +360,7 @@ const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => numb
  * Stands in for the backend's sort-then-page step: orders `report.people` by
  * the request's `peopleSort`/`peopleSortDirection`, then slices to
  * `peopleOffset`/`peoplePageSize`, so Storybook and the mock server exercise
- * the same "Load more" contract the real API does.
+ * the same "Show more" contract the real API does.
  */
 export function paginateVelocityPeople(
   report: FactoriesDescribeFactoryVelocityResponse,
@@ -329,7 +377,7 @@ export function paginateVelocityPeople(
   });
 
   const offset = Number(url.searchParams.get("peopleOffset") ?? 0);
-  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? 10);
+  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? peoplePageSizeForOffset(offset));
   const page = people.slice(offset, offset + pageSize);
 
   return {

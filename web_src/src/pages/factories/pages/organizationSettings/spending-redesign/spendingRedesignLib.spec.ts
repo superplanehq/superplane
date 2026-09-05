@@ -12,6 +12,7 @@ import {
   modelKey,
   rangeForPreset,
   rangeFromCustomDays,
+  spendingPeriodTriggerLabel,
   type SpendingCatalogs,
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
@@ -206,6 +207,11 @@ describe("filter helpers", () => {
     expect(formatFilterTriggerLabel("All users")).toBe("All users");
     expect(formatFilterTriggerLabel("All users", "Alex")).toBe("Alex");
     expect(formatSpendingRangeCaption(rangeForPreset("day", NOW))).toBe("Sep 2, 2026 – Sep 3, 2026");
+  });
+
+  it("labels the period trigger with the preset or the custom dates", () => {
+    expect(spendingPeriodTriggerLabel("month", rangeForPreset("month", NOW))).toBe("Last 30 days");
+    expect(spendingPeriodTriggerLabel("custom", rangeForPreset("week", NOW))).toBe("Aug 27, 2026 – Sep 3, 2026");
   });
 
   it("exposes group-by options for each usage section", () => {

@@ -1785,7 +1785,7 @@ message DescribeFactoryVelocityRequest {
   PeopleSort people_sort = 4;
   // Defaults to SORT_DIRECTION_DESC.
   SortDirection people_sort_direction = 5;
-  // Rows per page of the People table. Defaults to 10, and is capped
+  // Rows per page of the People table. Defaults to 5, and is capped
   // server-side so a client cannot request the whole table in one call.
   int32 people_page_size = 6;
   // 0-based row offset into the sorted People table, for "Load more" paging.
@@ -1829,6 +1829,9 @@ message DescribeFactoryVelocityResponse {
   // True when `people_offset + len(people) < people_total`, so the UI knows
   // whether to show "Load more".
   bool people_has_more = 13;
+  // One row per automation of the workspace that ran in the window, ordered by
+  // run count. Empty when no automation ran.
+  repeated DescribeFactoryVelocityAutomation automations = 14;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1884,6 +1887,23 @@ message DescribeFactoryVelocityPerson {
   // Median hours from first execution to close for those work orders. Zero
   // when none of them closed inside the window.
   double median_cycle_hours = 9;
+}
+
+// DescribeFactoryVelocityAutomation is one row of the Automations table: how
+// often an automation ran, how often it failed, and what those runs cost.
+message DescribeFactoryVelocityAutomation {
+  // Canvas id of the automation.
+  string id = 1;
+  string name = 2;
+  // Runs that started in the window.
+  int32 runs = 3;
+  // Part of `runs` that ended with a failure.
+  int32 failed = 4;
+  // Tracked model spend of those runs.
+  int64 cost_cents = 5;
+  // Mean hours from start to finish, over the runs that finished. Zero when
+  // none of them finished yet.
+  double average_duration_hours = 6;
 }
 
 message DescribeFactoryVelocityYesterday {
