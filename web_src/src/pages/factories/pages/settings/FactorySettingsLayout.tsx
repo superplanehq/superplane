@@ -364,15 +364,7 @@ function SettingsNavGroup({
   );
 }
 
-function SettingsNavGroupHeading({
-  name,
-  helper,
-  testId,
-}: {
-  name: string;
-  helper?: string;
-  testId?: string;
-}) {
+function SettingsNavGroupHeading({ name, helper, testId }: { name: string; helper?: string; testId?: string }) {
   return (
     <div className="mb-1 px-2.5 py-1" data-testid={testId}>
       <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</h2>
