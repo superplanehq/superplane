@@ -47,6 +47,18 @@ describe("repairActionLabel", () => {
     expect(repairActionLabel("Authorization revoked, please reconnect the account")).toBe("Reconnect");
   });
 
+  it("suggests reconnecting when an OAuth callback fails to persist the access token", () => {
+    // Jira emits this on the OAuth callback path; recovery is a re-authorize.
+    expect(repairActionLabel("failed to store access token: write timeout")).toBe("Reconnect");
+    // Linear (and GitLab's OAuth path) emit this variant.
+    expect(repairActionLabel("failed to save access token: write timeout")).toBe("Reconnect");
+  });
+
+  it("still suggests replacing the key when a pasted access token is missing", () => {
+    // GitLab's personal-access-token path emits this; recovery is a new key.
+    expect(repairActionLabel("access token is required")).toBe("Replace key");
+  });
+
   it("falls back to reconnect for an unrecognized description", () => {
     expect(repairActionLabel("Something went wrong")).toBe("Reconnect");
   });
