@@ -35,6 +35,7 @@ interface CanvasFolderSectionProps {
   permissionsLoading: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  allCanvasNames: string[];
 }
 
 interface CanvasFolderTitleProps {
@@ -189,6 +190,7 @@ export function CanvasFolderSection({
   permissionsLoading,
   canMoveUp,
   canMoveDown,
+  allCanvasNames,
 }: CanvasFolderSectionProps) {
   const [draftTitle, setDraftTitle] = useState(folder.title);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -282,9 +284,11 @@ export function CanvasFolderSection({
           organizationId={organizationId}
           onEditCanvas={onEditCanvas}
           onToggleStar={onToggleStar}
+          canCreateCanvases={canCreateCanvases}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
           permissionsLoading={permissionsLoading}
+          allCanvasNames={allCanvasNames}
         />
       ) : folder.canvasIds.length === 0 ? (
         <EmptyCanvasFolder backgroundColor={folder.backgroundColor} />
