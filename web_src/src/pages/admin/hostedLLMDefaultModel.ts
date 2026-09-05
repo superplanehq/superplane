@@ -1,3 +1,4 @@
+import { hostedLLMModelKey, parseHostedLLMModelKey } from "@/lib/hostedLLMModels";
 import { hostedProviderLabel } from "@/lib/hostedCredit";
 
 import type { HostedLLMProvider, InstallationLLMSettings, ProviderForm } from "./hostedLLMSettingsApi";
@@ -14,7 +15,7 @@ export function hostedDefaultModelOptions(
       const trimmed = model.trim();
       if (trimmed === "") continue;
       options.push({
-        value: `${provider.provider}::${trimmed}`,
+        value: hostedLLMModelKey(provider.provider, trimmed),
         label: `${hostedProviderLabel(provider.provider)} - ${trimmed}`,
       });
     }
@@ -35,13 +36,9 @@ export function defaultModelKeyFromSettings(settings: InstallationLLMSettings | 
   if (provider === "" || model === "") {
     return "";
   }
-  return `${provider}::${model}`;
+  return hostedLLMModelKey(provider, model);
 }
 
 export function parseDefaultModelKey(value: string): { provider: string; model: string } {
-  const separator = value.indexOf("::");
-  if (separator < 0) {
-    return { provider: "", model: "" };
-  }
-  return { provider: value.slice(0, separator), model: value.slice(separator + 2) };
+  return parseHostedLLMModelKey(value);
 }

@@ -106,6 +106,20 @@ func AgentModelField(provider, description, placeholder string) configuration.Fi
 	}
 }
 
+func SuperPlaneAgentModelField() configuration.Field {
+	return configuration.Field{
+		Name:        "model",
+		Label:       "Model",
+		Type:        configuration.FieldTypeHostedModel,
+		Required:    false,
+		Description: "Select a SuperPlane-hosted model. The instance SuperPlane agent model is used when you do not select one.",
+		Placeholder: "Instance SuperPlane agent model",
+		TypeOptions: &configuration.TypeOptions{
+			HostedModel: &configuration.HostedModelTypeOptions{Provider: configuration.HostedModelAllProviders},
+		},
+	}
+}
+
 func AgentStepsField(description, promptPlaceholder, commandPlaceholder string) configuration.Field {
 	return configuration.Field{
 		Name:        "steps",

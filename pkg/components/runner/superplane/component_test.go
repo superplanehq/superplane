@@ -47,15 +47,35 @@ func TestRunSuperPlaneExecuteDispatchesCodex(t *testing.T) {
 	assert.Equal(t, "sk-openai", requireEnvironmentValue(t, req.Environment, envOpenAIAPIKey))
 }
 
-func TestRunSuperPlaneExecuteDispatchesOpenRouter(t *testing.T) {
-	req := executeSuperPlane(t, core.DefaultHostedLLMModel{
-		Provider: models.UsageProviderOpenRouter,
-		Model:    "anthropic/claude-sonnet-4-6",
+func TestRunSuperPlaneExecuteUsesNodeModelOverDefault(t *testing.T) {
+	req := executeSuperPlaneWithConfig(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"model":       "openrouter::anthropic/claude-sonnet-4-6",
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, core.DefaultHostedLLMModel{
+		Provider: models.UsageProviderAnthropic,
+		Model:    "claude-sonnet-4-6",
 	}, core.HostedLLMAccess{
 		APIKey:        "sk-or",
 		AllowedModels: []string{"anthropic/claude-sonnet-4-6"},
 	})
 	assert.Equal(t, "sk-or", requireEnvironmentValue(t, req.Environment, envOpenRouterAPIKey))
+}
+
+func TestRunSuperPlaneExecuteUsesNodeModelWhenDefaultIsMissing(t *testing.T) {
+	req := executeSuperPlaneWithConfig(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"model":       "anthropic::claude-sonnet-4-6",
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, core.DefaultHostedLLMModel{}, core.HostedLLMAccess{
+		APIKey:        "sk-hosted",
+		AllowedModels: []string{"claude-sonnet-4-6"},
+	})
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
 func TestRunSuperPlaneExecuteRejectsMissingDefaultModel(t *testing.T) {
@@ -110,6 +130,21 @@ func TestRunSuperPlaneExecuteSoftBlocksWhenHostedCreditIsEmpty(t *testing.T) {
 
 func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, access core.HostedLLMAccess) createTaskRequest {
 	t.Helper()
+	return executeSuperPlaneWithConfig(t, map[string]any{
+		"machineType": testRunnerMachineType,
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
+		},
+	}, defaultModel, access)
+}
+
+func executeSuperPlaneWithConfig(
+	t *testing.T,
+	configuration map[string]any,
+	defaultModel core.DefaultHostedLLMModel,
+	access core.HostedLLMAccess,
+) createTaskRequest {
+	t.Helper()
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
 	t.Setenv("TASK_BROKER_FLEET_ID", "")
@@ -122,15 +157,10 @@ func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, ac
 
 	component := &RunSuperPlane{}
 	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType": testRunnerMachineType,
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
+		Configuration: configuration,
+		HTTP:          httpContext,
+		Secrets:       &contexts.SecretsContext{Values: map[string][]byte{}},
+		Webhook:       &contexts.NodeWebhookContext{},
 		HostedLLM: &contexts.HostedLLMContext{
 			Default: defaultModel,
 			Access:  access,
@@ -149,44 +179,22 @@ func executeSuperPlane(t *testing.T, defaultModel core.DefaultHostedLLMModel, ac
 }
 
 func TestRunSuperPlaneExecuteAcceptsPersistedUsageSidecar(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-	t.Setenv("TASK_BROKER_FLEET_ID", "")
-
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-superplane-1"}`))},
+	req := executeSuperPlaneWithConfig(t, map[string]any{
+		"machineType":    testRunnerMachineType,
+		"hostedProvider": models.UsageProviderAnthropic,
+		"model":          "claude-sonnet-4-6",
+		"credentials":    map[string]any{"source": "hosted"},
+		"steps": []map[string]any{
+			{"name": "Hello", "type": "prompt", "prompt": "hello"},
 		},
-	}
-
-	component := &RunSuperPlane{}
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"machineType":    testRunnerMachineType,
-			"hostedProvider": models.UsageProviderAnthropic,
-			"model":          "claude-sonnet-4-6",
-			"credentials":    map[string]any{"source": "hosted"},
-			"steps": []map[string]any{
-				{"name": "Hello", "type": "prompt", "prompt": "hello"},
-			},
-		},
-		HTTP:    httpContext,
-		Secrets: &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook: &contexts.NodeWebhookContext{},
-		HostedLLM: &contexts.HostedLLMContext{
-			Default: core.DefaultHostedLLMModel{
-				Provider: models.UsageProviderAnthropic,
-				Model:    "claude-sonnet-4-6",
-			},
-			Access: core.HostedLLMAccess{
-				APIKey:        "sk-hosted",
-				AllowedModels: []string{"claude-sonnet-4-6"},
-			},
-		},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
-		Requests:       &contexts.RequestContext{},
+	}, core.DefaultHostedLLMModel{
+		Provider: models.UsageProviderOpenAI,
+		Model:    "gpt-5",
+	}, core.HostedLLMAccess{
+		APIKey:        "sk-hosted",
+		AllowedModels: []string{"claude-sonnet-4-6"},
 	})
-	require.NoError(t, err)
+	assert.Equal(t, "sk-hosted", requireEnvironmentValue(t, req.Environment, envAnthropicAPIKey))
 }
 
 func requireEnvironmentValue(t *testing.T, environment []runner.BrokerEnvironmentVariable, name string) string {

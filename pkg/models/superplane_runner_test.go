@@ -31,7 +31,7 @@ func Test__RewriteHostedProviderRunnerToSuperPlane(t *testing.T) {
 		assert.True(t, models.RewriteHostedProviderRunnerToSuperPlane(&node))
 		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 		assert.NotContains(t, node.Configuration, "credentials")
-		assert.NotContains(t, node.Configuration, "model")
+		assert.Equal(t, "anthropic::sonnet", node.Configuration["model"])
 		assert.Equal(t, "e1-large-amd64", node.Configuration["machineType"])
 	})
 
@@ -48,6 +48,7 @@ func Test__RewriteHostedProviderRunnerToSuperPlane(t *testing.T) {
 		assert.True(t, models.RewriteHostedProviderRunnerToSuperPlane(&node))
 		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 		assert.NotContains(t, node.Configuration, "maxTurns")
+		assert.Equal(t, "openrouter::anthropic/claude-sonnet-4-6", node.Configuration["model"])
 	})
 
 	t.Run("leaves integration nodes unchanged", func(t *testing.T) {
@@ -108,6 +109,23 @@ func Test__NormalizeDefaultHostedLLMModel(t *testing.T) {
 	got, err := models.NormalizeDefaultHostedLLMModel(" Anthropic ", " claude-sonnet-4-6 ")
 	require.NoError(t, err)
 	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "anthropic", Model: "claude-sonnet-4-6"}, got)
+}
+
+func Test__ParseHostedLLMModelKey(t *testing.T) {
+	t.Parallel()
+
+	got, err := models.ParseHostedLLMModelKey("openrouter::anthropic/claude-sonnet-4-6")
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "openrouter", Model: "anthropic/claude-sonnet-4-6"}, got)
+
+	got, err = models.ParseHostedLLMModelKey("hosted::anthropic::claude-sonnet-4-6")
+	require.NoError(t, err)
+	assert.Equal(t, models.DefaultHostedLLMModel{Provider: "anthropic", Model: "claude-sonnet-4-6"}, got)
+
+	_, err = models.ParseHostedLLMModelKey("claude-sonnet-4-6")
+	assert.ErrorIs(t, err, models.ErrDefaultHostedModelIncomplete)
+
+	assert.Equal(t, "anthropic::claude-sonnet-4-6", models.FormatHostedLLMModelKey("anthropic", "claude-sonnet-4-6"))
 }
 
 func Test__InstallationDefaultHostedLLMModel(t *testing.T) {

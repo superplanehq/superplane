@@ -77,29 +77,30 @@ type StartPlanningSessionParams struct {
 }
 
 type FactoryPlanningSession struct {
-	ID               uuid.UUID
-	OrganizationID   uuid.UUID
-	FactoryID        uuid.UUID
-	CreatedByUserID  uuid.UUID
-	Repository       string
-	State            string
-	CanvasID         *uuid.UUID
-	CanvasRunID      *uuid.UUID
-	DraftTitle       string
-	DraftDescription string
-	DraftWorkOrderID *uuid.UUID
-	WaitState        string
-	WaitKind         string
-	WaitText         string
-	WaitWorkOrderID  *uuid.UUID
-	WaitWorkOrderKey string
-	SurveyID         *uuid.UUID
-	Survey           datatypes.JSONType[PlanningSessionSurvey]
-	HeartbeatAt      time.Time
-	EndedAt          *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Messages         []PlanningSessionMessage `gorm:"-"`
+	ID                 uuid.UUID
+	OrganizationID     uuid.UUID
+	FactoryID          uuid.UUID
+	CreatedByUserID    uuid.UUID
+	Repository         string
+	State              string
+	CanvasID           *uuid.UUID
+	CanvasRunID        *uuid.UUID
+	DraftTitle         string
+	DraftDescription   string
+	DraftWorkOrderID   *uuid.UUID
+	WaitState          string
+	WaitKind           string
+	WaitText           string
+	WaitWorkOrderID    *uuid.UUID
+	WaitWorkOrderKey   string
+	SurveyID           *uuid.UUID
+	Survey             datatypes.JSONType[PlanningSessionSurvey]
+	SelectableModelKey string
+	HeartbeatAt        time.Time
+	EndedAt            *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Messages           []PlanningSessionMessage `gorm:"-"`
 }
 
 func (FactoryPlanningSession) TableName() string {
@@ -159,24 +160,7 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 	}
 
 	now := time.Now()
-	run := &CanvasRun{
-		ID:         uuid.New(),
-		WorkflowID: params.CanvasID,
-		NodeID:     params.Entrypoint,
-		VersionID:  liveVersion.ID,
-		Callbacks: datatypes.JSONSlice[core.RunCallback]{
-			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
-		},
-		Input: NewJSONValue(map[string]any{
-			"planning_session": map[string]any{
-				"factory_id": f.ID.String(),
-				"repository": repository,
-			},
-		}),
-		State:     CanvasRunStatePending,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-	}
+	run := NewPlanningSessionRun(params.CanvasID, liveVersion.ID, params.Entrypoint, f.ID.String(), repository, "")
 	if err := tx.Create(run).Error; err != nil {
 		return nil, err
 	}
@@ -199,6 +183,53 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		return nil, err
 	}
 	return session, nil
+}
+
+func NewPlanningSessionRun(canvasID, versionID uuid.UUID, entrypoint, factoryID, repository, modelKey string) *CanvasRun {
+	now := time.Now()
+	planning := map[string]any{
+		"factory_id": factoryID,
+		"repository": repository,
+	}
+	if key := strings.TrimSpace(modelKey); key != "" {
+		planning["selectable_model_key"] = key
+	}
+	return &CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: canvasID,
+		NodeID:     entrypoint,
+		VersionID:  versionID,
+		Callbacks: datatypes.JSONSlice[core.RunCallback]{
+			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
+		},
+		Input:     NewJSONValue(map[string]any{"planning_session": planning}),
+		State:     CanvasRunStatePending,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+	}
+}
+
+func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, modelKey string) error {
+	if err := s.guardOpen(); err != nil {
+		return err
+	}
+	s.CanvasRunID = &runID
+	s.SelectableModelKey = strings.TrimSpace(modelKey)
+	s.clearWait()
+	s.clearSurvey()
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id":        s.CanvasRunID,
+		"selectable_model_key": s.SelectableModelKey,
+		"wait_state":           s.WaitState,
+		"wait_kind":            s.WaitKind,
+		"wait_text":            s.WaitText,
+		"wait_work_order_id":   s.WaitWorkOrderID,
+		"wait_work_order_key":  s.WaitWorkOrderKey,
+		"survey_id":            s.SurveyID,
+		"survey":               s.Survey,
+		"updated_at":           s.UpdatedAt,
+	}).Error
 }
 
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
@@ -309,6 +340,10 @@ func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, e
 
 func (s *FactoryPlanningSession) reload(tx *gorm.DB) error {
 	return tx.Where("id = ?", s.ID).First(s).Error
+}
+
+func (s *FactoryPlanningSession) LockForUpdate(tx *gorm.DB) error {
+	return s.lockAndReload(tx)
 }
 
 func (s *FactoryPlanningSession) lockAndReload(tx *gorm.DB) error {

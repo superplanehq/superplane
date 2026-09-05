@@ -655,6 +655,18 @@ service Factories {
     };
   }
 
+  rpc ReloadPlanningSessionAgent(ReloadPlanningSessionAgentRequest) returns (ReloadPlanningSessionAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reload planning session agent";
+      description: "Keeps the Create with an Agent session and starts a new machine with the selected model";
+      tags: "Factory";
+    };
+  }
+
   rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
@@ -2078,6 +2090,7 @@ message PlanningSession {
   string wait_state = 10;
   string execution_id = 11;
   PlanningSessionSurvey survey = 12;
+  string selectable_model_key = 13;
 }
 
 message StartPlanningSessionRequest {
@@ -2143,5 +2156,15 @@ message SkipPlanningSessionDraftRequest {
 }
 
 message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message ReloadPlanningSessionAgentRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string selectable_model_key = 3;
+}
+
+message ReloadPlanningSessionAgentResponse {
   PlanningSession session = 1;
 }

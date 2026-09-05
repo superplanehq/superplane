@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -25,7 +27,10 @@ var reservedHostedEnvNames = []string{
 	envOpenRouterBaseURL,
 }
 
-var unsupportedSuperPlaneFields = []string{"credentials", "model", "maxTurns", "hostedProvider"}
+var (
+	unsupportedSuperPlaneFields = []string{"credentials", "maxTurns"}
+	executeSidecarFields        = []string{"credentials"}
+)
 
 type RunSuperPlaneSpec struct {
 	MachineType             string                        `mapstructure:"machineType"`
@@ -34,6 +39,8 @@ type RunSuperPlaneSpec struct {
 	EnvironmentFrom         []runner.EnvironmentFromEntry `mapstructure:"environmentFrom"`
 	Environment             []runner.EnvironmentVariable  `mapstructure:"environment"`
 	ExecutionTimeoutSeconds int                           `mapstructure:"executionTimeoutSeconds"`
+	Model                   string                        `mapstructure:"model"`
+	HostedProvider          string                        `mapstructure:"hostedProvider"`
 }
 
 func decodeRunSuperPlaneSpec(raw any) (RunSuperPlaneSpec, error) {
@@ -86,7 +93,31 @@ func validateRunSuperPlaneSpec(spec RunSuperPlaneSpec) error {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", runner.MaxExecutionTimeoutSecondsRequest, runner.DefaultExecutionTimeoutSeconds)
 		}
 	}
+	if _, _, err := specSelectedSuperPlaneModel(spec); err != nil {
+		return err
+	}
 	return nil
+}
+
+func specSelectedSuperPlaneModel(spec RunSuperPlaneSpec) (core.DefaultHostedLLMModel, bool, error) {
+	model := strings.TrimSpace(spec.Model)
+	provider := strings.TrimSpace(spec.HostedProvider)
+	if model == "" && provider == "" {
+		return core.DefaultHostedLLMModel{}, false, nil
+	}
+	if parsed, err := models.ParseHostedLLMModelKey(model); err == nil && parsed.IsSet() {
+		return core.DefaultHostedLLMModel{Provider: parsed.Provider, Model: parsed.Model}, true, nil
+	}
+	if provider != "" && model != "" {
+		parsed, err := models.NormalizeDefaultHostedLLMModel(provider, model)
+		if err != nil {
+			return core.DefaultHostedLLMModel{}, false, err
+		}
+		if parsed.IsSet() {
+			return core.DefaultHostedLLMModel{Provider: parsed.Provider, Model: parsed.Model}, true, nil
+		}
+	}
+	return core.DefaultHostedLLMModel{}, false, fmt.Errorf("model must be a SuperPlane-hosted allowlist entry")
 }
 
 func rejectUnsupportedSuperPlaneFields(raw any) error {
@@ -107,7 +138,7 @@ func stripSuperPlaneSidecarFields(raw any) {
 	if !ok {
 		return
 	}
-	for _, key := range unsupportedSuperPlaneFields {
+	for _, key := range executeSidecarFields {
 		delete(cfg, key)
 	}
 }

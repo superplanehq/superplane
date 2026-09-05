@@ -12,6 +12,8 @@ import (
 
 const SuperPlaneRunnerComponent = "runnerSuperPlane"
 
+const hostedLLMModelKeySeparator = "::"
+
 const (
 	SuperPlaneRunnerNoCreditMessage        = "This organization has no hosted credit."
 	SuperPlaneRunnerNoFactoryBudgetMessage = "This workspace has no remaining hosted credit."
@@ -51,12 +53,16 @@ func RewriteHostedProviderRunnerToSuperPlane(node *Node) bool {
 	if node == nil {
 		return false
 	}
-	if !isHostedProviderRunnerComponent(node.ComponentName()) {
+	component := node.ComponentName()
+	if !isHostedProviderRunnerComponent(component) {
 		return false
 	}
 	if !nodeHasHostedCredentials(node.Configuration) {
 		return false
 	}
+
+	provider := hostedProviderForRunnerComponent(component)
+	model := configurationStringValue(node.Configuration, "model")
 
 	if node.Ref.Component == nil {
 		node.Ref.Component = &ComponentRef{}
@@ -64,8 +70,12 @@ func RewriteHostedProviderRunnerToSuperPlane(node *Node) bool {
 	node.Ref.Component.Name = SuperPlaneRunnerComponent
 	if node.Configuration != nil {
 		delete(node.Configuration, "credentials")
-		delete(node.Configuration, "model")
 		delete(node.Configuration, "maxTurns")
+		if provider != "" && model != "" {
+			node.Configuration["model"] = FormatHostedLLMModelKey(provider, model)
+		} else {
+			delete(node.Configuration, "model")
+		}
 	}
 	return true
 }
@@ -74,6 +84,10 @@ func RewriteHostedProviderRunnerNodes(nodes []Node) {
 	for i := range nodes {
 		RewriteHostedProviderRunnerToSuperPlane(&nodes[i])
 	}
+}
+
+func FormatHostedLLMModelKey(provider, model string) string {
+	return strings.TrimSpace(provider) + hostedLLMModelKeySeparator + strings.TrimSpace(model)
 }
 
 func NormalizeDefaultHostedLLMModel(provider, model string) (DefaultHostedLLMModel, error) {
@@ -254,6 +268,27 @@ func isSuperPlaneReadinessMessage(message string) bool {
 
 func isHostedProviderRunnerComponent(name string) bool {
 	return slices.Contains(hostedProviderRunnerComponents, name)
+}
+
+func hostedProviderForRunnerComponent(name string) string {
+	switch name {
+	case "runnerClaudeCode":
+		return UsageProviderAnthropic
+	case "runnerCodex":
+		return UsageProviderOpenAI
+	case "runnerOpenRouter":
+		return UsageProviderOpenRouter
+	default:
+		return ""
+	}
+}
+
+func configurationStringValue(configuration map[string]any, key string) string {
+	if configuration == nil {
+		return ""
+	}
+	value, _ := configuration[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func nodeHasHostedCredentials(configuration map[string]any) bool {

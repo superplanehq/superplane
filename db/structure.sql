@@ -480,7 +480,8 @@ CREATE TABLE public.factory_planning_sessions (
     heartbeat_at timestamp with time zone DEFAULT now() NOT NULL,
     ended_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    selectable_model_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -4233,7 +4234,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260905183645	f
+20260905194301	f
 \.
 
 

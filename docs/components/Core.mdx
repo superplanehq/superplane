@@ -54,7 +54,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
-  <LinkCard title="Run SuperPlane Agent" href="#run-super-plane-agent" description="Runs a SuperPlane-hosted coding agent on a fleet runner. This agent uses the SuperPlane-hosted model from instance settings." />
+  <LinkCard title="Run SuperPlane Agent" href="#run-super-plane-agent" description="Runs a SuperPlane-hosted coding agent on a fleet runner." />
   <LinkCard title="Set Work Order Status Note" href="#set-work-order-status-note" description="Announce what a waiting work order is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -1870,7 +1870,7 @@ def main(payload):
 
 Runs a SuperPlane-hosted coding agent on a fleet runner.
 
-This agent uses the SuperPlane-hosted model from instance settings. It does not store a provider, model, or API key on the node.
+This agent uses SuperPlane-hosted models. Select a model on the node, or use the instance SuperPlane agent model. The node does not store an API key.
 
 ### Prerequisites
 - The organization has hosted credit.
@@ -1884,6 +1884,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
+- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).

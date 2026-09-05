@@ -50,13 +50,13 @@ func (c *RunSuperPlane) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *RunSuperPlane) Description() string {
-	return "Runs a SuperPlane-hosted coding agent on a fleet runner. This agent uses the SuperPlane-hosted model from instance settings."
+	return "Runs a SuperPlane-hosted coding agent on a fleet runner."
 }
 
 func (c *RunSuperPlane) Documentation() string {
 	return `Runs a SuperPlane-hosted coding agent on a fleet runner.
 
-This agent uses the SuperPlane-hosted model from instance settings. It does not store a provider, model, or API key on the node.
+This agent uses SuperPlane-hosted models. Select a model on the node, or use the instance SuperPlane agent model. The node does not store an API key.
 
 ## Prerequisites
 - The organization has hosted credit.
@@ -70,6 +70,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
+- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
@@ -84,10 +85,9 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 }
 
 func (c *RunSuperPlane) Configuration() []configuration.Field {
-	machineType := runner.AgentMachineTypeField()
-	machineType.Description = "This agent uses the SuperPlane-hosted model from instance settings."
 	return []configuration.Field{
-		machineType,
+		runner.AgentMachineTypeField(),
+		runner.SuperPlaneAgentModelField(),
 		runner.AgentStepsField(
 			"Ordered bash commands and SuperPlane agent prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
@@ -129,24 +129,24 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	defaultModel, err := resolveSuperPlaneDefaultModel(ctx)
+	runModel, err := resolveSuperPlaneRunModel(ctx, spec)
 	if err != nil {
 		return err
 	}
 
-	access, err := runner.PrepareHostedRun(ctx, defaultModel.Provider, defaultModel.Model)
+	access, err := runner.PrepareHostedRun(ctx, runModel.Provider, runModel.Model)
 	if err != nil {
 		return err
 	}
 
-	recordSuperPlaneRunOnConfiguration(ctx.Configuration, defaultModel)
+	recordSuperPlaneRunOnConfiguration(ctx.Configuration, runModel)
 
 	resolved, err := runner.ResolveEnvironment(ctx.Secrets, spec.EnvironmentFrom, spec.Environment)
 	if err != nil {
 		return err
 	}
 
-	environment, err := injectSuperPlaneCredentials(resolved.Variables, defaultModel.Provider, access)
+	environment, err := injectSuperPlaneCredentials(resolved.Variables, runModel.Provider, access)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
-	commands, files, err := buildSuperPlaneBrokerTask(defaultModel.Provider, spec, defaultModel.Model, resolved.Usage, resolved.Setups, environment)
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment)
 	if err != nil {
 		return err
 	}
@@ -206,6 +206,17 @@ func (c *RunSuperPlane) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *RunSuperPlane) Cleanup(ctx core.SetupContext) error { return nil }
+
+func resolveSuperPlaneRunModel(ctx core.ExecutionContext, spec RunSuperPlaneSpec) (core.DefaultHostedLLMModel, error) {
+	selected, ok, err := specSelectedSuperPlaneModel(spec)
+	if err != nil {
+		return core.DefaultHostedLLMModel{}, err
+	}
+	if ok {
+		return selected, nil
+	}
+	return resolveSuperPlaneDefaultModel(ctx)
+}
 
 func resolveSuperPlaneDefaultModel(ctx core.ExecutionContext) (core.DefaultHostedLLMModel, error) {
 	if ctx.HostedLLM == nil {
