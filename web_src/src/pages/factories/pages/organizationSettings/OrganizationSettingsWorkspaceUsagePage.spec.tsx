@@ -46,8 +46,8 @@ function renderPage(queryClient: QueryClient) {
   );
 }
 
-function loadingMessage() {
-  return screen.queryByText("Loading spending...");
+function loadingState() {
+  return screen.queryByTestId("spending-page-loading");
 }
 
 function refetchIndicator() {
@@ -85,21 +85,21 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderPage(queryClient);
 
-    expect(loadingMessage()).toBeInTheDocument();
+    expect(loadingState()).toBeInTheDocument();
 
     await act(async () => {
       pending.resolveAll("100");
     });
 
-    await waitFor(() => expect(loadingMessage()).not.toBeInTheDocument());
+    await waitFor(() => expect(loadingState()).not.toBeInTheDocument());
   });
 
   /**
    * Switching settings tabs remounts this page. Before this fix, the fresh
    * `new Date()` baked into the query range meant every remount produced a
    * new React Query key, so the cached report never hit and the page always
-   * fell back to the full "Loading spending..." message. Quantizing the
-   * range's "now" anchor keeps the key stable across quick remounts.
+   * fell back to the full-page loading spinner. Quantizing the range's "now"
+   * anchor keeps the key stable across quick remounts.
    */
   it("keeps showing the previous report on a return visit and shows a quiet indicator while it revalidates", async () => {
     organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse("100"));
@@ -107,7 +107,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { unmount } = renderPage(queryClient);
 
-    await waitFor(() => expect(loadingMessage()).not.toBeInTheDocument());
+    await waitFor(() => expect(loadingState()).not.toBeInTheDocument());
     expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$1.00");
 
     unmount();
@@ -125,7 +125,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
 
     // The previously loaded report is visible immediately: no full-page
     // loading swap.
-    expect(loadingMessage()).not.toBeInTheDocument();
+    expect(loadingState()).not.toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$1.00");
     await waitFor(() => expect(refetchIndicator()).toBeInTheDocument());
 
@@ -134,7 +134,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     });
 
     await waitFor(() => expect(refetchIndicator()).not.toBeInTheDocument());
-    expect(loadingMessage()).not.toBeInTheDocument();
+    expect(loadingState()).not.toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$2.50");
   });
 });

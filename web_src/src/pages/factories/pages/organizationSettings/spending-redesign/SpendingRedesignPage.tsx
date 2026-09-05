@@ -84,11 +84,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
   }
 
   if (showFullPageLoading) {
-    return (
-      <div className="min-h-full bg-sidebar p-6 dark:bg-background" data-testid="spending-redesign-page">
-        <p className="text-[13px] text-muted-foreground">Loading spending...</p>
-      </div>
-    );
+    return <SpendingPageLoading />;
   }
 
   return (
@@ -131,6 +127,24 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
           onBreakdownChange={view.setMachineBreakdown}
           onChange={view.setMachineFilters}
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * First-load placeholder for the spending report. Centered in the settings
+ * pane so it does not read as leftover copy in the top-left corner.
+ */
+function SpendingPageLoading() {
+  return (
+    <div
+      className="flex h-full min-h-0 flex-1 items-center justify-center bg-sidebar dark:bg-background"
+      data-testid="spending-redesign-page"
+    >
+      <div data-testid="spending-page-loading" role="status">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
+        <span className="sr-only">Loading spending</span>
       </div>
     </div>
   );
