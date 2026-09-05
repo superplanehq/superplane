@@ -4,12 +4,24 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
-import type { FactoriesWorkOrder, FactoryApp } from "@/api-client";
+import type { FactoriesFactoryLine, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 
 import { AutomationDetail } from "./AutomationDetail";
 import { AutomationCard } from "./automationsPageParts";
 import { duplicateAutomationName } from "./automationCardActions";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+
+const planLine: FactoriesFactoryLine = {
+  id: "line-plan",
+  name: "plan-and-implement",
+  steps: [{ name: "plan", app: { app: "app-refund-planner", entrypoint: "start-plan" } }],
+};
+
+const hotfixLine: FactoriesFactoryLine = {
+  id: "line-hotfix",
+  name: "hotfix",
+  steps: [{ name: "verify", app: { app: "app-refund-planner", entrypoint: "start-verification" } }],
+};
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useInfiniteCanvasRuns: () => ({
@@ -61,7 +73,7 @@ const app: FactoryApp = {
 function renderCard(props: Partial<ComponentProps<typeof AutomationCard>> = {}) {
   return render(
     <MemoryRouter>
-      <AutomationCard app={app} tick="passed" statusLabel="Passed" emphasized {...props} />
+      <AutomationCard app={app} tick="passed" statusLabel="Passed" emphasized lines={[planLine]} {...props} />
     </MemoryRouter>,
   );
 }
@@ -131,6 +143,25 @@ describe("AutomationCard menu", () => {
   });
 });
 
+describe("AutomationCard line usage", () => {
+  it("lists the lines that use the automation", () => {
+    renderCard({ lines: [planLine, hotfixLine] });
+
+    const usedBy = screen.getByTestId("automations-used-by");
+    expect(usedBy).toHaveTextContent("Used by Plan and Implement, Hotfix");
+    expect(usedBy.querySelector("a")).toBeNull();
+  });
+
+  it("says when no line uses the automation", () => {
+    renderCard({
+      app: { ...app, id: "app-unused" },
+      lines: [planLine],
+    });
+
+    expect(screen.getByTestId("automations-used-by")).toHaveTextContent("Not used by a line");
+  });
+});
+
 describe("AutomationDetail tabs", () => {
   const actions = {
     onEdit: vi.fn(),
@@ -185,7 +216,7 @@ describe("AutomationDetail tabs", () => {
           factoryKey="SP"
           app={app}
           actions={actions}
-          factory={{ id: "factory-1", name: "Refunds", key: "SP" }}
+          factory={{ id: "factory-1", name: "Refunds", key: "SP", lines: [planLine, hotfixLine] }}
           workOrders={workOrders}
           workOrderCardContext={workOrderCardContext}
         />
@@ -221,6 +252,21 @@ describe("AutomationDetail tabs", () => {
     expect(screen.getByRole("link", { name: "Open Add refund reconciliation test" })).toHaveAttribute(
       "href",
       expect.stringContaining("run=run-c1111111"),
+    );
+  });
+
+  it("links each line that uses the automation", () => {
+    renderDetail();
+
+    const usedBy = screen.getByTestId("automations-used-by");
+    expect(usedBy).toHaveTextContent("Used by Plan and Implement, Hotfix");
+    expect(screen.getByRole("link", { name: "Plan and Implement" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/SP/lines/line-plan",
+    );
+    expect(screen.getByRole("link", { name: "Hotfix" })).toHaveAttribute(
+      "href",
+      "/org-1/workspaces/SP/lines/line-hotfix",
     );
   });
 
