@@ -18,6 +18,9 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/api-keys")?.id).toBe(
       "organization-api-keys",
     );
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
+      "organization-models",
+    );
   });
 
   it("returns undefined for a non-canonical route", () => {
@@ -41,6 +44,7 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "General",
       "Members",
       "Integrations",
+      "LLM Models",
       "API keys",
       "Secrets",
       "Spending",

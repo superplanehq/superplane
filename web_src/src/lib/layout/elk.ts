@@ -1,6 +1,6 @@
 import type { CanvasesCanvas, ActionsAction, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { CanvasFlowDirection } from "@/lib/canvasFlowDirection";
-import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
+import { agentRunnerStepTitles, AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import { FACTORY_NODE_VERTICAL_GAP, factoryNodeCardSize } from "@/lib/factoryCanvasChrome";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
@@ -43,7 +43,9 @@ export class ElkLayoutEngine implements LayoutEngine {
     }
 
     if (direction === "vertical") {
-      const stepCount = node.component === "runnerClaudeCode" ? agentRunnerStepTitles(node.configuration).length : 0;
+      const stepCount = AGENT_HARNESS_COMPONENTS.has(node.component ?? "")
+        ? agentRunnerStepTitles(node.configuration).length
+        : 0;
       return factoryNodeCardSize(stepCount);
     }
 

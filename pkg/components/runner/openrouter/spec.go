@@ -47,6 +47,9 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
 	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
 		return err
 	}
@@ -57,9 +60,6 @@ func validateRunOpenRouterSpec(spec RunOpenRouterSpec) error {
 		return err
 	}
 	if err := runner.ValidateReservedEnvironmentName(spec.Environment, envOpenRouterAPIKey); err != nil {
-		return err
-	}
-	if err := runner.ValidateHostedAgentSpec(spec.Credentials, spec.Model, spec.Environment, envOpenRouterBaseURL); err != nil {
 		return err
 	}
 	if strings.TrimSpace(spec.Model) == "" {
@@ -106,6 +106,14 @@ func buildOpenRouterBrokerTask(spec RunOpenRouterSpec, usage string, setups []ru
 		},
 	})
 	return OpenRouterBrokerTask{Commands: commands, Files: files}
+}
+
+func BuildBrokerTask(spec RunOpenRouterSpec, usage string, setups []runner.IntegrationSetup) OpenRouterBrokerTask {
+	return buildOpenRouterBrokerTask(spec, usage, setups)
+}
+
+func ApplyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
+	return applyPlanningFollowUp(task, environment, spec)
 }
 
 // applyPlanningFollowUp keeps the machine on after canvas steps when this run

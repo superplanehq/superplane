@@ -42,6 +42,9 @@ const (
 	FieldTypeHostedModel         = "hosted-model"
 )
 
+// HostedModelAllProviders lists every SuperPlane-hosted allowlist in one picker.
+const HostedModelAllProviders = "all"
+
 type Field struct {
 	/*
 	 * Unique name identifier for the field

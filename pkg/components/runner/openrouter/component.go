@@ -56,7 +56,7 @@ func (c *RunOpenRouter) Documentation() string {
 
 ## Prerequisites
 - Node.js on the runner ` + "`PATH`" + `.
-- An OpenRouter API key stored as a SuperPlane secret, or SuperPlane-hosted credentials.
+- An OpenRouter API key stored as a SuperPlane secret or an OpenRouter integration.
 
 ## Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -67,11 +67,13 @@ Configure an ordered list of **bash** and **prompt** steps:
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as ` + "`OPENROUTER_API_KEY`" + `.
-- **Model**: Required OpenRouter model id (` + "`provider/model`" + `). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
+- **Model**: Required OpenRouter model id (` + "`provider/model`" + `).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 - **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ## Output channels
 - **Passed**: All steps finished with exit code **0**.
@@ -80,16 +82,14 @@ Configure an ordered list of **bash** and **prompt** steps:
 }
 
 func (c *RunOpenRouter) Configuration() []configuration.Field {
-	model := runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). Required. SuperPlane-hosted credentials use the installation allowlist.", "anthropic/claude-sonnet-4-6")
+	model := runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). Required.", "anthropic/claude-sonnet-4-6")
 	model.Required = true
 	return []configuration.Field{
 		runner.AgentMachineTypeField(),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
-			SecretLabel:       "OpenRouter API Key",
-			IntegrationName:   "openrouter",
-			IntegrationLabel:  "Integration",
-			AllowHosted:       true,
-			HostedDescription: "OpenRouter API key, OpenRouter integration, or SuperPlane-hosted credentials.",
+			SecretLabel:      "OpenRouter API Key",
+			IntegrationName:  "openrouter",
+			IntegrationLabel: "Integration",
 		}),
 		model,
 		runner.AgentStepsField(
@@ -147,7 +147,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err := injectOpenRouterCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
+	environment, err := injectOpenRouterCredentials(ctx, resolved.Variables, spec.Credentials)
 	if err != nil {
 		return err
 	}
@@ -188,18 +188,14 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
+func injectOpenRouterCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenRouterAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
-		access, err := runner.PrepareHostedRun(ctx, "openrouter", model)
-		if err != nil {
-			return nil, err
-		}
-		return runner.InjectHostedCredentials(environment, envOpenRouterAPIKey, access.APIKey, envOpenRouterBaseURL, access.BaseURL), nil
+		return nil, runner.RejectHostedCredentials(credentials)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}

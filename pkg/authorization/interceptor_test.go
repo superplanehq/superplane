@@ -306,6 +306,20 @@ func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	describe, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}]
 	require.True(t, ok)
 	assert.Equal(t, "read", describe.Action)
+
+	reload, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", reload.Resource)
+	assert.Equal(t, "update", reload.Action)
+}
+
+func TestListSelectableLLMModelsUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/selectable-llm-models"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
 }
 
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {

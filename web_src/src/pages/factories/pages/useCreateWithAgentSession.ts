@@ -15,6 +15,7 @@ import {
   createPlanningSessionWorkOrder,
   describePlanningSession,
   endPlanningSession,
+  reloadPlanningSessionAgent,
   sendPlanningSessionMessage,
   skipPlanningSessionDraft,
   startPlanningSession,
@@ -458,6 +459,22 @@ function createWithAgentViewActions({
         .then((session) => applySession(session, generation))
         .catch((error: unknown) => {
           showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSkip));
+        });
+    },
+    onSelectModel: (key: string) => {
+      if (!sessionId || key === view.selectableModelKey) {
+        return;
+      }
+      const generation = startGenerationRef.current;
+      setView((current) => ({
+        ...current,
+        selectableModelKey: key,
+        machineStatus: "starting",
+      }));
+      void reloadPlanningSessionAgent(organizationId, factoryId, sessionId, key)
+        .then((session) => applySession(session, generation))
+        .catch((error: unknown) => {
+          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedReload));
         });
     },
     onSelectCreated: (order: CreateWithAgentView["created"][number]) => {
