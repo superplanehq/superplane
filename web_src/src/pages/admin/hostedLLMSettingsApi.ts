@@ -10,6 +10,8 @@ export type InstallationLLMSettings = {
   welcome_grant_cents: number;
   markup_bps: number;
   warning_threshold_bps: number;
+  default_hosted_provider?: string;
+  default_hosted_model?: string;
   providers: HostedLLMProvider[];
 };
 
@@ -53,9 +55,11 @@ export const fetchInstallationLLMSettings = async (): Promise<InstallationLLMSet
 };
 
 export const patchInstallationLLMPolicy = async (body: {
-  welcome_grant_cents: number;
-  markup_bps: number;
-  warning_threshold_bps: number;
+  welcome_grant_cents?: number;
+  markup_bps?: number;
+  warning_threshold_bps?: number;
+  default_hosted_provider?: string;
+  default_hosted_model?: string;
 }): Promise<InstallationLLMSettings> => {
   const response = await fetch(SETTINGS_PATH, {
     method: "PATCH",

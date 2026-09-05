@@ -200,3 +200,39 @@ func TestNormalizeYAML1YKey(t *testing.T) {
 		assert.Equal(t, 99, position["true"])
 	})
 }
+
+func TestCanvasFromYAML_RewritesHostedProviderRunnerToSuperPlane(t *testing.T) {
+	raw := []byte(`apiVersion: v1
+kind: Canvas
+metadata:
+  name: test
+spec:
+  nodes:
+    - id: agent-1
+      name: Agent
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        machineType: e1-large-amd64
+        model: claude-sonnet-4-6
+        credentials:
+          source: hosted
+        steps:
+          - name: Prompt
+            type: prompt
+            prompt: hello
+  edges: []
+`)
+
+	resource, err := CanvasFromYAML(raw)
+	require.NoError(t, err)
+	require.Len(t, resource.Spec.Nodes, 1)
+	assert.Equal(t, models.SuperPlaneRunnerComponent, resource.Spec.Nodes[0].Component)
+	_, hasCredentials := resource.Spec.Nodes[0].Configuration["credentials"]
+	assert.False(t, hasCredentials)
+	_, hasModel := resource.Spec.Nodes[0].Configuration["model"]
+	assert.False(t, hasModel)
+
+	node := resource.Spec.Nodes[0].Model()
+	assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+}

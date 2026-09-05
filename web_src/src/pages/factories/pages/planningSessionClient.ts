@@ -95,3 +95,19 @@ export function skipPlanningSessionDraft(organizationId: string, factoryId: stri
     body: "{}",
   });
 }
+
+export function reloadPlanningSessionAgent(
+  organizationId: string,
+  factoryId: string,
+  sessionId: string,
+  selectableModelKey: string,
+) {
+  return planningSessionRequest(
+    organizationId,
+    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/reload-agent`,
+    {
+      method: "POST",
+      body: JSON.stringify({ selectableModelKey }),
+    },
+  );
+}

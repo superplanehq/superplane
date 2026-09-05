@@ -58,7 +58,7 @@ func (c *RunClaudeCode) Documentation() string {
 
 ## Prerequisites
 - The ` + "`claude`" + ` CLI is installed on the runner machine and available on ` + "`PATH`" + `.
-- An Anthropic API key stored as a SuperPlane secret, a Claude integration, or SuperPlane-hosted credentials.
+- An Anthropic API key stored as a SuperPlane secret or a Claude integration.
 
 ## Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -76,10 +76,12 @@ Example:
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Anthropic API Key**: SuperPlane secret, Claude integration, or SuperPlane-hosted credentials used as ` + "`ANTHROPIC_API_KEY`" + `.
-- **Model**: Optional model id or alias (for example ` + "`sonnet`" + `). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
+- **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ## Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest Claude ` + "`result`" + `.
@@ -94,13 +96,11 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 	return []configuration.Field{
 		runner.AgentMachineTypeField(),
 		runner.AgentCredentialsField(runner.AgentCredentialsOptions{
-			SecretLabel:       "Anthropic API Key",
-			IntegrationName:   "claude",
-			IntegrationLabel:  "Integration",
-			AllowHosted:       true,
-			HostedDescription: "Anthropic API key, Claude integration, or SuperPlane-hosted credentials.",
+			SecretLabel:      "Anthropic API Key",
+			IntegrationName:  "claude",
+			IntegrationLabel: "Integration",
 		}),
-		runner.AgentModelField("anthropic", "Claude model id. SuperPlane-hosted credentials use the installation allowlist.", "sonnet"),
+		runner.AgentModelField("anthropic", "Claude model id.", "sonnet"),
 		runner.AgentStepsField(
 			"Ordered bash commands and Claude Code prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",
@@ -142,7 +142,7 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials, spec.Model)
+	environment, err := c.injectCredentials(ctx, resolved.Variables, spec.Credentials)
 	if err != nil {
 		return err
 	}
@@ -188,18 +188,14 @@ func (c *RunClaudeCode) Execute(ctx core.ExecutionContext) error {
 	return runner.AfterRunnerTaskCreated(ctx, taskID)
 }
 
-func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, model string) ([]runner.BrokerEnvironmentVariable, error) {
+func (c *RunClaudeCode) injectCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envAnthropicAPIKey, credentials.Secret)
 	case runner.CredentialsSourceIntegration:
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
-		access, err := runner.PrepareHostedRun(ctx, "anthropic", model)
-		if err != nil {
-			return nil, err
-		}
-		return runner.InjectHostedCredentials(environment, envAnthropicAPIKey, access.APIKey, envAnthropicBaseURL, access.BaseURL), nil
+		return nil, runner.RejectHostedCredentials(credentials)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}

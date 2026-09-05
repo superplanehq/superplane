@@ -1,8 +1,33 @@
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
+import type { SelectableLLMModel } from "@/lib/selectableLLMModels";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 
 export const CREATE_WITH_AGENT_DEMO_REPOSITORY = "acme/payments";
+
+export const CREATE_WITH_AGENT_DEMO_MODELS: SelectableLLMModel[] = [
+  {
+    source: { id: "hosted", name: "SuperPlane" },
+    provider: { id: "anthropic", name: "Anthropic" },
+    model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+    key: "hosted::anthropic::claude-sonnet-4-6",
+    label: "anthropic/claude-sonnet-4-6",
+  },
+  {
+    source: { id: "byok", name: "Your keys" },
+    provider: { id: "anthropic", name: "Anthropic" },
+    model: { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+    key: "byok::anthropic::claude-sonnet-4-6",
+    label: "anthropic/claude-sonnet-4-6",
+  },
+  {
+    source: { id: "hosted", name: "SuperPlane" },
+    provider: { id: "openai", name: "OpenAI" },
+    model: { id: "gpt-5", name: "gpt-5" },
+    key: "hosted::openai::gpt-5",
+    label: "openai/gpt-5",
+  },
+];
 
 export function emptyCreateWithAgentView(repository = CREATE_WITH_AGENT_DEMO_REPOSITORY): CreateWithAgentView {
   return {
@@ -16,6 +41,7 @@ export function emptyCreateWithAgentView(repository = CREATE_WITH_AGENT_DEMO_REP
     created: [],
     right: { kind: "empty" },
     endConfirmOpen: false,
+    selectableModelKey: "hosted::anthropic::claude-sonnet-4-6",
   };
 }
 

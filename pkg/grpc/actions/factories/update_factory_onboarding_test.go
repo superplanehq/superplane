@@ -322,6 +322,16 @@ func upsertHostedOnboardingProvider(t *testing.T, db *gorm.DB) {
 		AllowedModels: datatypes.JSONSlice[string]{"sonnet"},
 	})
 	require.NoError(t, err)
+	provider := models.UsageProviderAnthropic
+	model := "sonnet"
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: &provider,
+		DefaultHostedModel:    &model,
+	})
+	require.NoError(t, err)
 }
 
 func clearHostedLLMProviders(t *testing.T, db *gorm.DB) {
