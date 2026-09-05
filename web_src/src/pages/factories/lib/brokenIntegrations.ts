@@ -18,14 +18,19 @@ export interface BrokenIntegration {
 
 const REINSTALL_HINTS = ["uninstall", "app was removed", "app removed"];
 // OAuth recovery: re-run the authorization flow rather than paste a new key.
-// Checked before REPLACE_KEY_HINTS so phrases like "refresh token" or
-// "save access token" do not fall through to the generic "token" hint.
+// Checked before REPLACE_KEY_HINTS so phrases like "refresh token",
+// "token refresh", or "save access token" do not fall through to the generic
+// "token" hint.
 //
 // "store access token" / "save access token" are the OAuth callback failures
 // emitted by Jira ("failed to store access token"), Linear ("failed to save
 // access token"), and GitLab's OAuth path - all of which need a re-authorize,
 // not a new pasted key. The pasted-key path emits "access token is required"
 // instead, so it still resolves to "Replace key" below.
+//
+// "token refresh" covers Jira's OAuth callback failure to schedule the refresh
+// ("failed to schedule token refresh"), which reverses the "refresh token"
+// word order and would otherwise match the generic "token" hint.
 const RECONNECT_HINTS = [
   "reconnect",
   "re-connect",
@@ -35,6 +40,7 @@ const RECONNECT_HINTS = [
   "oauth",
   "offline_access",
   "refresh token",
+  "token refresh",
   "store access token",
   "save access token",
 ];

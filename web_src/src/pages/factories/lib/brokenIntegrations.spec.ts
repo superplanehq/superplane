@@ -54,6 +54,12 @@ describe("repairActionLabel", () => {
     expect(repairActionLabel("failed to save access token: write timeout")).toBe("Reconnect");
   });
 
+  it("suggests reconnecting when an OAuth callback fails to schedule the token refresh", () => {
+    // Jira emits this on the OAuth callback path; the reversed word order
+    // ("token refresh") must not fall through to the "Replace key" hint.
+    expect(repairActionLabel("failed to schedule token refresh: queue unavailable")).toBe("Reconnect");
+  });
+
   it("still suggests replacing the key when a pasted access token is missing", () => {
     // GitLab's personal-access-token path emits this; recovery is a new key.
     expect(repairActionLabel("access token is required")).toBe("Replace key");
