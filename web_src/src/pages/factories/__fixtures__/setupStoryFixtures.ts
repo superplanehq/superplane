@@ -1,7 +1,12 @@
 import type { FactoriesFactoryOnboarding } from "@/api-client";
 import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 
-import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  REFUND_FACTORY,
+  type FactoriesFixture,
+} from "./factoryPageResponses";
 import type { StorybookUsageReport } from "./usageReportFixtures";
 
 /** GitHub connection every workspace story shares. */
@@ -68,5 +73,18 @@ export function factoriesFixtureWithSetupAnswers(
     factories: defaultFactoriesFixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),
+  };
+}
+
+/**
+ * Only the placeholder workspace under setup, no others in the organization.
+ * Pair with a single-organization account (see `Onboarding.stories.tsx`) to
+ * show the account menu's sign-out-only fallback, for a user with nowhere
+ * else to go.
+ */
+export function soloFactoriesFixtureWithSetupAnswers(onboarding: FactoriesFactoryOnboarding): FactoriesFixture {
+  return {
+    ...defaultFactoriesFixture,
+    factories: [{ ...REFUND_FACTORY, onboarding }],
   };
 }
