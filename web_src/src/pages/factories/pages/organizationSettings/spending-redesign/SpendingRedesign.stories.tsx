@@ -124,6 +124,12 @@ function EmptyPage() {
   );
 }
 
+function LoadingPage() {
+  return (
+    <SpendingRedesignPage catalogs={SPENDING_CATALOGS} credit={SPENDING_CREDIT} isLoading now={SPENDING_REDESIGN_NOW} />
+  );
+}
+
 function renderSpending(Page: ComponentType) {
   return (
     <FactorySettingsNavProvider groups={ORG_SPENDING_ONLY_NAV_GROUPS}>
@@ -176,4 +182,9 @@ export const FilteredWorkspaceAndModel: Story = {
 /** No ledger rows. Hosted credit is empty so the wallet warning stays visible. */
 export const Empty: Story = {
   render: () => renderSpending(EmptyPage),
+};
+
+/** First visit before either spending report has resolved. */
+export const Loading: Story = {
+  render: () => renderSpending(LoadingPage),
 };
