@@ -14,7 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Broadcast" href="#on-broadcast" description="Receive broadcast messages from another SuperPlane app" />
   <LinkCard title="On Error" href="#on-error" description="Run a workflow whenever any node in this canvas errors out" />
   <LinkCard title="On Run" href="#on-run" description="Handle runs started from another app" />
-  <LinkCard title="On Work Order" href="#on-work-order" description="Start when a work order is created in this factory" />
+  <LinkCard title="On Task" href="#on-task" description="Start when a task is created in this factory" />
   <LinkCard title="Schedule" href="#schedule" description="Start a new execution chain on a schedule" />
   <LinkCard title="Manual Run" href="#manual-run" description="Start a new execution chain manually" />
   <LinkCard title="Webhook" href="#webhook" description="Start a new execution chain when a webhook is called" />
@@ -24,19 +24,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
-  <LinkCard title="Add Pull Request" href="#add-pull-request" description="Attach a pull request to a work order" />
+  <LinkCard title="Add Pull Request" href="#add-pull-request" description="Attach a pull request to a task" />
   <LinkCard title="Add Pull Request Activity" href="#add-pull-request-activity" description="Create a factory pull request activity for the current run" />
   <LinkCard title="Add Run Error" href="#add-run-error" description="Record a business failure on the current run" />
-  <LinkCard title="Add Task Artifact" href="#add-task-artifact" description="Attach a typed artifact (markdown note, branch, or link) to a work order" />
-  <LinkCard title="Add Work Order Comment" href="#add-work-order-comment" description="Append a comment to a work order timeline" />
+  <LinkCard title="Add Task Artifact" href="#add-task-artifact" description="Attach a typed artifact (markdown note, branch, or link) to a task" />
+  <LinkCard title="Add Task Comment" href="#add-task-comment" description="Append a comment to a task timeline" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Broadcast Message" href="#broadcast-message" description="Broadcast a message to other SuperPlane apps" />
-  <LinkCard title="Create Task" href="#create-task" description="Create a new work order" />
+  <LinkCard title="Create Task" href="#create-task" description="Create a new task" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
   <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Look up a factory pull request by provider identity or URL" />
-  <LinkCard title="Find Work Order" href="#find-work-order" description="Look up a work order by id or by an artifact's key" />
+  <LinkCard title="Find Task" href="#find-task" description="Look up a task by id or by an artifact's key" />
   <LinkCard title="For Each" href="#for-each" description="Emit one downstream event per item in an array" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
@@ -45,7 +45,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Report Work Order Check" href="#report-work-order-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a work order" />
+  <LinkCard title="Report Task Check" href="#report-task-check" description="Report a scored or pass/fail check (risk, coverage, CI) on a task" />
   <LinkCard title="Run App" href="#run-app" description="Run another SuperPlane app and wait for its run to finish" />
   <LinkCard title="Run Shell Commands" href="#run-shell-commands" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Run Bash" href="#run-bash" description="Runs a Bash script on a fleet runner with upstream node data in SUPERPLANE_PAYLOAD_FILE" />
@@ -55,13 +55,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
   <LinkCard title="Run SuperPlane Agent" href="#run-super-plane-agent" description="Runs a SuperPlane-hosted coding agent on a fleet runner." />
-  <LinkCard title="Set Work Order Status Note" href="#set-work-order-status-note" description="Announce what a waiting work order is blocked on and what resolves it" />
+  <LinkCard title="Set Task Status Note" href="#set-task-status-note" description="Announce what a waiting task is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
-  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a factory pull request that is already attached to a work order" />
+  <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update a factory pull request that is already attached to a task" />
   <LinkCard title="Update Pull Request Activity" href="#update-pull-request-activity" description="Update the current factory pull request activity" />
-  <LinkCard title="Update Work Order Status" href="#update-work-order-status" description="Transition a work order between lifecycle states" />
+  <LinkCard title="Update Task Status" href="#update-task-status" description="Transition a task between lifecycle states" />
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
   <LinkCard title="Wait" href="#wait" description="Wait for a certain amount of time" />
 </CardGrid>
@@ -207,15 +207,15 @@ Handle runs started from another app
 }
 ```
 
-<a id="on-work-order"></a>
+<a id="on-task"></a>
 
-## On Work Order
+## On Task
 
 **Trigger key:** `onWorkOrder`
 
-The On Work Order trigger starts a workflow when a work order is created in the factory that owns this app.
+The On Task trigger starts a workflow when a task is created in the factory that owns this app.
 
-Use it on a factory-owned app, such as the generated Backlog automation that scores new work orders.
+Use it on a factory-owned app, such as the generated Backlog automation that scores new tasks.
 
 ### Event Data
 
@@ -234,7 +234,7 @@ Each event has type `workOrder.created`. The payload is:
 }
 ```
 
-`origin` is present only when the work order was created from an intake item.
+`origin` is present only when the task was created from an intake item.
 
 ### Example Data
 
@@ -492,7 +492,7 @@ A single `memory.added` event is emitted with all written rows and the total `co
 
 **Component key:** `addPullRequest`
 
-The Add Pull Request component records a pull request on a work order.
+The Add Pull Request component records a pull request on a task.
 
 Required fields are `repository`, `number`, and `url`. `provider` defaults to `github`. `state` defaults to `open`.
 
@@ -500,7 +500,7 @@ Required fields are `repository`, `number`, and `url`. `provider` defaults to `g
 
 Set `mergedAt` or `closedAt` (RFC3339) when the pull request is already merged or closed so Velocity uses the real day.
 
-`orderId` defaults to `{{ order().id }}`. In a flow that is not dispatched from a factory line, replace it with the work order id from a previous step. This component can only be used in factory-owned apps.
+`orderId` defaults to `{{ order().id }}`. In a flow that is not dispatched from a factory line, replace it with the task id from a previous step. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -603,7 +603,7 @@ The Add Run Error component appends an error entry to the current run.
 
 **Component key:** `addWorkOrderArtifact`
 
-The Add Task Artifact component stores a typed artifact against a work order.
+The Add Task Artifact component stores a typed artifact against a task.
 
 Supported types:
 
@@ -611,13 +611,13 @@ Supported types:
 - **Branch** (`branch`): requires `name` and `repository` (`owner/repo` or a repository http(s) URL), or an explicit `url`. SuperPlane writes a GitHub tree URL from the repository and branch name at attach time.
 - **Link** (`link`): requires `url` (must be http or https); optional `title` for the artifact chip's label — e.g. attach a preview-environment URL as "Preview".
 
-Use the Add Pull Request component to attach a pull request to a work order.
+Use the Add Pull Request component to attach a pull request to a task.
 
 Markdown and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
-Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this work order. Keys are unique per factory.
+Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this task. Keys are unique per factory.
 
-`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}`. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}`. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -638,15 +638,15 @@ Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkO
 }
 ```
 
-<a id="add-work-order-comment"></a>
+<a id="add-task-comment"></a>
 
-## Add Work Order Comment
+## Add Task Comment
 
 **Component key:** `addWorkOrderComment`
 
-The Add Work Order Comment component appends a comment from this automation to the work order's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label.
+The Add Task Comment component appends a comment from this automation to the task's activity timeline. Authorship is captured automatically — the timeline shows which canvas node and app wrote the comment, without any configurable label.
 
-`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event, replace it with e.g. `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -756,7 +756,7 @@ Broadcast a message to other SuperPlane apps subscribed to this app
 
 **Component key:** `createWorkOrder`
 
-The Create Task component creates a new work order in the factory. This component can only be used in factory-owned apps.
+The Create Task component creates a new task in the factory. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -764,9 +764,9 @@ The Create Task component creates a new work order in the factory. This componen
 {
   "data": {
     "workOrder": {
-      "description": "Work Order 1 description",
+      "description": "Task 1 description",
       "id": "123",
-      "title": "Work Order 1"
+      "title": "Task 1"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",
@@ -910,7 +910,7 @@ Supply at least one complete identity:
 - Provider, repository, and number
 - URL
 
-On a match, emits `pullRequest.found` with the pull request and its work order on the `found` channel. When nothing matches, emits `pullRequest.notFound` on the `notFound` channel instead of failing the run. This component can only be used in factory-owned apps.
+On a match, emits `pullRequest.found` with the pull request and its task on the `found` channel. When nothing matches, emits `pullRequest.notFound` on the `notFound` channel instead of failing the run. This component can only be used in factory-owned apps.
 
 ### Output Channels
 
@@ -938,25 +938,25 @@ On a match, emits `pullRequest.found` with the pull request and its work order o
 }
 ```
 
-<a id="find-work-order"></a>
+<a id="find-task"></a>
 
-## Find Work Order
+## Find Task
 
 **Component key:** `findWorkOrder`
 
-The Find Work Order component resolves a work order without requiring the current run to be attached to one — the missing piece for flows that don't start on a factory line, e.g. a `github.onPullRequest` merged event that needs to close the order a pull request belongs to.
+The Find Task component resolves a task without requiring the current run to be attached to one — the missing piece for flows that don't start on a factory line, e.g. a `github.onPullRequest` merged event that needs to close the task a pull request belongs to.
 
 Lookup modes:
 
-- **Work Order ID** (`by: id`): resolves `orderId` directly.
-- **Artifact Key** (`by: artifactKey`): resolves the work order that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
+- **Task ID** (`by: id`): resolves `orderId` directly.
+- **Artifact Key** (`by: artifactKey`): resolves the task that owns the artifact tagged with `artifactKey` (set via `addWorkOrderArtifact`'s `artifactKey` field — e.g. the pull request's URL).
 
-On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked order shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
+On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel, so downstream components can target it with `orderId: {{ previous().data.workOrder.id }}`. When nothing matches, emits on the `notFound` channel instead of failing the run — a PR merge unrelated to any tracked task shouldn't red a flow, and downstream components can wire the `notFound` channel to a no-op if they don't need to react to it. Misconfiguration (invalid id, wrong factory, etc.) still fails the run. This component can only be used in factory-owned apps.
 
 ### Output Channels
 
-- **Found**: A work order matched the lookup
-- **Not Found**: No work order matched the lookup
+- **Found**: A task matched the lookup
+- **Not Found**: No task matched the lookup
 
 ### Example Output
 
@@ -966,7 +966,7 @@ On a match, emits `workOrder.found` with `{ workOrder }` on the `found` channel,
     "workOrder": {
       "id": "wo-123",
       "state": "open",
-      "title": "Work Order 1"
+      "title": "Task 1"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",
@@ -1405,15 +1405,15 @@ The Read Memory component looks up values from canvas-level memory storage.
 }
 ```
 
-<a id="report-work-order-check"></a>
+<a id="report-task-check"></a>
 
-## Report Work Order Check
+## Report Task Check
 
 **Component key:** `reportWorkOrderCheck`
 
-The Report Work Order Check component stores a scored check against a work order. Checks appear as scorecards on the work order page, next to the description.
+The Report Task Check component stores a scored check against a task. Checks appear as scorecards on the task page, next to the description.
 
-Each check is identified by its `checkKey` (for example `risk-review`). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the work order timeline.
+Each check is identified by its `checkKey` (for example `risk-review`). The first report creates the check. A later report with the same key updates the check in place and keeps the prior score, so the UI can show the movement between runs. Every report also adds an entry to the task timeline.
 
 A check is either scored or a pass/fail verdict, controlled by `format`:
 
@@ -1430,7 +1430,7 @@ For example, a risk score from 0 to 10 where lower is better, with `cautionAt: 5
 
 `score`, `maxScore`, and `passed` accept expressions, so a preceding automation run can feed them (e.g. `{{ previous().data.risk.score }}`). Use `analysis` for the full markdown report — it renders when a user opens the check.
 
-`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -1915,24 +1915,24 @@ Prompt steps stream agent activity to **View logs**. The finished event includes
 }
 ```
 
-<a id="set-work-order-status-note"></a>
+<a id="set-task-status-note"></a>
 
-## Set Work Order Status Note
+## Set Task Status Note
 
 **Component key:** `setWorkOrderStatusNote`
 
-The Set Work Order Status Note component announces what a waiting work order is blocked on and what resolves it. The note shows as a "next step" panel on the work order page — for example, a PR watcher can announce "Review the pull request: when it merges, this work order completes automatically."
+The Set Task Status Note component announces what a waiting task is blocked on and what resolves it. The note shows as a "next step" panel on the task page — for example, a PR watcher can announce "Review the pull request: when it merges, this task completes automatically."
 
-Each note is identified by its `noteKey` (for example `pr-closure`). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one work order can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The work order must be open.
+Each note is identified by its `noteKey` (for example `pr-closure`). The first set creates the note. A later set with the same key updates that note in place. A different key sits beside it, so one task can carry several waits at once (a PR review and a later decision prompt). Any state change (close, reopen, back to draft) clears every note. The task must be open.
 
 - `headline` is the short instruction shown as the panel title (e.g. "Review the pull request").
 - `body` is an optional markdown paragraph with the details — what happens on each outcome.
 - `ctaLabel` and `ctaUrl` render an optional action button that links to where the wait resolves (e.g. the pull request). Set both or neither.
 - `showOnlyWhenWaiting` hides the note while a line is running. The default is off, so the note stays visible during a run.
 
-`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run. This component can only be used in factory-owned apps.
 
-Setting a note also emails the work order's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other work order emails.
+Setting a note also emails the task's owners and creator (excluding whoever triggered the run), so they know it's waiting on their review — every set sends a fresh email, including one that just updates an existing note's body. Recipients can turn this off in their notification settings without affecting other task emails.
 
 ### Example Output
 
@@ -1940,7 +1940,7 @@ Setting a note also emails the work order's owners and creator (excluding whoeve
 {
   "data": {
     "statusNote": {
-      "body": "When PR #42 merges, this work order completes automatically.",
+      "body": "When PR #42 merges, this task completes automatically.",
       "ctaLabel": "Review PR #42",
       "ctaUrl": "https://github.com/acme/app/pull/42",
       "headline": "Review the pull request",
@@ -2114,7 +2114,7 @@ iteration starts) instead of a bare expression.
 
 The Update Pull Request component updates a factory pull request by `pullRequestId`. External-event canvases should run Find Pull Request first and pass its output id.
 
-Mutable fields: repository, external id, URL, title, state, merged timestamp, and closed timestamp. The component does not move the pull request to a different work order.
+Mutable fields: repository, external id, URL, title, state, merged timestamp, and closed timestamp. The component does not move the pull request to a different task.
 
 `state`, `merged`, and `draft` accept expressions. A GitHub-shaped `state: "closed"` + `merged: true` becomes SuperPlane state `merged`. This component can only be used in factory-owned apps.
 
@@ -2170,15 +2170,15 @@ This component can only be used in factory-owned apps.
 }
 ```
 
-<a id="update-work-order-status"></a>
+<a id="update-task-status"></a>
 
-## Update Work Order Status
+## Update Task Status
 
 **Component key:** `updateWorkOrderStatus`
 
-The Update Work Order Status component transitions a work order through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened order never ran).
+The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened task never ran).
 
-`orderId` explicitly targets the work order — it defaults to `{{ order().id }}`, the work order driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
+`orderId` explicitly targets the task — it defaults to `{{ order().id }}`, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as `github.onPullRequest`, replace it with `{{ previous().data.workOrder.id }}` after a `findWorkOrder` step. This component can only be used in factory-owned apps.
 
 ### Example Output
 
@@ -2189,7 +2189,7 @@ The Update Work Order Status component transitions a work order through the life
       "id": "wo-123",
       "result": "completed",
       "state": "closed",
-      "title": "Work Order 1"
+      "title": "Task 1"
     }
   },
   "timestamp": "2026-01-01T00:00:00Z",

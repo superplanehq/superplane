@@ -39,6 +39,8 @@ import {
   FactoryLineEditPage,
   FactorySettingsLayout,
   LegacyWorkOrderDetailRedirect,
+  LegacyWorkOrderPermalinkRedirect,
+  LegacyWorkOrdersRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
@@ -133,12 +135,15 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
-            <Route path="work-orders">
+            <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />
               <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
             </Route>
-            <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
+            <Route path="task/:orderNumber" element={<WorkOrderDetailPage />} />
+            {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
+            <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
+            <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
             <Route path="lines">
               <Route index element={<FactoryHomeRedirect />} />
               <Route path="new" element={<FactoryLineEditPageGate />} />
@@ -328,9 +333,7 @@ function FactoryLineEditPageGate() {
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
-  if (!organizationId || !factoryKey) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey) return <Navigate to="/" replace />;
   return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
@@ -340,9 +343,7 @@ function LegacyAutomationsLineEditRedirect() {
     factoryKey: string;
     lineId: string;
   }>();
-  if (!organizationId || !factoryKey || !lineId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey || !lineId) return <Navigate to="/" replace />;
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
@@ -350,9 +351,7 @@ function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
   const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
   const location = useLocation();
 
-  if (!organizationId || !canvasId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !canvasId) return <Navigate to="/" replace />;
 
   const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
   return <Navigate to={`${path}${location.search}`} replace />;

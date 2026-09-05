@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { CalendarDays, ChevronDown, Loader2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,12 @@ export interface SpendingRedesignPageProps extends SpendingRedesignControlledSta
   initialMachineBreakdown?: SpendingBreakdown;
   initialCustomRange?: SpendingDateRange;
   isLoading?: boolean;
+  /**
+   * A background refetch is in flight (for example, the report is
+   * revalidating after a return visit to this tab). Unlike `isLoading`,
+   * this can be true while data from a previous load is already on screen.
+   */
+  isFetching?: boolean;
   errorMessage?: string;
 }
 
@@ -52,10 +58,22 @@ export interface SpendingRedesignPageProps extends SpendingRedesignControlledSta
  * the spending-report API.
  */
 export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
-  const { credit, catalogs, isLoading = false, errorMessage, ...modelArgs } = props;
+  const { credit, catalogs, isLoading = false, isFetching = false, errorMessage, ...modelArgs } = props;
   usePageTitle(["Spending"]);
   const view = useSpendingRedesignPageModel({ ...modelArgs, catalogs });
   const metrics = spendingMetricCopy(view.rangeTotals);
+  // Reports from a real query are only present once the first fetch
+  // resolves. Once we have them, keep rendering them (and swap in the small
+  // top-right indicator below) instead of dropping back to the full-page
+  // loading state on every refetch, including on remounts that reuse a
+  // cached report.
+  //
+  // Require *both* reports so that a partially resolved first load (the model
+  // query settling before the compute query, or vice versa) does not suppress
+  // the full-page loading state and render the still-loading section as empty
+  // data behind a background-refresh indicator.
+  const hasReport = Boolean(props.modelReport && props.machineReport);
+  const showFullPageLoading = isLoading && !hasReport;
 
   if (errorMessage) {
     return (
@@ -65,12 +83,8 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-full bg-sidebar p-6 dark:bg-background" data-testid="spending-redesign-page">
-        <p className="text-[13px] text-muted-foreground">Loading spending...</p>
-      </div>
-    );
+  if (showFullPageLoading) {
+    return <SpendingPageLoading />;
   }
 
   return (
@@ -80,14 +94,17 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         title="Spending"
         subtitle="Review factory token usage, VM time, and estimated spend for this organization."
         actions={
-          <SpendingPeriodControls
-            customOpen={view.customOpen}
-            customRange={view.range}
-            period={view.period}
-            onCustomOpenChange={view.setCustomOpen}
-            onCustomRangeChange={view.setCustomRange}
-            onPeriodChange={view.handlePeriodChange}
-          />
+          <>
+            {isFetching && hasReport ? <SpendingRefetchIndicator /> : null}
+            <SpendingPeriodControls
+              customOpen={view.customOpen}
+              customRange={view.range}
+              period={view.period}
+              onCustomOpenChange={view.setCustomOpen}
+              onCustomRangeChange={view.setCustomRange}
+              onPeriodChange={view.handlePeriodChange}
+            />
+          </>
         }
       />
       <div className={cn(factoryCenteredSectionBodyClassName, "flex flex-col gap-5 pb-10")}>
@@ -112,6 +129,44 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * First-load placeholder for the spending report. Centered in the settings
+ * pane so it does not read as leftover copy in the top-left corner.
+ */
+function SpendingPageLoading() {
+  return (
+    <div
+      className="flex h-full min-h-0 flex-1 items-center justify-center bg-sidebar dark:bg-background"
+      data-testid="spending-redesign-page"
+    >
+      <div data-testid="spending-page-loading" role="status">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" aria-hidden />
+        <span className="sr-only">Loading spending</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Quiet indicator shown in the top-right of the header while the spending
+ * report revalidates over data that is already on screen. Deliberately
+ * small and unobtrusive: it must not compete with the loading state used
+ * for the true first load.
+ */
+function SpendingRefetchIndicator() {
+  return (
+    <span
+      className="flex items-center gap-1.5 text-[12px] text-muted-foreground"
+      data-testid="spending-refetch-indicator"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      Refreshing spending...
+    </span>
   );
 }
 
