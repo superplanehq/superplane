@@ -130,7 +130,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
     searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
     hostedGitHubInstallRequestedAccount(integration.status?.metadata);
   const showInstallPicker =
-    pendingInstallations.length >= 2 && pendingInstallState !== "" && integration.status?.state !== "ready";
+    pendingInstallations.length >= 1 && pendingInstallState !== "" && integration.status?.state !== "ready";
   const browserAction = integration.status?.browserAction;
   const instructions = integrationDef?.instructions?.trim();
   const hasChanges =

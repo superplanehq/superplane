@@ -112,7 +112,7 @@ export function FirstRunConnectScreen({
   onContinue: () => void;
 }) {
   const waitingForApproval = installRequested && !githubConnected;
-  const showAccountPicker = !githubConnected && pendingInstallations.length >= 2 && githubState !== "";
+  const showAccountPicker = !githubConnected && pendingInstallations.length >= 1 && githubState !== "";
 
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
