@@ -6,6 +6,7 @@ import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
@@ -239,6 +240,10 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const installRequested =
     searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
     model.githubConnections.allInstances.some((instance) => hostedGitHubInstallRequested(instance.status?.metadata));
+
+  // An approved install request binds outside the wizard round trip, so the
+  // waiting screen rechecks GitHub through the connection until it is ready.
+  useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
 
   useEffect(() => {
     if (!installRequested || openedScreen !== "welcome") return;
