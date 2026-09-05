@@ -5,7 +5,12 @@ import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
+import {
+  hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
+  type PendingGitHubInstallation,
+} from "@/lib/hostedGitHubInstall";
+import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
@@ -262,12 +267,30 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // user. The /account id is the account, so a match would hide the picker.
   const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
 
+  // Binding through a page redirect reloads the whole app and walks the user
+  // through the connect screen again. Binding in place opens the repository
+  // screen directly once the connection is ready.
+  const bindInstallation = useBindGitHubInstallation(organizationId);
+  const useInstallation = (installation: PendingGitHubInstallation) => {
+    const state = accountPicker?.state;
+    if (!state || bindInstallation.isPending) return;
+    bindInstallation.mutate(
+      { state, installationId: installation.id },
+      {
+        onSuccess: () => goToScreen("choose"),
+        onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
+      },
+    );
+  };
+
   return {
     screen: screenWithoutAgent(openedScreen, skipAgentScreen),
     skipAgentScreen,
     installRequested,
     githubOrganization,
     accountPicker,
+    bindingInstallationId: bindInstallation.isPending ? bindInstallation.variables?.installationId : undefined,
+    useInstallation,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -342,8 +365,10 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         pendingInstallations={flow.accountPicker?.installations}
         githubState={flow.accountPicker?.state}
         githubAppSlug={flow.accountPicker?.appSlug}
+        bindingInstallationId={flow.bindingInstallationId}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
+        onUseInstallation={flow.useInstallation}
         onContinue={() => flow.goToScreen("choose")}
       />
     );
