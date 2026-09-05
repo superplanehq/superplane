@@ -164,6 +164,44 @@ describe("FirstRunConnectScreen", () => {
     expect(onUseInstallation).toHaveBeenCalledWith({ id: "11", accountLogin: "acme" });
   });
 
+  it("hides the waiting chip when the picker offers the requested organization", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="Acme"
+        pendingInstallations={[{ id: "11", accountLogin: "acme" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-install-requested")).not.toBeInTheDocument();
+  });
+
+  it("keeps the waiting chip when the picker lacks the requested organization", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="acme"
+        pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+  });
+
   it("disables the picker while one account is binding", () => {
     render(
       <FirstRunConnectScreen

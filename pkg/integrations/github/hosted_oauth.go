@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -103,9 +104,26 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	// bind would lock the connection to that account (often the user's
 	// personal one) with no way to install the App on an organization.
 	metadata.PendingInstallations = installations
+
+	// The picker now offers the requested account, so the install request is
+	// approved and the waiting state must not show next to the picker.
+	if installationsIncludeAccount(installations, metadata.InstallRequestedAccount) {
+		metadata.InstallRequested = false
+		metadata.InstallRequestedAccount = ""
+	}
+
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.RemoveBrowserAction()
 	redirectToIntegrationSettings(ctx)
+}
+
+func installationsIncludeAccount(installations []common.PendingInstallation, account string) bool {
+	if account == "" {
+		return false
+	}
+	return slices.ContainsFunc(installations, func(installation common.PendingInstallation) bool {
+		return strings.EqualFold(installation.AccountLogin, account)
+	})
 }
 
 func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {

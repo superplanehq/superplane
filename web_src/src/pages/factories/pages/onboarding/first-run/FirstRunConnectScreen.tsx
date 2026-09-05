@@ -90,6 +90,31 @@ function FirstRunGitHubAccountPicker({
   );
 }
 
+function connectScreenState({
+  githubConnected,
+  installRequested,
+  githubOrganization,
+  pendingInstallations,
+  githubState,
+}: {
+  githubConnected: boolean;
+  installRequested: boolean;
+  githubOrganization: string;
+  pendingInstallations: PendingGitHubInstallation[];
+  githubState: string;
+}) {
+  const showAccountPicker = !githubConnected && pendingInstallations.length >= 1 && githubState !== "";
+  // A picker that offers the requested organization means the request is
+  // approved, so the waiting state must not show next to it.
+  const requestApproved = pendingInstallations.some(
+    (installation) => installation.accountLogin.toLowerCase() === githubOrganization.toLowerCase(),
+  );
+  return {
+    showAccountPicker,
+    waitingForApproval: installRequested && !githubConnected && !(showAccountPicker && requestApproved),
+  };
+}
+
 export function FirstRunConnectScreen({
   githubConnected,
   installRequested = false,
@@ -117,8 +142,13 @@ export function FirstRunConnectScreen({
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onContinue: () => void;
 }) {
-  const waitingForApproval = installRequested && !githubConnected;
-  const showAccountPicker = !githubConnected && pendingInstallations.length >= 1 && githubState !== "";
+  const { showAccountPicker, waitingForApproval } = connectScreenState({
+    githubConnected,
+    installRequested,
+    githubOrganization,
+    pendingInstallations,
+    githubState,
+  });
 
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
