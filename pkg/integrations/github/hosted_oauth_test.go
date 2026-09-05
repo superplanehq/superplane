@@ -491,23 +491,17 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 	assert.Nil(t, integrationCtx.BrowserAction)
 }
 
-func Test__Sync_hostedAppAdoptsApprovedInstallRequest(t *testing.T) {
+func Test__Sync_hostedAppOffersApprovedInstallInPicker(t *testing.T) {
 	setHostedAppOAuthEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
 	t.Cleanup(restore)
 	t.Cleanup(resetBindClientHooks)
 
-	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-		return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
-	}
-	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-		return gh.NewClient(nil), nil
-	}
-	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (string, error) {
+	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (common.PendingInstallation, bool, error) {
 		if account == "acme" {
-			return "11", nil
+			return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
 		}
-		return "", nil
+		return common.PendingInstallation{}, false, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -521,6 +515,9 @@ func Test__Sync_hostedAppAdoptsApprovedInstallRequest(t *testing.T) {
 			InstallRequested:        true,
 			InstallRequestedAccount: "acme",
 			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "22", AccountLogin: "octo", AccountType: "User"},
+			},
 		},
 	}
 
@@ -531,13 +528,56 @@ func Test__Sync_hostedAppAdoptsApprovedInstallRequest(t *testing.T) {
 		Integration:    integrationCtx,
 	}))
 
-	assert.Equal(t, "ready", integrationCtx.State)
+	// A silent bind must not happen: the approved installation joins the
+	// picker and the member still picks the account.
+	assert.NotEqual(t, "ready", integrationCtx.State)
 	metadata := integrationCtx.Metadata.(common.Metadata)
-	assert.Equal(t, "11", metadata.InstallationID)
-	assert.Equal(t, "acme", metadata.Owner)
+	assert.Empty(t, metadata.InstallationID)
+	assert.Equal(t, "csrf", metadata.State)
 	assert.False(t, metadata.InstallRequested)
 	assert.Empty(t, metadata.InstallRequestedAccount)
-	assert.Nil(t, integrationCtx.BrowserAction)
+	require.Len(t, metadata.PendingInstallations, 2)
+	assert.Equal(t, "11", metadata.PendingInstallations[1].ID)
+	assert.Equal(t, "acme", metadata.PendingInstallations[1].AccountLogin)
+}
+
+func Test__Sync_hostedAppDoesNotDuplicatePickerEntry(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme", AccountType: "Organization"},
+			},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.False(t, metadata.InstallRequested)
 }
 
 func Test__Sync_hostedAppFindsRequestedAccountOnGitHub(t *testing.T) {
@@ -555,8 +595,8 @@ func Test__Sync_hostedAppFindsRequestedAccountOnGitHub(t *testing.T) {
 		}
 		return "", nil
 	}
-	listAppInstallations = func(context.Context, *gh.Client, string) (string, error) {
-		return "", nil // The request is still waiting for an approval.
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{}, false, nil // The request is still waiting for an approval.
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
@@ -586,7 +626,7 @@ func Test__Sync_hostedAppFindsRequestedAccountOnGitHub(t *testing.T) {
 	assert.True(t, metadata.InstallRequested)
 }
 
-func Test__Sync_hostedAppAdoptsRequestWithoutStoredAccount(t *testing.T) {
+func Test__Sync_hostedAppOffersRequestWithoutStoredAccountInPicker(t *testing.T) {
 	setHostedAppOAuthEnv(t)
 	restore := withFactoriesEnabledForTest(func(string) bool { return true })
 	t.Cleanup(restore)
@@ -598,20 +638,14 @@ func Test__Sync_hostedAppAdoptsRequestWithoutStoredAccount(t *testing.T) {
 		}
 		return "", nil
 	}
-	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (string, error) {
+	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (common.PendingInstallation, bool, error) {
 		if account == "acme" {
-			return "11", nil
+			return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
 		}
-		return "", nil
+		return common.PendingInstallation{}, false, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil
-	}
-	newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-		return gh.NewClient(nil), nil
-	}
-	listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-		return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
 	}
 
 	integrationCtx := &contexts.IntegrationContext{
@@ -632,10 +666,12 @@ func Test__Sync_hostedAppAdoptsRequestWithoutStoredAccount(t *testing.T) {
 		Integration:    integrationCtx,
 	}))
 
-	assert.Equal(t, "ready", integrationCtx.State)
+	assert.NotEqual(t, "ready", integrationCtx.State)
 	metadata := integrationCtx.Metadata.(common.Metadata)
-	assert.Equal(t, "11", metadata.InstallationID)
-	assert.Equal(t, "acme", metadata.Owner)
+	assert.Empty(t, metadata.InstallationID)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+	assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
 	assert.False(t, metadata.InstallRequested)
 }
 
@@ -645,8 +681,8 @@ func Test__Sync_hostedAppKeepsWaitingWhenRequestNotApproved(t *testing.T) {
 	t.Cleanup(restore)
 	t.Cleanup(resetBindClientHooks)
 
-	listAppInstallations = func(context.Context, *gh.Client, string) (string, error) {
-		return "", nil
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{}, false, nil
 	}
 	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
 		return gh.NewClient(nil), nil

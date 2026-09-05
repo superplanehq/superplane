@@ -7,7 +7,7 @@ import { integrationKeys } from "@/hooks/useIntegrations";
 import { hostedGitHubInstallRequested } from "@/lib/hostedGitHubInstall";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-const RECHECK_INTERVAL_MS = 30_000;
+const RECHECK_INTERVAL_MS = 5_000;
 
 export function pendingGitHubInstallRequestId(instances: OrganizationsIntegration[]): string | undefined {
   const pending = instances.find(
@@ -25,8 +25,8 @@ export function pendingGitHubInstallRequestId(instances: OrganizationsIntegratio
  * The GitHub approve callback carries no CSRF state and the installation
  * webhook cannot find a connection without an installation id, so the server
  * only learns about an approval during a connection sync. An empty update
- * runs that sync: it binds the approved installation and turns the
- * connection ready. Runs on page access and then every 30 seconds until the
+ * runs that sync: an approved installation joins the account picker, where
+ * the user picks it. Runs on page access and then every 10 seconds until the
  * request resolves or the page closes.
  */
 export function useRecheckGitHubInstallRequest(organizationId: string, instances: OrganizationsIntegration[]) {
