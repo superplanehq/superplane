@@ -23,6 +23,11 @@ type Metadata struct {
 	// InstallRequestedAccount is the GitHub organization (or user) login the
 	// member asked an admin to approve.
 	InstallRequestedAccount string `mapstructure:"installRequestedAccount" json:"installRequestedAccount,omitempty"`
+	// StartedByGitHubLogin is the GitHub login of the member who authorized
+	// the connect OAuth. The request callback from GitHub does not name the
+	// requested organization, so Sync finds that member's App install request
+	// through this login.
+	StartedByGitHubLogin string `mapstructure:"startedByGitHubLogin" json:"startedByGitHubLogin,omitempty"`
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`

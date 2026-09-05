@@ -18,6 +18,7 @@ import (
 const (
 	githubOAuthTokenURL        = "https://github.com/login/oauth/access_token"
 	githubUserInstallationsURL = "https://api.github.com/user/installations"
+	githubUserURL              = "https://api.github.com/user"
 )
 
 type githubOAuthTokenResponse struct {
@@ -93,6 +94,16 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		ctx.Logger.Errorf("failed to list user GitHub App installations: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// The request callback from GitHub does not name the requested
+	// organization, so Sync later finds this member's install request on
+	// GitHub through this login.
+	login, err := fetchGitHubUserLogin(ctx.HTTP, token)
+	if err != nil {
+		ctx.Logger.Errorf("failed to fetch GitHub user login: %v", err)
+	} else {
+		metadata.StartedByGitHubLogin = login
 	}
 
 	if len(installations) == 0 {
@@ -222,6 +233,42 @@ func exchangeGitHubUserOAuthToken(httpCtx core.HTTPContext, clientID, clientSecr
 	}
 
 	return token.AccessToken, nil
+}
+
+func fetchGitHubUserLogin(httpCtx core.HTTPContext, token string) (string, error) {
+	if httpCtx == nil {
+		return "", fmt.Errorf("HTTP context is required")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, githubUserURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	response, err := httpCtx.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := io.ReadAll(response.Body)
+	_ = response.Body.Close()
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return "", fmt.Errorf("GitHub user request failed: status %d", response.StatusCode)
+	}
+
+	var payload struct {
+		Login string `json:"login"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return "", err
+	}
+
+	return payload.Login, nil
 }
 
 func listUserAppInstallations(httpCtx core.HTTPContext, token string, appID int64) ([]common.PendingInstallation, error) {
