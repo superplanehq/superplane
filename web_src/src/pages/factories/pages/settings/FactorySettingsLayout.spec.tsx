@@ -401,11 +401,11 @@ describe("FactorySettingsLayout sidebar", () => {
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Semaphore");
       expect(within(sidebar).getByTestId("factory-settings-workspace-heading")).toHaveTextContent("Workspace · RF");
-      expect(within(sidebar).getByTestId("factory-settings-workspace-heading-avatar")).toHaveTextContent("S");
+      expect(within(sidebar).queryByTestId("factory-settings-workspace-heading-avatar")).not.toBeInTheDocument();
       expect(within(sidebar).getByTestId("factory-settings-organization-heading")).toHaveTextContent("SuperPlane");
       expect(within(sidebar).getByTestId("factory-settings-organization-heading")).toHaveTextContent("Organization");
-      expect(within(sidebar).getByTestId("factory-settings-organization-heading-avatar")).toHaveTextContent("S");
-      expect(within(sidebar).getByTestId("factory-settings-account-heading-avatar")).toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-organization-heading-avatar")).not.toBeInTheDocument();
+      expect(within(sidebar).queryByTestId("factory-settings-account-heading-avatar")).not.toBeInTheDocument();
       expect(within(sidebar).queryByRole("button", { name: /Switch workspace/ })).not.toBeInTheDocument();
       expect(within(sidebar).queryByRole("button", { name: /Switch organization/ })).not.toBeInTheDocument();
       expect(within(sidebar).queryByTestId("factory-settings-workspace-switcher")).not.toBeInTheDocument();

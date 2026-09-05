@@ -1,5 +1,4 @@
 import type { FactoriesFactory } from "@/api-client";
-import { Avatar } from "@/components/Avatar/avatar";
 import { Input } from "@/components/ui/input";
 import { useAccount } from "@/contexts/useAccount";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -20,7 +19,6 @@ import {
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
 import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
-import { initialsForName } from "../../layout/factoriesRail";
 import { factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
@@ -267,7 +265,6 @@ function FactorySettingsSidebar({
               organizationId={organizationId}
               factoryKey={factoryKey}
               accountLabel={accountLabel}
-              accountAvatarUrl={account?.avatar_url}
               organizationName={organizationName}
               workspaceName={workspaceName}
               workspaceKey={workspaceKey}
@@ -332,7 +329,6 @@ function SettingsNavGroup({
   organizationId,
   factoryKey,
   accountLabel,
-  accountAvatarUrl,
   organizationName,
   workspaceName,
   workspaceKey,
@@ -341,7 +337,6 @@ function SettingsNavGroup({
   organizationId: string;
   factoryKey: string;
   accountLabel: string;
-  accountAvatarUrl?: string | null;
   organizationName: string;
   workspaceName: string;
   workspaceKey: string;
@@ -353,22 +348,16 @@ function SettingsNavGroup({
         <SettingsNavGroupHeading
           name={workspaceName}
           helper={`Workspace · ${workspaceKey}`}
-          square
           testId="factory-settings-workspace-heading"
         />
       ) : group.id === "organization" ? (
         <SettingsNavGroupHeading
           name={organizationName}
           helper="Organization"
-          square
           testId="factory-settings-organization-heading"
         />
       ) : (
-        <SettingsNavGroupHeading
-          name={accountLabel}
-          avatarSrc={accountAvatarUrl}
-          testId="factory-settings-account-heading"
-        />
+        <SettingsNavGroupHeading name={accountLabel} testId="factory-settings-account-heading" />
       )}
       <SettingsNavItems organizationId={organizationId} factoryKey={factoryKey} items={group.items} />
     </section>
@@ -378,30 +367,16 @@ function SettingsNavGroup({
 function SettingsNavGroupHeading({
   name,
   helper,
-  avatarSrc,
-  square = false,
   testId,
 }: {
   name: string;
   helper?: string;
-  avatarSrc?: string | null;
-  square?: boolean;
   testId?: string;
 }) {
   return (
-    <div className="mb-1 flex items-center gap-2 px-2.5 py-1" data-testid={testId}>
-      <Avatar
-        src={avatarSrc || undefined}
-        initials={avatarSrc ? undefined : initialsForName(name)}
-        square={square}
-        alt=""
-        className="size-6 bg-sidebar-accent text-[10px] text-foreground"
-        data-testid={testId ? `${testId}-avatar` : undefined}
-      />
-      <div className="min-w-0">
-        <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</h2>
-        {helper ? <p className="truncate text-[11px] text-muted-foreground">{helper}</p> : null}
-      </div>
+    <div className="mb-1 px-2.5 py-1" data-testid={testId}>
+      <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</h2>
+      {helper ? <p className="truncate text-[11px] text-muted-foreground">{helper}</p> : null}
     </div>
   );
 }
