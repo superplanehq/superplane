@@ -182,6 +182,45 @@ export function isFieldRequired(field: ConfigurationField, allValues: Record<str
 }
 
 /**
+ * Checks if a configuration value should be treated as "missing" for required-field
+ * purposes. undefined, null, empty string, and empty arrays all count as missing;
+ * any other value (including 0, false, and non-empty objects) counts as filled.
+ */
+function isConfigurationValueMissing(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return value.trim() === "";
+  }
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+  return false;
+}
+
+/**
+ * Checks whether every visible, required configuration field has a value.
+ *
+ * Used to gate "Connect"/"Save" actions so an integration is never created (or
+ * updated) with a required field like an API key left empty. A field only needs a
+ * value when it is both visible (isFieldVisible) and required (isFieldRequired) for
+ * the current set of values; hidden or not-currently-required fields are ignored.
+ */
+export function areRequiredConfigurationFieldsFilled(
+  fields: ConfigurationField[],
+  values: Record<string, unknown>,
+): boolean {
+  return fields.every((field) => {
+    if (!isFieldVisible(field, values) || !isFieldRequired(field, values)) {
+      return true;
+    }
+
+    return !isConfigurationValueMissing(field.name ? values[field.name] : undefined);
+  });
+}
+
+/**
  * Validates a single field value for form submission (includes type-specific validation)
  */
 export function validateFieldForSubmission(field: ConfigurationField, value: unknown): string[] {
