@@ -19,7 +19,16 @@ export interface BrokenIntegration {
 const REINSTALL_HINTS = ["uninstall", "app was removed", "app removed"];
 // OAuth recovery: re-run the authorization flow rather than paste a new key.
 // Checked before REPLACE_KEY_HINTS so "refresh token" does not match "token".
-const RECONNECT_HINTS = ["reconnect", "re-connect", "reauthor", "re-author", "reauthenticate", "oauth", "offline_access", "refresh token"];
+const RECONNECT_HINTS = [
+  "reconnect",
+  "re-connect",
+  "reauthor",
+  "re-author",
+  "reauthenticate",
+  "oauth",
+  "offline_access",
+  "refresh token",
+];
 const REPLACE_KEY_HINTS = ["expired", "key", "token", "credential", "secret", "unauthorized", "invalid"];
 
 /**

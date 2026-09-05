@@ -38,9 +38,9 @@ describe("repairActionLabel", () => {
   });
 
   it("suggests reconnecting when an OAuth refresh token is missing", () => {
-    expect(
-      repairActionLabel("No refresh token was returned; reconnect with the offline_access scope"),
-    ).toBe("Reconnect");
+    expect(repairActionLabel("No refresh token was returned; reconnect with the offline_access scope")).toBe(
+      "Reconnect",
+    );
   });
 
   it("suggests reconnecting when the description asks to re-authorize", () => {
