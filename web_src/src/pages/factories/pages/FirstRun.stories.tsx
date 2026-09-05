@@ -96,8 +96,8 @@ export const ConnectGitHubConnected: Story = {
       <FirstRunConnectScreen
         githubConnected
         chrome={firstRunStoryChrome(1)}
-        onConnectGitHub={() => undefined}
-        onContinue={() => undefined}
+        onConnectGitHub={() => console.log("connect GitHub")}
+        onContinue={() => console.log("continue")}
       />
     </FirstRunStoryFrame>
   ),
@@ -111,8 +111,8 @@ export const ConnectError: Story = {
         githubConnected={false}
         connectError={FIRST_RUN_COPY.connect.connectError}
         chrome={firstRunStoryChrome(1)}
-        onConnectGitHub={() => undefined}
-        onContinue={() => undefined}
+        onConnectGitHub={() => console.log("connect GitHub")}
+        onContinue={() => console.log("continue")}
       />
     </FirstRunStoryFrame>
   ),
@@ -127,8 +127,8 @@ export const ConnectInstallRequested: Story = {
         installRequested
         githubOrganization="acme"
         chrome={firstRunStoryChrome(1)}
-        onConnectGitHub={() => undefined}
-        onContinue={() => undefined}
+        onConnectGitHub={() => console.log("connect GitHub")}
+        onContinue={() => console.log("continue")}
       />
     </FirstRunStoryFrame>
   ),
@@ -196,7 +196,7 @@ export const AnalysisOverrun: Story = {
         status="overrun"
         currentStageIndex={2}
         chrome={firstRunStoryChrome(4)}
-        onRetry={() => undefined}
+        onRetry={() => console.log("retry")}
       />
     </FirstRunStoryFrame>
   ),
@@ -210,7 +210,7 @@ export const AnalysisFailed: Story = {
         status="failed"
         currentStageIndex={0}
         chrome={firstRunStoryChrome(4)}
-        onRetry={() => undefined}
+        onRetry={() => console.log("retry")}
       />
     </FirstRunStoryFrame>
   ),
