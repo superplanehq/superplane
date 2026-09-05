@@ -4,7 +4,7 @@ import { buildBuildingBlockCategories } from "./buildingBlocks";
 const triggers = [
   { name: "onBroadcast", label: "On Broadcast" },
   { name: "onRun", label: "On Run" },
-  { name: "onWorkOrder", label: "On Work Order" },
+  { name: "onWorkOrder", label: "On Task" },
 ];
 
 const components = [

@@ -496,9 +496,7 @@ const factorySettingsSectionRoutes = [
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
-  if (!organizationId || !factoryKey) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey) return <Navigate to="/" replace />;
   return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
@@ -508,9 +506,7 @@ function LegacyAutomationsLineEditRedirect() {
     factoryKey: string;
     lineId: string;
   }>();
-  if (!organizationId || !factoryKey || !lineId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey || !lineId) return <Navigate to="/" replace />;
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
@@ -518,9 +514,7 @@ function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
   const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
   const location = useLocation();
 
-  if (!organizationId || !canvasId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !canvasId) return <Navigate to="/" replace />;
 
   const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
   return <Navigate to={`${path}${location.search}`} replace />;
