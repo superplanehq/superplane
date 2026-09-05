@@ -84,7 +84,7 @@ export function pendingGitHubAccountPicker(
     if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
       return false;
     }
-    return pendingGitHubInstallations(item.status?.metadata).length >= 2;
+    return pendingGitHubInstallations(item.status?.metadata).length >= 1;
   });
   if (!pending?.metadata?.id) {
     return undefined;

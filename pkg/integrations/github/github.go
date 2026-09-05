@@ -251,7 +251,7 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
-	if len(metadata.PendingInstallations) >= 2 {
+	if len(metadata.PendingInstallations) >= 1 {
 		ctx.Integration.SetMetadata(metadata)
 		return
 	}

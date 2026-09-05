@@ -111,6 +111,26 @@ describe("FirstRunConnectScreen", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
+  it("asks which GitHub account to use when one install is pending", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.selectAccount,
+    );
+    expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toBeInTheDocument();
+  });
+
   it("asks which GitHub account to use when two installs are pending", async () => {
     const user = userEvent.setup();
     const assign = vi.fn();

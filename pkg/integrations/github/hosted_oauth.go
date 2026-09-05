@@ -94,22 +94,18 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	switch len(installations) {
-	case 0:
+	if len(installations) == 0 {
 		g.redirectToHostedInstall(ctx, metadata, app.Slug)
-	case 1:
-		if err := g.bindHostedInstallation(ctx, metadata, installations[0].ID); err != nil {
-			ctx.Logger.Errorf("%v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-		redirectToIntegrationSettings(ctx)
-	default:
-		metadata.PendingInstallations = installations
-		ctx.Integration.SetMetadata(metadata)
-		ctx.Integration.RemoveBrowserAction()
-		redirectToIntegrationSettings(ctx)
+		return
 	}
+
+	// Even a single installation goes through the account picker. A silent
+	// bind would lock the connection to that account (often the user's
+	// personal one) with no way to install the App on an organization.
+	metadata.PendingInstallations = installations
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.RemoveBrowserAction()
+	redirectToIntegrationSettings(ctx)
 }
 
 func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
