@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { SidebarUserMenu } from "../../../layout/SidebarUserMenu";
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunChrome } from "./firstRunTypes";
@@ -21,39 +21,25 @@ export function FirstRunShell({
 }) {
   useFactoriesThemeClass();
   const copy = FIRST_RUN_COPY.chrome;
-  const identity = chrome?.email ?? chrome?.displayName;
   const stepCount = chrome?.stepCount ?? FIRST_RUN_STEP_COUNT;
 
   return (
     <div className="fixed inset-0 bg-background text-foreground" data-testid={testId}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 py-5">
-        {chrome?.onCancel ? (
-          <button
-            type="button"
-            className="pointer-events-auto text-muted-foreground transition-colors hover:text-foreground"
-            onClick={chrome.onCancel}
-            aria-label={copy.close}
-            data-testid="first-run-cancel"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pointer-events-auto text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-            onClick={chrome?.onLogOut}
-            data-testid="first-run-log-out"
-          >
-            {copy.logOut}
-          </button>
-        )}
-        {identity ? (
-          <p className="text-right text-[13px] leading-5 text-muted-foreground" data-testid="first-run-signed-in">
-            <span className="block">{copy.loggedInAs}</span>
-            <span className="block text-foreground">{identity}</span>
-          </p>
-        ) : null}
-      </div>
+      {chrome ? (
+        <div className="absolute bottom-4 left-4 z-10">
+          <SidebarUserMenu
+            variant="floating"
+            organizationId={chrome.organizationId}
+            organizationName={chrome.organizationName}
+            factoryKey={chrome.factoryKey}
+            userName={chrome.displayName || chrome.email || "You"}
+            userEmail={chrome.email}
+            userAvatarUrl={chrome.avatarUrl}
+            onQuitOnboarding={chrome.onQuitOnboarding}
+            defaultOpen={chrome.menuDefaultOpen}
+          />
+        </div>
+      ) : null}
 
       <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
         <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>{children}</div>

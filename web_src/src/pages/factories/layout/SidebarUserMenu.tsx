@@ -19,18 +19,33 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
+import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon, XCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
-interface SidebarUserMenuProps {
+export interface SidebarUserMenuProps {
   organizationId: string;
   factoryKey?: string;
   userName: string;
+  userEmail?: string;
   userAvatarUrl?: string | null;
   organizationName: string;
   defaultOpen?: boolean;
+  /**
+   * `sidebar` (default) is the factory rail: a bordered row that opens the
+   * menu to the right. `floating` drops the border for placement anywhere
+   * else on screen, such as the onboarding shell's bottom-left corner, and
+   * skips Appearance to keep the menu short.
+   */
+  variant?: "sidebar" | "floating";
+  /**
+   * Shown above Sign out when set. Onboarding passes this to let a user who
+   * has somewhere else to go leave setup, deleting the placeholder
+   * workspace. Unset elsewhere, and whenever onboarding has nowhere else to
+   * send the user — Sign out still works either way.
+   */
+  onQuitOnboarding?: () => void;
 }
 
 const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
@@ -49,9 +64,12 @@ export function SidebarUserMenu({
   organizationId,
   factoryKey,
   userName,
+  userEmail,
   userAvatarUrl,
   organizationName,
   defaultOpen = false,
+  variant = "sidebar",
+  onQuitOnboarding,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
@@ -61,6 +79,9 @@ export function SidebarUserMenu({
   const organizationHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")
     : `/${organizationId}/settings/general`;
+  const identityLabel = userEmail
+    ? `${userName} (${userEmail}), ${organizationName}`
+    : `${userName}, ${organizationName}`;
 
   const handleSignOut = () => {
     posthog.reset();
@@ -68,15 +89,22 @@ export function SidebarUserMenu({
   };
 
   return (
-    <div className="flex justify-center border-t border-sidebar-border p-1.5" data-testid="factories-sidebar-user-menu">
+    <div
+      className={cn("flex justify-center", variant === "sidebar" && "border-t border-sidebar-border p-1.5")}
+      data-testid="factories-sidebar-user-menu"
+    >
       <DropdownMenu defaultOpen={defaultOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             data-testid="factories-sidebar-user-menu-trigger"
-            aria-label={`${userName}, ${organizationName}`}
-            title={`${userName}, ${organizationName}`}
-            className={cn(factoriesRailControlClassName, "data-[state=open]:bg-sidebar-accent")}
+            aria-label={identityLabel}
+            title={identityLabel}
+            className={cn(
+              factoriesRailControlClassName,
+              variant === "floating" && "bg-background shadow-sm",
+              "data-[state=open]:bg-sidebar-accent",
+            )}
           >
             <Avatar
               src={userAvatarUrl ?? undefined}
@@ -84,9 +112,7 @@ export function SidebarUserMenu({
               alt=""
               className="size-7 text-[10px]"
             />
-            <span className="sr-only">
-              {userName}, {organizationName}
-            </span>
+            <span className="sr-only">{identityLabel}</span>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" sideOffset={8} className="min-w-56">
@@ -114,9 +140,23 @@ export function SidebarUserMenu({
               Installation Admin
             </DropdownMenuItem>
           ) : null}
-          <AppearanceMenuItem />
+          {variant === "sidebar" ? <AppearanceMenuItem /> : null}
           <DropdownMenuSeparator />
-          <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={handleSignOut}>
+          {onQuitOnboarding ? (
+            <DropdownMenuItem
+              className={MENU_ITEM_CLASS}
+              onClick={onQuitOnboarding}
+              data-testid="factories-sidebar-quit-onboarding"
+            >
+              <XCircle aria-hidden />
+              Quit onboarding
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem
+            className={MENU_ITEM_CLASS}
+            onClick={handleSignOut}
+            data-testid="factories-sidebar-sign-out"
+          >
             <LogOut aria-hidden />
             Sign out
           </DropdownMenuItem>
