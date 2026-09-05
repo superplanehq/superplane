@@ -108,15 +108,10 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assert.Contains(t, integration.BrowserAction.URL, "installations/new")
 	})
 
-	t.Run("one install binds the connection", func(t *testing.T) {
-		t.Cleanup(resetBindClientHooks)
-		listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-			return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
-		}
-		newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-			return gh.NewClient(nil), nil
-		}
-
+	t.Run("one install writes allowlist and stays pending", func(t *testing.T) {
+		// A silent bind of the single installation would lock the connection
+		// to that account (often the user's personal one) with no way to
+		// install the App on an organization. The account picker must open.
 		integration := pendingHostedIntegration("csrf")
 		httpCtx := oauthHTTP(
 			jsonResponse(`{"access_token":"user-token"}`),
@@ -127,12 +122,14 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		g.afterHostedAppOAuth(ctx)
 
 		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Equal(t, "ready", integration.State)
+		assert.NotEqual(t, "ready", integration.State)
+		assert.Nil(t, integration.BrowserAction)
 		metadata := integration.Metadata.(common.Metadata)
-		assert.Equal(t, "11", metadata.InstallationID)
-		assert.Equal(t, "acme", metadata.Owner)
-		assert.Empty(t, metadata.State)
-		assert.Empty(t, metadata.PendingInstallations)
+		assert.Empty(t, metadata.InstallationID)
+		assert.Equal(t, "csrf", metadata.State)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+		assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
 	})
@@ -442,6 +439,34 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 	assert.Equal(t, "starter-user", metadata.StartedByUserID)
 	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 2)
+	assert.Nil(t, integrationCtx.BrowserAction)
+}
+
+func Test__Sync_hostedAppKeepsSinglePendingInstallation(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:     "csrf-keep",
+			HostedApp: true,
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme"},
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Equal(t, "csrf-keep", metadata.State)
+	require.Len(t, metadata.PendingInstallations, 1)
 	assert.Nil(t, integrationCtx.BrowserAction)
 }
 
