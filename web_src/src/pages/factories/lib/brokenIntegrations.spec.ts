@@ -57,7 +57,13 @@ describe("repairActionLabel", () => {
   it("suggests reconnecting when an OAuth callback fails to schedule the token refresh", () => {
     // Jira emits this on the OAuth callback path; the reversed word order
     // ("token refresh") must not fall through to the "Replace key" hint.
-    expect(repairActionLabel("failed to schedule token refresh: queue unavailable")).toBe("Reconnect");
+    expect(repairActionLabel("failed to schedule token refresh: queue unavailable", "jira")).toBe("Reconnect");
+  });
+
+  it("suggests replacing the key when a pasted-token provider fails to schedule its token refresh", () => {
+    // DockerHub emits the identical "failed to schedule token refresh" string,
+    // but it authenticates with a pasted token, so recovery is a new key.
+    expect(repairActionLabel("failed to schedule token refresh: queue unavailable", "dockerhub")).toBe("Replace key");
   });
 
   it("still suggests replacing the key when a pasted access token is missing", () => {
@@ -94,6 +100,19 @@ describe("findBrokenIntegrations", () => {
         actionLabel: "Reinstall app",
       },
     ]);
+  });
+
+  it("uses the provider name to label a DockerHub token-refresh failure as Replace key", () => {
+    const broken = findBrokenIntegrations([
+      instance({
+        id: "dh-1",
+        integrationName: "dockerhub",
+        state: "error",
+        stateDescription: "failed to schedule token refresh: queue unavailable",
+      }),
+    ]);
+
+    expect(broken[0]?.actionLabel).toBe("Replace key");
   });
 
   it("flags a pending integration with no active setup step as incomplete", () => {

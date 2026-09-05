@@ -30,7 +30,9 @@ const REINSTALL_HINTS = ["uninstall", "app was removed", "app removed"];
 //
 // "token refresh" covers Jira's OAuth callback failure to schedule the refresh
 // ("failed to schedule token refresh"), which reverses the "refresh token"
-// word order and would otherwise match the generic "token" hint.
+// word order and would otherwise match the generic "token" hint. DockerHub
+// emits the identical string on its pasted-token path, so that phrase is only
+// treated as a reconnect signal off KEY_BASED_TOKEN_REFRESH_PROVIDERS (below).
 const RECONNECT_HINTS = [
   "reconnect",
   "re-connect",
@@ -46,16 +48,31 @@ const RECONNECT_HINTS = [
 ];
 const REPLACE_KEY_HINTS = ["expired", "key", "token", "credential", "secret", "unauthorized", "invalid"];
 
+// Pasted-token providers that schedule their own access-token refresh emit the
+// exact same "failed to schedule token refresh" message that Jira's OAuth
+// callback does (DockerHub: pkg/integrations/dockerhub/dockerhub.go). For those
+// providers the credential is a pasted key, so the "token refresh" phrase must
+// not route to "Reconnect" - recovery is a new key, not a re-authorize. There
+// is no distinguishing text, so the provider name is the only signal.
+const KEY_BASED_TOKEN_REFRESH_PROVIDERS = new Set(["dockerhub"]);
+
 /**
- * Chooses the next repair step from the state description text. Falls back
+ * Chooses the next repair step from the state description text, using the
+ * provider name to break ties when the text alone is ambiguous. Falls back
  * to "Reconnect" so every broken integration always offers an action.
  */
-export function repairActionLabel(description: string | undefined): string {
+export function repairActionLabel(description: string | undefined, integrationName?: string): string {
   const text = (description ?? "").toLowerCase();
+  const provider = (integrationName ?? "").toLowerCase();
   if (REINSTALL_HINTS.some((hint) => text.includes(hint))) {
     return "Reinstall app";
   }
-  if (RECONNECT_HINTS.some((hint) => text.includes(hint))) {
+  // "token refresh" is an OAuth reconnect signal for OAuth providers, but a
+  // pasted-token provider emits the identical string when its own refresh
+  // scheduling fails; keep that on the "Replace key" path below.
+  const reconnectFromTokenRefreshOnly =
+    text.includes("token refresh") && KEY_BASED_TOKEN_REFRESH_PROVIDERS.has(provider);
+  if (!reconnectFromTokenRefreshOnly && RECONNECT_HINTS.some((hint) => text.includes(hint))) {
     return "Reconnect";
   }
   if (REPLACE_KEY_HINTS.some((hint) => text.includes(hint))) {
@@ -92,7 +109,7 @@ function classifyIntegration(integration: OrganizationsIntegration): BrokenInteg
       ...identity,
       reason: "error",
       description: description || "Connection is broken.",
-      actionLabel: repairActionLabel(description),
+      actionLabel: repairActionLabel(description, identity.integrationName),
     };
   }
 
