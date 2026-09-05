@@ -384,6 +384,14 @@ func Test__resolveInstallationOwner(t *testing.T) {
 	})
 }
 
+func Test__GitHub__Configuration(t *testing.T) {
+	fields := (&GitHub{}).Configuration()
+	require.Len(t, fields, 1)
+	assert.Equal(t, "GitHub organization name", fields[0].Label)
+	assert.Equal(t, "Name of the GitHub organization to install the app into. If left blank, the app will be installed into the user's account.", fields[0].Description)
+	assert.Equal(t, "e.g. superplanehq", fields[0].Placeholder)
+}
+
 func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	t.Parallel()
 
