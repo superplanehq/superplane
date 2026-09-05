@@ -34,6 +34,10 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
 }));
 
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganization: () => ({ data: { metadata: { name: "Acme" } } }),
+}));
+
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
 const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
@@ -101,6 +105,10 @@ function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/s
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
+}
+
+async function openAccountMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByTestId("factories-sidebar-user-menu-trigger"));
 }
 
 describe("FirstRunSetup", () => {
@@ -284,41 +292,44 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 
-  it("shows the close control instead of Log out when another workspace exists", () => {
-    factories = [factory, { id: "factory-2" }];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
-  });
-
-  it("deletes the placeholder workspace and returns to the workspace index on cancel", async () => {
+  it("offers Quit onboarding from the account menu when another workspace exists", async () => {
     factories = [factory, { id: "factory-2" }];
     const user = userEvent.setup();
 
     renderSetup(pageModel());
+    await openAccountMenu(user);
 
-    await user.click(screen.getByTestId("first-run-cancel"));
+    expect(screen.getByRole("menuitem", { name: "Quit onboarding" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("deletes the placeholder workspace and returns to the workspace index when the user quits onboarding", async () => {
+    factories = [factory, { id: "factory-2" }];
+    const user = userEvent.setup();
+
+    renderSetup(pageModel());
+    await openAccountMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Quit onboarding" }));
 
     expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
     await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
   });
 
-  it("shows the close control when another organization exists, even with no other workspace here", () => {
+  it("offers Quit onboarding when another organization exists, even with no other workspace here", async () => {
     factories = [factory];
     accountOrganizations = [
       { id: "org-1", name: "Acme" },
       { id: "org-2", name: "Other Co" },
     ];
+    const user = userEvent.setup();
 
     renderSetup(pageModel());
+    await openAccountMenu(user);
 
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Quit onboarding" })).toBeInTheDocument();
   });
 
-  it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
+  it("navigates to another organization when the user quits onboarding, not back into onboarding, when this org has no other workspace", async () => {
     factories = [factory];
     accountOrganizations = [
       { id: "org-1", name: "Acme" },
@@ -327,21 +338,23 @@ describe("FirstRunSetup", () => {
     const user = userEvent.setup();
 
     renderSetup(pageModel());
-
-    await user.click(screen.getByTestId("first-run-cancel"));
+    await openAccountMenu(user);
+    await user.click(screen.getByRole("menuitem", { name: "Quit onboarding" }));
 
     expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
     await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/other-co"));
     expect(navigateSpy).not.toHaveBeenCalledWith("/org-1/workspaces");
   });
 
-  it("keeps Log out and hides the close control with a single org and single (placeholder) workspace", () => {
+  it("hides Quit onboarding and keeps Sign out with a single org and single (placeholder) workspace", async () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
+    const user = userEvent.setup();
 
     renderSetup(pageModel());
+    await openAccountMenu(user);
 
-    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Quit onboarding" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
   });
 });
