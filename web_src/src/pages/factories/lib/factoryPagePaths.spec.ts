@@ -7,6 +7,7 @@ import {
   factoryAppViewPath,
   factoryDetailPath,
   factoryHomePath,
+  pathAfterWorkspaceSwitch,
   factoryIntakePath,
   factoryPRFeedbackPath,
   intakeSettingsTabFromSearch,
@@ -44,6 +45,43 @@ describe("factoryHomePath", () => {
 
   it("opens the workspace index when no line id is present", () => {
     expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP");
+  });
+});
+
+describe("pathAfterWorkspaceSwitch", () => {
+  const nextFactory = { key: "AO", lines: [{ id: "line-acme" }] };
+
+  it("keeps the settings page", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/settings/workspace/general",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/settings/workspace/general");
+  });
+
+  it("keeps Velocity", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/velocity",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/velocity");
+  });
+
+  it("opens the new workspace board from a line that belongs to the previous workspace", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/lines/line-plan",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/lines/line-acme");
   });
 });
 
