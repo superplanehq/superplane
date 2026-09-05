@@ -222,6 +222,16 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.InstallationID == "" && existing.State != "" {
 		existing.SetupReturnPath = returnPath
+		if existing.InstallRequested {
+			bound, err := g.adoptRequestedInstallation(ctx, app, existing)
+			if err != nil {
+				// The connection stays pending; the next sync retries.
+				ctx.Logger.Errorf("failed to adopt requested GitHub App installation: %v", err)
+			}
+			if bound {
+				return nil
+			}
+		}
 		g.refreshHostedPendingAction(ctx, app, existing)
 		return nil
 	}

@@ -36,6 +36,12 @@ vi.mock("@/hooks/useMe", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+// The install-request recheck needs a query client and the network; the flow
+// tests cover the waiting screen only.
+vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
+  useRecheckGitHubInstallRequest: vi.fn(),
+}));
+
 const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
 const navigateSpy = vi.fn();
 
