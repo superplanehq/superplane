@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"bytes"
 	"encoding/json"
 	"os/exec"
 	"path/filepath"
@@ -88,6 +89,34 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
 }
 
+// Claude Code's own "result" event is the authoritative verdict for a turn.
+// Headless (`-p`) mode exits 0 even when that event reports is_error: an
+// invalid API key still produces a "completed" turn, just one that says it
+// failed. run.js must surface that failure instead of trusting the exit code
+// alone, otherwise a failed analysis looks like a pass everywhere downstream.
+func TestFormatStreamJsonLinesReportsFailedResult(t *testing.T) {
+	failed := formatStreamJSONLinesFailed(t, []string{
+		`{"type":"system","subtype":"init","model":"claude-opus-4"}`,
+		`{"type":"result","is_error":true,"num_turns":1,"total_cost_usd":0,"duration_ms":185600,"result":"Failed to authenticate. API Error: 401 API key is invalid."}`,
+	})
+	assert.True(t, failed)
+}
+
+func TestFormatStreamJsonLinesReportsPassedResult(t *testing.T) {
+	failed := formatStreamJSONLinesFailed(t, []string{
+		`{"type":"system","subtype":"init","model":"claude-opus-4"}`,
+		`{"type":"result","is_error":false,"num_turns":1,"total_cost_usd":0.01,"duration_ms":1200,"result":"Done."}`,
+	})
+	assert.False(t, failed)
+}
+
+func TestFormatStreamJsonLinesWithNoResultEventIsNotFailed(t *testing.T) {
+	failed := formatStreamJSONLinesFailed(t, []string{
+		`{"type":"assistant","message":{"content":[{"type":"text","text":"hi"}]}}`,
+	})
+	assert.False(t, failed)
+}
+
 func claudePermissionModeFromScript(t *testing.T, env map[string]string) string {
 	t.Helper()
 	script, err := filepath.Abs("run.js")
@@ -122,6 +151,37 @@ func runClaudeFormatter(t *testing.T, lines []string) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return string(out)
+}
+
+// formatStreamJSONLinesFailed runs the formatter and reports the "failed"
+// verdict it returns, without mixing it into the formatted log text. The
+// script writes it to stderr, on its own, so the test does not have to parse
+// it out of the log lines formatStreamJsonLines prints to stdout.
+func formatStreamJSONLinesFailed(t *testing.T, lines []string) bool {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(lines)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { formatStreamJsonLines } = require(process.argv[1]);
+const result = formatStreamJsonLines(JSON.parse(process.argv[2]));
+process.stderr.write(JSON.stringify(result));`,
+		script,
+		string(payload),
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	require.NoError(t, cmd.Run(), stdout.String())
+
+	var result struct {
+		Failed bool `json:"failed"`
+	}
+	require.NoError(t, json.Unmarshal(stderr.Bytes(), &result), stderr.String())
+	return result.Failed
 }
 
 func liveLogRecords(t *testing.T, output string) []map[string]any {

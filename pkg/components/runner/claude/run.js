@@ -156,11 +156,20 @@ async function runPrompt(promptFile, model) {
     new Promise((resolve) => rl.on("close", resolve)),
   ]).then(([code]) => code);
 
-  formatter.flush(exitCode !== 0);
+  // A nonzero exit code always means failure. But `claude -p` exits 0 even
+  // when its own result event reports is_error: it treated a soft failure
+  // (an invalid API key, a rate limit it never recovered from, …) as a
+  // completed turn. Trust that verdict too, so the node execution — and
+  // everything downstream that reads it — actually fails.
+  const failed = exitCode !== 0 || formatter.resultFailed();
+  formatter.flush(failed);
   const resultJSON = formatter.resultJSON();
   fs.writeFileSync(resultFile, `${resultJSON}\n`);
   accumulateLLMUsage(resultJSON, model);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
+  if (failed) {
+    return exitCode !== 0 ? exitCode : 1;
+  }
   return exitCode;
 }
 
@@ -197,6 +206,7 @@ function createFormatter() {
   let textBuf = "";
   let lastLine = "";
   let resultLine = "";
+  let resultFailed = false;
   const tools = createToolTracker();
 
   return {
@@ -249,6 +259,7 @@ function createFormatter() {
           inText = ended.inText;
           textBuf = ended.textBuf;
           resultLine = line;
+          resultFailed = Boolean(event.is_error);
           formatResult(event);
           break;
         }
@@ -271,6 +282,14 @@ function createFormatter() {
         return lastLine;
       }
       return "{}";
+    },
+    // Claude Code's own "result" event is the authoritative verdict: headless
+    // (-p) mode exits 0 even when the turn ended in an error (e.g. the API
+    // key it was given is invalid), because the CLI still produced a result,
+    // just one that says it failed. The process exit code alone would hide
+    // that failure from the rest of the pipeline.
+    resultFailed() {
+      return resultFailed;
     },
   };
 }
@@ -635,7 +654,9 @@ function formatStreamJsonLines(rawLines) {
   for (const line of rawLines) {
     formatter.handleLine(line);
   }
-  formatter.flush();
+  const failed = formatter.resultFailed();
+  formatter.flush(failed);
+  return { failed };
 }
 
 if (require.main === module) {
