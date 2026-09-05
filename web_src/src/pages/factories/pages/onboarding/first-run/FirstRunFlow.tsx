@@ -4,7 +4,7 @@ import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
-import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
+import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL, firstRunStoryChrome } from "./firstRunMocks";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 import type { FirstRunAnalysisStatus, FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
@@ -24,7 +24,9 @@ export function FirstRunFlow({
   analysisStatus = "running",
   completeAfterMs = COMPLETE_AFTER_MS,
   board,
-  onLogOut,
+  /** Shows "Quit onboarding" in the account menu. Set false for the sign-out-only fallback. */
+  canQuitOnboarding = true,
+  menuDefaultOpen = false,
 }: {
   firstName?: string;
   email?: string;
@@ -33,7 +35,8 @@ export function FirstRunFlow({
   analysisStatus?: FirstRunAnalysisStatus;
   completeAfterMs?: number;
   board?: ReactNode;
-  onLogOut?: () => void;
+  canQuitOnboarding?: boolean;
+  menuDefaultOpen?: boolean;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
   const [githubConnected, setGithubConnected] = useState(githubStartsConnected);
@@ -41,12 +44,13 @@ export function FirstRunFlow({
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [stageIndex, setStageIndex] = useState(0);
 
-  const chromeFor = (stepIndex: number): FirstRunChrome => ({
-    displayName: firstName,
-    email,
-    onLogOut,
-    stepIndex,
-  });
+  const chromeFor = (stepIndex: number): FirstRunChrome =>
+    firstRunStoryChrome(stepIndex, {
+      displayName: firstName,
+      email,
+      onQuitOnboarding: canQuitOnboarding ? () => undefined : undefined,
+      menuDefaultOpen,
+    });
 
   useEffect(() => {
     if (screen !== "analysis" || analysisStatus === "failed") return;

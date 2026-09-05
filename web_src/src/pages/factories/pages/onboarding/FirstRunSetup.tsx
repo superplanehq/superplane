@@ -3,6 +3,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { hostedGitHubInstallRequested, hostedGitHubInstallRequestedAccount } from "@/lib/hostedGitHubInstall";
@@ -14,7 +15,6 @@ import {
   GITHUB_SETUP_REQUEST_VALUE,
 } from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
-import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -86,11 +86,6 @@ const DEFAULT_ISSUES_CHOICE: IssuesChoiceId = "vcs";
 function firstNameOf(name: string | undefined): string | undefined {
   const first = name?.trim().split(/\s+/)[0];
   return first || undefined;
-}
-
-function signOut() {
-  posthog.reset();
-  window.location.href = "/logout";
 }
 
 /**
@@ -281,7 +276,8 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId, factoryId, factories } = useFactoriesLayout();
+  const { organizationId, factoryId, factoryKey, factories } = useFactoriesLayout();
+  const { data: organization } = useOrganization(organizationId);
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
   const navigate = useNavigate();
@@ -317,8 +313,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
     displayName: firstNameOf(account?.name),
     email: account?.email,
-    onLogOut: canExitSetup ? undefined : signOut,
-    onCancel: canExitSetup ? () => void cancelSetup() : undefined,
+    avatarUrl: account?.avatar_url,
+    organizationId,
+    organizationName: organization?.metadata?.name ?? "",
+    factoryKey,
+    onQuitOnboarding: canExitSetup ? () => void cancelSetup() : undefined,
     stepIndex: STEP_INDEX_FOR_SCREEN[target],
     stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
   });

@@ -1,12 +1,23 @@
 import type { FirstRunChrome, FirstRunScoredTicket } from "./firstRunTypes";
 
 export const FIRST_RUN_STORY_EMAIL = "ada@superplane.dev";
+export const FIRST_RUN_STORY_ORGANIZATION_ID = "org-storybook-acme";
+export const FIRST_RUN_STORY_ORGANIZATION_NAME = "Acme";
 
-export function firstRunStoryChrome(stepIndex: number): FirstRunChrome {
+/**
+ * Chrome for an isolated screen story. Defaults to a user who can quit
+ * onboarding; pass `{ onQuitOnboarding: undefined }` to show the sign-out-only
+ * fallback instead.
+ */
+export function firstRunStoryChrome(stepIndex: number, overrides: Partial<FirstRunChrome> = {}): FirstRunChrome {
   return {
     displayName: "Ada",
     email: FIRST_RUN_STORY_EMAIL,
+    organizationId: FIRST_RUN_STORY_ORGANIZATION_ID,
+    organizationName: FIRST_RUN_STORY_ORGANIZATION_NAME,
+    onQuitOnboarding: () => undefined,
     stepIndex,
+    ...overrides,
   };
 }
 

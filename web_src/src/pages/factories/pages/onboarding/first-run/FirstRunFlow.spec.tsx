@@ -1,14 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunFlow } from "./FirstRunFlow";
 
+function renderFlow(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe("FirstRunFlow", () => {
   it("walks welcome, GitHub, repository, tickets, then analysis", async () => {
     const user = userEvent.setup();
-    render(<FirstRunFlow />);
+    renderFlow(<FirstRunFlow />);
 
     await user.click(screen.getByTestId("first-run-get-started"));
     expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
@@ -32,7 +38,7 @@ describe("FirstRunFlow", () => {
   });
 
   it("opens the board when analysis finishes", async () => {
-    render(
+    renderFlow(
       <FirstRunFlow initialScreen="analysis" completeAfterMs={20} board={<div data-testid="first-run-board" />} />,
     );
 

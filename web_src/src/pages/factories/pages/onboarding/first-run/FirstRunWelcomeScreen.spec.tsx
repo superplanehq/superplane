@@ -1,23 +1,26 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FIRST_RUN_STORY_EMAIL, firstRunStoryChrome } from "./firstRunMocks";
+import { firstRunStoryChrome } from "./firstRunMocks";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
 
 describe("FirstRunWelcomeScreen", () => {
   it("shows the greeting, chrome, and Get started", async () => {
     const user = userEvent.setup();
     const onGetStarted = vi.fn();
-    const onLogOut = vi.fn();
+    const onQuitOnboarding = vi.fn();
 
     render(
-      <FirstRunWelcomeScreen
-        firstName="Ada"
-        chrome={{ ...firstRunStoryChrome(0), onLogOut }}
-        onGetStarted={onGetStarted}
-      />,
+      <MemoryRouter>
+        <FirstRunWelcomeScreen
+          firstName="Ada"
+          chrome={{ ...firstRunStoryChrome(0), onQuitOnboarding }}
+          onGetStarted={onGetStarted}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByText("Hi Ada.")).toBeInTheDocument();
@@ -26,13 +29,12 @@ describe("FirstRunWelcomeScreen", () => {
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectGitHub)).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-ticket-list")).not.toBeInTheDocument();
     expect(screen.queryByText("Example: tickets scored from a real backlog.")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-log-out")).toHaveTextContent(FIRST_RUN_COPY.chrome.logOut);
-    expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent(FIRST_RUN_STORY_EMAIL);
 
     await user.click(screen.getByTestId("first-run-get-started"));
     expect(onGetStarted).toHaveBeenCalled();
 
-    await user.click(screen.getByTestId("first-run-log-out"));
-    expect(onLogOut).toHaveBeenCalled();
+    await user.click(screen.getByTestId("factories-sidebar-user-menu-trigger"));
+    await user.click(screen.getByRole("menuitem", { name: "Quit onboarding" }));
+    expect(onQuitOnboarding).toHaveBeenCalled();
   });
 });
