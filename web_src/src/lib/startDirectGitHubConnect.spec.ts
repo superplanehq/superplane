@@ -79,6 +79,33 @@ describe("pendingGitHubBrowserAction", () => {
 });
 
 describe("pendingGitHubInstallPicker", () => {
+  it("returns a pending GitHub connection with a single install", () => {
+    expect(
+      pendingGitHubAccountPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                state: "csrf",
+                githubApp: { slug: "superplane" },
+                pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toEqual({
+      id: "int-1",
+      state: "csrf",
+      appSlug: "superplane",
+      installations: [{ id: "11", accountLogin: "acme" }],
+    });
+  });
+
   it("returns a pending GitHub connection with two or more installs", () => {
     expect(
       pendingGitHubInstallPicker(
