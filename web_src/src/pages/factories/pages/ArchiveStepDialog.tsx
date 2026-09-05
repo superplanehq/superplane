@@ -13,24 +13,37 @@ type ArchiveStepDialogProps = {
   open: boolean;
   stepName: string;
   hasTasks: boolean;
+  /** True when this is the only remaining line step. */
+  isLastStep?: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 };
 
-export function ArchiveStepDialog({ open, stepName, hasTasks, onOpenChange, onConfirm }: ArchiveStepDialogProps) {
+export function ArchiveStepDialog({
+  open,
+  stepName,
+  hasTasks,
+  isLastStep = false,
+  onOpenChange,
+  onConfirm,
+}: ArchiveStepDialogProps) {
+  const blocked = hasTasks || isLastStep;
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent data-testid="lines-archive-step-dialog">
         <AlertDialogHeader>
-          <AlertDialogTitle>{hasTasks ? "Archive this step" : "Archive this step?"}</AlertDialogTitle>
+          <AlertDialogTitle>{blocked ? "Archive this step" : "Archive this step?"}</AlertDialogTitle>
           <AlertDialogDescription>
             {hasTasks
               ? "Make sure that the column does not have any tasks in it."
-              : `This removes ${stepName} from the line. The automation stays in the workspace.`}
+              : isLastStep
+                ? "A line must have at least one step."
+                : `This archives ${stepName} and the automation.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          {hasTasks ? (
+          {blocked ? (
             <AlertDialogCancel data-testid="lines-archive-step-close">Close</AlertDialogCancel>
           ) : (
             <>

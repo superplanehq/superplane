@@ -145,6 +145,29 @@ describe("matchFactoryPageFixture", () => {
     expect(body.order?.description).toBe("New body");
   });
 
+  it("updates a line's steps and column colors", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/lines/${REFUND_LINE_PLAN_ID}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          steps: [{ type: "runApp", app: { app: "app-refund-implementer", entrypoint: "start-implementation" } }],
+          columnColors: { backlog: "lime", "phase-0": "teal" },
+        }),
+      },
+      fixture,
+    );
+    const body = (await response.json()) as {
+      line?: { steps?: Array<{ app?: { app?: string } }>; columnColors?: Record<string, string> };
+    };
+
+    expect(body.line?.steps).toEqual([
+      { type: "runApp", app: { app: "app-refund-implementer", entrypoint: "start-implementation" } },
+    ]);
+    expect(body.line?.columnColors).toEqual({ backlog: "lime", "phase-0": "teal" });
+  });
+
   it("does not serve a separate line-metrics route", async () => {
     const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/line-metrics`);
     expect(response.status).toBe(404);

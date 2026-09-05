@@ -37,12 +37,35 @@ describe("ArchiveStepDialog", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Archive this step?" })).toBeInTheDocument();
-    expect(
-      screen.getByText("This removes Implement from the line. The automation stays in the workspace."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("This archives Implement and the automation.")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("lines-archive-step-confirm"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("blocks archive when the line has only one step", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onOpenChange = vi.fn();
+
+    render(
+      <ArchiveStepDialog
+        open
+        stepName="Implement"
+        hasTasks={false}
+        isLastStep
+        onOpenChange={onOpenChange}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Archive this step" })).toBeInTheDocument();
+    expect(screen.getByText("A line must have at least one step.")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-archive-step-confirm")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-archive-step-close"));
+    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it("cancels without archiving", async () => {

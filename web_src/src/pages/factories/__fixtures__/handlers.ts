@@ -75,6 +75,7 @@ interface RequestBody {
   result?: unknown;
   state?: unknown;
   steps?: unknown;
+  columnColors?: unknown;
   body?: unknown;
 }
 
@@ -84,6 +85,13 @@ function stringOrEmpty(value: unknown): string {
 
 function stringArrayOrEmpty(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every((entry) => typeof entry === "string");
 }
 
 function findUsersByIds(ids: string[]) {
@@ -380,6 +388,9 @@ function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         existing.name = stringOrEmpty(request.name) || existing.name;
         if (Array.isArray(request.steps)) {
           existing.steps = request.steps as typeof existing.steps;
+        }
+        if (isStringRecord(request.columnColors)) {
+          existing.columnColors = request.columnColors;
         }
         return { json: { line: existing } };
       },

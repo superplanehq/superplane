@@ -926,12 +926,15 @@ describe("LinesPage board editing", () => {
     expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });
 
-  it("hides Archive Step when the line has only one step", async () => {
+  it("offers Archive Step when the line has only one step and blocks confirm", async () => {
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_HOTFIX_ID}`);
 
     await user.click(screen.getByTestId("lines-phase-menu-0"));
-    expect(screen.queryByTestId("lines-phase-menu-0-archive")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-phase-menu-0-archive"));
+    expect(screen.getByText("A line must have at least one step.")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-archive-step-confirm")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
   });
 
   it("hides the phase path and shows work-order filters", async () => {

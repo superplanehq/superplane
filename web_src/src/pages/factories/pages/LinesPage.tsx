@@ -967,7 +967,7 @@ function PhaseBoard({
     [line.id, line.steps, updateLine],
   );
 
-  const canArchiveStep = (line.steps?.length ?? 0) > 1;
+  const isLastStep = (line.steps?.length ?? 0) <= 1;
 
   return (
     <WorkOrderKanbanBoard testId="lines-phase-board">
@@ -1019,7 +1019,8 @@ function PhaseBoard({
               title={columnTitles[columnKey] ?? column.stepName}
               parallelism={parallelismByStep[column.stepIndex] ?? column.maxParallelism}
               onSaveParallelism={(value) => void saveParallelism(column.stepIndex, value)}
-              onArchiveStep={canArchiveStep ? () => void archiveStep(column.stepIndex) : undefined}
+              onArchiveStep={() => void archiveStep(column.stepIndex)}
+              isLastStep={isLastStep}
               colorId={columnColors[columnKey] ?? null}
               onColorChange={(colorId) => void setColumnColor(columnKey, colorId)}
               canRename={canRename}
@@ -1232,6 +1233,7 @@ function PhaseColumn({
   parallelism,
   onSaveParallelism,
   onArchiveStep,
+  isLastStep,
   colorId,
   onColorChange,
   canRename,
@@ -1247,6 +1249,7 @@ function PhaseColumn({
   parallelism: number;
   onSaveParallelism: (value: number) => void;
   onArchiveStep?: () => void;
+  isLastStep?: boolean;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
   canRename: boolean;
@@ -1339,6 +1342,7 @@ function PhaseColumn({
         open={archiveOpen}
         stepName={title}
         hasTasks={totalRuns > 0}
+        isLastStep={isLastStep}
         onOpenChange={setArchiveOpen}
         onConfirm={() => {
           onArchiveStep?.();

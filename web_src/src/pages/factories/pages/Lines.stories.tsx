@@ -11,6 +11,11 @@ import {
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
+import {
+  archiveStepBlockedFactoriesFixture,
+  archiveStepEmptyFactoriesFixture,
+  archiveStepSingleStepFactoriesFixture,
+} from "../__fixtures__/archiveStepFactoriesFixture";
 import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import {
   githubAndSentryIntakeFactoriesFixture,
@@ -156,6 +161,48 @@ export const LineDetailFivePhases: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={fiveStepLineFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Two empty phases. Archive Step is last in the Plan and Implement menus. */
+export const LineBoardArchiveEmpty: Story = {
+  name: "Line board — archive empty step",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={archiveStepEmptyFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Implement has a task. Archive Step on Implement is blocked. Plan is empty. */
+export const LineBoardArchiveBlocked: Story = {
+  name: "Line board — archive blocked",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={archiveStepBlockedFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** One step left. Archive Step is in the Implement menu and explains the limit. */
+export const LineBoardArchiveHidden: Story = {
+  name: "Line board — one step",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={archiveStepSingleStepFactoriesFixture}
       />
     );
   },
