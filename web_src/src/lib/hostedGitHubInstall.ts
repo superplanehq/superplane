@@ -83,6 +83,25 @@ export function hostedGitHubBindPath(state: string, installationId: string): str
   return `/api/v1/github/app/bind?${params.toString()}`;
 }
 
+/**
+ * Binds a pending connection to an App installation without leaving the page.
+ * The bind endpoint answers with a redirect on success and with an error
+ * status when the bind did not happen. The redirect target comes from the
+ * server BASE_URL, which can differ from the page origin (a tunnel domain in
+ * local setups), so the fetch must not follow it: the redirect itself is the
+ * success signal.
+ */
+export async function bindHostedGitHubInstallation(state: string, installationId: string): Promise<void> {
+  const response = await fetch(hostedGitHubBindPath(state, installationId), {
+    credentials: "same-origin",
+    redirect: "manual",
+  });
+  const redirected = response.type === "opaqueredirect";
+  if (!redirected && !response.ok) {
+    throw new Error("Failed to connect the GitHub account");
+  }
+}
+
 export function hostedGitHubInstallURL(slug: string, state: string): string {
   return `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
 }

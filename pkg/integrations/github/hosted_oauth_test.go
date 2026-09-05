@@ -169,6 +169,52 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assert.Equal(t, "/user/installations", httpCtx.Requests[1].URL.Path)
 		assert.NotContains(t, httpCtx.Requests[1].URL.Path, "/app/installations")
 	})
+
+	t.Run("approved install request clears the waiting state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":11,"account":{"login":"Acme","type":"Organization"}}]}`),
+		)
+		ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		metadata := integration.Metadata.(common.Metadata)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.False(t, metadata.InstallRequested)
+		assert.Empty(t, metadata.InstallRequestedAccount)
+	})
+
+	t.Run("unapproved install request keeps the waiting state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`),
+		)
+		ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		metadata := integration.Metadata.(common.Metadata)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.True(t, metadata.InstallRequested)
+		assert.Equal(t, "acme", metadata.InstallRequestedAccount)
+	})
 }
 
 func Test__afterHostedAppBind(t *testing.T) {

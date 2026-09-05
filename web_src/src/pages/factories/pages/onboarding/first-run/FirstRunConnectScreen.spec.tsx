@@ -119,6 +119,7 @@ describe("FirstRunConnectScreen", () => {
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
         onContinue={vi.fn()}
       />,
     );
@@ -133,8 +134,7 @@ describe("FirstRunConnectScreen", () => {
 
   it("asks which GitHub account to use when two installs are pending", async () => {
     const user = userEvent.setup();
-    const assign = vi.fn();
-    vi.stubGlobal("location", { ...window.location, assign });
+    const onUseInstallation = vi.fn();
 
     render(
       <FirstRunConnectScreen
@@ -146,6 +146,7 @@ describe("FirstRunConnectScreen", () => {
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
+        onUseInstallation={onUseInstallation}
         onContinue={vi.fn()}
       />,
     );
@@ -159,12 +160,67 @@ describe("FirstRunConnectScreen", () => {
       "https://github.com/apps/superplane/installations/new?state=csrf",
     );
 
-    try {
-      await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
-      expect(assign).toHaveBeenCalledWith("/api/v1/github/app/bind?state=csrf&installation_id=11");
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+    expect(onUseInstallation).toHaveBeenCalledWith({ id: "11", accountLogin: "acme" });
+  });
+
+  it("hides the waiting chip when the picker offers the requested organization", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="Acme"
+        pendingInstallations={[{ id: "11", accountLogin: "acme" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-install-requested")).not.toBeInTheDocument();
+  });
+
+  it("keeps the waiting chip when the picker lacks the requested organization", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        installRequested
+        githubOrganization="acme"
+        pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+  });
+
+  it("disables the picker while one account is binding", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected={false}
+        pendingInstallations={[
+          { id: "11", accountLogin: "acme" },
+          { id: "22", accountLogin: "octo" },
+        ]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        bindingInstallationId="11"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-use-acme")).toBeDisabled();
+    expect(screen.getByTestId("first-run-github-use-octo")).toBeDisabled();
   });
 
   it("continues to the repository step after GitHub is connected", async () => {
