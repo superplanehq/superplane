@@ -37,6 +37,16 @@ describe("repairActionLabel", () => {
     expect(repairActionLabel("API key expired")).toBe("Replace key");
   });
 
+  it("suggests reconnecting when an OAuth refresh token is missing", () => {
+    expect(
+      repairActionLabel("No refresh token was returned; reconnect with the offline_access scope"),
+    ).toBe("Reconnect");
+  });
+
+  it("suggests reconnecting when the description asks to re-authorize", () => {
+    expect(repairActionLabel("Authorization revoked, please reconnect the account")).toBe("Reconnect");
+  });
+
   it("falls back to reconnect for an unrecognized description", () => {
     expect(repairActionLabel("Something went wrong")).toBe("Reconnect");
   });
