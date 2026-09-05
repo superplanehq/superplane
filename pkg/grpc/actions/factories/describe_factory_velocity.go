@@ -19,7 +19,7 @@ const (
 	velocityPeriodDaysDefault = 14
 	velocityPeriodDaysMax     = 30
 
-	velocityPeoplePageSizeDefault = 10
+	velocityPeoplePageSizeDefault = 5
 	velocityPeoplePageSizeMax     = 50
 )
 
@@ -109,6 +109,11 @@ func DescribeFactoryVelocity(
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
 
+	automations, err := models.SummarizeFactoryAutomationRuns(db, factoryID, current.start, current.end)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
+
 	points := make([]*pb.DescribeFactoryVelocityDay, 0, len(buckets))
 	for i := range buckets {
 		b := &buckets[i]
@@ -143,7 +148,23 @@ func DescribeFactoryVelocity(
 		People:            people,
 		PeopleTotal:       int32(peopleTotal),
 		PeopleHasMore:     peopleOffset+len(people) < peopleTotal,
+		Automations:       serializeVelocityAutomations(automations),
 	}, nil
+}
+
+func serializeVelocityAutomations(rows []models.FactoryAutomationRuns) []*pb.DescribeFactoryVelocityAutomation {
+	result := make([]*pb.DescribeFactoryVelocityAutomation, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, &pb.DescribeFactoryVelocityAutomation{
+			Id:                   row.CanvasID.String(),
+			Name:                 row.Name,
+			Runs:                 int32(row.Runs),
+			Failed:               int32(row.Failed),
+			CostCents:            row.CostCents(),
+			AverageDurationHours: row.AverageDurationHours(),
+		})
+	}
+	return result
 }
 
 // velocityPeopleSortKeyFromProto translates the wire enum to the internal sort

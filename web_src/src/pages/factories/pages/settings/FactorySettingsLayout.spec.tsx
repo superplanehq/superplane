@@ -203,7 +203,7 @@ describe("FactorySettingsLayout sidebar", () => {
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       await user.type(within(sidebar).getByTestId("factory-settings-find"), "billing");
       const results = within(sidebar).getByTestId("factory-settings-search-results");
-      expect(within(results).getAllByText("Spending").length).toBeGreaterThanOrEqual(2);
+      expect(within(results).getAllByText("Spending")).toHaveLength(1);
       expect(within(sidebar).queryByTestId("factory-settings-workspace-nav")).not.toBeInTheDocument();
     }, 10000);
 

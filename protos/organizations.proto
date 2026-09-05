@@ -128,6 +128,17 @@ service Organizations {
     };
   }
 
+  rpc DescribeOrganizationSpendingReport(DescribeOrganizationSpendingReportRequest) returns (DescribeOrganizationSpendingReportResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/spending-report"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization spending report";
+      description: "Returns aggregated spending KPIs, chart series, and breakdown rows for the organization spending explorer";
+      tags: "Organization";
+    };
+  }
+
   rpc ListHostedLLMModels(ListHostedLLMModelsRequest) returns (ListHostedLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/hosted-llm-models"
@@ -477,6 +488,81 @@ message DescribeOrganizationWorkspaceUsageResponse {
   repeated UsageByMachineType by_machine_type = 15;
   string default_hosted_provider = 16;
   string default_hosted_model = 17;
+}
+
+message DescribeOrganizationSpendingReportRequest {
+  string id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string factory_id = 4;
+  string model = 5;
+  string machine_type = 6;
+  string task_owner_id = 7;
+  string group_by = 8;
+  string time_grain = 9;
+  string usage_kind = 10;
+}
+
+message SpendingReportTotals {
+  int64 cost_cents = 1;
+  int64 total_tokens = 2;
+  int64 duration_seconds = 3;
+  int64 hosted_cost_cents = 4;
+  int64 byok_cost_cents = 5;
+}
+
+message SpendingReportSeriesValue {
+  string series_id = 1;
+  int64 cost_cents = 2;
+}
+
+message SpendingReportSeriesPoint {
+  string key = 1;
+  string label = 2;
+  int64 total_cents = 3;
+  repeated SpendingReportSeriesValue values = 4;
+}
+
+message SpendingReportBreakdownRow {
+  string id = 1;
+  string label = 2;
+  int64 total_tokens = 3;
+  int64 duration_seconds = 4;
+  int64 cost_cents = 5;
+  double share = 6;
+}
+
+message SpendingReportCatalogItem {
+  string id = 1;
+  string label = 2;
+}
+
+message SpendingReportCatalogs {
+  repeated SpendingReportCatalogItem workspaces = 1;
+  repeated SpendingReportCatalogItem users = 2;
+  repeated SpendingReportCatalogItem models = 3;
+  repeated SpendingReportCatalogItem machines = 4;
+}
+
+message SpendingReportCreditSnapshot {
+  int64 remaining_credit_cents = 1;
+  int64 grant_total_cents = 2;
+  int64 superplane_grant_cents = 3;
+  int64 purchased_credit_cents = 4;
+  int64 hosted_billed_cents = 5;
+  bool remaining_credit_warning = 6;
+  bool billing_enabled = 7;
+  bool has_billing_customer = 8;
+}
+
+message DescribeOrganizationSpendingReportResponse {
+  SpendingReportTotals kpi_totals = 1;
+  SpendingReportTotals explorer_totals = 2;
+  repeated SpendingReportSeriesPoint series = 3;
+  repeated SpendingReportCatalogItem series_keys = 4;
+  repeated SpendingReportBreakdownRow breakdown = 5;
+  SpendingReportCreditSnapshot credit = 6;
+  SpendingReportCatalogs catalogs = 7;
 }
 
 message HostedCreditInvoice {

@@ -67,6 +67,26 @@ describe("GitHubConnectControls", () => {
     expect(screen.getByTestId("location-path")).toHaveTextContent(githubPrivateAppSetupPath("org-1"));
   });
 
+  it("hides the private-app link when allowPrivateApp is false", () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/settings/integrations"]}>
+        <TooltipProvider>
+          <GitHubConnectControls
+            organizationId="org-1"
+            definition={{ name: "github", label: "GitHub", hostedAppInstall: true, legacySetupOnly: false }}
+            canCreateIntegrations
+            permissionsLoading={false}
+            onConnect={vi.fn()}
+            allowPrivateApp={false}
+          />
+        </TooltipProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByTestId("integrations-create-private-github-app")).not.toBeInTheDocument();
+    expect(screen.getByTestId("integrations-connect-github")).toBeInTheDocument();
+  });
+
   it("keeps the private-app link when the setup flow feature is off", async () => {
     const user = userEvent.setup();
     const onCreatePrivateApp = vi.fn();

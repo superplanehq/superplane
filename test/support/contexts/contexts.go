@@ -132,6 +132,10 @@ func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
 }
 
+func (c *IntegrationContext) Persist() error {
+	return nil
+}
+
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	if c.Configuration == nil {
 		return nil, fmt.Errorf("config not found: %s", name)

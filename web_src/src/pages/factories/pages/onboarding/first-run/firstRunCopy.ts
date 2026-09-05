@@ -1,4 +1,8 @@
-import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
+import {
+  GITHUB_INSTALL_REQUEST_NEXT,
+  GITHUB_INSTALL_REQUEST_TITLE,
+  githubInstallRequestBody,
+} from "@/lib/githubInstallRequestCopy";
 
 export const FIRST_RUN_COPY = {
   chrome: {
@@ -18,10 +22,16 @@ export const FIRST_RUN_COPY = {
     body: "SuperPlane reads your repositories. It does not start work yet.",
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
-    createPrivateApp: CREATE_PRIVATE_GITHUB_APP_LABEL,
+    selectAccount: "Select a GitHub account",
+    selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
+    useAccount: (account: string) => `Use ${account}`,
+    installDifferentAccount: "Install on a different account",
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
+    installRequested: GITHUB_INSTALL_REQUEST_TITLE,
+    installRequestedBody: githubInstallRequestBody,
+    installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
   },
   choose: {
     headline: "Choose a repository",

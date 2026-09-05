@@ -35,6 +35,28 @@ export function pendingGitHubInstallations(metadata: unknown): PendingGitHubInst
   });
 }
 
+export function hostedGitHubInstallRequested(metadata: unknown): boolean {
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+
+  return (metadata as { installRequested?: unknown }).installRequested === true;
+}
+
+export function hostedGitHubInstallRequestedAccount(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const requested = (metadata as { installRequestedAccount?: unknown }).installRequestedAccount;
+  if (typeof requested === "string" && requested !== "") {
+    return requested;
+  }
+
+  const owner = (metadata as { owner?: unknown }).owner;
+  return typeof owner === "string" ? owner : "";
+}
+
 export function hostedGitHubState(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";
@@ -59,6 +81,25 @@ export function hostedGitHubBindPath(state: string, installationId: string): str
     installation_id: installationId,
   });
   return `/api/v1/github/app/bind?${params.toString()}`;
+}
+
+/**
+ * Binds a pending connection to an App installation without leaving the page.
+ * The bind endpoint answers with a redirect on success and with an error
+ * status when the bind did not happen. The redirect target comes from the
+ * server BASE_URL, which can differ from the page origin (a tunnel domain in
+ * local setups), so the fetch must not follow it: the redirect itself is the
+ * success signal.
+ */
+export async function bindHostedGitHubInstallation(state: string, installationId: string): Promise<void> {
+  const response = await fetch(hostedGitHubBindPath(state, installationId), {
+    credentials: "same-origin",
+    redirect: "manual",
+  });
+  const redirected = response.type === "opaqueredirect";
+  if (!redirected && !response.ok) {
+    throw new Error("Failed to connect the GitHub account");
+  }
 }
 
 export function hostedGitHubInstallURL(slug: string, state: string): string {

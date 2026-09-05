@@ -8,8 +8,8 @@ export function githubIntegrationOwner(integration: OrganizationsIntegration): s
   return typeof owner === "string" && owner.trim() ? owner.trim() : undefined;
 }
 
-export function shouldNameOrganizationFromGitHub(factory: FactoriesFactory | null, selectNewest: boolean): boolean {
-  return selectNewest && factory?.onboarding?.initial === true;
+export function shouldNameOrganizationFromGitHub(factory: FactoriesFactory | null): boolean {
+  return factory?.onboarding?.initial === true;
 }
 
 export function randomOrganizationSuffix(): string {
@@ -24,7 +24,9 @@ export function organizationIdentityFromOwner(owner: string, suffix?: string): {
   if (!suffix) {
     return { name: base, slug: slugBase };
   }
-  return { name: `${base}-${suffix}`, slug: `${slugBase}-${suffix}` };
+  // Only the slug needs to stay unique; the name always mirrors the plain
+  // GitHub owner so retries on a slug collision don't rename the org.
+  return { name: base, slug: `${slugBase}-${suffix}` };
 }
 
 export function isOrganizationIdentityTaken(message: string): boolean {
@@ -37,6 +39,19 @@ export function isOrganizationIdentityTaken(message: string): boolean {
   );
 }
 
+/**
+ * True when the slug already derives from this GitHub owner, either as the
+ * plain owner slug or with the random collision suffix. A repeat visit to
+ * onboarding must not rename the organization again.
+ */
+export function organizationSlugMatchesOwner(currentSlug: string, owner: string): boolean {
+  const slugBase = slugifyOrganizationOwner(owner);
+  if (currentSlug === slugBase) {
+    return true;
+  }
+  return new RegExp(`^${slugBase}-[a-z0-9]{6}$`).test(currentSlug);
+}
+
 export async function nameOrganizationFromGitHubOwner(args: {
   owner: string;
   currentSlug: string;
@@ -45,7 +60,7 @@ export async function nameOrganizationFromGitHubOwner(args: {
 }): Promise<string | undefined> {
   const nextSuffix = args.randomSuffix ?? randomOrganizationSuffix;
   let identity = organizationIdentityFromOwner(args.owner);
-  if (identity.slug === args.currentSlug) {
+  if (organizationSlugMatchesOwner(args.currentSlug, args.owner)) {
     return args.currentSlug;
   }
 

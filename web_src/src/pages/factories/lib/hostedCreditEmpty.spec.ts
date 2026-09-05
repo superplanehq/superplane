@@ -49,11 +49,11 @@ describe("shouldShowHostedCreditEmptyBanner", () => {
 });
 
 describe("hostedCreditEmptyBannerCopy", () => {
-  it("tells the user to add hosted credit when billing is on", () => {
+  it("tells the user to view spending when billing is on", () => {
     expect(hostedCreditEmptyBannerCopy(true)).toEqual({
       title: "Hosted credit is empty",
       description: "Add hosted credit to start SuperPlane-hosted runs.",
-      actionLabel: "Add hosted credit",
+      actionLabel: "View spending",
     });
   });
 
@@ -65,7 +65,7 @@ describe("hostedCreditEmptyBannerCopy", () => {
     });
   });
 
-  it("points a non-owner to Spending instead of promising a checkout button", () => {
+  it("points every role to Spending", () => {
     expect(hostedCreditEmptyBannerCopy(true, false)).toEqual({
       title: "Hosted credit is empty",
       description: "Add hosted credit to start SuperPlane-hosted runs.",

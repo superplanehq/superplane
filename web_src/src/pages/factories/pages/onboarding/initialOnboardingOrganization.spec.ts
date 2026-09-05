@@ -6,6 +6,7 @@ import {
   isOrganizationIdentityTaken,
   nameOrganizationFromGitHubOwner,
   organizationIdentityFromOwner,
+  organizationSlugMatchesOwner,
   shouldNameOrganizationFromGitHub,
 } from "./initialOnboardingOrganization";
 
@@ -15,17 +16,26 @@ function factoryWithOnboarding(onboarding: FactoriesFactory["onboarding"]): Fact
 
 describe("shouldNameOrganizationFromGitHub", () => {
   it("names only an organization from the initial account onboarding workspace", () => {
-    expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({ initial: true }), true)).toBe(true);
-    expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({}), true)).toBe(false);
+    expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({ initial: true }))).toBe(true);
+    expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({}))).toBe(false);
+    expect(shouldNameOrganizationFromGitHub(null)).toBe(false);
   });
 
   it("retries naming after the GitHub connection was saved", () => {
     const factory = factoryWithOnboarding({ initial: true, vcsIntegrationId: "integration-id" });
-    expect(shouldNameOrganizationFromGitHub(factory, true)).toBe(true);
+    expect(shouldNameOrganizationFromGitHub(factory)).toBe(true);
+  });
+});
+
+describe("organizationSlugMatchesOwner", () => {
+  it("matches the plain owner slug and the suffixed slug", () => {
+    expect(organizationSlugMatchesOwner("acme-org", "Acme Org")).toBe(true);
+    expect(organizationSlugMatchesOwner("acme-org-1ajioa", "Acme Org")).toBe(true);
   });
 
-  it("does not rename when the user selects an existing connection", () => {
-    expect(shouldNameOrganizationFromGitHub(factoryWithOnboarding({ initial: true }), false)).toBe(false);
+  it("does not match a different slug or a non-suffix tail", () => {
+    expect(organizationSlugMatchesOwner("dev-user", "Acme Org")).toBe(false);
+    expect(organizationSlugMatchesOwner("acme-org-inc", "Acme Org")).toBe(false);
   });
 });
 
@@ -34,9 +44,9 @@ describe("organizationIdentityFromOwner", () => {
     expect(organizationIdentityFromOwner("Acme Org")).toEqual({ name: "Acme Org", slug: "acme-org" });
   });
 
-  it("appends a random suffix when the owner is already taken", () => {
+  it("appends a random suffix to the slug only when the owner is already taken", () => {
     expect(organizationIdentityFromOwner("Acme Org", "1ajioa")).toEqual({
-      name: "Acme Org-1ajioa",
+      name: "Acme Org",
       slug: "acme-org-1ajioa",
     });
   });
@@ -54,6 +64,17 @@ describe("isOrganizationIdentityTaken", () => {
 });
 
 describe("nameOrganizationFromGitHubOwner", () => {
+  it("does not rename when the slug already derives from the owner", async () => {
+    const update = vi.fn();
+
+    await expect(nameOrganizationFromGitHubOwner({ owner: "acme", currentSlug: "acme", update })).resolves.toBe("acme");
+    await expect(nameOrganizationFromGitHubOwner({ owner: "acme", currentSlug: "acme-1ajioa", update })).resolves.toBe(
+      "acme-1ajioa",
+    );
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("retries with a suffix when the owner slug is already in use", async () => {
     const update = vi
       .fn()
@@ -70,7 +91,7 @@ describe("nameOrganizationFromGitHubOwner", () => {
     ).resolves.toBe("acme-1ajioa");
 
     expect(update).toHaveBeenNthCalledWith(1, { name: "acme", slug: "acme" });
-    expect(update).toHaveBeenNthCalledWith(2, { name: "acme-1ajioa", slug: "acme-1ajioa" });
+    expect(update).toHaveBeenNthCalledWith(2, { name: "acme", slug: "acme-1ajioa" });
   });
 
   it("retries when the name conflict uses the update error text", async () => {
@@ -87,5 +108,34 @@ describe("nameOrganizationFromGitHubOwner", () => {
         randomSuffix: () => "1ajioa",
       }),
     ).resolves.toBe("acme-1ajioa");
+  });
+
+  it("keeps the plain owner as the name across every retry, only rotating the slug suffix", async () => {
+    const update = vi
+      .fn()
+      .mockRejectedValueOnce({ response: { data: { message: "organization slug is already in use" } } })
+      .mockRejectedValueOnce({ response: { data: { message: "organization slug is already in use" } } })
+      .mockResolvedValueOnce("acme-8f3kd2");
+
+    const suffixes = ["1ajioa", "8f3kd2"];
+    let call = 0;
+
+    await expect(
+      nameOrganizationFromGitHubOwner({
+        owner: "acme",
+        currentSlug: "dev-user",
+        update,
+        randomSuffix: () => suffixes[call++],
+      }),
+    ).resolves.toBe("acme-8f3kd2");
+
+    expect(update).toHaveBeenCalledTimes(3);
+    expect(update).toHaveBeenNthCalledWith(1, { name: "acme", slug: "acme" });
+    expect(update).toHaveBeenNthCalledWith(2, { name: "acme", slug: "acme-1ajioa" });
+    expect(update).toHaveBeenNthCalledWith(3, { name: "acme", slug: "acme-8f3kd2" });
+
+    const names = update.mock.calls.map(([identity]) => identity.name);
+    expect(new Set(names).size).toBe(1);
+    expect(names[0]).toBe("acme");
   });
 });

@@ -44,7 +44,6 @@ import {
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
-  FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   OrganizationSettingsOverviewPage,
   LegacyWorkOrderDetailRedirect,
@@ -69,9 +68,11 @@ import {
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
+  WorkspaceSpendingRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
+import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import {
@@ -248,6 +249,8 @@ function AppRouter() {
               <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
+              {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
+              <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
@@ -394,7 +397,8 @@ const factorySettingsSectionRoutes = [
       </RequireExperimentalFeature>
     }
   />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
+  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"
