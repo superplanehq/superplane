@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { FACTORIES_ORGANIZATION_ID } from "../__fixtures__/factoryPageResponses";
-import { SidebarUserMenu } from "./SidebarUserMenu";
+import { SidebarUserMenu, type SidebarUserMenuProps } from "./SidebarUserMenu";
 
 vi.mock("@/posthog", () => ({
   posthog: { reset: vi.fn() },
@@ -32,7 +32,7 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderMenu() {
+function renderMenu(overrides: Partial<SidebarUserMenuProps> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -47,6 +47,7 @@ function renderMenu() {
                   factoryKey="RFSDR"
                   userName="Ada Lovelace"
                   organizationName="SuperPlane"
+                  {...overrides}
                 />
               }
             />
@@ -135,5 +136,36 @@ describe("SidebarUserMenu", () => {
     ).toHaveAttribute("aria-checked", "true");
     const items = within(menu).getAllByRole("menuitem");
     expect(items[items.length - 1]).toHaveTextContent("Create new organization");
+  });
+
+  it("hides Quit onboarding by default and shows it once a handler is passed", async () => {
+    const user = userEvent.setup();
+    const onQuitOnboarding = vi.fn();
+    renderMenu({ onQuitOnboarding });
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    expect(screen.getByRole("menuitem", { name: "Quit onboarding" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: "Quit onboarding" }));
+    expect(onQuitOnboarding).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers only Sign out with no Quit onboarding handler", async () => {
+    const user = userEvent.setup();
+    renderMenu();
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    expect(screen.queryByRole("menuitem", { name: "Quit onboarding" })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("drops the border and Appearance in the floating variant, for placement outside the sidebar", async () => {
+    const user = userEvent.setup();
+    renderMenu({ variant: "floating" });
+
+    expect(screen.getByTestId("factories-sidebar-user-menu")).not.toHaveClass("border-t");
+
+    await user.click(screen.getByRole("button", { name: /Ada Lovelace/ }));
+    expect(screen.queryByTestId("factories-sidebar-appearance")).not.toBeInTheDocument();
   });
 });
