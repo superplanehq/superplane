@@ -69,7 +69,7 @@ export function CreateWithAgentModelPicker({
                   }}
                 >
                   <span className="text-foreground">{model.label}</span>
-                  <span className="text-[11px] text-muted-foreground">{model.source.name}</span>
+                  <span className="text-[11px] text-muted-foreground">{model.provider.name}</span>
                 </button>
               ))}
             </div>

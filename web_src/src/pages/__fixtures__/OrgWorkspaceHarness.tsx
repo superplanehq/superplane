@@ -63,6 +63,7 @@ import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/or
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
+  FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
   FactoryOrganizationSecretDetailPage,
   FactoryOrganizationSecretsPage,
@@ -324,6 +325,15 @@ const factorySettingsStorybookRoutes = [
     element={
       <RequirePermission resource="integrations" action="read">
         <OrganizationSettingsIntegrationsPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-models"
+    path="organization/models"
+    element={
+      <RequirePermission resource="org" action="read">
+        <FactoryOrganizationLLMModelsPage />
       </RequirePermission>
     }
   />,

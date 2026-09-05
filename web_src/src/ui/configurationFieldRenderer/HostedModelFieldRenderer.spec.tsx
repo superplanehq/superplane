@@ -210,6 +210,29 @@ describe("HostedModelFieldRenderer", () => {
     ).toBeInTheDocument();
   });
 
+  it("explains when no BYOK models are selected", () => {
+    mockBYOKModels({
+      data: { selected: [] },
+      isLoading: false,
+    });
+
+    renderField(
+      <HostedModelFieldRenderer
+        field={createField()}
+        value=""
+        onChange={vi.fn()}
+        organizationId="org-1"
+        allValues={{ credentials: { source: "secret" } }}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on Integrations.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("waits for the canvas factory before it loads SuperPlane-hosted models", () => {
     useCanvasMock.mockReturnValue({ data: undefined, isPending: true });
 

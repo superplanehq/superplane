@@ -644,24 +644,36 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
-function byokModelsRoute(): FactoriesRoute {
+function byokModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/byok-models"),
     resolve: (_match, method, body, url) => {
       const request = (body ?? {}) as { provider?: string; allowedModels?: unknown };
       const provider =
         url.searchParams.get("provider") || (typeof request.provider === "string" ? request.provider : "");
-      const models = storybookHostedLlmModels(provider).models;
+      const catalogIds =
+        fixture.byokCandidatesByProvider?.[provider] ??
+        storybookHostedLlmModels(provider).models.map((model) => model.id);
+      const connected = fixture.byokConnectedProviders
+        ? fixture.byokConnectedProviders.includes(provider)
+        : catalogIds.length > 0;
       if (method === "PUT") {
         const allowed = stringArrayOrEmpty(request.allowedModels);
+        fixture.byokSelectedByProvider = {
+          ...fixture.byokSelectedByProvider,
+          [provider]: allowed,
+        };
         return { json: { selected: allowed.map((id) => ({ id, name: id })) } };
       }
+      const selectedIds = connected
+        ? (fixture.byokSelectedByProvider?.[provider] ?? catalogIds)
+        : (fixture.byokSelectedByProvider?.[provider] ?? []);
       return {
         json: {
-          connected: models.length > 0,
-          integrationId: models.length > 0 ? "int-byok" : "",
-          selected: models,
-          candidates: models,
+          connected,
+          integrationId: connected ? `int-byok-${provider}` : "",
+          selected: selectedIds.map((id) => ({ id, name: id })),
+          candidates: connected ? catalogIds.map((id) => ({ id, name: id })) : [],
         },
       };
     },
@@ -749,7 +761,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),
     hostedLlmModelsRoute(),
-    byokModelsRoute(),
+    byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),
     billingPortalSessionRoute(),

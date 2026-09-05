@@ -157,6 +157,7 @@ describe("FactorySettingsLayout sidebar", () => {
   it.each([
     ["API keys", "api-keys", "factory-settings-api-keys"],
     ["Secrets", "secrets", "factory-settings-secrets"],
+    ["LLM Models", "models", "factory-settings-llm-models"],
   ])("renders the Organization %s page in the factory settings shell", async (_title, path, pageTestId) => {
     render(
       <FactoriesHarness
@@ -308,6 +309,7 @@ describe("FactorySettingsLayout sidebar", () => {
 
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-models")).not.toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-models")).toHaveTextContent("LLM Models");
     }, 10000);
 
     it("shows the Models nav item when the feature is on", async () => {

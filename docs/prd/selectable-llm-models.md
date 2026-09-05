@@ -39,6 +39,7 @@ Do not reinvent these pieces:
 
 - Installation hosted allowlists already gate SuperPlane-hosted models.
 - Organization BYOK selected lists already store models the user chose.
+  Organization admins write that list on Organization LLM Models.
 - A factory can further subset those lists.
 - `ResolveSelectableLLMModels` already applies those allowlists per provider
   and funding source.

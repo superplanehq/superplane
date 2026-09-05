@@ -26,7 +26,15 @@ describe("CreateWithAgentModelPicker", () => {
     const picker = screen.getByTestId("create-with-agent-model-picker");
     expect(picker).toHaveTextContent("SuperPlane");
     expect(picker).toHaveTextContent("Your keys");
-    await user.click(screen.getByTestId("create-with-agent-model-option-byok::anthropic::claude-sonnet-4-6"));
+    const hosted = screen.getByTestId("create-with-agent-model-option-hosted::anthropic::claude-sonnet-4-6");
+    expect(hosted).toHaveTextContent("anthropic/claude-sonnet-4-6");
+    expect(hosted).toHaveTextContent("Anthropic");
+    expect(hosted).not.toHaveTextContent("SuperPlane");
+    expect(hosted).not.toHaveTextContent("Your keys");
+    const byok = screen.getByTestId("create-with-agent-model-option-byok::anthropic::claude-sonnet-4-6");
+    expect(byok).toHaveTextContent("Anthropic");
+    expect(byok).not.toHaveTextContent("Your keys");
+    await user.click(byok);
     expect(onSelect).toHaveBeenCalledWith("byok::anthropic::claude-sonnet-4-6");
   });
 

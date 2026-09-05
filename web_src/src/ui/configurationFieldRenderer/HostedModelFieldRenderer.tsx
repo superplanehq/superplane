@@ -178,7 +178,7 @@ function EmptyModelField({ fundingSource }: { fundingSource: "hosted" | "byok" }
   const message =
     fundingSource === "hosted"
       ? "SuperPlane-hosted models are not configured for this provider. Ask an installation admin to add a key and allowlist."
-      : "No models are selected for this provider. Select models on Organization Spending, or connect a provider key on Integrations.";
+      : "No models are selected for this provider. Select models on Organization LLM Models, or connect a provider on Integrations.";
   return <Text className="text-sm text-gray-500 dark:text-gray-400">{message}</Text>;
 }
 
