@@ -5,8 +5,11 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useOrganization } from "./hooks/useOrganizationData";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -20,9 +23,9 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
-import OrganizationCreate from "./pages/auth/OrganizationCreate";
-import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
@@ -41,7 +44,6 @@ import {
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
-  FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   OrganizationSettingsOverviewPage,
   LegacyWorkOrderDetailRedirect,
@@ -57,15 +59,20 @@ import {
   WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
+import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
+import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
 import {
   AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
+  WorkspaceSpendingRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
+import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import {
@@ -230,7 +237,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
@@ -239,9 +246,11 @@ function AppRouter() {
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
-              <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
+              {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
+              <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
@@ -252,24 +261,70 @@ function AppRouter() {
   );
 }
 
+function OrganizationOnboardingRoute() {
+  return (
+    <OrganizationOnboardingRedirect
+      renderWorkspace={(workspace, entryPath, reresolveWorkspace) => (
+        <OnboardingEntryPathProvider path={entryPath}>
+          <OnboardingWorkspaceResolutionProvider resolve={reresolveWorkspace}>
+            <InitialWorkspaceOnboarding
+              organizationId={workspace.organizationSlug}
+              factoryKey={workspace.workspaceKey}
+            />
+          </OnboardingWorkspaceResolutionProvider>
+        </OnboardingEntryPathProvider>
+      )}
+    />
+  );
+}
+
 function PageObservabilityScope() {
   usePageObservability();
   return null;
 }
 
-function OrganizationScope() {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function OrganizationScope() {
+  const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
-  useConsumeIntegrationSetupReturnOnArrival(organizationId);
+  const location = useLocation();
 
+  const isReserved = isReservedAppPathSegment(segment);
+  // The route param accepts either the org slug or its UID, so resolve it
+  // once here and self-correct any UID URL to the slug below. Every other
+  // in-app link reuses this same `:organizationId` URL segment, so fixing
+  // it at this single boundary keeps the rest of the app slug-only.
+  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const resolvedId = organization?.metadata?.id ?? "";
+  const resolvedSlug = organization?.metadata?.slug ?? "";
+  useRedirectIntegrationSetupReturn(segment, resolvedSlug);
+  useConsumeIntegrationSetupReturnOnArrival(resolvedSlug || segment);
+
+  const uidRedirectPath =
+    !isReserved && segment
+      ? resolveOrganizationUidRedirect({
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+          segment,
+          organizationId: resolvedId,
+          organizationSlug: resolvedSlug,
+        })
+      : null;
   useEffect(() => {
-    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
-      recordLastVisitedOrganization(account.id, organizationId);
+    if (!account?.id || !segment || isReserved || uidRedirectPath) {
+      return;
     }
-  }, [account?.id, organizationId]);
+    // Prefer the resolved slug so the last-visited value never carries a UID
+    // forward into a later root redirect.
+    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
+  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 
-  if (isReservedAppPathSegment(organizationId)) {
+  if (isReserved) {
     return <Navigate to="/" replace />;
+  }
+
+  if (uidRedirectPath) {
+    return <Navigate to={uidRedirectPath} replace />;
   }
 
   return (
@@ -342,7 +397,8 @@ const factorySettingsSectionRoutes = [
       </RequireExperimentalFeature>
     }
   />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
+  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"

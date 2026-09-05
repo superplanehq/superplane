@@ -561,6 +561,17 @@ service Factories {
     };
   }
 
+  rpc ListFactoryLineRunnerModels(ListFactoryLineRunnerModelsRequest) returns (ListFactoryLineRunnerModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/line-runner-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List line runner models";
+      description: "Returns the models a draft task can pick for the runner agents on one factory line";
+      tags: "Factory";
+    };
+  }
+
   rpc UpdateFactoryLLMModels(UpdateFactoryLLMModelsRequest) returns (UpdateFactoryLLMModelsResponse) {
     option (google.api.http) = {
       put: "/api/v1/factories/{factory_id}/llm-models"
@@ -569,6 +580,89 @@ service Factories {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update factory LLM models";
       description: "Sets the workspace subset of parent models. An empty list inherits the parent list.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartPlanningSession(StartPlanningSessionRequest) returns (StartPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start planning session";
+      description: "Starts a new Create with an Agent planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe planning session";
+      description: "Returns a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc EndPlanningSession(EndPlanningSessionRequest) returns (EndPlanningSessionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "End planning session";
+      description: "Stops the planning session machine";
+      tags: "Factory";
+    };
+  }
+
+  rpc SendPlanningSessionMessage(SendPlanningSessionMessageRequest) returns (SendPlanningSessionMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send planning session message";
+      description: "Sends a user message in a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc UpdatePlanningSessionDraft(UpdatePlanningSessionDraftRequest) returns (UpdatePlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update planning session draft";
+      description: "Edits the pending draft on a planning session";
+      tags: "Factory";
+    };
+  }
+
+  rpc CreatePlanningSessionWorkOrder(CreatePlanningSessionWorkOrderRequest) returns (CreatePlanningSessionWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create planning session work order";
+      description: "Creates a draft work order from the planning session draft";
+      tags: "Factory";
+    };
+  }
+
+  rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Skip planning session draft";
+      description: "Throws away the pending planning session draft";
       tags: "Factory";
     };
   }
@@ -691,6 +785,8 @@ message FactoryOnboarding {
   string provisioned_app_id = 8;
   string provisioned_line_id = 9;
   string default_branch = 10;
+  // True when account onboarding created this workspace.
+  bool initial = 11;
 }
 
 message Factory {
@@ -1350,6 +1446,9 @@ message WorkOrderLineDispatch {
   // its maxParallelism. A dispatch waits at no more than one step at a
   // time; no run or step execution exists for a queued step yet.
   optional WorkOrderQueueItem queue_item = 9;
+  // Model chosen at Start. Empty means Auto: each runner keeps the model
+  // stored on the live automation canvas.
+  string model = 10;
 }
 
 // WorkOrderQueueItem is a line dispatch waiting for admission into a step
@@ -1453,6 +1552,8 @@ message DispatchWorkOrderRequest {
   string line_name = 3;
   int32 start_step_index = 4;
   bool replace_active = 5;
+  // Optional model override for this start. Empty means Auto.
+  string model = 6;
 }
 
 message DispatchWorkOrderResponse {
@@ -1651,6 +1752,27 @@ message SyncFactoryVelocityResponse {
 }
 
 message DescribeFactoryVelocityRequest {
+  // How the People table is ordered. Values name the column the table sorts
+  // on; the UI's sort keys map to these one-to-one.
+  enum PeopleSort {
+    // Same as PEOPLE_SORT_TOTAL.
+    PEOPLE_SORT_UNSPECIFIED = 0;
+    // authored_merged + factory_merged.
+    PEOPLE_SORT_TOTAL = 1;
+    PEOPLE_SORT_FACTORY_MERGED = 2;
+    PEOPLE_SORT_AUTHORED_MERGED = 3;
+    PEOPLE_SORT_MEDIAN_CYCLE_HOURS = 4;
+    // Sorts on cost_cents.
+    PEOPLE_SORT_COST_USD = 5;
+  }
+
+  enum SortDirection {
+    // Same as SORT_DIRECTION_DESC.
+    SORT_DIRECTION_UNSPECIFIED = 0;
+    SORT_DIRECTION_ASC = 1;
+    SORT_DIRECTION_DESC = 2;
+  }
+
   string factory_id = 1;
   // Period window in days. Only 14 and 30 are supported by the UI today; any
   // other positive value is clamped server-side.
@@ -1659,6 +1781,15 @@ message DescribeFactoryVelocityRequest {
   // response returns SuperPlane data only and sets `has_people_cohort = false`
   // so the UI can hide the People series.
   string repository = 3;
+  // Column the People table sorts on. Defaults to PEOPLE_SORT_TOTAL.
+  PeopleSort people_sort = 4;
+  // Defaults to SORT_DIRECTION_DESC.
+  SortDirection people_sort_direction = 5;
+  // Rows per page of the People table. Defaults to 5, and is capped
+  // server-side so a client cannot request the whole table in one call.
+  int32 people_page_size = 6;
+  // 0-based row offset into the sorted People table, for "Load more" paging.
+  int32 people_offset = 7;
 }
 
 message DescribeFactoryVelocityResponse {
@@ -1692,6 +1823,15 @@ message DescribeFactoryVelocityResponse {
   // merges yet. SuperPlane counts are still present; the People series is
   // omitted until the sync finishes.
   bool people_sync_pending = 11;
+  // Total people with activity in the window, before `people_offset` and
+  // `people_page_size` are applied. Drives the "N people with activity" count.
+  int32 people_total = 12;
+  // True when `people_offset + len(people) < people_total`, so the UI knows
+  // whether to show "Load more".
+  bool people_has_more = 13;
+  // One row per automation of the workspace that ran in the window, ordered by
+  // run count. Empty when no automation ran.
+  repeated DescribeFactoryVelocityAutomation automations = 14;
 }
 
 message DescribeFactoryVelocityDay {
@@ -1747,6 +1887,23 @@ message DescribeFactoryVelocityPerson {
   // Median hours from first execution to close for those work orders. Zero
   // when none of them closed inside the window.
   double median_cycle_hours = 9;
+}
+
+// DescribeFactoryVelocityAutomation is one row of the Automations table: how
+// often an automation ran, how often it failed, and what those runs cost.
+message DescribeFactoryVelocityAutomation {
+  // Canvas id of the automation.
+  string id = 1;
+  string name = 2;
+  // Runs that started in the window.
+  int32 runs = 3;
+  // Part of `runs` that ended with a failure.
+  int32 failed = 4;
+  // Tracked model spend of those runs.
+  int64 cost_cents = 5;
+  // Mean hours from start to finish, over the runs that finished. Zero when
+  // none of them finished yet.
+  double average_duration_hours = 6;
 }
 
 message DescribeFactoryVelocityYesterday {
@@ -1827,6 +1984,15 @@ message DescribeFactoryUsageResponse {
   repeated UsageByMachineType by_machine_type = 14;
 }
 
+message ListFactoryLineRunnerModelsRequest {
+  string factory_id = 1;
+  string line_name = 2;
+}
+
+message ListFactoryLineRunnerModelsResponse {
+  repeated FactoryLLMModel models = 1;
+}
+
 message ListFactoryLLMModelsRequest {
   string factory_id = 1;
   string provider = 2;
@@ -1867,4 +2033,114 @@ message UsageByMachineType {
   string machine_type = 1;
   int64 duration_seconds = 2;
   int64 cost_cents = 3;
+}
+
+message PlanningSessionDraft {
+  string title = 1;
+  string description = 2;
+}
+
+message PlanningSessionCreatedOrder {
+  string id = 1;
+  string key = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message PlanningSessionMessage {
+  string id = 1;
+  string role = 2;
+  string text = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message PlanningSessionSurveyQuestion {
+  string prompt = 1;
+  repeated string options = 2;
+}
+
+message PlanningSessionSurvey {
+  string id = 1;
+  repeated PlanningSessionSurveyQuestion questions = 2;
+}
+
+message PlanningSession {
+  string id = 1;
+  string factory_id = 2;
+  string repository = 3;
+  string state = 4;
+  string canvas_id = 5;
+  string canvas_run_id = 6;
+  repeated PlanningSessionMessage messages = 7;
+  PlanningSessionDraft draft = 8;
+  repeated PlanningSessionCreatedOrder created = 9;
+  string wait_state = 10;
+  string execution_id = 11;
+  PlanningSessionSurvey survey = 12;
+}
+
+message StartPlanningSessionRequest {
+  string factory_id = 1;
+  string repository = 2;
+}
+
+message StartPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message DescribePlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message DescribePlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message EndPlanningSessionRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message EndPlanningSessionResponse {
+  PlanningSession session = 1;
+}
+
+message SendPlanningSessionMessageRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string text = 3;
+}
+
+message SendPlanningSessionMessageResponse {
+  PlanningSession session = 1;
+}
+
+message UpdatePlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string title = 3;
+  string description = 4;
+}
+
+message UpdatePlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message CreatePlanningSessionWorkOrderRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message CreatePlanningSessionWorkOrderResponse {
+  PlanningSession session = 1;
+}
+
+message SkipPlanningSessionDraftRequest {
+  string factory_id = 1;
+  string session_id = 2;
+}
+
+message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
 }

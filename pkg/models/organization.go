@@ -14,8 +14,12 @@ import (
 )
 
 type Organization struct {
-	ID   uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name string    `gorm:"uniqueIndex"`
+	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	// Name is a display label and is not required to be unique: two
+	// organizations may share a name (for example, onboarding keeps an
+	// organization's name equal to its GitHub owner across slug-collision
+	// retries). Only Slug is unique among active organizations.
+	Name string
 	// Slug is the URL-friendly identifier used to route to this organization
 	// in the frontend. Uniqueness among non-deleted organizations is enforced
 	// by a partial unique index added in the add-organization-slug migration,
@@ -236,6 +240,7 @@ func ListOrganizationsCreatedByAccount(tx *gorm.DB, accountID uuid.UUID) ([]Orga
 	var organizations []Organization
 	err := tx.
 		Where("created_by_account_id = ?", accountID).
+		Order("created_at DESC").
 		Find(&organizations).
 		Error
 	return organizations, err

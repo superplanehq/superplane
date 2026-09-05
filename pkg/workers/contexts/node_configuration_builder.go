@@ -87,16 +87,20 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 }
 
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	var (
+		resolved map[string]any
+		err      error
+	)
 	if len(b.configurationFields) > 0 {
-		return b.resolveWithSchema(configuration, b.configurationFields)
+		resolved, err = b.resolveWithSchema(configuration, b.configurationFields)
+	} else {
+		resolved, err = b.resolve(configuration)
 	}
-
-	resolved, err := b.resolve(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	return resolved, nil
+	return b.applyLineDispatchModel(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -1048,7 +1052,7 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 // and its task() alias. Returns nil when the run is not attached to a
 // factory work-order execution. The url, key, artifacts, comments, and
 // assignees are loaded only when the expression AST references those fields
-// on order() or task().
+// on order() or task(). Origin is attached whenever the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1094,6 +1098,7 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
 	}
+	attachOrderOrigin(order, payload)
 
 	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
 	if err != nil {
@@ -1226,6 +1231,19 @@ func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryW
 
 func githubRepositoryURL(repository string) string {
 	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
+}
+
+func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
+	origin := order.Origin()
+	if origin == nil {
+		return
+	}
+
+	item := map[string]any{"url": origin.URL}
+	if origin.Label != "" {
+		item["label"] = origin.Label
+	}
+	payload["origin"] = item
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
@@ -2185,4 +2203,119 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
+	if _, hasModel := resolved["model"]; !hasModel {
+		return resolved, nil
+	}
+
+	dispatch, err := b.lineDispatch()
+	if err != nil || dispatch == nil {
+		return resolved, err
+	}
+	override := strings.TrimSpace(dispatch.Model)
+	if override == "" {
+		return resolved, nil
+	}
+
+	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
+	if err != nil || !ok {
+		return resolved, err
+	}
+
+	resolved["model"] = override
+	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {
+	if b.rootEventID == nil || b.tx == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(b.tx, execution.LineDispatchID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderLineDispatchNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return dispatch, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
+	resolved map[string]any,
+	model string,
+) (bool, error) {
+	if b.nodeID == "" {
+		return false, nil
+	}
+
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	provider, ok := runnerProviderForComponent(node.ComponentName())
+	if !ok {
+		return false, nil
+	}
+
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, err
+	}
+
+	return models.ModelIsSelectable(
+		b.tx,
+		workflow.OrganizationID,
+		workflow.FactoryID,
+		provider,
+		runnerFundingSourceFromConfig(resolved),
+		model,
+	)
+}
+
+func runnerProviderForComponent(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerCodex":
+		return models.UsageProviderOpenAI, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func runnerFundingSourceFromConfig(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }

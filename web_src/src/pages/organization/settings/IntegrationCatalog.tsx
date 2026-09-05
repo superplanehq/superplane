@@ -149,7 +149,11 @@ function CatalogProviderCard({
   styles: CatalogStyles;
 }) {
   return (
-    <section className={styles.card}>
+    <section
+      id={`integration-${item.providerName}`}
+      className={cn(styles.card, "scroll-mt-8")}
+      data-testid={`integration-card-${item.providerName}`}
+    >
       <div className={styles.cardHeader}>
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex size-8 items-center justify-center">
@@ -174,6 +178,7 @@ function CatalogProviderCard({
             permissionsLoading={catalog.permissionsLoading}
             onConnect={() => item.integrationDef && catalog.handleConnectClick(item.integrationDef)}
             onCreatePrivateApp={() => catalog.handlePrivateAppClick(item.integrationDef ?? undefined)}
+            allowPrivateApp={appearance !== "factories"}
           />
         ) : (
           <PermissionTooltip

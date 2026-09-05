@@ -18,15 +18,15 @@ export const VELOCITY_PERIOD_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export const VELOCITY_BREAKDOWN_OPTIONS: { value: VelocityBreakdown; label: string }[] = [
-  { value: "origin", label: "Origin" },
+  { value: "origin", label: "Who created" },
   { value: "outcome", label: "Outcome" },
   { value: "intake", label: "Intake source" },
 ];
 
 export const VELOCITY_BREAKDOWN_COPY: Record<VelocityBreakdown, { title: string; description: string }> = {
   origin: {
-    title: "Merged pull requests by origin",
-    description: "Team output split between people and SuperPlane.",
+    title: "Merged pull requests by who created them",
+    description: "Merged pull requests from people, next to pull requests SuperPlane created.",
   },
   outcome: {
     title: "Pull requests by outcome",
@@ -96,6 +96,18 @@ export interface VelocityPerson {
   costUsd: number;
 }
 
+/** One automation of the workspace, summed over the reported window. */
+export interface VelocityAutomation {
+  /** Canvas id of the automation, used to link to its detail page. */
+  id: string;
+  name: string;
+  runs: number;
+  failed: number;
+  averageDurationHours: number;
+  averageCostUsd: number;
+  totalCostUsd: number;
+}
+
 export interface VelocityReport {
   totals: VelocityTotals;
   /** Totals of the window before this one, when it holds comparable output. */
@@ -103,6 +115,12 @@ export interface VelocityReport {
   points: VelocityPoint[];
   intakeSeries: VelocityIntakeSeries[];
   people: VelocityPerson[];
+  /** Total people with activity in the window, before paging. */
+  peopleTotal: number;
+  /** True when the People table has rows beyond the ones already fetched. */
+  peopleHasMore: boolean;
+  /** Automations with runs in the window, busiest first. */
+  automations: VelocityAutomation[];
   hasPeopleCohort: boolean;
   /** When the background sync last stored repository merges. */
   peopleSyncedAt?: Date;
@@ -188,12 +206,30 @@ export function toVelocityReport(response: FactoriesDescribeFactoryVelocityRespo
     costUsd: centsToUsd(person.costCents),
   }));
 
+  const automations: VelocityAutomation[] = (response.automations ?? []).map((automation) => {
+    const runs = automation.runs ?? 0;
+    const totalCostUsd = centsToUsd(automation.costCents);
+
+    return {
+      id: automation.id ?? "",
+      name: automation.name || "Unnamed automation",
+      runs,
+      failed: automation.failed ?? 0,
+      averageDurationHours: automation.averageDurationHours ?? 0,
+      averageCostUsd: runs > 0 ? totalCostUsd / runs : 0,
+      totalCostUsd,
+    };
+  });
+
   return {
     totals: toTotals(response.totals),
     previous: response.hasPreviousWindow ? toTotals(response.previousTotals) : undefined,
     points: (response.points ?? []).map(toPoint),
     intakeSeries,
+    automations,
     people,
+    peopleTotal: response.peopleTotal ?? people.length,
+    peopleHasMore: Boolean(response.peopleHasMore),
     hasPeopleCohort: Boolean(response.hasPeopleCohort),
     peopleSyncedAt: response.peopleSyncedAt ? new Date(response.peopleSyncedAt) : undefined,
     peopleSyncPending: Boolean(response.peopleSyncPending),
@@ -223,8 +259,8 @@ export function velocityBreakdownSeries(
 ): VelocityBreakdownSeries[] {
   if (breakdown === "origin") {
     return [
-      { key: "people", label: "People", color: VELOCITY_ORIGIN_COLORS.people },
-      { key: "superplane", label: "SuperPlane", color: VELOCITY_ORIGIN_COLORS.superplane },
+      { key: "people", label: "Manual work", color: VELOCITY_ORIGIN_COLORS.people },
+      { key: "superplane", label: "Automated via SuperPlane", color: VELOCITY_ORIGIN_COLORS.superplane },
     ];
   }
   if (breakdown === "outcome") {

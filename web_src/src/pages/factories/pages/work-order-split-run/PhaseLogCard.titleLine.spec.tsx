@@ -60,6 +60,19 @@ describe("PhaseLogCard title line", () => {
     expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1.2k · 01:00");
   });
 
+  it("shows the used model next to spend", () => {
+    render(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "1200", model: "anthropic/claude-opus-4-6" }}
+        expanded={false}
+      />,
+    );
+
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent(
+      "$0.45 · 1.2k · claude-opus-4-6 · 01:00",
+    );
+  });
+
   it("uses one mono face and size on the name and artifact", () => {
     render(
       <PhaseLogCard

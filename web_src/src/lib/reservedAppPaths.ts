@@ -8,10 +8,12 @@ const RESERVED_APP_PATH_SEGMENTS = new Set([
   "login",
   "signup",
   "welcome",
+  "onboarding",
   "create",
   "setup",
   "invite",
   "install",
+  "github",
   // Infrastructure roots served outside the SPA.
   "api",
   "health",

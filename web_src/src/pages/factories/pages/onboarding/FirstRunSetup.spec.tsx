@@ -27,16 +27,36 @@ vi.mock("../../layout/factoriesLayoutContext", () => ({
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "user-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+  useAccount: () => ({ account: { id: "account-1", name: "Ada Lovelace", email: "ada@example.com" } }),
+}));
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => ({ data: { id: "user-1" } }),
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
+
+// The install-request recheck and the in-place bind need a query client and
+// the network; the flow tests cover the screens only.
+vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
+  useRecheckGitHubInstallRequest: vi.fn(),
+}));
+
+vi.mock("@/hooks/useBindGitHubInstallation", () => ({
+  useBindGitHubInstallation: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+}));
 
 const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
 const navigateSpy = vi.fn();
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
+}));
+
+let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
+
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: accountOrganizations }),
 }));
 
 vi.mock("react-router", async () => {
@@ -85,9 +105,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   };
 }
 
-function renderSetup(model: OnboardingPageModel) {
+function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
   render(
-    <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
+    <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
   );
@@ -97,6 +117,7 @@ describe("FirstRunSetup", () => {
   beforeEach(() => {
     factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }];
     deleteFactoryMutateAsync.mockClear();
     navigateSpy.mockClear();
   });
@@ -132,6 +153,102 @@ describe("FirstRunSetup", () => {
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(model.finish).toHaveBeenCalledWith("vcs");
+  });
+
+  it("shows the GitHub account picker on the connect screen", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [],
+          allInstances: [
+            {
+              metadata: { id: "int-1", integrationName: "github" },
+              status: {
+                state: "pending",
+                metadata: {
+                  startedByUserID: "user-1",
+                  state: "csrf",
+                  githubApp: { slug: "superplane" },
+                  pendingInstallations: [
+                    { id: "11", accountLogin: "acme" },
+                    { id: "22", accountLogin: "octo" },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.selectAccount,
+    );
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
+  it("does not show another member's GitHub account picker", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [],
+          allInstances: [
+            {
+              metadata: { id: "int-1", integrationName: "github" },
+              status: {
+                state: "pending",
+                metadata: {
+                  startedByUserID: "some-other-user",
+                  state: "csrf",
+                  githubApp: { slug: "superplane" },
+                  pendingInstallations: [
+                    { id: "11", accountLogin: "acme" },
+                    { id: "22", accountLogin: "octo" },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+  });
+
+  it("opens Connect when GitHub returned an install request without a step", () => {
+    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
+
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+  });
+
+  it("shows a waiting chip when GitHub returned an install request", () => {
+    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request");
+
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.installRequested,
+    );
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+  });
+
+  it("names the GitHub organization from the return query", () => {
+    renderSetup(
+      pageModel({ openSection: "vcs" }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
+
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {
@@ -198,8 +315,39 @@ describe("FirstRunSetup", () => {
     await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
   });
 
-  it("keeps Log out and hides the close control on the first ever workspace", () => {
+  it("shows the close control when another organization exists, even with no other workspace here", () => {
     factories = [factory];
+    accountOrganizations = [
+      { id: "org-1", name: "Acme" },
+      { id: "org-2", name: "Other Co" },
+    ];
+
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+  });
+
+  it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
+    factories = [factory];
+    accountOrganizations = [
+      { id: "org-1", name: "Acme" },
+      { id: "org-2", name: "Other Co", slug: "other-co" },
+    ];
+    const user = userEvent.setup();
+
+    renderSetup(pageModel());
+
+    await user.click(screen.getByTestId("first-run-cancel"));
+
+    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
+    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/other-co"));
+    expect(navigateSpy).not.toHaveBeenCalledWith("/org-1/workspaces");
+  });
+
+  it("keeps Log out and hides the close control with a single org and single (placeholder) workspace", () => {
+    factories = [factory];
+    accountOrganizations = [{ id: "org-1", name: "Acme" }];
 
     renderSetup(pageModel());
 

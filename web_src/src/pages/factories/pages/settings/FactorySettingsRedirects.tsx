@@ -20,11 +20,12 @@ const LEGACY_WORKSPACE_SETTINGS: Record<string, FactorySettingsDestination> = {
   general: { scope: "workspace", section: "general" },
   automations: { scope: "workspace", section: "automations" },
   models: { scope: "workspace", section: "models" },
-  usage: { scope: "workspace", section: "spending" },
-  spending: { scope: "workspace", section: "spending" },
+  usage: { scope: "organization", section: "spending" },
+  spending: { scope: "organization", section: "spending" },
   repositories: { scope: "workspace", section: "repository" },
   repository: { scope: "workspace", section: "repository" },
   profile: { scope: "account", section: "profile" },
+  security: { scope: "account", section: "profile" },
   "linked-accounts": { scope: "account", section: "profile" },
   notifications: { scope: "account", section: "notifications" },
   members: { scope: "organization", section: "members" },
@@ -160,6 +161,15 @@ export function LegacyFactorySettingsIndexRedirect() {
   return (
     <Navigate to={`${factorySettingsWorkspaceGeneralPath(organizationId, factoryKey)}${location.search}`} replace />
   );
+}
+
+/** Old workspace Spending URLs. Send the user to Organization Spending. */
+export function WorkspaceSpendingRedirect() {
+  const { pathname, search } = useLocation();
+  const target = pathname
+    .replace(/\/workspace\/(spending|usage)\/?$/, "/organization/spending")
+    .replace(/\/settings\/usage\/?$/, "/settings/organization/spending");
+  return <Navigate to={`${target}${search}`} replace />;
 }
 
 /** Old Linked accounts URL. Send the user to Profile. */

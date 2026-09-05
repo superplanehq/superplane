@@ -1,4 +1,8 @@
-import { CREATE_PRIVATE_GITHUB_APP_LABEL } from "@/lib/privateGitHubApp";
+import {
+  GITHUB_INSTALL_REQUEST_NEXT,
+  GITHUB_INSTALL_REQUEST_TITLE,
+  githubInstallRequestBody,
+} from "@/lib/githubInstallRequestCopy";
 
 export const FIRST_RUN_COPY = {
   chrome: {
@@ -18,10 +22,16 @@ export const FIRST_RUN_COPY = {
     body: "SuperPlane reads your repositories. It does not start work yet.",
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
-    createPrivateApp: CREATE_PRIVATE_GITHUB_APP_LABEL,
+    selectAccount: "Select a GitHub account",
+    selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
+    useAccount: (account: string) => `Use ${account}`,
+    installDifferentAccount: "Install on a different account",
     connected: "Connected",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
+    installRequested: GITHUB_INSTALL_REQUEST_TITLE,
+    installRequestedBody: githubInstallRequestBody,
+    installRequestedNext: GITHUB_INSTALL_REQUEST_NEXT,
   },
   choose: {
     headline: "Choose a repository",
@@ -30,8 +40,15 @@ export const FIRST_RUN_COPY = {
     searchPlaceholder: "Search repositories",
     missingRepository: "Do not see your repository?",
     editConnection: "Edit the GitHub connection.",
+    accessHint: "You need admin access to the GitHub App or organization to change the repositories.",
     continue: "Choose a repository to continue",
     moreLater: "You can add more repositories later.",
+    missingTitle: "Why is my repository not shown?",
+    missingReasons: [
+      "The repository must be granted to the SuperPlane GitHub App.",
+      "You need admin rights on the GitHub organization to add a repository.",
+      "Editing the connection opens GitHub. A 404 there means you do not have access.",
+    ],
   },
   tickets: {
     headline: "Connect your ticket system",

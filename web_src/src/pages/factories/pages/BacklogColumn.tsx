@@ -1,16 +1,21 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
+import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
+import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
+import { workspacePlanningRepository } from "./planningSessionView";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
-import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
-import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { useCreateWithAgentSession } from "./useCreateWithAgentSession";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -76,24 +81,16 @@ export function BacklogColumn({
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
+  const { factory } = useFactoriesLayout();
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
-  const createPopover = {
+  const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
+  const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
-    sources: createMenu.sources,
-    items: createMenu.items,
-    query: createMenu.query,
-    focusedIntakeId: createMenu.focusedIntakeId,
-    onQueryChange: createMenu.setQuery,
-    onFocusedIntakeChange: createMenu.setFocusedIntake,
-    onCreateManually: onCreateWorkOrder,
-    onImportItem: createMenu.importItem,
-    isLoading: createMenu.isLoading,
-    isLoadingMore: createMenu.isLoadingMore,
-    hasMore: createMenu.hasMore,
-    onLoadMore: createMenu.loadMore,
-    errorMessage: createMenu.errorMessage,
-  };
+    createMenu,
+    onCreateWorkOrder,
+    onCreateWithAgent: agentSession.start,
+  });
 
   return (
     <>
@@ -161,6 +158,66 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
+      <BacklogCreateWithAgentDialog factoryKey={factoryKey} organizationId={organizationId} session={agentSession} />
     </>
   );
+}
+
+function BacklogCreateWithAgentDialog({
+  factoryKey,
+  organizationId,
+  session,
+}: {
+  factoryKey: string;
+  organizationId: string;
+  session: ReturnType<typeof useCreateWithAgentSession>;
+}) {
+  const view = usePlanningSessionLiveRun(organizationId, session.view);
+  return (
+    <CreateWithAgentDialog
+      open={session.open}
+      workspaceName={factoryKey}
+      organizationId={organizationId}
+      view={view}
+      onComposerChange={session.onComposerChange}
+      onSend={session.onSend}
+      onSubmitSurvey={session.onSubmitSurvey}
+      onDraftTitleChange={session.onDraftTitleChange}
+      onDraftDescriptionChange={session.onDraftDescriptionChange}
+      onCreateDraft={session.onCreateDraft}
+      onSkipDraft={session.onSkipDraft}
+      onSelectCreated={session.onSelectCreated}
+      onRefineCreated={session.onRefineCreated}
+      onRequestClose={session.onRequestClose}
+      onCancelEnd={session.onCancelEnd}
+      onConfirmEnd={session.onConfirmEnd}
+    />
+  );
+}
+
+function backlogCreatePopoverProps(args: {
+  canAdd: boolean;
+  atCapacity: boolean;
+  createMenu: ReturnType<typeof useBacklogCreateMenu>;
+  onCreateWorkOrder: () => void;
+  onCreateWithAgent: () => void;
+}) {
+  return {
+    canAdd: args.canAdd,
+    atCapacity: args.atCapacity,
+    sources: args.createMenu.sources,
+    items: args.createMenu.items,
+    query: args.createMenu.query,
+    focusedIntakeId: args.createMenu.focusedIntakeId,
+    onQueryChange: args.createMenu.setQuery,
+    onFocusedIntakeChange: args.createMenu.setFocusedIntake,
+    onCreateManually: args.onCreateWorkOrder,
+    onCreateWithAgent: args.onCreateWithAgent,
+    onImportItem: args.createMenu.importItem,
+    isLoading: args.createMenu.isLoading,
+    isLoadingMore: args.createMenu.isLoadingMore,
+    hasMore: args.createMenu.hasMore,
+    onLoadMore: args.createMenu.loadMore,
+    errorMessage: args.createMenu.errorMessage,
+  };
 }

@@ -2,17 +2,29 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import { followAfterRunningPhaseChange, isNearLogBottom } from "./followLogScroll";
 
+export type FollowLogScrollOptions = {
+  resumeOnBottom?: boolean;
+};
+
 /**
  * Follow pins the log scroller to the bottom. Live runner notes grow
  * inside the phase card, so the hook watches the scroller DOM rather
  * than only a parent stream-length tick.
  */
-export function useFollowLogScroll(runningPhaseId: string | null, contentTick: unknown) {
-  const [following, setFollowing] = useState(() => runningPhaseId != null);
+export function useFollowLogScroll<T extends HTMLElement = HTMLElement>(
+  runningPhaseId: string | null,
+  contentTick: unknown,
+  options?: FollowLogScrollOptions,
+) {
+  const resumeOnBottom = options?.resumeOnBottom === true;
+  // Auto-scroll starts on so the log opens pinned to the newest line and the
+  // "Jump to latest" pill stays hidden until the user scrolls up, whether or
+  // not a phase is still running.
+  const [following, setFollowing] = useState(true);
   const followingRef = useRef(following);
   followingRef.current = following;
   const previousRunningPhaseIdRef = useRef(runningPhaseId);
-  const scrollRef = useRef<HTMLOListElement>(null);
+  const scrollRef = useRef<T>(null);
   const ignoreScrollRef = useRef(false);
 
   useEffect(() => {
@@ -86,8 +98,12 @@ export function useFollowLogScroll(runningPhaseId: string | null, contentTick: u
     }
     if (!isNearLogBottom(el.scrollTop, el.scrollHeight, el.clientHeight)) {
       setFollowing(false);
+      return;
     }
-  }, []);
+    if (resumeOnBottom) {
+      setFollowing(true);
+    }
+  }, [resumeOnBottom]);
 
   return { following, setFollowing: setFollow, scrollRef, onScroll };
 }

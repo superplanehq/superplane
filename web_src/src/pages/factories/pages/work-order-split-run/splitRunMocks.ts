@@ -84,6 +84,8 @@ export interface SplitRunStreamLine {
   kind?: SplitRunStreamKind;
   /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
   componentType?: string;
+  /** Compact session log: user talk vs a survey answer. */
+  userTalk?: "message" | "survey";
   action?: string;
   iconSlug?: string;
   iconSrc?: string;
@@ -91,6 +93,13 @@ export interface SplitRunStreamLine {
   component?: string;
   /** Node execution id for live runner logs. */
   executionId?: string;
+  /**
+   * Comparable chronological sort key (epoch ms), when known. Lets the
+   * planning session merge interleave a user reply with agent notes by true
+   * time instead of guessing from wait-slot position. Absent when the
+   * source has no timestamp (falls back to positional heuristics).
+   */
+  orderKey?: number;
 }
 
 export interface SplitRunPhase {
@@ -119,6 +128,8 @@ export interface SplitRunPhase {
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
   totalTokens?: string;
+  /** Runner model this automation used. Hidden when empty. */
+  model?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -296,6 +307,7 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
 export type SplitRunFixtureOptions = {
   checks?: FactoriesWorkOrderCheck[];
   lineId?: string | null;
+  lineName?: string;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
   /** PR-feedback canvas runs for this task, shown as extra Log phases. */
@@ -334,7 +346,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
-    lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    lineName:
+      options?.lineName?.trim() ||
+      visibleDispatchForLine(order, options?.lineId)?.line?.name ||
+      SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
@@ -847,12 +862,12 @@ function automationBacklogPhase(
       {
         id: "backlog-create",
         at,
-        componentName: automation.nodeName?.trim() || "Create Work Order",
+        componentName: automation.nodeName?.trim() || "Create Task",
         status: "passed",
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "factory",
       },
@@ -883,7 +898,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "user",
       },
@@ -954,6 +969,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
+    model: dispatchModelForExecution(order, execution),
   };
 }
 
@@ -1074,6 +1090,17 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function dispatchModelForExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): string | undefined {
+  const owner = (order.lineDispatches ?? []).find((dispatch) =>
+    (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
+  );
+  const value = owner?.model?.trim();
+  return value || undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

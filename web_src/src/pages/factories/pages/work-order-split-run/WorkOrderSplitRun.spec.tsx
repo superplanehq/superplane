@@ -116,7 +116,9 @@ describe("WorkOrderSplitRunPopup", () => {
   it("shows tokens and cost on a line-step phase", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
+      "$0.28 · 900 · claude-sonnet-4-6 ·",
+    );
   });
 
   it("does not put an Open task link next to close", () => {
@@ -178,7 +180,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-log-scroll")).toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
 
@@ -447,7 +450,8 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
   it("pins a review note and keeps Update manually off the note", () => {

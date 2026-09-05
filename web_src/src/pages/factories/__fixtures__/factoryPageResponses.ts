@@ -16,6 +16,7 @@ import type {
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -292,6 +293,7 @@ export interface FactoriesFixture {
    */
   velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
   organizationWorkspaceUsage?: StorybookUsageReport;
+  organizationSpendingReport?: StorybookSpendingReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
@@ -340,4 +342,5 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
   },
   organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
+  organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
 };

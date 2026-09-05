@@ -498,6 +498,10 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
+	if err := models.EndPlanningSessionForFinishedRun(tx, run.ID, result); err != nil {
+		return false, "", err
+	}
+
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).

@@ -60,6 +60,7 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		AgentHarness:       serializeFactoryOnboardingAgentHarness(config.AgentHarness),
 		ProvisionedAppId:   config.ProvisionedAppID,
 		ProvisionedLineId:  config.ProvisionedLineID,
+		Initial:            factory.IsInitialOnboarding(),
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
@@ -108,12 +109,14 @@ func serializeFactoryLines(lines []models.FactoryLine, metricsByLine map[uuid.UU
 }
 
 func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
-	result := make([]*pb.Factory_App, len(canvases))
-	for i, canvas := range canvases {
+	result := make([]*pb.Factory_App, 0, len(canvases))
+	for _, canvas := range canvases {
+		name := canvas.Name
+		description := canvas.Description
 		app := &pb.Factory_App{
 			Id:          canvas.ID.String(),
-			Name:        canvas.Name,
-			Description: canvas.Description,
+			Name:        name,
+			Description: description,
 		}
 		if canvas.CreatedAt != nil {
 			app.CreatedAt = timestamppb.New(*canvas.CreatedAt)
@@ -121,7 +124,7 @@ func serializeFactoryApps(canvases []models.Canvas) []*pb.Factory_App {
 		if canvas.UpdatedAt != nil {
 			app.UpdatedAt = timestamppb.New(*canvas.UpdatedAt)
 		}
-		result[i] = app
+		result = append(result, app)
 	}
 	return result
 }
@@ -445,6 +448,7 @@ func serializeWorkOrderLineDispatch(dispatch models.FactoryWorkOrderLineDispatch
 		Result:         serializeLineDispatchResult(dispatch.Result),
 		CreatedAt:      timestamppb.New(dispatch.CreatedAt),
 		StepExecutions: serializeWorkOrderExecutions(dispatch.Executions),
+		Model:          dispatch.Model,
 	}
 	if dispatch.FinishedAt != nil {
 		item.FinishedAt = timestamppb.New(*dispatch.FinishedAt)
