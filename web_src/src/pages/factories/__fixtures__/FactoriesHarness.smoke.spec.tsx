@@ -210,10 +210,8 @@ describe("FactoriesHarness tasks", () => {
     const orgCog = await screen.findByTestId("factories-sidebar-organization-settings-link");
     await user.click(orgCog);
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-back")).toHaveAttribute(
-      "href",
-      `/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`,
-    );
+    expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
+    expect(within(sidebar).queryByTestId("factory-settings-back")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
       "aria-current",
       "page",
