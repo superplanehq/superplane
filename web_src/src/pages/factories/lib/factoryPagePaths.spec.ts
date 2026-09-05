@@ -20,6 +20,7 @@ import {
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
   replaceOrganizationSegment,
+  createWorkOrderPath,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
@@ -168,29 +169,41 @@ describe("firstFactoryLineName", () => {
   });
 });
 
+describe("workOrdersPath", () => {
+  it("builds the tasks list URL", () => {
+    expect(workOrdersPath("org-1", "SP")).toBe("/org-1/workspaces/SP/tasks");
+  });
+});
+
+describe("createWorkOrderPath", () => {
+  it("builds the create-task URL under the tasks list", () => {
+    expect(createWorkOrderPath("org-1", "SP")).toBe("/org-1/workspaces/SP/tasks/new");
+  });
+});
+
 describe("workOrderDetailPath", () => {
   it("builds the canonical permalink from the workspace key and task number", () => {
-    expect(workOrderDetailPath("org-1", "SP", 42)).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderDetailPath("org-1", "SP", 42)).toBe("/org-1/workspaces/SP/task/42");
   });
 
   it("accepts the number as a string", () => {
-    expect(workOrderDetailPath("org-1", "SP", "42")).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderDetailPath("org-1", "SP", "42")).toBe("/org-1/workspaces/SP/task/42");
   });
 
-  it("is a sibling of, not nested under, the plural work-orders list path", () => {
+  it("is a sibling of, not nested under, the plural tasks list path", () => {
     expect(workOrderDetailPath("org-1", "SP", "42")).not.toContain(workOrdersPath("org-1", "SP"));
   });
 
   it("keeps the board line on the permalink when a line id is given", () => {
     expect(workOrderDetailPath("org-1", "SP", "42", "line-hotfix")).toBe(
-      "/org-1/workspaces/SP/work-order/42?lineId=line-hotfix",
+      "/org-1/workspaces/SP/task/42?lineId=line-hotfix",
     );
   });
 });
 
 describe("workOrderOpenPath", () => {
   it("uses the canonical permalink when the order has a number", () => {
-    expect(workOrderOpenPath("org-1", "SP", 42, "line-1")).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderOpenPath("org-1", "SP", 42, "line-1")).toBe("/org-1/workspaces/SP/task/42");
   });
 
   it("falls back to the line board when the order has no number", () => {
@@ -206,8 +219,8 @@ describe("legacyWorkOrderDetailPath", () => {
 
 describe("factoryAppPath", () => {
   it("encodes orderNumber (not orderId) in the query string", () => {
-    expect(factoryAppPath("org-1", "SP", "app-1", { from: "work-order", orderNumber: "42" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?from=work-order&orderNumber=42",
+    expect(factoryAppPath("org-1", "SP", "app-1", { from: "task", orderNumber: "42" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?from=task&orderNumber=42",
     );
   });
 });
@@ -321,6 +334,11 @@ describe("factoryAppRunPath", () => {
 describe("parseFactoryAppNavFrom", () => {
   it("accepts known from values", () => {
     expect(parseFactoryAppNavFrom("lines")).toBe("lines");
+    expect(parseFactoryAppNavFrom("task")).toBe("task");
+  });
+
+  it("normalizes the legacy work-order value to task", () => {
+    expect(parseFactoryAppNavFrom("work-order")).toBe("task");
   });
 
   it("returns undefined for unknown from values", () => {

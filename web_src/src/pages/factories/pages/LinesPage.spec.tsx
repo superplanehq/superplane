@@ -284,7 +284,7 @@ describe("LinesPage board", () => {
     expect(within(dialog).queryByTestId("split-run-phase-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842?lineId=${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -296,20 +296,20 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("opens the split run from a work-order permalink", () => {
+  it("opens the split run from a task permalink", () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`);
 
     const popup = screen.getByTestId("work-order-split-run");
     expect(within(popup).getByRole("heading", { name: "Add retry handling to webhook delivery" })).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`,
     );
   });
 
   it("keeps the line board without a popup when the permalink is unknown", () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/999`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/999`);
 
     expect(screen.getByTestId("lines-detail-page")).toBeInTheDocument();
     expect(screen.queryByTestId("work-order-split-run")).not.toBeInTheDocument();
@@ -323,7 +323,7 @@ describe("LinesPage board", () => {
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/work-order/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
     );
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
