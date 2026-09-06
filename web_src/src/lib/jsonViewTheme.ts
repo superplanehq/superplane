@@ -42,3 +42,12 @@ export const jsonViewClassName = "json-viewer-hide-types json-viewer-wrap-values
 export function getJsonViewStyle(theme: "light" | "dark"): CSSProperties {
   return theme === "dark" ? darkJsonViewStyle : lightJsonViewStyle;
 }
+
+/**
+ * Re-escapes a decoded string so JSON control characters (\n, \t, \", \\) render
+ * as visible escapes instead of real whitespace inside the viewer.
+ */
+export function escapeJsonStringValue(value: string): string {
+  const encoded = JSON.stringify(value);
+  return encoded.slice(1, -1);
+}
