@@ -230,8 +230,7 @@ spec:
 	assert.Equal(t, models.SuperPlaneRunnerComponent, resource.Spec.Nodes[0].Component)
 	_, hasCredentials := resource.Spec.Nodes[0].Configuration["credentials"]
 	assert.False(t, hasCredentials)
-	_, hasModel := resource.Spec.Nodes[0].Configuration["model"]
-	assert.False(t, hasModel)
+	assert.Equal(t, "anthropic::claude-sonnet-4-6", resource.Spec.Nodes[0].Configuration["model"])
 
 	node := resource.Spec.Nodes[0].Model()
 	assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
