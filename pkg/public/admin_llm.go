@@ -19,10 +19,12 @@ import (
 )
 
 type installationLLMSettingsResponse struct {
-	WelcomeGrantCents   int64                       `json:"welcome_grant_cents"`
-	MarkupBPS           int                         `json:"markup_bps"`
-	WarningThresholdBPS int                         `json:"warning_threshold_bps"`
-	Providers           []hostedLLMProviderResponse `json:"providers"`
+	WelcomeGrantCents     int64                       `json:"welcome_grant_cents"`
+	MarkupBPS             int                         `json:"markup_bps"`
+	WarningThresholdBPS   int                         `json:"warning_threshold_bps"`
+	DefaultHostedProvider string                      `json:"default_hosted_provider"`
+	DefaultHostedModel    string                      `json:"default_hosted_model"`
+	Providers             []hostedLLMProviderResponse `json:"providers"`
 }
 
 type hostedLLMProviderResponse struct {
@@ -34,9 +36,11 @@ type hostedLLMProviderResponse struct {
 }
 
 type installationLLMSettingsRequest struct {
-	WelcomeGrantCents   *int64 `json:"welcome_grant_cents"`
-	MarkupBPS           *int   `json:"markup_bps"`
-	WarningThresholdBPS *int   `json:"warning_threshold_bps"`
+	WelcomeGrantCents     *int64  `json:"welcome_grant_cents"`
+	MarkupBPS             *int    `json:"markup_bps"`
+	WarningThresholdBPS   *int    `json:"warning_threshold_bps"`
+	DefaultHostedProvider *string `json:"default_hosted_provider"`
+	DefaultHostedModel    *string `json:"default_hosted_model"`
 }
 
 type hostedLLMProviderRequest struct {
@@ -112,11 +116,22 @@ func (s *Server) adminUpdateInstallationLLMSettings(w http.ResponseWriter, r *ht
 		if req.WarningThresholdBPS != nil {
 			next.WarningThresholdBPS = *req.WarningThresholdBPS
 		}
+		if req.DefaultHostedProvider != nil {
+			next.DefaultHostedProvider = optionalTrimmedStringPointer(*req.DefaultHostedProvider)
+		}
+		if req.DefaultHostedModel != nil {
+			next.DefaultHostedModel = optionalTrimmedStringPointer(*req.DefaultHostedModel)
+		}
 		_, err = models.UpdateInstallationLLMSettings(tx, next)
 		return err
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status := http.StatusBadRequest
+		if !isClientLLMSettingsError(err) {
+			log.Errorf("admin: failed to update hosted LLM settings: %v", err)
+			status = http.StatusInternalServerError
+		}
+		http.Error(w, err.Error(), status)
 		return
 	}
 
@@ -182,8 +197,10 @@ func (s *Server) adminUpdateHostedLLMProvider(w http.ResponseWriter, r *http.Req
 		if next.Enabled && len(next.AllowedModels) == 0 {
 			return errors.New("select at least one model when the provider is enabled")
 		}
-		_, err = models.UpsertHostedLLMProvider(tx, next)
-		return err
+		if _, err = models.UpsertHostedLLMProvider(tx, next); err != nil {
+			return err
+		}
+		return models.SyncDefaultHostedLLMModelAfterProviderChange(tx)
 	})
 	if err != nil {
 		status := http.StatusBadRequest
@@ -366,12 +383,23 @@ func (s *Server) buildInstallationLLMSettingsResponse() (installationLLMSettings
 		})
 	}
 
+	defaultModel := models.InstallationDefaultHostedLLMModel(settings)
 	return installationLLMSettingsResponse{
-		WelcomeGrantCents:   settings.WelcomeGrantCents,
-		MarkupBPS:           settings.MarkupBPS,
-		WarningThresholdBPS: settings.WarningThresholdBPS,
-		Providers:           providers,
+		WelcomeGrantCents:     settings.WelcomeGrantCents,
+		MarkupBPS:             settings.MarkupBPS,
+		WarningThresholdBPS:   settings.WarningThresholdBPS,
+		DefaultHostedProvider: defaultModel.Provider,
+		DefaultHostedModel:    defaultModel.Model,
+		Providers:             providers,
 	}, nil
+}
+
+func optionalTrimmedStringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func describeOrganizationLLMCreditJSON(tx *gorm.DB, orgID uuid.UUID) (organizationLLMCreditResponse, error) {
@@ -424,7 +452,10 @@ func isClientLLMSettingsError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if errors.Is(err, models.ErrHostedLLMProviderNotFound) {
+	if errors.Is(err, models.ErrHostedLLMProviderNotFound) ||
+		errors.Is(err, models.ErrDefaultHostedModelIncomplete) ||
+		errors.Is(err, models.ErrDefaultHostedModelNotOnAllowlist) ||
+		errors.Is(err, models.ErrDefaultHostedModelMustBeReplaced) {
 		return true
 	}
 	msg := strings.ToLower(err.Error())
@@ -436,5 +467,6 @@ func isClientLLMSettingsError(err error) bool {
 		strings.Contains(msg, "markup cannot") ||
 		strings.Contains(msg, "welcome grant") ||
 		strings.Contains(msg, "warning threshold") ||
-		strings.Contains(msg, "llm base url")
+		strings.Contains(msg, "llm base url") ||
+		strings.Contains(msg, "superplane agent model")
 }

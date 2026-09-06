@@ -94,33 +94,13 @@ func TestValidateRunClaudeCodeSpec(t *testing.T) {
 		require.Error(t, validateRunClaudeCodeSpec(spec))
 	})
 
-	t.Run("requires model for hosted credentials", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		err := validateRunClaudeCodeSpec(spec)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "model is required")
-	})
-
-	t.Run("accepts hosted credentials with model", func(t *testing.T) {
+	t.Run("rejects hosted credentials", func(t *testing.T) {
 		spec := valid
 		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
 		spec.Model = "claude-sonnet-4-6"
-		require.NoError(t, validateRunClaudeCodeSpec(spec))
-	})
-
-	t.Run("rejects hosted base URL environment override", func(t *testing.T) {
-		spec := valid
-		spec.Credentials = runner.AgentCredentials{Source: runner.CredentialsSourceHosted}
-		spec.Model = "claude-sonnet-4-6"
-		spec.Environment = []runner.EnvironmentVariable{{
-			Name:        envAnthropicBaseURL,
-			ValueSource: runner.EnvironmentValueSourceLiteral,
-			Value:       strPtr("https://attacker.example"),
-		}}
 		err := validateRunClaudeCodeSpec(spec)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), envAnthropicBaseURL)
+		assert.Contains(t, err.Error(), "Run SuperPlane Agent")
 	})
 }
 

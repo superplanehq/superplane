@@ -7,6 +7,7 @@ import {
   organizationsCreateHostedCreditCheckout,
   organizationsListByokllmModels,
   organizationsListHostedCreditProducts,
+  organizationsUpdateByokllmModels,
 } from "@/api-client";
 import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -39,6 +40,33 @@ export function useBYOKLLMModels(
     },
     enabled: Boolean(organizationId && provider && enabled),
     staleTime: 30 * 1000,
+  });
+}
+
+export function useUpdateBYOKLLMModels(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { provider: string; allowedModels: string[] }) => {
+      const response = await organizationsUpdateByokllmModels(
+        withOrganizationHeader({
+          organizationId,
+          path: { id: organizationId },
+          body: { provider: input.provider, allowedModels: input.allowedModels },
+        }),
+      );
+      return response.data ?? {};
+    },
+    onSuccess: (_data, input) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["organizations", organizationId, "byok-models", input.provider],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["organizations", organizationId, "selectable-llm-models"],
+      });
+      void queryClient.invalidateQueries({
+        predicate: (query) => isFactoryBYOKModelsQuery(query.queryKey, organizationId, input.provider),
+      });
+    },
   });
 }
 

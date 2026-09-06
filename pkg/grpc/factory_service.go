@@ -312,3 +312,8 @@ func (s *FactoryService) SkipPlanningSessionDraft(ctx context.Context, req *pb.S
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.SkipPlanningSessionDraft(ctx, organizationID, req)
 }
+
+func (s *FactoryService) ReloadPlanningSessionAgent(ctx context.Context, req *pb.ReloadPlanningSessionAgentRequest) (*pb.ReloadPlanningSessionAgentResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ReloadPlanningSessionAgent(ctx, organizationID, req)
+}
