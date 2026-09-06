@@ -40,6 +40,8 @@ type ConfigurationFieldInputProps = {
   organizationId?: string;
   allowExpressions: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  payloadSourceLabel?: string;
+  payloadSourceIsExample?: boolean;
   isRequired: boolean;
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
@@ -76,6 +78,8 @@ export function ConfigurationFieldInput({
   organizationId,
   allowExpressions,
   autocompleteExampleObj,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   isRequired,
   validationErrors,
   fieldPath,
@@ -103,6 +107,8 @@ export function ConfigurationFieldInput({
         integrationId={integrationId}
         allowExpressions={allowExpressions}
         autocompleteExampleObj={autocompleteExampleObj}
+        payloadSourceLabel={payloadSourceLabel}
+        payloadSourceIsExample={payloadSourceIsExample}
         labelRightRef={allowExpressions ? labelRightRef : undefined}
         labelRightReady={allowExpressions ? labelRightReady : false}
       />

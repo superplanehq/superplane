@@ -18,6 +18,8 @@ interface IntegrationResourceFieldRendererProps {
   integrationId?: string;
   allowExpressions?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  payloadSourceLabel?: string;
+  payloadSourceIsExample?: boolean;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
 }
@@ -51,6 +53,8 @@ export const IntegrationResourceFieldRenderer = ({
   integrationId,
   allowExpressions = false,
   autocompleteExampleObj = null,
+  payloadSourceLabel,
+  payloadSourceIsExample,
   labelRightRef,
   labelRightReady = false,
 }: IntegrationResourceFieldRendererProps) => {
@@ -230,6 +234,8 @@ export const IntegrationResourceFieldRenderer = ({
         suffix=" }}"
         inputSize="md"
         showValuePreview
+        payloadSourceLabel={payloadSourceLabel}
+        payloadSourceIsExample={payloadSourceIsExample}
         quickTip="Tip: type {{ to start an expression."
         className=""
       />

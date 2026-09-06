@@ -76,6 +76,8 @@ import {
   normalizeCanvasHeaderMode,
 } from "@/pages/app/viewState";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/app/mappers/safeMappers";
+import type { AutocompleteExampleResult, PayloadSourceSummary } from "@/pages/app/buildAutocompleteExampleObj";
+import { summarizePayloadSources } from "@/pages/app/buildAutocompleteExampleObj";
 import {
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
@@ -307,7 +309,7 @@ export interface CanvasPageProps {
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
-  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
+  getAutocompleteExampleResult?: (nodeId: string) => AutocompleteExampleResult;
   onNodeConfigurationSave?: (
     nodeId: string,
     configuration: Record<string, unknown>,
@@ -1363,7 +1365,7 @@ function CanvasPage(props: CanvasPageProps) {
         getSidebarData={props.getSidebarData}
         loadSidebarData={props.loadSidebarData}
         getTabData={props.getTabData}
-        getAutocompleteExampleObj={props.getAutocompleteExampleObj}
+        getAutocompleteExampleResult={props.getAutocompleteExampleResult}
         onCancelQueueItem={handleCancelQueueItem}
         onCancelExecution={handleCancelExecution}
         getAllHistoryEvents={props.getAllHistoryEvents}
@@ -1414,7 +1416,7 @@ function CanvasPage(props: CanvasPageProps) {
       props.fetchRunIdForSidebarEvent,
       props.getAllHistoryEvents,
       props.getAllQueueEvents,
-      props.getAutocompleteExampleObj,
+      props.getAutocompleteExampleResult,
       props.getCustomField,
       props.getExecutionState,
       props.getHasMoreHistory,
@@ -1754,7 +1756,7 @@ function Sidebar({
   getSidebarData,
   loadSidebarData,
   getTabData,
-  getAutocompleteExampleObj,
+  getAutocompleteExampleResult,
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
@@ -1795,7 +1797,7 @@ function Sidebar({
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
-  getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
+  getAutocompleteExampleResult?: (nodeId: string) => AutocompleteExampleResult;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
@@ -1878,12 +1880,21 @@ function Sidebar({
     }
   }, [sidebarData?.latestEvents, sidebarData?.nextInQueueEvents]);
 
-  const autocompleteExampleObj = useMemo(() => {
-    if (!state.componentSidebar.selectedNodeId || !getAutocompleteExampleObj) {
+  // Build the authoring result once and derive both the `$` payload and the
+  // source label from it, so the workflow graph is traversed a single time.
+  const autocompleteExampleResult = useMemo(() => {
+    if (!state.componentSidebar.selectedNodeId || !getAutocompleteExampleResult) {
       return undefined;
     }
-    return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
-  }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
+    return getAutocompleteExampleResult(state.componentSidebar.selectedNodeId);
+  }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleResult]);
+
+  const autocompleteExampleObj = autocompleteExampleResult?.context;
+
+  const payloadSourceSummary = useMemo<PayloadSourceSummary | undefined>(() => {
+    if (!autocompleteExampleResult) return undefined;
+    return summarizePayloadSources(autocompleteExampleResult.sourcesByNodeId) ?? undefined;
+  }, [autocompleteExampleResult]);
 
   const componentDocsData = useMemo(() => {
     const blockName = editingNodeData?.blockName;
@@ -1988,6 +1999,8 @@ function Sidebar({
       canCreateIntegrations={canCreateIntegrations}
       canUpdateIntegrations={canUpdateIntegrations}
       autocompleteExampleObj={autocompleteExampleObj}
+      payloadSourceLabel={payloadSourceSummary?.label}
+      payloadSourceIsExample={payloadSourceSummary?.isExample}
       componentDescription={componentDocsData?.description}
       componentExamplePayload={componentDocsData?.examplePayload}
       componentPayloadLabel={componentDocsData?.payloadLabel}
