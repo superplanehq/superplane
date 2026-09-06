@@ -1,6 +1,7 @@
 package apikeys
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,6 +13,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
+
+const apiKeyNameAlreadyExistsMessage = "API key with the same name already exists"
+
+func apiKeyErrorToStatus(err error, internalMessage string) error {
+	err = models.MapAPIKeyNameUniqueConstraintError(err)
+
+	switch {
+	case errors.Is(err, models.ErrAPIKeyNameAlreadyExists):
+		return grpcerrors.AlreadyExists(err, apiKeyNameAlreadyExistsMessage)
+	default:
+		return grpcerrors.Internal(err, internalMessage)
+	}
+}
 
 func serializeAPIKey(apiKey *models.User, creator *models.User) *pb.APIKey {
 	out := &pb.APIKey{
