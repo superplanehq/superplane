@@ -38,6 +38,8 @@ export type PendingFileChange =
       path: string;
     };
 
+export type FileChangeStatus = PendingFileChange["type"];
+
 export const repositoryFileTreeStyle = {
   height: "100%",
   colorScheme: "light",

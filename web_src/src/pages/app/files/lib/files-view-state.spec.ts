@@ -49,4 +49,21 @@ describe("getSelectedFileViewState", () => {
 
     expect(view.selectedContent).toBe("name: edited");
   });
+
+  it("shows the committed baseline for a deleted repository file", () => {
+    const view = getSelectedFileViewState({
+      selectedPath: "README.md",
+      selectedChange: { type: "deleted", path: "README.md" },
+      loadedContentByPath: { "README.md": "staged content" },
+      committedContentByPath: { "README.md": "committed content" },
+      selectedPathExistsInRepository: true,
+      selectedFileQuery: { isLoading: false, error: null },
+      canManageRepositoryFiles: true,
+    });
+
+    expect(view.selectedContent).toBe("committed content");
+    expect(view.selectedIsDeleted).toBe(true);
+    expect(view.editorDisabled).toBe(true);
+    expect(view.editorLoading).toBe(false);
+  });
 });
