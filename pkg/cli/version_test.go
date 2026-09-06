@@ -3,6 +3,7 @@ package cli
 import (
 	"testing"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/require"
 )
 
@@ -60,6 +61,12 @@ func TestShouldStartUpdateCheck(t *testing.T) {
 	defer func() { Version = original }()
 
 	Version = "v0.13.0"
+
+	// Point the CLI at an empty home so the developer's own configuration file
+	// does not decide whether an update check is due.
+	t.Setenv("HOME", t.TempDir())
+	homedir.Reset()
+	defer homedir.Reset()
 
 	tests := []struct {
 		name     string
