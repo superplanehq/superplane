@@ -358,6 +358,27 @@ func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*Can
 	return &execution, nil
 }
 
+// LockNodeExecution loads an execution and locks its row with FOR NO KEY UPDATE,
+// so that two user-invoked hooks on the same execution cannot start from the same
+// metadata snapshot and overwrite each other. The lock blocks instead of skipping:
+// the caller is a user request that has to be served, not one of many queue items.
+// Hooks only write non-key columns, so child FK inserts can still proceed.
+func LockNodeExecution(tx *gorm.DB, workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	err := tx.
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey}).
+		Where("id = ?", id).
+		Where("workflow_id = ?", workflowID).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
 func FindNodeExecutionWithNodeID(workflowID, id uuid.UUID, nodeID string) (*CanvasNodeExecution, error) {
 	return FindNodeExecutionWithNodeIDInTransaction(database.Conn(), workflowID, id, nodeID)
 }
