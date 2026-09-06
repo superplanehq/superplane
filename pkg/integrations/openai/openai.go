@@ -87,7 +87,7 @@ Create an [OpenAI API key](https://platform.openai.com/api-keys) and copy it.
 
 ## Admin API Key (optional)
 
-Only required for the **Get Usage Data** component.
+Required for tracking organization usage and costs via the **Get Usage Data** component.
 
 Create an [Admin API key](https://platform.openai.com/settings/organization/admin-keys) and copy it (starts with ` + "`sk-admin-`" + `).
 
