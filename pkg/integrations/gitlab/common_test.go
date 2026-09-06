@@ -18,6 +18,20 @@ func Test__IsExpression(t *testing.T) {
 	assert.False(t, isExpression("{ not an expression }"))
 }
 
+func Test__EnsureConcreteProject(t *testing.T) {
+	t.Run("concrete project is accepted", func(t *testing.T) {
+		assert.NoError(t, ensureConcreteProject("123456"))
+		assert.NoError(t, ensureConcreteProject("my-group/my-project"))
+		assert.NoError(t, ensureConcreteProject(""))
+	})
+
+	t.Run("expression project is rejected", func(t *testing.T) {
+		err := ensureConcreteProject("{{ root().data.project.id }}")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "project does not support expressions")
+	})
+}
+
 func Test__EnsureProjectInMetadata(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		Metadata: Metadata{
