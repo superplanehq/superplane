@@ -486,7 +486,7 @@ func Test__ReloadPlanningSessionAgent__KeepsSessionAndLiveCanvas(t *testing.T) {
 		}
 		foundAgent = true
 		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
-		assert.Equal(t, "anthropic::sonnet", node.Configuration["model"])
+		assert.Equal(t, "hosted::anthropic::sonnet", node.Configuration["model"])
 		assert.Equal(t, "anthropic", node.Configuration["hostedProvider"])
 		assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration), "Add a Size field.")
 		assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration), "Do not greet as if the session is new")

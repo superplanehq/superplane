@@ -31,7 +31,7 @@ func Test__RewriteHostedProviderRunnerToSuperPlane(t *testing.T) {
 		assert.True(t, models.RewriteHostedProviderRunnerToSuperPlane(&node))
 		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 		assert.NotContains(t, node.Configuration, "credentials")
-		assert.Equal(t, "anthropic::sonnet", node.Configuration["model"])
+		assert.Equal(t, "hosted::anthropic::sonnet", node.Configuration["model"])
 		assert.Equal(t, "e1-large-amd64", node.Configuration["machineType"])
 	})
 
@@ -48,7 +48,7 @@ func Test__RewriteHostedProviderRunnerToSuperPlane(t *testing.T) {
 		assert.True(t, models.RewriteHostedProviderRunnerToSuperPlane(&node))
 		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 		assert.NotContains(t, node.Configuration, "maxTurns")
-		assert.Equal(t, "openrouter::anthropic/claude-sonnet-4-6", node.Configuration["model"])
+		assert.Equal(t, "hosted::openrouter::anthropic/claude-sonnet-4-6", node.Configuration["model"])
 	})
 
 	t.Run("leaves integration nodes unchanged", func(t *testing.T) {

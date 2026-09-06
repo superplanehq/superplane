@@ -55,12 +55,16 @@ function mockSelectableModels(
     key: string;
     label: string;
   }>,
-  isLoading = false,
+  options: { isLoading?: boolean; isError?: boolean } = {},
 ) {
-  vi.mocked(useSelectableLLMModels).mockImplementation((_organizationId, options) => {
-    const sources = options?.sources;
+  vi.mocked(useSelectableLLMModels).mockImplementation((_organizationId, queryOptions) => {
+    const sources = queryOptions?.sources;
     const listed = sources ? data.filter((item) => sources.includes(item.source.id as "hosted" | "byok")) : data;
-    return { data: listed, isLoading } as unknown as ReturnType<typeof useSelectableLLMModels>;
+    return {
+      data: listed,
+      isLoading: options.isLoading ?? false,
+      isError: options.isError ?? false,
+    } as unknown as ReturnType<typeof useSelectableLLMModels>;
   });
 }
 
@@ -149,6 +153,14 @@ describe("HostedModelFieldRenderer", () => {
 
     await user.click(screen.getByRole("option", { name: "anthropic/claude-sonnet-4-6" }));
     expect(onChange).toHaveBeenCalledWith("claude-sonnet-4-6");
+  });
+
+  it("explains when organization BYOK models cannot load", () => {
+    mockSelectableModels([], { isError: true });
+
+    renderField(<HostedModelFieldRenderer field={createField()} value="" onChange={vi.fn()} organizationId="org-1" />);
+
+    expect(screen.getByText("Unable to load models. Try again.")).toBeInTheDocument();
   });
 
   it("explains when no organization BYOK models are selected", () => {

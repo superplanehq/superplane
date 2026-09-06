@@ -270,12 +270,12 @@ func clonePlanningCanvasNodes(nodes []models.Node) ([]models.Node, error) {
 	return cloned, nil
 }
 
-func applySelectableModelToPlanningNodes(nodes []models.Node, model models.SelectableLLMModel, messages []models.PlanningSessionMessage) error {
+func applySelectableModelToPlanningNodes(tx *gorm.DB, orgID uuid.UUID, nodes []models.Node, model models.SelectableLLMModel, messages []models.PlanningSessionMessage) error {
 	component, err := models.SelectableLLMRunnerComponent(model)
 	if err != nil {
 		return err
 	}
-	credentials, err := models.SelectableLLMRunnerCredentials(model)
+	credentials, err := models.SelectableLLMRunnerCredentials(tx, orgID, model)
 	if err != nil {
 		return err
 	}

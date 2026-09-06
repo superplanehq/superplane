@@ -13,6 +13,7 @@ import {
   SELECTABLE_LLM_SOURCE_BYOK,
   SELECTABLE_LLM_SOURCE_HOSTED,
   selectableLLMModelsForProvider,
+  type SelectableLLMSourceID,
 } from "@/lib/selectableLLMModels";
 import { toTestId } from "@/lib/testID";
 import type { FieldRendererProps } from "./types";
@@ -42,44 +43,36 @@ function useCanvasFactoryScope(organizationId: string | undefined) {
 }
 
 function SuperPlaneModelField({ field, value, onChange, organizationId, readOnly = false }: FieldRendererProps) {
-  const selection = useSuperPlaneModels(organizationId);
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_HOSTED]);
   const usage = useOrganizationWorkspaceUsage(organizationId ?? "");
-
-  if (!organizationId) {
-    return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
-  }
-  if (selection.isLoading || usage.isLoading) {
-    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading models...</Text>;
+  const status = modelFieldStatus(organizationId, selection.isLoading || usage.isLoading, selection.isError);
+  if (status) {
+    return status;
   }
   if (selection.models.length === 0) {
-    return <SuperPlaneEmptyModels />;
+    return (
+      <Text className="text-sm text-gray-500 dark:text-gray-400">
+        No SuperPlane-hosted models are allowlisted. Ask an installation admin to add a key and select models.
+      </Text>
+    );
   }
 
+  const options = selection.models.map((model) => ({ value: model.key, label: model.label }));
   const selected = superPlanePickerValue(
     value,
     hostedSelectableLLMModelKey(usage.data?.defaultHostedProvider ?? "", usage.data?.defaultHostedModel ?? ""),
-    selection.models,
+    options,
   );
-  const testId = field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined;
-  const placeholder = field.placeholder || "Instance SuperPlane agent model";
 
   return (
     <ModelSelect
       value={selected}
-      placeholder={placeholder}
-      testId={testId}
+      placeholder={field.placeholder || "Instance SuperPlane agent model"}
+      testId={field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined}
       readOnly={readOnly}
-      options={selection.models}
+      options={options}
       onChange={onChange}
     />
-  );
-}
-
-function SuperPlaneEmptyModels() {
-  return (
-    <Text className="text-sm text-gray-500 dark:text-gray-400">
-      No SuperPlane-hosted models are allowlisted. Ask an installation admin to add a key and select models.
-    </Text>
   );
 }
 
@@ -95,17 +88,17 @@ function superPlanePickerValue(value: unknown, defaultKey: string, models: Array
 }
 
 function ProviderBYOKModelField({ field, value, onChange, organizationId, readOnly = false }: FieldRendererProps) {
-  const selection = useProviderBYOKModels(organizationId, field.typeOptions?.hostedModel?.provider ?? "");
-
-  if (!organizationId) {
-    return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
-  }
-  if (selection.isLoading) {
-    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading models...</Text>;
+  const selection = useSelectablePickerModels(organizationId, [SELECTABLE_LLM_SOURCE_BYOK]);
+  const status = modelFieldStatus(organizationId, selection.isLoading, selection.isError);
+  if (status) {
+    return status;
   }
 
   const current = typeof value === "string" ? value : "";
-  const options = byokRunnerModelOptions(selection.models, current);
+  const options = byokRunnerModelOptions(
+    selectableLLMModelsForProvider(selection.models, field.typeOptions?.hostedModel?.provider ?? ""),
+    current,
+  );
   if (options.length === 0) {
     return (
       <Text className="text-sm text-gray-500 dark:text-gray-400">
@@ -114,14 +107,12 @@ function ProviderBYOKModelField({ field, value, onChange, organizationId, readOn
       </Text>
     );
   }
-  const testId = field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined;
-  const placeholder = field.placeholder || "Select a model";
 
   return (
     <ModelSelect
       value={current}
-      placeholder={placeholder}
-      testId={testId}
+      placeholder={field.placeholder || "Select a model"}
+      testId={field.name ? toTestId(`field-${field.name}-hosted-model`) : undefined}
       readOnly={readOnly}
       options={options}
       onChange={onChange}
@@ -160,28 +151,29 @@ function ModelSelect({
   );
 }
 
-function useProviderBYOKModels(organizationId: string | undefined, provider: string) {
-  const { factoryId, waitingForCanvas } = useCanvasFactoryScope(organizationId);
-  const query = useSelectableLLMModels(organizationId, {
-    factoryId,
-    sources: [SELECTABLE_LLM_SOURCE_BYOK],
-    enabled: Boolean(organizationId) && !waitingForCanvas,
-  });
-  return {
-    isLoading: waitingForCanvas || query.isLoading,
-    models: selectableLLMModelsForProvider(query.data ?? [], provider),
-  };
+function modelFieldStatus(organizationId: string | undefined, isLoading: boolean, isError: boolean) {
+  if (!organizationId) {
+    return <div className="text-sm text-red-500 dark:text-red-400">This field requires organization context.</div>;
+  }
+  if (isLoading) {
+    return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading models...</Text>;
+  }
+  if (isError) {
+    return <Text className="text-sm text-gray-500 dark:text-gray-400">Unable to load models. Try again.</Text>;
+  }
+  return null;
 }
 
-function useSuperPlaneModels(organizationId: string | undefined) {
+function useSelectablePickerModels(organizationId: string | undefined, sources: SelectableLLMSourceID[]) {
   const { factoryId, waitingForCanvas } = useCanvasFactoryScope(organizationId);
   const query = useSelectableLLMModels(organizationId, {
     factoryId,
-    sources: [SELECTABLE_LLM_SOURCE_HOSTED],
+    sources,
     enabled: Boolean(organizationId) && !waitingForCanvas,
   });
   return {
     isLoading: waitingForCanvas || query.isLoading,
-    models: (query.data ?? []).map((model) => ({ value: model.key, label: model.label })),
+    isError: Boolean(query.isError),
+    models: query.data ?? [],
   };
 }

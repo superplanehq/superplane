@@ -20,13 +20,11 @@ var (
 	ErrSelectableLLMModelNotAllowed = errors.New("this workspace does not allow the selected model")
 )
 
-// SelectableLLMNamedID is a picklist identity with a stable id and a display name.
 type SelectableLLMNamedID struct {
 	ID   string
 	Name string
 }
 
-// SelectableLLMModel is one row a model picker may show.
 type SelectableLLMModel struct {
 	Source   SelectableLLMNamedID
 	Provider SelectableLLMNamedID
@@ -181,21 +179,27 @@ func SelectableLLMRunnerComponent(model SelectableLLMModel) (string, error) {
 
 func SelectableLLMRunnerModel(model SelectableLLMModel) string {
 	if model.Source.ID == UsageFundingSourceHosted {
-		return FormatHostedLLMModelKey(model.Provider.ID, model.Model.ID)
+		return model.Key
 	}
 	return model.Model.ID
 }
 
-func SelectableLLMRunnerCredentials(model SelectableLLMModel) (map[string]any, error) {
+func SelectableLLMRunnerCredentials(tx *gorm.DB, orgID uuid.UUID, model SelectableLLMModel) (map[string]any, error) {
 	if model.Source.ID == UsageFundingSourceHosted {
 		return nil, nil
 	}
-	appName, err := BYOKIntegrationAppName(model.Provider.ID)
+	if tx == nil {
+		return nil, fmt.Errorf("provider is not connected")
+	}
+	integration, err := FindReadyBYOKIntegration(tx, orgID, model.Provider.ID)
 	if err != nil {
 		return nil, err
 	}
+	if integration == nil {
+		return nil, fmt.Errorf("provider is not connected")
+	}
 	return map[string]any{
 		"source":      "integration",
-		"integration": map[string]any{"name": appName},
+		"integration": map[string]any{"name": integration.InstallationName},
 	}, nil
 }

@@ -3,6 +3,7 @@ package models_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
@@ -118,8 +119,8 @@ func Test__SelectableLLMRunnerComponent(t *testing.T) {
 	component, err := models.SelectableLLMRunnerComponent(hosted)
 	require.NoError(t, err)
 	assert.Equal(t, models.SuperPlaneRunnerComponent, component)
-	assert.Equal(t, "openai::gpt-5", models.SelectableLLMRunnerModel(hosted))
-	credentials, err := models.SelectableLLMRunnerCredentials(hosted)
+	assert.Equal(t, "hosted::openai::gpt-5", models.SelectableLLMRunnerModel(hosted))
+	credentials, err := models.SelectableLLMRunnerCredentials(nil, uuid.Nil, hosted)
 	require.NoError(t, err)
 	assert.Nil(t, credentials)
 
@@ -128,9 +129,25 @@ func Test__SelectableLLMRunnerComponent(t *testing.T) {
 	component, err = models.SelectableLLMRunnerComponent(byok)
 	require.NoError(t, err)
 	assert.Equal(t, "runnerClaudeCode", component)
-	credentials, err = models.SelectableLLMRunnerCredentials(byok)
+}
+
+func Test__SelectableLLMRunnerCredentialsUsesInstallationName(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	installationName := support.RandomName("claude")
+	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "claude", installationName, map[string]any{})
+	require.NoError(t, err)
+	require.NoError(t, db.Model(integration).Update("state", models.IntegrationStateReady).Error)
+
+	byok, err := models.ParseSelectableLLMModelKey("byok::anthropic::claude-sonnet-4-6")
+	require.NoError(t, err)
+	credentials, err := models.SelectableLLMRunnerCredentials(db, r.Organization.ID, byok)
 	require.NoError(t, err)
 	assert.Equal(t, "integration", credentials["source"])
+	ref, ok := credentials["integration"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, installationName, ref["name"])
+	assert.NotEqual(t, "claude", ref["name"])
 }
 
 func selectableKeys(models []models.SelectableLLMModel) []string {

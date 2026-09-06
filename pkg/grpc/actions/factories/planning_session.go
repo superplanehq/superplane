@@ -228,7 +228,7 @@ func ReloadPlanningSessionAgent(ctx context.Context, organizationID string, req 
 		if err != nil {
 			return err
 		}
-		if err := applySelectableModelToPlanningNodes(nodes, selected, session.Messages); err != nil {
+		if err := applySelectableModelToPlanningNodes(tx, session.OrganizationID, nodes, selected, session.Messages); err != nil {
 			return err
 		}
 		now := time.Now()

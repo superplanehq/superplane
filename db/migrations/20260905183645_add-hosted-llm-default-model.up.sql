@@ -20,7 +20,23 @@ ALTER TABLE installation_llm_settings
 UPDATE workflow_nodes
 SET
   ref = jsonb_set(ref, '{component,name}', '"runnerSuperPlane"'::jsonb, true),
-  configuration = (configuration - 'credentials' - 'model' - 'maxTurns')
+  configuration = (
+    (configuration - 'credentials' - 'maxTurns' - 'model')
+    || CASE
+      WHEN COALESCE(btrim(configuration ->> 'model'), '') = '' THEN '{}'::jsonb
+      ELSE jsonb_build_object(
+        'model',
+        'hosted::'
+          || CASE ref -> 'component' ->> 'name'
+            WHEN 'runnerClaudeCode' THEN 'anthropic'
+            WHEN 'runnerCodex' THEN 'openai'
+            WHEN 'runnerOpenRouter' THEN 'openrouter'
+          END
+          || '::'
+          || (configuration ->> 'model')
+      )
+    END
+  )
 WHERE ref -> 'component' ->> 'name' IN ('runnerClaudeCode', 'runnerCodex', 'runnerOpenRouter')
   AND configuration -> 'credentials' ->> 'source' = 'hosted';
 
@@ -33,7 +49,22 @@ SET nodes = COALESCE((
       THEN elem
         || jsonb_build_object(
           'ref', jsonb_set(COALESCE(elem -> 'ref', '{}'::jsonb), '{component,name}', '"runnerSuperPlane"'::jsonb, true),
-          'configuration', COALESCE(elem -> 'configuration', '{}'::jsonb) - 'credentials' - 'model' - 'maxTurns'
+          'configuration',
+            (COALESCE(elem -> 'configuration', '{}'::jsonb) - 'credentials' - 'maxTurns' - 'model')
+            || CASE
+              WHEN COALESCE(btrim(elem -> 'configuration' ->> 'model'), '') = '' THEN '{}'::jsonb
+              ELSE jsonb_build_object(
+                'model',
+                'hosted::'
+                  || CASE elem -> 'ref' -> 'component' ->> 'name'
+                    WHEN 'runnerClaudeCode' THEN 'anthropic'
+                    WHEN 'runnerCodex' THEN 'openai'
+                    WHEN 'runnerOpenRouter' THEN 'openrouter'
+                  END
+                  || '::'
+                  || (elem -> 'configuration' ->> 'model')
+              )
+            END
         )
       ELSE elem
     END

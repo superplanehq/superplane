@@ -72,7 +72,7 @@ func RewriteHostedProviderRunnerToSuperPlane(node *Node) bool {
 		delete(node.Configuration, "credentials")
 		delete(node.Configuration, "maxTurns")
 		if provider != "" && model != "" {
-			node.Configuration["model"] = FormatHostedLLMModelKey(provider, model)
+			node.Configuration["model"] = FormatSelectableLLMModelKey(UsageFundingSourceHosted, provider, model)
 		} else {
 			delete(node.Configuration, "model")
 		}
