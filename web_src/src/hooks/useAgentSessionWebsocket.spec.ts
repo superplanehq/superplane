@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
 import { agentChatKeys, type AgentMessagesPage } from "@/hooks/useAgentChats";
+import { WEBSOCKET_RECONNECT_MAX_MS } from "@/lib/websocketReconnect";
 
 const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
@@ -194,6 +195,16 @@ describe("useAgentSessionWebsocket", () => {
     emit("session_notice", { sessionId: "session-1", error: "transient provider error" });
     expect(onNotice).toHaveBeenCalledWith("transient provider error");
     expect(onStatus).not.toHaveBeenCalled();
+  });
+
+  it("backs off between reconnect attempts", () => {
+    render({});
+    const [, options] = lastCall();
+    const reconnectInterval = options.reconnectInterval as (attempt: number) => number;
+
+    expect(typeof reconnectInterval).toBe("function");
+    expect(reconnectInterval(5)).toBeGreaterThan(reconnectInterval(0));
+    expect(reconnectInterval(100)).toBeLessThanOrEqual(WEBSOCKET_RECONNECT_MAX_MS);
   });
 
   it("ignores malformed payloads without crashing", () => {
