@@ -558,14 +558,16 @@ describe("VelocityPage shell", () => {
     expect(taskTime).toHaveTextContent("We could not load task time.");
   });
 
-  it("reports tracked spend and the part of it that went to waste", () => {
+  it("reports tracked spend split between tokens and compute", () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
     renderShell();
 
     const cost = screen.getByTestId("velocity-cost");
+    expect(cost).toHaveTextContent("Total cost");
     expect(cost).toHaveTextContent("$42.00");
-    expect(cost).toHaveTextContent("$9.00 of this went to tasks that closed without a merge.");
+    expect(cost).toHaveTextContent("Tokens");
+    expect(cost).toHaveTextContent("Compute");
   });
 });

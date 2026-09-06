@@ -542,10 +542,37 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 	assert.Equal(t, 1, last.tasksWaste, "a task that closed without a merge is waste")
 }
 
+func TestFillBuckets_SplitsSpendAndKeepsTaskSamples(t *testing.T) {
+	now := time.Now().In(time.Local)
+	buckets := buildDayBuckets(now, 7)
+	window := velocityWindow{start: buckets[0].start, end: buckets[len(buckets)-1].end}
+
+	today := localMidnight(now)
+	cheap, expensive := uuid.New(), uuid.New()
+
+	fillBuckets(
+		buckets,
+		nil,
+		map[uuid.UUID]*velocityOrder{
+			cheap:     {id: cheap, day: today, merged: true, costCents: 120, modelCostCents: 100, computeCostCents: 20},
+			expensive: {id: expensive, day: today, merged: true, costCents: 1100, modelCostCents: 900, computeCostCents: 200},
+		},
+		nil,
+		window,
+	)
+
+	last := buckets[len(buckets)-1]
+	assert.Equal(t, int64(1000), last.modelCostCents)
+	assert.Equal(t, int64(220), last.computeCostCents)
+	assert.Equal(t, last.costCents, last.modelCostCents+last.computeCostCents, "the bands add up to the day")
+	assert.ElementsMatch(t, []int64{100, 900}, last.taskModelCostCents, "the median needs one sample per task")
+	assert.ElementsMatch(t, []int64{20, 200}, last.taskComputeCostCents)
+}
+
 func TestAggregateTotals(t *testing.T) {
 	buckets := []dayBucket{
-		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
-		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, tokens: 300, tasksClosed: 1},
+		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, modelCostCents: 320, computeCostCents: 80, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
+		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, modelCostCents: 150, computeCostCents: 50, tokens: 300, tasksClosed: 1},
 	}
 	got := aggregateTotals(buckets, true)
 	assert.Equal(t, int32(4), got.SuperplaneMerged)
@@ -554,6 +581,8 @@ func TestAggregateTotals(t *testing.T) {
 	assert.Equal(t, int32(50), got.SuperplaneSharePct)
 	assert.Equal(t, int32(20), got.WastePct, "waste is 1 of 5 SuperPlane closures")
 	assert.Equal(t, int64(600), got.CostCents)
+	assert.Equal(t, int64(470), got.ModelCostCents)
+	assert.Equal(t, int64(130), got.ComputeCostCents)
 	assert.Equal(t, int64(1200), got.Tokens)
 	assert.Equal(t, int64(100), got.WasteCostCents)
 	assert.Equal(t, int32(4), got.TasksClosed)
@@ -878,6 +907,99 @@ func TestDescribeFactoryVelocity_CountsTasksApartFromPullRequests(t *testing.T) 
 	assert.Equal(t, int32(1), resp.Totals.Waste)
 	assert.Equal(t, int32(2), resp.Totals.TasksClosed, "the merged order counts once, however many pull requests it opened")
 	assert.Equal(t, int32(1), resp.Totals.TasksWaste)
+}
+
+func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	mergedAt := now.Add(-3 * time.Hour)
+
+	// Two tasks that closed today. Their spend differs, so the median is not
+	// the mean and a wrong aggregation shows.
+	seedVelocityOrderSpend(t, factoryModel, 1, mergedAt, 1_000_000, 200_000)
+	seedVelocityOrderSpend(t, factoryModel, 2, mergedAt, 5_000_000, 400_000)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(600), resp.Totals.ModelCostCents, "6 million micros of model spend is 600 cents")
+	assert.Equal(t, int64(60), resp.Totals.ComputeCostCents)
+	assert.Equal(t, resp.Totals.ModelCostCents+resp.Totals.ComputeCostCents, resp.Totals.CostCents,
+		"the bands add up to the reported total")
+
+	today := resp.Points[len(resp.Points)-1]
+	assert.Equal(t, int64(600), today.ModelCostCents)
+	assert.Equal(t, int64(60), today.ComputeCostCents)
+	assert.Equal(t, int64(300), today.MedianTaskModelCostCents, "the middle of 100 and 500 cents")
+	assert.Equal(t, int64(30), today.MedianTaskComputeCostCents)
+
+	quiet := resp.Points[0]
+	assert.Zero(t, quiet.MedianTaskModelCostCents, "a day with no tasks reports no median")
+	assert.Zero(t, quiet.MedianTaskComputeCostCents)
+}
+
+// seedVelocityOrderSpend creates a merged work order and charges it the given
+// model and compute spend, in micros.
+func seedVelocityOrderSpend(
+	t *testing.T,
+	factoryModel *models.Factory,
+	number int,
+	mergedAt time.Time,
+	modelMicros, computeMicros int64,
+) {
+	t.Helper()
+
+	db := database.DB(t.Context())
+	order, err := factoryModel.CreateWorkOrder(db, "Spending order", "", nil, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      fmt.Sprintf("https://github.com/example/repo/pull/%d", number),
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedAt,
+	})
+	require.NoError(t, err)
+
+	events := []models.WorkspaceUsageEvent{
+		{
+			Provider:    models.UsageProviderAnthropic,
+			Model:       "claude-sonnet-4-6",
+			UsageKind:   models.UsageKindModel,
+			TotalTokens: 1_000,
+			CostMicros:  modelMicros,
+		},
+		{
+			Provider:        models.UsageProviderRunner,
+			Model:           "e1-large-amd64",
+			UsageKind:       models.UsageKindCompute,
+			MachineType:     "e1-large-amd64",
+			DurationSeconds: 900,
+			CostMicros:      computeMicros,
+		},
+	}
+	for _, event := range events {
+		event.ID = uuid.New()
+		event.OrganizationID = factoryModel.OrganizationID
+		event.FactoryID = &factoryModel.ID
+		event.WorkOrderID = &order.ID
+		event.CanvasRunID = uuid.New()
+		event.NodeExecutionID = uuid.New()
+		event.NodeID = "prompt"
+		event.FundingSource = models.UsageFundingSourceBYOK
+		event.Currency = "usd"
+		event.PriceBookVersion = "test"
+		event.IdempotencyKey = uuid.NewString()
+		event.OccurredAt = mergedAt
+		require.NoError(t, db.Create(&event).Error)
+	}
 }
 
 func seedPRArtifact(t *testing.T, factoryModel *models.Factory, url string, state string, at time.Time) *models.FactoryPullRequest {
