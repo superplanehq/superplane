@@ -70,6 +70,25 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Len(t, liveVersion.Edges, 2)
 	})
 
+	t.Run("creating a Productive.io intake builds a healthy trigger to createWorkOrder canvas", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS})
+
+		assert.Equal(t, pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS, intake.GetSource())
+		assert.Equal(t, "Productive.io tasks", intake.GetName())
+		assert.True(t, intake.GetHealthy())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		assert.Len(t, liveVersion.Nodes, 2)
+		assert.Len(t, liveVersion.Edges, 1)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "productive.onTask", trigger.ComponentName())
+	})
+
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")

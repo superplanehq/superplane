@@ -34,6 +34,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.incident.html_url }}",
     title: "PagerDuty incident intake",
   },
+  "productive-tasks": {
+    triggerComponent: "productive.onTask",
+    triggerName: "On Task",
+    createTitle: "{{ root().data.data.attributes.title }}",
+    createDescription: "{{ root().data.data.attributes.description }}",
+    title: "Productive.io task intake",
+  },
 };
 
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {
