@@ -1435,11 +1435,17 @@ spec:
     - sourceId: component-node-nbf347
       targetId: github-markpullrequestreadyforreview-github-markpullrequestreadyforreview-wie92w
       channel: passed
-    - sourceId: component-node-nbf347
-      targetId: mark-ci-done-mark-ci-done-2-ru37ew
-      channel: passed
+    # "Mark CI Done" and "Mark Human Review Requested" both invoke the "Update
+    # Progress" app, which reads the PR body, flips one checkbox, and writes the
+    # whole body back. Fanning both out from Babysit in parallel makes the two
+    # runs read the same original body and race: the slower write clobbers the
+    # other's checkbox, so "Human review requested" was never checked off.
+    # Chain them so each update reads the body the previous one already wrote.
     - sourceId: component-node-nbf347
       targetId: mark-implementation-done-mark-implementation-done-2-qpudc5
+      channel: passed
+    - sourceId: mark-implementation-done-mark-implementation-done-2-qpudc5
+      targetId: mark-ci-done-mark-ci-done-2-ru37ew
       channel: passed
     - sourceId: component-node-t3n3jn
       targetId: mark-implementation-done-mark-implementation-done-2-8ukxus
