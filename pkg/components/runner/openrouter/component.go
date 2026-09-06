@@ -68,7 +68,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as ` + "`OPENROUTER_API_KEY`" + `.
-- **Model**: Required OpenRouter model id (` + "`provider/model`" + `).
+- **Model**: Required. Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 - **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
@@ -82,7 +82,7 @@ Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 }
 
 func (c *RunOpenRouter) Configuration() []configuration.Field {
-	model := runner.AgentModelField("openrouter", "OpenRouter model id (provider/model). Required.", "anthropic/claude-sonnet-4-6")
+	model := runner.AgentModelField("openrouter")
 	model.Required = true
 	return []configuration.Field{
 		runner.AgentMachineTypeField(),

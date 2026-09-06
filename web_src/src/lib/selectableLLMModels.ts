@@ -65,6 +65,26 @@ export function sortSelectableLLMModels(models: SelectableLLMModel[]): Selectabl
   });
 }
 
+export function selectableLLMModelsForProvider(models: SelectableLLMModel[], provider: string): SelectableLLMModel[] {
+  const wanted = provider.trim();
+  if (wanted === "") {
+    return [];
+  }
+  return models.filter((model) => model.provider.id === wanted);
+}
+
+export function byokRunnerModelOptions(
+  models: SelectableLLMModel[],
+  current: string,
+): Array<{ value: string; label: string }> {
+  const options = models.map((model) => ({ value: model.model.id, label: model.label }));
+  const selected = current.trim();
+  if (selected === "" || options.some((option) => option.value === selected)) {
+    return options;
+  }
+  return [{ value: selected, label: selected }, ...options];
+}
+
 export function selectableLLMModelsFromResponse(
   items: Array<{
     source?: { id?: string; name?: string };

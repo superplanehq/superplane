@@ -68,7 +68,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenAI integration used as ` + "`OPENAI_API_KEY`" + `.
-- **Model**: Optional Codex model id.
+- **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -88,7 +88,7 @@ func (c *RunCodex) Configuration() []configuration.Field {
 			IntegrationName:  "openai",
 			IntegrationLabel: "Integration",
 		}),
-		runner.AgentModelField("openai", "Codex model id.", "gpt-5"),
+		runner.AgentModelField("openai"),
 		runner.AgentStepsField(
 			"Ordered bash commands and Codex prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",

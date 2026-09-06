@@ -77,7 +77,7 @@ Example:
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as ` + "`ANTHROPIC_API_KEY`" + `.
-- **Model**: Optional model id or alias (for example ` + "`sonnet`" + `).
+- **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 
@@ -100,7 +100,7 @@ func (c *RunClaudeCode) Configuration() []configuration.Field {
 			IntegrationName:  "claude",
 			IntegrationLabel: "Integration",
 		}),
-		runner.AgentModelField("anthropic", "Claude model id.", "sonnet"),
+		runner.AgentModelField("anthropic"),
 		runner.AgentStepsField(
 			"Ordered bash commands and Claude Code prompts. Add, reorder, and mix freely.",
 			"Fix the failing tests and commit the changes.",

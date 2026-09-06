@@ -27,9 +27,10 @@ import type {
   FactoriesWorkOrderEvent,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { HOSTED_LLM_PROVIDERS } from "@/lib/hostedLLMModels";
 import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
-import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
 import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
@@ -644,6 +645,31 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   };
 }
 
+function byokSelectedModelIds(fixture: FactoriesFixture, provider: string): string[] {
+  const catalogIds =
+    fixture.byokCandidatesByProvider?.[provider] ?? storybookHostedLlmModels(provider).models.map((model) => model.id);
+  const connected = fixture.byokConnectedProviders
+    ? fixture.byokConnectedProviders.includes(provider)
+    : catalogIds.length > 0;
+  if (!connected) {
+    return fixture.byokSelectedByProvider?.[provider] ?? [];
+  }
+  return fixture.byokSelectedByProvider?.[provider] ?? catalogIds;
+}
+
+function selectableLlmModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/selectable-llm-models"),
+    resolve: () => {
+      const byokByProvider: Record<string, string[]> = {};
+      for (const provider of HOSTED_LLM_PROVIDERS) {
+        byokByProvider[provider] = byokSelectedModelIds(fixture, provider);
+      }
+      return { json: { models: storybookSelectableLlmModels(byokByProvider) } };
+    },
+  };
+}
+
 function byokModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/byok-models"),
@@ -665,9 +691,7 @@ function byokModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
         };
         return { json: { selected: allowed.map((id) => ({ id, name: id })) } };
       }
-      const selectedIds = connected
-        ? (fixture.byokSelectedByProvider?.[provider] ?? catalogIds)
-        : (fixture.byokSelectedByProvider?.[provider] ?? []);
+      const selectedIds = byokSelectedModelIds(fixture, provider);
       return {
         json: {
           connected,
@@ -761,6 +785,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),
     hostedLlmModelsRoute(),
+    selectableLlmModelsRoute(fixture),
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),
     hostedCreditCheckoutRoute(),

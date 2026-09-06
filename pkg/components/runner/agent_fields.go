@@ -92,14 +92,14 @@ func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
 	}
 }
 
-func AgentModelField(provider, description, placeholder string) configuration.Field {
+func AgentModelField(provider string) configuration.Field {
 	return configuration.Field{
 		Name:        "model",
 		Label:       "Model",
 		Type:        configuration.FieldTypeHostedModel,
 		Required:    false,
-		Description: description,
-		Placeholder: placeholder,
+		Description: "Select a model from Organization LLM Models.",
+		Placeholder: "Select a model",
 		TypeOptions: &configuration.TypeOptions{
 			HostedModel: &configuration.HostedModelTypeOptions{Provider: provider},
 		},

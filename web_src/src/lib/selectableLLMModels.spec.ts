@@ -9,6 +9,8 @@ import {
   selectableLLMModelLabel,
   selectableLLMModelLabelFromKey,
   selectableLLMModelsFromResponse,
+  selectableLLMModelsForProvider,
+  byokRunnerModelOptions,
   sortSelectableLLMModels,
   type SelectableLLMModel,
 } from "./selectableLLMModels";
@@ -40,6 +42,47 @@ describe("selectableLLMModelLabel", () => {
   it("uses provider/model for native ids", () => {
     expect(selectableLLMModelLabel("anthropic", "claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6");
     expect(selectableLLMModelLabelFromKey("hosted::openrouter::moonshotai/kimi-k2.6")).toBe("moonshotai/kimi-k2.6");
+  });
+});
+
+describe("selectableLLMModelsForProvider", () => {
+  it("keeps only the requested provider", () => {
+    const listed = [
+      model({
+        key: "byok::anthropic::claude-sonnet-4-6",
+        label: "anthropic/claude-sonnet-4-6",
+        source: { id: "byok", name: "Your keys" },
+      }),
+      model({
+        key: "byok::openai::gpt-5",
+        label: "openai/gpt-5",
+        source: { id: "byok", name: "Your keys" },
+        provider: { id: "openai", name: "OpenAI" },
+        model: { id: "gpt-5", name: "gpt-5" },
+      }),
+    ];
+    expect(selectableLLMModelsForProvider(listed, "anthropic").map((item) => item.model.id)).toEqual([
+      "claude-sonnet-4-6",
+    ]);
+  });
+});
+
+describe("byokRunnerModelOptions", () => {
+  it("stores the model id and keeps a value that is not on the list", () => {
+    const listed = [
+      model({
+        key: "byok::anthropic::claude-sonnet-4-6",
+        label: "anthropic/claude-sonnet-4-6",
+        source: { id: "byok", name: "Your keys" },
+      }),
+    ];
+    expect(byokRunnerModelOptions(listed, "")).toEqual([
+      { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
+    ]);
+    expect(byokRunnerModelOptions(listed, "opus")).toEqual([
+      { value: "opus", label: "opus" },
+      { value: "claude-sonnet-4-6", label: "anthropic/claude-sonnet-4-6" },
+    ]);
   });
 });
 
