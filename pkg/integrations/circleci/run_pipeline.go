@@ -453,45 +453,23 @@ func (t *RunPipeline) poll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("pipeline ID is missing from execution metadata")
 	}
 
-	// Always fetch workflows fresh
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return err
 	}
 
-	pipeline, err := client.GetPipeline(metadata.Pipeline.ID)
-	if err != nil {
-		return err
-	}
-
-	if pipeline.State == "errored" {
-		payload := map[string]any{"pipeline": pipeline}
-		err = ctx.ExecutionState.Emit(FailedOutputChannel, PayloadType, []any{payload})
-		if err != nil {
-			return fmt.Errorf("failed to emit output: %w", err)
-		}
-
-		return nil
-	}
-
-	workflows, err := client.GetPipelineWorkflows(metadata.Pipeline.ID)
+	result, err := client.CheckPipelineStatus(metadata.Pipeline.ID)
 	if err != nil {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
-	if len(workflows) == 0 {
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
-	}
-
-	firstWorkflow := workflows[0]
-
-	if t.isRunning(firstWorkflow.Status) {
+	if !result.AllDone {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, PollInterval)
 	}
 
 	payload := map[string]any{"pipeline": metadata.Pipeline}
 	channel := SuccessOutputChannel
-	if t.isFailed(firstWorkflow.Status) {
+	if result.AnyFailed {
 		channel = FailedOutputChannel
 	}
 
@@ -533,8 +511,4 @@ func (t *RunPipeline) Cleanup(ctx core.SetupContext) error {
 
 func (t *RunPipeline) isFailed(workflowStatus string) bool {
 	return workflowStatus == WorkflowStatusFailed || workflowStatus == WorkflowStatusCanceled || workflowStatus == "error" || workflowStatus == "failing" || workflowStatus == "unauthorized"
-}
-
-func (t *RunPipeline) isRunning(workflowStatus string) bool {
-	return workflowStatus == "running" || workflowStatus == "on_hold" || workflowStatus == "not_run"
 }
