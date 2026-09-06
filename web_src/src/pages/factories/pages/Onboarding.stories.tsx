@@ -1,14 +1,21 @@
 import type { FactoriesFactoryOnboarding } from "@/api-client";
+import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
-import { PRIMARY_FACTORY_ID, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
+import {
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../__fixtures__/factoryPageResponses";
 import {
   CONNECTED_SETUP_INTEGRATIONS,
   GITHUB_SETUP_INTEGRATIONS,
   SETUP_ANSWERS,
   factoriesFixtureWithSetupAnswers,
+  soloFactoriesFixtureWithSetupAnswers,
 } from "../__fixtures__/setupStoryFixtures";
 import { NO_GRANT_USAGE_REPORT, type StorybookUsageReport } from "../__fixtures__/usageReportFixtures";
 import type { WizardStepId } from "./onboarding/onboardingFixtures";
@@ -68,6 +75,32 @@ export const Welcome: Story = {
       orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
     />
   ),
+};
+
+/**
+ * A single workspace in a single organization: the account menu's "Quit
+ * onboarding" has nowhere to send the user, so it falls back to Sign out
+ * only. Every other story in this file has another workspace or
+ * organization to leave to, so it shows Quit onboarding instead.
+ */
+function SoloWorkspaceSetup() {
+  const queryClient = useQueryClient();
+  queryClient.setQueryData(accountOrganizationsQueryKey, [
+    { id: FACTORIES_ORGANIZATION_ID, slug: "superplane", name: "SuperPlane" },
+  ]);
+  return (
+    <FactoriesHarness
+      pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup`}
+      factoriesFixture={soloFactoriesFixtureWithSetupAnswers(SETUP_ANSWERS.none)}
+      onboardingSeed={pendingSeed}
+      orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+    />
+  );
+}
+
+export const WelcomeSignOutOnly: Story = {
+  name: "0 Welcome (sign out only)",
+  render: () => <SoloWorkspaceSetup />,
 };
 
 /** First workspace in a new organization: nothing is connected yet. */
