@@ -79,12 +79,17 @@ func (p *Provider) CreateRepository(ctx context.Context, repoID string) (*provid
 	// Initialize repository
 	//
 	initialCommit := provider.InitialRepositoryCommitOptions(p.defaultBranch)
+	committer := provider.CommitterOrAuthor(initialCommit)
 	builder, err := repo.CreateCommit(codestorage.CommitOptions{
 		TargetBranch:  p.defaultBranch,
 		CommitMessage: initialCommit.Message,
 		Author: codestorage.CommitSignature{
 			Name:  initialCommit.Author.Name,
 			Email: initialCommit.Author.Email,
+		},
+		Committer: &codestorage.CommitSignature{
+			Name:  committer.Name,
+			Email: committer.Email,
 		},
 	})
 
@@ -186,6 +191,7 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		return "", err
 	}
 
+	committer := provider.CommitterOrAuthor(options)
 	builder, err := repo.CreateCommit(codestorage.CommitOptions{
 		TargetBranch:    provider.RefOrDefault(options.Branch, p.defaultBranch),
 		BaseBranch:      strings.TrimSpace(options.BaseBranch),
@@ -194,6 +200,10 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		Author: codestorage.CommitSignature{
 			Name:  strings.TrimSpace(options.Author.Name),
 			Email: strings.TrimSpace(options.Author.Email),
+		},
+		Committer: &codestorage.CommitSignature{
+			Name:  strings.TrimSpace(committer.Name),
+			Email: strings.TrimSpace(committer.Email),
 		},
 	})
 
@@ -299,6 +309,10 @@ func (p *Provider) MergeBranch(ctx context.Context, repoID, sourceBranch, target
 		TargetBranch:  provider.RefOrDefault(targetBranch, p.defaultBranch),
 		CommitMessage: strings.TrimSpace(message),
 		Author: &codestorage.CommitSignature{
+			Name:  strings.TrimSpace(author.Name),
+			Email: strings.TrimSpace(author.Email),
+		},
+		Committer: &codestorage.CommitSignature{
 			Name:  strings.TrimSpace(author.Name),
 			Email: strings.TrimSpace(author.Email),
 		},
