@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 const instancePayloadType = "gcp.cloudsql.instance"
@@ -439,7 +440,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if _, err := createInstance(context.Background(), client, client.ProjectID(), body); err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create instance", err, roleHintAdmin))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to create instance", roleHintAdmin))
 	}
 
 	// Instance creation takes minutes, so record what to poll and schedule the

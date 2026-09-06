@@ -73,7 +73,7 @@ func Test__ManageVMInstancePower__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -111,7 +111,7 @@ func Test__ManageVMInstancePower__Execute(t *testing.T) {
 			},
 		}
 
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
@@ -130,7 +130,7 @@ func Test__ManageVMInstancePower__Execute(t *testing.T) {
 
 	t.Run("cross-project selfLink -> fails", func(t *testing.T) {
 		mc := &mockInstanceClient{projectID: "my-project"}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{

@@ -71,7 +71,7 @@ func TestUpdateRecord_Execute(t *testing.T) {
 
 	t.Run("deletes old record and creates new one", func(t *testing.T) {
 		var capturedBody any
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -86,7 +86,7 @@ func TestUpdateRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&UpdateRecord{}).Execute(core.ExecutionContext{
@@ -113,14 +113,14 @@ func TestUpdateRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when record does not exist", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
 					return json.Marshal(map[string]any{"rrsets": []any{}})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&UpdateRecord{}).Execute(core.ExecutionContext{
@@ -140,7 +140,7 @@ func TestUpdateRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when change status is unexpected", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -154,7 +154,7 @@ func TestUpdateRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}
