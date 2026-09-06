@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import type { SelectableLLMModel } from "@/lib/selectableLLMModels";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,11 +13,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alertDialog";
-import { Loader2, Sparkles } from "lucide-react";
 import type { FormEvent } from "react";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentView } from "./createWithAgentTypes";
+import { CreateWithAgentHeader } from "./CreateWithAgentHeader";
 import { planningSessionPhase } from "./planningSessionActivity";
 import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { JumpToLatestPill } from "./work-order-split-run/JumpToLatestPill";
@@ -28,6 +29,7 @@ export type CreateWithAgentDialogProps = {
   open: boolean;
   workspaceName: string;
   organizationId?: string;
+  factoryId?: string;
   view: CreateWithAgentView;
   onComposerChange: (value: string) => void;
   onSend: () => void;
@@ -41,12 +43,17 @@ export type CreateWithAgentDialogProps = {
   onRequestClose: () => void;
   onCancelEnd: () => void;
   onConfirmEnd: () => void;
+  onSelectModel?: (key: string) => void;
+  modelPickerOpen?: boolean;
+  onModelPickerOpenChange?: (open: boolean) => void;
+  models?: SelectableLLMModel[];
 };
 
 export function CreateWithAgentDialog({
   open,
   workspaceName,
   organizationId = "",
+  factoryId = "",
   view,
   onComposerChange,
   onSend,
@@ -60,6 +67,10 @@ export function CreateWithAgentDialog({
   onRequestClose,
   onCancelEnd,
   onConfirmEnd,
+  onSelectModel,
+  modelPickerOpen,
+  onModelPickerOpenChange,
+  models,
 }: CreateWithAgentDialogProps) {
   return (
     <>
@@ -72,9 +83,16 @@ export function CreateWithAgentDialog({
         >
           <CreateWithAgentHeader
             workspaceName={workspaceName}
+            organizationId={organizationId}
+            factoryId={factoryId}
             repository={view.repository}
             machineStatus={view.machineStatus}
+            selectableModelKey={view.selectableModelKey}
             onEndSession={onRequestClose}
+            onSelectModel={onSelectModel}
+            modelPickerOpen={modelPickerOpen}
+            onModelPickerOpenChange={onModelPickerOpenChange}
+            models={models}
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
             <CreateWithAgentStream
@@ -110,58 +128,6 @@ export function CreateWithAgentDialog({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  );
-}
-
-function CreateWithAgentHeader({
-  workspaceName,
-  repository,
-  machineStatus,
-  onEndSession,
-}: {
-  workspaceName: string;
-  repository: string;
-  machineStatus: CreateWithAgentView["machineStatus"];
-  onEndSession: () => void;
-}) {
-  const starting = machineStatus === "starting";
-  const failed = machineStatus === "failed";
-  return (
-    <div
-      className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5"
-      data-testid="create-with-agent-header"
-    >
-      <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted">
-          <Sparkles className="size-3" aria-hidden />
-        </span>
-        <span className="truncate text-foreground">{workspaceName}</span>
-        <span aria-hidden>/</span>
-        <DialogTitle className="truncate text-[13px] font-medium text-foreground">
-          {CREATE_WITH_AGENT_COPY.title}
-        </DialogTitle>
-        <DialogDescription className="sr-only">Create tasks with an agent in this workspace.</DialogDescription>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span
-          className="hidden items-center gap-1.5 text-[12px] text-muted-foreground sm:flex"
-          data-testid="create-with-agent-machine"
-        >
-          {starting && !failed ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-          {machineStatusLabel(repository, machineStatus)}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 px-2.5 text-[12px]"
-          data-testid="create-with-agent-end"
-          onClick={onEndSession}
-        >
-          {CREATE_WITH_AGENT_COPY.endSession}
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -265,20 +231,6 @@ function CreateWithAgentStream({
       </form>
     </section>
   );
-}
-
-function machineStatusLabel(repository: string, machineStatus: CreateWithAgentView["machineStatus"]): string {
-  if (machineStatus === "starting") {
-    return CREATE_WITH_AGENT_COPY.machineStarting;
-  }
-  if (machineStatus === "failed") {
-    return repository
-      ? `${repository} · ${CREATE_WITH_AGENT_COPY.machineStopped}`
-      : CREATE_WITH_AGENT_COPY.machineStopped;
-  }
-  const label =
-    machineStatus === "waiting" ? CREATE_WITH_AGENT_COPY.machineWaiting : CREATE_WITH_AGENT_COPY.machineRunning;
-  return repository ? `${repository} · ${label}` : label;
 }
 
 function CreateWithAgentWorkPane({

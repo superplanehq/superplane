@@ -57,7 +57,7 @@ func UpdateCanvas(
 		return nil, grpcerrors.Internal(err, "failed to load canvas spec")
 	}
 
-	serializedCanvas, err := SerializeCanvas(refreshedCanvas, liveVersion, user, nil)
+	serializedCanvas, err := serializePreparedCanvas(db, refreshedCanvas, liveVersion, user, nil)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to serialize canvas")
 	}
