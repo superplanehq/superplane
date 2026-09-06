@@ -87,9 +87,15 @@ export function parseCanvasYamlToSpec(text: string): CanvasesCanvas["spec"] | nu
   }
 
   return {
-    nodes: (spec.nodes ?? []).map(normalizeCanvasYamlNode),
+    // YAML list items can be null while editing (e.g. "- "). Skip non-objects so
+    // autosave/import does not crash on incomplete canvas.yaml documents.
+    nodes: (spec.nodes ?? []).filter(isCanvasYamlNode).map(normalizeCanvasYamlNode),
     edges: spec.edges ?? [],
   };
+}
+
+function isCanvasYamlNode(node: unknown): node is ComponentsNode {
+  return node != null && typeof node === "object" && !Array.isArray(node);
 }
 
 function normalizeCanvasYamlPosition(position: ComponentsNode["position"]): ComponentsNode["position"] {
