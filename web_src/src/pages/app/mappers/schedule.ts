@@ -81,7 +81,7 @@ function formatScheduleDescription(configuration: ScheduleConfiguration): string
   }
 }
 
-function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
+export function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNextTrigger?: string): Date | null {
   // Always use backend-calculated nextTrigger first if available
   if (referenceNextTrigger) {
     try {
@@ -244,10 +244,17 @@ function calculateNextTrigger(configuration: ScheduleConfiguration, referenceNex
 
       if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
-      // Match Go backend: add interval months in timezone, set day/hour/minute
+      // Match Go backend: advance the month arithmetically, then clamp
+      // dayOfMonth to the target month's length. Setting the day to 1
+      // before changing the month prevents setMonth from overflowing into
+      // a later month when the current day doesn't exist there (e.g. Jan
+      // 31 + 1 month would otherwise become Mar 3 instead of Feb).
       const nextTriggerInTZ = new Date(nowInTZ);
+      nextTriggerInTZ.setDate(1);
       nextTriggerInTZ.setMonth(nextTriggerInTZ.getMonth() + interval);
-      nextTriggerInTZ.setDate(dayOfMonth);
+
+      const lastDayOfTargetMonth = new Date(nextTriggerInTZ.getFullYear(), nextTriggerInTZ.getMonth() + 1, 0).getDate();
+      nextTriggerInTZ.setDate(Math.min(dayOfMonth, lastDayOfTargetMonth));
       nextTriggerInTZ.setHours(hour);
       nextTriggerInTZ.setMinutes(minute);
       nextTriggerInTZ.setSeconds(0);
