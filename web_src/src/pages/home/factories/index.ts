@@ -9,6 +9,7 @@ import softwareFactoryConsoleYaml from "./software-factory/console.yaml?raw";
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
 export {
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   normalizeFactoryInstallParams,

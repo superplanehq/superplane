@@ -54,6 +54,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Run JavaScript" href="#run-java-script" description="Runs JavaScript on a fleet runner with access to upstream node data via $" />
   <LinkCard title="Run OpenRouter Agent" href="#run-open-router-agent" description="Runs a SuperPlane OpenRouter agent on a fleet runner" />
   <LinkCard title="Run Python" href="#run-python" description="Runs Python on a fleet runner with access to upstream node data via the payload argument" />
+  <LinkCard title="Run SuperPlane Agent" href="#run-super-plane-agent" description="Runs a SuperPlane-hosted coding agent on a fleet runner." />
   <LinkCard title="Set Task Status Note" href="#set-task-status-note" description="Announce what a waiting task is blocked on and what resolves it" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -1599,7 +1600,7 @@ Runs [Claude Code](https://code.claude.com/docs/en/headless) in non-interactive 
 
 ### Prerequisites
 - The `claude` CLI is installed on the runner machine and available on `PATH`.
-- An Anthropic API key stored as a SuperPlane secret, a Claude integration, or SuperPlane-hosted credentials.
+- An Anthropic API key stored as a SuperPlane secret or a Claude integration.
 
 ### Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -1617,10 +1618,12 @@ Example:
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Anthropic API Key**: SuperPlane secret, Claude integration, or SuperPlane-hosted credentials used as `ANTHROPIC_API_KEY`.
-- **Model**: Optional model id or alias (for example `sonnet`). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Anthropic API Key**: SuperPlane secret or Claude integration used as `ANTHROPIC_API_KEY`.
+- **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ### Output
 Prompt steps stream agent activity to **View logs**. The finished event includes the latest Claude `result`.
@@ -1659,7 +1662,7 @@ Runs the OpenAI Codex CLI in non-interactive mode on a fleet runner.
 
 ### Prerequisites
 - The `codex` CLI is installed on the runner machine and available on `PATH`.
-- An OpenAI API key stored as a SuperPlane secret, an OpenAI integration, or SuperPlane-hosted credentials.
+- An OpenAI API key stored as a SuperPlane secret or an OpenAI integration.
 
 ### Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -1670,10 +1673,12 @@ Configure an ordered list of **bash** and **prompt** steps:
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Credentials**: SuperPlane secret, OpenAI integration, or SuperPlane-hosted credentials used as `OPENAI_API_KEY`.
-- **Model**: Optional Codex model id. SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Credentials**: SuperPlane secret or OpenAI integration used as `OPENAI_API_KEY`.
+- **Model**: Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ### Output channels
 - **Passed**: All steps finished with exit code **0**.
@@ -1762,7 +1767,7 @@ Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can u
 
 ### Prerequisites
 - Node.js on the runner `PATH`.
-- An OpenRouter API key stored as a SuperPlane secret, or SuperPlane-hosted credentials.
+- An OpenRouter API key stored as a SuperPlane secret or an OpenRouter integration.
 
 ### Steps
 Configure an ordered list of **bash** and **prompt** steps:
@@ -1773,11 +1778,13 @@ Configure an ordered list of **bash** and **prompt** steps:
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
-- **Credentials**: SuperPlane secret, OpenRouter integration, or SuperPlane-hosted credentials used as `OPENROUTER_API_KEY`.
-- **Model**: Required OpenRouter model id (`provider/model`). SuperPlane-hosted credentials require a model from the installation allowlist.
+- **Credentials**: SuperPlane secret or OpenRouter integration used as `OPENROUTER_API_KEY`.
+- **Model**: Required. Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
 - **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
+
+Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 
 ### Output channels
 - **Passed**: All steps finished with exit code **0**.
@@ -1852,6 +1859,59 @@ def main(payload):
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "runnerPython.finished"
+}
+```
+
+<a id="run-super-plane-agent"></a>
+
+## Run SuperPlane Agent
+
+**Component key:** `runnerSuperPlane`
+
+Runs a SuperPlane-hosted coding agent on a fleet runner.
+
+This agent uses SuperPlane-hosted models. Select a model on the node, or use the instance SuperPlane agent model. The node does not store an API key.
+
+### Prerequisites
+- The organization has hosted credit.
+- An installation admin has set a SuperPlane agent model.
+
+### Steps
+Configure an ordered list of **bash** and **prompt** steps:
+
+- **bash** — shell commands (clone a repo, install deps, run tests, push).
+- **prompt** — an agent turn. Later prompts continue the same session.
+
+### Configuration
+- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
+- **Steps**: Ordered bash/prompt actions (at least one prompt required).
+- **Working directory**: Optional starting directory.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
+
+### Output
+Prompt steps stream agent activity to **View logs**. The finished event includes the latest agent result.
+
+### Output channels
+- **Passed**: All steps finished with exit code **0**.
+- **Failed**: A bash or prompt step failed (non-zero exit).
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "result": {
+        "result": "Done.",
+        "type": "result"
+      },
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runnerSuperPlane.finished"
 }
 ```
 

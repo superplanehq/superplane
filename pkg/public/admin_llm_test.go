@@ -69,6 +69,8 @@ func TestAdminLLMSettings(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
 		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
 		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Empty(t, settings.DefaultHostedProvider)
+		assert.Empty(t, settings.DefaultHostedModel)
 		require.Len(t, settings.Providers, 3)
 
 		body, err := json.Marshal(map[string]any{
@@ -116,6 +118,23 @@ func TestAdminLLMSettings(t *testing.T) {
 		assert.True(t, anthropic.Enabled)
 		assert.True(t, anthropic.APIKeyConfigured)
 		assert.Equal(t, []string{"claude-sonnet-4-6"}, anthropic.AllowedModels)
+
+		body, err = json.Marshal(map[string]any{
+			"default_hosted_provider": "anthropic",
+			"default_hosted_model":    "claude-sonnet-4-6",
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, "anthropic", settings.DefaultHostedProvider)
+		assert.Equal(t, "claude-sonnet-4-6", settings.DefaultHostedModel)
 	})
 
 	t.Run("admin can grant credit and set markup override", func(t *testing.T) {

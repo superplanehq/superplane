@@ -25,6 +25,11 @@ describe("searchFactorySettings", () => {
     expect(results[0]?.section).toBe("integrations");
   });
 
+  it("returns LLM Models under Organization for your keys", () => {
+    const results = searchFactorySettings(index, "your keys");
+    expect(results.some((result) => result.title === "LLM Models" && result.section === "models")).toBe(true);
+  });
+
   it("returns Workspace key under Workspace General", () => {
     const results = searchFactorySettings(index, "workspace key");
     expect(results[0]?.title).toBe("Workspace key");
