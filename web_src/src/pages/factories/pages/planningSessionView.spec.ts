@@ -250,4 +250,238 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.messages[0]?.createdAtMs).toBeUndefined();
   });
+
+  it("keeps an unpersisted optimistic user message across a sync", () => {
+    const local = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "What about staging?",
+      createdAtMs: Date.now(),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [local] },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+      local,
+    ]);
+  });
+
+  it("drops the optimistic bubble once the server has the message", () => {
+    const local = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "What about staging?",
+      createdAtMs: Date.now(),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+          { id: "msg-2", role: "user", text: "What about staging? ", createdAt: "2026-09-03T10:00:00Z" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [local] },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "greet", kind: "text", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting },
+      {
+        id: "msg-2",
+        kind: "text",
+        role: "user",
+        text: "What about staging? ",
+        createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+      },
+    ]);
+    expect(view.messages.some((message) => message.id.startsWith("local-"))).toBe(false);
+  });
+
+  it("dedupes a survey reply optimistic bubble", () => {
+    const local = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "What is the priority? High",
+      origin: "survey" as const,
+      createdAtMs: Date.now(),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "reply", role: "user", text: "What is the priority? High" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [local] },
+    );
+
+    expect(view.messages).toEqual([
+      { id: "reply", kind: "text", role: "user", text: "What is the priority? High", origin: "survey" },
+    ]);
+  });
+
+  it("orders the surviving optimistic bubble last by createdAtMs", () => {
+    const local = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "One more thing",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "greet", role: "agent", text: CREATE_WITH_AGENT_COPY.greeting, createdAt: "2026-09-03T10:00:00Z" },
+          { id: "reply", role: "user", text: "Add color to puppies", createdAt: "2026-09-03T11:00:00Z" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [local] },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["greet", "reply", "local-1"]);
+  });
+
+  it("keeps both optimistic bubbles from a double send until each is persisted", () => {
+    const localA = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.now(),
+    };
+    const localB = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.now() + 1,
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [localA, localB] },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["local-1", "local-2"]);
+  });
+
+  it("retires one bubble per newly persisted message from a double send", () => {
+    const localA = {
+      id: "local-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    const localB = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:01Z"),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T11:59:59Z" }],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, previousMessages: [localA, localB] },
+    );
+
+    // The first send is now persisted (msg-1); the second send is still pending.
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "local-2"]);
+  });
+
+  it("keeps a repeated message that matches an older persisted message", () => {
+    const persisted = {
+      id: "msg-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+    };
+    const local = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    // A poll that races the second send still only shows the older message.
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [{ id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T10:00:00Z" }],
+      },
+      {
+        composer: "",
+        right: { kind: "empty" },
+        endConfirmOpen: false,
+        previousMessages: [persisted, local],
+      },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "local-2"]);
+  });
+
+  it("drops the repeated optimistic bubble once its own send is persisted", () => {
+    const persisted = {
+      id: "msg-1",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T10:00:00Z"),
+    };
+    const local = {
+      id: "local-2",
+      kind: "text" as const,
+      role: "user" as const,
+      text: "Retry please",
+      createdAtMs: Date.parse("2026-09-03T12:00:00Z"),
+    };
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        messages: [
+          { id: "msg-1", role: "user", text: "Retry please", createdAt: "2026-09-03T10:00:00Z" },
+          { id: "msg-2", role: "user", text: "Retry please", createdAt: "2026-09-03T12:00:00Z" },
+        ],
+      },
+      {
+        composer: "",
+        right: { kind: "empty" },
+        endConfirmOpen: false,
+        previousMessages: [persisted, local],
+      },
+    );
+
+    expect(view.messages.map((message) => message.id)).toEqual(["msg-1", "msg-2"]);
+    expect(view.messages.some((message) => message.id.startsWith("local-"))).toBe(false);
+  });
 });
