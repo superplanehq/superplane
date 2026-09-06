@@ -384,6 +384,15 @@ func Test__resolveInstallationOwner(t *testing.T) {
 	})
 }
 
+func Test__GitHub__Actions__includesCompareCommits(t *testing.T) {
+	actionNames := make([]string, 0)
+	for _, action := range (&GitHub{}).Actions() {
+		actionNames = append(actionNames, action.Name())
+	}
+
+	require.Contains(t, actionNames, "github.compareCommits")
+}
+
 func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
 	t.Parallel()
 
