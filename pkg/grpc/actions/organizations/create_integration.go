@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -109,6 +110,16 @@ func CreateIntegrationWithUsage(
 	//
 	// Otherwise, use the old flow.
 	//
+	// The old flow has no multi-step setup: every required field must already be
+	// present in configMap, or the integration would be created just to fail Sync
+	// and get stuck in the "error" state. Only fields that are unconditionally
+	// required are checked here, so conditionally-required fields (which depend on
+	// other field values the client is responsible for supplying together) are left
+	// to Sync/ValidateConfiguration.
+	if err := validateRequiredConfigurationFields(integration.Configuration(), configMap); err != nil {
+		return nil, grpcerrors.InvalidArgument(nil, err.Error())
+	}
+
 	configuration, err := encryptConfigurationIfNeeded(ctx, registry, integration, configMap, integrationID, nil)
 	if err != nil {
 		integrationLogger.WithError(err).Error("failed to encrypt sensitive configuration")
@@ -123,6 +134,38 @@ func CreateIntegrationWithUsage(
 
 	userID, _ := authentication.GetUserIdFromMetadata(ctx)
 	return syncIntegration(registry, baseURL, webhooksBaseURL, oidcProvider, orgID, newIntegration, integration, userID)
+}
+
+// validateRequiredConfigurationFields returns an error if any field that is
+// unconditionally required (Required: true, no RequiredConditions) is missing
+// or empty in config. It intentionally ignores conditionally-required fields:
+// those depend on the value of other fields, and the legacy create flow does
+// not have enough context to evaluate that safely for every integration.
+func validateRequiredConfigurationFields(fields []configuration.Field, config map[string]any) error {
+	for _, field := range fields {
+		if !field.Required || len(field.RequiredConditions) > 0 {
+			continue
+		}
+
+		if isEmptyConfigurationValue(config[field.Name]) {
+			return fmt.Errorf("%s is required", field.Name)
+		}
+	}
+
+	return nil
+}
+
+func isEmptyConfigurationValue(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return true
+	case string:
+		return v == ""
+	case []any:
+		return len(v) == 0
+	default:
+		return false
+	}
 }
 
 func usesSetupWizard(reg *registry.Registry, orgID uuid.UUID, integrationName string, config map[string]any) bool {

@@ -12,6 +12,8 @@ interface IntegrationCreateDialogFooterProps {
   mutationPending: boolean;
   isCreatePending: boolean;
   integrationName: string;
+  /** Whether every visible required configuration field currently has a value. */
+  requiredFieldsFilled: boolean;
   onCompleteWebhookSetup: () => Promise<void>;
   onBrowserActionContinue: () => void;
   onBrowserActionConfigSave: () => Promise<void>;
@@ -27,6 +29,7 @@ export function IntegrationCreateDialogFooter({
   mutationPending,
   isCreatePending,
   integrationName,
+  requiredFieldsFilled,
   onCompleteWebhookSetup,
   onBrowserActionContinue,
   onBrowserActionConfigSave,
@@ -40,6 +43,7 @@ export function IntegrationCreateDialogFooter({
         <LoadingButton
           color="blue"
           onClick={() => void onCompleteWebhookSetup()}
+          disabled={!requiredFieldsFilled}
           loading={mutationPending}
           loadingText="Completing..."
           className="flex items-center gap-2"
@@ -101,7 +105,7 @@ export function IntegrationCreateDialogFooter({
       <LoadingButton
         color="blue"
         onClick={() => void onSubmit()}
-        disabled={!integrationName?.trim()}
+        disabled={!integrationName?.trim() || !requiredFieldsFilled}
         loading={isCreatePending}
         loadingText="Connecting..."
         className="flex items-center gap-2"
