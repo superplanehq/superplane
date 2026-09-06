@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,7 +83,11 @@ const (
 var errUsageServiceUnavailable = errors.New("usage service unavailable")
 
 type Server struct {
+	// httpServerMu guards httpServer and shuttingDown, which Serve writes and
+	// Shutdown reads from the goroutine that watches for the termination signal.
+	httpServerMu          sync.Mutex
 	httpServer            *http.Server
+	shuttingDown          bool
 	encryptor             crypto.Encryptor
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
@@ -1539,13 +1544,23 @@ func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Serve(host string, port int) error {
+	//
+	// Shutdown may already have run, in which case it found no server to close.
+	// Listening now would ignore it and block until the process is killed, so
+	// stop before starting the hub as well as before listening.
+	//
+	if s.isShuttingDown() {
+		log.Info("Not serving, the server is already shutting down")
+		return http.ErrServerClosed
+	}
+
 	log.Infof("Starting server at %s:%d", host, port)
 
 	// Start the WebSocket hub
 	log.Info("Starting WebSocket hub")
 	s.wsHub.Run()
 
-	s.httpServer = &http.Server{
+	httpServer := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", host, port),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 70 * time.Second,
@@ -1553,13 +1568,57 @@ func (s *Server) Serve(host string, port int) error {
 		Handler:      s.Router,
 	}
 
-	return s.httpServer.ListenAndServe()
+	s.httpServerMu.Lock()
+	if s.shuttingDown {
+		s.httpServerMu.Unlock()
+		log.Info("Not serving, the server is already shutting down")
+		return http.ErrServerClosed
+	}
+	s.httpServer = httpServer
+	s.httpServerMu.Unlock()
+
+	return httpServer.ListenAndServe()
+}
+
+func (s *Server) isShuttingDown() bool {
+	s.httpServerMu.Lock()
+	defer s.httpServerMu.Unlock()
+	return s.shuttingDown
 }
 
 func (s *Server) Close() {
-	if err := s.httpServer.Close(); err != nil {
+	httpServer := s.currentHTTPServer()
+	if httpServer == nil {
+		return
+	}
+
+	if err := httpServer.Close(); err != nil {
 		log.Errorf("Error closing server: %v", err)
 	}
+}
+
+// Shutdown stops accepting new connections and waits for the in-flight requests
+// to finish, or for ctx to expire. Serve returns http.ErrServerClosed when this
+// happens, which callers must not treat as a failure. Calling Shutdown before
+// Serve stops the server from listening at all.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.httpServerMu.Lock()
+	s.shuttingDown = true
+	httpServer := s.httpServer
+	s.httpServerMu.Unlock()
+
+	if httpServer == nil {
+		// Serve has not started listening yet, and now it never will.
+		return nil
+	}
+
+	return httpServer.Shutdown(ctx)
+}
+
+func (s *Server) currentHTTPServer() *http.Server {
+	s.httpServerMu.Lock()
+	defer s.httpServerMu.Unlock()
+	return s.httpServer
 }
 
 func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {

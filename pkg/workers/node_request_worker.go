@@ -39,7 +39,7 @@ func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registr
 		registry:       registry,
 		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
-		semaphore:      semaphore.NewWeighted(25),
+		semaphore:      semaphore.NewWeighted(maxConcurrentTasks),
 		authService:    authService,
 		logger:         log.WithFields(log.Fields{"worker": "NodeRequestWorker"}),
 	}
@@ -52,6 +52,7 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			tickStart := time.Now()
@@ -64,6 +65,15 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 			telemetry.RecordNodeRequestWorkerRequestsCount(context.Background(), len(requests))
 
 			for _, request := range requests {
+				//
+				// Stop handing out new work once shutdown starts. Without this the
+				// worker keeps launching the rest of the batch after cancellation,
+				// and the drain then waits for work it should never have started.
+				//
+				if ctx.Err() != nil {
+					break
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue

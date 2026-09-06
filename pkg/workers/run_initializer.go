@@ -41,7 +41,7 @@ func NewRunInitializer(rabbitMQURL string, registry *registry.Registry) *RunInit
 	return &RunInitializer{
 		registry:    registry,
 		rabbitMQURL: rabbitMQURL,
-		semaphore:   semaphore.NewWeighted(25),
+		semaphore:   semaphore.NewWeighted(maxConcurrentTasks),
 		logger:      log.WithFields(log.Fields{"worker": "RunInitializer"}),
 	}
 }
@@ -63,6 +63,7 @@ func (w *RunInitializer) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			drainTasks(w.semaphore, maxConcurrentTasks)
 			return
 		case <-ticker.C:
 			w.sweepPendingRuns()

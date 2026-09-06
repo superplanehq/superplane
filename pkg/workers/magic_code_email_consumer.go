@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -12,6 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/services"
 )
+
+// reconnectDelay is how long an email consumer waits before it reconnects to
+// RabbitMQ after the connection drops or fails to open.
+const reconnectDelay = 5 * time.Second
 
 const MagicCodeEmailServiceName = "superplane" + "." + messages.CanvasExchange + "." + messages.MagicCodeRequestedRoutingKey + ".worker-consumer"
 const MagicCodeEmailConnectionName = "superplane"
@@ -39,7 +44,7 @@ func NewMagicCodeEmailConsumer(rabbitMQURL string, emailService services.EmailSe
 	}
 }
 
-func (c *MagicCodeEmailConsumer) Start() error {
+func (c *MagicCodeEmailConsumer) Start(ctx context.Context) error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
 		ConnectionName: MagicCodeEmailConnectionName,
@@ -49,17 +54,42 @@ func (c *MagicCodeEmailConsumer) Start() error {
 	}
 
 	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+
 		log.Infof("Connecting to RabbitMQ queue for %s events", messages.MagicCodeRequestedRoutingKey)
 
 		err := c.Consumer.Start(&options, c.Consume)
-		if err != nil {
-			log.Errorf("Error consuming messages from %s: %v", messages.MagicCodeRequestedRoutingKey, err)
-			time.Sleep(5 * time.Second)
-			continue
+
+		//
+		// A cancelled context means shutdown closed the connection on purpose,
+		// so this is neither a failure nor a reconnect. Keep a real error
+		// visible, at a level that does not read as an alert during a deploy.
+		//
+		if ctx.Err() != nil {
+			if err != nil {
+				log.Infof("Consumer for %s stopped during shutdown: %v", messages.MagicCodeRequestedRoutingKey, err)
+			}
+
+			return nil
 		}
 
-		log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.MagicCodeRequestedRoutingKey)
-		time.Sleep(5 * time.Second)
+		if err != nil {
+			log.Errorf("Error consuming messages from %s: %v", messages.MagicCodeRequestedRoutingKey, err)
+		} else {
+			log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.MagicCodeRequestedRoutingKey)
+		}
+
+		//
+		// Wait before reconnecting, but give up as soon as the process is shutting
+		// down, so a cancelled consumer does not reconnect and take new messages.
+		//
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(reconnectDelay):
+		}
 	}
 }
 
