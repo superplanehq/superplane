@@ -749,6 +749,7 @@ export const ComponentSidebar = ({
                     nodeId={nodeId}
                     nodeName={nodeName}
                     nodeLabel={nodeLabel}
+                    blockName={blockName}
                     configuration={nodeConfiguration}
                     configurationFields={nodeConfigurationFields}
                     onSave={onNodeConfigSave || (() => {})}
