@@ -175,6 +175,60 @@ func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	assert.Contains(t, got, "https://github.com/owner/repo/pull/9")
 }
 
+func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
+	t.Run("same-repo issue origin adds backlink", func(t *testing.T) {
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		assert.Contains(t, got, `Include "This resolves #12" in the pull request description`)
+	})
+
+	t.Run("cross-repo issue origin uses owner/repo#N", func(t *testing.T) {
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			ResolvesIssue: &IssueRef{Repository: "other-owner/other-repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		assert.Contains(t, got, `Include "This resolves other-owner/other-repo#12" in the pull request description`)
+	})
+
+	t.Run("no origin: no backlink instruction", func(t *testing.T) {
+		spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
+		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+
+	t.Run("autoCreatePr disabled: no backlink instruction even with an issue origin", func(t *testing.T) {
+		no := false
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			AutoCreatePr:  &no,
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+
+	t.Run("update-existing-PR path never gets a backlink instruction", func(t *testing.T) {
+		pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
+		spec := Spec{
+			SourceMode:    "pr",
+			Task:          "address review",
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, pr, "feature-x", false, commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+}
+
 func Test__RunCodeAgent__buildPrompt__structuredOutput(t *testing.T) {
 	schema := map[string]any{
 		"type":       "object",
