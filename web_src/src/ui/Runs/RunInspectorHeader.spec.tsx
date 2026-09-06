@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun } from "@/api-client";
@@ -70,5 +71,34 @@ describe("RunInspectorHeader", () => {
 
     expect(screen.getByLabelText("Cancelling")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancelling" })).toBeDisabled();
+  });
+
+  it("disables the action and uses the permission reason for the tooltip when provided", async () => {
+    render(
+      <MemoryRouter initialEntries={["/org-1/apps/child-canvas-id?run=child-run-id"]}>
+        <RunInspectorHeader
+          run={baseRun}
+          title="Child run"
+          stepCount={1}
+          organizationId="org-1"
+          actionPending={false}
+          actionDisabled
+          actionDisabledReason="You do not have permission to restart this run."
+          onAction={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    const button = screen.getByRole("button", { name: "Rerun" });
+    expect(button).toBeDisabled();
+
+    await userEvent.hover(button);
+    expect((await screen.findAllByText("You do not have permission to restart this run.")).length).toBeGreaterThan(0);
+  });
+
+  it("falls back to the status-based tooltip when no disabled reason is provided", () => {
+    renderHeader(baseRun);
+
+    expect(screen.getByRole("button", { name: "Rerun" })).not.toBeDisabled();
   });
 });

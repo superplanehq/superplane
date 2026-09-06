@@ -1,8 +1,11 @@
-import { screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as ApiClient from "@/api-client";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
 import { executions, renderInspector } from "./RunInspectorPanel.spec.fixtures";
+
+let mockedExecutions = executions;
+let mockedMe: SuperplaneMeUser | null = null;
 
 vi.mock("@uiw/react-json-view", () => ({
   default: ({ value, collapsed }: { value: unknown; collapsed?: boolean | number }) => (
@@ -12,22 +15,24 @@ vi.mock("@uiw/react-json-view", () => ({
   ),
 }));
 
+const reemitTriggerEventMock = vi.fn();
+
 vi.mock("@/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof ApiClient>();
   return {
     ...actual,
-    canvasesReemitTriggerEvent: vi.fn(),
+    canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
     canvasesCancelExecution: vi.fn(),
     canvasesInvokeNodeExecutionHook: vi.fn(),
-    canvasesDescribeRun: vi.fn(),
-    canvasesListNodeQueueItems: vi.fn(),
+    canvasesDescribeRun: vi.fn().mockResolvedValue({ data: { run: { queueItems: [] } } }),
+    canvasesListNodeQueueItems: vi.fn().mockResolvedValue({ data: { items: [] } }),
     canvasesDeleteNodeQueueItem: vi.fn(),
   };
 });
 
 vi.mock("@/hooks/useCanvasData", () => ({
   useEventExecutions: () => ({
-    data: { executions },
+    data: { executions: mockedExecutions },
     isLoading: false,
   }),
   useCanvasVersion: () => ({
@@ -37,7 +42,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
 }));
 
 vi.mock("@/hooks/useMe", () => ({
-  useMe: () => ({ data: null }),
+  useMe: () => ({ data: mockedMe }),
 }));
 
 vi.mock("@/pages/app/mappers", () => ({
@@ -66,21 +71,37 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, isLoading: false }),
+  usePermissions: () => ({ canAct: () => false, isLoading: false }),
 }));
 
-describe("RunInspectorPanel factory timeline", () => {
-  it("opens factory node timeline cards for the selected node", () => {
-    renderInspector({
-      factoryContext: true,
-      selectedNodeId: "action-2",
-    });
+beforeEach(() => {
+  mockedExecutions = executions;
+  mockedMe = null;
+  reemitTriggerEventMock.mockResolvedValue({});
+});
 
-    const panel = screen.getByTestId("run-inspector-panel");
-    expect(panel).toHaveAttribute("data-factory-context", "true");
-    expect(screen.getByTestId("factory-run-node-detail")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Input/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Runtime Config/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Output/i })).toBeInTheDocument();
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("RunInspectorPanel without canvases:update permission", () => {
+  it("disables the global Restart button and never fires a request when clicked", async () => {
+    renderInspector();
+
+    const restartButtons = screen.getAllByRole("button", { name: /Rerun/i });
+    const globalRestartButton = restartButtons[0];
+    expect(globalRestartButton).toBeDisabled();
+
+    fireEvent.click(globalRestartButton);
+
+    expect(reemitTriggerEventMock).not.toHaveBeenCalled();
+  });
+
+  it("disables the per-trigger inline Rerun button inside the node accordion", () => {
+    renderInspector({ selectedNodeId: "trigger-1" });
+
+    const restartButtons = screen.getAllByRole("button", { name: /Rerun/i });
+    expect(restartButtons.length).toBeGreaterThan(1);
+    restartButtons.forEach((button) => expect(button).toBeDisabled());
   });
 });
