@@ -194,6 +194,12 @@ func (a *RunCodeAgent) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Only the "open a new PR" path ever gets a "This resolves #N" backlink;
+	// the "update existing PR" path leaves the PR description untouched.
+	if spec.SourceMode == sourceModeRepository {
+		spec.ResolvesIssue = resolveResolvesIssue(ctx)
+	}
+
 	schema, err := structuredoutput.Parse(spec.OutputSchema)
 	if err != nil {
 		return err
