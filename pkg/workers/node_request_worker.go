@@ -239,6 +239,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(logger *log.Entry, tx *gorm.DB, re
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node, nil, onNewEvents),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
+		Runs:          contexts.NewRunStateContext(tx, node.WorkflowID),
 	}
 
 	if node.WebhookID != nil {
