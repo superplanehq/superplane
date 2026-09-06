@@ -1,0 +1,195 @@
+---
+title: "OpenCode Go"
+---
+
+Run prompts on curated open coding models through OpenCode Go
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Chat Completion" href="#chat-completion" description="Generate a response with a curated open coding model on OpenCode Go" />
+  <LinkCard title="Get Usage" href="#get-usage" description="Fetches OpenCode Go plan limit windows and how much of each is used" />
+</CardGrid>
+
+## Instructions
+
+## OpenCode Go API Key
+
+Subscribe to OpenCode Go at [opencode.ai/docs/go](https://opencode.ai/docs/go).
+
+Sign in at [opencode.ai/auth](https://opencode.ai/auth) and copy your API key. Paste it below.
+
+Usage limits apply: $12 per 5 hours, $30 per week, and $60 per month.
+
+## Supported models
+
+The Chat Completion component selects the correct OpenCode Go endpoint for the model. Chat Completions supports GLM, Kimi, DeepSeek, MiMo, Hy3, and Ox Alpha Free. The Messages API supports MiniMax and Qwen. The Responses API supports Grok 4.5, GPT 5.6 Luna, and Muse Spark 1.2 Contributor.
+
+## Model opt-ins
+
+Some models need an opt-in in your OpenCode Go workspace settings at [opencode.ai/auth](https://opencode.ai/auth):
+
+- DeepSeek V4 Pro and DeepSeek V4 Flash: enable the China region.
+- Muse Spark 1.2 Contributor: accept training data use. Availability is limited to permitted regions.
+
+If a run fails with a region or data policy error, check these settings first.
+
+<a id="chat-completion"></a>
+
+## Chat Completion
+
+**Component key:** `opencodego.chatCompletion`
+
+The Chat Completion component sends a prompt to an OpenCode Go model and returns the generated response.
+
+### Use Cases
+
+- **Workflow automation**: Run prompts on flat-rate open coding models from a workflow
+- **Classification**: Sort incoming events into categories before a human reads them
+- **Triage**: Read reports and assign a priority
+- **Enrichment**: Add summaries or labels to data as it moves through the workflow
+- **Document analysis**: Attach images, PDFs, or text files from the Files tab alongside the prompt
+
+### Configuration
+
+- **Model**: The model to prompt. Picked from the models OpenCode Go currently lists.
+- **Prompt**: The user message (supports expressions)
+- **System Prompt**: (Optional) System-level instructions sent ahead of the prompt
+- **Files**: (Optional) Files from the Files tab to attach. Text files are added to the prompt directly. Images require a vision-capable model.
+- **Max Tokens**: (Optional) Upper bound on generated tokens
+- **Temperature**: (Optional) Sampling temperature
+- **Structured Output**: (Optional) A JSON Schema for the response. The reply is requested in strict JSON mode and is also available parsed on the `parsed` output. Support depends on the model. Models without support ignore this setting and return plain text.
+
+### Output
+
+Returns the completion including:
+- **text**: The generated text
+- **parsed**: When Structured Output is configured, the response parsed into an object
+- **model**: The model that served the request
+- **finishReason**: Why generation stopped
+- **usage**: Token counts for the request
+- **response**: The full API response
+
+### Notes
+
+	- The action selects the correct endpoint for the selected model: Chat Completions for GLM, Kimi, DeepSeek, MiMo, Hy3, and Ox Alpha Free; Messages for MiniMax and Qwen; and Responses for Grok 4.5, GPT 5.6 Luna, and Muse Spark 1.2 Contributor.
+- Attachments are inlined into the request body rather than uploaded, so the combined size is capped at 8MB.
+- Some models need an opt-in in your OpenCode Go workspace settings (China region or training data policy). See the integration instructions.
+- Only PDFs and images are sent as attachments. Text files become part of the prompt, so they cost prompt tokens only.
+- The schema is validated before the request and sent in strict mode. Strict mode marks every property required, so express optional fields by making their type nullable.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "finishReason": "stop",
+    "id": "chatcmpl-20260818-0001",
+    "model": "glm-5.2",
+    "response": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "Hello, world!",
+            "role": "assistant"
+          }
+        }
+      ],
+      "created": 1787263920,
+      "id": "chatcmpl-20260818-0001",
+      "model": "glm-5.2",
+      "object": "chat.completion",
+      "usage": {
+        "completion_tokens": 9,
+        "prompt_tokens": 14,
+        "total_tokens": 23
+      }
+    },
+    "text": "Hello, world!",
+    "usage": {
+      "completion_tokens": 9,
+      "prompt_tokens": 14,
+      "total_tokens": 23
+    }
+  },
+  "timestamp": "2026-08-18T12:00:00Z",
+  "type": "opencodego.chatCompletion.result"
+}
+```
+<a id="get-usage"></a>
+
+## Get Usage
+
+**Component key:** `opencodego.getUsage`
+
+The Get Usage component fetches how much of your OpenCode Go subscription's limit windows is used, straight from the gateway with the regular API key.
+
+### Use Cases
+
+- **Budget alerts**: Trigger a notification when the weekly or monthly window crosses a threshold
+- **Pre-flight gating**: Hold an expensive workflow until the rolling window resets
+- **Dashboards**: Track percent used across the rolling, weekly, and monthly windows
+
+### How It Works
+
+1. Reads the Go subscription's limit windows from the gateway
+2. Emits status, percent used, and reset time for each window
+
+### Configuration
+
+None. It uses the regular API key set on the integration.
+
+### Output
+
+Each window (rolling, weekly, monthly) contributes three fields:
+
+- **status**: "ok" while requests are served, or throttled once the window is exhausted
+- **percent**: Share of the window's dollar cap already used
+- **resetsAt**: When the window resets
+
+The full response is also included under **response**.
+
+### Notes
+
+- The rolling window covers 5 hours ($12), the weekly window covers 7 days ($30), and the monthly window covers a month ($60). Limits are dollar values, so request counts depend on the model.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "monthlyPercent": 48,
+    "monthlyResetsAt": "2026-09-16T15:27:05.432Z",
+    "monthlyStatus": "ok",
+    "response": {
+      "monthly": {
+        "percent": 48,
+        "resetsAt": "2026-09-16T15:27:05.432Z",
+        "status": "ok"
+      },
+      "rolling": {
+        "percent": 0,
+        "resetsAt": "2026-08-22T23:29:53.432Z",
+        "status": "ok"
+      },
+      "weekly": {
+        "percent": 51,
+        "resetsAt": "2026-08-24T00:00:00.432Z",
+        "status": "ok"
+      }
+    },
+    "rollingPercent": 0,
+    "rollingResetsAt": "2026-08-22T23:29:53.432Z",
+    "rollingStatus": "ok",
+    "weeklyPercent": 51,
+    "weeklyResetsAt": "2026-08-24T00:00:00.432Z",
+    "weeklyStatus": "ok"
+  },
+  "timestamp": "2026-08-22T18:29:53Z",
+  "type": "opencodego.getUsage.result"
+}
+```
