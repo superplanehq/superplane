@@ -1964,6 +1964,7 @@ The Time Gate component delays event processing until the next valid day and tim
 ### Behavior
 
 - Events wait until the next valid time window is reached
+- The gate forwards the event that it held, so downstream nodes receive the original payload
 - Exclude dates override the day/time rules
 - Can be manually pushed through using the "Push Through" action
 - Automatically schedules execution when the time window is reached
