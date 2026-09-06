@@ -145,6 +145,11 @@ func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasE
 
 // ListRootEventsForRuns returns the event that started each run, keyed by run
 // id. A root event is the one with no execution behind it.
+//
+// A multi-input replay leaves several such events on the same run, and its
+// queue items and executions are rooted on exactly one of them. Prefer that
+// event so ListEventExecutions, which matches on root_event_id, can find the
+// run's work.
 func ListRootEventsForRuns(tx *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]CanvasEvent, error) {
 	eventsByRunID := make(map[uuid.UUID]CanvasEvent, len(runIDs))
 	if len(runIDs) == 0 {
@@ -163,10 +168,71 @@ func ListRootEventsForRuns(tx *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) 
 	}
 
 	for _, event := range events {
+		if _, exists := eventsByRunID[event.RunID]; exists {
+			return listRootEventsPreferringRooted(tx, canvasID, runIDs, events)
+		}
+
 		eventsByRunID[event.RunID] = event
 	}
 
 	return eventsByRunID, nil
+}
+
+func listRootEventsPreferringRooted(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	runIDs []uuid.UUID,
+	events []CanvasEvent,
+) (map[uuid.UUID]CanvasEvent, error) {
+	rootedOn, err := rootEventIDsForRuns(tx, canvasID, runIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	eventsByRunID := make(map[uuid.UUID]CanvasEvent, len(runIDs))
+	for _, event := range events {
+		_, taken := eventsByRunID[event.RunID]
+		if taken && !rootedOn[event.ID] {
+			continue
+		}
+
+		eventsByRunID[event.RunID] = event
+	}
+
+	return eventsByRunID, nil
+}
+
+func rootEventIDsForRuns(tx *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	var ids []uuid.UUID
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("workflow_id = ?", canvasID).
+		Where("run_id IN ?", runIDs).
+		Distinct().
+		Pluck("root_event_id", &ids).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	var queueItemIDs []uuid.UUID
+	err = tx.
+		Model(&CanvasNodeQueueItem{}).
+		Where("workflow_id = ?", canvasID).
+		Where("run_id IN ?", runIDs).
+		Distinct().
+		Pluck("root_event_id", &queueItemIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	rootedOn := make(map[uuid.UUID]bool, len(ids)+len(queueItemIDs))
+	for _, id := range append(ids, queueItemIDs...) {
+		rootedOn[id] = true
+	}
+
+	return rootedOn, nil
 }
 
 func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {

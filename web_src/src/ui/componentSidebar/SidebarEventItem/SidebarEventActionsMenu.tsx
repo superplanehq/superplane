@@ -13,6 +13,7 @@ interface SidebarEventActionsMenuProps {
   onReEmit?: () => void;
   kind: "queue" | "execution" | "trigger";
   onOpenChange?: (open: boolean) => void;
+  onReplay?: () => void;
 }
 
 export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = ({
@@ -24,6 +25,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   onReEmit,
   kind,
   onOpenChange,
+  onReplay,
 }) => {
   const isWaiting = eventState === "waiting";
   const isQueued = eventState === "queued";
@@ -31,7 +33,8 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
 
   const showCancel = (kind === "queue" && isQueued) || (kind === "execution" && (isRunning || isWaiting));
   const showReEmit = kind === "trigger" && !!onReEmit;
-  const showDropdown = showCancel || showReEmit;
+  const showReplay = kind === "execution" && !!onReplay;
+  const showDropdown = showCancel || showReEmit || showReplay;
 
   const handleReEmit = React.useCallback(
     (e: React.MouseEvent) => {
@@ -68,6 +71,14 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
     [onCancelQueueItem, eventId],
   );
 
+  const handleReplay = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onReplay?.();
+    },
+    [onReplay],
+  );
+
   if (!showDropdown) return null;
 
   return (
@@ -98,6 +109,13 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           <DropdownMenuItem onClick={handleReEmit} className="gap-2" data-testid="reemit-item">
             {React.createElement(resolveIcon("rotate-ccw"), { size: 16 })}
             Re-emit
+          </DropdownMenuItem>
+        )}
+
+        {showReplay && (
+          <DropdownMenuItem onClick={handleReplay} className="gap-2" data-testid="replay-item">
+            {React.createElement(resolveIcon("rotate-ccw"), { size: 16 })}
+            Replay
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
