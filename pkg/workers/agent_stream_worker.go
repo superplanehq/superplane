@@ -41,6 +41,30 @@ const (
 var errCustomToolResultsRequired = errors.New("custom tool results required")
 var errAgentStreamAlreadyLocked = errors.New("agent stream already in progress")
 var errSessionAlreadyReset = errors.New("agent session no longer streaming")
+var errWorkerShutdown = errors.New("agent stream worker interrupted")
+
+var errTurnDeadlineExpired = fmt.Errorf("provider turn did not complete within %v", agentStreamTimeout)
+
+// classifyTurnError maps the error a provider turn ended with to the turn's
+// outcome. turnCtx is the worker's own per-turn deadline context; only its
+// expiry counts as the turn deadline, so a provider-internal timeout is not
+// misreported as agentStreamTimeout. A canceled parent means worker shutdown:
+// the turn has no outcome and the session must stay streaming for cleanup —
+// unless the turn deadline had already expired, which is a real outcome.
+func classifyTurnError(parentCtx, turnCtx context.Context, err error) error {
+	switch {
+	case err == nil:
+		// The stream ended cleanly; a shutdown racing in after that does
+		// not un-complete the turn.
+		return nil
+	case turnCtx.Err() == context.DeadlineExceeded:
+		return errTurnDeadlineExpired
+	case parentCtx.Err() != nil:
+		return errWorkerShutdown
+	default:
+		return err
+	}
+}
 
 var publishAgentRunFinished = func(session *models.AgentSession, evt agents.ProviderEvent, idempotencyKey string) error {
 	return messages.NewAgentRunFinishedMessage(
@@ -365,6 +389,9 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		}).Warn("agent stream: provider mismatch, dropping")
 		return nil
 	}
+	// A streaming row is either a live turn or one a shut-down worker
+	// abandoned for cleanup; a later request may legitimately resume the
+	// latter here before FailStuckStreamingSessions reclaims it.
 	if session.Status != models.AgentSessionStatusStreaming {
 		log.WithFields(log.Fields{
 			"session_id": sessionID,
@@ -385,6 +412,15 @@ func (w *AgentStreamWorker) handleLocked(parentCtx context.Context, req messages
 		publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
 
 		streamErr := w.streamProviderTurn(parentCtx, session, publish)
+
+		if errors.Is(streamErr, errWorkerShutdown) {
+			// Leave the row streaming: FailStuckStreamingSessions (or
+			// another replica) reclaims it once the heartbeat goes stale.
+			// Marking it failed here would burst failures on every deploy.
+			// Open tools are left open too — the turn has no outcome.
+			log.WithField("session_id", sessionID).Info("agent stream: worker interrupted mid-turn, leaving session streaming for cleanup")
+			return nil
+		}
 		closeOpenTools(sessionID, publish)
 
 		if streamErr != nil {
@@ -459,15 +495,22 @@ func (w *AgentStreamWorker) streamProviderTurn(
 		if errors.Is(err, errSessionAlreadyReset) {
 			return nil
 		}
-		if streamErr == nil && err != nil && !isContextCancel(err) {
-			streamErr = err
+		if streamErr == nil {
+			// A failure the provider already reported (streamErr) is a real
+			// turn outcome and wins over the shutdown classification below.
+			streamErr = classifyTurnError(parentCtx, ctx, err)
 		}
 		if streamErr != nil || !customTools.resultsRequired {
 			return streamErr
 		}
 
+		if parentCtx.Err() != nil {
+			// Do not execute side-effecting custom tools with a dead
+			// context: the resumed session would run them again.
+			return errWorkerShutdown
+		}
 		if err := w.executeAndSendCustomToolResults(ctx, session, customTools, publish); err != nil {
-			return err
+			return classifyTurnError(parentCtx, ctx, err)
 		}
 	}
 }
@@ -1124,11 +1167,4 @@ func runStreamHeartbeat(ctx context.Context, sessionID uuid.UUID) {
 			}
 		}
 	}
-}
-
-func isContextCancel(err error) bool {
-	if err == nil {
-		return false
-	}
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
