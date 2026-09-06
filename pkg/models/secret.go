@@ -122,10 +122,17 @@ func FindSecretByIDInTransaction(tx *gorm.DB, domainType string, domainID uuid.U
 	return &secret, nil
 }
 
-func CreateSecret(name, provider, requesterID, domainType string, domainID uuid.UUID, data []byte) (*Secret, error) {
+// CreateSecret takes the ID because local secret payloads are encrypted under it,
+// so the caller has to know the ID before it can build the data to store.
+func CreateSecret(id uuid.UUID, name, provider, requesterID, domainType string, domainID uuid.UUID, data []byte) (*Secret, error) {
+	if id == uuid.Nil {
+		return nil, ErrSecretIDRequired
+	}
+
 	now := time.Now()
 
 	secret := Secret{
+		ID:         id,
 		Name:       name,
 		DomainType: domainType,
 		DomainID:   domainID,
