@@ -100,9 +100,10 @@ func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "organization",
-			Label:       "Organization",
+			Label:       "GitHub organization name",
 			Type:        configuration.FieldTypeString,
-			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+			Description: "Name of the GitHub organization to install the app into. If left blank, the app will be installed into the user's account.",
+			Placeholder: "e.g. superplanehq",
 		},
 	}
 }
@@ -114,6 +115,7 @@ func (g *GitHub) Actions() []core.Action {
 		&checks.WaitForPullRequestChecks{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
+		&contents.GetFileContent{},
 		&contents.GetRelease{},
 		&contents.UpdateRelease{},
 		&contents.DeleteRelease{},
