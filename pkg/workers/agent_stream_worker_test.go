@@ -629,6 +629,64 @@ func TestAgentStreamWorker_MarksFailedOnSessionError(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status)
 }
 
+// A turn cut short by agentStreamTimeout never sees ProviderEventTurnCompleted,
+// so nothing downstream publishes a terminal event. Recording it as a completed
+// turn leaves the session idle and the UI waiting forever.
+func TestAgentStreamWorker_FailsSessionWhenTurnDeadlineExpires(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		err:  context.DeadlineExceeded,
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status,
+		"a turn cut short by its deadline must be reported as failed, not recorded as a completed turn")
+}
+
+// Shutdown is not a turn outcome. The row has to stay streaming so
+// FailStuckStreamingSessions can reclaim it — that sweeper only looks at
+// streaming rows, so marking it idle here would strand the session forever.
+func TestAgentStreamWorker_LeavesSessionStreamingWhenWorkerShutsDown(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name:        testProvider,
+		streamReady: make(chan struct{}),
+		release:     make(chan struct{}),
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- w.Handle(ctx, body)
+	}()
+	<-provider.streamReady
+
+	cancel()
+	require.NoError(t, <-done)
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status,
+		"a turn interrupted by shutdown has no outcome to record; the session must stay recoverable")
+}
+
 func TestAgentStreamWorker_SkipsUnknownProvider(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
