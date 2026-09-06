@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -329,6 +330,12 @@ func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) 
 func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 	webhookSecret, err := g.findWebhookSecret(ctx)
 	if err != nil {
+		if !ctx.Integration.LegacySetup() && errors.Is(err, core.ErrIntegrationSecretNotFound) {
+			ctx.Logger.Warn("GitHub webhook secret is missing for incomplete setup")
+			ctx.Response.WriteHeader(http.StatusNotFound)
+			return
+		}
+
 		ctx.Logger.Errorf("Error finding webhook secret: %v", err)
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
