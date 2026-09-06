@@ -107,10 +107,11 @@ describe("ConversationTranscript user messages", () => {
   it("applies theme-aware selection colors so selected text stays readable", () => {
     render(<ConversationTranscript {...baseProps} messageGroups={userMessage("Hello")} />);
 
-    // Explicit `selection:` utilities keep dark-mode selected text readable (issue #6372).
+    // The `.agent-chat-selection` hook wires up the theme-aware `::selection` rules in App.css that
+    // keep dark-mode selected text readable (issue #6372). The actual colors are global CSS and
+    // cannot be asserted in jsdom, so we verify the class contract here.
     const transcript = screen.getByTestId("agent-chat-messages");
-    expect(transcript).toHaveClass("selection:text-slate-900");
-    expect(transcript).toHaveClass("dark:selection:text-gray-50");
+    expect(transcript).toHaveClass("agent-chat-selection");
   });
 
   it("keeps compact user messages sticky", () => {
