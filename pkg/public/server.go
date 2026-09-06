@@ -847,7 +847,9 @@ func (s *Server) dispatchIntegrationRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			log.Errorf("failed to publish canvas event created RabbitMQ message for event %s in canvas %s: %v", event.ID, event.WorkflowID, err)
+		}
 	}
 }
 
@@ -1627,7 +1629,9 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			log.Errorf("failed to publish canvas event created RabbitMQ message for event %s in canvas %s: %v", event.ID, event.WorkflowID, err)
+		}
 	}
 
 	for executionID, workflowID := range touchedExecutions {

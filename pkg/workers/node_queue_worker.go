@@ -689,7 +689,9 @@ func (c *MessageCollector) Publish() {
 	}
 
 	for _, event := range c.events {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			c.logger.Errorf("failed to publish canvas event created RabbitMQ message for event %s in canvas %s: %v", event.ID, event.WorkflowID, err)
+		}
 	}
 
 	for _, queueItem := range c.queueItemsConsumed {

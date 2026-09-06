@@ -314,7 +314,9 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	for _, event := range newEvents {
-		messages.PublishCanvasEventCreatedMessage(&event)
+		if err := messages.PublishCanvasEventCreatedMessage(&event); err != nil {
+			w.logger.Errorf("failed to publish canvas event created RabbitMQ message for event %s in canvas %s: %v", event.ID, event.WorkflowID, err)
+		}
 	}
 
 	for _, pendingRun := range pendingRuns {
