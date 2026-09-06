@@ -733,8 +733,8 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 
 	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
 
-	// start the search on Sunday of the next week
-	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
+	// Start the search on Sunday of the target week.
+	nextIntervalStart = nextIntervalStart.AddDate(0, 0, -int(nextIntervalStart.Weekday()))
 	for i := 0; i < 7; i++ {
 		checkDate := nextIntervalStart.AddDate(0, 0, i)
 		if validWeekdays[checkDate.Weekday()] {
