@@ -7,6 +7,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
 import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
+import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
 import { useHostedCreditEmptyBanner } from "../../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
 import { MissionsWorkOrdersLoadedView } from "./MissionsWorkOrdersLoadedView";
@@ -32,6 +33,7 @@ export function MissionsWorkOrdersPage() {
   const canDispatch = canAct("work_orders", "update");
   const canAssign = canAct("work_orders", "update");
   const hostedCreditEmptyBanner = useHostedCreditEmptyBanner(organizationId, factoryKey);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, factoryKey);
   const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
 
   if (workOrdersError) {
@@ -71,6 +73,7 @@ export function MissionsWorkOrdersPage() {
       canAssign={canAssign}
       permissionsLoading={permissionsLoading}
       hostedCreditEmptyBanner={hostedCreditEmptyBanner}
+      brokenIntegrationsBanner={brokenIntegrationsBanner}
       {...cardActions}
     />
   );

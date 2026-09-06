@@ -368,7 +368,7 @@ function storybookIntegrationDefinition(
 
 export type StorybookOrgIntegration = {
   metadata: { id: string; name: string; integrationName: string };
-  status: { state: "ready" | "pending" | "error" };
+  status: { state: "ready" | "pending" | "error"; stateDescription?: string };
   spec?: { configuration?: Record<string, unknown> };
 };
 
