@@ -78,7 +78,7 @@ func (c *ResolveIncident) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "fromEmail",
-			Label:       "From Email",
+			Label:       "PagerDuty User Email",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Email address of a valid PagerDuty user. Required for App OAuth and account-level API tokens, optional for user-level API tokens.",
