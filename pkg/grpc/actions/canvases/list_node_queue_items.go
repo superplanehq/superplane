@@ -20,10 +20,12 @@ func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 	//
 	// List and count queue items
 	//
-	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, nodeID, int(limit), beforeTime)
+	queueItems, err := models.ListNodeQueueItems(db, canvas.ID, nodeID, int(limit)+1, beforeTime)
 	if err != nil {
 		return nil, err
 	}
+
+	queueItems, hasNext := trimPage(queueItems, int(limit))
 
 	totalCount, err := models.CountNodeQueueItems(db, canvas.ID, nodeID)
 	if err != nil {
@@ -38,7 +40,7 @@ func ListNodeQueueItems(ctx context.Context, db *gorm.DB, canvas *models.Canvas,
 	return &pb.ListNodeQueueItemsResponse{
 		Items:         serialized,
 		TotalCount:    uint32(totalCount),
-		HasNextPage:   hasNextPage(len(queueItems), int(limit), totalCount),
+		HasNextPage:   hasNext,
 		LastTimestamp: getLastQueueItemTimestamp(queueItems),
 	}, nil
 }
