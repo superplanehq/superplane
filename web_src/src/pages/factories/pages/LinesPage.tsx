@@ -796,7 +796,6 @@ function LineDetail({
           factoryId={factoryId}
           factoryKey={factoryKey}
           line={line}
-          apps={apps}
           backlogOrders={backlogOrders}
           verifyOrders={verifyOrders}
           doneOrders={doneOrders}
@@ -1077,7 +1076,6 @@ function PhaseBoard({
   factoryId,
   factoryKey,
   line,
-  apps,
   backlogOrders,
   verifyOrders,
   doneOrders,
@@ -1106,7 +1104,6 @@ function PhaseBoard({
   factoryId: string;
   factoryKey: string;
   line: FactoriesFactoryLine;
-  apps: Array<{ id?: string; name?: string }>;
   backlogOrders: FactoriesWorkOrder[];
   verifyOrders: FactoriesWorkOrder[];
   doneOrders: FactoriesWorkOrder[];
@@ -1141,14 +1138,6 @@ function PhaseBoard({
   const [parallelismByStep, setParallelismByStep] = useState<Record<number, number>>({});
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const lineId = line.id;
-  const backlogAutomationApp = findBacklogAutomationApp(apps);
-  const backlogAutomationHref =
-    backlogAutomationApp && lineId
-      ? factoryAppConfigurePath(organizationId, factoryKey, backlogAutomationApp.id, {
-          from: "lines",
-          lineId,
-        })
-      : undefined;
 
   // The line query is the source of truth for persisted colors. Resync when
   // it changes, but skip while a color save is in flight so a stale refetch
@@ -1252,7 +1241,6 @@ function PhaseBoard({
           analyzingOrderIds={analyzingOrderIds}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
-          automationHref={backlogAutomationHref}
           automations={showColumnAutomations ? automationsFor("backlog", columnTitles.backlog ?? "Backlog") : undefined}
           onOpenAutomations={showColumnAutomations ? () => onOpenAutomations("backlog") : undefined}
           automationsOpen={automationsOpenKey === "backlog"}
@@ -1429,7 +1417,6 @@ function VerifyColumn({
             testId="lines-verify-menu"
             colorId={colorId}
             onColorChange={onColorChange}
-            onOpenAutomations={onOpenAutomations}
           />
         </div>
       }
@@ -1517,7 +1504,6 @@ function DoneColumn({
             testId="lines-done-menu"
             colorId={colorId}
             onColorChange={onColorChange}
-            onOpenAutomations={onOpenAutomations}
           />
         </div>
       }
@@ -1684,7 +1670,6 @@ function PhaseColumn({
               parallelism={parallelism}
               colorId={colorId}
               onColorChange={onColorChange}
-              onOpenAutomations={onOpenAutomations}
             />
           </div>
         }
