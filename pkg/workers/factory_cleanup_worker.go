@@ -103,6 +103,15 @@ func (w *FactoryCleanupWorker) processFactory(tx *gorm.DB, factory *models.Facto
 		return fmt.Errorf("delete factory file objects: %w", err)
 	}
 
+	var remainingFiles int64
+	if err := tx.Model(&models.File{}).Where("factory_id = ?", factory.ID).Limit(1).Count(&remainingFiles).Error; err != nil {
+		return fmt.Errorf("count remaining factory files: %w", err)
+	}
+	if remainingFiles > 0 {
+		w.logger.Infof("Factory %s still has files - waiting for object cleanup", factory.ID)
+		return nil
+	}
+
 	deleted, complete, err := models.NewFactoryResourceCleaner(tx, factory).
 		WithLimit(w.maxResourcesPerTick).
 		Run()

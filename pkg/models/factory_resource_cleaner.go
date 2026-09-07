@@ -8,7 +8,8 @@ import (
 )
 
 // FactoryResourceCleaner hard-deletes factory-owned rows in FK-safe order
-// after all factory canvases are gone. Each Run deletes at most limit rows
+// after all factory canvases are gone. File objects are deleted by the
+// cleanup worker before Run. Each Run deletes at most limit rows
 // total so large factories finish across ticks without long transactions.
 type FactoryResourceCleaner struct {
 	tx      *gorm.DB
@@ -143,16 +144,6 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 	count, err = deleteRowsLimited(c.tx, &FactoryPullRequest{}, remaining, "factory_id = ?", c.factory.ID)
 	if err != nil {
 		return deleted, false, fmt.Errorf("delete factory pull requests: %w", err)
-	}
-	deleted += count
-	remaining -= int(count)
-	if remaining <= 0 {
-		return deleted, false, nil
-	}
-
-	count, err = deleteRowsLimited(c.tx, &File{}, remaining, "factory_id = ?", c.factory.ID)
-	if err != nil {
-		return deleted, false, fmt.Errorf("delete factory files: %w", err)
 	}
 	deleted += count
 	remaining -= int(count)
@@ -371,6 +362,13 @@ func deleteOrphanFactoryWorkOrdersLimited(tx *gorm.DB, factoryID uuid.UUID, limi
 			NOT EXISTS (
 				SELECT 1 FROM factory_pull_requests
 				WHERE factory_pull_requests.work_order_id = factory_work_orders.id
+			)`).
+		// File objects are deleted by the cleanup worker. Leave the order
+		// until those rows are gone so the FK does not fail.
+		Where(`
+			NOT EXISTS (
+				SELECT 1 FROM files
+				WHERE files.work_order_id = factory_work_orders.id
 			)`).
 		Limit(limit)
 
