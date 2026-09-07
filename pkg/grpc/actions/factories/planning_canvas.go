@@ -2,12 +2,10 @@ package factories
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/datatypes"
@@ -21,7 +19,7 @@ const (
 )
 
 var (
-	errPlanningClaudeRequired = errors.New("claude is not connected")
+	errPlanningAgentRequired  = errors.New("agent is not connected")
 	errPlanningGitHubRequired = errors.New("github is not connected")
 )
 
@@ -166,51 +164,15 @@ func requirePlanningGitHub(tx *gorm.DB, factoryModel *models.Factory) error {
 }
 
 func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) (*intakeAgent, error) {
-	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil && agent.component() == "runnerClaudeCode" {
+	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil {
 		return agent, nil
 	}
-	if agent := resolveClaudePlanningAgent(tx, factoryModel); agent != nil {
-		return agent, nil
-	}
-	return nil, errPlanningClaudeRequired
-}
-
-func resolveClaudePlanningAgent(tx *gorm.DB, factoryModel *models.Factory) *intakeAgent {
-	integrations, err := models.ListIntegrations(tx, factoryModel.OrganizationID)
-	if err == nil {
-		for i := range integrations {
-			if integrations[i].AppName != "claude" {
-				continue
-			}
-			if agent := intakeAgentFromIntegration(&integrations[i]); agent != nil {
-				return agent
-			}
-		}
-	}
-	providers, err := models.ListHostedLLMProviders(tx)
-	if err != nil {
-		return nil
-	}
-	index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
-		return provider.Provider == models.UsageProviderAnthropic && provider.OffersHostedModels()
-	})
-	if index < 0 {
-		return nil
-	}
-	model := hostedIntakeModel(providers[index], "opus")
-	if model == "" {
-		return nil
-	}
-	return &intakeAgent{
-		Component:   "runnerClaudeCode",
-		Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
-		Model:       model,
-	}
+	return nil, errPlanningAgentRequired
 }
 
 func planningTemplateAgent(agent *intakeAgent) *factoryTemplateAgent {
 	out := &factoryTemplateAgent{
-		component: "runnerClaudeCode",
+		component: agent.component(),
 		model:     agent.model(),
 	}
 	credentials := agent.credentials()
@@ -237,7 +199,7 @@ func planningTemplateIntegrations(tx *gorm.DB, factoryModel *models.Factory) map
 			continue
 		}
 		switch integrations[i].AppName {
-		case intakeGitHubAppName, "claude":
+		case intakeGitHubAppName, "claude", "openai", "openrouter":
 			out[integrations[i].AppName] = factoryTemplateIntegration{
 				id:   integrations[i].ID.String(),
 				name: integrations[i].InstallationName,
