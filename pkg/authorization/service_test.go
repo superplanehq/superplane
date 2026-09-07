@@ -573,3 +573,11 @@ func Test__AuthService_GetRoleHierarchy(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func Test__AuthService_SetupOrganizationMarksCreatorAsOwner(t *testing.T) {
+	r := support.Setup(t)
+
+	user, err := models.FindActiveUserByID(r.Organization.ID.String(), r.User.String())
+	require.NoError(t, err)
+	assert.True(t, user.IsOwner)
+}

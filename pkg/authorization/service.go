@@ -605,29 +605,28 @@ func (a *AuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) erro
 
 	log.Infof("Role metadata added - assigning owner for %s", orgID)
 
+	ownerUUID, parseErr := uuid.Parse(ownerID)
+	if parseErr != nil {
+		return fmt.Errorf("invalid owner ID: %w", parseErr)
+	}
+
+	if err := models.SetUserIsOwner(tx, ownerUUID, true); err != nil {
+		log.Errorf("Error setting owner flag for %s: %v", orgID, err)
+		return fmt.Errorf("failed to set organization owner: %w", err)
+	}
+
 	//
-	// Then, we make the casbin owner assignment in a transaction.
+	// Then, we make the casbin admin assignment in a transaction.
 	// If this succeeds, we commit the tx we started above.
 	// Otherwise, we fail it, rolling back the metadata changes.
+	// The owner flag lives on users. Write it on the caller
+	// transaction, not inside the Casbin adapter session.
 	//
 	db := a.enforcer.GetAdapter().(*gormadapter.Adapter)
 	err = db.Transaction(a.enforcer, func(enforcerTx casbin.IEnforcer) error {
-
-		//
-		// Setup the organization owner
-		//
 		err = a.assignRoleWithEnforcer(enforcerTx, ownerID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		if err != nil {
 			return fmt.Errorf("failed to assign organization admin: %w", err)
-		}
-
-		ownerUUID, parseErr := uuid.Parse(ownerID)
-		if parseErr != nil {
-			return fmt.Errorf("invalid owner ID: %w", parseErr)
-		}
-
-		if err := models.SetUserIsOwner(tx, ownerUUID, true); err != nil {
-			return fmt.Errorf("failed to set organization owner: %w", err)
 		}
 
 		return nil

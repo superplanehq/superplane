@@ -33,7 +33,11 @@ func Test_SetUserOwner(t *testing.T) {
 	})
 
 	t.Run("refuses to clear the last owner", func(t *testing.T) {
-		_, err := SetUserOwner(ctx, orgID, r.User.String(), false)
+		owner, err := models.FindActiveUserByID(orgID, r.User.String())
+		require.NoError(t, err)
+		require.True(t, owner.IsOwner)
+
+		_, err = SetUserOwner(ctx, orgID, r.User.String(), false)
 		require.Error(t, err)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
