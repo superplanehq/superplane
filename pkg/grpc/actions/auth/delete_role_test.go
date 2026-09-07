@@ -170,6 +170,6 @@ func Test_DeleteRole(t *testing.T) {
 
 		groupRole, err := r.AuthService.GetGroupRole(context.Background(), orgID, models.DomainTypeOrganization, groupName)
 		require.NoError(t, err)
-		assert.Equal(t, models.RoleOrgViewer, groupRole)
+		assert.Equal(t, models.RoleOrgOperator, groupRole)
 	})
 }

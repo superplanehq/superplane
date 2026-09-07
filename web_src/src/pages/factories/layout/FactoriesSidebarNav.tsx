@@ -1,9 +1,13 @@
-import { PermissionTooltip } from "@/components/PermissionGate";
 import { cn } from "@/lib/utils";
 import { Gauge, Kanban, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import {
+  factoryHomePath,
+  factorySettingsSectionPath,
+  factorySettingsWorkspaceGeneralPath,
+  factoryVelocityPath,
+} from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
@@ -50,17 +54,13 @@ function RailNavLink({
  * then settings. Intakes and PR feedback open from their listener rows on
  * the board, so they do not need a rail icon.
  */
-export function FactoriesSidebarNav({
-  organizationId,
-  factoryKey,
-  lineId,
-  canOpenSettings,
-  permissionsLoading,
-}: FactoriesSidebarNavProps) {
+export function FactoriesSidebarNav({ organizationId, factoryKey, lineId, canOpenSettings }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
-  const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, factoryKey);
+  const settingsHref = canOpenSettings
+    ? factorySettingsWorkspaceGeneralPath(organizationId, factoryKey)
+    : factorySettingsSectionPath(organizationId, factoryKey, "account", "profile");
   const boardCurrent = isBoardPath(pathname);
   const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
@@ -75,26 +75,13 @@ export function FactoriesSidebarNav({
         testId="factories-nav-velocity"
         isCurrent={velocityCurrent}
       />
-      <PermissionTooltip
-        allowed={canOpenSettings || permissionsLoading}
-        message="You don't have permission to open workspace settings."
-      >
-        <Link
-          to={canOpenSettings ? settingsHref : "#"}
-          onClick={(event) => {
-            if (!canOpenSettings) {
-              event.preventDefault();
-            }
-          }}
-          aria-label="Workspace settings"
-          title="Workspace settings"
-          aria-current={settingsCurrent ? "page" : undefined}
-          data-testid="factories-workspace-settings-link"
-          className={cn(railLinkClassName(settingsCurrent), !canOpenSettings && "pointer-events-none opacity-60")}
-        >
-          <Settings className="size-3.5" aria-hidden />
-        </Link>
-      </PermissionTooltip>
+      <RailNavLink
+        to={settingsHref}
+        label="Workspace settings"
+        Icon={Settings}
+        testId="factories-workspace-settings-link"
+        isCurrent={settingsCurrent}
+      />
     </nav>
   );
 }
