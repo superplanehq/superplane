@@ -13,8 +13,17 @@ import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   GITHUB_INTAKE_RUNS,
   type IntakeAutomationRun,
+  type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
+import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+
+vi.mock("@monaco-editor/react", () => ({
+  Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
+    <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
+  ),
+}));
 
 const githubAutomationGraph = githubIntakeGraph();
 
@@ -65,7 +74,8 @@ function renderPopup(
     onOpenRun?: (run: IntakeAutomationRun) => void;
     runs?: IntakeAutomationRun[];
     editAutomationHref?: string;
-    initialTab?: "general" | "runs" | "automation";
+    agent?: PlanningReviewAgentSlot;
+    initialTab?: IntakeSettingsTab;
   } = {},
 ) {
   return render(
@@ -80,6 +90,7 @@ function renderPopup(
               onOpenRun={props.onOpenRun}
               runs={props.runs}
               editAutomationHref={props.editAutomationHref}
+              agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
               fixed={false}
@@ -108,6 +119,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByRole("radio", { name: "Any assignment" })).toBeChecked();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs", "Automation"]);
+    expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-runs")).not.toBeInTheDocument();
   });
@@ -172,6 +184,25 @@ describe("IntakeSourceSettingsPopup", () => {
 
     await user.click(screen.getByRole("button", { name: "View run for Handle duplicate refunds on retry" }));
     expect(onOpenRun).toHaveBeenCalledWith(expect.objectContaining({ id: "gh-issue-1", placement: "progressed" }));
+  });
+
+  it("puts Agent after General when the intake canvas has an agent", async () => {
+    const user = userEvent.setup();
+    renderPopup({
+      agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
+    });
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "General",
+      "Agent",
+      "Runs",
+      "Automation",
+    ]);
+
+    await user.click(screen.getByTestId("intake-settings-tab-agent"));
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
+    expect(screen.queryByTestId("planning-review-automation-note")).not.toBeInTheDocument();
   });
 
   it("saves the edited configuration", async () => {

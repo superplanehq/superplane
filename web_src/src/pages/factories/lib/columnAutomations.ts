@@ -3,6 +3,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
 import { PR_FEEDBACK_SOURCES, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
+import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
 
@@ -381,6 +382,38 @@ export function runningCountForApp(appId: string | undefined, workOrders: Factor
   return count;
 }
 
+/** Path for an existing column automation. Opens the popup on the first tab. */
+export function columnAutomationOpenPath(
+  automation: ColumnAutomation,
+  args: { organizationId: string; factoryKey: string; lineId?: string },
+): string | undefined {
+  if (automation.kind === "intake") {
+    return factoryIntakePath(args.organizationId, args.factoryKey, args.lineId, automation.id);
+  }
+  if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
+    return factoryPRFeedbackPath(args.organizationId, args.factoryKey, args.lineId, undefined, automation.id);
+  }
+  if (!automation.canvasId) {
+    return undefined;
+  }
+  return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
+}
+
+export type ColumnAutomationViewTab = "general" | "agent" | "automation";
+
+/** Tab order: form first, then agent, then the canvas. */
+export function columnAutomationViewTabs(input: { hasGeneral: boolean; hasAgent: boolean }): ColumnAutomationViewTab[] {
+  const tabs: ColumnAutomationViewTab[] = [];
+  if (input.hasGeneral) {
+    tabs.push("general");
+  }
+  if (input.hasAgent) {
+    tabs.push("agent");
+  }
+  tabs.push("automation");
+  return tabs;
+}
+
 export function applyColumnAutomationsOverlay(
   automations: ColumnAutomation[],
   extra: ColumnAutomation[] | undefined,
@@ -429,4 +462,13 @@ export const COLUMN_AUTOMATIONS_COPY = {
   sourceTaken: "This automation is already configured.",
   needsRepairLabel: "Needs repair",
   disabledLabel: "Disabled",
+  editLabel: "Edit automation",
+  tabsLabel: "Automation sections",
+  generalTab: "General",
+  agentTab: "Agent",
+  automationTab: "Automation",
+  viewLoading: "The automation is loading.",
+  viewEmpty: "This automation has no canvas yet.",
+  viewError: "SuperPlane could not load the automation.",
+  viewRetry: "Try again",
 } as const;

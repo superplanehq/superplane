@@ -106,6 +106,7 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   columnAutomationsKeyFromSearch,
+  columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
@@ -125,6 +126,7 @@ import {
 import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
+  columnAutomationOpenPath,
   catalogEntryToAutomation,
   catalogForColumn,
   isColumnKey,
@@ -148,6 +150,7 @@ import {
 } from "./lineIntakeModel";
 import { isIntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { useFactoryPreviewFlag } from "./factoryPreviewFlagsContext";
+import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
@@ -207,6 +210,7 @@ export function LinesPage() {
   const intakeOpen = isIntakeSearchOpen(search);
   const intakeId = intakeIdFromSearch(search);
   const intakeSettingsTab = intakeSettingsTabFromSearch(search);
+  const automationViewCanvasId = columnAutomationViewCanvasIdFromSearch(search);
   const prFeedbackOpen = isPRFeedbackSearchOpen(search);
   const prFeedbackSettingsTab = prFeedbackSettingsTabFromSearch(search);
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
@@ -438,6 +442,16 @@ export function LinesPage() {
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
       />
+      {automationViewCanvasId ? (
+        <ColumnAutomationViewHost
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          lineId={selectedLine.id}
+          canvasId={automationViewCanvasId}
+          title={factoryApps.find((app) => app.id === automationViewCanvasId)?.name?.trim() || "Automation"}
+          onClose={() => navigate(factoryHomePath(organizationId, factoryKey, selectedLine.id))}
+        />
+      ) : null}
       {prFeedbackOpen ? (
         <PRFeedbackSettingsHost
           organizationId={organizationId}
@@ -725,18 +739,9 @@ function LineDetail({
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
-      if (automation.kind === "intake") {
-        navigate(factoryIntakePath(organizationId, factoryKey, line.id, automation.id));
-        return;
-      }
-      if (automation.kind === "pr-discussion" || automation.kind === "pr-checks") {
-        navigate(factoryPRFeedbackPath(organizationId, factoryKey, line.id, undefined, automation.id));
-        return;
-      }
-      if (automation.canvasId) {
-        navigate(
-          factoryAppConfigurePath(organizationId, factoryKey, automation.canvasId, { from: "lines", lineId: line.id }),
-        );
+      const href = columnAutomationOpenPath(automation, { organizationId, factoryKey, lineId: line.id });
+      if (href) {
+        navigate(href);
       }
       return;
     }

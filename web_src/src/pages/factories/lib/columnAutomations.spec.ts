@@ -6,6 +6,8 @@ import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   catalogForColumn,
+  columnAutomationOpenPath,
+  columnAutomationViewTabs,
   columnAutomationsEmptyCopy,
   columnAutomationsNeedRepair,
   columnTitleForKey,
@@ -13,6 +15,7 @@ import {
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
+import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import type { LinePhaseColumn } from "./linePhaseRuns";
 
@@ -240,6 +243,114 @@ describe("catalogForColumn", () => {
 
     expect(takenCatalogIds(automations, catalog)).toEqual([]);
     expect(catalog.map((entry) => entry.id)).toEqual(["agent-step", "custom"]);
+  });
+});
+
+describe("columnAutomationOpenPath", () => {
+  const nav = { organizationId: "org-1", factoryKey: "RF", lineId: "line-plan" };
+
+  it("opens an existing canvas automation in the board view popup", () => {
+    expect(
+      columnAutomationOpenPath(
+        {
+          id: "step-0-app-refund-implementer",
+          kind: "agent-step",
+          name: "Implement",
+          trigger: "On task in Implement",
+          action: "Run the Implement agent",
+          iconSrc: "",
+          iconAlt: "",
+          health: "healthy",
+          runningCount: 0,
+          catalogId: "agent-step",
+          canvasId: "app-refund-implementer",
+        },
+        nav,
+      ),
+    ).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-implementer"));
+  });
+
+  it("does not open the full-screen editor for a canvas automation", () => {
+    const href = columnAutomationOpenPath(
+      {
+        id: "analysis-app-refund-backlog",
+        kind: "analysis",
+        name: "Task analysis",
+        trigger: "On task in Backlog",
+        action: "Score the task",
+        iconSrc: "",
+        iconAlt: "",
+        health: "healthy",
+        runningCount: 0,
+        catalogId: "analysis",
+        canvasId: "app-refund-backlog",
+      },
+      nav,
+    );
+
+    expect(href).toBe(factoryColumnAutomationViewPath("org-1", "RF", "line-plan", "app-refund-backlog"));
+    expect(href).not.toContain("/apps/");
+    expect(href).not.toContain("configure=1");
+  });
+
+  it("opens the intake settings popup on the first tab", () => {
+    expect(
+      columnAutomationOpenPath(
+        {
+          id: "intake-github",
+          kind: "intake",
+          name: "GitHub issues",
+          trigger: "On GitHub issue",
+          action: "Create a task in Backlog",
+          iconSrc: "",
+          iconAlt: "GitHub",
+          health: "healthy",
+          runningCount: 0,
+          catalogId: "github-issues",
+          canvasId: "app-github",
+        },
+        nav,
+      ),
+    ).toBe(factoryIntakePath("org-1", "RF", "line-plan", "intake-github"));
+  });
+
+  it("opens the PR feedback settings popup on the first tab", () => {
+    expect(
+      columnAutomationOpenPath(
+        {
+          id: "handler-checks",
+          kind: "pr-checks",
+          name: "Pull request checks",
+          trigger: "On failing pull request check",
+          action: "Fix the checks",
+          iconSrc: "",
+          iconAlt: "GitHub",
+          health: "healthy",
+          runningCount: 0,
+          catalogId: "checks",
+          canvasId: "app-pr-feedback",
+        },
+        nav,
+      ),
+    ).toBe(factoryPRFeedbackPath("org-1", "RF", "line-plan", undefined, "handler-checks"));
+  });
+});
+
+describe("columnAutomationViewTabs", () => {
+  it("shows only Automation when the canvas has no form and no agent", () => {
+    expect(columnAutomationViewTabs({ hasGeneral: false, hasAgent: false })).toEqual(["automation"]);
+  });
+
+  it("shows Agent then Automation when the canvas has an agent", () => {
+    expect(columnAutomationViewTabs({ hasGeneral: false, hasAgent: true })).toEqual(["agent", "automation"]);
+  });
+
+  it("shows General, Agent, then Automation when a form and an agent exist", () => {
+    expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: true })).toEqual(["general", "agent", "automation"]);
+  });
+
+  it("shows General then Automation when a form exists without an agent", () => {
+    expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
   });
 });
 
