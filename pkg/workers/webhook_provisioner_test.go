@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
+	"gorm.io/datatypes"
 )
 
 type BadEncryptor struct{}
@@ -137,6 +138,74 @@ func Test__WebhookProvisioner_MaxRetriesExceeded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.WebhookStateFailed, updatedWebhook.State)
 	assert.Equal(t, 3, updatedWebhook.RetryCount)
+}
+
+// A node whose webhook was never registered receives nothing. Without this the
+// canvas kept showing a trigger that looked like it was listening, and the only
+// trace of the failure was a line in the worker log.
+func Test__WebhookProvisioner_MaxRetriesExceeded_FailsWaitingNodes(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	logger := logrus.NewEntry(logrus.New())
+	provisioner := NewWebhookProvisioner("https://example.com", r.Encryptor, r.Registry)
+
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{})
+	r.Registry.WebhookHandlers["dummy"] = impl.NewDummyWebhookHandler(impl.DummyWebhookHandlerOptions{
+		SetupFunc: func(ctx core.WebhookHandlerContext) (any, error) {
+			return nil, errors.New("Plan limit for webhooks exceeded")
+		},
+	})
+
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"dummy",
+		support.RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	webhook := models.Webhook{
+		ID:                webhookID,
+		State:             models.WebhookStatePending,
+		Secret:            []byte("secret"),
+		AppInstallationID: &integration.ID,
+		RetryCount:        3,
+		MaxRetries:        3,
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "trigger",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "webhook"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", "trigger").
+		Update("webhook_id", webhookID).
+		Error)
+
+	require.NoError(t, provisioner.LockAndProcessWebhook(logger, webhook))
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, "trigger")
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeStateError, node.State)
+	require.NotNil(t, node.StateReason)
+	assert.Contains(t, *node.StateReason, "Plan limit for webhooks exceeded")
 }
 
 func Test__WebhookProvisioner_ConcurrentProcessing(t *testing.T) {
