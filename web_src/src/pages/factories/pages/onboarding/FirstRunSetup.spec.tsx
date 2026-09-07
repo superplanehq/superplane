@@ -323,6 +323,52 @@ describe("FirstRunSetup", () => {
     expect(navigateSpy).toHaveBeenCalledWith("/org-1");
   });
 
+  it("goes back from the ticket screen to the repository screen", async () => {
+    const user = userEvent.setup();
+    const model = pageModel({
+      setup: (() => {
+        const setup = setupState();
+        setup.selectRepo("acme/payments-service");
+        return setup;
+      })(),
+    });
+
+    renderSetup(model);
+
+    expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+  });
+
+  it("offers connect another GitHub account on the connect screen", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          readyInstances: [
+            {
+              metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+              status: { state: "ready", metadata: { owner: "acme" } },
+            },
+          ],
+          allInstances: [
+            {
+              metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+              status: { state: "ready", metadata: { owner: "acme" } },
+            },
+          ],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-github-connect-another")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-connections")).toHaveTextContent("acme");
+  });
+
   it("keeps Log out and hides the organization switch with a single org and single workspace", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];

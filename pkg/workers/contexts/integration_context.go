@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -333,6 +334,9 @@ func (c *IntegrationContext) SetMetadata(value any) {
 func (c *IntegrationContext) Persist() error {
 	if c.tx == nil || c.integration == nil {
 		return nil
+	}
+	if err := github.RenameGeneratedInstallation(c.tx, c.integration); err != nil {
+		return err
 	}
 
 	return c.tx.Save(c.integration).Error
