@@ -169,7 +169,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -744,7 +744,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {

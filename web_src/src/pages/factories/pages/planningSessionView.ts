@@ -40,24 +40,6 @@ export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
   extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
 ): CreateWithAgentView {
-  const created: CreateWithAgentCreatedOrder[] = (session.created ?? [])
-    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
-      Boolean(order.id && order.key && order.title),
-    )
-    .map((order) => ({
-      id: order.id,
-      key: order.key,
-      title: order.title,
-      description: order.description ?? "",
-    }));
-
-  const draftTitle = session.draft?.title?.trim() ?? "";
-  const right = draftTitle
-    ? { kind: "draft" as const, draft: { title: draftTitle, description: session.draft?.description ?? "" } }
-    : extras.right.kind === "preview"
-      ? extras.right
-      : { kind: "empty" as const };
-
   return {
     repository: session.repository ?? "",
     machineStatus: createWithAgentMachineStatus(session),
@@ -67,11 +49,38 @@ export function createWithAgentViewFromSession(
     messages: (session.messages ?? []).flatMap(planningSessionMessageFromPayload),
     survey: planningSessionSurveyFromPayload(session.survey),
     composer: extras.composer,
-    created,
-    right,
+    created: createdOrdersFromSession(session),
+    right: planningSessionRightPane(session, extras.right),
     endConfirmOpen: extras.endConfirmOpen,
     refining: Boolean(session.draft?.workOrderId?.trim()),
   };
+}
+
+function createdOrdersFromSession(session: PlanningSessionPayload): CreateWithAgentCreatedOrder[] {
+  return (session.created ?? [])
+    .filter((order): order is { id: string; key: string; title: string; description?: string } =>
+      Boolean(order.id && order.key && order.title),
+    )
+    .map((order) => ({
+      id: order.id,
+      key: order.key,
+      title: order.title,
+      description: order.description ?? "",
+    }));
+}
+
+function planningSessionRightPane(
+  session: PlanningSessionPayload,
+  right: CreateWithAgentView["right"],
+): CreateWithAgentView["right"] {
+  const draftTitle = session.draft?.title?.trim() ?? "";
+  if (draftTitle) {
+    return { kind: "draft", draft: { title: draftTitle, description: session.draft?.description ?? "" } };
+  }
+  if (right.kind === "preview") {
+    return right;
+  }
+  return { kind: "empty" };
 }
 
 function planningSessionSurveyFromPayload(

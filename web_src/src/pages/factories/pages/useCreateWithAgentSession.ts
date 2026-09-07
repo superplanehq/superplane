@@ -66,6 +66,16 @@ function clearDraftSaveTimer(timer: { current: number | undefined }) {
   timer.current = undefined;
 }
 
+function stopPlanningSession(organizationId: string, factoryId: string, id: string, options?: { keepalive?: boolean }) {
+  if (!id || !organizationId || !factoryId) {
+    return;
+  }
+  const request = options
+    ? endPlanningSession(organizationId, factoryId, id, options)
+    : endPlanningSession(organizationId, factoryId, id);
+  void request.catch(() => undefined);
+}
+
 export function useCreateWithAgentSession(repository: string, organizationId: string, factoryId: string) {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState("");
@@ -110,15 +120,7 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
   });
 
   const stopSession = useCallback(
-    (id: string, options?: { keepalive?: boolean }) => {
-      if (!id || !organizationId || !factoryId) {
-        return;
-      }
-      const request = options
-        ? endPlanningSession(organizationId, factoryId, id, options)
-        : endPlanningSession(organizationId, factoryId, id);
-      void request.catch(() => undefined);
-    },
+    (id: string, options?: { keepalive?: boolean }) => stopPlanningSession(organizationId, factoryId, id, options),
     [factoryId, organizationId],
   );
 

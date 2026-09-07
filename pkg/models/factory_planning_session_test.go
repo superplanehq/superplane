@@ -15,7 +15,7 @@ import (
 func TestFactory_StartPlanningSession(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-start")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 
 	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
@@ -43,7 +43,7 @@ func TestFactory_StartPlanningSession(t *testing.T) {
 func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-repo")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 
 	_, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
@@ -57,7 +57,7 @@ func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-start")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
 	require.NoError(t, err)
@@ -89,7 +89,7 @@ func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
 func TestFactory_StartPlanningSession_RejectsOpenWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-open-start")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func planningSessionInputFromRun(t *testing.T, run CanvasRun) map[string]any {
 func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-hb")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	before := session.HeartbeatAt
 	require.NoError(t, session.Heartbeat(db))
@@ -140,7 +140,7 @@ func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
 func TestFactoryPlanningSession_EndIfStale(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-stale")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-6*time.Minute)).Error)
 	require.NoError(t, db.First(session, "id = ?", session.ID).Error)
@@ -154,7 +154,7 @@ func TestFactoryPlanningSession_EndIfStale(t *testing.T) {
 func TestFactoryPlanningSession_EndIfStale_KeepsRecentHeartbeat(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-fresh-hb")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-2*time.Minute)).Error)
 	require.NoError(t, db.First(session, "id = ?", session.ID).Error)
@@ -168,7 +168,7 @@ func TestFactoryPlanningSession_EndIfStale_KeepsRecentHeartbeat(t *testing.T) {
 func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-wait")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.BeginWait(db))
 	assert.Equal(t, PlanningWaitPending, session.WaitState)
@@ -193,7 +193,7 @@ func TestFactoryPlanningSession_SendMessageResolvesWait(t *testing.T) {
 func TestFactoryPlanningSession_RestoreWaitKeepsQueuedUserMessage(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-restore-queue")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Add refund retries"))
@@ -216,7 +216,7 @@ func TestFactoryPlanningSession_RestoreWaitKeepsQueuedUserMessage(t *testing.T) 
 func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-queue")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.SendUserMessage(db, "Add a puppy color field"))
 	assert.Equal(t, PlanningWaitIdle, session.WaitState)
@@ -234,7 +234,7 @@ func TestFactoryPlanningSession_BeginWaitDeliversQueuedUserMessage(t *testing.T)
 func TestFactoryPlanningSession_CreateDraftBeforeWaitIsKept(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-create-early")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -258,7 +258,7 @@ func TestFactoryPlanningSession_CreateDraftBeforeWaitIsKept(t *testing.T) {
 func TestFactoryPlanningSession_SkipDraftBeforeWaitIsKept(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-skip-early")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
 		Title:       "Retry refunds",
@@ -277,7 +277,7 @@ func TestFactoryPlanningSession_SkipDraftBeforeWaitIsKept(t *testing.T) {
 func TestFactoryPlanningSession_ProposeSurveyAndSendClearsIt(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-survey")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
 		Questions: []PlanningSessionSurveyQuestion{
@@ -297,7 +297,7 @@ func TestFactoryPlanningSession_ProposeSurveyAndSendClearsIt(t *testing.T) {
 func TestFactoryPlanningSession_ProposeSurveyRejectsEmptyQuestions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-survey-empty")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	err := session.ProposeSurvey(db, PlanningSessionSurvey{})
 	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
@@ -307,7 +307,7 @@ func TestFactoryPlanningSession_ProposeSurveyRejectsEmptyQuestions(t *testing.T)
 func TestFactoryPlanningSession_ProposeSurveyReplacesPrevious(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-survey-replace")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.ProposeSurvey(db, PlanningSessionSurvey{
 		Questions: []PlanningSessionSurveyQuestion{
@@ -326,7 +326,7 @@ func TestFactoryPlanningSession_ProposeSurveyReplacesPrevious(t *testing.T) {
 func TestFactoryPlanningSession_ProposeAndSkipDraft(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-draft")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
 		Title:       "Retry refunds",
@@ -347,7 +347,7 @@ func TestFactoryPlanningSession_ProposeAndSkipDraft(t *testing.T) {
 func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-create")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -372,7 +372,7 @@ func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
 func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-ready")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -403,7 +403,7 @@ func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
 func TestFactoryPlanningSession_FollowUpKeepsCurrentDraftInWaitText(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-follow-draft")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
 		Title:       "Add a color field with a visual color picker to the Puppy entity",
@@ -424,7 +424,7 @@ func TestFactoryPlanningSession_FollowUpKeepsCurrentDraftInWaitText(t *testing.T
 func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -464,7 +464,7 @@ func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *test
 func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-skip")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -490,7 +490,7 @@ func TestFactoryPlanningSession_SkipAfterRefineKeepsCreatedTask(t *testing.T) {
 func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-chat")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, session.BeginWait(db))
 	require.NoError(t, session.SendUserMessage(db, "Refine checkout: please."))
@@ -502,7 +502,7 @@ func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) 
 func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdatesSameTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-backlog")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -538,7 +538,7 @@ func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdates
 func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine-open")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
 	require.NoError(t, err)
 
@@ -563,7 +563,7 @@ func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 func TestEndPlanningSessionForFinishedRun(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-run-fail")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	require.NotNil(t, session.CanvasRunID)
 
 	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultPassed))
@@ -581,7 +581,7 @@ func TestEndPlanningSessionForFinishedRun(t *testing.T) {
 func TestEndPlanningSessionForFinishedRun_Cancelled(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-run-cancel")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	require.NotNil(t, session.CanvasRunID)
 
 	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultCancelled))
@@ -593,7 +593,7 @@ func TestEndPlanningSessionForFinishedRun_Cancelled(t *testing.T) {
 func TestEndPlanningSessionForFinishedRun_AlreadyEnded(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-run-ended")
-	db := database.Conn()
+	db := database.DB(t.Context())
 	require.NoError(t, session.End(db))
 	require.NotNil(t, session.CanvasRunID)
 
@@ -605,14 +605,14 @@ func TestEndPlanningSessionForFinishedRun_AlreadyEnded(t *testing.T) {
 
 func TestEndPlanningSessionForFinishedRun_NoSession(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	require.NoError(t, EndPlanningSessionForFinishedRun(database.Conn(), uuid.New(), CanvasRunResultFailed))
+	require.NoError(t, EndPlanningSessionForFinishedRun(database.DB(t.Context()), uuid.New(), CanvasRunResultFailed))
 }
 
 func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-list-stale")
 	fresh := startTestPlanningSession(t, "plan-list-fresh")
-	db := database.Conn()
+	db := database.DB(t.Context())
 
 	require.NoError(t, db.Model(session).Update("heartbeat_at", time.Now().Add(-6*time.Minute)).Error)
 
@@ -626,7 +626,7 @@ func TestFactoryPlanningSession_ListStaleOpenPlanningSessions(t *testing.T) {
 func startTestPlanningSession(t *testing.T, prefix string) *FactoryPlanningSession {
 	t.Helper()
 	org, userID, factoryModel := setupFactoryWithUser(t, prefix)
-	db := database.Conn()
+	db := database.DB(t.Context())
 	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
 	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
 		CreatedByUserID: userID,
@@ -653,7 +653,7 @@ func createPlanningCanvas(t *testing.T, orgID, factoryID, userID uuid.UUID) (*Ca
 		CreatedAt:      &now,
 		UpdatedAt:      &now,
 	}
-	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(canvas).Error; err != nil {
 			return err
 		}
