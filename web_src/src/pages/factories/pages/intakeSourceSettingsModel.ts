@@ -4,10 +4,14 @@ import { formatTimeAgo } from "@/lib/date";
 export type IntakeListenMode = "listen" | "schedule";
 export type IntakeLabelFilterMode = "include" | "exclude";
 export type IntakeAssignmentFilter = "any" | "assigned" | "unassigned";
-export type IntakeSettingsTab = "general" | "runs" | "automation";
+export type IntakeSettingsTab = "general" | "agent" | "runs" | "automation";
 
 export function isIntakeSettingsTab(value: string | null | undefined): value is IntakeSettingsTab {
-  return value === "general" || value === "runs" || value === "automation";
+  return value === "general" || value === "agent" || value === "runs" || value === "automation";
+}
+
+export function intakeSettingsTabs(hasAgent: boolean): IntakeSettingsTab[] {
+  return hasAgent ? ["general", "agent", "runs", "automation"] : ["general", "runs", "automation"];
 }
 export type IntakeTicketPlacement = "backlog" | "rejected" | "progressed" | "below-threshold";
 export type IntakeLineStage = "implement" | "verify" | "done";
@@ -51,6 +55,7 @@ export const INTAKE_SETTINGS_COPY = {
   title: "Intake GitHub issues",
   tabsLabel: "Intake settings",
   generalTab: "General",
+  agentTab: "Agent",
   automationTab: "Automation",
   editAutomation: "Edit automation",
   automationLoading: "The automation is loading.",
