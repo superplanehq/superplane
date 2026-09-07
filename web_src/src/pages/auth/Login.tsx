@@ -20,6 +20,8 @@ import {
   savePendingSignupAnalyticsPreference,
 } from "@/lib/signupAnalytics";
 import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
+import { getSafeRedirectPath } from "@/lib/safeRedirectPath";
+import { fetchLastLocationPath } from "@/hooks/useLastLocation";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
@@ -39,31 +41,6 @@ type AuthConfig = {
   signupEnabled: boolean;
   signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
-};
-
-const isValidRedirectPath = (path: string | null): path is string => {
-  if (!path || path[0] !== "/") {
-    return false;
-  }
-
-  if (path.length > 1 && path[1] === "/") {
-    return false;
-  }
-
-  return true;
-};
-
-const getSafeRedirectPath = (rawRedirect: string | null): string | null => {
-  if (!rawRedirect) {
-    return null;
-  }
-
-  try {
-    const decoded = decodeURIComponent(rawRedirect);
-    return isValidRedirectPath(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
 };
 
 const getProviderLabel = (provider: string) => {
@@ -324,7 +301,11 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
             // slug yet; OrganizationScope corrects that case on arrival.
             const orgRef = organizations[0].slug || organizations[0].id;
             if (orgRef) {
-              window.location.href = `/${orgRef}`;
+              // Resume the last screen the account was on in this
+              // organization (e.g. a pending approval) instead of always
+              // landing on the home page.
+              const resumePath = await fetchLastLocationPath(orgRef);
+              window.location.href = resumePath || `/${orgRef}`;
               return;
             }
           }
