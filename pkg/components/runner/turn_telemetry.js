@@ -263,6 +263,7 @@ function createTurnTelemetry(options) {
         return state.currentTurn;
       }
       if (
+        !opts.forceNew &&
         previous &&
         usageEquals(previous.usage, incoming) &&
         !opts.hasTools &&

@@ -206,13 +206,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
       messages.push(message);
       const text = assistantText(message);
-      telemetry.beginTurn(
-        {
-          ...usage,
-          total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
-        },
-        { message: text },
-      );
+      telemetry.beginTurn(turnUsageFromResponse(response.usage), { message: text, forceNew: true });
       if (text) {
         lastText = text;
         process.stdout.write(`${lastText}\n`);
@@ -269,13 +263,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       lastText = wrapUp.text;
       costMicros += wrapUp.costMicros;
       numTurns += 1;
-      telemetry.beginTurn(
-        {
-          ...usage,
-          total_cost_usd: costMicros > 0 ? costMicros / 1000000 : undefined,
-        },
-        { message: lastText },
-      );
+      telemetry.beginTurn(turnUsageFromResponse(wrapUp.usage), { message: lastText, forceNew: true });
     }
     exitCode = 0;
     return 0;
@@ -417,7 +405,23 @@ async function requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, 
   return {
     text: text || lastText,
     costMicros: usageCostMicros(response.usage),
+    usage: response.usage,
   };
+}
+
+function turnUsageFromResponse(usage) {
+  const turn = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    reasoning_tokens: 0,
+  };
+  addUsage(turn, usage);
+  const costMicros = usageCostMicros(usage);
+  if (costMicros > 0) {
+    turn.total_cost_usd = costMicros / 1000000;
+  }
+  return turn;
 }
 
 async function chat(baseURL, apiKey, model, messages, withTools, tools = TOOLS) {

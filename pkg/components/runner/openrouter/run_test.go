@@ -58,6 +58,28 @@ func TestRunPromptMarksFilesystemToolErrorsFailed(t *testing.T) {
 	assert.Contains(t, result.output, `"kind":"read"`)
 }
 
+func TestRunPromptRecordsPerResponseTurnUsage(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 2})
+	payload := resultPayload(t, result.resultFile)
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok)
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok)
+	require.Len(t, turns, 3)
+	for i, raw := range turns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		usage, ok := turn["usage"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, float64(11), usage["input_tokens"], "turn %d input", i+1)
+		assert.Equal(t, float64(3), usage["output_tokens"], "turn %d output", i+1)
+	}
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(33), usage["input_tokens"])
+	assert.Equal(t, float64(9), usage["output_tokens"])
+}
+
 func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 4, failOnRequest: 2})
 	assert.Equal(t, 1, result.exitCode)

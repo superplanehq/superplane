@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   applyAgentTelemetryRecord,
   applyPromptUsageRecord,
-  chartPointsForTelemetry,
   emptyAgentRunTelemetry,
   emptyPromptUsageState,
   parseAgentTurnLiveLogText,
@@ -14,6 +13,7 @@ import {
   telemetryFromFinishedResult,
   telemetrySeriesFromFinishedResult,
 } from "./agentRunTelemetry";
+import { chartPointsForTelemetry } from "./agentRunTelemetryChart";
 
 describe("reduceAgentTelemetryRecords", () => {
   it("joins turn usage with tool records on the same turn", () => {

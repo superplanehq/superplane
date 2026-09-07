@@ -166,6 +166,28 @@ process.stdout.write(JSON.stringify({ records, telemetry: telemetry.snapshot() }
 	assert.Equal(t, 2, payload.Telemetry.NumTurns)
 }
 
+func TestTurnTelemetryForceNewKeepsSameUsageTurns(t *testing.T) {
+	t.Parallel()
+
+	taskDir := t.TempDir()
+	writeTurnTelemetryScript(t, taskDir)
+
+	payload := runTurnTelemetryHarness(t, taskDir, `
+const { createTurnTelemetry } = require(process.env.TURN_TELEMETRY_SCRIPT);
+const telemetry = createTurnTelemetry({
+  taskDir: process.env.SUPERPLANE_TASK_DIR,
+  write: () => undefined,
+});
+telemetry.beginTurn({ input_tokens: 11, output_tokens: 3 });
+telemetry.beginTurn({ input_tokens: 11, output_tokens: 3 }, { forceNew: true });
+process.stdout.write(JSON.stringify({ telemetry: telemetry.snapshot() }));
+`)
+
+	require.Len(t, payload.Telemetry.Turns, 2)
+	assert.Equal(t, float64(11), payload.Telemetry.Turns[0].Usage["input_tokens"])
+	assert.Equal(t, float64(11), payload.Telemetry.Turns[1].Usage["input_tokens"])
+}
+
 func TestTurnTelemetryUpdatesUsageForTheSameMessageID(t *testing.T) {
 	t.Parallel()
 

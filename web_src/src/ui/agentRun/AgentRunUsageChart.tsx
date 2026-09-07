@@ -1,6 +1,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
+import type { AgentRunTelemetry, AgentTurnTool } from "@/lib/agentRunTelemetry";
 import {
   agentRunCacheReadCount,
   agentRunInputTokenCount,
@@ -8,9 +9,7 @@ import {
   agentRunToolCallCount,
   chartPointsForTelemetry,
   type AgentChartPoint,
-  type AgentRunTelemetry,
-  type AgentTurnTool,
-} from "@/lib/agentRunTelemetry";
+} from "@/lib/agentRunTelemetryChart";
 import { cn } from "@/lib/utils";
 
 type AgentRunUsageChartProps = {

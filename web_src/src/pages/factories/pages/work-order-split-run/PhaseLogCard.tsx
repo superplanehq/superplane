@@ -1,9 +1,5 @@
-import {
-  agentRunNewTokenCount,
-  emptyAgentRunTelemetry,
-  type AgentPromptUsageSeries,
-  type AgentRunTelemetry,
-} from "@/lib/agentRunTelemetry";
+import { emptyAgentRunTelemetry, type AgentPromptUsageSeries, type AgentRunTelemetry } from "@/lib/agentRunTelemetry";
+import { agentRunNewTokenCount } from "@/lib/agentRunTelemetryChart";
 
 const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
