@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -335,7 +336,12 @@ func (c *IntegrationContext) Persist() error {
 		return nil
 	}
 
-	return c.tx.Save(c.integration).Error
+	return c.tx.Transaction(func(inner *gorm.DB) error {
+		if err := github.RenameGeneratedInstallation(inner, c.integration); err != nil {
+			return err
+		}
+		return inner.Save(c.integration).Error
+	})
 }
 
 func (c *IntegrationContext) GetState() string {

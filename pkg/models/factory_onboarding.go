@@ -109,6 +109,12 @@ func (f *Factory) IsInitialOnboarding() bool {
 	return f.OnboardingConfigValue().InitialOnboardingAttemptID != ""
 }
 
+// IsPendingInitialOnboarding reports whether this workspace is the unfinished
+// first-run organization setup for an account.
+func (f *Factory) IsPendingInitialOnboarding() bool {
+	return f.IsInitialOnboarding() && !f.IsOnboardingComplete()
+}
+
 func (f *Factory) OnboardingConfigValue() FactoryOnboardingConfig {
 	return f.OnboardingConfig.Data()
 }

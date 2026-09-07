@@ -45,6 +45,18 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, reloaded.HasInitialOnboardingAttempt(attemptID))
 		assert.True(t, reloaded.IsInitialOnboarding())
+		assert.True(t, reloaded.IsPendingInitialOnboarding())
+	})
+
+	t.Run("pending initial onboarding is false after complete", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		require.NoError(t, factory.SetInitialOnboardingAttempt(db, uuid.New()))
+		assert.True(t, factory.IsPendingInitialOnboarding())
+
+		require.NoError(t, factory.CompleteOnboarding(db, readyOnboardingPatch()))
+		assert.False(t, factory.IsPendingInitialOnboarding())
+		assert.True(t, factory.IsInitialOnboarding())
 	})
 
 	t.Run("partial update merges fields", func(t *testing.T) {

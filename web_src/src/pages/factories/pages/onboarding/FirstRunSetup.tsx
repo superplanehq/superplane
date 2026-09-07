@@ -30,7 +30,9 @@ import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } f
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
+import type { FirstRunGithubConnection } from "./first-run/FirstRunConnectScreen";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
+import { githubIntegrationOwner } from "./initialOnboardingOrganization";
 import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -63,6 +65,26 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   tickets: 3,
   agent: 4,
 };
+
+const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  choose: "connect",
+  tickets: "choose",
+  agent: "tickets",
+};
+
+function readyGithubConnections(model: OnboardingPageModel): FirstRunGithubConnection[] {
+  const connections: FirstRunGithubConnection[] = [];
+  for (const instance of model.githubConnections.readyInstances) {
+    const id = instance.metadata?.id ?? "";
+    if (!id) continue;
+    connections.push({
+      id,
+      name: instance.metadata?.name ?? "",
+      owner: githubIntegrationOwner(instance),
+    });
+  }
+  return connections;
+}
 
 /**
  * Hosted credentials leave the agent screen with no question to ask, so the
@@ -318,14 +340,18 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   );
   const canSwitchOrganization = hasOtherWorkspace || otherOrganizations.length > 0;
 
-  const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
-    displayName: firstNameOf(account?.name),
-    email: account?.email,
-    onLogOut: signOut,
-    organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
-    stepIndex: STEP_INDEX_FOR_SCREEN[target],
-    stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
-  });
+  const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
+    const backScreen = BACK_SCREEN[target];
+    return {
+      displayName: firstNameOf(account?.name),
+      email: account?.email,
+      onLogOut: signOut,
+      organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
+      stepIndex: STEP_INDEX_FOR_SCREEN[target],
+      stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+      onBack: backScreen ? () => flow.goToScreen(backScreen) : undefined,
+    };
+  };
 
   if (flow.screen === "welcome") {
     return (
@@ -347,9 +373,13 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         githubState={flow.accountPicker?.state}
         githubAppSlug={flow.accountPicker?.appSlug}
         bindingInstallationId={flow.bindingInstallationId}
+        readyConnections={readyGithubConnections(model)}
+        selectedConnectionId={model.selectedVcsConnectionId}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
+        onSelectConnection={model.selectVcsConnection}
+        onConnectAnother={model.createVcsConnection}
         onContinue={() => flow.goToScreen("choose")}
       />
     );

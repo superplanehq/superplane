@@ -1246,16 +1246,29 @@ func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.
 		return nil, nil, false, err
 	}
 
-	for _, organization := range organizations {
+	var pendingOrganization *models.Organization
+	var pendingWorkspace *models.Factory
+
+	for i := range organizations {
+		organization := &organizations[i]
 		factories, err := models.ListFactories(tx, organization.ID)
 		if err != nil {
 			return nil, nil, false, err
 		}
-		for _, factory := range factories {
+		for j := range factories {
+			factory := &factories[j]
 			if factory.HasInitialOnboardingAttempt(attemptID) {
-				return &organization, &factory, true, nil
+				return organization, factory, true, nil
+			}
+			if pendingWorkspace == nil && factory.IsPendingInitialOnboarding() {
+				pendingOrganization = organization
+				pendingWorkspace = factory
 			}
 		}
+	}
+
+	if pendingWorkspace != nil {
+		return pendingOrganization, pendingWorkspace, true, nil
 	}
 
 	return nil, nil, false, nil
