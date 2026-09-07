@@ -1,4 +1,5 @@
 import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ArrowRightLeft } from "lucide-react";
@@ -30,25 +31,29 @@ export function FirstRunShell({
     <div className="fixed inset-0 bg-background text-foreground" data-testid={testId}>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 py-5">
         <div className="pointer-events-auto flex items-center gap-3">
-          <button
+          <Button
             type="button"
-            className="text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
             onClick={chrome?.onLogOut}
             data-testid="first-run-log-out"
           >
             {copy.logOut}
-          </button>
+          </Button>
           {chrome?.organizationSwitch ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
+                <Button
                   type="button"
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground"
                   aria-label={copy.switchOrganization}
                   data-testid="first-run-organization-switch"
                 >
                   <ArrowRightLeft className="size-4" aria-hidden />
-                </button>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64">
                 <OrganizationSwitchMenu

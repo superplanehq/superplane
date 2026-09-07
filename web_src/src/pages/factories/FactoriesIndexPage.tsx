@@ -6,7 +6,7 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import { Navigate, useParams } from "react-router";
 import { factoryHomePath, firstFactoryLineId, newFactoryPath } from "./lib/factoryPagePaths";
-import { pickInitialFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
+import { pickReadyFactory, readLastVisitedFactory } from "./lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "./lib/useFactoriesThemeClass";
 
 export function FactoriesIndexPage() {
@@ -50,7 +50,7 @@ function FactoriesIndexPageContent({ organizationId }: { organizationId: string 
   }
 
   const lastVisited = account?.id ? readLastVisitedFactory(account.id, organizationId) : null;
-  const targetFactory = pickInitialFactory(factories, lastVisited);
+  const targetFactory = pickReadyFactory(factories, lastVisited);
 
   if (targetFactory?.key) {
     return (

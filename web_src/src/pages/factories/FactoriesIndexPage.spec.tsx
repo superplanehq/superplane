@@ -75,6 +75,15 @@ describe("FactoriesIndexPage", () => {
     );
   });
 
+  it("opens a finished workspace when another workspace is still in setup", () => {
+    listedFactories.splice(0, listedFactories.length, EMPTY_FACTORY, ACME_ONBOARDING_FACTORY);
+    renderIndex();
+
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      factoryHomePath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!, ACME_ONBOARDING_LINE_ID),
+    );
+  });
+
   it("opens workspace setup when the organization has no workspace", () => {
     renderIndex();
 
