@@ -18,10 +18,11 @@ type Options struct {
 
 // WithConstantWait tries to execute the task and if it fails,
 // awaits the specified duration before retrying maxAttempts times.
+// InitialDelay, when set, is applied once before the first attempt.
 func WithConstantWait(f func() error, options Options) error {
-	for attempt := 1; ; attempt++ {
-		time.Sleep(options.InitialDelay)
+	time.Sleep(options.InitialDelay)
 
+	for attempt := 1; ; attempt++ {
 		err := f()
 		if err == nil {
 			return nil
