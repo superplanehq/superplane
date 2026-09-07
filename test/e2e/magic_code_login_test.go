@@ -144,9 +144,9 @@ func (s *magicCodeSteps) enterCodeAndSubmit(code string) {
 }
 
 func (s *magicCodeSteps) assertRedirectedToOrganization() {
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.session.OrgSlug,
-		"expected redirect to organization home, got %s", currentURL)
+	// The app lands on "/" first and then resolves the organization redirect
+	// after several async requests, so poll instead of checking once.
+	s.session.WaitUntilURLContains("/" + s.session.OrgSlug)
 }
 
 func (s *magicCodeSteps) assertAccountCreated(email string) {

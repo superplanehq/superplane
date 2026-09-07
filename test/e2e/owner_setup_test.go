@@ -132,8 +132,9 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 }
 
 func (s *ownerSetupSteps) assertRedirectedToOrganization() {
-	currentURL := s.session.Page().URL()
-	assert.Contains(s.t, currentURL, "/"+s.orgSlug, "expected to be redirected into the organization")
+	// The app lands on "/" first and then resolves the organization redirect
+	// after several async requests, so poll instead of checking once.
+	s.session.WaitUntilURLContains("/" + s.orgSlug)
 }
 
 func (s *ownerSetupSteps) assertOwnerSetupIsNoLongerRequired() {

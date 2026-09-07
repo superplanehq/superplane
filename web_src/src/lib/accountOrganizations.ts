@@ -2,6 +2,8 @@ export interface AccountOrganization {
   id: string;
   name: string;
   slug?: string;
+  lastLocationPath?: string;
+  lastLocationUpdatedAt?: string;
 }
 
 export function parseAccountOrganizations(body: unknown): AccountOrganization[] {
@@ -48,5 +50,11 @@ function parseAccountOrganization(entry: unknown): AccountOrganization | null {
     id: candidate.id,
     name: candidate.name,
     ...(typeof candidate.slug === "string" && candidate.slug ? { slug: candidate.slug } : {}),
+    ...(typeof candidate.lastLocationPath === "string" && candidate.lastLocationPath
+      ? { lastLocationPath: candidate.lastLocationPath }
+      : {}),
+    ...(typeof candidate.lastLocationUpdatedAt === "string" && candidate.lastLocationUpdatedAt
+      ? { lastLocationUpdatedAt: candidate.lastLocationUpdatedAt }
+      : {}),
   };
 }
