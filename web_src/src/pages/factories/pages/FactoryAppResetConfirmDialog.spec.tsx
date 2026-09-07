@@ -28,6 +28,12 @@ describe("FactoryAppResetConfirmDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("explains SuperPlane reset and that Save is still required", () => {
+    render(<FactoryAppResetConfirmDialog open onOpenChange={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByTestId("factory-app-reset-defaults-dialog")).toHaveTextContent("Run SuperPlane Agent");
+    expect(screen.getByTestId("factory-app-reset-defaults-dialog")).toHaveTextContent("Save");
+  });
+
   it("renders nothing when closed", () => {
     render(<FactoryAppResetConfirmDialog open={false} onOpenChange={vi.fn()} onConfirm={vi.fn()} />);
     expect(screen.queryByTestId("factory-app-reset-defaults-dialog")).not.toBeInTheDocument();

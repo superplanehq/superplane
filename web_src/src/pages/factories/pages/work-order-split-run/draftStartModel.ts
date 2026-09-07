@@ -40,6 +40,7 @@ const RUNNER_PROVIDER: Record<string, string> = {
   runnerClaudeCode: "anthropic",
   runnerCodex: "openai",
   runnerOpenRouter: "openrouter",
+  runnerSuperPlane: "hosted",
 };
 
 export function runnerModelsFromCanvasNodes(nodes?: RunnerCanvasNode[]): string {
@@ -60,7 +61,7 @@ function runnerAcceptsStartModel(component: string | undefined, model: string): 
   if (!runner) {
     return false;
   }
-  if (runner === "openrouter") {
+  if (runner === "hosted" || runner === "openrouter") {
     return true;
   }
   const hint = startModelProvider(trimmed);
