@@ -135,6 +135,7 @@ message User {
   repeated Authorization.Permission permissions = 7;
   repeated string roles = 8;
   repeated string groups = 9;
+  bool is_owner = 10;
 }
 
 message RegenerateTokenResponse {

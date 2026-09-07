@@ -4,8 +4,10 @@ import (
 	"context"
 	"slices"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -17,13 +19,18 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 		return nil, grpcerrors.NotFound(err, "user not found")
 	}
 
-	ownerIDs, err := authService.GetOrgUsersForRole(ctx, models.RoleOrgOwner, orgID)
+	orgUUID, err := uuid.Parse(orgID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+	}
+
+	ownerIDs, err := models.ListOrganizationOwnerIDs(database.DB(ctx), orgUUID)
 	if err != nil {
 		log.Errorf("Error determining owners for org %s: %v", orgID, err)
 		return nil, grpcerrors.Internal(err, "error determining organization owners")
 	}
 
-	if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
+	if user.IsOwner && len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
 		return nil, grpcerrors.FailedPrecondition(nil, "cannot remove the last organization owner")
 	}
 

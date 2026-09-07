@@ -313,6 +313,15 @@ func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
 	assert.Equal(t, "update", reload.Action)
 }
 
+func TestSetUserOwnerRouteUsesMembersUpdate(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodPatch, Pattern: "/api/v1/organizations/{id}/users/{user_id}/owner"}]
+	require.True(t, ok)
+	assert.Equal(t, "members", rule.Resource)
+	assert.Equal(t, "update", rule.Action)
+}
+
 func TestListSelectableLLMModelsUsesOrgRead(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

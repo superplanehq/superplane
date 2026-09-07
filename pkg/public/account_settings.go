@@ -244,35 +244,20 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account
 			continue
 		}
 
-		ownerIDs, err := s.authService.GetOrgUsersForRole(r.Context(), models.RoleOrgOwner, organization.ID.String())
+		if !user.IsOwner {
+			continue
+		}
+
+		ownerIDs, err := models.ListOrganizationOwnerIDs(tx, organization.ID)
 		if err != nil {
 			return err
 		}
-		livingIDs, err := livingOwnerIDs(tx, organization.ID.String(), ownerIDs)
-		if err != nil {
-			return err
-		}
-		if len(livingIDs) <= 1 && slices.Contains(livingIDs, user.ID.String()) {
+		if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
 			return models.ErrAccountDeleteLastUncreatedOwner
 		}
 	}
 
 	return nil
-}
-
-func livingOwnerIDs(tx *gorm.DB, organizationID string, ownerIDs []string) ([]string, error) {
-	if len(ownerIDs) == 0 {
-		return nil, nil
-	}
-	living, err := models.ListActiveUsersByIDInTransaction(tx, organizationID, ownerIDs)
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]string, 0, len(living))
-	for i := range living {
-		ids = append(ids, living[i].ID.String())
-	}
-	return ids, nil
 }
 
 func (s *Server) removeAccountOrganizationRoles(ctx context.Context, users []models.User) error {
