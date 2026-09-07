@@ -21,7 +21,7 @@ import { LinesPage } from "./LinesPage";
 
 /**
  * Line board is the workspace home: phase columns fill the pane. Cards open
- * the work-order popup.
+ * the work-order popup. The backlog plus menu includes Create with an Agent.
  */
 const meta = {
   title: "Factories/Pages/Lines",

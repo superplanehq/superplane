@@ -6,7 +6,7 @@ import { useFactoryConfigureInitialLayout } from "./useFactoryConfigureInitialLa
 describe("useFactoryConfigureInitialLayout", () => {
   it("applies layout once when Factory Configure becomes ready", async () => {
     const applyLayout = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = renderHook(
+    const { result, rerender } = renderHook(
       (props: { factoryAutoLayout: boolean; isEditing: boolean; editBootstrapReady: boolean }) =>
         useFactoryConfigureInitialLayout({
           ...props,
@@ -19,11 +19,13 @@ describe("useFactoryConfigureInitialLayout", () => {
     );
 
     expect(applyLayout).not.toHaveBeenCalled();
+    expect(result.current.ready).toBe(false);
 
     await act(async () => {
       rerender({ factoryAutoLayout: true, isEditing: true, editBootstrapReady: true });
     });
     expect(applyLayout).toHaveBeenCalledTimes(1);
+    expect(result.current.ready).toBe(true);
 
     await act(async () => {
       rerender({ factoryAutoLayout: true, isEditing: true, editBootstrapReady: true });
@@ -33,7 +35,7 @@ describe("useFactoryConfigureInitialLayout", () => {
 
   it("applies layout again on a new Configure visit", async () => {
     const applyLayout = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = renderHook(
+    const { result, rerender } = renderHook(
       ({ factoryAutoLayout }: { factoryAutoLayout: boolean }) =>
         useFactoryConfigureInitialLayout({
           factoryAutoLayout,
@@ -45,11 +47,44 @@ describe("useFactoryConfigureInitialLayout", () => {
       { initialProps: { factoryAutoLayout: true } },
     );
 
+    await act(async () => {
+      await Promise.resolve();
+    });
     expect(applyLayout).toHaveBeenCalledTimes(1);
+    expect(result.current.ready).toBe(true);
 
     await act(async () => rerender({ factoryAutoLayout: false }));
+    expect(result.current.ready).toBe(true);
+
     await act(async () => rerender({ factoryAutoLayout: true }));
 
     expect(applyLayout).toHaveBeenCalledTimes(2);
+    expect(result.current.ready).toBe(true);
+  });
+
+  it("stays unready until the first Configure layout settles", async () => {
+    let finishLayout: (() => void) | undefined;
+    const applyLayout = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLayout = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useFactoryConfigureInitialLayout({
+        factoryAutoLayout: true,
+        isEditing: true,
+        editBootstrapReady: true,
+        activeCanvasVersionId: "version-live",
+        applyLayout,
+      }),
+    );
+
+    expect(result.current.ready).toBe(false);
+
+    await act(async () => {
+      finishLayout?.();
+    });
+    expect(result.current.ready).toBe(true);
   });
 });

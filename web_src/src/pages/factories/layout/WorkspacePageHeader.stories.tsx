@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Copy, Ellipsis, Funnel, Pencil, Plus, RefreshCw, Search, Settings2 } from "lucide-react";
+import { Copy, Ellipsis, Funnel, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SegmentedNav } from "@/ui/SegmentedNav";
@@ -12,6 +12,7 @@ import {
   REFUND_FACTORY,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
+import { VELOCITY_PERIOD_OPTIONS } from "../lib/factoryVelocityReport";
 import { factorySectionHeaderClassName } from "../pages/factoryPageLayoutStyles";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 import { WorkspacePageHeader } from "./WorkspacePageHeader";
@@ -67,22 +68,31 @@ export const SectionWithPrimaryAction: Story = {
   },
 };
 
+/** Matches the header of the Velocity page: period pills and an overflow menu. */
 export const SectionWithPeriodPills: Story = {
   args: {
     ...sectionHeader,
     title: "Velocity",
-    subtitle: "Merged pull requests from SuperPlane, waste, and cost.",
+    subtitle: "What acme/refunds ships, how long the work takes, and what it costs.",
     actions: (
-      <SegmentedNav
-        ariaLabel="Velocity period in days"
-        size="xs"
-        value="7"
-        onValueChange={() => undefined}
-        options={[
-          { value: "7", label: "7d" },
-          { value: "30", label: "30d" },
-        ]}
-      />
+      <div className="flex items-center gap-2">
+        <SegmentedNav
+          ariaLabel="Velocity period in days"
+          size="xs"
+          value="14"
+          onValueChange={() => undefined}
+          options={VELOCITY_PERIOD_OPTIONS}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label="Velocity menu"
+        >
+          <MoreHorizontal className="size-3.5" aria-hidden />
+        </Button>
+      </div>
     ),
   },
 };

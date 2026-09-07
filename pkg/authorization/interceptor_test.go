@@ -295,6 +295,19 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
+func TestPlanningSessionRoutesUseWorkOrderPermissions(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	start, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", start.Resource)
+	assert.Equal(t, "create", start.Action)
+
+	describe, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}]
+	require.True(t, ok)
+	assert.Equal(t, "read", describe.Action)
+}
+
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

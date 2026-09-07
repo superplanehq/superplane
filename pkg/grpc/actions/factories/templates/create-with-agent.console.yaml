@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Create with an Agent
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: About this app
+        body: |
+          > [!SECTION:setup] Create with an Agent
+          >
+          > This app starts when you choose Create with an Agent in the backlog.
+          >
+          > The agent talks and proposes a draft. You create the work order.
+          > This app is not a factory line step.
+  layout:
+    - i: about
+      x: 0
+      'y': 0
+      w: 12
+      h: 6
+      minW: 3
+      minH: 5

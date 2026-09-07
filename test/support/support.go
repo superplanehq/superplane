@@ -78,6 +78,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
+	_ = models.LoadCurrentPriceBook(database.Conn())
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
@@ -132,6 +133,18 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	}
 
 	err = r.AuthService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	organization, err = models.FindOrganizationByIDInTransaction(tx, organization.ID.String())
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()

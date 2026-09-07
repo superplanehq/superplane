@@ -113,6 +113,19 @@ export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{
   return needHosted && queries.some((query) => !query.isFetched);
 }
 
+/**
+ * Hosted credentials answer the agent question for the whole organization, so
+ * setup has nothing left to ask about the agent. A plan that still loads can
+ * become a plan that needs a key, so setup waits for the hosted models.
+ */
+export function isHostedAgentReady(args: {
+  hostedModelsLoading: boolean;
+  plan: OnboardingAgentPlan | undefined;
+}): boolean {
+  if (args.hostedModelsLoading) return false;
+  return args.plan?.credentialsSource === "hosted";
+}
+
 export function firstWorkOrderAgentError(args: {
   remainingCreditCents: number;
   hostedModelsLoading: boolean;

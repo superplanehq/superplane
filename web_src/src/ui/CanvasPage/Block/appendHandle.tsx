@@ -92,6 +92,7 @@ export function AppendSourceHandle({
     >
       <span
         aria-hidden="true"
+        data-testid="append-connector-stem"
         style={
           isVertical
             ? {
@@ -125,9 +126,10 @@ export function AppendSourceHandle({
         style={
           isVertical
             ? {
-                left: buttonLeft,
+                left: "50%",
                 top: buttonTop,
                 position: "absolute",
+                transform: "translateX(-50%)",
               }
             : {
                 left: buttonLeft + APPEND_HORIZONTAL_NUDGE,

@@ -33,7 +33,7 @@ export function Header({
     <div className="flex flex-wrap items-center gap-4 mb-6">
       <Link
         to={integrationsHref}
-        className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100"
+        className="text-muted-foreground transition-colors hover:text-foreground"
         aria-label="Back to integrations"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -53,7 +53,7 @@ export function Header({
         </h4>
         {integrationId ? (
           <div className="mt-1.5 flex max-w-full items-center gap-1.5">
-            <span className="min-w-0 truncate font-mono text-xs text-gray-700 dark:text-gray-300">{integrationId}</span>
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{integrationId}</span>
             <CopyButton text={integrationId} />
           </div>
         ) : null}
@@ -64,20 +64,20 @@ export function Header({
             integrationStatus === "ready"
               ? "text-green-500"
               : integrationStatus === "error"
-                ? "text-red-600"
+                ? "text-destructive"
                 : "text-amber-600"
           }`}
           aria-label={`Integration status: ${integrationStatus}`}
         />
         <PermissionTooltip
           allowed={canDeleteIntegrations || permissionsLoading}
-          message="You don't have permission to delete integrations."
+          message="You do not have permission to delete integrations."
         >
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="shrink-0 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+            className="shrink-0 text-muted-foreground hover:text-destructive"
             aria-label="Delete integration"
             disabled={!canDeleteIntegrations}
             data-testid="integration-detail-delete"

@@ -26,7 +26,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function detailPath(orderNumber?: string) {
-  return `workspaces/${PRIMARY_FACTORY_KEY}/work-order/${orderNumber ?? OPEN_WORK_ORDER.number}`;
+  return `workspaces/${PRIMARY_FACTORY_KEY}/task/${orderNumber ?? OPEN_WORK_ORDER.number}`;
 }
 
 export const Open: Story = {

@@ -9,6 +9,12 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PLANNING_REVIEW_DRAFT, type PlanningReviewStep } from "./planningReviewMockup";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
 
+vi.mock("@monaco-editor/react", () => ({
+  Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
+    <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
+  ),
+}));
+
 function renderPopup(
   props: Omit<ComponentProps<typeof PlanningReviewPopup>, "onClose"> & { onClose?: () => void } = {},
 ) {
@@ -27,9 +33,7 @@ describe("PlanningReviewPopup", () => {
   it("uses the agent name as the title", () => {
     renderPopup();
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
     expect(screen.queryByTestId("planning-review-title-input")).not.toBeInTheDocument();
   });
 
@@ -53,9 +57,7 @@ describe("PlanningReviewPopup", () => {
 
     expect(screen.queryByTestId("planning-review-component-plan-agent")).not.toBeInTheDocument();
     expect(screen.getByTestId("planning-review-component-implementation-agent")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
   });
 
   it("notes that agents are part of an automation and links to the automation editor", () => {
@@ -76,25 +78,34 @@ describe("PlanningReviewPopup", () => {
     expect(within(note).queryByRole("link")).not.toBeInTheDocument();
   });
 
-  it("places Environment and Model on one row under Steps", () => {
+  it("shows runner fields from the runner navigation item", async () => {
+    const user = userEvent.setup();
     renderPopup();
 
-    const steps = screen.getByRole("heading", { name: "Steps" });
+    await user.click(screen.getByTestId("planning-review-nav-runner"));
+
     const row = screen.getByTestId("planning-review-environment-model-row");
     expect(within(row).getByText("Environment")).toBeInTheDocument();
     expect(within(row).getByText("Model")).toBeInTheDocument();
-    expect(steps.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(row).getByText("Working directory")).toBeInTheDocument();
+    expect(within(row).getByText("Execution timeout (seconds)")).toBeInTheDocument();
   });
 
-  it("shows the runner component expanded", () => {
+  it("names the agent once, in the header, and describes it below the name", () => {
+    renderPopup();
+
+    expect(screen.getAllByText("Implement From Task Description")).toHaveLength(1);
+    expect(screen.getByTestId("planning-review-description")).toHaveTextContent(
+      "Implement the approved plan and prepare the branch for review.",
+    );
+  });
+
+  it("shows the runner settings without an extra collapsed wrapper", () => {
     renderPopup();
 
     const implementation = screen.getByTestId("planning-review-component-implementation-agent");
 
-    expect(within(implementation).getByRole("button", { name: /Agent - Implement/ })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.queryByTestId("planning-review-component-toggle-implementation-agent")).not.toBeInTheDocument();
     expect(within(implementation).getByText("Steps")).toBeInTheDocument();
     expect(within(implementation).queryByText("Working directory")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Credentials")).not.toBeInTheDocument();
@@ -104,7 +115,7 @@ describe("PlanningReviewPopup", () => {
     expect(within(implementation).queryByText("Concurrency")).not.toBeInTheDocument();
   });
 
-  it("shows every step as a row with a kind chip, a name, and a body", () => {
+  it("shows every step collapsed with a name and kind badge", () => {
     renderPopup();
 
     const implementation = screen.getByTestId("planning-review-component-implementation-agent");
@@ -112,8 +123,8 @@ describe("PlanningReviewPopup", () => {
 
     steps.forEach((step, index) => {
       const row = within(implementation).getByTestId(`planning-review-step-${index}`);
-      expect(within(row).getByTestId(`planning-review-step-name-${index}`)).toHaveValue(step.name);
-      expect(within(row).getByTestId(`planning-review-step-body-${index}`)).toHaveValue(step.command ?? step.prompt);
+      expect(within(row).getByTestId(`planning-review-step-summary-${index}`)).toHaveTextContent(step.name);
+      expect(within(row).getByTestId(`planning-review-step-toggle-${index}`)).toHaveAttribute("aria-expanded", "false");
       expect(within(row).getByText(step.type === "prompt" ? "Prompt" : "Bash")).toBeInTheDocument();
     });
   });
@@ -135,33 +146,24 @@ describe("PlanningReviewPopup", () => {
     const steps = PLANNING_REVIEW_DRAFT.components[0].configuration.steps as PlanningReviewStep[];
     await user.click(screen.getByTestId("planning-review-step-remove-0"));
 
-    expect(screen.getByTestId("planning-review-step-name-0")).toHaveValue(steps[1].name);
+    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent(steps[1].name);
   });
 
-  it("reveals environment, timeout, and concurrency in more settings", async () => {
+  it("opens each settings group from the navigation", async () => {
     const user = userEvent.setup();
     renderPopup();
-
     const implementation = screen.getByTestId("planning-review-component-implementation-agent");
-    await user.click(within(implementation).getByTestId("planning-review-more-settings-toggle"));
 
-    expect(within(implementation).getByText("Working directory")).toBeInTheDocument();
+    await user.click(screen.getByTestId("planning-review-nav-credentials"));
     expect(within(implementation).getByText("Credentials")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("planning-review-nav-environment"));
     expect(within(implementation).getByText("Environment from")).toBeInTheDocument();
     expect(within(implementation).getByText("Environment variables")).toBeInTheDocument();
-    expect(within(implementation).getByText("Execution timeout (seconds)")).toBeInTheDocument();
-    expect(within(implementation).getByText("Concurrency")).toBeInTheDocument();
-  });
 
-  it("collapses the agent block", async () => {
-    const user = userEvent.setup();
-    renderPopup();
-
-    const implementationToggle = screen.getByTestId("planning-review-component-toggle-implementation-agent");
-
-    await user.click(implementationToggle);
-    expect(implementationToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Steps")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("planning-review-nav-concurrency"));
+    expect(screen.getByText("Max parallel executions")).toBeInTheDocument();
+    expect(screen.getByText("Key")).toBeInTheDocument();
   });
 
   it("saves component configuration and closes", async () => {
@@ -170,7 +172,7 @@ describe("PlanningReviewPopup", () => {
     const user = userEvent.setup();
     renderPopup({ onClose, onSave });
 
-    await user.click(screen.getByTestId("planning-review-more-settings-toggle"));
+    await user.click(screen.getByTestId("planning-review-nav-concurrency"));
     const max = screen.getByTestId("planning-review-concurrency-max-implementation-agent");
     await user.clear(max);
     await user.type(max, "8");

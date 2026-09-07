@@ -200,12 +200,6 @@ const ATTENTION_META: Record<
     icon: WORK_ORDER_ATTENTION_ICON.approval,
     chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.approval,
   },
-  question: {
-    label: WORK_ORDER_ATTENTION_LABEL.question,
-    actionLabel: "Answer",
-    icon: WORK_ORDER_ATTENTION_ICON.question,
-    chipClassName: WORK_ORDER_ATTENTION_CHIP_CLASSNAME.question,
-  },
   failed: {
     label: WORK_ORDER_ATTENTION_LABEL.failed,
     actionLabel: "Retry",

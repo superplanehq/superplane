@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Create with an Agent
+  description: Starts the machine when you create a task with an agent.
+spec:
+  edges:
+    - channel: default
+      sourceId: onrun-create-with-agent
+      targetId: planning-agent
+  nodes:
+    - id: onrun-create-with-agent
+      name: Planning
+      type: TYPE_TRIGGER
+      component: onRun
+      configuration: {}
+      position:
+        x: 400
+        'y': 880
+      isCollapsed: true
+    - id: planning-agent
+      name: Planning Agent
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      concurrency:
+        max: 10
+      configuration:
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: '{{ root().data.planning_session.repository }}'
+            valueSource: literal
+        executionTimeoutSeconds: 3600
+        machineType: e1-large-amd64
+        model: opus
+        steps:
+          - name: Clone Repo
+            type: bash
+            command: |-
+              rm -rf repo
+              git clone --depth 1 "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+          - name: Plan with the user
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              You are in a SuperPlane planning session. The repository is cloned in the working directory.
+
+              Use propose_draft only when the user asked for a task in this turn.
+              Use survey to ask one or more questions. Each question is multiple choice. The user can also write an answer.
+
+              Write to the user in plain text. Do not create work orders yourself.
+              When the user creates or skips a draft, acknowledge that in one short sentence. Ask what they want to do next. Do not call propose_draft unless they ask for a task.
+              When the user starts a refine, read the current task. Tell them you are ready. Ask what they want to change. Do not call propose_draft until they say what to change.
+              Do not call wait_for_user. SuperPlane waits after you stop.
+
+              Greet the user in plain text. Then stop.
+      position:
+        x: 720
+        'y': 880
+      isCollapsed: true

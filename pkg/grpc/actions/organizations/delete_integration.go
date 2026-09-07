@@ -12,9 +12,9 @@ import (
 )
 
 func DeleteIntegration(ctx context.Context, orgID string, ID string) (*pb.DeleteIntegrationResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+		return nil, err
 	}
 
 	integrationID, err := uuid.Parse(ID)

@@ -6,11 +6,13 @@ import { PermissionsContext } from "./permissionsContextState";
 
 interface PermissionsProviderProps {
   children: React.ReactNode;
+  organizationId?: string;
 }
 
-export function PermissionsProvider({ children }: PermissionsProviderProps) {
-  const organizationId = useOrganizationId();
-  const { data: me, isLoading: meLoading } = useMe();
+export function PermissionsProvider({ children, organizationId: organizationIdOverride }: PermissionsProviderProps) {
+  const routeOrganizationId = useOrganizationId();
+  const organizationId = organizationIdOverride ?? routeOrganizationId;
+  const { data: me, isLoading: meLoading } = useMe(true, organizationId);
 
   const permissions = useMemo(() => me?.permissions ?? [], [me?.permissions]);
 
@@ -35,7 +37,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
     [permissionSet],
   );
 
-  const isLoading = !organizationId || meLoading || (!!organizationId && meLoading);
+  const isLoading = !organizationId || meLoading;
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>

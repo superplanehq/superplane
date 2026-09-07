@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -630,7 +631,7 @@ func (c *FactoryContext) FindPullRequest(params core.FindPullRequestParams) (*co
 	return c.pullRequestMatch(pullRequest)
 }
 
-func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestMatch, error) {
+func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
 	if c.execution == nil {
 		return nil, errors.New("run is required to add pull request activity")
 	}
@@ -653,11 +654,160 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 		return nil, err
 	}
 
-	if err := pullRequest.LinkRun(c.tx, c.execution.RunID, params.Description); err != nil {
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(c.tx, c.canvas.ID)
+	if err != nil {
 		return nil, err
 	}
 
-	return c.pullRequestMatch(pullRequest)
+	access := params.Access
+	if access == "" && handler != nil && handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+		access = models.FactoryPullRequestAccessExclusive
+	}
+
+	var handlerID *uuid.UUID
+	if handler != nil {
+		handlerID = &handler.ID
+	}
+
+	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
+		RunID:             c.execution.RunID,
+		Description:       params.Description,
+		RevisionSHA:       params.Revision,
+		Access:            access,
+		FeedbackHandlerID: handlerID,
+	})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestActivityDuplicate) {
+			return nil, core.ErrPullRequestActivityAlreadyActive
+		}
+		return nil, err
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityAdded")
+	return c.activityResult(pullRequest, created.Activity, created.Revision, created.CurrentRevision, created.Outcome)
+}
+
+func (c *FactoryContext) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	if c.execution == nil {
+		return nil, errors.New("run is required to update pull request activity")
+	}
+
+	activity, err := models.FindPullRequestActivityByRunID(c.tx, c.execution.RunID)
+	if err != nil {
+		return nil, err
+	}
+
+	var pullRequest models.FactoryPullRequest
+	if err := c.tx.Where("id = ?", activity.PullRequestID).First(&pullRequest).Error; err != nil {
+		return nil, err
+	}
+
+	if params.Description != nil {
+		if err := activity.UpdateDescription(c.tx, *params.Description); err != nil {
+			return nil, err
+		}
+	}
+
+	outcome := models.FactoryPullRequestActivityOutcomeReady
+	var currentRevision *models.FactoryPullRequestRevision
+	if params.Access == models.FactoryPullRequestAccessExclusive {
+		accessResult, accessErr := pullRequest.RequestExclusiveAccess(c.tx, activity)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		activity = accessResult.Activity
+		outcome = accessResult.Outcome
+		currentRevision = accessResult.CurrentRevision
+	} else {
+		outcome = activityOutcomeFromModel(activity)
+		if pullRequest.CurrentRevisionID != nil {
+			currentRevision, err = models.FindPullRequestRevision(c.tx, *pullRequest.CurrentRevisionID)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	var revision *models.FactoryPullRequestRevision
+	if activity.RevisionID != nil {
+		revision, err = models.FindPullRequestRevision(c.tx, *activity.RevisionID)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityUpdated")
+	return c.activityResult(&pullRequest, activity, revision, currentRevision, outcome)
+}
+
+func (c *FactoryContext) activityResult(
+	pullRequest *models.FactoryPullRequest,
+	activity *models.FactoryPullRequestRun,
+	revision *models.FactoryPullRequestRevision,
+	currentRevision *models.FactoryPullRequestRevision,
+	outcome models.FactoryPullRequestActivityOutcome,
+) (*core.PullRequestActivityResult, error) {
+	match, err := c.pullRequestMatch(pullRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &core.PullRequestActivityResult{
+		PullRequest: match.PullRequest,
+		WorkOrder:   match.WorkOrder,
+		Outcome:     coreActivityOutcome(outcome),
+	}
+	if activity != nil {
+		result.Activity = pullRequestActivityToCore(activity, revision)
+	}
+	if currentRevision != nil {
+		result.CurrentRevision = pullRequestRevisionToCore(currentRevision)
+		result.CurrentHeadSHA = currentRevision.SHA
+	}
+	return result, nil
+}
+
+func pullRequestActivityToCore(activity *models.FactoryPullRequestRun, revision *models.FactoryPullRequestRevision) *core.PullRequestActivity {
+	item := &core.PullRequestActivity{
+		Description:  activity.Description,
+		Access:       activity.Access,
+		State:        activity.State,
+		Attempt:      activity.Attempt,
+		AttemptLimit: activity.AttemptLimit,
+	}
+	if revision != nil {
+		item.Revision = pullRequestRevisionToCore(revision)
+	}
+	return item
+}
+
+func pullRequestRevisionToCore(revision *models.FactoryPullRequestRevision) *core.PullRequestRevision {
+	return &core.PullRequestRevision{
+		SHA:        revision.SHA,
+		ObservedAt: revision.ObservedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+func coreActivityOutcome(outcome models.FactoryPullRequestActivityOutcome) string {
+	switch outcome {
+	case models.FactoryPullRequestActivityOutcomeWaiting:
+		return core.PullRequestActivityOutcomeWaiting
+	case models.FactoryPullRequestActivityOutcomeLimitReached:
+		return core.PullRequestActivityOutcomeLimitReached
+	default:
+		return core.PullRequestActivityOutcomeReady
+	}
+}
+
+func activityOutcomeFromModel(activity *models.FactoryPullRequestRun) models.FactoryPullRequestActivityOutcome {
+	switch activity.State {
+	case models.FactoryPullRequestActivityStateLimitReached:
+		return models.FactoryPullRequestActivityOutcomeLimitReached
+	}
+	if activity.Access == models.FactoryPullRequestAccessWaiting {
+		return models.FactoryPullRequestActivityOutcomeWaiting
+	}
+	return models.FactoryPullRequestActivityOutcomeReady
 }
 
 func artifactToCore(artifact *models.FactoryWorkOrderArtifact) (*core.WorkOrderArtifact, error) {

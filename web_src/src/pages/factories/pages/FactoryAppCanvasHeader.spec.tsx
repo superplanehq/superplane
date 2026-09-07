@@ -225,4 +225,37 @@ describe("FactoryAppCanvasHeader", () => {
     await user.click(screen.getByTestId("factory-app-edit-local-agent"));
     expect(onEditWithLocalAgent).toHaveBeenCalledTimes(1);
   });
+
+  it("wires Reset to factory defaults into More options when available", async () => {
+    const user = userEvent.setup();
+    const onResetToFactoryDefaults = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <FactoryAppCanvasHeader
+          backHref="/back"
+          backLabel="Plan and Implement"
+          title="Refund Implementer"
+          subtitle="Applies the plan across affected repos and opens PRs."
+          isConfigure
+          configureBusy={false}
+          onDiscard={vi.fn()}
+          onSave={vi.fn()}
+          workspace={{
+            agentOpen: false,
+            componentsOpen: false,
+            onAgentOpenChange: vi.fn(),
+            onComponentsOpenChange: vi.fn(),
+            onViewYaml: vi.fn(),
+            onEditWithLocalAgent: vi.fn(),
+            onResetToFactoryDefaults,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("factory-app-more-options"));
+    await user.click(screen.getByTestId("factory-app-reset-defaults"));
+    expect(onResetToFactoryDefaults).toHaveBeenCalledTimes(1);
+  });
 });

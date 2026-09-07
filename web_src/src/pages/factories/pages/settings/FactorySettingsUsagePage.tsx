@@ -10,50 +10,71 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { centsToDollarInput, parseDollarInputToCents } from "@/lib/hostedCredit";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
-import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
-import { factoryCardClassName, factoryContentBodyClassName } from "../factoryPageLayoutStyles";
+import { factoryCardClassName } from "../factoryPageLayoutStyles";
+import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
-import { LLMUsageByModelTable, LLMUsageTotals } from "./LLMUsageBreakdown";
+import {
+  WorkspaceUsageByMachineTypeTable,
+  WorkspaceUsageByModelTable,
+  WorkspaceUsageTotals,
+} from "./WorkspaceUsageBreakdown";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useEffect, useState } from "react";
+import type { FactoriesDescribeFactoryUsageResponse } from "@/api-client";
 
 export function FactorySettingsUsagePage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { data, isLoading, error } = useFactoryUsage(organizationId, factoryId);
 
-  usePageTitle(["Usage", "Settings", factory.name ?? "Workspace"]);
-
-  const totalTokens = parseWorkOrderMetric(data?.totalTokens);
-  const totalCostCents = parseWorkOrderMetric(data?.totalCostCents);
-  const periodDays = data?.periodDays ?? 30;
-  const byModel = data?.byModel ?? [];
+  usePageTitle(["Spending", "Settings", factory.name ?? "Workspace"]);
 
   return (
-    <>
-      <WorkspacePageHeader title="Usage" subtitle="LLM tokens and estimated spend for this workspace." />
-      <div className={factoryContentBodyClassName}>
-        {isLoading ? (
-          <p className="text-[13px] text-muted-foreground">Loading usage...</p>
-        ) : error ? (
-          <p className="text-[13px] text-destructive">Unable to load usage.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <LLMUsageTotals periodDays={periodDays} totalTokens={totalTokens} totalCostCents={totalCostCents} />
-            <HostedSpendLimitCard />
-            <HostedCreditSummary
-              remainingCreditCents={data?.remainingCreditCents}
-              grantTotalCents={data?.grantTotalCents}
-              hostedBilledCents={data?.hostedBilledCents}
-              remainingCreditWarning={data?.remainingCreditWarning}
-              cardClassName={`${factoryCardClassName} p-4`}
-              labelClassName="workspace-section-label"
-              valueClassName="workspace-page-title mt-1"
-            />
-            <LLMUsageByModelTable byModel={byModel} />
-          </div>
-        )}
-      </div>
-    </>
+    <FactorySettingsPageFrame
+      title="Spending"
+      subtitle="LLM tokens, VM seconds, and estimated spend for this workspace."
+    >
+      <FactorySettingsUsageBody data={data} error={error} isLoading={isLoading} />
+    </FactorySettingsPageFrame>
+  );
+}
+
+function FactorySettingsUsageBody({
+  data,
+  error,
+  isLoading,
+}: {
+  data: FactoriesDescribeFactoryUsageResponse | undefined;
+  error: unknown;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return <p className="text-[13px] text-muted-foreground">Loading usage...</p>;
+  }
+  if (error || !data) {
+    return <p className="text-[13px] text-destructive">Unable to load usage.</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <WorkspaceUsageTotals
+        periodDays={data.periodDays ?? 30}
+        totalTokens={parseWorkOrderMetric(data.totalTokens)}
+        totalCostCents={parseWorkOrderMetric(data.totalCostCents)}
+        totalDurationSeconds={parseWorkOrderMetric(data.totalDurationSeconds)}
+      />
+      <HostedSpendLimitCard />
+      <HostedCreditSummary
+        remainingCreditCents={data.remainingCreditCents}
+        grantTotalCents={data.grantTotalCents}
+        hostedBilledCents={data.hostedBilledCents}
+        remainingCreditWarning={data.remainingCreditWarning}
+        cardClassName={`${factoryCardClassName} p-4`}
+        labelClassName="workspace-section-label"
+        valueClassName="workspace-page-title mt-1"
+      />
+      <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
+      <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
+    </div>
   );
 }
 
@@ -68,7 +89,7 @@ function HostedSpendLimitCard() {
   const [noLimit, setNoLimit] = useState(!hasLimit);
   const [dollars, setDollars] = useState(hasLimit ? centsToDollarInput(Number(currentBudget)) : "");
   const limitCents = parseDollarInputToCents(dollars);
-  const canSaveLimit = noLimit || limitCents !== null;
+  const canSaveLimit = limitCents !== null;
 
   useEffect(() => {
     const nextHasLimit = currentBudget !== undefined && currentBudget !== null;
@@ -77,17 +98,33 @@ function HostedSpendLimitCard() {
   }, [currentBudget]);
 
   const save = async () => {
-    if (!noLimit && limitCents === null) {
+    if (limitCents === null) {
       showErrorToast("Enter a valid spend limit in USD.");
       return;
     }
     try {
       await updateFactory.mutateAsync({
-        hostedSpendBudgetCents: noLimit ? null : limitCents,
+        hostedSpendBudgetCents: limitCents,
       });
       showSuccessToast("Hosted spend limit saved.");
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const clearLimit = async () => {
+    try {
+      await updateFactory.mutateAsync({ hostedSpendBudgetCents: null });
+      showSuccessToast("Hosted spend limit saved.");
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Unable to save hosted spend limit."));
+    }
+  };
+
+  const handleNoLimitChange = (checked: boolean) => {
+    setNoLimit(checked);
+    if (checked && hasLimit) {
+      void clearLimit();
     }
   };
 
@@ -102,7 +139,7 @@ function HostedSpendLimitCard() {
           id="hosted-spend-no-limit"
           checked={noLimit}
           disabled={!canUpdate || updateFactory.isPending}
-          onCheckedChange={setNoLimit}
+          onCheckedChange={handleNoLimitChange}
         />
       </div>
       {!noLimit ? (
@@ -138,7 +175,7 @@ function HostedSpendLimitCard() {
           {formatUsdCents(parseWorkOrderMetric(data.hostedSpendBudgetCents))}.
         </p>
       ) : null}
-      {canUpdate ? (
+      {canUpdate && !noLimit ? (
         <Button
           className="mt-3"
           type="button"

@@ -82,7 +82,7 @@ func requireFactoryExecutionRunID(t *testing.T, execution *models.FactoryWorkOrd
 
 func recordFactoryLLMUsage(t *testing.T, organizationID, runID uuid.UUID) {
 	t.Helper()
-	require.NoError(t, models.RecordUsage(database.Conn(), models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(database.Conn(), models.WorkspaceUsageEventInput{
 		OrganizationID:  organizationID,
 		CanvasRunID:     runID,
 		NodeExecutionID: uuid.New(),
@@ -121,7 +121,7 @@ func dispatchFactoryExecutionForUsageTest(t *testing.T, r *support.ResourceRegis
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}))
+	}, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {

@@ -1,9 +1,12 @@
 import ReactMarkdown from "react-markdown";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-const INSTRUCTIONS_CLASSES =
+const DEFAULT_INSTRUCTIONS_CLASSES =
   "rounded-md border border-orange-950/15 bg-orange-100 p-4 text-sm text-gray-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-gray-200 [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-2 [&_a]:decoration-current [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:space-y-1";
+const SETTINGS_INSTRUCTIONS_CLASSES =
+  "rounded-lg border border-border bg-card p-4 text-sm text-card-foreground [&_a]:!underline [&_a]:underline-offset-2 [&_a]:decoration-current [&_ol]:ml-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ul]:ml-5 [&_ul]:list-disc [&_ul]:space-y-1";
 
 export interface IntegrationInstructionsProps {
   /** Markdown description (e.g. setup steps) */
@@ -12,20 +15,27 @@ export interface IntegrationInstructionsProps {
   onContinue?: () => void;
   /** Optional class name for the wrapper */
   className?: string;
+  /** Use the neutral settings card palette instead of the setup callout palette. */
+  tone?: "default" | "settings";
 }
 
 /**
  * Shared block for integration setup/configuration instructions.
- * Same styling everywhere: bg-blue-50, border-blue-200, text-gray-800.
- * Used in sidebar (Create/Configure integration dialogs) and org/integrations.
+ * Setup flows use a callout palette. Settings pages can use the neutral card palette.
  */
-export function IntegrationInstructions({ description, onContinue, className = "" }: IntegrationInstructionsProps) {
+export function IntegrationInstructions({
+  description,
+  onContinue,
+  className,
+  tone = "default",
+}: IntegrationInstructionsProps) {
   if (!description?.trim()) return null;
 
   const normalizedDescription = description.replace(/\r\n/g, "\n").replace(/\n(?!\n)/g, "  \n");
+  const isSettingsTone = tone === "settings";
 
   return (
-    <div className={`${INSTRUCTIONS_CLASSES} ${className}`.trim()}>
+    <div className={cn(isSettingsTone ? SETTINGS_INSTRUCTIONS_CLASSES : DEFAULT_INSTRUCTIONS_CLASSES, className)}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <ReactMarkdown
@@ -36,7 +46,14 @@ export function IntegrationInstructions({ description, onContinue, className = "
               h4: ({ children }) => <h4 className="text-sm font-medium mt-2 mb-1">{children}</h4>,
               p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
               blockquote: ({ children }) => (
-                <blockquote className="mb-2 rounded-md border border-orange-950/15 bg-orange-50/80 p-3 text-sm last:mb-0 dark:border-blue-700/40 dark:bg-blue-950/40">
+                <blockquote
+                  className={cn(
+                    "mb-2 rounded-md border p-3 text-sm last:mb-0",
+                    isSettingsTone
+                      ? "border-border bg-muted/50"
+                      : "border-orange-950/15 bg-orange-50/80 dark:border-blue-700/40 dark:bg-blue-950/40",
+                  )}
+                >
                   {children}
                 </blockquote>
               ),
@@ -53,7 +70,11 @@ export function IntegrationInstructions({ description, onContinue, className = "
                   {children}
                 </a>
               ),
-              code: ({ children }) => <code className="rounded bg-black/10 px-1 text-xs">{children}</code>,
+              code: ({ children }) => (
+                <code className={cn("rounded px-1 text-xs", isSettingsTone ? "bg-muted" : "bg-black/10")}>
+                  {children}
+                </code>
+              ),
               strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
               em: ({ children }) => <em className="italic">{children}</em>,
             }}

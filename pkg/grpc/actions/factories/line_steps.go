@@ -108,6 +108,46 @@ func parseLineStep(
 	}, nil
 }
 
+// factoryLineColumnColorIDs are the allowed board column color ids. Keep in
+// sync with LINE_BOARD_COLUMN_COLORS in
+// web_src/src/pages/factories/pages/lineBoardColumnColors.ts.
+var factoryLineColumnColorIDs = map[string]bool{
+	"lime":   true,
+	"yellow": true,
+	"teal":   true,
+	"sky":    true,
+	"purple": true,
+	"slate":  true,
+}
+
+const (
+	factoryLineColumnColorKeyMaxLength = 64
+	factoryLineColumnColorMaxEntries   = 64
+)
+
+// parseLineColumnColors validates a full replacement map of board column
+// colors and returns a normalized, non-nil copy (an empty input map is a
+// valid "clear all colors" request). Unknown color ids, and empty or
+// oversized keys, are rejected.
+func parseLineColumnColors(colors map[string]string) (map[string]string, error) {
+	if len(colors) > factoryLineColumnColorMaxEntries {
+		return nil, invalidArgument("too many column colors")
+	}
+
+	result := make(map[string]string, len(colors))
+	for key, colorID := range colors {
+		if key == "" || len(key) > factoryLineColumnColorKeyMaxLength {
+			return nil, invalidArgument(fmt.Sprintf("column color key %q is invalid", key))
+		}
+		if !factoryLineColumnColorIDs[colorID] {
+			return nil, invalidArgument(fmt.Sprintf("column color %q is not supported", colorID))
+		}
+		result[key] = colorID
+	}
+
+	return result, nil
+}
+
 func resolveFactoryOwnedApp(
 	tx *gorm.DB,
 	organizationID, factoryID uuid.UUID,

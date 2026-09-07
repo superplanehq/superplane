@@ -1,4 +1,7 @@
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -21,6 +24,7 @@ export function FirstRunChooseScreen({
   onContinue: () => void;
 }) {
   const copy = FIRST_RUN_COPY.choose;
+  const [whyMissingOpen, setWhyMissingOpen] = useState(false);
 
   return (
     <FirstRunShell testId="first-run-choose" chrome={chrome}>
@@ -46,6 +50,9 @@ export function FirstRunChooseScreen({
               {copy.editConnection}
             </button>
           </p>
+          <p className="mt-1 text-[12px] text-muted-foreground" data-testid="first-run-choose-access-hint">
+            {copy.accessHint}
+          </p>
         </FirstRunPanel>
 
         <div className="space-y-2">
@@ -60,6 +67,26 @@ export function FirstRunChooseScreen({
           </Button>
           <p className="text-[12px] text-muted-foreground">{copy.moreLater}</p>
         </div>
+
+        <details
+          className="rounded-lg border border-border p-3 text-left open:pb-4"
+          open={whyMissingOpen}
+          onToggle={(event) => setWhyMissingOpen(event.currentTarget.open)}
+          data-testid="first-run-choose-why-missing"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[13px] text-muted-foreground [&::-webkit-details-marker]:hidden">
+            {copy.missingTitle}
+            <ChevronDown
+              className={cn("size-3.5 shrink-0 transition-transform", whyMissingOpen && "rotate-180")}
+              aria-hidden
+            />
+          </summary>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] text-muted-foreground">
+            {copy.missingReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </details>
       </div>
     </FirstRunShell>
   );

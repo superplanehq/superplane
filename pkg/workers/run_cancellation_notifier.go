@@ -43,6 +43,10 @@ func (n *RunCancellationNotifier) Publish() {
 	}
 }
 
+func (n *RunCancellationNotifier) Record(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
+	n.record(workflowID, runID, drainResult)
+}
+
 func (n *RunCancellationNotifier) record(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
 	n.Outcomes = append(n.Outcomes, RunCancellationOutcome{
 		WorkflowID:  workflowID,

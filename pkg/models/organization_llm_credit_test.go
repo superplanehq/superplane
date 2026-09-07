@@ -60,7 +60,7 @@ func Test__AdminGrantRestoresHostedCredit(t *testing.T) {
 	db := database.DB(t.Context())
 
 	execution := dispatchWorkOrderExecution(t, r)
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -95,7 +95,7 @@ func Test__HostedRecordUsageAppliesOrgMarkupOverride(t *testing.T) {
 	override := 0
 	require.NoError(t, models.UpsertOrganizationLLMMarkup(db, r.Organization.ID, &override))
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -107,7 +107,7 @@ func Test__HostedRecordUsageAppliesOrgMarkupOverride(t *testing.T) {
 		FundingSource:   models.UsageFundingSourceHosted,
 	}))
 
-	var event models.LLMUsageEvent
+	var event models.WorkspaceUsageEvent
 	require.NoError(t, db.Where("work_order_execution_id = ?", execution.ID).First(&event).Error)
 	assert.Equal(t, models.UsageFundingSourceHosted, event.FundingSource)
 	assert.Equal(t, int64(3_000_000), event.ProviderCostMicros)
@@ -119,7 +119,7 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 	db := database.DB(t.Context())
 	execution := dispatchWorkOrderExecution(t, r)
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, execution),
 		NodeExecutionID: uuid.New(),
@@ -130,7 +130,7 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 		TotalTokens:     1_000_000,
 	}))
 
-	var event models.LLMUsageEvent
+	var event models.WorkspaceUsageEvent
 	require.NoError(t, db.Where("work_order_execution_id = ?", execution.ID).First(&event).Error)
 	assert.Equal(t, models.UsageFundingSourceBYOK, event.FundingSource)
 	assert.Equal(t, event.ProviderCostMicros, event.CostMicros)
@@ -160,53 +160,20 @@ func Test__AssertHostedCreditAvailable(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrHostedCreditEmpty)
 }
 
-func Test__ReserveHostedCreditBlocksConcurrentStarts(t *testing.T) {
+func Test__AssertHostedRunAllowedAllowsConcurrentStarts(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
 	db := database.Conn()
-	first := pendingHostedExecution(t, r)
-	second := pendingHostedExecution(t, r)
 
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
-	err := models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil)
-	require.ErrorIs(t, err, models.ErrHostedRunInFlight)
-
-	require.NoError(t, models.ReleaseHostedCreditHold(db, first.ID))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
-}
-
-func Test__ReserveHostedCreditIsIdempotentForSameExecution(t *testing.T) {
-	restoreInstallationLLMSettings(t)
-	r := support.Setup(t)
-	db := database.Conn()
-	execution := pendingHostedExecution(t, r)
-
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, nil))
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, nil))
-}
-
-func Test__ReserveHostedCreditReleasesHoldWhenExecutionFinishes(t *testing.T) {
-	restoreInstallationLLMSettings(t)
-	r := support.Setup(t)
-	db := database.Conn()
-	first := pendingHostedExecution(t, r)
-	second := pendingHostedExecution(t, r)
-
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
-	require.NoError(t, db.Model(first).Update("state", models.CanvasNodeExecutionStateFinished).Error)
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
-}
-
-func Test__ReserveHostedCreditReleasesHoldWhenExecutionIsDeleted(t *testing.T) {
-	restoreInstallationLLMSettings(t)
-	r := support.Setup(t)
-	db := database.Conn()
-	first := pendingHostedExecution(t, r)
-	second := pendingHostedExecution(t, r)
-
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, first.ID, nil))
-	require.NoError(t, db.Delete(first).Error)
-	require.NoError(t, models.ReserveHostedCredit(db, r.Organization.ID, second.ID, nil))
+	errs := make(chan error, 2)
+	go func() {
+		errs <- models.AssertHostedRunAllowed(db, r.Organization.ID, nil)
+	}()
+	go func() {
+		errs <- models.AssertHostedRunAllowed(db, r.Organization.ID, nil)
+	}()
+	require.NoError(t, <-errs)
+	require.NoError(t, <-errs)
 }
 
 func Test__PolarGrantIsIdempotentByOrderID(t *testing.T) {
@@ -299,8 +266,7 @@ func Test__FactoryHostedBudgetZeroBlocksHostedStart(t *testing.T) {
 	zero := int64(0)
 	require.NoError(t, factory.UpdateHostedSpendBudget(db, &zero))
 
-	execution := pendingHostedExecution(t, r)
-	err = models.ReserveHostedCredit(db, r.Organization.ID, execution.ID, &factory.ID)
+	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
 	require.ErrorIs(t, err, models.ErrFactoryHostedBudgetEmpty)
 }
 
@@ -314,7 +280,7 @@ func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 	budget := int64(1)
 	require.NoError(t, factory.UpdateHostedSpendBudget(db, &budget))
 
-	require.NoError(t, models.RecordUsage(db, models.LLMUsageEventInput{
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     requireExecutionRunID(t, workOrderExecution),
 		NodeExecutionID: uuid.New(),
@@ -326,19 +292,8 @@ func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 		FundingSource:   models.UsageFundingSourceHosted,
 	}))
 
-	node := pendingHostedExecution(t, r)
-	err = models.ReserveHostedCredit(db, r.Organization.ID, node.ID, &factory.ID)
+	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
 	require.ErrorIs(t, err, models.ErrFactoryHostedBudgetEmpty)
-}
-
-func pendingHostedExecution(t *testing.T, r *support.ResourceRegistry) *models.CanvasNodeExecution {
-	t.Helper()
-	nodeID := support.RandomName("hosted")
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{
-		{NodeID: nodeID, Type: models.NodeTypeComponent},
-	}, []models.Edge{})
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, nodeID, "default", nil)
-	return support.CreateCanvasNodeExecution(t, canvas.ID, nodeID, rootEvent.ID, rootEvent.ID)
 }
 
 func restoreInstallationLLMSettings(t *testing.T) {

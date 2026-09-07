@@ -201,6 +201,47 @@ func (c *Client) GetPullRequest(ctx context.Context, repository string, pullNumb
 	return c.underlying.PullRequests.Get(ctx, owner, name, pullNumber)
 }
 
+// ListPullRequests returns one page of a repository's pull requests.
+//
+// This is the plain REST endpoint, which draws on the 5000-per-hour budget.
+// Prefer it over a Search query, because Search allows only 30 requests a
+// minute per installation.
+func (c *Client) ListPullRequests(
+	ctx context.Context,
+	repository string,
+	opts *github.PullRequestListOptions,
+) ([]*github.PullRequest, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.PullRequests.List(ctx, owner, name, opts)
+}
+
+// HeadFilter builds the "owner:branch" value GitHub's pull request list "head"
+// filter requires, using repository to resolve the owner the same way every
+// other call on this client does. If branch already carries an "owner:"
+// prefix (for example, a cross-repository head), it is returned unchanged.
+func (c *Client) HeadFilter(repository, branch string) string {
+	branch = strings.TrimSpace(branch)
+	if strings.Contains(branch, ":") {
+		return branch
+	}
+
+	owner, _ := c.ownerAndName(repository)
+	return owner + ":" + branch
+}
+
+// ListCommits returns one page of a repository's commits.
+//
+// The commit message carries the trailers a squashed merge collected, which name
+// the co-authors of the work. A pull request listing does not include them.
+func (c *Client) ListCommits(
+	ctx context.Context,
+	repository string,
+	opts *github.CommitsListOptions,
+) ([]*github.RepositoryCommit, *github.Response, error) {
+	owner, name := c.ownerAndName(repository)
+	return c.underlying.Repositories.ListCommits(ctx, owner, name, opts)
+}
+
 func (c *Client) ListPullRequestReviewComments(
 	ctx context.Context,
 	repository string,

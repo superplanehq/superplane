@@ -8,7 +8,7 @@
  * self-contained.
  */
 
-export type AttentionReason = "approval" | "question" | "failed" | "stalled";
+export type AttentionReason = "approval" | "failed" | "stalled";
 
 export interface WorkOrderOwner {
   name: string;
@@ -155,7 +155,7 @@ export const POPULATED_OVERVIEW: OverviewRedesignData = {
       id: "att-2",
       workOrderKey: "RF-58",
       title: "Add retry limits to the payment poller",
-      reason: "question",
+      reason: "approval",
       lineName: "Backend",
       stepName: "Build",
       waitingFor: "1h",

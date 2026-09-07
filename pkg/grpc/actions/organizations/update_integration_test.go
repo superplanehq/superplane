@@ -247,4 +247,44 @@ func Test__UpdateIntegration(t *testing.T) {
 		assert.Equal(t, codes.AlreadyExists, code)
 		assert.Contains(t, msg, "already exists")
 	})
+
+	t.Run("empty sensitive togglable value removes the stored secret", func(t *testing.T) {
+		r.Registry.Integrations["dummy"] = &secretFieldIntegration{
+			DummyIntegration: impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+				OnSync: func(ctx core.SyncContext) error {
+					ctx.Integration.Ready()
+					return nil
+				},
+			}),
+		}
+
+		integrationName := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"adminKey": "admin-secret"})
+		require.NoError(t, err)
+
+		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", integrationName, appConfig)
+		require.NoError(t, err)
+		require.Equal(t, "<redacted>", createResponse.Integration.Spec.Configuration.AsMap()["adminKey"])
+
+		updateResponse, err := UpdateIntegration(
+			ctx,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			createResponse.Integration.Metadata.Id,
+			map[string]any{"adminKey": ""},
+			"",
+		)
+		require.NoError(t, err)
+
+		integration, err := models.FindIntegrationByName(database.Conn(), r.Organization.ID, integrationName)
+		require.NoError(t, err)
+		_, exists := integration.Configuration.Data()["adminKey"]
+		assert.False(t, exists, "stored configuration must not keep the cleared secret")
+
+		_, exists = updateResponse.Integration.Spec.Configuration.AsMap()["adminKey"]
+		assert.False(t, exists, "serialized configuration must not return a redacted cleared secret")
+	})
 }

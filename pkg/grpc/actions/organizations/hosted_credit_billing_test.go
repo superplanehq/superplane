@@ -149,7 +149,7 @@ func Test__CreateHostedCreditCheckout(t *testing.T) {
 				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
 				assert.Equal(t, "203.0.113.10", body["customer_ip_address"])
 				assert.Nil(t, body["customer_email"])
-				assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/organization/llm-spend?credit=added&checkout_id={CHECKOUT_ID}", body["success_url"])
+				assert.Equal(t, "http://localhost:8000/"+r.Organization.ID.String()+"/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}", body["success_url"])
 				require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 					"url":         "https://buy.example/checkout",
 					"customer_id": "cust_1",
@@ -484,14 +484,14 @@ func Test__HostedCreditCheckoutSuccessURL(t *testing.T) {
 	orgID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	assert.Equal(
 		t,
-		"http://localhost:8000/11111111-1111-1111-1111-111111111111/organization/llm-spend?credit=added&checkout_id={CHECKOUT_ID}",
+		"http://localhost:8000/11111111-1111-1111-1111-111111111111/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}",
 		hostedCreditCheckoutSuccessURL("http://localhost:8000/", orgID),
 	)
 
 	t.Setenv("BASE_URL", "https://app.example")
 	assert.Equal(
 		t,
-		"https://app.example/11111111-1111-1111-1111-111111111111/organization/llm-spend?credit=added&checkout_id={CHECKOUT_ID}",
+		"https://app.example/11111111-1111-1111-1111-111111111111/organization/workspace-usage?credit=added&checkout_id={CHECKOUT_ID}",
 		hostedCreditCheckoutSuccessURL("  ", orgID),
 	)
 }

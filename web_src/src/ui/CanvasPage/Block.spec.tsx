@@ -292,6 +292,7 @@ describe("Block fallback rendering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add next component" }));
 
     expect(onAppendFromNode).toHaveBeenCalledWith("end-node", "default");
+    expect(screen.getByTestId("append-connector-stem")).toBeInTheDocument();
   });
 
   it("highlights the append connector source handle during compatible connection drags", () => {
@@ -349,6 +350,34 @@ describe("Block fallback rendering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add next component (failure)" }));
 
     expect(onAppendFromNode).toHaveBeenCalledWith("router-node", "failure");
+  });
+
+  it("centers the factory append plus on the vertical stem", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="finder"
+        onAppendFromNode={vi.fn()}
+        data={{
+          label: "Find Pull Request",
+          state: "pending",
+          type: "component",
+          outputChannels: ["found", "notFound"],
+          _flowDirection: "vertical",
+          component: {
+            title: "Find Pull Request",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "finder", sourceHandle: "found", target: "next" }],
+        }}
+      />,
+    );
+
+    const plus = screen.getByRole("button", { name: "Add next component (notFound)" });
+
+    expect(plus.style.left).toBe("50%");
+    expect(plus.style.transform).toBe("translateX(-50%)");
   });
 
   it("keeps node body content visible and fades opacity during edge-hover dimming", () => {

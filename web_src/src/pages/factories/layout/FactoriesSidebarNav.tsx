@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Gauge, Kanban, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, isBoardPath, isSettingsPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
@@ -12,8 +12,6 @@ interface FactoriesSidebarNavProps {
   lineId?: string;
   canOpenSettings: boolean;
   permissionsLoading: boolean;
-  /** Shows the Velocity rail link when the org has the `factory_velocity` experimental feature. */
-  showVelocity: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -48,11 +46,9 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: the line board, an optional
- * Velocity link, then settings. Velocity only shows when the organization
- * has the `factory_velocity` experimental feature enabled. Intakes and PR
- * feedback open from their listener rows on the board, so they do not need a
- * rail icon.
+ * Icon rail under the workspace switcher: the line board, the Velocity link,
+ * then settings. Intakes and PR feedback open from their listener rows on
+ * the board, so they do not need a rail icon.
  */
 export function FactoriesSidebarNav({
   organizationId,
@@ -60,12 +56,11 @@ export function FactoriesSidebarNav({
   lineId,
   canOpenSettings,
   permissionsLoading,
-  showVelocity,
 }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
-  const settingsHref = factorySettingsPath(organizationId, factoryKey);
+  const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, factoryKey);
   const boardCurrent = isBoardPath(pathname);
   const velocityCurrent = isVelocityPath(pathname);
   const settingsCurrent = isSettingsPath(pathname);
@@ -73,15 +68,13 @@ export function FactoriesSidebarNav({
   return (
     <nav className="flex flex-col items-center gap-1 px-1.5" aria-label="Workspace" data-testid="factories-sidebar-nav">
       <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
-      {showVelocity ? (
-        <RailNavLink
-          to={velocityHref}
-          label="Velocity"
-          Icon={Gauge}
-          testId="factories-nav-velocity"
-          isCurrent={velocityCurrent}
-        />
-      ) : null}
+      <RailNavLink
+        to={velocityHref}
+        label="Velocity"
+        Icon={Gauge}
+        testId="factories-nav-velocity"
+        isCurrent={velocityCurrent}
+      />
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."

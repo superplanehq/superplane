@@ -21,9 +21,9 @@ import (
 )
 
 func UpdateIntegrationCapabilities(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, capabilities []*pb.Integration_CapabilityState) (*pb.UpdateIntegrationCapabilitiesResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
+		return nil, err
 	}
 
 	id, err := uuid.Parse(integrationID)

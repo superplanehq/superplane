@@ -74,6 +74,28 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, res.Code)
 	})
 
+	t.Run("organization slug in header resolves to the matching user", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.Slug)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("unknown organization slug returns not found", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", "does-not-exist-slug")
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNotFound, res.Code)
+	})
+
 	t.Run("blocked account cookie returns contact-support message", func(t *testing.T) {
 		require.NoError(t, r.Account.Block(database.Conn(), time.Now()))
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render as testingLibraryRender } from "@testing-library/react";
+import { act, render as testingLibraryRender, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -139,6 +139,7 @@ function render(ui: ReactElement) {
 function canvasPage(overrides: {
   isEditing: boolean;
   factoryConfigure?: boolean;
+  factoryConfigureLayoutReady?: boolean;
   initialSidebar?: { isOpen: boolean; nodeId: string };
   initialFocusNodeId?: string;
   hasFitToViewRef: { current: boolean };
@@ -206,9 +207,67 @@ describe("CanvasPage factory Configure fit", () => {
       expect(fitViewMock).toHaveBeenCalledTimes(1);
       expect(fitViewMock).toHaveBeenCalledWith({
         ...FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
-        duration: 500,
+        duration: 0,
       });
       expect(viewportRef.current).toEqual(fittedViewport);
+      expect(screen.queryByTestId("factory-configure-enter-loading")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("covers the canvas until Configure fit finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const hasFitToViewRef = { current: true };
+      const viewportRef = { current: { x: 0, y: 0, zoom: 1 } };
+
+      const { rerender } = render(
+        canvasPage({ isEditing: false, factoryConfigure: false, hasFitToViewRef, viewportRef }),
+      );
+      act(() => {
+        reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+      });
+
+      rerender(canvasPage({ isEditing: true, factoryConfigure: true, hasFitToViewRef, viewportRef }));
+      expect(screen.getByTestId("factory-configure-enter-loading")).toBeInTheDocument();
+      expect(screen.getByText("Loading canvas...")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(FACTORY_CONFIGURE_FIT_SETTLE_MS);
+      });
+
+      expect(screen.queryByTestId("factory-configure-enter-loading")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the cover until Configure layout snaps", async () => {
+    vi.useFakeTimers();
+    try {
+      const hasFitToViewRef = { current: true };
+      const viewportRef = { current: { x: 0, y: 0, zoom: 1 } };
+
+      render(
+        canvasPage({
+          isEditing: true,
+          factoryConfigure: true,
+          factoryConfigureLayoutReady: false,
+          hasFitToViewRef,
+          viewportRef,
+        }),
+      );
+      act(() => {
+        reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(FACTORY_CONFIGURE_FIT_SETTLE_MS);
+      });
+
+      expect(fitViewMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId("factory-configure-enter-loading")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

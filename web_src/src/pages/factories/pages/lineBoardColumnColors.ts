@@ -32,3 +32,36 @@ export function lineBoardColumnColorById(id: string | null | undefined): LineBoa
 export function lineBoardColumnLaneClassName(id: string | null | undefined): string | undefined {
   return lineBoardColumnColorById(id)?.className;
 }
+
+/**
+ * Board column colors are persisted on the line as a map of column key to
+ * color id. Unknown ids (e.g. saved by a newer client) are dropped rather
+ * than shown as an invalid color.
+ */
+export function normalizeColumnColors(
+  columnColors: Record<string, string> | undefined,
+): Record<string, LineBoardColumnColorId | null> {
+  const normalized: Record<string, LineBoardColumnColorId | null> = {};
+  for (const [key, value] of Object.entries(columnColors ?? {})) {
+    if (lineBoardColumnColorById(value)) {
+      normalized[key] = value as LineBoardColumnColorId;
+    }
+  }
+  return normalized;
+}
+
+/**
+ * Inverse of normalizeColumnColors: drops cleared (null) entries so the
+ * persisted map only contains columns that have an explicit color.
+ */
+export function serializeColumnColors(
+  columnColors: Record<string, LineBoardColumnColorId | null>,
+): Record<string, string> {
+  const serialized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(columnColors)) {
+    if (value) {
+      serialized[key] = value;
+    }
+  }
+  return serialized;
+}

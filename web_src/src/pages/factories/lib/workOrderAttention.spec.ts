@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesWorkOrder } from "@/api-client";
 
-import { getWorkOrderAttentionReason, WORK_ORDER_ATTENTION_LABEL } from "./workOrderAttention";
+import {
+  getWorkOrderAttentionReason,
+  getWorkOrderAttentionReasons,
+  WORK_ORDER_ATTENTION_LABEL,
+} from "./workOrderAttention";
 
 function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
   return {
@@ -86,6 +90,49 @@ describe("getWorkOrderAttentionReason", () => {
       ),
     ).toBe("approval");
     expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
+  });
+
+  it("labels an active check wait as Waiting on status checks without user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { waitingOnChecks: true })).toEqual(["checks"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.approval).toBe("Waiting for user review");
+    expect(WORK_ORDER_ATTENTION_LABEL.checks).toBe("Waiting on status checks");
+  });
+
+  it("labels a paused fixer as Automatic fixes paused without user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { fixesPaused: true })).toEqual(["fixesPaused"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.fixesPaused).toBe("Automatic fixes paused");
+  });
+
+  it("labels passed checks and keeps user review", () => {
+    const waitingOnReview = order({
+      statusNotes: [
+        {
+          key: "pr-closure",
+          headline: "Waiting for user review",
+          body: "The pull request is open.",
+        },
+      ],
+    });
+    expect(getWorkOrderAttentionReasons(waitingOnReview, { checksPassed: true })).toEqual(["approval", "checksPassed"]);
+    expect(WORK_ORDER_ATTENTION_LABEL.checksPassed).toBe("Status checks passed");
   });
 
   it("labels an active PR-feedback run as Addressing user feedback", () => {

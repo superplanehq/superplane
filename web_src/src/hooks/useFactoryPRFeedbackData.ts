@@ -4,7 +4,11 @@ import {
   factoriesListFactoryPrFeedbackHandlers,
   factoriesUpdateFactoryPrFeedbackHandler,
 } from "@/api-client";
-import type { FactoriesFactoryPrFeedbackHandler, FactoriesFactoryPrFeedbackHandlerSettings } from "@/api-client";
+import type {
+  FactoriesFactoryPrFeedbackHandler,
+  FactoriesFactoryPrFeedbackHandlerSettings,
+  FactoriesFactoryPrFeedbackHandlerSource,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
@@ -50,13 +54,18 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; repository?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      repository?: string;
+      source?: FactoriesFactoryPrFeedbackHandlerSource;
+    }) => {
       const response = await factoriesCreateFactoryPrFeedbackHandler(
         withOrganizationHeader({
           organizationId,
           path: { factoryId },
           body: {
             name: input.name,
+            source: input.source,
             settings: input.repository ? { subject: { repository: input.repository } } : undefined,
           },
         }),

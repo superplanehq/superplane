@@ -28,18 +28,32 @@ const (
 )
 
 const (
-	factoryPullRequestProviderRepoNumberConstraint = "idx_factory_pull_requests_factory_provider_repo_number"
-	factoryPullRequestURLConstraint                = "idx_factory_pull_requests_factory_url"
-	factoryPullRequestProviderExternalConstraint   = "idx_factory_pull_requests_factory_provider_external"
-	factoryPullRequestRunUniqueConstraint          = "idx_factory_pull_request_runs_run_unique"
+	factoryPullRequestProviderRepoNumberConstraint   = "idx_factory_pull_requests_factory_provider_repo_number"
+	factoryPullRequestURLConstraint                  = "idx_factory_pull_requests_factory_url"
+	factoryPullRequestProviderExternalConstraint     = "idx_factory_pull_requests_factory_provider_external"
+	factoryPullRequestRunUniqueConstraint            = "idx_factory_pull_request_runs_run_unique"
+	factoryPullRequestActivityActiveUniqueConstraint = "idx_factory_pull_request_runs_active_handler_revision"
+	factoryPullRequestRevisionSHAUniqueConstraint    = "idx_factory_pull_request_revisions_pull_request_sha"
+
+	FactoryPullRequestAccessConcurrent = "concurrent"
+	FactoryPullRequestAccessWaiting    = "waiting"
+	FactoryPullRequestAccessExclusive  = "exclusive"
+	FactoryPullRequestAccessReleased   = "released"
+
+	FactoryPullRequestActivityStateActive       = "active"
+	FactoryPullRequestActivityStateFinished     = "finished"
+	FactoryPullRequestActivityStateLimitReached = "limit_reached"
 )
 
 var (
-	ErrFactoryPullRequestNotFound         = errors.New("factory pull request not found")
-	ErrFactoryPullRequestInvalid          = errors.New("invalid factory pull request")
-	ErrFactoryPullRequestAlreadyExists    = errors.New("factory pull request already exists")
-	ErrFactoryPullRequestRunAlreadyLinked = errors.New("run is already linked to a different pull request")
-	ErrFactoryPullRequestLookupIncomplete = errors.New("pull request lookup is incomplete")
+	ErrFactoryPullRequestNotFound             = errors.New("factory pull request not found")
+	ErrFactoryPullRequestInvalid              = errors.New("invalid factory pull request")
+	ErrFactoryPullRequestAlreadyExists        = errors.New("factory pull request already exists")
+	ErrFactoryPullRequestRunAlreadyLinked     = errors.New("run is already linked to a different pull request")
+	ErrFactoryPullRequestLookupIncomplete     = errors.New("pull request lookup is incomplete")
+	ErrFactoryPullRequestActivityNotFound     = errors.New("factory pull request activity not found")
+	ErrFactoryPullRequestActivityDuplicate    = errors.New("factory pull request activity already exists for this handler and revision")
+	ErrFactoryPullRequestActivityLimitReached = errors.New("factory pull request activity reached the attempt limit")
 )
 
 var factoryPullRequestProviders = []string{
@@ -64,33 +78,49 @@ var (
 )
 
 type FactoryPullRequest struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	FactoryID      uuid.UUID
-	WorkOrderID    uuid.UUID
-	Provider       string
-	ExternalID     *string
-	Repository     string
-	Number         int64
-	URL            string
-	Title          string
-	State          string
-	MergedAt       *time.Time
-	ClosedAt       *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                  uuid.UUID
+	OrganizationID      uuid.UUID
+	FactoryID           uuid.UUID
+	WorkOrderID         uuid.UUID
+	Provider            string
+	ExternalID          *string
+	Repository          string
+	Number              int64
+	URL                 string
+	Title               string
+	State               string
+	MergedAt            *time.Time
+	ClosedAt            *time.Time
+	CurrentRevisionID   *uuid.UUID
+	ActiveMutationRunID *uuid.UUID
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type FactoryPullRequestRun struct {
-	PullRequestID uuid.UUID `gorm:"primaryKey"`
-	RunID         uuid.UUID `gorm:"primaryKey"`
-	Description   string
-	CreatedAt     time.Time
+	PullRequestID     uuid.UUID `gorm:"primaryKey"`
+	RunID             uuid.UUID `gorm:"primaryKey"`
+	FeedbackHandlerID *uuid.UUID
+	RevisionID        *uuid.UUID
+	Access            string
+	State             string
+	Description       string
+	Attempt           *int
+	AttemptLimit      *int
+	AccessRequestedAt *time.Time
+	AccessGrantedAt   *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type FactoryPullRequestLinkedRun struct {
-	Run         CanvasRun
-	Description string
+	Run          CanvasRun
+	Description  string
+	Access       string
+	State        string
+	Attempt      *int
+	AttemptLimit *int
+	Revision     *FactoryPullRequestRevision
 }
 
 type FactoryPullRequestParams struct {
@@ -363,26 +393,12 @@ func (f *Factory) ListPullRequests(tx *gorm.DB, filter FactoryPullRequestFilter)
 }
 
 func (p *FactoryPullRequest) LinkRun(tx *gorm.DB, runID uuid.UUID, description string) error {
-	if runID == uuid.Nil {
-		return fmt.Errorf("%w: run id is required", ErrFactoryPullRequestInvalid)
-	}
-
-	link := &FactoryPullRequestRun{
-		PullRequestID: p.ID,
-		RunID:         runID,
-		Description:   strings.TrimSpace(description),
-		CreatedAt:     time.Now(),
-	}
-
-	err := tx.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "pull_request_id"}, {Name: "run_id"}},
-		DoNothing: true,
-	}).Create(link).Error
-	if err != nil {
-		return mapFactoryPullRequestRunConstraintError(err)
-	}
-
-	return nil
+	_, err := p.CreateActivity(tx, FactoryPullRequestActivityParams{
+		RunID:       runID,
+		Description: description,
+		Access:      FactoryPullRequestAccessConcurrent,
+	})
+	return err
 }
 
 func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID][]FactoryPullRequestLinkedRun, error) {
@@ -425,6 +441,26 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 		runByID[run.ID] = run
 	}
 
+	revisionIDs := make([]uuid.UUID, 0)
+	seenRevisions := map[uuid.UUID]bool{}
+	for _, link := range links {
+		if link.RevisionID == nil || seenRevisions[*link.RevisionID] {
+			continue
+		}
+		seenRevisions[*link.RevisionID] = true
+		revisionIDs = append(revisionIDs, *link.RevisionID)
+	}
+	revisionByID := map[uuid.UUID]FactoryPullRequestRevision{}
+	if len(revisionIDs) > 0 {
+		var revisions []FactoryPullRequestRevision
+		if err := tx.Where("id IN ?", revisionIDs).Find(&revisions).Error; err != nil {
+			return nil, err
+		}
+		for _, revision := range revisions {
+			revisionByID[revision.ID] = revision
+		}
+	}
+
 	seenRunByPullRequest := map[uuid.UUID]map[uuid.UUID]bool{}
 	for _, link := range links {
 		run, ok := runByID[link.RunID]
@@ -440,10 +476,21 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 			continue
 		}
 		seen[link.RunID] = true
-		runsByPullRequest[link.PullRequestID] = append(runsByPullRequest[link.PullRequestID], FactoryPullRequestLinkedRun{
-			Run:         run,
-			Description: link.Description,
-		})
+		linked := FactoryPullRequestLinkedRun{
+			Run:          run,
+			Description:  link.Description,
+			Access:       link.Access,
+			State:        link.State,
+			Attempt:      link.Attempt,
+			AttemptLimit: link.AttemptLimit,
+		}
+		if link.RevisionID != nil {
+			if revision, ok := revisionByID[*link.RevisionID]; ok {
+				copied := revision
+				linked.Revision = &copied
+			}
+		}
+		runsByPullRequest[link.PullRequestID] = append(runsByPullRequest[link.PullRequestID], linked)
 	}
 
 	return runsByPullRequest, nil
@@ -541,6 +588,29 @@ func ListFactoryPullRequests(tx *gorm.DB, factoryID uuid.UUID, filter FactoryPul
 		return nil, err
 	}
 	return pullRequests, nil
+}
+
+// ListFactoryPullRequestNumbers returns the numbers of every pull request
+// SuperPlane opened in a repository, whatever state it reached.
+//
+// The velocity sync uses it to exclude SuperPlane work from the people merges
+// it stores. State is deliberately not filtered: a pull request whose merge
+// webhook has not arrived yet is still SuperPlane's, and must not be counted as
+// people output in the meantime.
+func ListFactoryPullRequestNumbers(tx *gorm.DB, factoryID uuid.UUID, repository string) ([]int64, error) {
+	repository = strings.ToLower(strings.TrimSpace(repository))
+	if repository == "" {
+		return nil, nil
+	}
+
+	var numbers []int64
+	err := tx.Model(&FactoryPullRequest{}).
+		Where("factory_id = ? AND LOWER(repository) = ?", factoryID, repository).
+		Pluck("number", &numbers).Error
+	if err != nil {
+		return nil, err
+	}
+	return numbers, nil
 }
 
 type normalizedPullRequestParams struct {
@@ -723,8 +793,13 @@ func mapFactoryPullRequestRunConstraintError(err error) error {
 	}
 
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.ConstraintName == factoryPullRequestRunUniqueConstraint {
-		return ErrFactoryPullRequestRunAlreadyLinked
+	if errors.As(err, &pgErr) {
+		switch pgErr.ConstraintName {
+		case factoryPullRequestRunUniqueConstraint:
+			return ErrFactoryPullRequestRunAlreadyLinked
+		case factoryPullRequestActivityActiveUniqueConstraint:
+			return ErrFactoryPullRequestActivityDuplicate
+		}
 	}
 
 	return err

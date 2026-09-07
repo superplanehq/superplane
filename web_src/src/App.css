@@ -421,6 +421,8 @@
 
   --border: #e5e5e5;
   --input: #e5e5e5;
+  /* Form fills. Light matches GitHub: white field, gray stroke. */
+  --field: #ffffff;
   --ring: #a3a3a3;
 
   --sidebar: #f7f7f7;
@@ -510,7 +512,9 @@
   --accent-foreground: #edecec;
   --border: #33312b;
   --input: #33312b;
-  --ring: #737373;
+  /* Same warm hue as the canvas. Cool gray-800 is what clashed with this theme. */
+  --field: #221f18;
+  --ring: #8a8578;
   --sidebar: #1b1913;
   --sidebar-foreground: #edecec;
   --sidebar-border: #33312b;
@@ -559,6 +563,62 @@
 
   --work-order-mention-fg: #4493f8;
   --work-order-mention-bg: rgba(56, 139, 253, 0.15);
+}
+
+/*
+ * GitHub Primer dark: cool the whole surface so field fills match the canvas.
+ * Use with `theme-factories-palette-github` on the same node as `theme-factories`.
+ * References: https://mobbin.com/screens/856e47e9-cdfa-4e29-88f8-d9ad3d4b4cc2
+ *             https://mobbin.com/screens/c968b3b2-82a5-4044-8e4a-0bec5683dec5
+ */
+.dark .theme-factories.theme-factories-palette-github,
+.theme-factories.theme-factories-palette-github.dark {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --card: #161b22;
+  --card-foreground: #e6edf3;
+  --popover: #161b22;
+  --popover-foreground: #e6edf3;
+  --primary: #f0f6fc;
+  --primary-foreground: #0d1117;
+  --secondary: #21262d;
+  --secondary-foreground: #e6edf3;
+  --muted: #21262d;
+  --muted-foreground: #9198a1;
+  --accent: #21262d;
+  --accent-foreground: #e6edf3;
+  --border: #30363d;
+  --input: #30363d;
+  --field: #0d1117;
+  --ring: #58a6ff;
+  --sidebar: #010409;
+  --sidebar-foreground: #e6edf3;
+  --sidebar-border: #30363d;
+  --sidebar-accent: #21262d;
+  --sidebar-accent-foreground: #e6edf3;
+}
+
+.theme-factories [data-slot="input"],
+.theme-factories [data-slot="select-trigger"],
+.theme-factories [data-slot="textarea"] {
+  background-color: var(--field);
+  border-color: var(--border);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.theme-factories [data-slot="input"]::placeholder,
+.theme-factories [data-slot="textarea"]::placeholder {
+  color: var(--muted-foreground);
+}
+
+.theme-factories [data-slot="input"]:focus,
+.theme-factories [data-slot="select-trigger"]:focus,
+.theme-factories [data-slot="select-trigger"]:focus-visible,
+.theme-factories [data-slot="textarea"]:focus {
+  border-color: var(--ring);
+  box-shadow: none;
+  outline: none;
 }
 
 @layer components {
@@ -867,6 +927,31 @@
   background-clip: text;
   color: transparent;
   animation: sp-ai-thinking-shimmer 1.4s linear infinite;
+}
+
+/*
+ * An indeterminate bar for work whose length is unknown. The segment is a
+ * quarter of the track, so it travels four track widths to cross once.
+ */
+@keyframes sp-indeterminate-bar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+.sp-indeterminate-bar {
+  animation: sp-indeterminate-bar 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-indeterminate-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.6;
+  }
 }
 
 @keyframes sp-tool-enter {

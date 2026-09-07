@@ -65,6 +65,7 @@ export function WorkOrderDetailSidebar({
     <div className="flex flex-col gap-6">
       <WorkOrderSidebarOverview
         organizationId={organizationId}
+        factoryKey={factoryKey}
         order={order}
         displayStatus={displayStatus}
         statusMeta={statusMeta}
@@ -87,13 +88,13 @@ export function WorkOrderDetailSidebar({
         onDispatch={onDispatch}
       />
 
+      <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
+
       <WorkOrderPullRequestsList
         pullRequests={pullRequests}
         isLoading={isPullRequestsLoading}
         error={pullRequestsError}
       />
-
-      <WorkOrderArtifactsList artifacts={artifacts} isLoading={isArtifactsLoading} error={artifactsError} />
     </div>
   );
 }

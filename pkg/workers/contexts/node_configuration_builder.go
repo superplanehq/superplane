@@ -87,16 +87,20 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 }
 
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	var (
+		resolved map[string]any
+		err      error
+	)
 	if len(b.configurationFields) > 0 {
-		return b.resolveWithSchema(configuration, b.configurationFields)
+		resolved, err = b.resolveWithSchema(configuration, b.configurationFields)
+	} else {
+		resolved, err = b.resolve(configuration)
 	}
-
-	resolved, err := b.resolve(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	return resolved, nil
+	return b.applyLineDispatchModel(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -508,12 +512,18 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 
 			return b.resolveAppPayload()
 		}),
-		expr.Function("order", func(params ...any) (any, error) {
+		expr.Function("order", noArgExpressionFunc("order", func() (any, error) {
+			return b.resolveOrderPayload(expression)
+		})),
+		expr.Function("task", noArgExpressionFunc("task", func() (any, error) {
+			return b.resolveOrderPayload(expression)
+		})),
+		expr.Function("workspace", func(params ...any) (any, error) {
 			if len(params) != 0 {
-				return nil, fmt.Errorf("order() takes no arguments")
+				return nil, fmt.Errorf("workspace() takes no arguments")
 			}
 
-			return b.resolveOrderPayload(expression)
+			return b.resolveWorkspacePayload()
 		}),
 	}
 
@@ -981,6 +991,33 @@ func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
 	}, nil
 }
 
+// resolveWorkspacePayload exposes the factory workspace that owns this app.
+// It is intentionally unavailable for organization apps so expressions cannot
+// infer a workspace outside their execution scope.
+func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current app: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("workspace() is only available in factory apps")
+	}
+
+	factory, err := models.FindFactory(b.tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	return map[string]any{
+		"id":                 factory.ID.String(),
+		"key":                factory.Key,
+		"name":               factory.Name,
+		"repository":         config.AppRepository,
+		"backlog_repository": config.BacklogRepository,
+		"default_branch":     config.DefaultBranch,
+	}, nil
+}
+
 // resolveRunPayload exposes the current run to expressions via run().
 // It returns id, url, and started_at (a time.Time) for the run that the
 // current node belongs to, resolved from the builder's root event.
@@ -1011,10 +1048,11 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 	return payload, nil
 }
 
-// resolveOrderPayload exposes the work order driving this run via order().
-// Returns nil when the run is not attached to a factory work-order execution.
-// The url, artifacts, comments, and assignees are loaded only when the expression AST
-// references order().url / order().artifacts / order().comments / order().assignees.
+// resolveOrderPayload exposes the work order driving this run via order()
+// and its task() alias. Returns nil when the run is not attached to a
+// factory work-order execution. The url, key, artifacts, comments, and
+// assignees are loaded only when the expression AST references those fields
+// on order() or task(). Origin is attached whenever the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1040,30 +1078,47 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	if err != nil {
 		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
 	}
+	repository, defaultBranch, err := b.resolveOrderRepository(order)
+	if err != nil {
+		return nil, err
+	}
 
 	payload := map[string]any{
-		"id":          order.ID.String(),
-		"title":       order.Title,
-		"description": order.Description,
-		"factory_id":  order.FactoryID.String(),
-		"state":       order.State,
-		"result":      order.Result,
+		"id":             order.ID.String(),
+		"title":          order.Title,
+		"description":    order.Description,
+		"factory_id":     order.FactoryID.String(),
+		"state":          order.State,
+		"result":         order.Result,
+		"repository":     repository,
+		"repository_url": githubRepositoryURL(repository),
+		"default_branch": defaultBranch,
 	}
 
 	if err := attachOrderSource(b.tx, order, payload); err != nil {
 		return nil, err
 	}
+	attachOrderOrigin(order, payload)
 
 	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
 	if err != nil {
 		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
 	}
-	if usesURL {
-		url, err := b.buildWorkOrderURL(order)
+	usesKey, err := expressionvalidation.ExpressionUsesOrderKey(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL || usesKey {
+		owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
 		}
-		payload["url"] = url
+		if usesURL {
+			payload["url"] = uiBaseURL() + order.URLPath(owningFactory.Key)
+		}
+		if usesKey {
+			payload["key"] = owningFactory.WorkOrderKey(order.Number)
+		}
 	}
 
 	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
@@ -1147,6 +1202,48 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+// resolveOrderRepository keeps orders created before repository snapshots
+// compatible with workflow templates that use order().repository.
+func (b *NodeConfigurationBuilder) resolveOrderRepository(order *models.FactoryWorkOrder) (string, string, error) {
+	repository := stringValue(order.Repository)
+	defaultBranch := stringValue(order.DefaultBranch)
+	if repository != "" && defaultBranch != "" {
+		return repository, defaultBranch, nil
+	}
+
+	factory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return "", "", fmt.Errorf("order() could not resolve the workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	// Repository and branch are one snapshot. Do not combine a saved value
+	// with current workspace settings when a legacy row contains only one.
+	repository = config.AppRepository
+	defaultBranch = config.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	return repository, defaultBranch, nil
+}
+
+func githubRepositoryURL(repository string) string {
+	return "https://github.com/" + strings.TrimSuffix(repository, ".git") + ".git"
+}
+
+func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
+	origin := order.Origin()
+	if origin == nil {
+		return
+	}
+
+	item := map[string]any{"url": origin.URL}
+	if origin.Label != "" {
+		item["label"] = origin.Label
+	}
+	payload["origin"] = item
 }
 
 func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
@@ -1271,17 +1368,6 @@ func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[
 	}
 
 	return authorPayload
-}
-
-// buildWorkOrderURL resolves the work order permalink in the SuperPlane UI.
-// The factory key is part of that path, so the owning factory has to be loaded.
-func (b *NodeConfigurationBuilder) buildWorkOrderURL(order *models.FactoryWorkOrder) (string, error) {
-	owner, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
-	if err != nil {
-		return "", fmt.Errorf("order() could not resolve the factory that owns the work order: %w", err)
-	}
-
-	return uiBaseURL() + order.URLPath(owner.Key), nil
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
@@ -1427,20 +1513,38 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
-	"$":        {},
-	"memory":   {},
-	"config":   {},
-	"root":     {},
-	"previous": {},
-	"run":      {},
-	"app":      {},
-	"order":    {},
-	"ctx":      {},
+	"$":         {},
+	"memory":    {},
+	"config":    {},
+	"root":      {},
+	"previous":  {},
+	"run":       {},
+	"app":       {},
+	"order":     {},
+	"task":      {},
+	"workspace": {},
+	"ctx":       {},
 }
 
 func isReservedExpressionIdentifier(name string) bool {
 	_, ok := reservedExpressionIdentifiers[name]
 	return ok
+}
+
+func noArgExpressionFunc(name string, resolve func() (any, error)) func(params ...any) (any, error) {
+	return func(params ...any) (any, error) {
+		if len(params) != 0 {
+			return nil, fmt.Errorf("%s() takes no arguments", name)
+		}
+		return resolve()
+	}
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func parseDepth(param any) (int, error) {
@@ -2099,4 +2203,119 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(resolved map[string]any) (map[string]any, error) {
+	if _, hasModel := resolved["model"]; !hasModel {
+		return resolved, nil
+	}
+
+	dispatch, err := b.lineDispatch()
+	if err != nil || dispatch == nil {
+		return resolved, err
+	}
+	override := strings.TrimSpace(dispatch.Model)
+	if override == "" {
+		return resolved, nil
+	}
+
+	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
+	if err != nil || !ok {
+		return resolved, err
+	}
+
+	resolved["model"] = override
+	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {
+	if b.rootEventID == nil || b.tx == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(b.tx, execution.LineDispatchID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderLineDispatchNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return dispatch, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
+	resolved map[string]any,
+	model string,
+) (bool, error) {
+	if b.nodeID == "" {
+		return false, nil
+	}
+
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	provider, ok := runnerProviderForComponent(node.ComponentName())
+	if !ok {
+		return false, nil
+	}
+
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, err
+	}
+
+	return models.ModelIsSelectable(
+		b.tx,
+		workflow.OrganizationID,
+		workflow.FactoryID,
+		provider,
+		runnerFundingSourceFromConfig(resolved),
+		model,
+	)
+}
+
+func runnerProviderForComponent(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerCodex":
+		return models.UsageProviderOpenAI, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func runnerFundingSourceFromConfig(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }

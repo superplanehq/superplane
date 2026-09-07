@@ -5,11 +5,6 @@ import factoryMeta from "./software-factory/factory.json";
 import factoryParams from "./software-factory/params.json";
 import softwareFactoryCanvasYaml from "./software-factory/canvas.yaml?raw";
 import softwareFactoryConsoleYaml from "./software-factory/console.yaml?raw";
-import lineAppConsoleYaml from "./line-apps/console.yaml?raw";
-import eventAppConsoleYaml from "./line-apps/event-app.console.yaml?raw";
-import planningCanvasYaml from "./line-apps/planning.canvas.yaml?raw";
-import implementationCanvasYaml from "./line-apps/implementation.canvas.yaml?raw";
-import prClosureCanvasYaml from "./line-apps/pr-closure.canvas.yaml?raw";
 
 export type { FactoryDefinition, FactoryStartingTask, FactoryRunDefinition } from "./types";
 export {
@@ -51,8 +46,6 @@ function buildOnboardingApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
-  consoleYaml: string;
   integrations: string[];
   componentIntegrations: Record<string, string>;
   entrypointNodeId: string;
@@ -73,8 +66,6 @@ function buildOnboardingApp(args: {
     },
     source: { type: "bundled" },
     installParams: factoryParams.install_params as InstallParam[],
-    canvasYaml: args.canvasYaml,
-    consoleYaml: args.consoleYaml,
   };
 }
 
@@ -82,14 +73,12 @@ function buildLineApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
   entrypointNodeId: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
     ...args,
     integrations: ["github", "claude"],
     componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
-    consoleYaml: lineAppConsoleYaml,
   });
 }
 
@@ -102,15 +91,12 @@ function buildEventApp(args: {
   id: string;
   title: string;
   description: string;
-  canvasYaml: string;
   triggerNodeId: string;
 }): FactoryDefinition {
   return buildOnboardingApp({
     id: args.id,
     title: args.title,
     description: args.description,
-    canvasYaml: args.canvasYaml,
-    consoleYaml: eventAppConsoleYaml,
     integrations: ["github"],
     componentIntegrations: EVENT_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: args.triggerNodeId,
@@ -135,7 +121,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 // Event-driven factory apps provisioned during onboarding. These listen for
 // GitHub events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
-export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
+export const ONBOARDING_EVENT_APPS = ["pr-closure", "create-with-agent"] as const;
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
   "software-factory": buildSoftwareFactory(),
@@ -143,22 +129,25 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     id: "line-planning",
     title: "Plan",
     description: "Read the task and write an implementation plan.",
-    canvasYaml: planningCanvasYaml,
     entrypointNodeId: "onrun-create-plan",
   }),
   "line-implementation": buildLineApp({
     id: "line-implementation",
     title: "Implement",
     description: "Create a branch, implement the plan, and open a pull request.",
-    canvasYaml: implementationCanvasYaml,
     entrypointNodeId: "onrun-implement",
   }),
   "pr-closure": buildEventApp({
     id: "pr-closure",
     title: "PR Closure",
     description: "Close the task when the attached pull request merges or is closed without a merge.",
-    canvasYaml: prClosureCanvasYaml,
     triggerNodeId: "on-pr-closed",
+  }),
+  "create-with-agent": buildLineApp({
+    id: "create-with-agent",
+    title: "Create with an Agent",
+    description: "Starts the machine when you create a task with an agent.",
+    entrypointNodeId: "onrun-create-with-agent",
   }),
 };
 

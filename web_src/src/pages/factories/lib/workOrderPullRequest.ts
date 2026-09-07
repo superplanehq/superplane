@@ -61,6 +61,19 @@ export function pullRequestLabel(pullRequest: FactoriesFactoryPullRequest): stri
   return "Pull request";
 }
 
+/** Sidebar list label: number plus title when both exist. */
+export function pullRequestListLabel(pullRequest: FactoriesFactoryPullRequest): string {
+  const numberLabel = pullRequestLabel(pullRequest);
+  const title = pullRequest.title?.trim();
+  if (!title || title === numberLabel) {
+    return numberLabel;
+  }
+  if (numberLabel.startsWith("#")) {
+    return `${numberLabel} ${title}`;
+  }
+  return title;
+}
+
 export function isActiveCanvasRun(run: CanvasesCanvasRunRef | undefined): boolean {
   if (!run?.id) {
     return false;

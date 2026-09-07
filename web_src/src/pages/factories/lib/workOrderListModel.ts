@@ -6,7 +6,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-import { formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
+import { formatDurationSeconds, formatUsdCents, formatWorkOrderUsage, parseWorkOrderMetric } from "./workOrderUsage";
 import {
   WORK_ORDER_BOARD_LANES,
   WORK_ORDER_DISPLAY_STATUSES,
@@ -45,6 +45,7 @@ export interface WorkOrderListEntry {
   distinctLineCount: number;
   totalTokens: number;
   totalCostCents: number;
+  durationSeconds: number;
   usageLabel: string | null;
   usageTooltip: string | null;
   updatedAtMs: number;
@@ -64,7 +65,7 @@ export function buildWorkOrderListEntry(
   const pairs = flattenDispatchExecutions(dispatches);
   const latestPair = findLatestExecution(pairs);
   const lines = collectLines(dispatches);
-  const { totalTokens, totalCostCents } = sumUsage(
+  const { totalTokens, totalCostCents, durationSeconds } = sumUsage(
     order,
     pairs.map((pair) => pair.execution),
   );
@@ -92,8 +93,9 @@ export function buildWorkOrderListEntry(
     distinctLineCount: lines.ids.length,
     totalTokens,
     totalCostCents,
-    usageLabel: formatWorkOrderUsage(totalTokens, totalCostCents),
-    usageTooltip: formatUsageTooltip(totalTokens, totalCostCents),
+    durationSeconds,
+    usageLabel: formatWorkOrderUsage(totalTokens, totalCostCents, durationSeconds),
+    usageTooltip: formatUsageTooltip(totalTokens, totalCostCents, durationSeconds),
     updatedAtMs: parseTimestamp(order.updatedAt) || createdAtMs,
     createdAtMs,
     assigneeIds,
@@ -187,18 +189,20 @@ function collectLines(dispatches: FactoriesWorkOrderLineDispatch[]): { ids: stri
 function sumUsage(
   order: FactoriesWorkOrder,
   executions: FactoriesWorkOrderExecution[],
-): { totalTokens: number; totalCostCents: number } {
+): { totalTokens: number; totalCostCents: number; durationSeconds: number } {
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
-  if (totalTokens > 0 || totalCostCents > 0) {
-    return { totalTokens, totalCostCents };
+  const durationSeconds = parseWorkOrderMetric(order.totalDurationSeconds);
+  if (totalTokens > 0 || totalCostCents > 0 || durationSeconds > 0) {
+    return { totalTokens, totalCostCents, durationSeconds };
   }
   return executions.reduce(
     (sum, execution) => ({
       totalTokens: sum.totalTokens + parseWorkOrderMetric(execution.totalTokens),
       totalCostCents: sum.totalCostCents + parseWorkOrderMetric(execution.costCents),
+      durationSeconds: sum.durationSeconds + parseWorkOrderMetric(execution.durationSeconds),
     }),
-    { totalTokens: 0, totalCostCents: 0 },
+    { totalTokens: 0, totalCostCents: 0, durationSeconds: 0 },
   );
 }
 
@@ -244,13 +248,16 @@ function findLatestExecution(pairs: ExecutionWithLine[]): ExecutionWithLine | nu
   return winner;
 }
 
-function formatUsageTooltip(totalTokens: number, totalCostCents: number): string | null {
+function formatUsageTooltip(totalTokens: number, totalCostCents: number, durationSeconds: number): string | null {
   const parts: string[] = [];
   if (totalCostCents > 0) {
     parts.push(formatUsdCents(totalCostCents));
   }
   if (totalTokens > 0) {
     parts.push(`${totalTokens.toLocaleString()} tokens`);
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }

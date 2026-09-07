@@ -7,14 +7,20 @@ import {
   factoryAppViewPath,
   factoryDetailPath,
   factoryHomePath,
+  pathAfterWorkspaceSwitch,
   factoryIntakePath,
   factoryPRFeedbackPath,
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
   isPRFeedbackSearchOpen,
+  prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
   factorySettingsGeneralPathAfterKeyChange,
+  factorySettingsSectionPath,
+  factorySettingsWorkspaceGeneralPath,
+  replaceOrganizationSegment,
+  createWorkOrderPath,
   firstFactoryLineId,
   firstFactoryLineName,
   legacyWorkOrderDetailPath,
@@ -40,6 +46,43 @@ describe("factoryHomePath", () => {
 
   it("opens the workspace index when no line id is present", () => {
     expect(factoryHomePath("org-1", "SP")).toBe("/org-1/workspaces/SP");
+  });
+});
+
+describe("pathAfterWorkspaceSwitch", () => {
+  const nextFactory = { key: "AO", lines: [{ id: "line-acme" }] };
+
+  it("keeps the settings page", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/settings/workspace/general",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/settings/workspace/general");
+  });
+
+  it("keeps Velocity", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/velocity",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/velocity");
+  });
+
+  it("opens the new workspace board from a line that belongs to the previous workspace", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/RF/lines/line-plan",
+        organizationId: "org-1",
+        currentFactoryKey: "RF",
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/AO/lines/line-acme");
   });
 });
 
@@ -95,6 +138,13 @@ describe("factoryPRFeedbackPath", () => {
     expect(prFeedbackSettingsTabFromSearch("?prFeedback=1&prFeedbackSettings=automation")).toBe("automation");
     expect(prFeedbackSettingsTabFromSearch("prFeedback=1")).toBeNull();
   });
+
+  it("opens a specific handler", () => {
+    expect(factoryPRFeedbackPath("org-1", "SP", "line-plan", undefined, "handler-1")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackHandler=handler-1",
+    );
+    expect(prFeedbackHandlerIdFromSearch("?prFeedback=1&prFeedbackHandler=handler-1")).toBe("handler-1");
+  });
 });
 
 describe("firstFactoryLineId", () => {
@@ -119,29 +169,41 @@ describe("firstFactoryLineName", () => {
   });
 });
 
+describe("workOrdersPath", () => {
+  it("builds the tasks list URL", () => {
+    expect(workOrdersPath("org-1", "SP")).toBe("/org-1/workspaces/SP/tasks");
+  });
+});
+
+describe("createWorkOrderPath", () => {
+  it("builds the create-task URL under the tasks list", () => {
+    expect(createWorkOrderPath("org-1", "SP")).toBe("/org-1/workspaces/SP/tasks/new");
+  });
+});
+
 describe("workOrderDetailPath", () => {
   it("builds the canonical permalink from the workspace key and task number", () => {
-    expect(workOrderDetailPath("org-1", "SP", 42)).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderDetailPath("org-1", "SP", 42)).toBe("/org-1/workspaces/SP/task/42");
   });
 
   it("accepts the number as a string", () => {
-    expect(workOrderDetailPath("org-1", "SP", "42")).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderDetailPath("org-1", "SP", "42")).toBe("/org-1/workspaces/SP/task/42");
   });
 
-  it("is a sibling of, not nested under, the plural work-orders list path", () => {
+  it("is a sibling of, not nested under, the plural tasks list path", () => {
     expect(workOrderDetailPath("org-1", "SP", "42")).not.toContain(workOrdersPath("org-1", "SP"));
   });
 
   it("keeps the board line on the permalink when a line id is given", () => {
     expect(workOrderDetailPath("org-1", "SP", "42", "line-hotfix")).toBe(
-      "/org-1/workspaces/SP/work-order/42?lineId=line-hotfix",
+      "/org-1/workspaces/SP/task/42?lineId=line-hotfix",
     );
   });
 });
 
 describe("workOrderOpenPath", () => {
   it("uses the canonical permalink when the order has a number", () => {
-    expect(workOrderOpenPath("org-1", "SP", 42, "line-1")).toBe("/org-1/workspaces/SP/work-order/42");
+    expect(workOrderOpenPath("org-1", "SP", 42, "line-1")).toBe("/org-1/workspaces/SP/task/42");
   });
 
   it("falls back to the line board when the order has no number", () => {
@@ -157,19 +219,48 @@ describe("legacyWorkOrderDetailPath", () => {
 
 describe("factoryAppPath", () => {
   it("encodes orderNumber (not orderId) in the query string", () => {
-    expect(factoryAppPath("org-1", "SP", "app-1", { from: "work-order", orderNumber: "42" })).toBe(
-      "/org-1/workspaces/SP/apps/app-1?from=work-order&orderNumber=42",
+    expect(factoryAppPath("org-1", "SP", "app-1", { from: "task", orderNumber: "42" })).toBe(
+      "/org-1/workspaces/SP/apps/app-1?from=task&orderNumber=42",
     );
+  });
+});
+
+describe("replaceOrganizationSegment", () => {
+  it("keeps the settings path when switching organization", () => {
+    expect(replaceOrganizationSegment("/demo/workspaces/RF/settings/organization/general", "demo", "acme")).toBe(
+      "/acme/workspaces/RF/settings/organization/general",
+    );
+  });
+
+  it("keeps the settings path when the current URL uses the organization id", () => {
+    expect(
+      replaceOrganizationSegment("/org-uuid/workspaces/RF/settings/organization/integrations", "org-uuid", "acme"),
+    ).toBe("/acme/workspaces/RF/settings/organization/integrations");
+  });
+
+  it("opens the workspace list when the path is not under the current organization", () => {
+    expect(replaceOrganizationSegment("/other/workspaces", "demo", "acme")).toBe("/acme/workspaces");
   });
 });
 
 describe("factorySettingsGeneralPathAfterKeyChange", () => {
   it("returns the General settings URL when the key changes", () => {
-    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe("/org-1/workspaces/AB/settings/general");
+    expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "AB")).toBe(
+      "/org-1/workspaces/AB/settings/workspace/general",
+    );
   });
 
   it("returns null when the key does not change", () => {
     expect(factorySettingsGeneralPathAfterKeyChange("org-1", "RF", "RF")).toBeNull();
+  });
+});
+
+describe("factorySettingsSectionPath", () => {
+  it("builds a scoped settings URL", () => {
+    expect(factorySettingsWorkspaceGeneralPath("org-1", "RF")).toBe("/org-1/workspaces/RF/settings/workspace/general");
+    expect(factorySettingsSectionPath("org-1", "RF", "organization", "api-keys")).toBe(
+      "/org-1/workspaces/RF/settings/organization/api-keys",
+    );
   });
 });
 
@@ -243,6 +334,11 @@ describe("factoryAppRunPath", () => {
 describe("parseFactoryAppNavFrom", () => {
   it("accepts known from values", () => {
     expect(parseFactoryAppNavFrom("lines")).toBe("lines");
+    expect(parseFactoryAppNavFrom("task")).toBe("task");
+  });
+
+  it("normalizes the legacy work-order value to task", () => {
+    expect(parseFactoryAppNavFrom("work-order")).toBe("task");
   });
 
   it("returns undefined for unknown from values", () => {

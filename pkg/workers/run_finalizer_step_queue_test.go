@@ -46,7 +46,7 @@ func setupStepQueueLine(t *testing.T, r *support.ResourceRegistry, stepMaxParall
 			MaxParallelism: limit,
 		}
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
 
 	return &stepQueueFixture{factory: f, line: line}
 }
@@ -347,7 +347,7 @@ func Test__StepQueue_RaisedCapacityKeepsFifoOrder(t *testing.T) {
 	// Raise the step's capacity while First runs and Second waits.
 	steps := []models.FactoryLineStep(fixture.line.Steps)
 	steps[0].MaxParallelism = stepMaxParallelism(2)
-	require.NoError(t, fixture.line.Update(database.Conn(), nil, steps))
+	require.NoError(t, fixture.line.Update(database.Conn(), nil, steps, nil))
 
 	// The free slot must not let Third jump ahead of Second.
 	thirdDispatch, thirdResult := fixture.dispatchLine(t, third)

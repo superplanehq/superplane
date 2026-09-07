@@ -67,6 +67,11 @@ func (s *FactoryService) UpdateFactoryOnboarding(ctx context.Context, req *pb.Up
 	return actions.UpdateFactoryOnboarding(ctx, organizationID, req)
 }
 
+func (s *FactoryService) UpdateFactoryRepository(ctx context.Context, req *pb.UpdateFactoryRepositoryRequest) (*pb.UpdateFactoryRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdateFactoryRepository(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) DeleteFactory(ctx context.Context, req *pb.DeleteFactoryRequest) (*pb.DeleteFactoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DeleteFactory(ctx, organizationID, req.GetId())
@@ -85,6 +90,16 @@ func (s *FactoryService) UpdateFactoryLine(ctx context.Context, req *pb.UpdateFa
 func (s *FactoryService) ListFactoryApps(ctx context.Context, req *pb.ListFactoryAppsRequest) (*pb.ListFactoryAppsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryApps(ctx, organizationID, req)
+}
+
+func (s *FactoryService) MaterializeFactoryAppTemplate(ctx context.Context, req *pb.MaterializeFactoryAppTemplateRequest) (*pb.MaterializeFactoryAppTemplateResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MaterializeFactoryAppTemplate(ctx, organizationID, req)
+}
+
+func (s *FactoryService) MaterializeFactoryAppDefaults(ctx context.Context, req *pb.MaterializeFactoryAppDefaultsRequest) (*pb.MaterializeFactoryAppDefaultsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.MaterializeFactoryAppDefaults(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListFactoryIntakes(ctx context.Context, req *pb.ListFactoryIntakesRequest) (*pb.ListFactoryIntakesResponse, error) {
@@ -230,7 +245,12 @@ func (s *FactoryService) CreateWorkOrderArtifact(ctx context.Context, req *pb.Cr
 
 func (s *FactoryService) DescribeFactoryVelocity(ctx context.Context, req *pb.DescribeFactoryVelocityRequest) (*pb.DescribeFactoryVelocityResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.DescribeFactoryVelocity(ctx, s.registry, organizationID, req)
+	return actions.DescribeFactoryVelocity(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SyncFactoryVelocity(ctx context.Context, req *pb.SyncFactoryVelocityRequest) (*pb.SyncFactoryVelocityResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SyncFactoryVelocity(ctx, organizationID, req)
 }
 
 func (s *FactoryService) ListWorkOrderChecks(ctx context.Context, req *pb.ListWorkOrderChecksRequest) (*pb.ListWorkOrderChecksResponse, error) {
@@ -248,7 +268,47 @@ func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListF
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryLineRunnerModels(ctx context.Context, req *pb.ListFactoryLineRunnerModelsRequest) (*pb.ListFactoryLineRunnerModelsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryLineRunnerModels(ctx, organizationID, req)
+}
+
 func (s *FactoryService) UpdateFactoryLLMModels(ctx context.Context, req *pb.UpdateFactoryLLMModelsRequest) (*pb.UpdateFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.UpdateFactoryLLMModels(ctx, organizationID, req)
+}
+
+func (s *FactoryService) StartPlanningSession(ctx context.Context, req *pb.StartPlanningSessionRequest) (*pb.StartPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.StartPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) DescribePlanningSession(ctx context.Context, req *pb.DescribePlanningSessionRequest) (*pb.DescribePlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.DescribePlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) EndPlanningSession(ctx context.Context, req *pb.EndPlanningSessionRequest) (*pb.EndPlanningSessionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.EndPlanningSession(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SendPlanningSessionMessage(ctx context.Context, req *pb.SendPlanningSessionMessageRequest) (*pb.SendPlanningSessionMessageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SendPlanningSessionMessage(ctx, organizationID, req)
+}
+
+func (s *FactoryService) UpdatePlanningSessionDraft(ctx context.Context, req *pb.UpdatePlanningSessionDraftRequest) (*pb.UpdatePlanningSessionDraftResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.UpdatePlanningSessionDraft(ctx, organizationID, req)
+}
+
+func (s *FactoryService) CreatePlanningSessionWorkOrder(ctx context.Context, req *pb.CreatePlanningSessionWorkOrderRequest) (*pb.CreatePlanningSessionWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreatePlanningSessionWorkOrder(ctx, organizationID, req)
+}
+
+func (s *FactoryService) SkipPlanningSessionDraft(ctx context.Context, req *pb.SkipPlanningSessionDraftRequest) (*pb.SkipPlanningSessionDraftResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.SkipPlanningSessionDraft(ctx, organizationID, req)
 }

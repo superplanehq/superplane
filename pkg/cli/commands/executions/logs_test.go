@@ -152,6 +152,11 @@ func TestRenderRunnerLogRecordFormatsKindPreviewAndTools(t *testing.T) {
 			want:   "$ git clone\n",
 		},
 		{
+			name:   "cmd start with multiline preview uses first line only",
+			record: runneraction.LiveLogRecord{Type: "cmd_start", Kind: "prompt", Text: "Implement", Preview: "Implement the change.\n\nDetails below."},
+			want:   "$ [PROMPT] Implement the change.\n",
+		},
+		{
 			name:   "cmd start without kind uses text",
 			record: runneraction.LiveLogRecord{Type: "cmd_start", Text: "npm run build"},
 			want:   "$ npm run build\n",

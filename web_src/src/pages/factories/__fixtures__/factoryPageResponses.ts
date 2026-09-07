@@ -1,4 +1,5 @@
 import type {
+  FactoriesDescribeFactoryVelocityResponse,
   FactoriesFactory,
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
@@ -15,7 +16,9 @@ import type {
 
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
+import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
+import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
   ACME_ONBOARDING_FACTORY_ID,
   ACME_ONBOARDING_LINE_ID,
@@ -180,6 +183,8 @@ export const REFUND_FACTORY_LINES: FactoriesFactoryLine[] = [
       runAppStep("app-refund-implementer", "start-implementation"),
       runAppStep("app-refund-verifier", "start-verification"),
     ],
+    // Exercises hydration of a persisted board color on mount.
+    columnColors: { backlog: "lime" },
   },
   {
     id: REFUND_LINE_HOTFIX_ID,
@@ -282,7 +287,13 @@ export interface FactoriesFixture {
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
-  organizationLlmSpend?: StorybookUsageReport;
+  /**
+   * Velocity reports keyed by factory, then by requested period in days. A
+   * period without an entry falls back to the empty report.
+   */
+  velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
+  organizationWorkspaceUsage?: StorybookUsageReport;
+  organizationSpendingReport?: StorybookSpendingReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
@@ -327,5 +338,9 @@ export const defaultFactoriesFixture: FactoriesFixture = {
     [EMPTY_FACTORY_ID]: EMPTY_USAGE_REPORT,
     [ACME_ONBOARDING_FACTORY_ID]: EMPTY_USAGE_REPORT,
   },
-  organizationLlmSpend: DEFAULT_FACTORY_USAGE,
+  velocityByFactoryId: {
+    [PRIMARY_FACTORY_ID]: DEFAULT_FACTORY_VELOCITY,
+  },
+  organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
+  organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
 };

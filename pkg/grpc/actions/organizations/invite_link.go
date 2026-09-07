@@ -13,13 +13,13 @@ import (
 )
 
 func GetInviteLink(ctx context.Context, orgID string) (*pb.GetInviteLinkResponse, error) {
-	db := database.DB(ctx)
-	orgUUID, parseErr := uuid.Parse(orgID)
-	if parseErr != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization id")
+	org, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
 	}
 
-	inviteLink, err := models.FindOrCreateInviteLink(db, orgUUID)
+	db := database.DB(ctx)
+	inviteLink, err := models.FindOrCreateInviteLink(db, org)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to get invite link")
 	}
@@ -30,8 +30,13 @@ func GetInviteLink(ctx context.Context, orgID string) (*pb.GetInviteLinkResponse
 }
 
 func UpdateInviteLink(ctx context.Context, orgID string, enabled bool) (*pb.UpdateInviteLinkResponse, error) {
+	org, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
 	db := database.DB(ctx)
-	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
+	inviteLink, err := models.FindInviteLinkByOrganizationID(db, org.String())
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}
@@ -48,8 +53,13 @@ func UpdateInviteLink(ctx context.Context, orgID string, enabled bool) (*pb.Upda
 }
 
 func ResetInviteLink(ctx context.Context, orgID string) (*pb.ResetInviteLinkResponse, error) {
+	org, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
 	db := database.DB(ctx)
-	inviteLink, err := models.FindInviteLinkByOrganizationID(db, orgID)
+	inviteLink, err := models.FindInviteLinkByOrganizationID(db, org.String())
 	if err != nil {
 		return nil, grpcerrors.NotFound(err, "invite link not found")
 	}

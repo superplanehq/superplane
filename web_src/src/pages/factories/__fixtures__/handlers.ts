@@ -1,4 +1,6 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
+import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
+import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
   defaultFactoriesFixture,
@@ -36,6 +38,19 @@ export type { FactoriesFixture };
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
+/**
+ * When each workspace last had its velocity synced in this session.
+ *
+ * The real sync runs in a background worker and the page waits for the stored
+ * sync time to move, so the fixtures record the time a sync was asked for.
+ * Without it the page would wait for a sync that never reports back.
+ */
+const velocitySyncedAt = new Map<string, string>();
+
+function velocitySynced(factoryId: string): void {
+  velocitySyncedAt.set(factoryId, new Date().toISOString());
+}
+
 interface FactoriesRoute {
   pattern: RegExp;
   resolve: (match: RegExpExecArray, method: string, body: Record<string, unknown> | null, url: URL) => FixtureResult;
@@ -56,6 +71,7 @@ interface RequestBody {
   start_step_index?: unknown;
   replaceActive?: unknown;
   replace_active?: unknown;
+  model?: unknown;
   result?: unknown;
   state?: unknown;
   steps?: unknown;
@@ -200,6 +216,39 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
     },
     {
+      pattern: re("/api/v1/factories/([^/]+)/velocity"),
+      resolve: (match, _method, _body, url) => {
+        const byPeriod = fixture.velocityByFactoryId?.[match[1]];
+        const periodDays = Number(url.searchParams.get("periodDays") ?? 14);
+        const report = byPeriod?.[periodDays] ?? byPeriod?.[14] ?? EMPTY_FACTORY_VELOCITY;
+        const paged = paginateVelocityPeople(report, url);
+
+        // The page follows peopleSyncedAt to know a sync finished, so a report
+        // read after a sync must carry the newer time.
+        const syncedAt = velocitySyncedAt.get(match[1]);
+        if (!syncedAt) return { json: paged };
+        return { json: { ...paged, peopleSyncedAt: syncedAt, peopleSyncPending: false } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/velocity/sync"),
+      resolve: (match) => {
+        velocitySynced(match[1]);
+        return { json: { started: true } };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),
+      resolve: () => ({
+        json: {
+          models: [
+            { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+            { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          ],
+        },
+      }),
+    },
+    {
       pattern: re("/api/v1/factories/([^/]+)/llm-models"),
       resolve: (_match, method, body, url) => {
         const request = (body ?? {}) as { provider?: string; fundingSource?: string; allowedModels?: unknown };
@@ -230,12 +279,31 @@ function mergedOnboarding(
   if (request.agentIntegrationId) next.agentIntegrationId = request.agentIntegrationId;
   if (request.appRepository) next.appRepository = request.appRepository;
   if (request.backlogRepository) next.backlogRepository = request.backlogRepository;
+  if (request.defaultBranch) next.defaultBranch = request.defaultBranch;
   if (request.issuesSource) next.issuesSource = request.issuesSource;
   if (request.agentHarness) next.agentHarness = request.agentHarness;
   if (request.provisionedAppId) next.provisionedAppId = request.provisionedAppId;
   if (request.provisionedLineId) next.provisionedLineId = request.provisionedLineId;
   if (request.complete) next.completedAt = new Date().toISOString();
   return next;
+}
+
+function factoryRepositoryRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/repository"),
+    resolve: (match, method, body) => {
+      if (method !== "PATCH") return null;
+      const factory = fixture.factories.find((entry) => entry.id === match[1]);
+      if (!factory) return { json: {} };
+      const request = (body ?? {}) as { repository?: string; defaultBranch?: string };
+      factory.onboarding = mergedOnboarding(factory.onboarding, {
+        appRepository: request.repository,
+        backlogRepository: request.repository,
+        defaultBranch: request.defaultBranch,
+      });
+      return { json: { factory: factoryWithLineMetrics(factory) } };
+    },
+  };
 }
 
 /** Persists workspace setup answers so setup stories advance step by step. */
@@ -394,6 +462,7 @@ function dispatchRequestOptions(request: RequestBody) {
     lineName: stringOrEmpty(request.lineName ?? request.line_name),
     startStepIndex: Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0,
     replaceActive: request.replaceActive === true || request.replace_active === true,
+    model: stringOrEmpty(request.model),
   };
 }
 
@@ -413,7 +482,10 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   if (options.replaceActive) {
     cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex);
+  const newDispatch = {
+    ...buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex),
+    model: options.model,
+  };
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
@@ -551,10 +623,17 @@ function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   ];
 }
 
-function organizationLlmSpendRoute(fixture: FactoriesFixture): FactoriesRoute {
+function organizationWorkspaceUsageRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
-    pattern: re("/api/v1/organizations/([^/]+)/llm-spend"),
-    resolve: () => ({ json: fixture.organizationLlmSpend ?? EMPTY_USAGE_REPORT }),
+    pattern: re("/api/v1/organizations/([^/]+)/workspace-usage"),
+    resolve: () => ({ json: fixture.organizationWorkspaceUsage ?? EMPTY_USAGE_REPORT }),
+  };
+}
+
+function organizationSpendingReportRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/spending-report"),
+    resolve: () => ({ json: fixture.organizationSpendingReport ?? DEFAULT_ORG_SPENDING_REPORT }),
   };
 }
 
@@ -663,10 +742,12 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     notificationSettingsRoute(fixture),
     ...factoryDetailRoutes(fixture),
     factoryOnboardingRoute(fixture),
+    factoryRepositoryRoute(fixture),
     ...factoryLinesRoutes(fixture),
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
-    organizationLlmSpendRoute(fixture),
+    organizationWorkspaceUsageRoute(fixture),
+    organizationSpendingReportRoute(fixture),
     hostedLlmModelsRoute(),
     byokModelsRoute(),
     hostedCreditProductsRoute(fixture),

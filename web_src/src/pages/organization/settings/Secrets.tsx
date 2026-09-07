@@ -12,6 +12,7 @@ import { useSecrets } from "@/hooks/useSecrets";
 import { CreateSecretDialog } from "@/ui/CreateSecretDialog";
 import type { SuperplaneSecretsSecret } from "@/api-client";
 import { cn } from "@/lib/utils";
+import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import {
   settingsEmptyStateIconClassName,
   settingsEmptyStateTitleClassName,
@@ -102,6 +103,7 @@ export function Secrets({ organizationId }: SecretsProps) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const canCreateSecrets = canAct("secrets", "create");
+  const settingsPaths = useOrganizationSettingsPaths(organizationId);
 
   const { data: secrets = [], isLoading } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
@@ -112,7 +114,7 @@ export function Secrets({ organizationId }: SecretsProps) {
     setIsCreateModalOpen(true);
   };
 
-  const getSecretDetailPath = (id: string) => `/${organizationId}/settings/secrets/${id}`;
+  const getSecretDetailPath = settingsPaths.secretDetail;
 
   if (isLoading) {
     return (
@@ -166,7 +168,7 @@ export function Secrets({ organizationId }: SecretsProps) {
         organizationId={organizationId}
         onCreated={(created) => {
           if (created.id) {
-            navigate(`/${organizationId}/settings/secrets/${created.id}`);
+            navigate(settingsPaths.secretDetail(created.id));
           }
         }}
       />

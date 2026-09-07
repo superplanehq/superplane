@@ -42,7 +42,7 @@ func ListFactoryPRFeedbackHandlers(
 	}
 
 	return &pb.ListFactoryPRFeedbackHandlersResponse{
-		Handlers: serializeFactoryPRFeedbackHandlers(handlers, specs),
+		Handlers: serializeFactoryPRFeedbackHandlers(db, orgID, handlers, specs),
 	}, nil
 }
 

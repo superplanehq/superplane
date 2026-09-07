@@ -85,12 +85,20 @@ func (s *OrganizationService) DescribeUsage(
 	return organizations.DescribeUsage(ctx, s.usageService, orgID)
 }
 
-func (s *OrganizationService) DescribeOrganizationLLMSpend(
+func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	ctx context.Context,
-	req *pb.DescribeOrganizationLLMSpendRequest,
-) (*pb.DescribeOrganizationLLMSpendResponse, error) {
+	req *pb.DescribeOrganizationWorkspaceUsageRequest,
+) (*pb.DescribeOrganizationWorkspaceUsageResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.DescribeOrganizationLLMSpend(ctx, orgID, req)
+	return organizations.DescribeOrganizationWorkspaceUsage(ctx, orgID, req)
+}
+
+func (s *OrganizationService) DescribeOrganizationSpendingReport(
+	ctx context.Context,
+	req *pb.DescribeOrganizationSpendingReportRequest,
+) (*pb.DescribeOrganizationSpendingReportResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListHostedLLMModels(

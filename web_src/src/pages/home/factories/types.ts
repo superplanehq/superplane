@@ -33,6 +33,7 @@ export interface FactoryDefinition {
   run: FactoryRunDefinition;
   source: { type: "bundled" } | { type: "github"; repo: string };
   installParams: InstallParam[];
-  canvasYaml: string;
-  consoleYaml: string;
+  /** Legacy standalone templates. Factory workspace apps are materialized by the backend catalog. */
+  canvasYaml?: string;
+  consoleYaml?: string;
 }

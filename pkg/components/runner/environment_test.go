@@ -177,11 +177,13 @@ func Test__ResolveEnvironment(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	got := environmentValues(resolved)
+	got := environmentValues(resolved.Variables)
 
 	assert.Equal(t, "override", got["GITHUB_TOKEN"])
 	assert.Equal(t, "org/repo", got["REPO"])
 	assert.Equal(t, "secret-key-value", got["API_KEY"])
+	assert.Empty(t, resolved.Usage)
+	assert.Empty(t, resolved.Setups)
 }
 
 func Test__ResolveEnvironmentDisablesPagers(t *testing.T) {
@@ -193,7 +195,7 @@ func Test__ResolveEnvironmentDisablesPagers(t *testing.T) {
 		resolved, err := ResolveEnvironment(nil, nil, nil)
 		require.NoError(t, err)
 
-		got := environmentValues(resolved)
+		got := environmentValues(resolved.Variables)
 		assert.Equal(t, "cat", got["GIT_PAGER"])
 		assert.Equal(t, "cat", got["PAGER"])
 	})
@@ -207,13 +209,61 @@ func Test__ResolveEnvironmentDisablesPagers(t *testing.T) {
 		require.NoError(t, err)
 
 		var names []string
-		for _, variable := range resolved {
+		for _, variable := range resolved.Variables {
 			names = append(names, variable.Name)
 		}
 
 		assert.Equal(t, []string{"PAGER", "GIT_PAGER"}, names)
-		assert.Equal(t, "less", environmentValues(resolved)["GIT_PAGER"])
+		assert.Equal(t, "less", environmentValues(resolved.Variables)["GIT_PAGER"])
 	})
+}
+
+func Test__ResolveEnvironmentCollectsUsageAndSetup(t *testing.T) {
+	t.Parallel()
+
+	secrets := &contexts.SecretsContext{
+		IntegrationKeys: map[string]map[string][]byte{
+			"github-acme": {
+				"GITHUB_TOKEN": []byte("gh-token"),
+			},
+			"semaphore-acme": {
+				"SEMAPHORE_API_TOKEN": []byte("sem-token"),
+			},
+		},
+		IntegrationUsage: map[string]string{
+			"github-acme":    "Use gh with GITHUB_TOKEN.",
+			"semaphore-acme": "Use sem-ai with SEMAPHORE_API_TOKEN.",
+		},
+		IntegrationSetup: map[string]string{
+			"semaphore-acme": "echo install-sem-ai",
+		},
+		IntegrationSetupName: map[string]string{
+			"semaphore-acme": "Set up Semaphore",
+		},
+	}
+
+	resolved, err := ResolveEnvironment(
+		secrets,
+		[]EnvironmentFromEntry{
+			{
+				Source:      EnvironmentFromSourceIntegration,
+				Integration: configuration.IntegrationRef{Name: "github-acme"},
+			},
+			{
+				Source:      EnvironmentFromSourceIntegration,
+				Integration: configuration.IntegrationRef{Name: "semaphore-acme"},
+			},
+		},
+		nil,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Use gh with GITHUB_TOKEN.\n\nUse sem-ai with SEMAPHORE_API_TOKEN.", resolved.Usage)
+	require.Len(t, resolved.Setups, 1)
+	assert.Equal(t, "Set up Semaphore", resolved.Setups[0].Name)
+	assert.Equal(t, "echo install-sem-ai", resolved.Setups[0].Script)
+	assert.Equal(t, "gh-token", environmentValues(resolved.Variables)["GITHUB_TOKEN"])
+	assert.Equal(t, "sem-token", environmentValues(resolved.Variables)["SEMAPHORE_API_TOKEN"])
 }
 
 func environmentValues(environment []BrokerEnvironmentVariable) map[string]string {

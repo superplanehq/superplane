@@ -17,7 +17,7 @@ const (
 	backlogDefaultName        = "Backlog"
 	backlogDefaultDescription = "Score new work orders for how well an agent can complete them."
 	backlogTriggerNodeID      = "trigger"
-	backlogTriggerName        = "On Work Order"
+	backlogTriggerName        = "On Task"
 	backlogAnalysisSubject    = "work order"
 )
 

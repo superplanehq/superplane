@@ -435,6 +435,29 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, googleUser.Name, account.Name)
 	})
+
+	t.Run("should refuse an invalid link state instead of signing in", func(t *testing.T) {
+		handler, _ := setupAuthHandler(t, true)
+		googleUser := goth.User{
+			UserID:      "google-link-expired",
+			Email:       "google-link-expired@example.com",
+			Name:        "Google Link Expired",
+			NickName:    "googlelinkexpired",
+			Provider:    "google",
+			AccessToken: "google-access-token",
+		}
+		req := mux.SetURLVars(
+			httptest.NewRequest(http.MethodGet, "/auth/google/callback?state=link:expired", nil),
+			map[string]string{"provider": "google"},
+		)
+		recorder := httptest.NewRecorder()
+
+		handler.completeProviderAuth(recorder, req, googleUser)
+
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		_, err := models.FindAccountByEmail(googleUser.Email)
+		assert.Error(t, err)
+	})
 }
 
 func TestHandler_checkSignupPolicy(t *testing.T) {

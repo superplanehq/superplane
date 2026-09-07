@@ -197,8 +197,8 @@ describe("attachStreamArtifacts", () => {
 
   it("does not attach an artifact produced by a different run when scoped by nodeName", () => {
     const stream = attachStreamArtifacts(
-      [streamLine("node-2", "Add Plan Artifact")],
-      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "Add Plan Artifact" }, { id: "run-planning" })],
+      [streamLine("node-2", "Add Task Artifact")],
+      [artifactAddedEvent("2026-08-24T16:35:18.000Z", NOTE, { nodeName: "Add Task Artifact" }, { id: "run-planning" })],
       undefined,
       undefined,
       "run-pr-feedback",

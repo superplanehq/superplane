@@ -1,9 +1,14 @@
+import { isReservedAppPathSegment } from "./reservedAppPaths";
+
+const NON_ORGANIZATION_PATH_SEGMENTS = new Set(["auth", "register"]);
+
 const getOrganizationIdFromUrl = (): string | null => {
   const pathSegments = window.location.pathname.split("/");
+  const segment = pathSegments[1];
 
   // Check if we're in the /:organizationId route pattern (for settings, canvas, etc.)
-  if (pathSegments[1] && pathSegments[1] !== "auth" && pathSegments[1] !== "login" && pathSegments[1] !== "register") {
-    return pathSegments[1];
+  if (segment && !NON_ORGANIZATION_PATH_SEGMENTS.has(segment) && !isReservedAppPathSegment(segment)) {
+    return segment;
   }
 
   return null;

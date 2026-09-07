@@ -10,6 +10,7 @@ import { Textarea } from "@/components/Textarea/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useOrganizationSettingsPaths } from "@/lib/organizationSettingsPaths";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { CopyButton } from "@/ui/CopyButton";
@@ -154,13 +155,23 @@ function useApiKeyEditForm(
   };
 }
 
-function useApiKeyTokenActions(
-  apiKey: ApiKeysApiKey | null | undefined,
-  id: string | undefined,
-  organizationId: string,
-  canDelete: boolean,
-  canUpdate: boolean,
-) {
+interface ApiKeyTokenActionOptions {
+  apiKey: ApiKeysApiKey | null | undefined;
+  id: string | undefined;
+  organizationId: string;
+  canDelete: boolean;
+  canUpdate: boolean;
+  apiKeysPath: string;
+}
+
+function useApiKeyTokenActions({
+  apiKey,
+  id,
+  organizationId,
+  canDelete,
+  canUpdate,
+  apiKeysPath,
+}: ApiKeyTokenActionOptions) {
   const navigate = useNavigate();
   const deleteMutation = useDeleteAPIKey(organizationId);
   const regenerateTokenMutation = useRegenerateAPIKeyToken(organizationId);
@@ -172,7 +183,7 @@ function useApiKeyTokenActions(
     try {
       await deleteMutation.mutateAsync(id);
       showSuccessToast("API key deleted");
-      navigate(`/${organizationId}/settings/api-keys`);
+      navigate(apiKeysPath);
     } catch (error) {
       showErrorToast(`Failed to delete: ${getApiErrorMessage(error)}`);
     }
@@ -205,6 +216,7 @@ function useApiKeyTokenActions(
 export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
   const { id } = useParams<{ id: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const settingsPaths = useOrganizationSettingsPaths(organizationId);
 
   const { data: apiKey, isLoading } = useAPIKey(organizationId, id || "");
   const { data: canvases = [] } = useCanvases(organizationId);
@@ -213,7 +225,14 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
   const canDelete = canAct("api_keys", "delete");
   const availableCanvasIds = canvases.map((canvas) => canvas.id || "").filter(Boolean);
   const editForm = useApiKeyEditForm(apiKey, id, organizationId, canUpdate, availableCanvasIds);
-  const tokenActions = useApiKeyTokenActions(apiKey, id, organizationId, canDelete, canUpdate);
+  const tokenActions = useApiKeyTokenActions({
+    apiKey,
+    id,
+    organizationId,
+    canDelete,
+    canUpdate,
+    apiKeysPath: settingsPaths.apiKeys,
+  });
 
   useReportPageReady(!isLoading && !permissionsLoading && !!id);
 
@@ -243,7 +262,7 @@ export function APIKeyDetail({ organizationId }: APIKeyDetailProps) {
 
   const createdAt = apiKey.createdAt ? new Date(apiKey.createdAt).toLocaleDateString() : "—";
   const createdByLabel = apiKey.createdByName ? apiKey.createdByName.trim() : "—";
-  const apiKeysHref = `/${organizationId}/settings/api-keys`;
+  const apiKeysHref = settingsPaths.apiKeys;
   const canvasNamesById = new Map(canvases.map((canvas) => [canvas.id, canvas.name || "Unnamed"]));
   const scopeLabel = apiKey.canvasIds?.length
     ? apiKey.canvasIds.map((canvasId) => canvasNamesById.get(canvasId) || canvasId).join(", ")

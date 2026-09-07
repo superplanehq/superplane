@@ -32,7 +32,7 @@ import {
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
-import { statusForCanvasRun } from "../../lib/workOrderPullRequest";
+import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
 import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
@@ -84,6 +84,8 @@ export interface SplitRunStreamLine {
   kind?: SplitRunStreamKind;
   /** Catalog identity: `Run Claude Code`, `github.addIssueLabel`. */
   componentType?: string;
+  /** Compact session log: user talk vs a survey answer. */
+  userTalk?: "message" | "survey";
   action?: string;
   iconSlug?: string;
   iconSrc?: string;
@@ -91,6 +93,13 @@ export interface SplitRunStreamLine {
   component?: string;
   /** Node execution id for live runner logs. */
   executionId?: string;
+  /**
+   * Comparable chronological sort key (epoch ms), when known. Lets the
+   * planning session merge interleave a user reply with agent notes by true
+   * time instead of guessing from wait-slot position. Absent when the
+   * source has no timestamp (falls back to positional heuristics).
+   */
+  orderKey?: number;
 }
 
 export interface SplitRunPhase {
@@ -119,6 +128,8 @@ export interface SplitRunPhase {
   costCents?: string;
   /** Ledger token count for this phase. Hidden when zero. */
   totalTokens?: string;
+  /** Runner model this automation used. Hidden when empty. */
+  model?: string;
 }
 
 export type { SplitRunFooter, SplitRunFooterKind, SplitRunFooterTone };
@@ -195,6 +206,14 @@ const WAITING_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
   key: "waiting-person",
   headline: SPLIT_RUN_WAITING_NOTE.headline,
   text: SPLIT_RUN_WAITING_NOTE.text ?? "",
+};
+
+const FIXES_PAUSED_HEADLINE = "Automatic fixes did not succeed";
+
+const FIXES_PAUSED_FALLBACK_NOTE: WorkOrderStatusNotePresentation = {
+  key: "check-fixes-paused",
+  headline: FIXES_PAUSED_HEADLINE,
+  text: "SuperPlane paused automatic fixes. Review the pull request and fix the remaining checks.",
 };
 
 /**
@@ -288,6 +307,7 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
 export type SplitRunFixtureOptions = {
   checks?: FactoriesWorkOrderCheck[];
   lineId?: string | null;
+  lineName?: string;
   /** Storybook keeps invented files and pull requests. Live orders do not. */
   demoArtifacts?: boolean;
   /** PR-feedback canvas runs for this task, shown as extra Log phases. */
@@ -326,7 +346,10 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     startedLabel: startedLabelForOrder(order),
     costUsd: costUsdForDisplay(order),
     tokensLabel: tokensLabelForDisplay(order),
-    lineName: visibleDispatchForLine(order, options?.lineId)?.line?.name ?? SPLIT_RUN_RUNNING.lineName,
+    lineName:
+      options?.lineName?.trim() ||
+      visibleDispatchForLine(order, options?.lineId)?.line?.name ||
+      SPLIT_RUN_RUNNING.lineName,
     currentStepIndex: current?.stepIndex ?? 0,
     lineStatus: lineStatusForDisplay(displayStatus),
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
@@ -338,7 +361,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       phases,
       apiChecks: options?.checks,
       demoArtifacts,
-      addressingFeedback: Boolean(activePRFeedbackPhaseId(phases)),
+      hideWaitingDecision: shouldHideWaitingDecision(options?.prFeedbackRuns),
+      fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
     }),
@@ -357,7 +381,8 @@ function reviewSurfaces(
     phases: SplitRunPhase[];
     apiChecks?: FactoriesWorkOrderCheck[];
     demoArtifacts?: boolean;
-    addressingFeedback?: boolean;
+    hideWaitingDecision?: boolean;
+    fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
   },
@@ -385,7 +410,7 @@ function reviewSurfaces(
     return stoppedReviewSurface(current, displayStatus, checks, input.stoppedBy);
   }
   if (displayStatus === "waiting" || (column === "implement" && current?.state === "STATE_PENDING")) {
-    return waitingReviewSurface(order, displayStatus, checks, input.addressingFeedback);
+    return waitingReviewSurface(order, displayStatus, checks, input.hideWaitingDecision, input.fixesPaused);
   }
   if (displayStatus === "running") {
     return surfaces(
@@ -442,12 +467,25 @@ function waitingReviewSurface(
   order: FactoriesWorkOrder,
   displayStatus: WorkOrderDisplayStatus,
   checks: WorkOrderCheckPresentation[],
-  addressingFeedback?: boolean,
+  hideWaitingDecision?: boolean,
+  fixesPaused?: boolean,
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
-  if (addressingFeedback) {
+  if (hideWaitingDecision) {
     return surfaces(buildSplitRunFooter({ kind: "waiting", status: displayStatus, decision: false }), [], checks);
   }
   const notes = presentWorkOrderStatusNotes(order.statusNotes, displayStatus);
+  if (fixesPaused) {
+    const note = pauseFooterNote(notes);
+    return surfaces(
+      buildSplitRunFooter({
+        kind: "waiting",
+        note,
+        status: displayStatus,
+      }),
+      [note],
+      checks,
+    );
+  }
   return surfaces(
     buildSplitRunFooter({
       kind: "waiting",
@@ -457,6 +495,18 @@ function waitingReviewSurface(
     notes,
     checks,
   );
+}
+
+function pauseFooterNote(notes: WorkOrderStatusNotePresentation[]): WorkOrderStatusNotePresentation {
+  const written = notes.find((note) => note.headline === FIXES_PAUSED_HEADLINE);
+  if (written) {
+    return written;
+  }
+  const review = notes[0];
+  if (!review?.cta) {
+    return FIXES_PAUSED_FALLBACK_NOTE;
+  }
+  return { ...FIXES_PAUSED_FALLBACK_NOTE, cta: review.cta };
 }
 
 function overviewChecks(
@@ -605,6 +655,23 @@ function activePRFeedbackPhaseId(phases: SplitRunPhase[]): SplitRunPhaseId | und
   return activePhaseIdWithPrefix(phases, "pr-feedback-");
 }
 
+function hasActivePRFeedbackRun(runs?: PRFeedbackLogRun[]): boolean {
+  return (runs ?? []).some((entry) => isActiveCanvasRun(entry.run));
+}
+
+function shouldHideWaitingDecision(runs?: PRFeedbackLogRun[]): boolean {
+  return hasActivePRFeedbackRun(runs);
+}
+
+function latestPRFeedbackRun(runs?: PRFeedbackLogRun[]): PRFeedbackLogRun | undefined {
+  if (!runs || runs.length === 0) {
+    return undefined;
+  }
+  return [...runs].sort(
+    (left, right) => Date.parse(right.run.createdAt ?? "") - Date.parse(left.run.createdAt ?? ""),
+  )[0];
+}
+
 /**
  * Factory-level automation that works on this order right now: a PR-feedback
  * run or a Backlog analysis run. The popup opens its log so the progress is
@@ -623,11 +690,12 @@ function activePhaseIdWithPrefix(phases: SplitRunPhase[], prefix: string): Split
 function prFeedbackRunToPhase(entry: PRFeedbackLogRun): SplitRunPhase {
   const status = statusForCanvasRun(entry.run);
   const description = entry.description?.trim();
-  const name = description
+  const baseName = description
     ? description
     : entry.pullRequestNumber
       ? `Activity on PR #${String(entry.pullRequestNumber).replace(/^#/, "")}`
       : "Activity on PR";
+  const name = entry.attemptLabel ? `${baseName} · ${entry.attemptLabel}` : baseName;
   const componentName = entry.handlerName?.trim() || "Address PR feedback";
   const duration = durationForExecution(
     {
@@ -794,12 +862,12 @@ function automationBacklogPhase(
       {
         id: "backlog-create",
         at,
-        componentName: automation.nodeName?.trim() || "Create Work Order",
+        componentName: automation.nodeName?.trim() || "Create Task",
         status: "passed",
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "factory",
       },
@@ -830,7 +898,7 @@ function manualBacklogPhase(order: FactoriesWorkOrder, description: FactoriesWor
         duration: "2s",
         artifact: description,
         kind: "action",
-        componentType: "Create Work Order",
+        componentType: "Create Task",
         action: "passed",
         iconSlug: "user",
       },
@@ -901,6 +969,7 @@ function executionToPhase(
     stepIndex: execution.stepIndex,
     costCents: execution.costCents,
     totalTokens: execution.totalTokens,
+    model: dispatchModelForExecution(order, execution),
   };
 }
 
@@ -1021,6 +1090,17 @@ function streamLineToCanvasStep(line: SplitRunStreamLine, provider: RunOverlayPr
 function canvasStatus(status: SplitRunPhaseStatus): RunOverlayStepStatus {
   if (status === "waiting" || status === "cancelled") return "pending";
   return status;
+}
+
+function dispatchModelForExecution(
+  order: FactoriesWorkOrder,
+  execution: FactoriesWorkOrderExecution,
+): string | undefined {
+  const owner = (order.lineDispatches ?? []).find((dispatch) =>
+    (dispatch.stepExecutions ?? []).some((step) => step.id && step.id === execution.id),
+  );
+  const value = owner?.model?.trim();
+  return value || undefined;
 }
 
 function statusForExecution(execution: FactoriesWorkOrderExecution): SplitRunPhaseStatus {

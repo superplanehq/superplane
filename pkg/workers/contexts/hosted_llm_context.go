@@ -15,22 +15,21 @@ import (
 )
 
 // HostedLLMContext resolves installation-hosted provider credentials.
-// Credit holds use a committed connection so the lock does not span CreateTask.
+// Credit checks use a committed connection so remaining credit includes
+// billed spend from other runs.
 type HostedLLMContext struct {
 	tx             *gorm.DB
 	encryptor      crypto.Encryptor
 	organizationID uuid.UUID
 	factoryID      *uuid.UUID
-	executionID    uuid.UUID
 }
 
-func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID, executionID uuid.UUID, factoryID *uuid.UUID) *HostedLLMContext {
+func NewHostedLLMContext(tx *gorm.DB, encryptor crypto.Encryptor, organizationID uuid.UUID, factoryID *uuid.UUID) *HostedLLMContext {
 	return &HostedLLMContext{
 		tx:             tx,
 		encryptor:      encryptor,
 		organizationID: organizationID,
 		factoryID:      factoryID,
-		executionID:    executionID,
 	}
 }
 
@@ -72,8 +71,5 @@ func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model 
 }
 
 func (c *HostedLLMContext) AssertCreditAvailable() error {
-	if c.organizationID == uuid.Nil {
-		return fmt.Errorf("organization is required for hosted LLM credit")
-	}
-	return models.ReserveHostedCredit(database.Conn(), c.organizationID, c.executionID, c.factoryID)
+	return models.AssertHostedRunAllowed(database.Conn(), c.organizationID, c.factoryID)
 }

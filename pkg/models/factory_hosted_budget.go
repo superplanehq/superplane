@@ -16,9 +16,9 @@ type FactoryHostedBudgetSummary struct {
 
 func SumFactoryHostedBilledMicros(tx *gorm.DB, orgID, factoryID uuid.UUID) (int64, error) {
 	var billedMicros int64
-	err := tx.Model(&LLMUsageEvent{}).
+	err := tx.Model(&WorkspaceUsageEvent{}).
 		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND factory_id = ? AND funding_source = ?", orgID, factoryID, UsageFundingSourceHosted).
+		Where("organization_id = ? AND factory_id = ? AND funding_source = ? AND usage_kind = ?", orgID, factoryID, UsageFundingSourceHosted, UsageKindModel).
 		Scan(&billedMicros).Error
 	return billedMicros, err
 }

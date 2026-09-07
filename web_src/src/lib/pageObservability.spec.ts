@@ -3,11 +3,15 @@ import { resolvePageObservability } from "@/lib/pageObservability";
 
 describe("resolvePageObservability", () => {
   it("maps top-level routes", () => {
-    expect(resolvePageObservability("/")).toEqual({ pageKey: "organizationSelect", attributes: {} });
+    expect(resolvePageObservability("/")).toEqual({ pageKey: "rootOrganizationRedirect", attributes: {} });
     expect(resolvePageObservability("/login")).toEqual({ pageKey: "login", attributes: {} });
-    expect(resolvePageObservability("/create")).toEqual({ pageKey: "organizationCreate", attributes: {} });
+    expect(resolvePageObservability("/onboarding")).toEqual({ pageKey: "organizationOnboarding", attributes: {} });
     expect(resolvePageObservability("/setup")).toEqual({ pageKey: "ownerSetup", attributes: {} });
     expect(resolvePageObservability("/install")).toEqual({ pageKey: "install", attributes: {} });
+    expect(resolvePageObservability("/github/approved")).toEqual({
+      pageKey: "githubInstallApproved",
+      attributes: {},
+    });
   });
 
   it("maps invite links", () => {
@@ -73,8 +77,16 @@ describe("resolvePageObservability", () => {
       pageKey: "organizationSettingsGeneral",
       attributes: { organization_id: "org-1" },
     });
+    expect(resolvePageObservability("/org-1/organization/workspace-usage")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
     expect(resolvePageObservability("/org-1/organization/llm-spend")).toEqual({
-      pageKey: "organizationSettingsLlmSpend",
+      pageKey: "organizationSettingsWorkspaceUsage",
+      attributes: { organization_id: "org-1" },
+    });
+    expect(resolvePageObservability("/org-1/organization/spending")).toEqual({
+      pageKey: "organizationSettingsWorkspaceUsage",
       attributes: { organization_id: "org-1" },
     });
     expect(resolvePageObservability("/org-1/organization/integrations")).toEqual({

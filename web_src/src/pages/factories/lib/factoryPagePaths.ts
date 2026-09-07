@@ -1,3 +1,5 @@
+import { replaceFactoryKeySegment } from "./factoryKeyResolution";
+
 export function factoryListPath(organizationId: string) {
   return `/${organizationId}/workspaces`;
 }
@@ -38,6 +40,46 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
     return factoryLineDetailPath(organizationId, factoryKey, lineId);
   }
   return factoryDetailPath(organizationId, factoryKey);
+}
+
+const WORKSPACE_PAGES_TO_KEEP = ["/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
+
+function workspacePageToKeep(pathnameRest: string): boolean {
+  if (WORKSPACE_LIST_PAGES_TO_KEEP.includes(pathnameRest)) {
+    return true;
+  }
+  return WORKSPACE_PAGES_TO_KEEP.some((prefix) => pathnameRest === prefix || pathnameRest.startsWith(`${prefix}/`));
+}
+
+/**
+ * Path after a workspace switch. Keeps settings, Velocity, and other pages
+ * that exist in every workspace. A line board, task, or app URL opens the
+ * new workspace home — those identifiers belong to one workspace.
+ */
+export function pathAfterWorkspaceSwitch({
+  pathname,
+  organizationId,
+  currentFactoryKey,
+  nextFactory,
+}: {
+  pathname: string;
+  organizationId: string;
+  currentFactoryKey: string;
+  nextFactory: { key?: string; lines?: Array<{ id?: string }> | null };
+}): string {
+  const nextKey = nextFactory.key;
+  if (!nextKey) {
+    return pathname;
+  }
+
+  const prefix = `/${organizationId}/workspaces/${currentFactoryKey}`;
+  const rest = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : "";
+  if (workspacePageToKeep(rest)) {
+    return replaceFactoryKeySegment(pathname, organizationId, currentFactoryKey, nextKey);
+  }
+
+  return factoryHomePath(organizationId, nextKey, firstFactoryLineId(nextFactory));
 }
 
 /** Opens the line board with the Intake drawer beside the columns. */
@@ -81,16 +123,24 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
 /** Opens PR feedback settings on a tab: general or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
+export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
 
 export function factoryPRFeedbackPath(
   organizationId: string,
   factoryKey: string,
   lineId?: string | null,
   settingsTab?: string,
+  handlerId?: string,
 ) {
-  const path = `${factoryHomePath(organizationId, factoryKey, lineId)}?${PR_FEEDBACK_SEARCH_PARAM}=1`;
-  const settingsQuery = settingsTab ? `&${PR_FEEDBACK_SETTINGS_SEARCH_PARAM}=${encodeURIComponent(settingsTab)}` : "";
-  return `${path}${settingsQuery}`;
+  const params = new URLSearchParams();
+  params.set(PR_FEEDBACK_SEARCH_PARAM, "1");
+  if (handlerId) {
+    params.set(PR_FEEDBACK_HANDLER_SEARCH_PARAM, handlerId);
+  }
+  if (settingsTab) {
+    params.set(PR_FEEDBACK_SETTINGS_SEARCH_PARAM, settingsTab);
+  }
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
 }
 
 export function isPRFeedbackSearchOpen(search: string): boolean {
@@ -103,12 +153,17 @@ export function prFeedbackSettingsTabFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(PR_FEEDBACK_SETTINGS_SEARCH_PARAM);
 }
 
+export function prFeedbackHandlerIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }
 
 export function workOrdersPath(organizationId: string, factoryKey: string) {
-  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/tasks`;
 }
 
 export function createWorkOrderPath(organizationId: string, factoryKey: string) {
@@ -116,8 +171,8 @@ export function createWorkOrderPath(organizationId: string, factoryKey: string) 
 }
 
 /**
- * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/work-order/{orderNumber}`
- * (singular segment, sibling of `work-orders`). `orderNumber` is the
+ * Canonical task permalink: `/{organizationId}/workspaces/{factoryKey}/task/{orderNumber}`
+ * (singular segment, sibling of the plural `tasks` list). `orderNumber` is the
  * factory-scoped sequence number (`FactoriesWorkOrder.number`), not the
  * database id — see `legacyWorkOrderDetailPath` for the old id-based shape.
  */
@@ -127,7 +182,7 @@ export function workOrderDetailPath(
   orderNumber: string | number,
   lineId?: string | null,
 ) {
-  const path = `${factoryDetailPath(organizationId, factoryKey)}/work-order/${orderNumber}`;
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/task/${orderNumber}`;
   const boardLineId = lineId?.trim();
   if (!boardLineId) {
     return path;
@@ -135,7 +190,7 @@ export function workOrderDetailPath(
   return `${path}?${WORK_ORDER_LINE_SEARCH_PARAM}=${encodeURIComponent(boardLineId)}`;
 }
 
-/** Line id carried on a work-order permalink when the popup opened from a board. */
+/** Line id carried on a task permalink when the popup opened from a board. */
 export const WORK_ORDER_LINE_SEARCH_PARAM = "lineId";
 
 export function workOrderBoardLineIdFromSearch(search: string): string | null {
@@ -160,12 +215,12 @@ export function workOrderOpenPath(
 }
 
 /**
- * Old id-based task URL shape, kept around only so the legacy
- * redirect route can compare against it / build test fixtures. New code
- * should always call `workOrderDetailPath`.
+ * Old id-based task URL shape (`.../work-orders/{orderId}`), kept around only
+ * so the legacy redirect route can compare against it / build test fixtures.
+ * New code should always call `workOrderDetailPath`.
  */
 export function legacyWorkOrderDetailPath(organizationId: string, factoryKey: string, orderId: string) {
-  return `${workOrdersPath(organizationId, factoryKey)}/${orderId}`;
+  return `${factoryDetailPath(organizationId, factoryKey)}/work-orders/${orderId}`;
 }
 
 export function linesPath(organizationId: string, factoryKey: string) {
@@ -192,10 +247,17 @@ export function automationDetailPath(organizationId: string, factoryKey: string,
   return `${automationsPath(organizationId, factoryKey)}/${appId}`;
 }
 
-export type FactoryAppNavFrom = "automations" | "lines" | "work-order" | "overview";
+export type FactoryAppNavFrom = "automations" | "lines" | "task" | "overview";
 
+/**
+ * Parses the `from` nav hint, accepting the legacy `work-order` value (from
+ * links generated before the task rename) and normalizing it to `task`.
+ */
 export function parseFactoryAppNavFrom(value: string | null): FactoryAppNavFrom | undefined {
-  if (value === "automations" || value === "lines" || value === "work-order" || value === "overview") {
+  if (value === "work-order") {
+    return "task";
+  }
+  if (value === "automations" || value === "lines" || value === "task" || value === "overview") {
     return value;
   }
   return undefined;
@@ -329,8 +391,19 @@ export function factorySettingsPath(organizationId: string, factoryKey: string) 
   return `${factoryDetailPath(organizationId, factoryKey)}/settings`;
 }
 
-export function factorySettingsSectionPath(organizationId: string, factoryKey: string, section: string) {
-  return `${factorySettingsPath(organizationId, factoryKey)}/${section}`;
+export type FactorySettingsScope = "account" | "workspace" | "organization";
+
+export function factorySettingsSectionPath(
+  organizationId: string,
+  factoryKey: string,
+  scope: FactorySettingsScope,
+  section: string,
+) {
+  return `${factorySettingsPath(organizationId, factoryKey)}/${scope}/${section}`;
+}
+
+export function factorySettingsWorkspaceGeneralPath(organizationId: string, factoryKey: string) {
+  return factorySettingsSectionPath(organizationId, factoryKey, "workspace", "general");
 }
 
 export type OrganizationSettingsLocationState = {
@@ -352,6 +425,22 @@ export function organizationSettingsBackPath(organizationId: string, fromFactory
   return factoryListPath(organizationId);
 }
 
+/**
+ * Swaps the `/:organizationId` route segment, leaving the rest of the path
+ * untouched so settings (and other workspace pages) stay in context.
+ */
+export function replaceOrganizationSegment(
+  pathname: string,
+  currentOrganizationId: string,
+  nextOrganizationId: string,
+): string {
+  const prefix = `/${currentOrganizationId}`;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
+    return factoryListPath(nextOrganizationId);
+  }
+  return `/${nextOrganizationId}${pathname.slice(prefix.length)}`;
+}
+
 /** Settings General URL after a workspace key change, or `null` when the key did not change. */
 export function factorySettingsGeneralPathAfterKeyChange(
   organizationId: string,
@@ -361,7 +450,7 @@ export function factorySettingsGeneralPathAfterKeyChange(
   if (!nextKey || nextKey === previousKey) {
     return null;
   }
-  return factorySettingsSectionPath(organizationId, nextKey, "general");
+  return factorySettingsWorkspaceGeneralPath(organizationId, nextKey);
 }
 
 export function factoryMissionsPath(organizationId: string, factoryKey: string) {

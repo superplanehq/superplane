@@ -68,6 +68,7 @@ vi.mock("@/contexts/useAccount", () => ({
     account: accountState.account,
     loading: accountState.loading,
     setupRequired: false,
+    refreshAccount: async () => undefined,
   }),
 }));
 

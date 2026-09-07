@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrderArtifact } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { useDismissOnEscape } from "@/hooks/useDismissOnEscape";
 import { cn } from "@/lib/utils";
 import { XIcon } from "lucide-react";
 import type { ReactNode } from "react";
@@ -86,6 +87,8 @@ export function RunOverlayFrame({
   fullPage?: boolean;
   onDismiss?: () => void;
 }) {
+  useDismissOnEscape(onDismiss);
+
   return (
     <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
       <div

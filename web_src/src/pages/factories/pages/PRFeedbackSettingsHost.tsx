@@ -10,12 +10,17 @@ import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 
 import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
+  apiPRFeedbackSource,
+  takenPRFeedbackSourceIds,
   prFeedbackDraftFromHandler,
+  prFeedbackSettingsToApi,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
+  type PRFeedbackSource,
 } from "./prFeedbackSettingsModel";
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -26,7 +31,9 @@ interface PRFeedbackSettingsHostProps {
   factoryKey: string;
   lineId?: string;
   canUpdate: boolean;
+  handlerId?: string | null;
   initialTab?: PRFeedbackSettingsTab;
+  onCreated?: (handlerId: string) => void;
   onClose: () => void;
 }
 
@@ -36,12 +43,34 @@ export function PRFeedbackSettingsHost({
   factoryKey,
   lineId,
   canUpdate,
+  handlerId,
   initialTab = "general",
+  onCreated,
   onClose,
 }: PRFeedbackSettingsHostProps) {
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
-  const handler = handlersQuery.data?.[0];
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const handlers = handlersQuery.data ?? [];
+  const takenSourceIds = takenPRFeedbackSourceIds(handlers);
+  const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
+
+  const createFromSource = (source: PRFeedbackSource) => {
+    if (takenSourceIds.includes(source.id)) {
+      return;
+    }
+    setPickerOpen(false);
+    createHandler
+      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
+      .then((created) => {
+        if (created.id) {
+          onCreated?.(created.id);
+        }
+      })
+      .catch((error) => {
+        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
+      });
+  };
 
   if (handlersQuery.isPending) {
     return (
@@ -68,26 +97,30 @@ export function PRFeedbackSettingsHost({
 
   if (!handler?.id) {
     return (
-      <PopupShell testId="pr-feedback-settings" canvas fixed onDismiss={onClose}>
-        <PopupHeader title="PR feedback" onClose={onClose} />
-        <div className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6">
-          <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.emptyBody}</p>
-          {canUpdate ? (
-            <Button
-              type="button"
-              disabled={createHandler.isPending}
-              onClick={() => {
-                createHandler.mutateAsync({}).catch((error) => {
-                  showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-                });
-              }}
-              data-testid="pr-feedback-create"
-            >
-              {createHandler.isPending ? PR_FEEDBACK_SETTINGS_COPY.creating : PR_FEEDBACK_SETTINGS_COPY.create}
-            </Button>
-          ) : null}
-        </div>
-      </PopupShell>
+      <>
+        <PopupShell testId="pr-feedback-settings" canvas fixed onDismiss={onClose}>
+          <PopupHeader title="PR feedback" onClose={onClose} />
+          <div className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6">
+            <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.emptyBody}</p>
+            {canUpdate ? (
+              <Button
+                type="button"
+                disabled={createHandler.isPending}
+                onClick={() => setPickerOpen(true)}
+                data-testid="pr-feedback-create"
+              >
+                {createHandler.isPending ? PR_FEEDBACK_SETTINGS_COPY.creating : PR_FEEDBACK_SETTINGS_COPY.create}
+              </Button>
+            ) : null}
+          </div>
+        </PopupShell>
+        <AddPRFeedbackPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={createFromSource}
+          takenSourceIds={takenSourceIds}
+        />
+      </>
     );
   }
 
@@ -143,6 +176,7 @@ function PRFeedbackSettingsLoaded({
 
   return (
     <PRFeedbackSettingsPopup
+      organizationId={organizationId}
       settings={settings}
       healthy={healthy}
       automationGraph={automation.graph}
@@ -158,10 +192,7 @@ function PRFeedbackSettingsLoaded({
           await updateHandler.mutateAsync({
             handlerId,
             name: next.name,
-            settings: {
-              subject: { repository: next.repository },
-              discussion: { mention: next.mention, ignoreBots: next.ignoreBots, allowedBots: next.allowedBots },
-            },
+            settings: prFeedbackSettingsToApi(next),
           });
         } catch (error) {
           const message = getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.saveError);

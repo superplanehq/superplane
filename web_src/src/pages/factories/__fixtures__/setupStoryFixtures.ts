@@ -4,7 +4,8 @@ import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
 import type { StorybookUsageReport } from "./usageReportFixtures";
 
-const GITHUB_CONNECTION_ID = "storybook-github-connection";
+/** GitHub connection every workspace story shares. */
+export const GITHUB_CONNECTION_ID = "storybook-github-connection";
 const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
 
 /** App repository the setup stories continue with. Served by the resources fixture. */
@@ -58,11 +59,12 @@ export const SETUP_ANSWERS = {
 /** Default dataset with saved setup answers on the primary workspace. */
 export function factoriesFixtureWithSetupAnswers(
   onboarding: FactoriesFactoryOnboarding,
-  options?: { organizationLlmSpend?: StorybookUsageReport },
+  options?: { organizationWorkspaceUsage?: StorybookUsageReport },
 ): FactoriesFixture {
   return {
     ...defaultFactoriesFixture,
-    organizationLlmSpend: options?.organizationLlmSpend ?? defaultFactoriesFixture.organizationLlmSpend,
+    organizationWorkspaceUsage:
+      options?.organizationWorkspaceUsage ?? defaultFactoriesFixture.organizationWorkspaceUsage,
     factories: defaultFactoriesFixture.factories.map((factory) =>
       factory.id === PRIMARY_FACTORY_ID ? { ...factory, onboarding } : factory,
     ),

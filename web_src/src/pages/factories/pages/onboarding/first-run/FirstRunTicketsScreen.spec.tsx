@@ -48,6 +48,21 @@ describe("FirstRunTicketsScreen", () => {
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
 
+  it("shows finish progress while the screen provisions the workspace", () => {
+    render(
+      <FirstRunTicketsScreen
+        ticketSource="github-issues"
+        saving
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    const analyze = screen.getByTestId("first-run-analyze-tickets");
+    expect(analyze).toHaveTextContent(FIRST_RUN_COPY.finish.saving);
+    expect(analyze).toBeDisabled();
+  });
+
   it("uses the next-step label when setup names the coding agent step", () => {
     render(
       <FirstRunTicketsScreen

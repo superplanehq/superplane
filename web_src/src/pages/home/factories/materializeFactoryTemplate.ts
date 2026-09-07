@@ -159,6 +159,9 @@ export function materializeFactoryCanvas(args: {
   integrations: IntegrationSelections;
   agentRewrite?: FactoryAgentRewrite;
 }): string {
+  if (!args.definition.canvasYaml) {
+    throw new Error(`Factory template ${args.definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(args.definition.canvasYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: args.canvasId,
   });
@@ -189,6 +192,9 @@ export function materializeFactoryCanvas(args: {
 }
 
 export function materializeFactoryConsole(definition: FactoryDefinition, canvasName: string, canvasId: string): string {
+  if (!definition.consoleYaml) {
+    throw new Error(`Factory template ${definition.id} must be materialized by the backend`);
+  }
   const withPlaceholders = replacePlaceholders(definition.consoleYaml, {
     [FACTORY_CANVAS_ID_PLACEHOLDER]: canvasId,
   });

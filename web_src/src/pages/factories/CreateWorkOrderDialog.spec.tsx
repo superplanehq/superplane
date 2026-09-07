@@ -1,6 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   EMPTY_FACTORY,
@@ -52,6 +52,18 @@ describe("CreateWorkOrderDialog", () => {
     createMutate.mockReset();
     dispatchMutate.mockReset();
     meUser.current = null;
+  });
+
+  afterEach(async () => {
+    // The dialog mounts a Radix focus scope that schedules a `setTimeout(0)` on
+    // unmount to dispatch its "auto focus on unmount" event. Unmount here and
+    // flush that timer while jsdom is still alive; otherwise it fires during
+    // environment teardown and throws an unhandled "dispatchEvent" TypeError
+    // that fails the whole test shard even though every test passed.
+    cleanup();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
   });
 
   it("names the dialog New task instead of the fallback Dialog title", () => {

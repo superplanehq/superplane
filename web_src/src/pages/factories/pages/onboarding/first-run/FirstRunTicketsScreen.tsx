@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 
 import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -9,12 +9,15 @@ export function FirstRunTicketsScreen({
   ticketSource,
   chrome,
   continueLabel = FIRST_RUN_COPY.tickets.analyze,
+  saving = false,
   onSelectTicketSource,
   onAnalyzeTickets,
 }: {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   continueLabel?: string;
+  /** True while this screen provisions the workspace, on the last screen. */
+  saving?: boolean;
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
 }) {
@@ -56,15 +59,17 @@ export function FirstRunTicketsScreen({
             <p>{copy.trust}</p>
             <p>{copy.scoreHint}</p>
           </div>
-          <Button
+          <LoadingButton
             type="button"
             className="w-full"
             disabled={!ticketSource}
+            loading={saving}
+            loadingText={FIRST_RUN_COPY.finish.saving}
             onClick={onAnalyzeTickets}
             data-testid="first-run-analyze-tickets"
           >
             {continueLabel}
-          </Button>
+          </LoadingButton>
         </div>
       </div>
     </FirstRunShell>

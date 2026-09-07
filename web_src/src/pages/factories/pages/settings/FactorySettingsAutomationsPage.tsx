@@ -21,7 +21,7 @@ export function FactorySettingsAutomationsPage() {
         openCreateWorkOrder: () => undefined,
       }}
     >
-      <AutomationsPage />
+      <AutomationsPage layout="settings" />
     </FactoriesLayoutContext.Provider>
   );
 }

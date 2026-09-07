@@ -56,13 +56,9 @@ function stopErrorFallback(choice: SplitRunStopChoice, footer: StopFooter): stri
   return "Failed to close task";
 }
 
-export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+function useSplitRunCancelRun(organizationId?: string, factoryId?: string, orderId?: string) {
   const queryClient = useQueryClient();
-  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
-  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
-  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
-  const live = Boolean(organizationId && factoryId && orderId);
-  const cancelRun = useMutation({
+  return useMutation({
     mutationFn: async (run: SplitRunStopRun) => {
       await canvasesCancelRun(
         withOrganizationHeader({
@@ -84,6 +80,14 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
       }
     },
   });
+}
+
+export function useSplitRunFooterActions(organizationId?: string, factoryId?: string, orderId?: string) {
+  const closeWorkOrder = useCloseWorkOrder(organizationId ?? "", factoryId ?? "");
+  const updateStatus = useUpdateWorkOrderStatus(organizationId ?? "", factoryId ?? "");
+  const dispatchWorkOrder = useDispatchWorkOrder(organizationId ?? "", factoryId ?? "");
+  const live = Boolean(organizationId && factoryId && orderId);
+  const cancelRun = useSplitRunCancelRun(organizationId, factoryId, orderId);
 
   const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 

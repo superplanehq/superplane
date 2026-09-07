@@ -196,7 +196,6 @@ function EndNodeAppendConnector({
             left: "50%",
             transform: "translateX(-50%)",
           }}
-          buttonLeft={-9}
           buttonTop={54}
         />
         <AppendHandlePreview

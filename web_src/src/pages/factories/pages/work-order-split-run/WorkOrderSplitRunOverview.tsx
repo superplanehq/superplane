@@ -1,23 +1,27 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { SidebarSectionHeading } from "../../sidebar/SidebarPrimitives";
 import { WorkOrderArtifactsList } from "../../WorkOrderArtifactsList";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
+import { WorkOrderPullRequestsList } from "../../WorkOrderPullRequestsList";
 import { SPLIT_RUN_PANE_GRID_CLASSNAME, splitRunLinkedArtifacts } from "./splitRunPopupModel";
 import type { SplitRunSource } from "./splitRunSource";
 import { WorkOrderSplitRunDescription } from "./WorkOrderSplitRunDescription";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 /**
- * Description tab: reading column on the left, Source and Artifacts on the
- * right.
+ * Description tab: reading column on the left, Source, Artifacts, and Pull
+ * requests on the right.
  */
 export function WorkOrderSplitRunOverview({
   description,
   artifacts,
   artifactsLoading = false,
+  pullRequests = [],
+  pullRequestsLoading = false,
+  pullRequestsError = null,
   checks,
   organizationId,
   factoryKey,
@@ -31,6 +35,9 @@ export function WorkOrderSplitRunOverview({
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
   artifactsLoading?: boolean;
+  pullRequests?: FactoriesFactoryPullRequest[];
+  pullRequestsLoading?: boolean;
+  pullRequestsError?: Error | null;
   checks: WorkOrderCheckPresentation[];
   organizationId?: string;
   factoryKey?: string;
@@ -85,6 +92,11 @@ export function WorkOrderSplitRunOverview({
             )}
           </section>
           <WorkOrderArtifactsList artifacts={splitRunLinkedArtifacts(artifacts, source)} isLoading={artifactsLoading} />
+          <WorkOrderPullRequestsList
+            pullRequests={pullRequests}
+            isLoading={pullRequestsLoading}
+            error={pullRequestsError}
+          />
         </div>
       </aside>
     </div>

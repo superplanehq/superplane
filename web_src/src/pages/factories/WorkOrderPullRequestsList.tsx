@@ -27,7 +27,7 @@ export function WorkOrderPullRequestsList({ pullRequests, isLoading, error }: Wo
                 className="flex items-center py-1.5"
                 key={pullRequest.id ?? `${pullRequest.url}-${pullRequest.number}`}
               >
-                <WorkOrderPullRequestInline className="w-full justify-start" pullRequest={pullRequest} />
+                <WorkOrderPullRequestInline className="w-full justify-start" pullRequest={pullRequest} showTitle />
               </li>
             ))}
           </ul>

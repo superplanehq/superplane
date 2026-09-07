@@ -1,4 +1,4 @@
-import { useOrganizationLLMSpend } from "@/hooks/useOrganizationLLMSpend";
+import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { cn } from "@/lib/utils";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
 
@@ -16,7 +16,7 @@ export function AgentStep({
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
-  const spend = useOrganizationLLMSpend(organizationId);
+  const spend = useOrganizationWorkspaceUsage(organizationId);
   const grantTotalCents = parseWorkOrderMetric(spend.data?.grantTotalCents);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
   const showGrant = shouldShowHostedCreditGrant(grantTotalCents);

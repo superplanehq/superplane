@@ -39,13 +39,14 @@ type FactoryWorkOrderExecution struct {
 	RunID          *uuid.UUID
 	Status         string
 	Result         string
-	// Aggregate usage populated by runners. Both default to zero; the API
+	// Aggregate usage populated by runners. All default to zero; the API
 	// only surfaces non-zero values to the UI.
-	TotalTokens int64
-	CostCents   int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	FinishedAt  *time.Time
+	TotalTokens     int64
+	DurationSeconds int64
+	CostCents       int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	FinishedAt      *time.Time
 }
 
 func FindWorkOrderExecutionByRunID(tx *gorm.DB, runID uuid.UUID) (*FactoryWorkOrderExecution, error) {

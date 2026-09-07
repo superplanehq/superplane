@@ -20,5 +20,8 @@ func TestResolveSecrets(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []byte("sk-test"), secrets[integrationSecretOpenAIAPIKey])
+	assert.Equal(t, []byte("sk-test"), secrets.Values[integrationSecretOpenAIAPIKey])
+	assert.Contains(t, secrets.Usage, "OPENAI_API_KEY")
+	assert.NotContains(t, secrets.Usage, "sk-test")
+	assert.Empty(t, secrets.Setup)
 }

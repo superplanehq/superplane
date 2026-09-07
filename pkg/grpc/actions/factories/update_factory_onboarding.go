@@ -173,6 +173,7 @@ func factoryOnboardingPatchFromRequest(req *pb.UpdateFactoryOnboardingRequest) (
 		AgentIntegrationID: req.AgentIntegrationId,
 		AppRepository:      req.AppRepository,
 		BacklogRepository:  req.BacklogRepository,
+		DefaultBranch:      req.DefaultBranch,
 		ProvisionedAppID:   req.ProvisionedAppId,
 		ProvisionedLineID:  req.ProvisionedLineId,
 	}

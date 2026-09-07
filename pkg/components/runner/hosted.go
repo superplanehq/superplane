@@ -46,11 +46,11 @@ func InjectSecretAPIKey(ctx core.ExecutionContext, environment []BrokerEnvironme
 }
 
 func InjectIntegrationKeys(ctx core.ExecutionContext, environment []BrokerEnvironmentVariable, integration configuration.IntegrationRef) ([]BrokerEnvironmentVariable, error) {
-	keys, err := ctx.Secrets.GetIntegrationKeys(integration.Name)
+	secrets, err := ctx.Secrets.GetIntegrationSecrets(integration.Name)
 	if err != nil {
 		return nil, fmt.Errorf("resolve integration: %w", err)
 	}
-	for name, value := range keys {
+	for name, value := range secrets.Values {
 		environment = append(environment, BrokerEnvironmentVariable{Name: name, Value: string(value)})
 	}
 	return environment, nil

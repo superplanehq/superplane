@@ -31,7 +31,12 @@ export default tseslint.config({ ignores: ['dist', 'dist-ssr', 'storybook-static
     },
   },
   rules: {
-    ...reactHooks.configs.recommended.rules,
+    // eslint-plugin-react-hooks v6+ folded the React Compiler's correctness
+    // rules into `configs.recommended`. Keep only the two rules that were
+    // enabled under v5's `recommended` (rules-of-hooks, exhaustive-deps) so
+    // this ESLint upgrade does not also adopt React Compiler linting.
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
     "no-unused-vars": "off",
     // Start as a warning to surface refactor targets without breaking CI.
     complexity: ["warn", { max: 15 }],

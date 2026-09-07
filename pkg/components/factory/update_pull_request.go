@@ -39,13 +39,13 @@ func (c *UpdatePullRequest) Label() string {
 }
 
 func (c *UpdatePullRequest) Description() string {
-	return "Update a factory pull request that is already attached to a work order"
+	return "Update a factory pull request that is already attached to a task"
 }
 
 func (c *UpdatePullRequest) Documentation() string {
 	return `The Update Pull Request component updates a factory pull request by ` + "`pullRequestId`" + `. External-event canvases should run Find Pull Request first and pass its output id.
 
-Mutable fields: repository, external id, URL, title, state, merged timestamp, and closed timestamp. The component does not move the pull request to a different work order.
+Mutable fields: repository, external id, URL, title, state, merged timestamp, and closed timestamp. The component does not move the pull request to a different task.
 
 ` + "`state`" + `, ` + "`merged`" + `, and ` + "`draft`" + ` accept expressions. A GitHub-shaped ` + "`state: \"closed\"`" + ` + ` + "`merged: true`" + ` becomes SuperPlane state ` + "`merged`" + `. This component can only be used in factory-owned apps.`
 }

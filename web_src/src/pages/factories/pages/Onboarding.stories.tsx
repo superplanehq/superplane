@@ -40,17 +40,17 @@ function SetupStep({
   step,
   answers = SETUP_ANSWERS.none,
   orgIntegrations = CONNECTED_SETUP_INTEGRATIONS,
-  organizationLlmSpend,
+  organizationWorkspaceUsage,
 }: {
   step: WizardStepId;
   answers?: FactoriesFactoryOnboarding;
   orgIntegrations?: StorybookOrgIntegration[];
-  organizationLlmSpend?: StorybookUsageReport;
+  organizationWorkspaceUsage?: StorybookUsageReport;
 }) {
   return (
     <FactoriesHarness
       pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=${step}`}
-      factoriesFixture={factoriesFixtureWithSetupAnswers(answers, { organizationLlmSpend })}
+      factoriesFixture={factoriesFixtureWithSetupAnswers(answers, { organizationWorkspaceUsage })}
       onboardingSeed={pendingSeed}
       orgIntegrations={orgIntegrations}
     />
@@ -107,7 +107,7 @@ export const AgentWithoutGrant: Story = {
       step="agent"
       answers={SETUP_ANSWERS.issues}
       orgIntegrations={GITHUB_SETUP_INTEGRATIONS}
-      organizationLlmSpend={NO_GRANT_USAGE_REPORT}
+      organizationWorkspaceUsage={NO_GRANT_USAGE_REPORT}
     />
   ),
 };

@@ -193,17 +193,20 @@ export const RUNNING_WORK_ORDER: FactoriesWorkOrder = {
   origin: githubOrigin(103),
   assignees: [{ id: STORYBOOK_ME_USER_ID, name: STORYBOOK_ME_USER_NAME }],
   lineDispatches: [
-    planLineDispatch([
-      planLineExecution("implement", {
-        id: "2",
-        state: "STATE_STARTED",
-        result: "RESULT_UNKNOWN",
-        run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
-        updatedAt: HOUR_AGO,
-        totalTokens: "900",
-        costCents: "28",
-      }),
-    ]),
+    planLineDispatch(
+      [
+        planLineExecution("implement", {
+          id: "2",
+          state: "STATE_STARTED",
+          result: "RESULT_UNKNOWN",
+          run: { id: LINE_RUN_IMPLEMENT_ID, appId: "app-refund-implementer", appName: "Implementation" },
+          updatedAt: HOUR_AGO,
+          totalTokens: "900",
+          costCents: "28",
+        }),
+      ],
+      { model: "anthropic/claude-sonnet-4-6" },
+    ),
   ],
   totalTokens: "2700",
   totalCostCents: "73",

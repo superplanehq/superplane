@@ -116,7 +116,9 @@ describe("WorkOrderSplitRunPopup", () => {
   it("shows tokens and cost on a line-step phase", () => {
     renderPopup({ fixture: splitRunFixtureForWorkOrder(RUNNING_WORK_ORDER, { demoArtifacts: false }) });
 
-    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent("$0.28 · 900 ·");
+    expect(screen.getByTestId("split-run-phase-duration-implement-0")).toHaveTextContent(
+      "$0.28 · 900 · claude-sonnet-4-6 ·",
+    );
   });
 
   it("does not put an Open task link next to close", () => {
@@ -178,7 +180,8 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("split-run-log-scroll")).toBeInTheDocument();
     expect(within(dialog).queryByRole("region", { name: "Run" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("run-overlay-compact-canvas")).not.toBeInTheDocument();
 
@@ -200,7 +203,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(implement).getAllByRole("link", { name: /feature\/refund-retry/ }).length).toBeGreaterThan(0);
     expect(screen.getByTestId("split-run-stream-implement")).toBeInTheDocument();
     expect(within(implement).queryByText("Started")).not.toBeInTheDocument();
-    expect(within(implement).getAllByText("Start").length).toBeGreaterThan(0);
+    expect(within(implement).getAllByText("Start Implementation").length).toBeGreaterThan(0);
     expect(
       within(screen.getByTestId("split-run-stream-line-onrun-implement")).queryByText("On Run"),
     ).not.toBeInTheDocument();
@@ -447,7 +450,8 @@ describe("WorkOrderSplitRunPopup", () => {
 
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "Follow" })).toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: "Follow" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-log-scroll")).toBeInTheDocument();
   });
 
   it("pins a review note and keeps Update manually off the note", () => {
@@ -747,6 +751,13 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(sidebar).getByText("plan.md")).toBeInTheDocument();
     expect(within(sidebar).queryByText("PAY-842")).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("details.md")).not.toBeInTheDocument();
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(sidebar).getByText("No pull requests yet.")).toBeInTheDocument();
+    const artifactsHeading = within(sidebar).getByRole("heading", { name: "Artifacts" });
+    const pullRequestsHeading = within(sidebar).getByRole("heading", { name: "Pull requests" });
+    expect(
+      artifactsHeading.compareDocumentPosition(pullRequestsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(within(tab).getByTestId("split-run-overview-checks")).toBeInTheDocument();
     expect(within(tab).getByTestId("split-run-check-comment-wo-review-pay-842-confidence")).toHaveAttribute("open");
     expect(within(tab).getByTestId("split-run-check-comment-check-risk-review")).not.toHaveAttribute("open");
@@ -792,6 +803,18 @@ describe("WorkOrderSplitRunPopup", () => {
 
     await user.click(screen.getByTestId("split-run-check-comment-toggle-check-code-coverage"));
     expect(coverage).toHaveAttribute("open");
+  });
+
+  it("shows the full check summary without a one-line clamp", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
+    });
+
+    const risk = screen.getByTestId("split-run-check-comment-check-risk-review");
+    const summary = within(risk).getByText(/Moderate risk: retry policy changes affect every refund path/);
+    expect(summary.tagName).toBe("P");
+    expect(summary).not.toHaveClass("truncate");
+    expect(summary).toHaveClass("break-words");
   });
 
   it("keeps description checks collapsed when the task is not a draft", async () => {
@@ -863,6 +886,12 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(note).getByText("The work is done. The result met the goal.")).toBeInTheDocument();
     expect(within(note).queryByRole("button", { name: "Reopen" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Description" })).toHaveAttribute("data-state", "active");
+
+    const sidebar = screen.getByTestId("split-run-overview-sidebar");
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole("link", { name: "#510 Send refund receipts after provider confirm" }),
+    ).toHaveAttribute("href", "https://github.com/example/ledger/pull/510");
   });
 
   it("explains a rejected result without Reopen", () => {
@@ -883,6 +912,9 @@ describe("WorkOrderSplitRunPopup", () => {
       fixture: splitRunFixtureForWorkOrder(LINE_BOARD_DONE_RECEIPTS_ORDER, { demoArtifacts: false }),
     });
 
+    const sidebar = screen.getByTestId("split-run-overview-sidebar");
+    expect(within(sidebar).getByRole("heading", { name: "Pull requests" })).toBeInTheDocument();
+    expect(within(sidebar).queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /#510/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "closure.md" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /merge-screenshot/ })).not.toBeInTheDocument();
@@ -995,7 +1027,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(view).toHaveAttribute(
       "href",
       factoryAppSplitRunPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "app-pr-closure", {
-        from: "work-order",
+        from: "task",
         orderNumber: BOARD_IMPLEMENT_NOTIFY_ORDER.number,
         canvas: "closure",
       }),

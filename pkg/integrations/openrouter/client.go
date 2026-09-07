@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -410,7 +411,8 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		message := fmt.Sprintf("request failed: %v", err)
+		return nil, core.NewProviderTransportError(message, errors.New(message))
 	}
 	defer res.Body.Close()
 
@@ -428,7 +430,9 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 // apiError turns OpenRouter's {"error":{...}} body into a message that keeps
 // the details callers act on: the providers actually serving a model when
-// routing excluded them all, and the backoff hint on a rate limit.
+// routing excluded them all, and the backoff hint on a rate limit. The
+// returned error is a *core.ProviderAPIError so callers can classify the
+// failure (auth, rate limit, unavailable) without matching on message text.
 func apiError(statusCode int, body []byte) error {
 	var parsed struct {
 		Error struct {
@@ -438,7 +442,8 @@ func apiError(statusCode int, body []byte) error {
 	}
 
 	if err := json.Unmarshal(body, &parsed); err != nil || parsed.Error.Message == "" {
-		return fmt.Errorf("request got %d code: %s", statusCode, string(body))
+		message := fmt.Sprintf("request got %d code: %s", statusCode, string(body))
+		return core.NewProviderAPIError(statusCode, message, errors.New(message))
 	}
 
 	message := fmt.Sprintf("request got %d code: %s", statusCode, parsed.Error.Message)
@@ -451,5 +456,5 @@ func apiError(statusCode int, body []byte) error {
 		message += fmt.Sprintf(" (retry after %v seconds)", retryAfter)
 	}
 
-	return fmt.Errorf("%s", message)
+	return core.NewProviderAPIError(statusCode, message, errors.New(message))
 }

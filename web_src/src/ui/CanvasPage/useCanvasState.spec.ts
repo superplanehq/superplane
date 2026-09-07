@@ -115,6 +115,20 @@ describe("useCanvasState", () => {
     expect(result.current.nodes.find((node) => node.id === "bottom")?.position.y).toBe(compactStride);
   });
 
+  it("snaps the first factory-auto layout without animation", () => {
+    const requestAnimationFrame = vi.spyOn(window, "requestAnimationFrame");
+    const { result, rerender } = renderHook(({ props }) => useCanvasState(props), {
+      initialProps: { props: { ...makeProps([makeNode("a", 0, 0)]), layoutMode: "factory-auto" as const } },
+    });
+
+    rerender({
+      props: { ...makeProps([makeNode("a", 100, 100)]), layoutMode: "factory-auto" as const },
+    });
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(result.current.nodes.find((node) => node.id === "a")?.position).toEqual({ x: 100, y: 100 });
+  });
+
   it("does not restart an active factory layout animation when the same layout refreshes", () => {
     const animationFrames = new Map<number, FrameRequestCallback>();
     let nextFrameId = 1;
@@ -140,11 +154,17 @@ describe("useCanvasState", () => {
         layoutMode: "factory-auto" as const,
       },
     });
+    rerender({
+      props: {
+        ...makeProps([makeNode("a", 200, 200)]),
+        layoutMode: "factory-auto" as const,
+      },
+    });
     expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 
     rerender({
       props: {
-        ...makeProps([{ ...makeNode("a", 100, 100), data: { status: "saved" } }]),
+        ...makeProps([{ ...makeNode("a", 200, 200), data: { status: "saved" } }]),
         layoutMode: "factory-auto" as const,
       },
     });
@@ -180,6 +200,13 @@ describe("useCanvasState", () => {
     rerender({
       props: {
         ...makeProps([makeNode("a", 100, 100)]),
+        layoutMode: "factory-auto" as const,
+        initialSidebar: { isOpen: true, nodeId: "a" },
+      } as unknown as CanvasPageProps,
+    });
+    rerender({
+      props: {
+        ...makeProps([makeNode("a", 200, 200)]),
         layoutMode: "factory-auto" as const,
         initialSidebar: { isOpen: true, nodeId: "a" },
       } as unknown as CanvasPageProps,

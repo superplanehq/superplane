@@ -46,11 +46,13 @@ export const integrationKeys = {
 
 // Hook to fetch available integrations (catalog).
 // Normalizes each integration's label (e.g. "github" -> "GitHub") so consumers get correct display names.
-export const useAvailableIntegrations = (options?: { enabled?: boolean }) => {
+export const useAvailableIntegrations = (options?: { enabled?: boolean; organizationId?: string }) => {
   return useQuery({
     queryKey: integrationKeys.available(),
     queryFn: async () => {
-      const response = await integrationsListIntegrations(withOrganizationHeader({}));
+      const response = await integrationsListIntegrations(
+        withOrganizationHeader({ organizationId: options?.organizationId }),
+      );
       const list: IntegrationsIntegrationDefinition[] = response.data?.integrations || [];
       return list.map((integration: IntegrationsIntegrationDefinition) => {
         // Support both camelCase and PascalCase (API may send either)

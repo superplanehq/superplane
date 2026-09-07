@@ -3,20 +3,38 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { filterAddIntakeTemplates, type AddIntakeTemplate } from "./lineIntakeModel";
+import { ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./lineIntakeModel";
 
 interface AddIntakePickerProps {
   open: boolean;
   onClose: () => void;
   onSelect: (template: AddIntakeTemplate) => void;
+  /** Templates offered by the picker. Defaults to the full template catalog. */
+  templates?: AddIntakeTemplate[];
+}
+
+function filterTemplates(templates: AddIntakeTemplate[], query: string): AddIntakeTemplate[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return templates;
+  }
+  return templates.filter((template) => {
+    const haystack = `${template.name} ${template.description}`.toLowerCase();
+    return haystack.includes(needle);
+  });
 }
 
 /**
  * Lightweight picker: search, then choose one intake template box.
  */
-export function AddIntakePicker({ open, onClose, onSelect }: AddIntakePickerProps) {
+export function AddIntakePicker({
+  open,
+  onClose,
+  onSelect,
+  templates: availableTemplates = ADD_INTAKE_TEMPLATES,
+}: AddIntakePickerProps) {
   const [query, setQuery] = useState("");
-  const templates = useMemo(() => filterAddIntakeTemplates(query), [query]);
+  const templates = useMemo(() => filterTemplates(availableTemplates, query), [availableTemplates, query]);
 
   useEffect(() => {
     if (open) {

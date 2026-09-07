@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
-import { formatCompactTokens, formatUsdCents } from "../lib/workOrderUsage";
+import { formatCompactTokens, formatDurationSeconds, formatUsdCents } from "../lib/workOrderUsage";
 import { WorkOrderLineStep } from "./WorkOrderLineStep";
 import { AssigneeGroup, InlineDispatchButton } from "./WorkOrderRowActions";
 
@@ -148,7 +148,8 @@ function TableRow({
 function SpendCell({ entry }: { entry: WorkOrderListEntry }) {
   const usd = entry.totalCostCents > 0 ? formatUsdCents(entry.totalCostCents) : null;
   const tokens = entry.totalTokens > 0 ? formatCompactTokens(entry.totalTokens) : null;
-  if (!usd && !tokens) {
+  const duration = entry.durationSeconds > 0 ? formatDurationSeconds(entry.durationSeconds) : null;
+  if (!usd && !tokens && !duration) {
     return (
       <span className="relative z-10 pointer-events-none text-right text-[11px] tabular-nums text-muted-foreground">
         —
@@ -163,6 +164,7 @@ function SpendCell({ entry }: { entry: WorkOrderListEntry }) {
     >
       {usd ? <span className="block">{usd}</span> : null}
       {tokens ? <span className="block">{tokens}</span> : null}
+      {duration ? <span className="block">{duration}</span> : null}
     </span>
   );
 }

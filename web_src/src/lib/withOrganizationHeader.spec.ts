@@ -21,6 +21,13 @@ describe("withOrganizationHeader", () => {
     expect(options.headers["x-organization-id"]).toBe("org-from-url");
   });
 
+  it("does not treat the onboarding route as an organization", () => {
+    setPathname("/onboarding");
+
+    const options = withOrganizationHeader();
+    expect(options.headers["x-organization-id"]).toBeUndefined();
+  });
+
   it("prefers explicit organizationId when window.location is stale", () => {
     // Regression test: this is the scenario that caused a transient 404 on first navigation.
     // During router transitions, window.location.pathname can still point at the previous route.

@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
-export interface AccountOrganization {
-  id: string;
-  name: string;
-}
+import { parseAccountOrganizations, type AccountOrganization } from "@/lib/accountOrganizations";
+
+export type { AccountOrganization };
 
 export const accountOrganizationsQueryKey = ["account-organizations"] as const;
 
@@ -12,18 +11,7 @@ async function fetchAccountOrganizations(): Promise<AccountOrganization[]> {
   if (!response.ok) {
     throw new Error("Failed to load organizations");
   }
-  const body: unknown = await response.json();
-  if (!Array.isArray(body)) {
-    return [];
-  }
-  return body.filter((entry): entry is AccountOrganization => {
-    return Boolean(
-      entry &&
-        typeof entry === "object" &&
-        typeof (entry as AccountOrganization).id === "string" &&
-        typeof (entry as AccountOrganization).name === "string",
-    );
-  });
+  return parseAccountOrganizations(await response.json());
 }
 
 export function useAccountOrganizations() {

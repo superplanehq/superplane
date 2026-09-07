@@ -124,7 +124,6 @@ function MultiBottomChannelControl({
             isHighlighted={isHighlighted}
             orientation="vertical"
             lineWidth={28}
-            buttonLeft={-9}
             buttonTop={40}
             style={{
               left: `calc(50% + ${offsetX}px)`,

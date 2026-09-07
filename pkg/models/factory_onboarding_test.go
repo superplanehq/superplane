@@ -21,12 +21,30 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		assert.Nil(t, factory.OnboardingCompletedAt)
 		assert.False(t, factory.IsOnboardingComplete())
+		assert.False(t, factory.IsInitialOnboarding())
 		assert.Equal(t, models.FactoryOnboardingConfig{}, factory.OnboardingConfigValue())
 
 		reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
 		require.NoError(t, err)
 		assert.Nil(t, reloaded.OnboardingCompletedAt)
 		assert.Equal(t, models.FactoryOnboardingConfig{}, reloaded.OnboardingConfigValue())
+	})
+
+	t.Run("stores the initial onboarding attempt outside the description", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		attemptID := uuid.New()
+		require.NoError(t, factory.SetInitialOnboardingAttempt(db, attemptID))
+
+		assert.Empty(t, factory.Description)
+		assert.True(t, factory.HasInitialOnboardingAttempt(attemptID))
+		assert.True(t, factory.IsInitialOnboarding())
+
+		reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+		require.NoError(t, err)
+		assert.True(t, reloaded.HasInitialOnboardingAttempt(attemptID))
+		assert.True(t, reloaded.IsInitialOnboarding())
 	})
 
 	t.Run("partial update merges fields", func(t *testing.T) {
@@ -45,9 +63,11 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, "acme/api", factory.OnboardingConfigValue().AppRepository)
 
 		backlogRepo := "acme/backlog"
+		defaultBranch := "main"
 		issuesSource := models.FactoryOnboardingIssuesSourceVCS
 		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
 			BacklogRepository: &backlogRepo,
+			DefaultBranch:     &defaultBranch,
 			IssuesSource:      &issuesSource,
 		}))
 
@@ -55,6 +75,7 @@ func Test__FactoryOnboarding(t *testing.T) {
 		assert.Equal(t, vcsID, config.VCSIntegrationID)
 		assert.Equal(t, "acme/api", config.AppRepository)
 		assert.Equal(t, "acme/backlog", config.BacklogRepository)
+		assert.Equal(t, "main", config.DefaultBranch)
 		assert.Equal(t, models.FactoryOnboardingIssuesSourceVCS, config.IssuesSource)
 	})
 

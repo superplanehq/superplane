@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  accountNotificationsFromSettings,
   defaultNotificationSettings,
   defaultNotificationTypeToggles,
   eventTypesFromToggles,
   filtersFromSettings,
   NOTIFICATION_TYPE_OPTIONS,
+  settingsFromAccountNotifications,
   togglesFromAllScopeEventTypes,
   togglesFromEventTypes,
   workspaceScopeFromSettings,
@@ -54,6 +56,33 @@ describe("notificationSettings", () => {
         },
       }),
     ).toEqual([{ workspaceId: "ws-1", eventTypes: ["TYPE_WORK_ORDER_ASSIGNED"] }]);
+  });
+
+  it("maps API settings onto the account notifications form", () => {
+    expect(accountNotificationsFromSettings({ workspaces: { scope: "WORKSPACE_SCOPE_NONE" } })).toMatchObject({
+      emailEnabled: false,
+      workspaceScope: "all",
+    });
+    expect(
+      accountNotificationsFromSettings({
+        workspaces: {
+          scope: "WORKSPACE_SCOPE_FILTERED",
+          filters: [{ workspaceId: "ws-1", eventTypes: ["TYPE_WORK_ORDER_ASSIGNED"] }],
+        },
+      }),
+    ).toMatchObject({
+      emailEnabled: true,
+      workspaceScope: "selected",
+      workspaceIds: ["ws-1"],
+    });
+    expect(
+      settingsFromAccountNotifications({
+        emailEnabled: false,
+        workspaceScope: "all",
+        workspaceIds: [],
+        events: defaultNotificationTypeToggles(true),
+      }).workspaces?.scope,
+    ).toBe("WORKSPACE_SCOPE_NONE");
   });
 });
 

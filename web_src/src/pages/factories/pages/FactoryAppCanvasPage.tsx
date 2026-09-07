@@ -10,6 +10,7 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
 import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
 import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
+import { FactoryAppResetConfirmDialog } from "./FactoryAppResetConfirmDialog";
 import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
 import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
 
@@ -68,6 +69,7 @@ export function FactoryAppCanvasPage() {
                 onComponentsOpenChange: model.handleComponentsOpenChange,
                 onViewYaml: model.handleViewYaml,
                 onEditWithLocalAgent: model.handleEditWithLocalAgent,
+                onResetToFactoryDefaults: model.resetAvailable ? model.handleOpenResetConfirm : undefined,
               }
             : undefined
         }
@@ -99,6 +101,11 @@ export function FactoryAppCanvasPage() {
         installInstructions={agentInstallInstructions}
         installCommands={agentInstallCommands}
         prompt={agentPrompt}
+      />
+      <FactoryAppResetConfirmDialog
+        open={model.resetConfirmOpen}
+        onOpenChange={model.handleResetConfirmOpenChange}
+        onConfirm={model.handleResetToFactoryDefaults}
       />
     </div>
   );

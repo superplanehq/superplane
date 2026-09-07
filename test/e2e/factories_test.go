@@ -15,7 +15,7 @@ import (
 )
 
 func TestFactories(t *testing.T) {
-	t.Run("updating factory name and description", func(t *testing.T) {
+	t.Run("updating factory name", func(t *testing.T) {
 		steps := &factorySteps{t: t}
 		originalName := support.RandomName("factory")
 		updatedName := support.RandomName("factory-updated")
@@ -24,11 +24,10 @@ func TestFactories(t *testing.T) {
 		factory := steps.givenFactoryExists(originalName, "original description")
 		steps.visitFactorySettings(factory)
 		steps.fillFactorySettingsName(updatedName)
-		steps.fillFactorySettingsDescription("updated description")
 		steps.submitFactorySettings()
 		steps.visitFactorySettings(factory)
 		steps.assertFactorySettingsName(updatedName)
-		steps.assertFactorySavedInDB(factory.ID, updatedName, "updated description")
+		steps.assertFactorySavedInDB(factory.ID, updatedName, "original description")
 	})
 
 	t.Run("soft-deleting a factory", func(t *testing.T) {
@@ -106,13 +105,6 @@ func (s *factorySteps) fillFactorySettingsName(name string) {
 	s.session.Sleep(200)
 }
 
-func (s *factorySteps) fillFactorySettingsDescription(description string) {
-	page := s.session.Page()
-	err := page.GetByTestId("factory-settings-description").Fill(description)
-	require.NoError(s.t, err)
-	s.session.Sleep(200)
-}
-
 func (s *factorySteps) submitFactorySettings() {
 	s.session.Click(q.TestID("factory-settings-save"))
 	s.session.Sleep(1000)
@@ -144,7 +136,7 @@ func (s *factorySteps) confirmDeleteFactory() {
 }
 
 func (s *factorySteps) assertRedirectedToFactoriesList() {
-	s.session.WaitForBrowserPath("/" + s.session.OrgID.String() + "/workspaces")
+	s.session.WaitForBrowserPath("/" + s.session.OrgSlug + "/workspaces")
 }
 
 func (s *factorySteps) assertFactoryNotVisibleInList(name string) {

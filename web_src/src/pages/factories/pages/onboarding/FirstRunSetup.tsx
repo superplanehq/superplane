@@ -1,16 +1,34 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import { useDeleteFactory } from "@/hooks/useFactoryData";
+import { useMe } from "@/hooks/useMe";
+import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
+import {
+  hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
+  type PendingGitHubInstallation,
+} from "@/lib/hostedGitHubInstall";
+import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
+import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
+import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
+import {
+  GITHUB_SETUP_ORG_PARAM,
+  GITHUB_SETUP_REQUEST_PARAM,
+  GITHUB_SETUP_REQUEST_VALUE,
+} from "@/lib/integrationSetupReturn";
 import { showErrorToast } from "@/lib/toast";
 import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
+import { factoryListPath } from "../../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
@@ -47,6 +65,15 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   tickets: 3,
   agent: 4,
 };
+
+/**
+ * Hosted credentials leave the agent screen with no question to ask, so the
+ * ticket screen becomes the last screen and provisions the workspace.
+ */
+function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): FirstRunScreen {
+  if (screen === "agent" && skipAgentScreen) return "tickets";
+  return screen;
+}
 
 /**
  * The first-run screens have no coding agent screen. This screen keeps the
@@ -132,11 +159,11 @@ function AgentScreen({
           className="w-full"
           disabled={!setup.agentReady}
           loading={saving}
-          loadingText="Finishing setup..."
+          loadingText={FIRST_RUN_COPY.finish.saving}
           onClick={onContinue}
           data-testid="first-run-finish-setup"
         >
-          Finish setup
+          {FIRST_RUN_COPY.finish.action}
         </LoadingButton>
       </div>
     </FirstRunShell>
@@ -148,15 +175,21 @@ function AgentScreen({
  * stay presentational, so this hook holds every step that talks to the API.
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory } = useFactoriesLayout();
+  const { factory, organizationId } = useFactoriesLayout();
+  const { data: me } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
+  const setOpenSection = model.setOpenSection;
 
-  const [screen, setScreen] = useState<FirstRunScreen>(() => {
+  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => {
+    if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
+      return "connect";
+    }
     const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
     return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
   });
   const openStep = useRef(model.openSection);
+  const skipAgentScreen = model.hostedAgentReady;
 
   useSingleGithubConnection(model);
   useRepositoryErrorToast(model.repositoriesError);
@@ -165,7 +198,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   useEffect(() => {
     if (model.openSection === openStep.current) return;
     openStep.current = model.openSection;
-    setScreen(SCREEN_FOR_STEP[model.openSection]);
+    setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
   const goToScreen = (next: FirstRunScreen) => {
@@ -173,9 +206,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     if (step) {
       // Keeps the provider return URL on the step the user is answering.
       openStep.current = step;
-      model.setOpenSection(step);
+      setOpenSection(step);
     }
-    setScreen(next);
+    setOpenedScreen(next);
   };
 
   const continueFromRepository = async () => {
@@ -190,6 +223,15 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
     setup.commitIssuesStep();
     if (!(await model.saveIssues(DEFAULT_ISSUES_CHOICE))) return;
+    if (skipAgentScreen) {
+      // The issues choice was just set above, in this same click; the setup
+      // state captured when this render closed over `model.finish` still
+      // holds the answer from before the click. Passing the answer here
+      // keeps a single click from saving a stale, empty issues source over
+      // the one `saveIssues` already stored.
+      await model.finish(DEFAULT_ISSUES_CHOICE);
+      return;
+    }
     goToScreen("agent");
   };
 
@@ -200,8 +242,55 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setup.setIssuesChoice(DEFAULT_ISSUES_CHOICE);
   };
 
+  const installRequested =
+    searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE ||
+    model.githubConnections.allInstances.some((instance) => hostedGitHubInstallRequested(instance.status?.metadata));
+
+  // An approved install request binds outside the wizard round trip, so the
+  // waiting screen rechecks GitHub through the connection until it is ready.
+  useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
+
+  useEffect(() => {
+    if (!installRequested || openedScreen !== "welcome") return;
+    openStep.current = "vcs";
+    setOpenSection("vcs");
+    setOpenedScreen("connect");
+  }, [installRequested, openedScreen, setOpenSection]);
+
+  const githubOrganization =
+    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
+    model.githubConnections.allInstances
+      .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
+      .find((account) => account !== "") ||
+    "";
+  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
+  // user. The /account id is the account, so a match would hide the picker.
+  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
+
+  // Binding through a page redirect reloads the whole app and walks the user
+  // through the connect screen again. Binding in place opens the repository
+  // screen directly once the connection is ready.
+  const bindInstallation = useBindGitHubInstallation(organizationId);
+  const useInstallation = (installation: PendingGitHubInstallation) => {
+    const state = accountPicker?.state;
+    if (!state || bindInstallation.isPending) return;
+    bindInstallation.mutate(
+      { state, installationId: installation.id },
+      {
+        onSuccess: () => goToScreen("choose"),
+        onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
+      },
+    );
+  };
+
   return {
-    screen,
+    screen: screenWithoutAgent(openedScreen, skipAgentScreen),
+    skipAgentScreen,
+    installRequested,
+    githubOrganization,
+    accountPicker,
+    bindingInstallationId: bindInstallation.isPending ? bindInstallation.variables?.installationId : undefined,
+    useInstallation,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
@@ -215,15 +304,46 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId } = useFactoriesLayout();
+  const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
+  const navigate = useNavigate();
+  const deleteFactory = useDeleteFactory(organizationId);
+  const accountOrganizations = useAccountOrganizations();
+
+  // The placeholder workspace under setup is itself in `factories`, so
+  // another workspace exists when any factory has a different id.
+  const hasOtherWorkspace = factories.some((existing) => existing.id !== factoryId);
+  // The user can also belong to organizations outside the current one. Those
+  // give the user somewhere to go even when this organization has no other
+  // workspace yet.
+  const otherOrganizations = (accountOrganizations.data ?? []).filter(
+    (organization) => !organizationMatchesRoute(organization, organizationId),
+  );
+  const canExitSetup = hasOtherWorkspace || otherOrganizations.length > 0;
+
+  const cancelSetup = async () => {
+    // Guards against a double delete from a second click while the mutation
+    // is already in flight.
+    if (deleteFactory.isPending) return;
+    await deleteFactory.mutateAsync(factoryId);
+    // Cancelling out of the last workspace in this organization must not
+    // bounce the user back into onboarding for it, so it sends them to
+    // another organization instead of this one's (now onboarding) workspace list.
+    if (hasOtherWorkspace) {
+      navigate(factoryListPath(organizationId));
+    } else {
+      navigate(`/${organizationRouteId(otherOrganizations[0])}`);
+    }
+  };
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
     displayName: firstNameOf(account?.name),
     email: account?.email,
-    onLogOut: signOut,
+    onLogOut: canExitSetup ? undefined : signOut,
+    onCancel: canExitSetup ? () => void cancelSetup() : undefined,
     stepIndex: STEP_INDEX_FOR_SCREEN[target],
+    stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
   });
 
   if (flow.screen === "welcome") {
@@ -240,10 +360,15 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     return (
       <FirstRunConnectScreen
         githubConnected={setup.vcsReady}
+        installRequested={flow.installRequested}
+        githubOrganization={flow.githubOrganization}
+        pendingInstallations={flow.accountPicker?.installations}
+        githubState={flow.accountPicker?.state}
+        githubAppSlug={flow.accountPicker?.appSlug}
+        bindingInstallationId={flow.bindingInstallationId}
         chrome={chromeFor("connect")}
-        showPrivateApp={model.offersPrivateGitHubAppSetup}
         onConnectGitHub={() => model.requestConnect("github")}
-        onCreatePrivateApp={model.requestPrivateGitHubConnect}
+        onUseInstallation={flow.useInstallation}
         onContinue={() => flow.goToScreen("choose")}
       />
     );
@@ -267,7 +392,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunTicketsScreen
         ticketSource={DEFAULT_TICKET_SOURCE}
         chrome={chromeFor("tickets")}
-        continueLabel={FIRST_RUN_COPY.tickets.continue}
+        continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+        saving={flow.skipAgentScreen && model.saving}
         onSelectTicketSource={flow.selectTicketSource}
         onAnalyzeTickets={() => void flow.continueFromTickets()}
       />

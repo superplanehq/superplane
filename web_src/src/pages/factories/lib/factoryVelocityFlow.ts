@@ -1,15 +1,10 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution } from "@/api-client";
 import { flattenWorkOrderExecutions } from "./workOrderExecutions";
 
-export type FactoryVelocityFlowPeriodDays = 7 | 30;
-
-export const VELOCITY_PERIOD_OPTIONS: { value: string; label: string }[] = [
-  { value: "7", label: "7d" },
-  { value: "30", label: "30d" },
-];
+export type FactoryVelocityFlowPeriodDays = 14 | 30;
 
 export function factoryVelocityPeriodLabel(days: FactoryVelocityFlowPeriodDays): string {
-  return days === 7 ? "Last 7 days" : "Last 30 days";
+  return `Last ${days} days`;
 }
 
 type VelocityDurationUnit = "m" | "h" | "d";
@@ -95,8 +90,6 @@ export interface FactoryVelocityFlow {
 }
 
 const MS_PER_HOUR = 60 * 60 * 1000;
-const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-
 const yesterdayFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
   month: "short",
@@ -227,16 +220,30 @@ function pct(part: number, whole: number): number {
   return Math.round((part / whole) * 100);
 }
 
-function dayLabel(dayIndex: number, totalDays: number, weekday: number): string {
-  if (totalDays <= 7) {
-    return WEEKDAY_SHORT[weekday];
-  }
-  const dayNumber = dayIndex + 1;
-  const isLast = dayIndex === totalDays - 1;
-  if (dayNumber === 1 || dayIndex % 5 === 0 || isLast) {
-    return String(dayNumber);
-  }
-  return "";
+/**
+ * Names the axis tick of a day, matching how the velocity API labels its own
+ * points so both charts on the page share one axis language.
+ *
+ * The weekday explains the gaps in the chart: a quiet Saturday reads as a
+ * weekend rather than as an outage. The month appears only where the window
+ * crosses into a new one, so no single tick reads as the odd one out.
+ *
+ * Every day gets a full label; deciding how many of them a chart has room to
+ * draw is the chart's job (see `pickVelocityAxisTicks`), not this producer's.
+ */
+function dayLabel(date: number): string {
+  const day = new Date(date);
+  const previous = new Date(addLocalCalendarDays(date, -1));
+  const startsNewMonth = day.getMonth() !== previous.getMonth();
+
+  // Composed part by part: asking Intl for a weekday and a day together yields
+  // "18 Tue" in en-US, which does not match the labels the API sends.
+  const weekday = day.toLocaleDateString(undefined, { weekday: "short" });
+  const datePart = startsNewMonth
+    ? day.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : String(day.getDate());
+
+  return `${weekday} ${datePart}`;
 }
 
 interface DayBucket {
@@ -252,11 +259,9 @@ function buildDayBuckets(periodDays: FactoryVelocityFlowPeriodDays, now: number)
 
   for (let offset = periodDays - 1; offset >= 0; offset--) {
     const key = addLocalCalendarDays(todayMidnight, -offset);
-    const date = new Date(key);
-    const dayIndex = periodDays - 1 - offset;
     buckets.push({
       key,
-      label: dayLabel(dayIndex, periodDays, date.getDay()),
+      label: dayLabel(key),
       running: [],
       waiting: [],
     });

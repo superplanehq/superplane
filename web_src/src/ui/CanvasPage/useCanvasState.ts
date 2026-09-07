@@ -138,6 +138,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const animationTargetKeyRef = useRef<string | null>(null);
   const animationTargetNodesRef = useRef<Node[]>([]);
   const animationEdgesRef = useRef<Edge[]>([]);
+  const snapNextFactoryLayoutRef = useRef(true);
   const sidebarSelectedNodeIdRef = useRef<string | null>(
     props.initialSidebar?.isOpen ? (props.initialSidebar.nodeId ?? null) : null,
   );
@@ -158,6 +159,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
     const factoryAutoLayout = isFactoryAutoLayout(props.layoutMode);
     if (!factoryAutoLayout) {
+      snapNextFactoryLayoutRef.current = true;
       if (animationFrameRef.current !== null) {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -201,6 +203,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
       });
 
     if (!shouldAnimate) {
+      animationTargetKeyRef.current = null;
+      publishLayoutNodes(targetNodes);
+      return;
+    }
+
+    if (snapNextFactoryLayoutRef.current) {
+      snapNextFactoryLayoutRef.current = false;
       animationTargetKeyRef.current = null;
       publishLayoutNodes(targetNodes);
       return;

@@ -1,9 +1,9 @@
-import { Route } from "react-router";
+import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { FactorySettingsSoonPage } from "../settings/FactorySettingsSoonPage";
 import { OrganizationSettingsIntegrationsPage } from "./OrganizationSettingsIntegrationsPage";
-import { OrganizationSettingsLLMSpendPage } from "./OrganizationSettingsLLMSpendPage";
+import { OrganizationSettingsWorkspaceUsagePage } from "./OrganizationSettingsWorkspaceUsagePage";
 import { OrganizationSettingsOverviewPage } from "./OrganizationSettingsOverviewPage";
 import { OrganizationSettingsWorkspacesPage } from "./OrganizationSettingsWorkspacesPage";
 import {
@@ -23,13 +23,18 @@ export const organizationSettingsSectionRoutes = [
   <Route key="organization-settings-settings" path="settings" element={<PreserveStateNavigate to="general" />} />,
   <Route key="organization-settings-workspaces" path="workspaces" element={<OrganizationSettingsWorkspacesPage />} />,
   <Route
-    key="organization-settings-llm-spend"
-    path="llm-spend"
+    key="organization-settings-workspace-usage"
+    path="workspace-usage"
     element={
       <RequirePermission resource="org" action="read">
-        <OrganizationSettingsLLMSpendPage />
+        <OrganizationSettingsWorkspaceUsagePage />
       </RequirePermission>
     }
+  />,
+  <Route
+    key="organization-settings-llm-spend-redirect"
+    path="llm-spend"
+    element={<Navigate to="workspace-usage" replace />}
   />,
   <Route
     key="organization-settings-integrations"

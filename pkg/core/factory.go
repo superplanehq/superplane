@@ -15,6 +15,10 @@ var ErrWorkOrderNotFound = errors.New("work order not found")
 // errors.Is.
 var ErrPullRequestNotFound = errors.New("pull request not found")
 
+// ErrPullRequestActivityAlreadyActive is returned by AddPullRequestActivity
+// when another active activity already owns the same handler and revision.
+var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity already active for this handler and revision")
+
 type FactoryContext interface {
 	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
 	// FindWorkOrder resolves a work order by id or by one of its
@@ -43,7 +47,8 @@ type FactoryContext interface {
 	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
 	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
-	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestMatch, error)
+	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
+	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
 }
 
 type WorkOrderParams struct {
@@ -186,9 +191,48 @@ type FindPullRequestParams struct {
 	URL        string
 }
 
+const (
+	PullRequestActivityAccessConcurrent = "concurrent"
+	PullRequestActivityAccessExclusive  = "exclusive"
+
+	PullRequestActivityOutcomeReady        = "ready"
+	PullRequestActivityOutcomeWaiting      = "waiting"
+	PullRequestActivityOutcomeLimitReached = "limitReached"
+)
+
 type AddPullRequestActivityParams struct {
 	PullRequestID string
 	Description   string
+	Revision      string
+	Access        string
+}
+
+type UpdatePullRequestActivityParams struct {
+	Description *string
+	Access      string
+}
+
+type PullRequestRevision struct {
+	SHA        string `json:"sha"`
+	ObservedAt string `json:"observedAt,omitempty"`
+}
+
+type PullRequestActivity struct {
+	Description  string               `json:"description,omitempty"`
+	Access       string               `json:"access"`
+	State        string               `json:"state"`
+	Attempt      *int                 `json:"attempt,omitempty"`
+	AttemptLimit *int                 `json:"attemptLimit,omitempty"`
+	Revision     *PullRequestRevision `json:"revision,omitempty"`
+}
+
+type PullRequestActivityResult struct {
+	PullRequest     *PullRequest
+	WorkOrder       *WorkOrder
+	Activity        *PullRequestActivity
+	CurrentRevision *PullRequestRevision
+	CurrentHeadSHA  string
+	Outcome         string
 }
 
 type WorkOrderArtifact struct {

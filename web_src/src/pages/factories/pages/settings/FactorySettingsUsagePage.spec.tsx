@@ -57,6 +57,13 @@ describe("FactorySettingsUsagePage hosted spend limit", () => {
     mutateAsync.mockResolvedValue({});
   });
 
+  it("does not render the Save button while No limit is on", () => {
+    renderPage();
+
+    expect(screen.getByLabelText("No limit")).toBeChecked();
+    expect(screen.queryByRole("button", { name: "Save hosted spend limit" })).not.toBeInTheDocument();
+  });
+
   it("does not save a zero cap when No limit is turned off", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -80,5 +87,15 @@ describe("FactorySettingsUsagePage hosted spend limit", () => {
     expect(screen.getByLabelText("Limit in USD")).toHaveValue("25.00");
     await user.click(screen.getByRole("button", { name: "Save hosted spend limit" }));
     expect(mutateAsync).toHaveBeenCalledWith({ hostedSpendBudgetCents: 2500 });
+  });
+
+  it("clears a saved limit when No limit is turned back on", async () => {
+    const user = userEvent.setup();
+    renderPage({ ...REFUND_FACTORY, hostedSpendBudgetCents: "2500" });
+
+    await user.click(screen.getByLabelText("No limit"));
+
+    expect(mutateAsync).toHaveBeenCalledWith({ hostedSpendBudgetCents: null });
+    expect(screen.queryByRole("button", { name: "Save hosted spend limit" })).not.toBeInTheDocument();
   });
 });

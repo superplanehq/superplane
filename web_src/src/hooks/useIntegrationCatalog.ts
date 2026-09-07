@@ -17,7 +17,7 @@ import { posthog, isPostHogEnabled } from "@/posthog";
 import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
-import { startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
 import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
@@ -181,6 +181,7 @@ function useIntegrationCatalogActions({
             const response = await createIntegrationMutation.mutateAsync(payload);
             return response.data;
           },
+          update: persistGitHubSetupReturnPath(organizationId),
         }).catch((error) => {
           showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
         });

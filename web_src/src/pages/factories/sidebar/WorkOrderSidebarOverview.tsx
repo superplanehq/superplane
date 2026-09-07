@@ -1,6 +1,6 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder } from "@/api-client";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { appPath } from "@/lib/appPaths";
+import { factoryAppPath } from "../lib/factoryPagePaths";
 import { cn } from "@/lib/utils";
 import { Calendar, CircleDollarSign, CircleDot, ExternalLink, Loader2, User, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
@@ -9,13 +9,19 @@ import { Link } from "react-router";
 import { resolveWorkOrderCreatorDisplay } from "../lib/workOrderCreator";
 import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
 import type { WorkOrderDisplayStatus } from "../lib/workOrderProgress";
-import { formatCompactTokens, formatUsdCents, parseWorkOrderMetric } from "../lib/workOrderUsage";
+import {
+  formatCompactTokens,
+  formatDurationSeconds,
+  formatUsdCents,
+  parseWorkOrderMetric,
+} from "../lib/workOrderUsage";
 import { OrgUserReference } from "../OrgUserReference";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
 import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
@@ -28,6 +34,7 @@ interface WorkOrderSidebarOverviewProps {
 
 export function WorkOrderSidebarOverview({
   organizationId,
+  factoryKey,
   order,
   displayStatus,
   statusMeta,
@@ -37,7 +44,8 @@ export function WorkOrderSidebarOverview({
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
   const totalCostCents = parseWorkOrderMetric(order.totalCostCents);
-  const showSpending = totalTokens > 0 || totalCostCents > 0;
+  const durationSeconds = parseWorkOrderMetric(order.totalDurationSeconds);
+  const showSpending = totalTokens > 0 || totalCostCents > 0 || durationSeconds > 0;
   const MissionSlot = useWorkOrderOverviewMissionSlot();
 
   return (
@@ -49,7 +57,7 @@ export function WorkOrderSidebarOverview({
         </OverviewRow>
 
         <OverviewRow icon={<UserPlus className="size-3.5" aria-hidden />} srLabel="Author">
-          <CreatorValue organizationId={organizationId} order={order} />
+          <CreatorValue organizationId={organizationId} factoryKey={factoryKey} order={order} />
         </OverviewRow>
 
         <AssigneeOverviewRow organizationId={organizationId} assigneeIds={assigneeIds} assigneeNames={assigneeNames} />
@@ -64,8 +72,8 @@ export function WorkOrderSidebarOverview({
 
         {showSpending ? (
           <OverviewRow icon={<CircleDollarSign className="size-3.5" aria-hidden />} srLabel="Spending">
-            <span title={formatSpendingTooltip(totalTokens, totalCostCents)}>
-              {formatSpendingLine(totalTokens, totalCostCents)}
+            <span title={formatSpendingTooltip(totalTokens, totalCostCents, durationSeconds)}>
+              {formatSpendingLine(totalTokens, totalCostCents, durationSeconds)}
             </span>
           </OverviewRow>
         ) : null}
@@ -109,11 +117,19 @@ function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplay
   );
 }
 
-function CreatorValue({ organizationId, order }: { organizationId: string; order: FactoriesWorkOrder }) {
+function CreatorValue({
+  organizationId,
+  factoryKey,
+  order,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  order: FactoriesWorkOrder;
+}) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const automation = order.createdBy?.automation;
   if (isAutomationRefResolved(automation)) {
-    return <AutomationLink organizationId={organizationId} automation={automation} />;
+    return <AutomationLink organizationId={organizationId} factoryKey={factoryKey} automation={automation} />;
   }
   const display = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   if (display) {
@@ -128,16 +144,18 @@ function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref i
 
 export function AutomationLink({
   organizationId,
+  factoryKey,
   automation,
 }: {
   organizationId: string;
+  factoryKey: string;
   automation: FactoriesAutomationRef;
 }) {
   const label = automation.nodeName || automation.appName || "Automation";
   if (automation.appId) {
     return (
       <Link
-        to={appPath(organizationId, automation.appId)}
+        to={factoryAppPath(organizationId, factoryKey, automation.appId)}
         className="inline-flex min-w-0 max-w-full items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
       >
         <span className="truncate">{label}</span>
@@ -183,22 +201,33 @@ function AssigneeButtonBody({
   return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;
 }
 
-function formatSpendingLine(totalTokens: number, totalCostCents: number): ReactNode {
-  const tokens = totalTokens > 0 ? formatCompactTokens(totalTokens) : null;
-  const usd = totalCostCents > 0 ? formatUsdCents(totalCostCents) : null;
-  if (tokens && usd) {
+function formatSpendingLine(totalTokens: number, totalCostCents: number, durationSeconds: number): ReactNode {
+  const parts: ReactNode[] = [];
+  if (totalCostCents > 0) {
+    parts.push(formatUsdCents(totalCostCents));
+  }
+  if (totalTokens > 0) {
+    parts.push(formatCompactTokens(totalTokens));
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
+  }
+  return parts.reduce<ReactNode>((acc, part, index) => {
+    if (index === 0) {
+      return part;
+    }
     return (
       <>
-        {usd} <span className="text-muted-foreground">·</span> {tokens}
+        {acc} <span className="text-muted-foreground">·</span> {part}
       </>
     );
-  }
-  return usd ?? tokens ?? "";
+  }, "");
 }
 
-function formatSpendingTooltip(totalTokens: number, totalCostCents: number): string {
+function formatSpendingTooltip(totalTokens: number, totalCostCents: number, durationSeconds: number): string {
   const parts: string[] = [];
   if (totalCostCents > 0) parts.push(formatUsdCents(totalCostCents));
   if (totalTokens > 0) parts.push(`${totalTokens.toLocaleString()} tokens`);
+  if (durationSeconds > 0) parts.push(formatDurationSeconds(durationSeconds));
   return parts.join(" · ");
 }
