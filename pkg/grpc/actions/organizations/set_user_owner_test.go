@@ -20,18 +20,6 @@ func Test_SetUserOwner(t *testing.T) {
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
 
-	t.Run("sets owner flag on another member", func(t *testing.T) {
-		member := support.CreateUser(t, r, r.Organization.ID)
-		require.False(t, member.IsOwner)
-
-		_, err := SetUserOwner(ctx, orgID, member.ID.String(), true)
-		require.NoError(t, err)
-
-		updated, err := models.FindActiveUserByID(orgID, member.ID.String())
-		require.NoError(t, err)
-		assert.True(t, updated.IsOwner)
-	})
-
 	t.Run("refuses to clear the last owner", func(t *testing.T) {
 		owner, err := models.FindActiveUserByID(orgID, r.User.String())
 		require.NoError(t, err)
@@ -43,6 +31,18 @@ func Test_SetUserOwner(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, code)
 		assert.Equal(t, "cannot remove the last organization owner", msg)
+	})
+
+	t.Run("sets owner flag on another member", func(t *testing.T) {
+		member := support.CreateUser(t, r, r.Organization.ID)
+		require.False(t, member.IsOwner)
+
+		_, err := SetUserOwner(ctx, orgID, member.ID.String(), true)
+		require.NoError(t, err)
+
+		updated, err := models.FindActiveUserByID(orgID, member.ID.String())
+		require.NoError(t, err)
+		assert.True(t, updated.IsOwner)
 	})
 
 	t.Run("clears owner flag when another owner remains", func(t *testing.T) {
