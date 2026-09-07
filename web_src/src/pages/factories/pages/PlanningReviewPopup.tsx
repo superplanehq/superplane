@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { PlanningReviewEditor, planningReviewEditorTitle } from "./PlanningReviewEditor";
+import { PlanningReviewEditor } from "./PlanningReviewEditor";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
@@ -24,7 +24,7 @@ export function PlanningReviewPopup({
   isLoading?: boolean;
 }) {
   const [draft] = useState(() => singleAgentDraft(initialDraft));
-  const title = isLoading ? "Editing Agent" : planningReviewEditorTitle(draft);
+  const title = isLoading ? "Editing Agent" : (draft.components[0]?.title ?? "Editing Agent");
   const description = isLoading ? undefined : draft.components[0]?.description;
 
   return (

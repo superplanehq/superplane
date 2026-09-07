@@ -122,7 +122,3 @@ export function PlanningReviewEditor({
     </div>
   );
 }
-
-export function planningReviewEditorTitle(draft: PlanningReviewDraft): string {
-  return draft.components[0]?.title ?? "Editing Agent";
-}

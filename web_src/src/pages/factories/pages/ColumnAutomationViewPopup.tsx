@@ -54,52 +54,105 @@ export function ColumnAutomationViewPopup({
   return (
     <PopupShell testId="column-automation-view" canvas fixed onDismiss={onClose}>
       <PopupHeader title={title} onClose={onClose}>
-        {tabs.length > 1 ? (
-          <Tabs value={tab} onValueChange={(value) => setUserTab(value as ColumnAutomationViewTab)} className="mt-3">
-            <TabsList aria-label={COLUMN_AUTOMATIONS_COPY.tabsLabel}>
-              {tabs.includes("general") ? (
-                <TabsTrigger value="general" data-testid="column-automation-view-tab-general">
-                  <Settings />
-                  {COLUMN_AUTOMATIONS_COPY.generalTab}
-                </TabsTrigger>
-              ) : null}
-              {tabs.includes("agent") ? (
-                <TabsTrigger value="agent" data-testid="column-automation-view-tab-agent">
-                  <Bot />
-                  {COLUMN_AUTOMATIONS_COPY.agentTab}
-                </TabsTrigger>
-              ) : null}
-              <TabsTrigger value="automation" data-testid="column-automation-view-tab-automation">
-                <Workflow />
-                {COLUMN_AUTOMATIONS_COPY.automationTab}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        ) : null}
+        <ColumnAutomationViewTabs tabs={tabs} tab={tab} onTabChange={setUserTab} />
       </PopupHeader>
-      {tab === "general" && general ? (
-        general
-      ) : tab === "agent" && agent ? (
-        <PlanningReviewEditor
-          key={agent.draft?.components[0]?.id ?? "agent"}
-          initialDraft={agent.draft}
-          onSave={agent.onSave}
-          organizationId={agent.organizationId}
-          isLoading={agent.isLoading}
-          showAutomationNote={false}
-          showCancel={false}
-        />
-      ) : (
-        <AutomationViewBody
-          title={title}
-          graph={graph}
-          loading={loading}
-          error={error}
-          onRetry={onRetry}
-          editHref={editHref}
-        />
-      )}
+      <ColumnAutomationViewBody
+        tab={tab}
+        title={title}
+        graph={graph}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        editHref={editHref}
+        general={general}
+        agent={agent}
+      />
     </PopupShell>
+  );
+}
+
+function ColumnAutomationViewTabs({
+  tabs,
+  tab,
+  onTabChange,
+}: {
+  tabs: ColumnAutomationViewTab[];
+  tab: ColumnAutomationViewTab;
+  onTabChange: (tab: ColumnAutomationViewTab) => void;
+}) {
+  if (tabs.length <= 1) {
+    return null;
+  }
+  return (
+    <Tabs value={tab} onValueChange={(value) => onTabChange(value as ColumnAutomationViewTab)} className="mt-3">
+      <TabsList aria-label={COLUMN_AUTOMATIONS_COPY.tabsLabel}>
+        {tabs.includes("general") ? (
+          <TabsTrigger value="general" data-testid="column-automation-view-tab-general">
+            <Settings />
+            {COLUMN_AUTOMATIONS_COPY.generalTab}
+          </TabsTrigger>
+        ) : null}
+        {tabs.includes("agent") ? (
+          <TabsTrigger value="agent" data-testid="column-automation-view-tab-agent">
+            <Bot />
+            {COLUMN_AUTOMATIONS_COPY.agentTab}
+          </TabsTrigger>
+        ) : null}
+        <TabsTrigger value="automation" data-testid="column-automation-view-tab-automation">
+          <Workflow />
+          {COLUMN_AUTOMATIONS_COPY.automationTab}
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+}
+
+function ColumnAutomationViewBody({
+  tab,
+  title,
+  graph,
+  loading,
+  error,
+  onRetry,
+  editHref,
+  general,
+  agent,
+}: {
+  tab: ColumnAutomationViewTab;
+  title: string;
+  graph?: IntakeAutomationGraph;
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
+  editHref?: string;
+  general?: ReactNode;
+  agent?: PlanningReviewAgentSlot;
+}) {
+  if (tab === "general" && general) {
+    return general;
+  }
+  if (tab === "agent" && agent) {
+    return (
+      <PlanningReviewEditor
+        key={agent.draft?.components[0]?.id ?? "agent"}
+        initialDraft={agent.draft}
+        onSave={agent.onSave}
+        organizationId={agent.organizationId}
+        isLoading={agent.isLoading}
+        showAutomationNote={false}
+        showCancel={false}
+      />
+    );
+  }
+  return (
+    <AutomationViewBody
+      title={title}
+      graph={graph}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      editHref={editHref}
+    />
   );
 }
 
