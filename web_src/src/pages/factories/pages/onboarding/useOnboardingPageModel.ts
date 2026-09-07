@@ -42,6 +42,7 @@ import { useFinishOnboarding } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { persistSelectedGithubConnection } from "./onboardingGithubCleanup";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
@@ -271,6 +272,7 @@ function useOnboardingGithubConnectionSelected(args: {
   factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   setup: OnboardingSetupApi;
@@ -288,10 +290,15 @@ function useOnboardingGithubConnectionSelected(args: {
     const integrationId = integration.metadata?.id;
     if (!integrationId) return;
 
-    try {
-      await args.updateOnboarding({ vcsIntegrationId: integrationId });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Could not save the GitHub connection"));
+    const previousId = args.factory?.onboarding?.vcsIntegrationId;
+    if (
+      !(await persistSelectedGithubConnection({
+        ...args,
+        queryClient,
+        integrationId,
+        previousId,
+      }))
+    ) {
       return;
     }
 
@@ -341,6 +348,7 @@ function useOnboardingGithubConnectionsForPage(args: {
   factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   searchParams: URLSearchParams;
@@ -369,6 +377,36 @@ function useOnboardingGithubConnectionsForPage(args: {
     selectInstance: args.selectInstance,
     onConnectionSelected,
   });
+}
+
+function useSelectOnboardingVcsConnection(args: {
+  organizationId: string;
+  factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
+  factoryId: string;
+  setup: OnboardingSetupApi;
+  updateOnboarding: UpdateOnboarding;
+  currentId: string;
+  selectInstance: (integrationName: string, integrationId: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  return async (integrationId: string) => {
+    if (integrationId !== args.currentId) {
+      const saved = await persistSelectedGithubConnection({
+        setup: args.setup,
+        updateOnboarding: args.updateOnboarding,
+        organizationId: args.organizationId,
+        factory: args.factory,
+        factories: args.factories,
+        factoryId: args.factoryId,
+        queryClient,
+        integrationId,
+        previousId: args.currentId || args.factory?.onboarding?.vcsIntegrationId,
+      });
+      if (!saved) return;
+    }
+    args.selectInstance("github", integrationId);
+  };
 }
 
 export function useOnboardingPageModel(args: {
@@ -487,7 +525,16 @@ export function useOnboardingPageModel(args: {
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
     createVcsConnection: () => connect.createNew("github"),
-    selectVcsConnection: (integrationId: string) => connect.selectInstance("github", integrationId),
+    selectVcsConnection: useSelectOnboardingVcsConnection({
+      organizationId: args.organizationId,
+      factory: args.factory,
+      factories: args.factories,
+      factoryId: args.factoryId,
+      setup,
+      updateOnboarding: updateOnboarding.mutateAsync,
+      currentId: githubIntegrationId,
+      selectInstance: connect.selectInstance,
+    }),
     githubConnections,
     selectedVcsConnectionId: githubIntegrationId || undefined,
     requestConfigure: () => {
