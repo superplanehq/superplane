@@ -10,11 +10,15 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 
-export type PRFeedbackSettingsTab = "general" | "automation";
+export type PRFeedbackSettingsTab = "general" | "agent" | "automation";
 export type PRFeedbackSourceId = "discussion" | "checks";
 
 export function isPRFeedbackSettingsTab(value: string | null | undefined): value is PRFeedbackSettingsTab {
-  return value === "general" || value === "automation";
+  return value === "general" || value === "agent" || value === "automation";
+}
+
+export function prFeedbackSettingsTabs(hasAgent: boolean): PRFeedbackSettingsTab[] {
+  return hasAgent ? ["general", "agent", "automation"] : ["general", "automation"];
 }
 
 export interface PRFeedbackSource {
@@ -85,6 +89,7 @@ export interface PRFeedbackDraftSettings {
 export const PR_FEEDBACK_SETTINGS_COPY = {
   tabsLabel: "PR feedback settings",
   generalTab: "General",
+  agentTab: "Agent",
   automationTab: "Automation",
   nameLabel: "Name",
   nameHelper: "This name appears in the workspace app list.",
