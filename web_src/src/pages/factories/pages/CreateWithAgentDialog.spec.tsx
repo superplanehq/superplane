@@ -204,6 +204,7 @@ describe("CreateWithAgentDialog", () => {
     expect(within(draft).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
     expect(within(draft).getByRole("button", { name: "Edit" })).toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-draft-description")).not.toBeInTheDocument();
+    expect(within(draft).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
   it("renders preview description markdown like the task popup", () => {
@@ -225,6 +226,7 @@ describe("CreateWithAgentDialog", () => {
     expect(within(preview).queryByText(/## Data model/)).not.toBeInTheDocument();
     expect(within(preview).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
     expect(within(preview).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(within(preview).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
   it("shows a read-only task without edit fields", () => {

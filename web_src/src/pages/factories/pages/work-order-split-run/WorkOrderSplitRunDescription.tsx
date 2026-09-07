@@ -15,11 +15,13 @@ export function WorkOrderSplitRunDescription({
   description,
   canEdit = false,
   busy = false,
+  collapsible = true,
   onSave,
 }: {
   description: string;
   canEdit?: boolean;
   busy?: boolean;
+  collapsible?: boolean;
   onSave?: (next: string) => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -47,7 +49,7 @@ export function WorkOrderSplitRunDescription({
   };
 
   const body = saved.trim() ? (
-    <WorkOrderDescription description={saved} />
+    <WorkOrderDescription description={saved} collapsible={collapsible} />
   ) : (
     <p className="text-[13px] text-muted-foreground">No description yet.</p>
   );
