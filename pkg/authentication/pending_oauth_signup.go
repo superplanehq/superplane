@@ -106,7 +106,8 @@ func pendingOAuthSignupCookieValue(r *http.Request, value string, maxAge int) *h
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
+		// Strict keeps a cross-site GET from completing signup with this cookie.
+		SameSite: http.SameSiteStrictMode,
 	}
 }
 

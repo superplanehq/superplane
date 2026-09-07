@@ -743,6 +743,8 @@ func TestHandler_pendingOAuthSignup(t *testing.T) {
 		assert.Equal(t, "/login?auth_error=signup_required&provider=google", recorder.Header().Get("Location"))
 		cookie := pendingOAuthSignupCookieFromRecorder(t, recorder)
 		assert.NotEmpty(t, cookie.Value)
+		assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
+		assert.True(t, cookie.HttpOnly)
 		_, err := models.FindAccountByEmail(googleUser.Email)
 		assert.Error(t, err)
 	})
