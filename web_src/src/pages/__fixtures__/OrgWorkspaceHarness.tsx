@@ -285,24 +285,42 @@ const factorySettingsStorybookRoutes = [
     path="account/notifications"
     element={<FactorySettingsAccountNotificationsPage />}
   />,
-  <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
+  <Route
+    key="factory-settings-workspace-general"
+    path="workspace/general"
+    element={
+      <RequirePermission resource="factories" action="update">
+        <FactorySettingsGeneralPage />
+      </RequirePermission>
+    }
+  />,
   <Route
     key="factory-settings-workspace-repository"
     path="workspace/repository"
-    element={<FactorySettingsRepositoryPage />}
+    element={
+      <RequirePermission resource="factories" action="update">
+        <FactorySettingsRepositoryPage />
+      </RequirePermission>
+    }
   />,
   <Route
     key="factory-settings-workspace-automations"
     path="workspace/automations"
-    element={<FactorySettingsAutomationsPage />}
+    element={
+      <RequirePermission resource="factories" action="update">
+        <FactorySettingsAutomationsPage />
+      </RequirePermission>
+    }
   />,
   <Route
     key="factory-settings-workspace-models"
     path="workspace/models"
     element={
-      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
-        <FactorySettingsModelsPage />
-      </RequireExperimentalFeature>
+      <RequirePermission resource="factories" action="update">
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
+          <FactorySettingsModelsPage />
+        </RequireExperimentalFeature>
+      </RequirePermission>
     }
   />,
   <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
@@ -310,7 +328,11 @@ const factorySettingsStorybookRoutes = [
   <Route
     key="factory-settings-organization-general"
     path="organization/general"
-    element={<OrganizationSettingsOverviewPage />}
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsOverviewPage />
+      </RequirePermission>
+    }
   />,
   <Route
     key="factory-settings-organization-members"

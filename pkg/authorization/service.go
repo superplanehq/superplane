@@ -13,6 +13,7 @@ import (
 	"github.com/casbin/casbin/v2/model"
 	"github.com/casbin/casbin/v2/util"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -506,7 +507,7 @@ func (a *AuthService) assignRoleWithEnforcer(enforcer casbin.IEnforcer, userID, 
 
 	// Check if it's a default role
 	validRoles := map[string][]string{
-		models.DomainTypeOrganization: {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
+		models.DomainTypeOrganization: models.DefaultOrganizationRoles,
 	}
 
 	isValidDefaultRole := false
@@ -615,9 +616,18 @@ func (a *AuthService) SetupOrganization(tx *gorm.DB, orgID, ownerID string) erro
 		//
 		// Setup the organization owner
 		//
-		err = a.assignRoleWithEnforcer(enforcerTx, ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = a.assignRoleWithEnforcer(enforcerTx, ownerID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		if err != nil {
-			return fmt.Errorf("failed to assign organization owner: %w", err)
+			return fmt.Errorf("failed to assign organization admin: %w", err)
+		}
+
+		ownerUUID, parseErr := uuid.Parse(ownerID)
+		if parseErr != nil {
+			return fmt.Errorf("invalid owner ID: %w", parseErr)
+		}
+
+		if err := models.SetUserIsOwner(tx, ownerUUID, true); err != nil {
+			return fmt.Errorf("failed to set organization owner: %w", err)
 		}
 
 		return nil
@@ -1019,7 +1029,7 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 
 func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
 	defaultRoles := map[string][]string{
-		models.DomainTypeOrganization: {models.RoleOrgOwner, models.RoleOrgAdmin, models.RoleOrgViewer},
+		models.DomainTypeOrganization: models.DefaultOrganizationRoles,
 	}
 
 	roles, exists := defaultRoles[domainType]
@@ -1292,9 +1302,9 @@ func (a *AuthService) getRolesFromPoliciesWithEnforcer(enforcer casbin.IEnforcer
 	}
 
 	if a.getDomainTypeFromDomain(domain) == models.DomainTypeOrganization {
-		roles[models.RoleOrgOwner] = true
-		roles[models.RoleOrgAdmin] = true
-		roles[models.RoleOrgViewer] = true
+		for _, role := range models.DefaultOrganizationRoles {
+			roles[role] = true
+		}
 	}
 
 	roleList := make([]string, 0, len(roles))
@@ -1307,9 +1317,9 @@ func (a *AuthService) getRolesFromPoliciesWithEnforcer(enforcer casbin.IEnforcer
 
 func (a *AuthService) getRoleDescription(roleName string) string {
 	descriptions := map[string]string{
-		models.RoleOrgViewer: models.DescOrgViewer,
-		models.RoleOrgAdmin:  models.DescOrgAdmin,
-		models.RoleOrgOwner:  models.DescOrgOwner,
+		models.RoleOrgOperator:   models.DescOrgOperator,
+		models.RoleOrgMaintainer: models.DescOrgMaintainer,
+		models.RoleOrgAdmin:      models.DescOrgAdmin,
 	}
 
 	if description, exists := descriptions[roleName]; exists {
@@ -1342,19 +1352,19 @@ func (a *AuthService) setupDefaultOrganizationRoleMetadataInTransaction(tx *gorm
 		description string
 	}{
 		{
-			name:        models.RoleOrgOwner,
-			displayName: models.DisplayNameOwner,
-			description: models.MetaDescOrgOwner,
-		},
-		{
 			name:        models.RoleOrgAdmin,
 			displayName: models.DisplayNameAdmin,
 			description: models.MetaDescOrgAdmin,
 		},
 		{
-			name:        models.RoleOrgViewer,
-			displayName: models.DisplayNameViewer,
-			description: models.MetaDescOrgViewer,
+			name:        models.RoleOrgMaintainer,
+			displayName: models.DisplayNameMaintainer,
+			description: models.MetaDescOrgMaintainer,
+		},
+		{
+			name:        models.RoleOrgOperator,
+			displayName: models.DisplayNameOperator,
+			description: models.MetaDescOrgOperator,
 		},
 	}
 

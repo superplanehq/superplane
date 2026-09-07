@@ -22,6 +22,7 @@ type User struct {
 	TokenHash       string
 	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
 	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
+	IsOwner         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt
@@ -542,6 +543,37 @@ func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*
 	}
 
 	return &user, nil
+}
+
+func SetUserIsOwner(tx *gorm.DB, userID uuid.UUID, isOwner bool) error {
+	return tx.Model(&User{}).Where("id = ?", userID).Update("is_owner", isOwner).Error
+}
+
+func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("is_owner = ?", true).
+		Where("type = ?", UserTypeHuman).
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func ListOrganizationOwnerIDs(tx *gorm.DB, orgID uuid.UUID) ([]string, error) {
+	owners, err := ListOrganizationOwners(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(owners))
+	for i := range owners {
+		ids = append(ids, owners[i].ID.String())
+	}
+	return ids, nil
 }
 
 type UserAccountProvider struct {

@@ -15,6 +15,7 @@ import {
   useOrganizationUsers,
   useRemoveOrganizationSubject,
   useResetOrganizationInviteLink,
+  useSetUserOwner,
   useUpdateOrganizationInviteLink,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ import {
 } from "./settingsPageStyles";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useMe } from "@/hooks/useMe";
+import { defaultOrganizationRoleSortIndex } from "@/lib/organizationRoles";
 
 interface Member {
   id: string;
@@ -42,6 +44,7 @@ interface Member {
   avatar?: string;
   type: "member";
   status: "active";
+  isOwner: boolean;
 }
 
 interface MembersProps {
@@ -76,6 +79,7 @@ export function Members({ organizationId }: MembersProps) {
 
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId);
+  const setUserOwnerMutation = useSetUserOwner(organizationId);
   const removeUserMutation = useRemoveOrganizationSubject(organizationId);
   const updateInviteLinkMutation = useUpdateOrganizationInviteLink(organizationId);
   const resetInviteLinkMutation = useResetOrganizationInviteLink(organizationId);
@@ -88,12 +92,25 @@ export function Members({ organizationId }: MembersProps) {
 
   const ownerIds = useMemo(() => {
     const ids = users
-      .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))
+      .filter((user) => user.status?.isOwner)
       .map((user) => user.metadata?.id)
       .filter((id): id is string => Boolean(id));
 
     return new Set(ids);
   }, [users]);
+
+  const assignableRoles = useMemo(() => {
+    return [...organizationRoles].sort((a, b) => {
+      const aDefault = defaultOrganizationRoleSortIndex(a.metadata?.name);
+      const bDefault = defaultOrganizationRoleSortIndex(b.metadata?.name);
+      if (aDefault !== bDefault) {
+        return aDefault - bDefault;
+      }
+      const aName = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
+      const bName = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [organizationRoles]);
 
   const inviteLinkUrl = useMemo(() => {
     if (!inviteLink?.token) {
@@ -135,6 +152,7 @@ export function Members({ organizationId }: MembersProps) {
         avatar: user.status?.accountProviders?.[0]?.avatarUrl,
         type: "member",
         status: "active",
+        isOwner: Boolean(user.status?.isOwner),
       };
     });
   }, [users]);
@@ -186,10 +204,28 @@ export function Members({ organizationId }: MembersProps) {
     }
   };
 
+  const handleOwnerChange = async (member: Member, isOwner: boolean) => {
+    if (!canUpdateMembers) return;
+    if (!isOwner && member.isOwner && ownerIds.size <= 1) {
+      setRemovalError("The organization must keep at least one owner.");
+      return;
+    }
+
+    try {
+      setRemovalError(null);
+      await setUserOwnerMutation.mutateAsync({
+        userId: member.id,
+        isOwner,
+      });
+    } catch (error) {
+      setRemovalError(getApiErrorMessage(error, "Unable to update owner."));
+    }
+  };
+
   const handleMemberRemove = async (member: Member) => {
     if (!canDeleteMembers) return;
     if (member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1) {
-      setRemovalError("You must have at least one organization owner.");
+      setRemovalError("The organization must keep at least one owner.");
       return;
     }
 
@@ -390,7 +426,10 @@ export function Members({ organizationId }: MembersProps) {
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />
                         <div>
-                          <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
+                            {member.isOwner && <Badge color="yellow">Owner</Badge>}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
@@ -421,7 +460,7 @@ export function Members({ organizationId }: MembersProps) {
                                 </button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
-                                {organizationRoles.map((role) => (
+                                {assignableRoles.map((role) => (
                                   <DropdownMenuItem
                                     key={role.metadata?.name}
                                     onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
@@ -449,50 +488,70 @@ export function Members({ organizationId }: MembersProps) {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        {ownerIds.has(member.id) && ownerIds.size <= 1 ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}>
-                                <Icon name="ellipsis-vertical" size="sm" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem disabled>
-                                <Icon name="x" size="sm" />
-                                <span className="ml-1">Cannot remove last owner</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          <PermissionTooltip
-                            allowed={canDeleteMembers || permissionsLoading}
-                            message="You don't have permission to remove members."
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className={cn(
-                                    "flex items-center gap-2 text-sm disabled:opacity-50",
-                                    settingsRowMenuClassName,
+                        {(() => {
+                          const isLastOwner = member.isOwner && ownerIds.size <= 1;
+                          const ownerActionAllowed = canUpdateMembers && !isLastOwner;
+                          const canSetOwner = canUpdateMembers && !member.isOwner;
+                          const canClearOwner = canUpdateMembers && member.isOwner && !isLastOwner;
+
+                          return (
+                            <PermissionTooltip
+                              allowed={canDeleteMembers || canUpdateMembers || permissionsLoading}
+                              message="You don't have permission to manage members."
+                            >
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className={cn(
+                                      "flex items-center gap-2 text-sm disabled:opacity-50",
+                                      settingsRowMenuClassName,
+                                    )}
+                                    disabled={!canDeleteMembers && !canUpdateMembers}
+                                  >
+                                    <Icon name="ellipsis-vertical" size="sm" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  {canSetOwner && (
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-1"
+                                      onClick={() => handleOwnerChange(member, true)}
+                                      disabled={!ownerActionAllowed || setUserOwnerMutation.isPending}
+                                    >
+                                      <Icon name="star" size="sm" />
+                                      Set as owner
+                                    </DropdownMenuItem>
                                   )}
-                                  disabled={!canDeleteMembers}
-                                >
-                                  <Icon name="ellipsis-vertical" size="sm" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem
-                                  className="flex items-center gap-1"
-                                  onClick={() => handleMemberRemove(member)}
-                                  disabled={!canDeleteMembers}
-                                >
-                                  <Icon name="x" size="sm" />
-                                  Remove
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </PermissionTooltip>
-                        )}
+                                  {canClearOwner && (
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-1"
+                                      onClick={() => handleOwnerChange(member, false)}
+                                      disabled={setUserOwnerMutation.isPending}
+                                    >
+                                      <Icon name="star" size="sm" />
+                                      Remove owner
+                                    </DropdownMenuItem>
+                                  )}
+                                  {isLastOwner ? (
+                                    <DropdownMenuItem disabled>
+                                      <Icon name="x" size="sm" />
+                                      <span className="ml-1">Cannot remove last owner</span>
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-1"
+                                      onClick={() => handleMemberRemove(member)}
+                                      disabled={!canDeleteMembers}
+                                    >
+                                      <Icon name="x" size="sm" />
+                                      Remove
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </PermissionTooltip>
+                          );
+                        })()}
                       </div>
                     </TableCell>
                   </TableRow>

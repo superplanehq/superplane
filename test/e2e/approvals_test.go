@@ -35,7 +35,7 @@ func TestApprovals(t *testing.T) {
 		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameOwner, groupName)
 		steps.saveCanvas()
 		steps.canvas.CommitAndPublish()
-		steps.verifyApprovalConfigurationPersisted(models.RoleOrgOwner, groupName)
+		steps.verifyApprovalConfigurationPersisted(models.RoleOrgAdmin, groupName)
 	})
 
 	t.Run("running and approving on a canvas", func(t *testing.T) {
@@ -533,7 +533,7 @@ func (s *ApprovalSteps) createApprovalGroup() string {
 		s.session.OrgID.String(),
 		models.DomainTypeOrganization,
 		groupName,
-		models.RoleOrgOwner,
+		models.RoleOrgAdmin,
 		groupName,
 		"",
 	)
