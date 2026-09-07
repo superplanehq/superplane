@@ -334,6 +334,7 @@ func serializeWorkOrder(
 		TotalDurationSeconds: usage.DurationSeconds,
 		StatusNotes:          statusNotes,
 		Origin:               serializeWorkOrderOrigin(order),
+		Position:             order.Position,
 	}, nil
 }
 

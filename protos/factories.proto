@@ -434,6 +434,18 @@ service Factories {
     };
   }
 
+  rpc ReorderWorkOrder(ReorderWorkOrderRequest) returns (ReorderWorkOrderResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/factories/{factory_id}/orders/{order_id}/reorder"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reorder a work order";
+      description: "Moves a work order to a new manual position next to another work order in the same board column";
+      tags: "Factory";
+    };
+  }
+
   rpc DispatchWorkOrder(DispatchWorkOrderRequest) returns (DispatchWorkOrderResponse) {
     option (google.api.http) = {
       patch: "/api/v1/factories/{factory_id}/orders/{order_id}/dispatch"
@@ -1365,6 +1377,12 @@ message WorkOrder {
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
   int64 total_duration_seconds = 17;
+  // Manual drag-and-drop order, scoped to the parent factory. Lower values
+  // sort first. The Board and List views group orders into columns by
+  // display status, then use this value as the tie-break within a column,
+  // so both views agree on a card's place in its column. Set by
+  // ReorderWorkOrder; the server also assigns an initial value at creation.
+  double position = 18;
 }
 
 message WorkOrderOrigin {
@@ -1543,6 +1561,21 @@ message UpdateWorkOrderRequest {
 }
 
 message UpdateWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message ReorderWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+  // Work order that should immediately precede this one in the same board
+  // column after the move. Leave unset to move to the top of the column.
+  optional string previous_order_id = 3;
+  // Work order that should immediately follow this one in the same board
+  // column after the move. Leave unset to move to the bottom of the column.
+  optional string next_order_id = 4;
+}
+
+message ReorderWorkOrderResponse {
   WorkOrder order = 1;
 }
 
