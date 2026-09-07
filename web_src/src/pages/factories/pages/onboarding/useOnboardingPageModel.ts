@@ -1,16 +1,9 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
-import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryQueryKeys, fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
-import {
-  integrationKeys,
-  resolveGithubDefaultBranch,
-  useIntegration,
-  useIntegrationResources,
-} from "@/hooks/useIntegrations";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -49,7 +42,7 @@ import { useFinishOnboarding } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
-import { unusedOnboardingVcsIntegrationId } from "./unusedOnboardingIntegration";
+import { deleteUnusedOnboardingIntegration, saveSelectedGithubConnection } from "./onboardingGithubCleanup";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
@@ -297,33 +290,17 @@ function useOnboardingGithubConnectionSelected(args: {
     const integrationId = integration.metadata?.id;
     if (!integrationId) return;
 
-    try {
-      await args.updateOnboarding({ vcsIntegrationId: integrationId });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Could not save the GitHub connection"));
-      return;
-    }
-
-    const unusedId = unusedOnboardingVcsIntegrationId({
-      isInitial: args.factory?.onboarding?.initial === true,
-      previousId: args.factory?.onboarding?.vcsIntegrationId,
-      nextId: integrationId,
+    const previousId = args.factory?.onboarding?.vcsIntegrationId;
+    if (!(await saveSelectedGithubConnection(args, integrationId, previousId))) return;
+    await deleteUnusedOnboardingIntegration({
+      organizationId: args.organizationId,
+      factory: args.factory,
       factories: args.factories,
-      currentFactoryId: args.factoryId,
+      factoryId: args.factoryId,
+      previousId,
+      nextId: integrationId,
+      queryClient,
     });
-    if (unusedId) {
-      try {
-        await organizationsDeleteIntegration(
-          withOrganizationHeader({
-            organizationId: args.organizationId,
-            path: { id: args.organizationId, integrationId: unusedId },
-          }),
-        );
-        void queryClient.invalidateQueries({ queryKey: integrationKeys.connected(args.organizationId) });
-      } catch (error) {
-        showErrorToast(getApiErrorMessage(error, "Could not remove the unused GitHub connection"));
-      }
-    }
 
     await advanceAfterGithubConnect({
       onboardingEntryPath: args.onboardingEntryPath,
@@ -518,7 +495,13 @@ export function useOnboardingPageModel(args: {
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
     createVcsConnection: () => connect.createNew("github"),
-    selectVcsConnection: (integrationId: string) => connect.selectInstance("github", integrationId),
+    selectVcsConnection: (integrationId: string) => {
+      if (integrationId !== githubIntegrationId) {
+        setup.clearRepository();
+        void updateOnboarding.mutateAsync({ vcsIntegrationId: integrationId, appRepository: "" });
+      }
+      connect.selectInstance("github", integrationId);
+    },
     githubConnections,
     selectedVcsConnectionId: githubIntegrationId || undefined,
     requestConfigure: () => {

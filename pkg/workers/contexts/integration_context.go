@@ -335,11 +335,13 @@ func (c *IntegrationContext) Persist() error {
 	if c.tx == nil || c.integration == nil {
 		return nil
 	}
-	if err := github.RenameGeneratedInstallation(c.tx, c.integration); err != nil {
-		return err
-	}
 
-	return c.tx.Save(c.integration).Error
+	return c.tx.Transaction(func(inner *gorm.DB) error {
+		if err := github.RenameGeneratedInstallation(inner, c.integration); err != nil {
+			return err
+		}
+		return inner.Save(c.integration).Error
+	})
 }
 
 func (c *IntegrationContext) GetState() string {

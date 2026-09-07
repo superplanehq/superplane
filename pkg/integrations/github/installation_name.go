@@ -1,6 +1,8 @@
 package github
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"regexp"
 	"strings"
@@ -58,11 +60,21 @@ func RenameGeneratedInstallation(tx *gorm.DB, integration *models.Integration) e
 		return nil
 	}
 
+	if err := lockOrganizationInstallationNames(tx, integration.OrganizationID); err != nil {
+		return err
+	}
+
 	name := NextOwnerInstallationName(owner, func(candidate string) bool {
 		return installationNameTaken(tx, integration.OrganizationID, integration.ID, candidate)
 	})
 	integration.InstallationName = name
 	return nil
+}
+
+func lockOrganizationInstallationNames(tx *gorm.DB, organizationID uuid.UUID) error {
+	sum := sha256.Sum256(append([]byte("github-installation-name:"), organizationID[:]...))
+	key := int64(binary.BigEndian.Uint64(sum[:8]))
+	return tx.Exec("SELECT pg_advisory_xact_lock(?)", key).Error
 }
 
 func installationNameTaken(tx *gorm.DB, organizationID, currentID uuid.UUID, name string) bool {
