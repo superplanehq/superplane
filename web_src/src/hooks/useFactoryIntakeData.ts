@@ -108,6 +108,9 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      // A new intake seeds the newest items of its source, so the Backlog
+      // already holds tasks the cached list does not know about.
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
     },
   });
 }
