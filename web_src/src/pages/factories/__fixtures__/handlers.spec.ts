@@ -57,6 +57,16 @@ describe("matchFactoryPageFixture", () => {
       enabled: true,
       models: [expect.objectContaining({ id: "claude-sonnet-4-6" })],
     });
+
+    const selectable = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/selectable-llm-models`,
+    );
+    await expect(selectable.json()).resolves.toMatchObject({
+      models: expect.arrayContaining([
+        expect.objectContaining({ key: "byok::anthropic::claude-sonnet-4-6" }),
+        expect.objectContaining({ key: "hosted::anthropic::claude-sonnet-4-6" }),
+      ]),
+    });
   });
 
   it("returns factory apps for the populated factory", async () => {

@@ -1,6 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 
-import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
@@ -10,15 +9,11 @@ import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
-import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
-import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
 import { lineBoardColumnLaneClassName, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
-import { workspacePlanningRepository } from "./planningSessionView";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
-import { useCreateWithAgentSession } from "./useCreateWithAgentSession";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -37,6 +32,7 @@ export type BacklogColumnProps = {
   canRename: boolean;
   onRename: (title: string) => void;
   onCreateWorkOrder: () => void;
+  onCreateWithAgent: () => void;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
   /** Tasks the Backlog automation analyzes right now. */
@@ -83,6 +79,7 @@ export function BacklogColumn({
   canRename,
   onRename,
   onCreateWorkOrder,
+  onCreateWithAgent,
   workOrderCardContext,
   onOpenWorkOrder,
   analyzingOrderIds,
@@ -100,15 +97,13 @@ export function BacklogColumn({
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
-  const { factory } = useFactoriesLayout();
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
-  const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
   const createPopover = backlogCreatePopoverProps({
     canAdd,
     atCapacity,
     createMenu,
     onCreateWorkOrder,
-    onCreateWithAgent: agentSession.start,
+    onCreateWithAgent,
   });
 
   return (
@@ -190,40 +185,7 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
-      <BacklogCreateWithAgentDialog factoryKey={factoryKey} organizationId={organizationId} session={agentSession} />
     </>
-  );
-}
-
-function BacklogCreateWithAgentDialog({
-  factoryKey,
-  organizationId,
-  session,
-}: {
-  factoryKey: string;
-  organizationId: string;
-  session: ReturnType<typeof useCreateWithAgentSession>;
-}) {
-  const view = usePlanningSessionLiveRun(organizationId, session.view);
-  return (
-    <CreateWithAgentDialog
-      open={session.open}
-      workspaceName={factoryKey}
-      organizationId={organizationId}
-      view={view}
-      onComposerChange={session.onComposerChange}
-      onSend={session.onSend}
-      onSubmitSurvey={session.onSubmitSurvey}
-      onDraftTitleChange={session.onDraftTitleChange}
-      onDraftDescriptionChange={session.onDraftDescriptionChange}
-      onCreateDraft={session.onCreateDraft}
-      onSkipDraft={session.onSkipDraft}
-      onSelectCreated={session.onSelectCreated}
-      onRefineCreated={session.onRefineCreated}
-      onRequestClose={session.onRequestClose}
-      onCancelEnd={session.onCancelEnd}
-      onConfirmEnd={session.onConfirmEnd}
-    />
   );
 }
 

@@ -1,3 +1,43 @@
+export const HOSTED_MODEL_ALL_PROVIDERS = "all";
+export const HOSTED_LLM_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
+
+export function hostedLLMModelKey(provider: string, model: string): string {
+  const trimmedProvider = provider.trim();
+  const trimmedModel = model.trim();
+  if (trimmedProvider === "" || trimmedModel === "") {
+    return "";
+  }
+  return `${trimmedProvider}::${trimmedModel}`;
+}
+
+export function parseHostedLLMModelKey(value: string): { provider: string; model: string } {
+  const separator = value.indexOf("::");
+  if (separator < 0) {
+    return { provider: "", model: "" };
+  }
+  return { provider: value.slice(0, separator), model: value.slice(separator + 2) };
+}
+
+export function hostedLLMTechnicalName(provider: string, model: string): string {
+  const trimmedProvider = provider.trim();
+  const trimmedModel = model.trim();
+  if (trimmedProvider === "" || trimmedModel === "") {
+    return trimmedModel;
+  }
+  if (trimmedProvider === "openrouter") {
+    return trimmedModel;
+  }
+  return `${trimmedProvider}/${trimmedModel}`;
+}
+
+export function hostedLLMTechnicalNameFromKey(value: string): string {
+  const parsed = parseHostedLLMModelKey(value);
+  if (parsed.provider === "") {
+    return value.trim();
+  }
+  return hostedLLMTechnicalName(parsed.provider, parsed.model);
+}
+
 export function compareModelLabels(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }

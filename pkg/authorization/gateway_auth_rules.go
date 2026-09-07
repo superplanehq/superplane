@@ -403,6 +403,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/selectable-llm-models"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/byok-models"}: {
 			Resource:   "org",
 			Action:     "read",
@@ -712,6 +717,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"}: {
 			Resource:                     "work_orders",
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,

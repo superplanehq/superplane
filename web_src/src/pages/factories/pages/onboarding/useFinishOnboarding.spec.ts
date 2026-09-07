@@ -3,13 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 import { afterOnboardingPath, finishOnboardingError, provisionWorkspace } from "./useFinishOnboarding";
 
 const readyPlan = {
-  providerId: "openrouter",
-  component: "runnerOpenRouter",
+  component: "runnerSuperPlane",
   credentialsSource: "hosted",
-  integrationName: "openrouter",
-  harness: "AGENT_HARNESS_CLAUDE_CODE",
-  model: "openai/gpt-4.1",
-  planningModel: "openai/gpt-4.1",
+  harness: "AGENT_HARNESS_SUPERPLANE",
+  model: "",
+  planningModel: "",
 } as const;
 
 describe("finishOnboardingError", () => {
@@ -60,10 +58,9 @@ describe("provisionWorkspace", () => {
       github: { id: "github-1" },
       agentPlan: readyPlan,
       agentRewrite: {
-        component: "runnerOpenRouter",
-        model: readyPlan.model,
-        planningModel: readyPlan.planningModel,
-        credentials: { source: "hosted" as const },
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
       },
       ...overrides,
     };

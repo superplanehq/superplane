@@ -227,12 +227,12 @@ describe("PhaseLogCard stream details", () => {
     const user = userEvent.setup();
     render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
 
-    const note = screen.getByText(LONG_NOTE);
+    const note = screen.getByText(LONG_NOTE).closest(".whitespace-normal");
     expect(note).toBeInTheDocument();
     expect(note).not.toHaveClass("truncate");
     expect(note).toHaveClass("whitespace-normal");
-    expect(note.parentElement?.className).toMatch(/\bbg-muted\b/);
-    expect(note.parentElement?.className).not.toMatch(/\bbg-background\b/);
+    expect(note?.closest("[data-testid^='split-run-stream-line-']")?.className).toMatch(/\bbg-muted\b/);
+    expect(note?.closest("[data-testid^='split-run-stream-line-']")?.className).not.toMatch(/\bbg-background\b/);
     const toolSummary = screen.getByRole("button", { name: "Ran 1 command" });
     expect(toolSummary).toBeInTheDocument();
     expect(toolSummary.className).toMatch(/\bbg-muted\b/);

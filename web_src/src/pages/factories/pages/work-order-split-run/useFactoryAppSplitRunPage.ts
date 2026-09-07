@@ -1,6 +1,7 @@
 import { useFactoryPullRequests, useFactoryWorkOrders } from "@/hooks/useFactoryData";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { useCallback, useMemo, useState } from "react";
@@ -68,9 +69,10 @@ export function useFactoryAppSplitRunPage() {
   const split = useSplitRunPanePercent();
   const { isLoading, lineName, order, query } = useSplitRunPageSelection(organizationId, factoryId, factory?.lines);
   const { orderChecks, prFeedbackRuns, analysisRuns } = useSplitRunWorkOrderExtras(organizationId, factoryId, order);
+  const { resolveUser } = useOrgUserLookup(organizationId);
   const fixture = useMemo(
-    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, prFeedbackRuns, analysisRuns),
-    [order, orderChecks, prFeedbackRuns, analysisRuns, query.lineId],
+    () => fixtureForSplitRunPage(order, orderChecks, query.lineId, { prFeedbackRuns, analysisRuns, resolveUser }),
+    [order, orderChecks, prFeedbackRuns, analysisRuns, query.lineId, resolveUser],
   );
   const canvasKey = query.canvasKey ?? canvasKeyForAutomation({ id: appId });
   const phase = useMemo(
