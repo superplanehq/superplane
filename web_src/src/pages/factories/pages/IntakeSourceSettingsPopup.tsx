@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { History, Settings, Workflow } from "lucide-react";
+import { Bot, History, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -14,6 +14,7 @@ import {
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
+  intakeSettingsTabs,
   normalizeIntakeSourceSettings,
   type IntakeAutomationRun,
   type IntakeListenMode,
@@ -23,6 +24,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
+import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
@@ -44,6 +46,7 @@ interface IntakeSourceSettingsPopupProps {
   saveError?: string;
   onOpenRun?: (run: IntakeAutomationRun) => void;
   editAutomationHref?: string;
+  agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
   initialTab?: IntakeSettingsTab;
@@ -65,16 +68,26 @@ export function IntakeSourceSettingsPopup({
   saveError,
   onOpenRun,
   editAutomationHref,
+  agent,
   onClose,
   fixed = true,
   initialTab = "general",
 }: IntakeSourceSettingsPopupProps) {
+  const tabs = intakeSettingsTabs(Boolean(agent));
+  const hasAgent = Boolean(agent);
   const [draft, setDraft] = useState(settings);
-  const [tab, setTab] = useState<IntakeSettingsTab>(initialTab);
+  const [tab, setTab] = useState<IntakeSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
 
   useEffect(() => {
     setDraft(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const next = intakeSettingsTabs(hasAgent);
+    if (!next.includes(tab)) {
+      setTab("general");
+    }
+  }, [tab, hasAgent]);
 
   function update<K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -89,6 +102,12 @@ export function IntakeSourceSettingsPopup({
               <Settings />
               {INTAKE_SETTINGS_COPY.generalTab}
             </TabsTrigger>
+            {tabs.includes("agent") ? (
+              <TabsTrigger value="agent" data-testid="intake-settings-tab-agent">
+                <Bot />
+                {INTAKE_SETTINGS_COPY.agentTab}
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="runs" data-testid="intake-settings-tab-runs">
               <History />
               {INTAKE_SETTINGS_COPY.runsTab}
@@ -108,6 +127,16 @@ export function IntakeSourceSettingsPopup({
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}
+        />
+      ) : tab === "agent" && agent ? (
+        <PlanningReviewEditor
+          key={agent.draft?.components[0]?.id ?? "agent"}
+          initialDraft={agent.draft}
+          onSave={agent.onSave}
+          organizationId={agent.organizationId}
+          isLoading={agent.isLoading}
+          showAutomationNote={false}
+          showCancel={false}
         />
       ) : tab === "runs" ? (
         <IntakeRunsList

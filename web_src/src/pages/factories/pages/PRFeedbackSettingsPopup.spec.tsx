@@ -11,8 +11,16 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
+import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+
+vi.mock("@monaco-editor/react", () => ({
+  Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
+    <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
+  ),
+}));
 
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: vi.fn(() => ({ data: [] })),
@@ -294,6 +302,50 @@ describe("PRFeedbackSettingsPopup additional integrations", () => {
 });
 
 describe("PRFeedbackSettingsPopup automation", () => {
+  it("hides the Agent tab when the canvas has no agent", () => {
+    renderAutomationPopup();
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
+    expect(screen.queryByTestId("pr-feedback-settings-tab-agent")).not.toBeInTheDocument();
+  });
+
+  it("puts Agent between General and Automation when the canvas has an agent", async () => {
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <PRFeedbackSettingsPopup
+                settings={discussionDraft()}
+                healthy
+                automationGraph={automationGraph}
+                agent={
+                  {
+                    draft: PLANNING_REVIEW_DRAFT,
+                    organizationId: "org-1",
+                    onSave: vi.fn(),
+                  } satisfies PlanningReviewAgentSlot
+                }
+                onSave={vi.fn()}
+                onClose={vi.fn()}
+                initialTab="general"
+                fixed={false}
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
+
+    await user.click(screen.getByTestId("pr-feedback-settings-tab-agent"));
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toHaveTextContent("Save Agent");
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+  });
+
   it("shows the automation in display mode at native zoom", () => {
     renderAutomationPopup();
 
