@@ -1,7 +1,7 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
@@ -22,6 +22,7 @@ import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
+import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
@@ -119,7 +120,7 @@ function organizationScopedRouteTree() {
       <Route path="apps">
         <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "create")} />
         <Route path=":appId/settings" element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")} />
-        <Route path=":appId" element={withAuthAndPermission(AppDefaultTabGate, "canvases", "read")} />
+        <Route path=":appId" element={withAuthAndPermission(CanvasPageConfigureGate, "canvases", "read")} />
       </Route>
       <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
       <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
@@ -156,7 +157,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<LegacyAutomationsLineEditRedirect />} />
               <Route path=":appId" element={<AutomationsPage />} />
             </Route>
-            <Route path="apps/:appId" element={<FactoryAppCanvasPage />} />
+            <Route path="apps/:appId" element={<FactoryCanvasConfigureGate />} />
             <Route path="apps/:appId/split-run" element={<FactoryAppSplitRunPage />} />
           </Route>
         </Route>
@@ -328,6 +329,34 @@ function FactoryLineEditPageGate() {
     <RequirePermission resource="factories" action="update">
       <FactoryLineEditPage />
     </RequirePermission>
+  );
+}
+
+function CanvasConfigureGate({ children }: { children: React.ReactNode }) {
+  const [searchParams] = useSearchParams();
+  if (isFactoryAppConfigureMode(searchParams)) {
+    return (
+      <RequirePermission resource="canvases" action="update">
+        {children}
+      </RequirePermission>
+    );
+  }
+  return <>{children}</>;
+}
+
+function CanvasPageConfigureGate() {
+  return (
+    <CanvasConfigureGate>
+      <AppDefaultTabGate />
+    </CanvasConfigureGate>
+  );
+}
+
+function FactoryCanvasConfigureGate() {
+  return (
+    <CanvasConfigureGate>
+      <FactoryAppCanvasPage />
+    </CanvasConfigureGate>
   );
 }
 

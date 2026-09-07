@@ -1,7 +1,7 @@
 import React from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePermissions } from "@/contexts/usePermissions";
-import { NotFoundPage } from "@/components/NotFoundPage";
+import { PermissionDeniedPage } from "@/components/PermissionDeniedPage";
 import { cn } from "@/lib/utils";
 
 interface PermissionTooltipProps {
@@ -44,7 +44,7 @@ export function RequirePermission({ resource, action, children }: RequirePermiss
   }
 
   if (!canAct(resource, action)) {
-    return <NotFoundPage />;
+    return <PermissionDeniedPage resource={resource} action={action} />;
   }
 
   return <>{children}</>;
@@ -67,7 +67,7 @@ export function RequireAnyPermission({ checks, children }: RequireAnyPermissionP
   }
 
   if (!checks.some((check) => canAct(check.resource, check.action))) {
-    return <NotFoundPage />;
+    return <PermissionDeniedPage />;
   }
 
   return <>{children}</>;
