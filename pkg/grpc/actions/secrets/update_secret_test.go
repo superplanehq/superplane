@@ -24,7 +24,7 @@ func Test__UpdateSecret(t *testing.T) {
 	local := map[string]string{"test": "test"}
 	data, _ := json.Marshal(local)
 
-	_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
+	_, err := models.CreateSecret(uuid.New(), "test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
