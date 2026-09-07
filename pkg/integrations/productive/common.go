@@ -20,43 +20,37 @@ const (
 	// as, both for the onTask trigger's project field and ListResources.
 	ResourceTypeProject = "project"
 
-	// EventHeader carries the webhook event name Productive.io sends with
-	// each delivery, e.g. "task.created".
-	EventHeader = "X-Productive-Event"
-
-	// SignatureHeader carries a hex-encoded HMAC-SHA256 of the raw request
-	// body, signed with the secret given when the webhook was created.
-	SignatureHeader = "X-Productive-Signature"
-
-	// TaskCreatedEvent and TaskUpdatedEvent are the webhook event names
-	// Productive.io sends for task lifecycle changes.
+	// TaskCreatedEvent and TaskUpdatedEvent name the change a task event
+	// carries, in the "meta" object of the emitted envelope.
 	TaskCreatedEvent = "task.created"
 	TaskUpdatedEvent = "task.updated"
+
+	// ActionCreated and ActionUpdated are the values of the onTask trigger's
+	// "actions" field.
+	ActionCreated = "created"
+	ActionUpdated = "updated"
 )
 
-// NodeMetadata is stored on productive.onTask nodes at setup time, so canvas
-// cards can show the project without re-querying Productive.io.
+// NodeMetadata is stored on productive.onTask nodes, so canvas cards can show
+// the project without re-querying Productive.io, and so each poll knows where
+// the one before it stopped.
 type NodeMetadata struct {
 	Project *Project `json:"project,omitempty" mapstructure:"project,omitempty"`
+
+	// PolledUntil is the newest task change the trigger emitted, as reported
+	// by Productive.io. The next poll only emits tasks changed after it.
+	// Productive.io timestamps are used rather than local clock reads, because
+	// the two drift and a drifting cursor either repeats or skips tasks.
+	PolledUntil string `json:"polledUntil,omitempty" mapstructure:"polledUntil,omitempty"`
 }
 
-// actionEvents maps the onTask "actions" configuration values to the webhook
-// event names Productive.io sends, so the trigger can request only the
-// events it was configured to listen for.
-var actionEvents = map[string]string{
-	"created": TaskCreatedEvent,
-	"updated": TaskUpdatedEvent,
-}
-
-// eventsForActions translates configured actions into webhook event names.
-// An action with no known event is dropped rather than rejected, so a future
-// action value added to the multi-select cannot break an existing trigger.
-func eventsForActions(actions []string) []string {
-	events := make([]string, 0, len(actions))
-	for _, action := range actions {
-		if event, ok := actionEvents[action]; ok {
-			events = append(events, event)
-		}
+// TaskEnvelope wraps a task resource the way every consumer of this trigger
+// reads it: the JSON:API resource under "data", and the change that produced
+// it under "meta". Seeded tasks use the same shape, so nothing downstream can
+// tell a seeded task from a polled one.
+func TaskEnvelope(event string, document map[string]any) map[string]any {
+	return map[string]any{
+		"meta": map[string]any{"event": event},
+		"data": document,
 	}
-	return events
 }

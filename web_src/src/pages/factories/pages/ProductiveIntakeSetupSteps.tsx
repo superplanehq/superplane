@@ -22,7 +22,7 @@ export function ProductiveConnectionStep({
   return (
     <div className="space-y-4">
       <p className="workspace-body-text text-muted-foreground">
-        SuperPlane uses a personal API token to read tasks and register a webhook.
+        SuperPlane uses a personal API token to read the tasks of your projects.
       </p>
       {integrations.length > 0 ? (
         <ConnectionOptions integrations={integrations} selectedId={selectedId} onSelect={onSelect} />
@@ -191,7 +191,8 @@ export function ProductiveCompleteStep() {
       </span>
       <p className="mt-3 text-[15px] font-semibold">Productive.io intake is ready</p>
       <p className="workspace-body-text mt-1 text-muted-foreground">
-        SuperPlane is adding the newest open tasks to the Backlog. New tasks arrive as your team creates them.
+        SuperPlane is adding the newest open tasks to the Backlog. SuperPlane checks the project every minute, so later
+        tasks arrive shortly after your team creates them.
       </p>
     </div>
   );

@@ -19,7 +19,9 @@ To configure Productive.io to work with SuperPlane:
 `
 
 func init() {
-	registry.RegisterIntegrationWithWebhookHandler("productive", &Productive{}, &ProductiveWebhookHandler{})
+	// No webhook handler: Productive.io grants webhooks by plan and refuses to
+	// register one otherwise, so the onTask trigger polls instead.
+	registry.RegisterIntegration("productive", &Productive{})
 }
 
 type Productive struct{}
@@ -125,7 +127,7 @@ func (p *Productive) HandleHook(ctx core.IntegrationHookContext) error {
 }
 
 func (p *Productive) HandleRequest(ctx core.HTTPRequestContext) {
-	// no-op - webhooks are handled by the onTask trigger.
+	// no-op - Productive.io does not call SuperPlane; the onTask trigger polls.
 }
 
 func (p *Productive) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

@@ -99,16 +99,13 @@ func seedProductiveTasks(
 	return emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents))
 }
 
-// productiveTaskEvents shapes each task of a newest-first page like the webhook
-// body the trigger would have delivered, so the rest of the graph cannot tell a
-// seeded task from a received one.
+// productiveTaskEvents shapes each task of a newest-first page like the event
+// the trigger emits when it polls, so the rest of the graph cannot tell a
+// seeded task from a polled one.
 func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	events := make([]map[string]any, 0, len(documents))
 	for _, document := range documents {
-		events = append(events, map[string]any{
-			"meta": map[string]any{"event": productive.TaskCreatedEvent},
-			"data": document,
-		})
+		events = append(events, productive.TaskEnvelope(productive.TaskCreatedEvent, document))
 	}
 
 	// The intake lists its runs newest first. Emitting the oldest task first

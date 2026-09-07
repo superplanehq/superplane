@@ -76,7 +76,7 @@ describe("ProductiveIntakeSetupDialog", () => {
     expect(screen.getByRole("heading", { name: "Setup complete" })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "SuperPlane is adding the newest open tasks to the Backlog. New tasks arrive as your team creates them.",
+        "SuperPlane is adding the newest open tasks to the Backlog. SuperPlane checks the project every minute, so later tasks arrive shortly after your team creates them.",
       ),
     ).toBeInTheDocument();
   });

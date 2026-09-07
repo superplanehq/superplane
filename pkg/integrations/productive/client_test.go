@@ -1,10 +1,7 @@
 package productive
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,16 +25,6 @@ func testClient(t *testing.T, http *contexts.HTTPContext) *Client {
 	client, err := NewClient(http, testIntegration(nil))
 	require.NoError(t, err)
 	return client
-}
-
-func requestBody(t *testing.T, req *http.Request) map[string]any {
-	t.Helper()
-	raw, err := io.ReadAll(req.Body)
-	require.NoError(t, err)
-
-	body := map[string]any{}
-	require.NoError(t, json.Unmarshal(raw, &body))
-	return body
 }
 
 func Test__NewClient(t *testing.T) {
@@ -204,51 +191,30 @@ func Test__Client__GetTask(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/tasks/91")
 }
 
-func Test__Client__CreateWebhook(t *testing.T) {
+func Test__Client__ListChangedTaskDocuments(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"data":{"id":"w1","type":"webhooks"}}`),
+		jsonResponse(`{"data":[
+			{
+				"id":"91",
+				"type":"tasks",
+				"attributes":{"title":"Fix payment retries","created_at":"2026-01-01T09:00:00Z","updated_at":"2026-01-03T09:00:00Z"}
+			}
+		]}`),
 	}}
 
-	webhook, err := testClient(t, httpContext).CreateWebhook("https://sp.test/hook", "s3cr3t", []string{TaskCreatedEvent}, "1")
+	documents, err := testClient(t, httpContext).ListChangedTaskDocuments("42", 2, 50)
 	require.NoError(t, err)
-	assert.Equal(t, &Webhook{ID: "w1"}, webhook)
+	require.Len(t, documents, 1)
+	assert.Equal(t, "91", documents[0]["id"])
 
 	require.Len(t, httpContext.Requests, 1)
-	req := httpContext.Requests[0]
-	assert.Equal(t, http.MethodPost, req.Method)
-	assert.Contains(t, req.URL.String(), "/webhooks")
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "-updated_at", query.Get("sort"))
+	assert.Equal(t, "2", query.Get("page[number]"))
+	assert.Equal(t, "50", query.Get("page[size]"))
 
-	body := requestBody(t, req)
-	data := body["data"].(map[string]any)
-	attributes := data["attributes"].(map[string]any)
-	assert.Equal(t, "https://sp.test/hook", attributes["target_url"])
-	assert.Equal(t, "s3cr3t", attributes["secret"])
-
-	relationships := data["relationships"].(map[string]any)
-	project := relationships["project"].(map[string]any)["data"].(map[string]any)
-	assert.Equal(t, "1", project["id"])
-}
-
-func Test__Client__CreateWebhook__WithoutProject(t *testing.T) {
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"data":{"id":"w1","type":"webhooks"}}`),
-	}}
-
-	_, err := testClient(t, httpContext).CreateWebhook("https://sp.test/hook", "s3cr3t", []string{TaskCreatedEvent}, "")
-	require.NoError(t, err)
-
-	body := requestBody(t, httpContext.Requests[0])
-	data := body["data"].(map[string]any)
-	assert.NotContains(t, data, "relationships")
-}
-
-func Test__Client__DeleteWebhook(t *testing.T) {
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader(""))},
-	}}
-
-	err := testClient(t, httpContext).DeleteWebhook("w1")
-	require.NoError(t, err)
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
-	assert.Contains(t, httpContext.Requests[0].URL.String(), "/webhooks/w1")
+	// A task closed since the last poll is still a change the trigger can be
+	// configured to report, so the read is not limited to open tasks.
+	assert.Empty(t, query.Get("filter[status]"))
 }

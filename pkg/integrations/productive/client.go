@@ -1,7 +1,6 @@
 package productive
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +19,11 @@ const (
 	// maxProjectPages bounds how many pages ListProjects walks, so a
 	// misbehaving pagination cursor cannot loop forever.
 	maxProjectPages = 20
+
+	// sortNewestCreated and sortNewestUpdated order tasks by the timestamp a
+	// caller reads them for: when they appeared, or when they last changed.
+	sortNewestCreated = "-created_at"
+	sortNewestUpdated = "-updated_at"
 )
 
 // Client talks to Productive.io's JSON:API v2 API using an API token and an
@@ -225,9 +229,27 @@ func (c *Client) GetProject(id string) (*Project, error) {
 	return &project, nil
 }
 
+// taskListOptions describes one page of a project's tasks.
+type taskListOptions struct {
+	projectID string
+	query     string
+	openOnly  bool
+	sort      string
+	page      int
+	pageSize  int
+}
+
 // ListTasks returns open tasks from one project, optionally filtered by text.
 func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
-	body, err := c.execRequest(http.MethodGet, c.taskListURL(projectID, query, limit), nil)
+	url := c.taskListURL(taskListOptions{
+		projectID: projectID,
+		query:     query,
+		openOnly:  true,
+		sort:      sortNewestCreated,
+		pageSize:  limit,
+	})
+
+	body, err := c.execRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -246,10 +268,32 @@ func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
 
 // ListNewestOpenTaskDocuments returns the untrimmed JSON:API resource of each
 // open task in the project, newest first. Seeding an intake replays these
-// through the graph the webhook feeds, and that graph reads attributes Task
+// through the graph the trigger feeds, and that graph reads attributes Task
 // does not keep.
 func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map[string]any, error) {
-	body, err := c.execRequest(http.MethodGet, c.taskListURL(projectID, "", limit), nil)
+	return c.listTaskDocuments(taskListOptions{
+		projectID: projectID,
+		openOnly:  true,
+		sort:      sortNewestCreated,
+		pageSize:  limit,
+	})
+}
+
+// ListChangedTaskDocuments returns one page of the project's tasks, most
+// recently changed first. The onTask trigger reads these to find what changed
+// since its last poll, so closed tasks are included: closing a task is a
+// change the trigger can be configured to report.
+func (c *Client) ListChangedTaskDocuments(projectID string, page, pageSize int) ([]map[string]any, error) {
+	return c.listTaskDocuments(taskListOptions{
+		projectID: projectID,
+		sort:      sortNewestUpdated,
+		page:      page,
+		pageSize:  pageSize,
+	})
+}
+
+func (c *Client) listTaskDocuments(options taskListOptions) ([]map[string]any, error) {
+	body, err := c.execRequest(http.MethodGet, c.taskListURL(options), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -264,15 +308,23 @@ func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map
 	return response.Data, nil
 }
 
-// taskListURL asks for the open tasks of one project, newest first.
-func (c *Client) taskListURL(projectID, query string, limit int) string {
+// taskListURL asks for one page of a project's tasks.
+func (c *Client) taskListURL(options taskListOptions) string {
 	params := url.Values{}
-	params.Set("filter[project_id]", projectID)
-	params.Set("filter[status]", "1")
-	params.Set("page[size]", strconv.Itoa(limit))
-	params.Set("sort", "-created_at")
-	if strings.TrimSpace(query) != "" {
-		params.Set("filter[query]", strings.TrimSpace(query))
+	params.Set("filter[project_id]", options.projectID)
+	params.Set("page[size]", strconv.Itoa(options.pageSize))
+	params.Set("sort", options.sort)
+
+	if options.page > 0 {
+		params.Set("page[number]", strconv.Itoa(options.page))
+	}
+
+	if options.openOnly {
+		params.Set("filter[status]", "1")
+	}
+
+	if query := strings.TrimSpace(options.query); query != "" {
+		params.Set("filter[query]", query)
 	}
 
 	return fmt.Sprintf("%s/tasks?%s", c.BaseURL, params.Encode())
@@ -295,62 +347,4 @@ func (c *Client) GetTask(id string) (*Task, error) {
 
 	task := taskFromDocument(response.Data)
 	return &task, nil
-}
-
-// Webhook is a Productive.io webhook subscription.
-type Webhook struct {
-	ID string `json:"id"`
-}
-
-// CreateWebhook registers a webhook subscribed to the given events, scoped to
-// one project when projectID is non-empty. Productive.io answers with the
-// created resource, whose id is stored so a later Cleanup can remove it.
-func (c *Client) CreateWebhook(url, secret string, events []string, projectID string) (*Webhook, error) {
-	attributes := map[string]any{
-		"target_url": url,
-		"secret":     secret,
-		"events":     events,
-	}
-
-	data := map[string]any{
-		"type":       "webhooks",
-		"attributes": attributes,
-	}
-
-	if projectID != "" {
-		data["relationships"] = map[string]any{
-			"project": map[string]any{
-				"data": map[string]any{"type": "projects", "id": projectID},
-			},
-		}
-	}
-
-	body, err := json.Marshal(map[string]any{"data": data})
-	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	requestURL := fmt.Sprintf("%s/webhooks", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodPost, requestURL, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	response := resourceResponse{}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing webhook response: %v", err)
-	}
-
-	if response.Data.ID == "" {
-		return nil, fmt.Errorf("productive did not return a webhook id")
-	}
-
-	return &Webhook{ID: response.Data.ID}, nil
-}
-
-// DeleteWebhook removes a webhook subscription by id.
-func (c *Client) DeleteWebhook(id string) error {
-	url := fmt.Sprintf("%s/webhooks/%s", c.BaseURL, id)
-	_, err := c.execRequest(http.MethodDelete, url, nil)
-	return err
 }
