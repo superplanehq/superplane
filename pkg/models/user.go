@@ -434,6 +434,8 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 		Joins("JOIN users ON organizations.id = users.organization_id").
 		Where("users.email = ?", utils.NormalizeEmail(email)).
 		Where("users.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL").
+		Order("organizations.created_at DESC").
 		Find(&organizations).
 		Error
 

@@ -1,3 +1,5 @@
+import { isSafeRedirectPath, pathBelongsToOrganization } from "./safeRedirectPath";
+
 // Organizations are addressed by slug in the URL (e.g. `/{slug}/...`), so
 // every value stored and read here is expected to be an organization slug,
 // never its UID. Callers are responsible for passing slugs; see
@@ -44,15 +46,21 @@ export function readLastVisitedOrganization(accountId: string): string | null {
   return readAllLastVisitedOrganizations()[accountId] ?? null;
 }
 
+export type AutoRedirectOrganization = {
+  slug: string;
+  lastLocationUpdatedAt?: string | null;
+};
+
 /**
  * Picks the organization slug to auto-redirect the account to, or `null`
  * when the account has no organizations.
  *
- * `organizations` must be keyed by slug (not UID) since the returned value
- * is used directly as the `/{slug}` URL segment.
+ * Prefer the last visited slug when the account still belongs to it. Else
+ * prefer the organization with the newest saved screen (cross-device). Else
+ * the first organization (callers pass newest-first).
  */
 export function pickAutoRedirectOrganization(
-  organizations: { slug: string }[],
+  organizations: AutoRedirectOrganization[],
   lastVisitedOrganizationSlug: string | null,
 ): string | null {
   if (organizations.length === 0) {
@@ -63,7 +71,33 @@ export function pickAutoRedirectOrganization(
     return lastVisitedOrganizationSlug;
   }
 
+  let latestSlug: string | null = null;
+  let latestAt = "";
+  for (const organization of organizations) {
+    const updatedAt = organization.lastLocationUpdatedAt ?? "";
+    if (updatedAt && updatedAt > latestAt) {
+      latestAt = updatedAt;
+      latestSlug = organization.slug;
+    }
+  }
+  if (latestSlug) {
+    return latestSlug;
+  }
+
   return organizations[0].slug;
+}
+
+/** First safe path that belongs to this organization, or null. */
+export function pickResumePath(
+  organizationSlug: string,
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  for (const path of candidates) {
+    if (path && isSafeRedirectPath(path) && pathBelongsToOrganization(path, organizationSlug)) {
+      return path;
+    }
+  }
+  return null;
 }
 
 /** Records the organization slug the account last visited. */

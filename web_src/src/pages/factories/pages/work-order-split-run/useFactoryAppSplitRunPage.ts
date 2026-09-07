@@ -140,6 +140,7 @@ export function useFactoryAppSplitRunPage() {
     setNodeId,
     split,
     stream,
+    streamLoading: live.isLoading,
     subtitle: resolveFactoryAppCanvasSubtitle({ factoryName: factory?.name }),
   };
 }
