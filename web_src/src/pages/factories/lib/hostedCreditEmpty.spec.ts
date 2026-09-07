@@ -49,11 +49,11 @@ describe("shouldShowHostedCreditEmptyBanner", () => {
 });
 
 describe("hostedCreditEmptyBannerCopy", () => {
-  it("tells the user to view spending when billing is on", () => {
+  it("tells the user to view billing when billing is on", () => {
     expect(hostedCreditEmptyBannerCopy(true)).toEqual({
       title: "Hosted credit is empty",
-      description: "Add hosted credit to start SuperPlane-hosted runs.",
-      actionLabel: "View spending",
+      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
+      actionLabel: "View billing",
     });
   });
 
@@ -61,15 +61,15 @@ describe("hostedCreditEmptyBannerCopy", () => {
     expect(hostedCreditEmptyBannerCopy(false)).toEqual({
       title: "Hosted credit is empty",
       description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-      actionLabel: "View spending",
+      actionLabel: "View billing",
     });
   });
 
-  it("points every role to Spending", () => {
+  it("points every role to Billing", () => {
     expect(hostedCreditEmptyBannerCopy(true, false)).toEqual({
       title: "Hosted credit is empty",
-      description: "Add hosted credit to start SuperPlane-hosted runs.",
-      actionLabel: "View spending",
+      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
+      actionLabel: "View billing",
     });
   });
 });

@@ -390,3 +390,36 @@ func Test__CentsToMicros(t *testing.T) {
 	assert.Equal(t, int64(50_000_000), models.CentsToMicros(5000))
 	assert.Equal(t, int64(0), models.CentsToMicros(0))
 }
+
+func Test__SignedMicrosToCents(t *testing.T) {
+	assert.Equal(t, int64(2500), models.SignedMicrosToCents(models.CentsToMicros(2500)))
+	assert.Equal(t, int64(-1000), models.SignedMicrosToCents(-models.CentsToMicros(1000)))
+	assert.Equal(t, int64(0), models.SignedMicrosToCents(0))
+}
+
+func Test__ListOrganizationLLMCreditGrants(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	actor := r.Account.ID
+	_, err := models.AddAdminLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(1500), "Support grant", &actor)
+	require.NoError(t, err)
+
+	orderID := uuid.NewString()
+	_, err = models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(2500), orderID)
+	require.NoError(t, err)
+	_, err = models.AddPolarLLMCreditRefund(db, r.Organization.ID, models.CentsToMicros(500), orderID, orderID+":partial")
+	require.NoError(t, err)
+
+	grants, err := models.ListOrganizationLLMCreditGrants(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(grants), 4)
+	assert.Equal(t, models.LLMCreditGrantKindPolarRefund, grants[0].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindPolar, grants[1].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindAdmin, grants[2].Kind)
+	assert.Equal(t, models.LLMCreditGrantKindWelcome, grants[3].Kind)
+
+	names, err := models.CreditGrantActorNames(db, grants)
+	require.NoError(t, err)
+	assert.Equal(t, r.Account.Name, names[actor])
+}
