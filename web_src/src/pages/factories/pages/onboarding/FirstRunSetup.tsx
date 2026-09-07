@@ -1,9 +1,8 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useDeleteFactory } from "@/hooks/useFactoryData";
 import { useMe } from "@/hooks/useMe";
-import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
+import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import {
   hostedGitHubInstallRequested,
@@ -21,9 +20,8 @@ import {
 import { showErrorToast } from "@/lib/toast";
 import { posthog } from "@/posthog";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 
-import { factoryListPath } from "../../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
@@ -307,8 +305,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
-  const navigate = useNavigate();
-  const deleteFactory = useDeleteFactory(organizationId);
   const accountOrganizations = useAccountOrganizations();
 
   // The placeholder workspace under setup is itself in `factories`, so
@@ -320,28 +316,13 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const otherOrganizations = (accountOrganizations.data ?? []).filter(
     (organization) => !organizationMatchesRoute(organization, organizationId),
   );
-  const canExitSetup = hasOtherWorkspace || otherOrganizations.length > 0;
-
-  const cancelSetup = async () => {
-    // Guards against a double delete from a second click while the mutation
-    // is already in flight.
-    if (deleteFactory.isPending) return;
-    await deleteFactory.mutateAsync(factoryId);
-    // Cancelling out of the last workspace in this organization must not
-    // bounce the user back into onboarding for it, so it sends them to
-    // another organization instead of this one's (now onboarding) workspace list.
-    if (hasOtherWorkspace) {
-      navigate(factoryListPath(organizationId));
-    } else {
-      navigate(`/${organizationRouteId(otherOrganizations[0])}`);
-    }
-  };
+  const canSwitchOrganization = hasOtherWorkspace || otherOrganizations.length > 0;
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
     displayName: firstNameOf(account?.name),
     email: account?.email,
-    onLogOut: canExitSetup ? undefined : signOut,
-    onCancel: canExitSetup ? () => void cancelSetup() : undefined,
+    onLogOut: signOut,
+    organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
     stepIndex: STEP_INDEX_FOR_SCREEN[target],
     stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
   });

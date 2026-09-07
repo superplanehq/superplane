@@ -96,6 +96,16 @@ describe("RootOrganizationRedirect", () => {
     });
   });
 
+  it("sends an account with no organization to onboarding", async () => {
+    organizationsState.data = [];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/onboarding");
+    });
+  });
+
   it("falls back to the organization home page when there is nothing saved", async () => {
     renderRedirect();
 

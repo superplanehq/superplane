@@ -7,7 +7,7 @@ import {
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
-    close: "Cancel setup",
+    switchOrganization: "Switch organization",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
   },
