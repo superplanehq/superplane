@@ -66,4 +66,12 @@ describe("phaseWithRunnerModel", () => {
       ]).model,
     ).toBe("gpt-5");
   });
+
+  it("keeps a hosted SuperPlane start model", () => {
+    expect(
+      phaseWithRunnerModel({ model: "hosted::openrouter::x-ai/grok-4.6" }, [
+        { component: "runnerSuperPlane", configuration: {} },
+      ]).model,
+    ).toBe("hosted::openrouter::x-ai/grok-4.6");
+  });
 });
