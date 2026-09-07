@@ -55,6 +55,8 @@ func TestOrganizationEntry(t *testing.T) {
 		})
 		require.NoError(t, waitErr)
 		session.AssertVisible(q.TestID("workspace-setup"))
+		session.AssertVisible(q.TestID("first-run-log-out"))
+		session.AssertHidden(q.TestID("first-run-organization-switch"))
 
 		organization, err := models.FindOrganizationByName("GitHub User")
 		require.NoError(t, err)
@@ -92,6 +94,8 @@ func TestOrganizationEntry(t *testing.T) {
 		})
 		require.NoError(t, waitErr)
 		session.AssertVisible(q.TestID("workspace-setup"))
+		session.AssertVisible(q.TestID("first-run-log-out"))
+		session.AssertVisible(q.TestID("first-run-organization-switch"))
 	})
 }
 

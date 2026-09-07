@@ -10,6 +10,11 @@ interface OrganizationSwitchMenuProps {
   currentOrganizationRouteId: string;
   onNavigate?: () => void;
   testIdPrefix?: string;
+  /**
+   * Set from onboarding so choosing the current organization still leaves
+   * the wizard and opens that organization home.
+   */
+  navigateToCurrentOrganization?: boolean;
 }
 
 /** Shared organization choices for the Factories and legacy navigation menus. */
@@ -17,13 +22,15 @@ export function OrganizationSwitchMenu({
   currentOrganizationRouteId,
   onNavigate,
   testIdPrefix = "organization",
+  navigateToCurrentOrganization = false,
 }: OrganizationSwitchMenuProps) {
   const navigate = useNavigate();
   const organizationsQuery = useAccountOrganizations();
   const organizations = organizationsQuery.data ?? [];
 
   const goToOrganization = (organization: AccountOrganization) => {
-    if (!organizationMatchesRoute(organization, currentOrganizationRouteId)) {
+    const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);
+    if (!isCurrent || navigateToCurrentOrganization) {
       navigate(`/${organizationRouteId(organization)}`);
     }
     onNavigate?.();

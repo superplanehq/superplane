@@ -1,5 +1,8 @@
+import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { ArrowRightLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
@@ -27,26 +30,41 @@ export function FirstRunShell({
   return (
     <div className="fixed inset-0 bg-background text-foreground" data-testid={testId}>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 py-5">
-        {chrome?.onCancel ? (
-          <button
+        <div className="pointer-events-auto flex items-center gap-3">
+          <Button
             type="button"
-            className="pointer-events-auto text-muted-foreground transition-colors hover:text-foreground"
-            onClick={chrome.onCancel}
-            aria-label={copy.close}
-            data-testid="first-run-cancel"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pointer-events-auto text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
             onClick={chrome?.onLogOut}
             data-testid="first-run-log-out"
           >
             {copy.logOut}
-          </button>
-        )}
+          </Button>
+          {chrome?.organizationSwitch ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label={copy.switchOrganization}
+                  data-testid="first-run-organization-switch"
+                >
+                  <ArrowRightLeft className="size-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                <OrganizationSwitchMenu
+                  currentOrganizationRouteId={chrome.organizationSwitch.currentOrganizationRouteId}
+                  navigateToCurrentOrganization
+                  testIdPrefix="first-run"
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
         {identity ? (
           <p className="text-right text-[13px] leading-5 text-muted-foreground" data-testid="first-run-signed-in">
             <span className="block">{copy.loggedInAs}</span>
