@@ -19,7 +19,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
@@ -115,6 +115,7 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
+import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   ADD_INTAKE_TEMPLATES,
@@ -194,12 +195,23 @@ export function LinesPage() {
   const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
-  const canAddSentryIntake = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_SENTRY_INTAKE);
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
+  const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
   const addIntakeTemplates = useMemo(() => {
-    const allowedIds = new Set(canAddSentryIntake ? ["github-issues", "sentry-exceptions"] : ["github-issues"]);
+    const allowedIds = new Set(["github-issues"]);
+    if (canAddSentryIntake) {
+      allowedIds.add("sentry-exceptions");
+    }
+    if (canAddProductiveIntake) {
+      allowedIds.add("productive-tasks");
+    }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddSentryIntake]);
+  }, [canAddSentryIntake, canAddProductiveIntake]);
+  // The menu entry only pays off once a source beyond the default GitHub issues is available.
+  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -312,6 +324,10 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
+    if (template.id === "productive-tasks") {
+      setProductiveIntakeSetupOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -382,6 +398,12 @@ export function LinesPage() {
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
       />
+      <ProductiveIntakeSetupDialog
+        open={productiveIntakeSetupOpen}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        onClose={() => setProductiveIntakeSetupOpen(false)}
+      />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
         onClose={() => setAddPRFeedbackOpen(false)}
@@ -430,7 +452,7 @@ export function LinesPage() {
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
-            onAddIntake={canAddSentryIntake ? () => setAddIntakeOpen(true) : undefined}
+            onAddIntake={canAddIntakeFromMenu ? () => setAddIntakeOpen(true) : undefined}
             verifyListeners={verifyListeners}
             onAddPRFeedback={canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined}
             workOrderCardContext={{

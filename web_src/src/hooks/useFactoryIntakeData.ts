@@ -80,7 +80,13 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { source: FactoriesFactoryIntakeSource; name?: string; confidencePct?: number }) => {
+    mutationFn: async (input: {
+      source: FactoriesFactoryIntakeSource;
+      name?: string;
+      confidencePct?: number;
+      integrationId?: string;
+      resourceId?: string;
+    }) => {
       const response = await factoriesCreateFactoryIntake(
         withOrganizationHeader({
           organizationId,
@@ -89,6 +95,8 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
             source: input.source,
             name: input.name,
             confidencePct: input.confidencePct,
+            integrationId: input.integrationId,
+            resourceId: input.resourceId,
           },
         }),
       );
@@ -100,6 +108,9 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: factoryIntakesKey(organizationId, factoryId) });
       void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      // A new intake seeds the newest items of its source, so the Backlog
+      // already holds tasks the cached list does not know about.
+      void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.workOrders(organizationId, factoryId) });
     },
   });
 }
