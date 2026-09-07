@@ -210,7 +210,7 @@ func Test_NodeConfigurationBuilder_WorkspaceFunction(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "WK")
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "wk")
 	require.NoError(t, err)
 	repository := "acme/service"
 	defaultBranch := "develop"
@@ -227,7 +227,7 @@ func Test_NodeConfigurationBuilder_WorkspaceFunction(t *testing.T) {
 	payload, ok := value.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, factoryModel.ID.String(), payload["id"])
-	assert.Equal(t, "WK", payload["key"])
+	assert.Equal(t, "wk", payload["key"])
 	assert.Equal(t, repository, payload["repository"])
 	assert.Equal(t, defaultBranch, payload["default_branch"])
 
