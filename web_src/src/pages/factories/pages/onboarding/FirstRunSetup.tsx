@@ -27,6 +27,7 @@ import { factoryListPath } from "../../lib/factoryPagePaths";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
+import { FirstRunAnalysisScreen } from "./first-run/FirstRunAnalysisScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
 import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
@@ -39,7 +40,7 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent";
+type FirstRunScreen = "welcome" | "connect" | "choose" | "tickets" | "agent" | "analysis";
 
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
@@ -64,6 +65,7 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   choose: 2,
   tickets: 3,
   agent: 4,
+  analysis: 5,
 };
 
 /**
@@ -229,6 +231,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       // holds the answer from before the click. Passing the answer here
       // keeps a single click from saving a stale, empty issues source over
       // the one `saveIssues` already stored.
+      if (model.repositoryAnalysisEnabled) {
+        setOpenedScreen("analysis");
+      }
       await model.finish(DEFAULT_ISSUES_CHOICE);
       return;
     }
@@ -342,8 +347,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     email: account?.email,
     onLogOut: canExitSetup ? undefined : signOut,
     onCancel: canExitSetup ? () => void cancelSetup() : undefined,
-    stepIndex: STEP_INDEX_FOR_SCREEN[target],
-    stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+    stepIndex: target === "analysis" && flow.skipAgentScreen ? 4 : STEP_INDEX_FOR_SCREEN[target],
+    stepCount: FIRST_RUN_STEP_COUNT - (flow.skipAgentScreen ? 1 : 0) + (model.repositoryAnalysisEnabled ? 1 : 0),
   });
 
   if (flow.screen === "welcome") {
@@ -400,6 +405,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     );
   }
 
+  if (flow.screen === "analysis") {
+    return (
+      <FirstRunAnalysisScreen
+        status={model.analysisStatus}
+        currentStageIndex={0}
+        chrome={chromeFor("analysis")}
+        onRetry={() => void model.finish()}
+      />
+    );
+  }
+
   return (
     <AgentScreen
       organizationId={organizationId}
@@ -407,7 +423,12 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       chrome={chromeFor("agent")}
       saving={model.saving}
       onRequestConnect={model.requestConnect}
-      onContinue={() => void model.finish()}
+      onContinue={() => {
+        if (model.repositoryAnalysisEnabled) {
+          flow.goToScreen("analysis");
+        }
+        void model.finish();
+      }}
     />
   );
 }

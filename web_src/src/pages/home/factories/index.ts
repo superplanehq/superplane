@@ -137,6 +137,12 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Create a branch, implement the plan, and open a pull request.",
     entrypointNodeId: "onrun-implement",
   }),
+  "workspace-repository-analysis": buildLineApp({
+    id: "workspace-repository-analysis",
+    title: "Repository Analysis",
+    description: "Detect repository languages and development commands with Suss.",
+    entrypointNodeId: "onrun-analyze-repository",
+  }),
   "pr-closure": buildEventApp({
     id: "pr-closure",
     title: "PR Closure",

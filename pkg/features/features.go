@@ -36,6 +36,10 @@ const FeatureWorkspaceModels = "workspace_models"
 // a draft task until the flow is generally available.
 const FeatureFactoryDraftStartModel = "factory_draft_start_model"
 
+// FeatureFactoryRepositoryAnalysis enables the Suss repository scan during
+// workspace onboarding.
+const FeatureFactoryRepositoryAnalysis = "factory_repository_analysis"
+
 func released() *bool {
 	v := true
 	return &v
@@ -48,6 +52,7 @@ var registry = []Feature{
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
+	{ID: FeatureFactoryRepositoryAnalysis, Label: "Factory Repository Analysis", Description: "Analyze repository setup during workspace onboarding"},
 }
 
 func All() []Feature {

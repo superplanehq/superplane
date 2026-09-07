@@ -9,6 +9,7 @@ import {
   type VcsHostId,
 } from "./onboardingFixtures";
 import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
+import type { FirstRunAnalysisStatus } from "./first-run/firstRunTypes";
 
 export type OnboardingSetupState = {
   workspaceName: string;
@@ -87,6 +88,7 @@ export function useOnboardingSetupState(
   const [issuesCommitted, setIssuesCommitted] = useState(false);
   const [agent, setAgent] = useState<AgentHarnessId | null>(null);
   const [finished, setFinished] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<FirstRunAnalysisStatus>("running");
   const discoveryTimerRef = useRef<number | null>(null);
   const connected = options?.connected ?? localConnected;
 
@@ -245,6 +247,8 @@ export function useOnboardingSetupState(
     setAgent,
     finished,
     setFinished,
+    analysisStatus,
+    setAnalysisStatus,
     issueCount,
     nameReady,
     vcsReady,

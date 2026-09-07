@@ -9,6 +9,7 @@ import {
   provisionGithubIntake,
   provisionLine,
   provisionPRFeedbackHandler,
+  provisionRepositoryAnalysis,
 } from "./onboardingProvision";
 
 describe("provisionLine", () => {
@@ -202,6 +203,32 @@ describe("provisionEventApps", () => {
     });
 
     expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "create-with-agent"]);
+  });
+});
+
+describe("provisionRepositoryAnalysis", () => {
+  it("installs and starts the Suss analysis app", async () => {
+    const installFactory = vi.fn().mockResolvedValue({ canvasId: "analysis-1", canvasName: "Repository Analysis" });
+
+    await provisionRepositoryAnalysis({
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      selections: {},
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "main",
+      installFactory,
+      listApps: vi.fn().mockResolvedValue([]),
+    });
+
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        factoryId: "workspace-repository-analysis",
+        workspaceFactoryId: "factory-1",
+        startingTaskPrompt: "Analyze the workspace repository.",
+        startInitialRun: true,
+      }),
+    );
   });
 });
 

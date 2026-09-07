@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	factoryTemplateMetadataKey = "factoryTemplate"
-	factoryTemplateVersion     = 1
-	factoryCanvasIDPlaceholder = "__FACTORY_CANVAS_ID__"
+	factoryTemplateMetadataKey   = "factoryTemplate"
+	factoryTemplateVersion       = 1
+	factoryCanvasIDPlaceholder   = "__FACTORY_CANVAS_ID__"
+	repositoryAnalysisTemplateID = "workspace-repository-analysis"
 )
 
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
@@ -51,6 +52,12 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 			"github.findPullRequest":   "github",
 			"github.updatePullRequest": "github",
 		},
+	},
+	repositoryAnalysisTemplateID: {
+		id:               repositoryAnalysisTemplateID,
+		entrypointNodeID: "onrun-analyze-repository",
+		canvasFile:       "templates/workspace-repository-analysis.canvas.yaml",
+		consoleFile:      "templates/line-app.console.yaml",
 	},
 	"pr-closure": {
 		id:               "pr-closure",

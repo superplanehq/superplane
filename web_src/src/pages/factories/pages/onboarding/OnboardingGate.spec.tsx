@@ -54,6 +54,13 @@ describe("OnboardingGate", () => {
     expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
   });
 
+  it("lets a user leave setup while repository analysis runs", async () => {
+    factory = { id: "factory-1", onboarding: {}, repositoryAnalysis: { status: "running" } };
+    renderRoute("/org-1/workspaces/PAY/overview");
+
+    expect(await screen.findByText("/org-1/workspaces/PAY/overview")).toBeInTheDocument();
+  });
+
   it("redirects a completed workspace away from setup", async () => {
     factory = { id: "factory-1", onboarding: { completedAt: "2026-08-17T12:00:00Z" } };
     renderRoute("/org-1/workspaces/PAY/setup");

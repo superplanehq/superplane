@@ -1,9 +1,16 @@
-import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import {
+  factoriesDescribeFactory,
+  type FactoriesFactory,
+  type FactoriesFactoryLine,
+  type FactoryLineStep,
+} from "@/api-client";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useNavigate } from "react-router";
+import type { FirstRunAnalysisStatus } from "./first-run/firstRunTypes";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
@@ -14,6 +21,7 @@ import {
   provisionGithubIntake,
   provisionLine,
   provisionPRFeedbackHandler,
+  provisionRepositoryAnalysis,
   type CreateFactoryIntake,
   type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
@@ -89,6 +97,7 @@ export async function provisionWorkspace(args: {
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
+  repositoryAnalysisEnabled: boolean;
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
     await saveWithFreeWorkspaceName({
@@ -133,6 +142,19 @@ export async function provisionWorkspace(args: {
     installFactory: args.installFactory,
     listApps: args.listApps,
   });
+  if (args.repositoryAnalysisEnabled) {
+    await provisionRepositoryAnalysis({
+      organizationId: args.organizationId,
+      factoryId: args.factoryId,
+      selections: args.selections,
+      appRepository: args.appRepository,
+      backlogRepository: args.backlogRepository,
+      defaultBranch,
+      agentRewrite: args.agentRewrite,
+      installFactory: args.installFactory,
+      listApps: args.listApps,
+    });
+  }
   // The intake needs the line: it opens tasks that the line runs.
   await provisionGithubIntake({
     listIntakes: args.listIntakes,
@@ -146,9 +168,30 @@ export async function provisionWorkspace(args: {
   await args.updateOnboarding({
     provisionedAppId: primaryAppId,
     provisionedLineId: lineId,
-    complete: true,
+    ...(!args.repositoryAnalysisEnabled ? { complete: true } : {}),
   });
   return { lineId };
+}
+
+const REPOSITORY_ANALYSIS_POLL_MS = 2_000;
+const REPOSITORY_ANALYSIS_TIMEOUT_MS = 5 * 60_000;
+
+async function waitForRepositoryAnalysis(organizationId: string, factoryId: string): Promise<void> {
+  const deadline = Date.now() + REPOSITORY_ANALYSIS_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const response = await factoriesDescribeFactory(
+      withOrganizationHeader({ organizationId, path: { id: factoryId } }),
+    );
+    const analysis = response.data?.factory?.repositoryAnalysis;
+    if (analysis?.status === "ready") {
+      return;
+    }
+    if (analysis?.status === "failed") {
+      throw new Error(analysis.error || "Repository analysis did not finish");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, REPOSITORY_ANALYSIS_POLL_MS));
+  }
+  throw new Error("Repository analysis did not finish in five minutes");
 }
 
 export function useFinishOnboarding(args: {
@@ -173,6 +216,8 @@ export function useFinishOnboarding(args: {
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
+  setAnalysisStatus: (status: FirstRunAnalysisStatus) => void;
+  repositoryAnalysisEnabled: boolean;
 }) {
   const navigate = useNavigate();
   // A caller that just changed the issues answer in the same click (the
@@ -205,6 +250,9 @@ export function useFinishOnboarding(args: {
     }
 
     args.setSaving(true);
+    if (args.repositoryAnalysisEnabled) {
+      args.setAnalysisStatus("running");
+    }
     try {
       const provisioned = await provisionWorkspace({
         ...args,
@@ -217,10 +265,17 @@ export function useFinishOnboarding(args: {
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
         agentIntegrationId:
           args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
+        repositoryAnalysisEnabled: args.repositoryAnalysisEnabled,
       });
+      if (args.repositoryAnalysisEnabled) {
+        await waitForRepositoryAnalysis(args.organizationId, args.factoryId);
+      }
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
       navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);
     } catch (error) {
+      if (args.repositoryAnalysisEnabled) {
+        args.setAnalysisStatus("failed");
+      }
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {
       args.setSaving(false);

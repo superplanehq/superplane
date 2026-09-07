@@ -15,3 +15,6 @@ export const FEATURE_WORKSPACE_MODELS = "workspace_models";
 
 /** Organization experimental feature: model selector next to Start on a draft task. */
 export const FEATURE_FACTORY_DRAFT_START_MODEL = "factory_draft_start_model";
+
+/** Organization experimental feature: Suss repository analysis during workspace setup. */
+export const FEATURE_FACTORY_REPOSITORY_ANALYSIS = "factory_repository_analysis";

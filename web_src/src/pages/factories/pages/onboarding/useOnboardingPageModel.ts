@@ -1,5 +1,6 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { factoryQueryKeys, fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
@@ -10,6 +11,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { githubInstallationUrl } from "@/lib/githubInstallation";
 import { showErrorToast } from "@/lib/toast";
 import { parseWorkOrderMetric } from "@/pages/factories/lib/workOrderUsage";
+import { FEATURE_FACTORY_REPOSITORY_ANALYSIS } from "@/lib/experimentalFeatures";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -93,6 +95,15 @@ function useRestoreSetup(
     if (!selections.claude?.ready) return;
     setup.setAgent("claude-code");
   }, [onboarding?.agentHarness, selections.claude?.ready, setup]);
+}
+
+function useOnboardingAccess(organizationId: string) {
+  const { canAct } = usePermissions();
+  const { has } = useExperimentalFeature(organizationId);
+  return {
+    canAct,
+    repositoryAnalysisEnabled: has(FEATURE_FACTORY_REPOSITORY_ANALYSIS),
+  };
 }
 
 async function runSave(setSaving: (saving: boolean) => void, action: () => Promise<unknown>): Promise<boolean> {
@@ -377,7 +388,7 @@ export function useOnboardingPageModel(args: {
   onboardingEntryPath?: string | null;
   reresolveWorkspace?: OnboardingWorkspaceResolution | null;
 }) {
-  const { canAct } = usePermissions();
+  const { canAct, repositoryAnalysisEnabled } = useOnboardingAccess(args.organizationId);
   const onboarding = args.factory?.onboarding;
   const integrations = useIntegrationSelections(onboarding);
   const agent = useOnboardingAgentContext(args.organizationId, integrations.connected);
@@ -463,6 +474,8 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
+    setAnalysisStatus: setup.setAnalysisStatus,
+    repositoryAnalysisEnabled,
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
@@ -478,6 +491,8 @@ export function useOnboardingPageModel(args: {
     // True when hosted credentials cover the agent, so setup can skip the
     // agent screen and provision from the ticket screen.
     hostedAgentReady: isHostedAgentReady({ hostedModelsLoading: agent.hostedModelsLoading, plan: agent.plan }),
+    analysisStatus: setup.analysisStatus,
+    repositoryAnalysisEnabled,
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,

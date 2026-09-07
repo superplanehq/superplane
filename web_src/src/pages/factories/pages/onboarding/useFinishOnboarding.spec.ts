@@ -65,6 +65,7 @@ describe("provisionWorkspace", () => {
         planningModel: readyPlan.planningModel,
         credentials: { source: "hosted" as const },
       },
+      repositoryAnalysisEnabled: true,
       ...overrides,
     };
   }
@@ -88,8 +89,17 @@ describe("provisionWorkspace", () => {
     );
 
     expect(result).toEqual({ lineId: "line-1" });
-    const completeCall = updateOnboarding.mock.calls.find(([input]) => input.complete);
-    expect(completeCall?.[0]).toMatchObject({ complete: true });
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete)).toBe(false);
+  });
+
+  it("completes onboarding without repository analysis when the feature is disabled", async () => {
+    const updateOnboarding = vi.fn().mockResolvedValue({});
+    const installFactory = vi.fn().mockResolvedValue({ canvasId: "canvas-1", canvasName: "canvas-1" });
+
+    await provisionWorkspace(provisionArgs({ repositoryAnalysisEnabled: false, updateOnboarding, installFactory }));
+
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).not.toContain("workspace-repository-analysis");
+    expect(updateOnboarding.mock.calls.some(([input]) => input.complete === true)).toBe(true);
   });
 });
 

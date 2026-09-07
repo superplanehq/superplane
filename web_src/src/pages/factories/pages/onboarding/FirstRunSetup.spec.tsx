@@ -81,6 +81,8 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    analysisStatus: "running",
+    repositoryAnalysisEnabled: true,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
@@ -133,6 +135,7 @@ describe("FirstRunSetup", () => {
     expect(model.saveIssues).toHaveBeenCalledWith("vcs");
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analysis")).toBeInTheDocument();
   });
 
   // Regression: the click that sets the issues choice and the call that
@@ -251,8 +254,14 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
   });
 
-  it("counts the ticket screen as the last step when the agent screen is skipped", () => {
+  it("keeps the analysis step after tickets when the agent screen is skipped", () => {
     renderSetup(pageModel({ hostedAgentReady: true }));
+
+    expect(screen.getByRole("navigation", { name: FIRST_RUN_COPY.chrome.stepLabel(4, 5) })).toBeInTheDocument();
+  });
+
+  it("does not add an analysis step when the feature is disabled", () => {
+    renderSetup(pageModel({ hostedAgentReady: true, repositoryAnalysisEnabled: false }));
 
     expect(screen.getByRole("navigation", { name: FIRST_RUN_COPY.chrome.stepLabel(4, 4) })).toBeInTheDocument();
   });

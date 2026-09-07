@@ -70,6 +70,12 @@ spec:
           - name: COAUTHORS
             value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
             valueSource: literal
+          - name: WORKSPACE_SETUP
+            value: '{{ toBase64(workspace().setup_script) }}'
+            valueSource: literal
+          - name: WORKSPACE_CONTEXT
+            value: '{{ toBase64(workspace().repository_context) }}'
+            valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
         model: sonnet
@@ -103,6 +109,16 @@ spec:
               exit 0
               HOOK
               chmod +x .git/hooks/prepare-commit-msg
+          - name: Set Up Environment
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+              echo "$WORKSPACE_CONTEXT" | base64 -d > /tmp/WORKSPACE.json
+              SETUP_SCRIPT="$(echo "$WORKSPACE_SETUP" | base64 -d)"
+              if [ -n "$SETUP_SCRIPT" ]; then
+                bash -euo pipefail -c "$SETUP_SCRIPT"
+              fi
           - name: Implementation
             type: prompt
             workingDirectory: repo
@@ -117,6 +133,8 @@ spec:
 
               Implementation plan:
               {{ find(task().artifacts, {#.type == "markdown" && #.data.title == "PLAN.md"}).data.body }}
+
+              Read /tmp/WORKSPACE.json first. Treat its languages and repository-native commands as the environment contract. Do not scan the complete tree or derive dependency-install commands again.
 
               1/ Create a new branch. Do not commit on {{ task().default_branch }}.
               2/ Implement the task and the plan. Keep the change focused.

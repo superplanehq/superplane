@@ -52,6 +52,10 @@ func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.Work
 	return nil, nil
 }
 
+func (f *fakeFactoryContext) SetRepositoryAnalysis(_ core.RepositoryAnalysisParams) error {
+	return nil
+}
+
 func (f *fakeFactoryContext) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
 	f.findCalls++
 	f.findParams = params

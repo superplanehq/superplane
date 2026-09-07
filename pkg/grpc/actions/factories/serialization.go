@@ -11,14 +11,37 @@ import (
 
 func serializeFactory(factory *models.Factory) *pb.Factory {
 	serialized := &pb.Factory{
-		Id:          factory.ID.String(),
-		Name:        factory.Name,
-		Description: factory.Description,
-		Key:         factory.Key,
-		Onboarding:  serializeFactoryOnboarding(factory),
+		Id:                 factory.ID.String(),
+		Name:               factory.Name,
+		Description:        factory.Description,
+		Key:                factory.Key,
+		Onboarding:         serializeFactoryOnboarding(factory),
+		RepositoryAnalysis: serializeFactoryRepositoryAnalysis(factory),
 	}
 	if factory.HostedSpendBudgetCents != nil {
 		serialized.HostedSpendBudgetCents = factory.HostedSpendBudgetCents
+	}
+	return serialized
+}
+
+func serializeFactoryRepositoryAnalysis(factory *models.Factory) *pb.FactoryRepositoryAnalysis {
+	analysis := factory.RepositoryAnalysisValue()
+	serialized := &pb.FactoryRepositoryAnalysis{
+		Status:     analysis.Status,
+		CommitSha:  analysis.CommitSHA,
+		Languages:  analysis.Languages,
+		Error:      analysis.Error,
+		SetupSteps: make([]*pb.FactoryRepositoryAnalysis_SetupStep, len(analysis.SetupSteps)),
+	}
+	for i, step := range analysis.SetupSteps {
+		serialized.SetupSteps[i] = &pb.FactoryRepositoryAnalysis_SetupStep{
+			Name:      step.Name,
+			Command:   step.Command,
+			Directory: step.Directory,
+		}
+	}
+	if analysis.UpdatedAt != nil {
+		serialized.UpdatedAt = timestamppb.New(*analysis.UpdatedAt)
 	}
 	return serialized
 }

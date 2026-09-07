@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
@@ -31,6 +32,18 @@ func MaterializeFactoryAppTemplate(
 	db := database.DB(ctx)
 	if _, err := models.FindFactory(db, orgID, factoryID); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+	}
+	if req.GetTemplateId() == repositoryAnalysisTemplateID {
+		organization, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
+		}
+		if !organization.HasExperimentalFeature(features.FeatureFactoryRepositoryAnalysis) {
+			return nil, factoryErrorToStatus(
+				invalidArgument("factory repository analysis feature is not enabled"),
+				"failed to materialize factory app template",
+			)
+		}
 	}
 	canvas, _, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {

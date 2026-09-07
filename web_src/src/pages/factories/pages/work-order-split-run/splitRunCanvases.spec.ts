@@ -303,6 +303,7 @@ describe("splitRunCanvasForPhase", () => {
     expect(plannerNotes.some((line) => line.componentName.includes("import type"))).toBe(false);
     expect(claudeCodeSteps(canvas.nodes.find((node) => node.id === "planner-agent-no-issue") ?? {})).toEqual([
       { name: "Clone Repo", type: "bash" },
+      { name: "Set Up Environment", type: "bash" },
       { name: "Write Implementation Plan", type: "prompt" },
       { name: "Use plan as output", type: "bash" },
     ]);

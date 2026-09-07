@@ -21,6 +21,7 @@ var ErrPullRequestActivityAlreadyActive = errors.New("pull request activity alre
 
 type FactoryContext interface {
 	CreateWorkOrder(params WorkOrderParams) (*WorkOrder, error)
+	SetRepositoryAnalysis(params RepositoryAnalysisParams) error
 	// FindWorkOrder resolves a work order by id or by one of its
 	// artifacts' keys, without requiring the current run to be attached
 	// to a `factory_work_order_executions` row. Returns ErrWorkOrderNotFound
@@ -49,6 +50,13 @@ type FactoryContext interface {
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
 	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
 	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
+}
+
+type RepositoryAnalysisParams struct {
+	Document  string
+	CommitSHA string
+	Status    string
+	Error     string
 }
 
 type WorkOrderParams struct {

@@ -15,11 +15,13 @@ import {
   ONBOARDING_LINE_APPS,
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
+import { invokeFactoryRun } from "@/pages/home/installFactoryCanvas";
 import type { InstallFactoryInput } from "@/pages/home/useInstallFactory";
 
 export const DEFAULT_LINE_NAME = "plan-and-implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
+export const REPOSITORY_ANALYSIS_TEMPLATE_ID = "workspace-repository-analysis";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -52,6 +54,7 @@ async function installOnboardingApp(args: {
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
   installFactory: InstallOnboardingApp;
+  startInitialRun?: boolean;
 }): Promise<{ canvasId: string; canvasName: string }> {
   const installed = await args.installFactory({
     factoryId: args.appFactoryId,
@@ -62,9 +65,9 @@ async function installOnboardingApp(args: {
       backlogRepository: args.backlogRepository,
       defaultBranch: args.defaultBranch,
     },
-    startingTaskPrompt: "",
+    startingTaskPrompt: args.startInitialRun ? "Analyze the workspace repository." : "",
     navigateOnComplete: false,
-    startInitialRun: false,
+    startInitialRun: args.startInitialRun ?? false,
     agentRewrite: args.agentRewrite,
   });
   if (!installed?.canvasId) throw new Error(`Failed to create the ${args.appFactoryId} app`);
@@ -116,6 +119,40 @@ function matchesEventAppTitle(appName: string | undefined, title: string): boole
   if (!appName) return false;
   if (appName === title) return true;
   return new RegExp(`^${escapeRegExp(title)} \\(\\d+\\)$`).test(appName);
+}
+
+export async function provisionRepositoryAnalysis(args: {
+  organizationId: string;
+  factoryId: string;
+  selections: IntegrationSelections;
+  appRepository: string;
+  backlogRepository: string;
+  defaultBranch: string;
+  agentRewrite?: FactoryAgentRewrite;
+  installFactory: InstallOnboardingApp;
+  listApps: ListFactoryApps;
+}): Promise<FactoryApp | { id?: string; name?: string }> {
+  const definition = getFactoryDefinition(REPOSITORY_ANALYSIS_TEMPLATE_ID);
+  const apps = await args.listApps();
+  const existing = apps.find((app) => matchesEventAppTitle(app.name, definition.title));
+  if (existing) {
+    if (!existing.id) throw new Error("Repository analysis app has no ID");
+    await invokeFactoryRun(args.organizationId, existing.id, definition, "Analyze the workspace repository.");
+    return existing;
+  }
+
+  const installed = await installOnboardingApp({
+    factoryId: args.factoryId,
+    appFactoryId: REPOSITORY_ANALYSIS_TEMPLATE_ID,
+    selections: args.selections,
+    appRepository: args.appRepository,
+    backlogRepository: args.backlogRepository,
+    defaultBranch: args.defaultBranch,
+    agentRewrite: args.agentRewrite,
+    installFactory: args.installFactory,
+    startInitialRun: true,
+  });
+  return { id: installed.canvasId, name: installed.canvasName };
 }
 
 // Event apps listen for GitHub events and are not factory line steps. Skip an

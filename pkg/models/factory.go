@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -42,6 +43,7 @@ type Factory struct {
 	NextWorkOrderNumber    int64
 	OnboardingConfig       datatypes.JSONType[FactoryOnboardingConfig]
 	OnboardingCompletedAt  *time.Time
+	RepositoryAnalysis     datatypes.JSONType[FactoryRepositoryAnalysis]
 	HostedSpendBudgetCents *int64
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
@@ -133,6 +135,7 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 		Key:                   normalizedKey,
 		NextWorkOrderNumber:   1,
 		OnboardingConfig:      datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		RepositoryAnalysis:    datatypes.NewJSONType(FactoryRepositoryAnalysis{}),
 		OnboardingCompletedAt: nil,
 		CreatedAt:             now,
 		UpdatedAt:             now,
@@ -143,6 +146,53 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 	}
 
 	return factory, nil
+}
+
+const MaxFactoryRepositoryAnalysisBytes = 2 * 1024 * 1024
+
+var ErrFactoryRepositoryAnalysisInvalid = errors.New("invalid repository analysis")
+
+type FactoryRepositorySetupStep struct {
+	Name      string `json:"name"`
+	Command   string `json:"command"`
+	Directory string `json:"directory"`
+}
+
+type FactoryRepositoryAnalysis struct {
+	Status     string                       `json:"status,omitempty"`
+	CommitSHA  string                       `json:"commit_sha,omitempty"`
+	UpdatedAt  *time.Time                   `json:"updated_at,omitempty"`
+	Languages  []string                     `json:"languages,omitempty"`
+	SetupSteps []FactoryRepositorySetupStep `json:"setup_steps,omitempty"`
+	Context    string                       `json:"context,omitempty"`
+	Document   json.RawMessage              `json:"document,omitempty"`
+	Error      string                       `json:"error,omitempty"`
+}
+
+func (f *Factory) RepositoryAnalysisValue() FactoryRepositoryAnalysis {
+	return f.RepositoryAnalysis.Data()
+}
+
+func (f *Factory) UpdateRepositoryAnalysis(tx *gorm.DB, analysis FactoryRepositoryAnalysis) error {
+	now := time.Now()
+	analysis.UpdatedAt = &now
+	raw, err := json.Marshal(analysis)
+	if err != nil || len(raw) > MaxFactoryRepositoryAnalysisBytes {
+		return ErrFactoryRepositoryAnalysisInvalid
+	}
+
+	if err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Updates(map[string]any{
+			"repository_analysis": datatypes.NewJSONType(analysis),
+			"updated_at":          now,
+		}).Error; err != nil {
+		return err
+	}
+
+	f.RepositoryAnalysis = datatypes.NewJSONType(analysis)
+	f.UpdatedAt = now
+	return nil
 }
 
 // GenerateUniqueFactoryKey picks a key that is unique among active

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -77,6 +78,26 @@ func Test__MaterializeFactoryAppDefaults(t *testing.T) {
 		assert.Equal(t, "line-planning", response.GetTemplateId())
 		assert.NotEmpty(t, response.GetCanvasYaml())
 		assert.NotEmpty(t, response.GetConsoleYaml())
+	})
+
+	t.Run("repository analysis requires its organization feature", func(t *testing.T) {
+		factoryModel := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Analysis"))
+		request := &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: repositoryAnalysisTemplateID,
+			AppId:      canvas.ID.String(),
+		}
+
+		_, err := MaterializeFactoryAppTemplate(ctx, orgID, request)
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRepositoryAnalysis))
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, request)
+		require.NoError(t, err)
+		assert.Equal(t, repositoryAnalysisTemplateID, response.GetTemplateId())
 	})
 
 	t.Run("an app from another factory reports not found", func(t *testing.T) {

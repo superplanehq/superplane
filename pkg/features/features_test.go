@@ -57,6 +57,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactorySentryIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureFactoryDraftStartModel))
+	assert.True(t, Exists(FeatureFactoryRepositoryAnalysis))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
@@ -61,6 +62,43 @@ func (c *FactoryContext) WithWorkOrderNotification(
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
 	return c
+}
+
+func (c *FactoryContext) SetRepositoryAnalysis(params core.RepositoryAnalysisParams) error {
+	if c.canvas.FactoryID == nil {
+		return errors.New("app is not owned by a factory")
+	}
+	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.canvas.OrganizationID.String())
+	if err != nil {
+		return err
+	}
+	if !organization.HasExperimentalFeature(features.FeatureFactoryRepositoryAnalysis) {
+		return errors.New("repository analysis is not enabled for the organization")
+	}
+
+	factory, err := models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+	if err != nil {
+		return err
+	}
+
+	var analysis models.FactoryRepositoryAnalysis
+	if params.Status == models.FactoryRepositoryAnalysisStatusReady || params.Status == "" {
+		analysis, err = models.BuildFactoryRepositoryAnalysis(params.Document, params.CommitSHA)
+		if err != nil {
+			return err
+		}
+	} else {
+		analysis = factory.RepositoryAnalysisValue()
+		analysis.Status = params.Status
+		analysis.Error = params.Error
+	}
+	if err := factory.UpdateRepositoryAnalysis(c.tx, analysis); err != nil {
+		return err
+	}
+	if analysis.Status == models.FactoryRepositoryAnalysisStatusReady {
+		return factory.CompleteOnboarding(c.tx, models.FactoryOnboardingPatch{})
+	}
+	return nil
 }
 
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {

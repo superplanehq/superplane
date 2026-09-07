@@ -789,6 +789,21 @@ message FactoryOnboarding {
   bool initial = 11;
 }
 
+message FactoryRepositoryAnalysis {
+  message SetupStep {
+    string name = 1;
+    string command = 2;
+    string directory = 3;
+  }
+
+  string status = 1;
+  string commit_sha = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  repeated string languages = 4;
+  repeated SetupStep setup_steps = 5;
+  string error = 6;
+}
+
 message Factory {
   message App {
     string id = 1;
@@ -807,6 +822,7 @@ message Factory {
   FactoryOnboarding onboarding = 6;
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.
   optional int64 hosted_spend_budget_cents = 7;
+  FactoryRepositoryAnalysis repository_analysis = 8;
 }
 
 message FactoryLine {

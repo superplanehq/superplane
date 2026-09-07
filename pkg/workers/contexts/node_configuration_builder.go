@@ -1008,6 +1008,7 @@ func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
 		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
 	}
 	config := factory.OnboardingConfigValue()
+	analysis := factory.RepositoryAnalysisValue()
 	return map[string]any{
 		"id":                 factory.ID.String(),
 		"key":                factory.Key,
@@ -1015,7 +1016,20 @@ func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
 		"repository":         config.AppRepository,
 		"backlog_repository": config.BacklogRepository,
 		"default_branch":     config.DefaultBranch,
+		"languages":          analysis.Languages,
+		"setup_steps":        analysis.SetupSteps,
+		"setup_script":       repositorySetupScript(analysis.SetupSteps),
+		"repository_context": analysis.Context,
 	}, nil
+}
+
+func repositorySetupScript(steps []models.FactoryRepositorySetupStep) string {
+	lines := make([]string, 0, len(steps))
+	for _, step := range steps {
+		directory := strings.ReplaceAll(step.Directory, "'", "'\"'\"'")
+		lines = append(lines, fmt.Sprintf("(cd '%s' && %s)", directory, step.Command))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // resolveRunPayload exposes the current run to expressions via run().

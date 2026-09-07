@@ -35,6 +35,7 @@ export function OnboardingGate() {
   const storybookPending = onboarding?.pending;
   const isSetupRoute = isWorkspaceSetupRoute(location.pathname);
   const isIncomplete = onboarding ? storybookPending?.workspaceId === factoryId : !isFactoryOnboardingComplete(factory);
+  const repositoryAnalysisRunning = factory?.repositoryAnalysis?.status === "running";
 
   if (!isIncomplete) {
     if (isSetupRoute) {
@@ -44,6 +45,9 @@ export function OnboardingGate() {
   }
 
   if (isSetupRoute) {
+    return <Outlet />;
+  }
+  if (repositoryAnalysisRunning) {
     return <Outlet />;
   }
 
