@@ -265,6 +265,37 @@ describe("PhaseLogCard usage", () => {
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
   });
 
+  it("keeps the loading state while a running run reconnects without turns", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      isStreaming: false,
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", costCents: "0", totalTokens: "210", duration: "12s" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
   it("shows a loading state while the run stream is still loading", async () => {
     const user = userEvent.setup();
     renderCard(
@@ -281,5 +312,20 @@ describe("PhaseLogCard usage", () => {
     expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
     expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("notifies the parent when the usage dialog opens from a collapsed run", async () => {
+    const user = userEvent.setup();
+    const onUsageOpenChange = vi.fn();
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded={false}
+        onUsageOpenChange={onUsageOpenChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(onUsageOpenChange).toHaveBeenCalledWith(true);
   });
 });

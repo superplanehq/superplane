@@ -212,7 +212,8 @@ function SplitRunPhaseLogItem({
   onStreamLength: (phaseId: string, length: number) => void;
   onToggle: () => void;
 }) {
-  const live = useSplitRunLiveCanvas(organizationId, entry);
+  const [usageOpen, setUsageOpen] = useState(false);
+  const live = useSplitRunLiveCanvas(organizationId, expanded || usageOpen ? entry : undefined);
   const visual = useMemo(() => resolveSplitRunVisual(entry, live, { demoArtifacts }), [demoArtifacts, entry, live]);
   const stream = useMemo(
     () => attachArtifactsToStream(visual.stream, artifactIndex, entry.runId),
@@ -238,6 +239,7 @@ function SplitRunPhaseLogItem({
       editHref={splitRunPhaseAutomationHref({ organizationId, factoryKey, orderNumber, phase: entry })}
       actionBusy={actionBusy}
       onToggle={onToggle}
+      onUsageOpenChange={setUsageOpen}
     />
   );
 }

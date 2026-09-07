@@ -18,12 +18,14 @@ export function PhaseUsageSpendButton({
   spendLabel,
   live = false,
   className,
+  onOpenChange,
 }: {
   phaseId: string;
   phaseName: string;
   spendLabel: string;
   live?: boolean;
   className?: string;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const agents = usePhaseAgentUsageAgents();
   const usageLoading = usePhaseAgentUsageLoading();
@@ -37,11 +39,20 @@ export function PhaseUsageSpendButton({
         aria-label={SHOW_USAGE_LABEL}
         title={SHOW_USAGE_LABEL}
         className={className}
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          onOpenChange?.(true);
+          setOpen(true);
+        }}
       >
         {spendLabel}
       </button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          onOpenChange?.(next);
+        }}
+      >
         <DialogContent
           size="large"
           className="max-h-[min(90vh,52rem)] w-[min(72rem,calc(100vw-2rem))] max-w-[min(72rem,calc(100vw-2rem))] min-w-0 overflow-x-hidden overflow-y-auto [grid-template-columns:minmax(0,1fr)]"
