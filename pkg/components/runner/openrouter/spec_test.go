@@ -28,7 +28,7 @@ func TestValidateRunOpenRouterSpecAcceptsIntegrationSource(t *testing.T) {
 	require.NoError(t, validateRunOpenRouterSpec(spec))
 }
 
-func TestValidateRunOpenRouterSpecAcceptsHostedCredentials(t *testing.T) {
+func TestValidateRunOpenRouterSpecRejectsHostedCredentials(t *testing.T) {
 	t.Parallel()
 
 	prompt := "fix tests"
@@ -39,29 +39,10 @@ func TestValidateRunOpenRouterSpecAcceptsHostedCredentials(t *testing.T) {
 		},
 		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
 		Model:       "anthropic/claude-sonnet-4-6",
-	}
-	require.NoError(t, validateRunOpenRouterSpec(spec))
-}
-
-func TestValidateRunOpenRouterSpecRejectsHostedBaseURLEnv(t *testing.T) {
-	t.Parallel()
-
-	prompt := "fix tests"
-	value := "https://attacker.example"
-	spec := RunOpenRouterSpec{
-		MachineType: "e1-large-amd64",
-		Steps: []runner.AgentStep{
-			{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt},
-		},
-		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
-		Model:       "anthropic/claude-sonnet-4-6",
-		Environment: []runner.EnvironmentVariable{
-			{Name: envOpenRouterBaseURL, ValueSource: runner.EnvironmentValueSourceLiteral, Value: &value},
-		},
 	}
 	err := validateRunOpenRouterSpec(spec)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), envOpenRouterBaseURL)
+	require.Contains(t, err.Error(), "Run SuperPlane Agent")
 }
 
 func TestValidateRunOpenRouterSpecRequiresModel(t *testing.T) {
@@ -132,9 +113,12 @@ func TestValidateConfigurationOpenRouterRejectsMaxTurnsAboveLimit(t *testing.T) 
 	fields := (&RunOpenRouter{}).Configuration()
 	err := configuration.ValidateConfiguration(fields, map[string]any{
 		"machineType": "e1-large-amd64",
-		"credentials": map[string]any{"source": "hosted"},
-		"model":       "anthropic/claude-sonnet-4-6",
-		"maxTurns":    MaxTurnsLimit + 1,
+		"credentials": map[string]any{
+			"source":      "integration",
+			"integration": map[string]any{"name": "openrouter"},
+		},
+		"model":    "anthropic/claude-sonnet-4-6",
+		"maxTurns": MaxTurnsLimit + 1,
 		"steps": []any{
 			map[string]any{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
 		},
@@ -211,8 +195,11 @@ func validOpenRouterSpec(prompt string) RunOpenRouterSpec {
 		Steps: []runner.AgentStep{
 			{Name: "Prompt", Type: runner.AgentStepPrompt, Prompt: &prompt},
 		},
-		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceHosted},
-		Model:       "anthropic/claude-sonnet-4-6",
+		Credentials: runner.AgentCredentials{
+			Source:      runner.CredentialsSourceIntegration,
+			Integration: configuration.IntegrationRef{Name: "openrouter"},
+		},
+		Model: "anthropic/claude-sonnet-4-6",
 	}
 }
 
@@ -222,7 +209,10 @@ func TestValidateConfigurationOpenRouterRequiresModel(t *testing.T) {
 	fields := (&RunOpenRouter{}).Configuration()
 	err := configuration.ValidateConfiguration(fields, map[string]any{
 		"machineType": "e1-large-amd64",
-		"credentials": map[string]any{"source": "hosted"},
+		"credentials": map[string]any{
+			"source":      "integration",
+			"integration": map[string]any{"name": "openrouter"},
+		},
 		"steps": []map[string]any{
 			{"name": "Prompt", "type": "prompt", "prompt": "fix tests"},
 		},

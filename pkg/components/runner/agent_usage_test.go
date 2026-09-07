@@ -137,6 +137,27 @@ func TestRecordRunnerLLMUsageFromFinishedEvent(t *testing.T) {
 	assert.Equal(t, models.UsageIdempotencyKeyRunner, recorder.records[0].IdempotencyKey)
 }
 
+func TestRecordRunnerLLMUsageFromSuperPlaneFinishedEvent(t *testing.T) {
+	t.Parallel()
+
+	recorder := &recordingUsage{}
+	RecordRunnerLLMUsage(
+		recorder,
+		nil,
+		"runnerSuperPlane.finished",
+		map[string]any{
+			"hostedProvider": models.UsageProviderOpenRouter,
+			"model":          "anthropic/claude-sonnet-4-6",
+			"credentials":    map[string]any{"source": "hosted"},
+		},
+		json.RawMessage(`{"usage":{"input_tokens":5,"output_tokens":2},"model":"anthropic/claude-sonnet-4-6"}`),
+	)
+	require.Len(t, recorder.records, 1)
+	assert.Equal(t, models.UsageProviderOpenRouter, recorder.records[0].Provider)
+	assert.Equal(t, "hosted", recorder.records[0].FundingSource)
+	assert.Equal(t, "anthropic/claude-sonnet-4-6", recorder.records[0].Model)
+}
+
 func TestProcessBrokerTaskStatusRecordsUsageWhenExecutionAlreadyFinished(t *testing.T) {
 	t.Parallel()
 

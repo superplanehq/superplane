@@ -150,6 +150,17 @@ service Organizations {
     };
   }
 
+  rpc ListSelectableLLMModels(ListSelectableLLMModelsRequest) returns (ListSelectableLLMModelsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/selectable-llm-models"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List selectable LLM models";
+      description: "Returns SuperPlane-hosted and selected BYOK models a picker may show";
+      tags: "Organization";
+    };
+  }
+
   rpc ListBYOKLLMModels(ListBYOKLLMModelsRequest) returns (ListBYOKLLMModelsResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/byok-models"
@@ -486,6 +497,8 @@ message DescribeOrganizationWorkspaceUsageResponse {
   repeated HostedCreditInvoice invoices = 13;
   int64 total_duration_seconds = 14;
   repeated UsageByMachineType by_machine_type = 15;
+  string default_hosted_provider = 16;
+  string default_hosted_model = 17;
 }
 
 message DescribeOrganizationSpendingReportRequest {
@@ -585,6 +598,28 @@ message ListHostedLLMModelsResponse {
 message HostedLLMModel {
   string id = 1;
   string name = 2;
+}
+
+message ListSelectableLLMModelsRequest {
+  string id = 1;
+  string factory_id = 2;
+}
+
+message SelectableLLMNamedID {
+  string id = 1;
+  string name = 2;
+}
+
+message SelectableLLMModel {
+  SelectableLLMNamedID source = 1;
+  SelectableLLMNamedID provider = 2;
+  SelectableLLMNamedID model = 3;
+  string key = 4;
+  string label = 5;
+}
+
+message ListSelectableLLMModelsResponse {
+  repeated SelectableLLMModel models = 1;
 }
 
 message ListBYOKLLMModelsRequest {

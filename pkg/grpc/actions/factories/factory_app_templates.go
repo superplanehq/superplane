@@ -223,20 +223,26 @@ func rewriteFactoryIntegrationNames(value any, integrations map[string]factoryTe
 }
 
 func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
-	if agent == nil || node.Component != "runnerClaudeCode" {
+	if agent == nil {
 		return
 	}
-	node.Component = agent.component
+	if node.Component != "runnerClaudeCode" && node.Component != models.SuperPlaneRunnerComponent {
+		return
+	}
 	if node.Configuration == nil {
 		node.Configuration = map[string]any{}
 	}
-	if agent.credentialSource == "hosted" {
-		node.Configuration["credentials"] = map[string]any{"source": "hosted"}
-	} else {
-		node.Configuration["credentials"] = map[string]any{
-			"source":      "integration",
-			"integration": map[string]any{"name": agent.credentialIntegrationName},
-		}
+	if agent.credentialSource == "hosted" || agent.component == models.SuperPlaneRunnerComponent {
+		node.Component = models.SuperPlaneRunnerComponent
+		delete(node.Configuration, "credentials")
+		delete(node.Configuration, "model")
+		delete(node.Configuration, "maxTurns")
+		return
+	}
+	node.Component = agent.component
+	node.Configuration["credentials"] = map[string]any{
+		"source":      "integration",
+		"integration": map[string]any{"name": agent.credentialIntegrationName},
 	}
 	model := agent.model
 	if (node.ID == "planner-agent-no-issue" || node.ID == "planning-agent") && agent.planningModel != "" {
@@ -418,16 +424,21 @@ func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 
 func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
 	for _, node := range nodes {
-		if node.ComponentName() != "runnerClaudeCode" &&
-			node.ComponentName() != "runnerCodex" &&
-			node.ComponentName() != "runnerOpenRouter" {
+		name := node.ComponentName()
+		if name == models.SuperPlaneRunnerComponent {
+			return &factoryTemplateAgent{
+				component:        models.SuperPlaneRunnerComponent,
+				credentialSource: "hosted",
+			}
+		}
+		if name != "runnerClaudeCode" && name != "runnerCodex" && name != "runnerOpenRouter" {
 			continue
 		}
 		model := configString(node.Configuration, "model")
 		if model == "" {
 			return nil
 		}
-		agent := &factoryTemplateAgent{component: node.ComponentName(), model: model}
+		agent := &factoryTemplateAgent{component: name, model: model}
 		credentials, _ := node.Configuration["credentials"].(map[string]any)
 		agent.credentialSource, _ = credentials["source"].(string)
 		if integration, ok := credentials["integration"].(map[string]any); ok {
@@ -542,7 +553,8 @@ func materializeBacklogDefaults(canvas *models.Canvas, version *models.CanvasVer
 
 func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 	for _, node := range nodes {
-		if node.ComponentName() != "runnerClaudeCode" &&
+		if node.ComponentName() != models.SuperPlaneRunnerComponent &&
+			node.ComponentName() != "runnerClaudeCode" &&
 			node.ComponentName() != "runnerCodex" &&
 			node.ComponentName() != "runnerOpenRouter" {
 			continue
