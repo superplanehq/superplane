@@ -41,13 +41,17 @@ The On Task trigger starts a workflow execution when task events occur in a Prod
 
 ### Outputs
 
-- **Default channel**: Emits the Productive.io webhook envelope, including a `data` object with the
-  task `id` and `attributes` such as `title` and `description`.
+- **Default channel**: Emits an envelope with a `data` object that holds the task `id` and
+  `attributes` such as `title` and `description`, and a `meta.event` field that names the
+  change (`task.created` or `task.updated`).
 
-### Webhook Setup
+### How tasks arrive
 
-This trigger registers a Productive.io webhook automatically when configured, and removes it when the
-trigger is deleted.
+The trigger reads the project every minute and emits the tasks that changed since the read before it.
+Tasks that already exist when you add the trigger are not reported; only later changes are.
+
+Productive.io offers webhooks on selected plans only, and rejects webhook registration on the other
+plans. Polling therefore works on every plan, at the cost of up to one minute of delay.
 
 ### Example Data
 
