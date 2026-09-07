@@ -114,12 +114,39 @@ func TestApplyVelocityOrderUsage(t *testing.T) {
 	orderID := uuid.New()
 	orders := map[uuid.UUID]*velocityOrder{orderID: {id: orderID}}
 
-	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageTotals{
-		orderID: {TotalTokens: 4200, CostMicros: 2_500_000},
+	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageSplit{
+		orderID: {
+			Model:   models.UsageTotals{TotalTokens: 4200, CostMicros: 2_500_000},
+			Compute: models.UsageTotals{DurationSeconds: 900, CostMicros: 500_000},
+		},
 	})
 
-	assert.Equal(t, int64(4200), orders[orderID].tokens)
-	assert.Equal(t, int64(250), orders[orderID].costCents, "2.5 million micros is 250 cents")
+	order := orders[orderID]
+	assert.Equal(t, int64(4200), order.tokens)
+	assert.Equal(t, int64(250), order.modelCostCents, "2.5 million micros is 250 cents")
+	assert.Equal(t, int64(50), order.computeCostCents)
+	assert.Equal(t, int64(300), order.costCents, "the total is the two bands together")
+}
+
+func TestApplyVelocityOrderUsage_LeavesOrdersWithoutSpendAtZero(t *testing.T) {
+	orderID := uuid.New()
+	orders := map[uuid.UUID]*velocityOrder{orderID: {id: orderID}}
+
+	applyVelocityOrderUsage(orders, map[uuid.UUID]models.UsageSplit{})
+
+	assert.Zero(t, orders[orderID].costCents)
+	assert.Zero(t, orders[orderID].modelCostCents)
+	assert.Zero(t, orders[orderID].computeCostCents)
+}
+
+func TestMedianCents(t *testing.T) {
+	assert.Zero(t, medianCents(nil), "a day with no tasks has no median")
+	assert.Equal(t, int64(180), medianCents([]int64{900, 180, 20}), "the middle of an odd sample")
+	assert.Equal(t, int64(150), medianCents([]int64{100, 200, 900, 20}), "the two middle values, averaged")
+
+	values := []int64{300, 100, 200}
+	medianCents(values)
+	assert.Equal(t, []int64{300, 100, 200}, values, "the sample keeps its order")
 }
 
 func TestVelocityIntakeTotals_KeepsSeriesOrderAndDropsWaste(t *testing.T) {

@@ -1844,13 +1844,24 @@ message DescribeFactoryVelocityDay {
   int32 waste = 5;
   // Merged SuperPlane pull requests grouped by intake source.
   repeated DescribeFactoryVelocityIntakeCount intake = 6;
-  // Tracked model spend of the work orders that closed on this day. A work
-  // order counts on the day its pull request merged, or on the day its last
-  // pull request closed when none merged.
+  // Tracked spend of the work orders that closed on this day. A work order
+  // counts on the day its pull request merged, or on the day its last pull
+  // request closed when none merged.
   int64 cost_cents = 7;
   int64 tokens = 8;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 9;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 10;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 11;
+  // Median model spend of one work order reported on this day. Medians of the
+  // two bands do not add up to the median of the total, so these two describe
+  // one typical work order per band rather than one typical total.
+  int64 median_task_model_cost_cents = 12;
+  // Median runner compute spend of one work order reported on this day.
+  int64 median_task_compute_cost_cents = 13;
 }
 
 // DescribeFactoryVelocityIntakeSource names one intake series and its total.
@@ -1921,7 +1932,7 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
-  // Tracked model spend of the work orders that closed in the window.
+  // Tracked spend of the work orders that closed in the window.
   int64 cost_cents = 6;
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
@@ -1932,6 +1943,11 @@ message DescribeFactoryVelocityTotals {
   int32 tasks_closed = 9;
   // Part of `tasks_closed` whose pull requests all closed without a merge.
   int32 tasks_waste = 10;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 11;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 12;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
