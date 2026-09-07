@@ -62,8 +62,10 @@ func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_start", records[0]["type"])
 	assert.Equal(t, "bash", records[0]["kind"])
 	assert.Equal(t, "git status", records[0]["text"])
+	assert.Equal(t, float64(1), records[0]["turn"])
 	assert.NotEmpty(t, records[0]["id"])
 	assert.Contains(t, output, "On branch main")
+	assert.Contains(t, output, `"type":"turn"`)
 	end := records[len(records)-1]
 	assert.Equal(t, "tool_end", end["type"])
 	assert.Equal(t, "passed", end["status"])
@@ -87,6 +89,124 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Equal(t, "read", records[3]["kind"])
 	assert.Equal(t, "passed", records[3]["status"])
 	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
+	assert.Equal(t, float64(1), records[0]["turn"])
+	assert.Equal(t, float64(1), records[1]["turn"])
+}
+
+func TestFormatStreamJsonLinesEmitsTurnUsageAndStampsTools(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":100,"output_tokens":20},"content":[{"type":"text","text":"I will generate protobufs."},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"make pb.gen"}}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":"ok"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":80,"output_tokens":10},"content":[{"type":"text","text":"done"}]}}`,
+		`{"type":"result","usage":{"input_tokens":180,"output_tokens":30},"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.Len(t, turns, 2)
+	assert.Equal(t, float64(1), turns[0]["turn"])
+	usage, ok := turns[0]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(100), usage["input_tokens"])
+	assert.Equal(t, float64(20), usage["output_tokens"])
+	assert.Equal(t, "I will generate protobufs.", turns[0]["message"])
+	assert.Equal(t, float64(2), turns[1]["turn"])
+	assert.Equal(t, "done", turns[1]["message"])
+
+	tools := liveLogRecords(t, output)
+	require.GreaterOrEqual(t, len(tools), 2)
+	assert.Equal(t, float64(1), tools[0]["turn"])
+	assert.Equal(t, "make pb.gen", tools[0]["text"])
+}
+
+func TestFormatStreamJsonLinesReadsOutputFromMessageDelta(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_a","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":1448,"cache_creation_input_tokens":815}}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_start","content_block":{"type":"text","text":""}}}`,
+		`{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Checking the docs."}}}`,
+		`{"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":47}}}`,
+		`{"type":"assistant","message":{"id":"msg_a","usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":1448,"cache_creation_input_tokens":815},"content":[{"type":"text","text":"Checking the docs."},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"cat AGENTS.md"}}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":"ok"}]}}`,
+		`{"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_b","usage":{"input_tokens":2,"output_tokens":1,"cache_read_input_tokens":20409,"cache_creation_input_tokens":2663}}}}`,
+		`{"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":80}}}`,
+		`{"type":"assistant","message":{"id":"msg_b","usage":{"input_tokens":2,"output_tokens":1,"cache_read_input_tokens":20409,"cache_creation_input_tokens":2663},"content":[{"type":"text","text":"Here is the answer."}]}}`,
+		`{"type":"result","usage":{"input_tokens":3,"output_tokens":127,"cache_read_input_tokens":21857,"cache_creation_input_tokens":3478},"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	first := lastTurnRecord(t, turns, 1)
+	second := lastTurnRecord(t, turns, 2)
+	assert.Equal(t, float64(47), first["output_tokens"])
+	assert.Equal(t, float64(1), first["input_tokens"])
+	assert.Equal(t, float64(1448), first["cache_read_input_tokens"])
+	assert.Equal(t, float64(80), second["output_tokens"])
+	assert.Equal(t, float64(2), second["input_tokens"])
+	assert.Equal(t, float64(20409), second["cache_read_input_tokens"])
+	assert.NotContains(t, output, `"turn":3`)
+	assert.Equal(t, "Checking the docs.", latestTurnMessage(t, turns, 1))
+	assert.Equal(t, "Here is the answer.", latestTurnMessage(t, turns, 2))
+
+	tools := liveLogRecords(t, output)
+	require.GreaterOrEqual(t, len(tools), 1)
+	assert.Equal(t, float64(1), tools[0]["turn"])
+	assert.Equal(t, "cat AGENTS.md", tools[0]["text"])
+}
+
+func TestFormatStreamJsonLinesUpdatesUsageForTheSameMessageID(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"id":"msg_1","usage":{"input_tokens":2,"output_tokens":1,"cache_read_input_tokens":20409},"content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"id":"msg_1","usage":{"input_tokens":2,"output_tokens":2000,"cache_read_input_tokens":20409},"content":[{"type":"text","text":"full answer"}]}}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.Len(t, turns, 2)
+	assert.Equal(t, float64(1), turns[0]["turn"])
+	assert.Equal(t, float64(1), turns[1]["turn"])
+	usage, ok := turns[1]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(2000), usage["output_tokens"])
+	assert.Equal(t, float64(2), usage["input_tokens"])
+	assert.Equal(t, "full answer", turns[1]["message"])
+	assert.NotContains(t, output, `"turn":2`)
+}
+
+func TestFormatStreamJsonLinesAppliesBilledOutputGapToLastTurn(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":1448},"content":[{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"git status"}}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":"ok"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":1,"cache_read_input_tokens":20409},"content":[{"type":"text","text":"done"}]}}`,
+		`{"type":"result","usage":{"input_tokens":13,"output_tokens":2057,"cache_read_input_tokens":71247},"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.GreaterOrEqual(t, len(turns), 3)
+	last := turns[len(turns)-1]
+	assert.Equal(t, float64(2), last["turn"])
+	usage, ok := last["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(2055), usage["output_tokens"])
+	assert.Equal(t, float64(2), usage["input_tokens"])
+}
+
+func TestFormatStreamJsonLinesSkipsDuplicateAssistantUsage(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":5,"cache_read_input_tokens":1448},"content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":5,"cache_read_input_tokens":1448},"content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":21,"cache_read_input_tokens":5394},"content":[{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"git status"}}]}}`,
+		`{"type":"result","usage":{"input_tokens":100,"output_tokens":14190,"cache_read_input_tokens":1505585},"total_cost_usd":0.88,"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.Len(t, turns, 3)
+	assert.Equal(t, float64(1), turns[0]["turn"])
+	assert.Equal(t, float64(2), turns[1]["turn"])
+	assert.Equal(t, float64(2), turns[2]["turn"])
+	usage, ok := turns[1]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(21), usage["output_tokens"])
+	billed, ok := turns[2]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(14185), billed["output_tokens"])
+	assert.NotContains(t, output, `"turn":3`)
 }
 
 // Claude Code's own "result" event is the authoritative verdict for a turn.
@@ -201,4 +321,55 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 		}
 	}
 	return records
+}
+
+func typedLiveLogRecords(t *testing.T, output string, recordType string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		if rec["type"] == recordType {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+func lastTurnRecord(t *testing.T, turns []map[string]any, turn float64) map[string]any {
+	t.Helper()
+	var usage map[string]any
+	for _, rec := range turns {
+		if rec["turn"] != turn {
+			continue
+		}
+		next, ok := rec["usage"].(map[string]any)
+		require.True(t, ok)
+		usage = next
+	}
+	require.NotNil(t, usage, "missing usage for turn %v", turn)
+	return usage
+}
+
+func latestTurnMessage(t *testing.T, turns []map[string]any, turn float64) string {
+	t.Helper()
+	message := ""
+	found := false
+	for _, rec := range turns {
+		if rec["turn"] != turn {
+			continue
+		}
+		found = true
+		if text, ok := rec["message"].(string); ok && text != "" {
+			message = text
+		}
+	}
+	require.True(t, found, "missing turn %v", turn)
+	return message
 }

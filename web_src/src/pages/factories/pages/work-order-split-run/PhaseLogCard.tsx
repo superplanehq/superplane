@@ -1,8 +1,17 @@
+import {
+  agentRunNewTokenCount,
+  emptyAgentRunTelemetry,
+  type AgentPromptUsageSeries,
+  type AgentRunTelemetry,
+} from "@/lib/agentRunTelemetry";
+
+const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
+const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { formatClockDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
 import { ChevronRight, CircleX, Loader2, Maximize2, Pencil, RotateCw } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,6 +31,13 @@ import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { groupPlanningSessionLog, mergePlanningSessionNotes } from "../planningSessionLog";
+import {
+  PhaseAgentUsageProvider,
+  usePhaseAgentUsageAgents,
+  useReportPhaseAgentUsageSeries,
+  type PhaseAgentUsageEntry,
+} from "./phaseAgentUsageContext";
+import { PhaseUsageSpendButton } from "./PhaseUsageChartButton";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
 /** One face and size for every log row, matched to the run log viewer. */
@@ -443,61 +459,69 @@ export function PhaseLogCard({
       data-testid={`split-run-phase-${phase.id}`}
       aria-current={expanded ? "step" : undefined}
     >
-      <div
-        className={cn(
-          "rounded-md bg-muted",
-          !expanded && LOG_ROW_HOVER,
-          expanded ? "pb-2" : "py-2",
-          canToggleFromHeader && !expanded && "cursor-pointer",
-        )}
-        data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
-        onClick={
-          canToggleFromHeader
-            ? (event) => {
-                if (isNestedHeaderControl(event.target)) {
-                  return;
+      <PhaseAgentUsageProvider>
+        <PhaseCollapsedUsageCollectors
+          groups={groups}
+          expanded={expanded}
+          organizationId={organizationId}
+          canvasId={canvasId ?? phase.appId}
+        />
+        <div
+          className={cn(
+            "rounded-md bg-muted",
+            !expanded && LOG_ROW_HOVER,
+            expanded ? "pb-2" : "py-2",
+            canToggleFromHeader && !expanded && "cursor-pointer",
+          )}
+          data-testid={canToggleFromHeader ? `split-run-phase-expand-${phase.id}` : undefined}
+          onClick={
+            canToggleFromHeader
+              ? (event) => {
+                  if (isNestedHeaderControl(event.target)) {
+                    return;
+                  }
+                  onToggle?.();
                 }
-                onToggle?.();
-              }
-            : undefined
-        }
-      >
-        {compactSessionLog ? null : (
-          <AutomationHeader
-            phase={phase}
-            expanded={expanded}
-            collapsible={collapsible}
-            producedArtifacts={producedArtifacts}
-            producedPullRequests={producedPullRequests}
-            onToggle={onToggle}
-            onStop={onStop}
-            onRerun={onRerun}
-            runHref={runHref}
-            editHref={editHref}
-            actionBusy={actionBusy}
-          />
-        )}
+              : undefined
+          }
+        >
+          {compactSessionLog ? null : (
+            <AutomationHeader
+              phase={phase}
+              expanded={expanded}
+              collapsible={collapsible}
+              producedArtifacts={producedArtifacts}
+              producedPullRequests={producedPullRequests}
+              onToggle={onToggle}
+              onStop={onStop}
+              onRerun={onRerun}
+              runHref={runHref}
+              editHref={editHref}
+              actionBusy={actionBusy}
+            />
+          )}
 
-        {expanded ? (
-          <ol
-            className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
-            data-testid={`split-run-stream-${phase.id}`}
-            onClick={(event) => event.stopPropagation()}
-          >
-            {groups.map((group) => (
-              <StreamNode
-                key={group.line.id}
-                group={group}
-                highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
-                onSelect={onSelectNode}
-                organizationId={organizationId}
-                canvasId={canvasId ?? phase.appId}
-                compactSessionLog={compactSessionLog}
-              />
-            ))}
-          </ol>
-        ) : null}
-      </div>
+          {expanded ? (
+            <ol
+              className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
+              data-testid={`split-run-stream-${phase.id}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              {groups.map((group) => (
+                <StreamNode
+                  key={group.line.id}
+                  group={group}
+                  highlighted={Boolean(group.line.nodeId && group.line.nodeId === selectedNodeId)}
+                  onSelect={onSelectNode}
+                  organizationId={organizationId}
+                  canvasId={canvasId ?? phase.appId}
+                  compactSessionLog={compactSessionLog}
+                />
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      </PhaseAgentUsageProvider>
     </div>
   );
 }
@@ -757,37 +781,63 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
   return null;
 }
 
+function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
+  let tokens = 0;
+  let cents = 0;
+  for (const agent of agents) {
+    tokens += agentRunNewTokenCount(agent.telemetry);
+    const usd = agent.telemetry.usage.total_cost_usd;
+    if (usd != null && Number.isFinite(usd)) {
+      cents += Math.round(usd * 100);
+    }
+  }
+  return { tokens, cents };
+}
+
 function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? tickingRunningClock(phase.duration, sampledAt, now)
     : formatClockDurationLabel(phase.duration);
-  const tokens = parseWorkOrderMetric(phase.totalTokens);
-  const cents = parseWorkOrderMetric(phase.costCents);
+  const agents = usePhaseAgentUsageAgents();
+  const live = livePhaseSpend(agents);
+  const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
+  const cents = Math.max(parseWorkOrderMetric(phase.costCents), live.cents);
   const model = displayRunnerModel(phase.model ?? "");
-  const parts: string[] = [];
+  const spendParts: string[] = [];
   if (cents > 0) {
-    parts.push(formatUsdCents(cents));
+    spendParts.push(formatUsdCents(cents));
   }
   if (tokens > 0) {
-    parts.push(formatCompactTokenValue(tokens));
+    spendParts.push(formatCompactTokenValue(tokens));
   }
+  const restParts: string[] = [];
   if (model) {
-    parts.push(model);
+    restParts.push(model);
   }
   if (clock && clock !== "—") {
-    parts.push(clock);
+    restParts.push(clock);
   }
-  if (parts.length === 0) {
+  if (spendParts.length === 0 && restParts.length === 0) {
     return null;
   }
   return (
     <span
       data-testid={`split-run-phase-duration-${phase.id}`}
-      className={cn(LOG_FACE, "tabular-nums text-muted-foreground")}
+      className={cn(LOG_FACE, "inline-flex items-center gap-1 tabular-nums text-muted-foreground")}
     >
-      {parts.join(" · ")}
+      {spendParts.length > 0 ? (
+        <PhaseUsageSpendButton
+          phaseId={phase.id}
+          phaseName={phase.name}
+          spendLabel={spendParts.join(" · ")}
+          live={running}
+          className={cn(LOG_FACE, "tabular-nums text-muted-foreground hover:text-foreground hover:underline")}
+        />
+      ) : null}
+      {spendParts.length > 0 && restParts.length > 0 ? <span aria-hidden> · </span> : null}
+      {restParts.length > 0 ? <span>{restParts.join(" · ")}</span> : null}
     </span>
   );
 }
@@ -824,7 +874,13 @@ function StreamNode({
   compactSessionLog: boolean;
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const liveNotes = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const { notes: liveNotes, usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries(
+    line.nodeId ?? line.id,
+    line.componentName,
+    usageSeries,
+    isRunnerComponent(line.component),
+  );
   const merged = compactSessionLog
     ? mergePlanningSessionNotes(liveNotes, notes)
     : mergeLiveStreamNotes(liveNotes, notes);
@@ -1161,28 +1217,82 @@ function StreamLineIcon({ iconSlug, iconSrc }: { iconSlug?: string; iconSrc?: st
   );
 }
 
+function PhaseCollapsedUsageCollectors({
+  groups,
+  expanded,
+  organizationId,
+  canvasId,
+}: {
+  groups: StreamNodeGroup[];
+  expanded: boolean;
+  organizationId?: string;
+  canvasId?: string;
+}) {
+  if (expanded) {
+    return null;
+  }
+  return (
+    <>
+      {groups.map((group) =>
+        isRunnerComponent(group.line.component) ? (
+          <PhaseAgentUsageCollector
+            key={`usage-${group.line.id}`}
+            line={group.line}
+            organizationId={organizationId}
+            canvasId={canvasId}
+          />
+        ) : null,
+      )}
+    </>
+  );
+}
+
+function PhaseAgentUsageCollector({
+  line,
+  organizationId,
+  canvasId,
+}: {
+  line: SplitRunStreamLine;
+  organizationId?: string;
+  canvasId?: string;
+}) {
+  const { usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries(line.nodeId ?? line.id, line.componentName, usageSeries, true);
+  return null;
+}
+
 function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
-): SplitRunStreamLine[] | undefined {
+): { notes: SplitRunStreamLine[] | undefined; telemetry: AgentRunTelemetry; usageSeries: AgentPromptUsageSeries[] } {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
-  const { sections, orphanLines, error, isStreaming } = useLiveLogStream(
+  const { sections, orphanLines, error, isStreaming, telemetry, usageSeries } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
     line.status === "running",
     line.status === "failed" ? "failed" : line.status === "passed" ? "passed" : null,
     null,
     { organizationId, canvasId },
   );
+  const nextTelemetry = telemetry ?? EMPTY_AGENT_TELEMETRY;
+  const fallbackSeries = useMemo(
+    () => (nextTelemetry.turns.length > 0 ? [{ name: "", telemetry: nextTelemetry }] : EMPTY_USAGE_SERIES),
+    [nextTelemetry],
+  );
+  const nextSeries = usageSeries && usageSeries.length > 0 ? usageSeries : fallbackSeries;
   if (!canStream) {
-    return undefined;
+    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries };
   }
-  return notesForLiveStream({
-    nodeId: line.nodeId ?? line.id,
-    sections,
-    orphanLines,
-    error,
-    isStreaming,
-    nodeStatus: line.status,
-  });
+  return {
+    notes: notesForLiveStream({
+      nodeId: line.nodeId ?? line.id,
+      sections,
+      orphanLines,
+      error,
+      isStreaming,
+      nodeStatus: line.status,
+    }),
+    telemetry: nextTelemetry,
+    usageSeries: nextSeries,
+  };
 }
