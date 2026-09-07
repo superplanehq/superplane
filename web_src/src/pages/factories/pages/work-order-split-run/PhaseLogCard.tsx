@@ -1,4 +1,9 @@
-import { emptyAgentRunTelemetry, type AgentPromptUsageSeries, type AgentRunTelemetry } from "@/lib/agentRunTelemetry";
+import {
+  agentRunNewTokenCount,
+  emptyAgentRunTelemetry,
+  type AgentPromptUsageSeries,
+  type AgentRunTelemetry,
+} from "@/lib/agentRunTelemetry";
 
 const EMPTY_AGENT_TELEMETRY = emptyAgentRunTelemetry();
 const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
@@ -25,7 +30,12 @@ import { SplitRunCheckPills } from "./SplitRunReview";
 import { type SplitRunPhase, type SplitRunPhaseStatus, type SplitRunStreamLine } from "./splitRunMocks";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import { groupPlanningSessionLog, mergePlanningSessionNotes } from "../planningSessionLog";
-import { PhaseAgentUsageProvider, useReportPhaseAgentUsageSeries } from "./phaseAgentUsageContext";
+import {
+  PhaseAgentUsageProvider,
+  usePhaseAgentUsageAgents,
+  useReportPhaseAgentUsageSeries,
+  type PhaseAgentUsageEntry,
+} from "./phaseAgentUsageContext";
 import { PhaseUsageSpendButton } from "./PhaseUsageChartButton";
 import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./streamNotesFromLiveLog";
 
@@ -766,14 +776,29 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
   return null;
 }
 
+function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
+  let tokens = 0;
+  let cents = 0;
+  for (const agent of agents) {
+    tokens += agentRunNewTokenCount(agent.telemetry);
+    const usd = agent.telemetry.usage.total_cost_usd;
+    if (usd != null && Number.isFinite(usd)) {
+      cents += Math.round(usd * 100);
+    }
+  }
+  return { tokens, cents };
+}
+
 function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
   const running = phase.status === "running";
   const { now, sampledAt } = useRunningLogClock(running, phase.duration);
   const clock = running
     ? tickingRunningClock(phase.duration, sampledAt, now)
     : formatClockDurationLabel(phase.duration);
-  const tokens = parseWorkOrderMetric(phase.totalTokens);
-  const cents = parseWorkOrderMetric(phase.costCents);
+  const agents = usePhaseAgentUsageAgents();
+  const live = livePhaseSpend(agents);
+  const tokens = Math.max(parseWorkOrderMetric(phase.totalTokens), live.tokens);
+  const cents = Math.max(parseWorkOrderMetric(phase.costCents), live.cents);
   const model = displayRunnerModel(phase.model ?? "");
   const spendParts: string[] = [];
   if (cents > 0) {
@@ -802,6 +827,7 @@ function PhaseMetrics({ phase }: { phase: SplitRunPhase }) {
           phaseId={phase.id}
           phaseName={phase.name}
           spendLabel={spendParts.join(" · ")}
+          live={running}
           className={cn(LOG_FACE, "tabular-nums text-muted-foreground hover:text-foreground hover:underline")}
         />
       ) : null}

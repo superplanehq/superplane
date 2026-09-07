@@ -75,18 +75,8 @@ describe("chartPointsForTelemetry", () => {
     { type: "tool_start", turn: 2, kind: "bash", text: "git status" },
   ]);
 
-  it("keeps cumulative token totals", () => {
-    const points = chartPointsForTelemetry(telemetry, "cumulative");
-    expect(points[0].tokens).toBe(120);
-    expect(points[1].tokens).toBe(210);
-    expect(points[1].tools).toBe(2);
-    expect(points[0].message).toBe("");
-    expect(points[1].inputBar).toBe(180);
-    expect(points[1].outputBar).toBe(30);
-  });
-
-  it("uses each turn's own usage for per-turn tokens", () => {
-    const points = chartPointsForTelemetry(telemetry, "per-turn");
+  it("uses each turn's own usage for tokens", () => {
+    const points = chartPointsForTelemetry(telemetry);
     expect(points[0].tokens).toBe(120);
     expect(points[1].input_tokens).toBe(80);
     expect(points[1].output_tokens).toBe(10);
@@ -97,7 +87,7 @@ describe("chartPointsForTelemetry", () => {
     expect(points[1].outputBar).toBe(10);
   });
 
-  it("does not count cached context in the per-turn bar", () => {
+  it("does not count cached context in the bar", () => {
     const cached = reduceAgentTelemetryRecords([
       {
         type: "turn",
@@ -115,7 +105,7 @@ describe("chartPointsForTelemetry", () => {
         },
       },
     ]);
-    const points = chartPointsForTelemetry(cached, "per-turn");
+    const points = chartPointsForTelemetry(cached);
     expect(points[0].tokens).toBe(107);
     expect(points[0].inputBar).toBe(102);
     expect(points[0].outputBar).toBe(5);
@@ -124,7 +114,6 @@ describe("chartPointsForTelemetry", () => {
     expect(points[1].inputBar).toBe(150);
     expect(points[1].outputBar).toBe(20);
     expect(points[1].cache_read_tokens).toBe(5000);
-    expect(points[1].expenseTokens).toBe(170);
   });
 });
 

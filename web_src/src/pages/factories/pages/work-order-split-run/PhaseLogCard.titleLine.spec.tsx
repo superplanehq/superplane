@@ -513,6 +513,41 @@ describe("PhaseLogCard usage", () => {
     return render(<MemoryRouter>{ui}</MemoryRouter>);
   }
 
+  it("shows live token counts before the phase records spend", async () => {
+    const user = userEvent.setup();
+    const live = usageTelemetry(210, [{ kind: "bash", text: "git status" }]);
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: live,
+      usageSeries: [{ name: "Prompt", telemetry: live }],
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", costCents: "0", totalTokens: "0", duration: "12s" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+
+    const showUsage = await screen.findByRole("button", { name: "Show usage" });
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent("210");
+    await user.click(showUsage);
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Live. The run is not finished. New turns will appear here.");
+  });
+
   it("opens a usage dialog from the cost and token text", async () => {
     const user = userEvent.setup();
     useLiveLogStreamMock.mockReturnValue({

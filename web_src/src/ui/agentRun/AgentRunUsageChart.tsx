@@ -1,3 +1,4 @@
+import { LoaderCircle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import {
@@ -6,7 +7,6 @@ import {
   agentRunOutputTokenCount,
   agentRunToolCallCount,
   chartPointsForTelemetry,
-  type AgentChartMode,
   type AgentChartPoint,
   type AgentRunTelemetry,
   type AgentTurnTool,
@@ -16,7 +16,11 @@ import { cn } from "@/lib/utils";
 type AgentRunUsageChartProps = {
   telemetry: AgentRunTelemetry;
   title?: string;
+  live?: boolean;
 };
+
+const LIVE_USAGE_STATUS = "Live. The run is not finished. New turns will appear here.";
+const LIVE_USAGE_DETAIL = "The run is not finished. New turns will appear here.";
 
 const CHART_HEIGHT = 200;
 const PAD_LEFT = 40;
@@ -31,11 +35,13 @@ const OUTPUT_BAR_FILL = "fill-amber-500 dark:fill-amber-400";
 const INPUT_SWATCH = "bg-sky-500 dark:bg-sky-400";
 const OUTPUT_SWATCH = "bg-amber-500 dark:bg-amber-400";
 
-export function AgentRunUsageChart({ telemetry, title }: AgentRunUsageChartProps) {
-  const [mode, setMode] = useState<AgentChartMode>("per-turn");
+type TokenKindFilter = "all" | "input" | "output";
+
+export function AgentRunUsageChart({ telemetry, title, live = false }: AgentRunUsageChartProps) {
+  const [tokenKind, setTokenKind] = useState<TokenKindFilter>("all");
   const [hoveredTurn, setHoveredTurn] = useState<number | null>(null);
   const [pinnedTurn, setPinnedTurn] = useState<number | null>(null);
-  const points = useMemo(() => chartPointsForTelemetry(telemetry, mode), [telemetry, mode]);
+  const points = useMemo(() => chartPointsForTelemetry(telemetry), [telemetry]);
   const activeTurn = pinnedTurn ?? hoveredTurn;
   const active = points.find((point) => point.turn === activeTurn) ?? null;
 
@@ -43,6 +49,7 @@ export function AgentRunUsageChart({ telemetry, title }: AgentRunUsageChartProps
     return (
       <section className="min-w-0">
         {title ? <h3 className="mb-2 text-sm font-medium text-foreground">{title}</h3> : null}
+        {live ? <LiveUsageStatus /> : null}
         <p className="py-2 text-sm text-muted-foreground">No usage data yet.</p>
       </section>
     );
@@ -51,21 +58,16 @@ export function AgentRunUsageChart({ telemetry, title }: AgentRunUsageChartProps
   return (
     <section className="min-w-0 overflow-hidden">
       {title ? <h3 className="mb-2 text-sm font-medium text-foreground">{title}</h3> : null}
+      {live ? <LiveUsageStatus /> : null}
       <p className="mb-3 text-sm text-muted-foreground">{usageSummary(telemetry)}</p>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <TokenKindLegend />
-        <ChartToggle
-          value={mode}
-          options={[
-            { id: "per-turn", label: "Per turn" },
-            { id: "cumulative", label: "Cumulative" },
-          ]}
-          onChange={setMode}
-        />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <TokenKindLegend value={tokenKind} onChange={setTokenKind} />
       </div>
       <div className="min-w-0" onMouseLeave={() => setHoveredTurn(null)}>
         <UsagePlot
           points={points}
+          tokenKind={tokenKind}
+          live={live}
           hoveredTurn={hoveredTurn}
           pinnedTurn={pinnedTurn}
           onHoverTurn={setHoveredTurn}
@@ -77,74 +79,122 @@ export function AgentRunUsageChart({ telemetry, title }: AgentRunUsageChartProps
   );
 }
 
-function TokenKindLegend() {
+function LiveUsageStatus() {
+  return (
+    <p role="status" className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+      <LoaderCircle className="size-3.5 shrink-0 animate-spin text-[color:var(--status-running-dot)]" aria-hidden />
+      <span>
+        <span className="font-medium text-foreground">Live.</span> {LIVE_USAGE_DETAIL}
+      </span>
+    </p>
+  );
+}
+
+function LiveIncomingSlot({ x, plotHeight }: { x: number; plotHeight: number }) {
+  const height = Math.max(plotHeight * 0.35, 16);
+  return (
+    <g data-testid="usage-live-slot" className="animate-pulse" pointerEvents="none">
+      <rect
+        x={x - 10}
+        y={PAD_TOP + plotHeight - height}
+        width={20}
+        height={height}
+        rx={3}
+        className="fill-muted-foreground/20"
+      />
+      <text x={x} y={CHART_HEIGHT - 8} textAnchor="middle" className="fill-current text-[10px] text-muted-foreground">
+        …
+      </text>
+    </g>
+  );
+}
+
+function TokenKindLegend({ value, onChange }: { value: TokenKindFilter; onChange: (value: TokenKindFilter) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-      <span className="inline-flex items-center gap-1.5">
-        <span className={cn("size-2.5 rounded-sm", INPUT_SWATCH)} />
-        Input
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className={cn("size-2.5 rounded-sm", OUTPUT_SWATCH)} />
-        Output
-      </span>
+      <TokenKindLegendButton
+        label="Input"
+        swatchClass={INPUT_SWATCH}
+        pressed={value === "input"}
+        dimmed={value === "output"}
+        ariaLabel={value === "input" ? "Show input and output tokens" : "Show input tokens only"}
+        onClick={() => onChange(value === "input" ? "all" : "input")}
+      />
+      <TokenKindLegendButton
+        label="Output"
+        swatchClass={OUTPUT_SWATCH}
+        pressed={value === "output"}
+        dimmed={value === "input"}
+        ariaLabel={value === "output" ? "Show input and output tokens" : "Show output tokens only"}
+        onClick={() => onChange(value === "output" ? "all" : "output")}
+      />
     </div>
   );
 }
 
-function ChartToggle<T extends string>({
-  value,
-  options,
-  onChange,
+function TokenKindLegendButton({
+  label,
+  swatchClass,
+  pressed,
+  dimmed,
+  ariaLabel,
+  onClick,
 }: {
-  value: T;
-  options: Array<{ id: T; label: string }>;
-  onChange: (value: T) => void;
+  label: string;
+  swatchClass: string;
+  pressed: boolean;
+  dimmed: boolean;
+  ariaLabel: string;
+  onClick: () => void;
 }) {
   return (
-    <div className="inline-flex rounded-md border border-border p-0.5 text-xs">
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          className={cn(
-            "rounded px-2 py-1 font-medium",
-            value === option.id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
-          )}
-          onClick={() => onChange(option.id)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={ariaLabel}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded px-0.5 font-medium hover:text-foreground",
+        pressed ? "text-foreground" : "text-muted-foreground",
+        dimmed && "opacity-40",
+      )}
+      onClick={onClick}
+    >
+      <span className={cn("size-2.5 rounded-sm", swatchClass)} />
+      {label}
+    </button>
   );
 }
 
 function UsagePlot({
   points,
+  tokenKind,
+  live,
   hoveredTurn,
   pinnedTurn,
   onHoverTurn,
   onPinTurn,
 }: {
   points: AgentChartPoint[];
+  tokenKind: TokenKindFilter;
+  live: boolean;
   hoveredTurn: number | null;
   pinnedTurn: number | null;
   onHoverTurn: (turn: number | null) => void;
   onPinTurn: (turn: number | null) => void;
 }) {
   const plotHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
-  const chartWidth = Math.max(640, PAD_LEFT + PAD_RIGHT + points.length * BAR_SLOT);
+  const slotCount = points.length + (live ? 1 : 0);
+  const chartWidth = Math.max(640, PAD_LEFT + PAD_RIGHT + slotCount * BAR_SLOT);
   const plotWidth = chartWidth - PAD_LEFT - PAD_RIGHT;
-  const maxValue = Math.max(1, ...points.map((point) => point.inputBar + point.outputBar));
-  const step = points.length > 1 ? plotWidth / (points.length - 1) : 0;
-  const columnX = (index: number) => PAD_LEFT + (points.length === 1 ? plotWidth / 2 : index * step);
+  const maxValue = Math.max(1, ...points.map((point) => visibleBarTotal(point, tokenKind)));
+  const step = slotCount > 1 ? plotWidth / (slotCount - 1) : 0;
+  const columnX = (index: number) => PAD_LEFT + (slotCount === 1 ? plotWidth / 2 : index * step);
 
   return (
     <div className="overflow-x-auto">
       <svg
         role="img"
-        aria-label="Input and output tokens by turn"
+        aria-label={chartAriaLabel(tokenKind, live)}
         viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
         className="h-52 w-full min-w-[40rem]"
       >
@@ -153,13 +203,14 @@ function UsagePlot({
         </text>
         {points.map((point, index) => {
           const x = columnX(index);
-          const stack = stackedBarLayout(point, maxValue, plotHeight);
+          const stack = stackedBarLayout(point, maxValue, plotHeight, tokenKind);
           const hovered = hoveredTurn === point.turn;
           const pinned = pinnedTurn === point.turn;
           return (
             <g key={point.turn} pointerEvents="none">
-              {point.inputBar > 0 ? (
+              {stack.inputHeight > 0 ? (
                 <rect
+                  data-testid="usage-bar-input"
                   x={x - 10}
                   y={stack.inputTop}
                   width={20}
@@ -167,8 +218,9 @@ function UsagePlot({
                   className={INPUT_BAR_FILL}
                 />
               ) : null}
-              {point.outputBar > 0 ? (
+              {stack.outputHeight > 0 ? (
                 <rect
+                  data-testid="usage-bar-output"
                   x={x - 10}
                   y={stack.outputTop}
                   width={20}
@@ -209,7 +261,7 @@ function UsagePlot({
               height={plotHeight}
               role="button"
               aria-pressed={pinned}
-              aria-label={turnAriaLabel(point)}
+              aria-label={turnAriaLabel(point, tokenKind)}
               className="cursor-pointer fill-transparent"
               pointerEvents="all"
               onMouseEnter={() => onHoverTurn(point.turn)}
@@ -217,6 +269,7 @@ function UsagePlot({
             />
           );
         })}
+        {live ? <LiveIncomingSlot x={columnX(points.length)} plotHeight={plotHeight} /> : null}
       </svg>
     </div>
   );
@@ -321,9 +374,11 @@ function TurnToolRow({ tool }: { tool: AgentTurnTool }) {
   );
 }
 
-function stackedBarLayout(point: AgentChartPoint, maxValue: number, plotHeight: number) {
-  const inputHeight = (point.inputBar / maxValue) * plotHeight;
-  const outputHeight = (point.outputBar / maxValue) * plotHeight;
+function stackedBarLayout(point: AgentChartPoint, maxValue: number, plotHeight: number, tokenKind: TokenKindFilter) {
+  const inputBar = tokenKind === "output" ? 0 : point.inputBar;
+  const outputBar = tokenKind === "input" ? 0 : point.outputBar;
+  const inputHeight = (inputBar / maxValue) * plotHeight;
+  const outputHeight = (outputBar / maxValue) * plotHeight;
   const height = Math.max(inputHeight + outputHeight, 2);
   const inputTop = PAD_TOP + plotHeight - inputHeight;
   const outputTop = inputTop - outputHeight;
@@ -337,8 +392,33 @@ function stackedBarLayout(point: AgentChartPoint, maxValue: number, plotHeight: 
   };
 }
 
-function turnAriaLabel(point: AgentChartPoint): string {
-  return `Turn ${point.turn}: ${tokenSplitAria(point.inputBar, point.outputBar)}`;
+function visibleBarTotal(point: AgentChartPoint, tokenKind: TokenKindFilter): number {
+  if (tokenKind === "input") {
+    return point.inputBar;
+  }
+  if (tokenKind === "output") {
+    return point.outputBar;
+  }
+  return point.inputBar + point.outputBar;
+}
+
+function chartAriaLabel(tokenKind: TokenKindFilter, live: boolean): string {
+  let base = "Input and output tokens by turn";
+  if (tokenKind === "input") {
+    base = "Input tokens by turn";
+  } else if (tokenKind === "output") {
+    base = "Output tokens by turn";
+  }
+  if (!live) {
+    return base;
+  }
+  return `${base}. ${LIVE_USAGE_STATUS}`;
+}
+
+function turnAriaLabel(point: AgentChartPoint, tokenKind: TokenKindFilter): string {
+  const input = tokenKind === "output" ? 0 : point.inputBar;
+  const output = tokenKind === "input" ? 0 : point.outputBar;
+  return `Turn ${point.turn}: ${tokenSplitAria(input, output)}`;
 }
 
 function turnDetailsTitle(point: AgentChartPoint): string {

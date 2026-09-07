@@ -41,8 +41,6 @@ export type AgentTelemetryLiveRecord =
       duration_ms?: number;
     };
 
-export type AgentChartMode = "cumulative" | "per-turn";
-
 const EMPTY_USAGE: AgentTurnUsage = {
   input_tokens: 0,
   output_tokens: 0,
@@ -417,51 +415,30 @@ export type AgentChartPoint = {
   tokens: number;
   input_tokens: number;
   output_tokens: number;
-  cache_tokens: number;
   cache_read_tokens: number;
-  reasoning_tokens: number;
   tools: number;
-  toolCounts: Record<string, number>;
   turnTools: AgentTurnTool[];
   message: string;
   inputBar: number;
   outputBar: number;
-  expenseTokens: number;
-  expenseTools: number;
 };
 
-export function chartPointsForTelemetry(telemetry: AgentRunTelemetry, mode: AgentChartMode): AgentChartPoint[] {
-  let inputSoFar = 0;
-  let outputSoFar = 0;
+export function chartPointsForTelemetry(telemetry: AgentRunTelemetry): AgentChartPoint[] {
   return telemetry.turns.map((snapshot) => {
     const usage = snapshot.usage;
-    const perTurnInput = inputTokenTotal(usage);
-    const perTurnOutput = outputTokenTotal(usage);
-    const perTurnTokens = perTurnInput + perTurnOutput;
-    inputSoFar += perTurnInput;
-    outputSoFar += perTurnOutput;
-    const inputBar = mode === "per-turn" ? perTurnInput : inputSoFar;
-    const outputBar = mode === "per-turn" ? perTurnOutput : outputSoFar;
-    const toolCounts: Record<string, number> = {};
-    for (const tool of snapshot.tools) {
-      toolCounts[tool.kind] = (toolCounts[tool.kind] || 0) + 1;
-    }
+    const inputBar = inputTokenTotal(usage);
+    const outputBar = outputTokenTotal(usage);
     return {
       turn: snapshot.turn,
       tokens: inputBar + outputBar,
       input_tokens: usage.input_tokens,
       output_tokens: usage.output_tokens,
-      cache_tokens: usage.cache_read_input_tokens + usage.cache_creation_input_tokens,
       cache_read_tokens: usage.cache_read_input_tokens,
-      reasoning_tokens: usage.reasoning_tokens,
       tools: snapshot.tools.length,
-      toolCounts,
       turnTools: snapshot.tools,
       message: snapshot.message ?? "",
       inputBar,
       outputBar,
-      expenseTokens: perTurnTokens,
-      expenseTools: snapshot.tools.length,
     };
   });
 }

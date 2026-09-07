@@ -10,11 +10,13 @@ export function PhaseUsageSpendButton({
   phaseId,
   phaseName,
   spendLabel,
+  live = false,
   className,
 }: {
   phaseId: string;
   phaseName: string;
   spendLabel: string;
+  live?: boolean;
   className?: string;
 }) {
   const agents = usePhaseAgentUsageAgents();
@@ -51,6 +53,7 @@ export function PhaseUsageSpendButton({
                   key={agent.nodeId}
                   telemetry={agent.telemetry}
                   title={agents.length > 1 ? agent.name : undefined}
+                  live={live}
                 />
               ))
             )}

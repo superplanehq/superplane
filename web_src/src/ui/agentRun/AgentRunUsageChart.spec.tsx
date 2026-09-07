@@ -31,17 +31,34 @@ describe("AgentRunUsageChart", () => {
   it("shows an empty state when there are no turns", () => {
     render(<AgentRunUsageChart telemetry={reduceAgentTelemetryRecords([])} />);
     expect(screen.getByText("No usage data yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("marks the chart as live while the run continues", () => {
+    render(<AgentRunUsageChart telemetry={telemetry} live />);
+    expect(screen.getByRole("status")).toHaveTextContent("Live. The run is not finished. New turns will appear here.");
+    expect(screen.getByTestId("usage-live-slot")).toBeInTheDocument();
+  });
+
+  it("does not mark a finished run as live", () => {
+    render(<AgentRunUsageChart telemetry={telemetry} />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("usage-live-slot")).not.toBeInTheDocument();
+  });
+
+  it("shows a live empty state when no turns have arrived", () => {
+    render(<AgentRunUsageChart telemetry={reduceAgentTelemetryRecords([])} live />);
+    expect(screen.getByText("No usage data yet.")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Live. The run is not finished. New turns will appear here.");
   });
 
   it("lists the tools for the hovered turn", async () => {
     const user = userEvent.setup();
     render(<AgentRunUsageChart telemetry={telemetry} />);
     expect(screen.getByText("2 turns · 3 tool calls · 180 input · 30 output")).toBeInTheDocument();
-    expect(screen.getByText("Input")).toBeInTheDocument();
-    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show input tokens only" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show output tokens only" })).toBeInTheDocument();
     expect(screen.getByText("Hover a turn to preview it. Click a turn to read the agent message.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Tool calls" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Tokens" })).not.toBeInTheDocument();
     await user.hover(screen.getByRole("button", { name: "Turn 1: 100 input tokens, 20 output tokens" }));
     expect(screen.getByText("Turn 1 · 100 input · 20 output · 2 tool calls")).toBeInTheDocument();
     expect(screen.getByText("I will generate protobufs.")).toBeInTheDocument();
@@ -116,5 +133,32 @@ describe("AgentRunUsageChart", () => {
     expect(screen.getByText(longBashCommand)).not.toHaveClass("line-clamp-2");
     await user.click(screen.getByRole("button", { name: "Collapse tool call" }));
     expect(screen.getByText(longBashCommand)).toHaveClass("line-clamp-2");
+  });
+
+  it("shows only input bars when Input is selected", async () => {
+    const user = userEvent.setup();
+    render(<AgentRunUsageChart telemetry={telemetry} />);
+    expect(screen.getByRole("img", { name: "Input and output tokens by turn" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("usage-bar-input")).toHaveLength(2);
+    expect(screen.getAllByTestId("usage-bar-output")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Show input tokens only" }));
+    expect(screen.getByRole("button", { name: "Show input and output tokens" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("img", { name: "Input tokens by turn" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("usage-bar-input")).toHaveLength(2);
+    expect(screen.queryByTestId("usage-bar-output")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Show input and output tokens" }));
+    expect(screen.getAllByTestId("usage-bar-output")).toHaveLength(2);
+  });
+
+  it("shows only output bars when Output is selected", async () => {
+    const user = userEvent.setup();
+    render(<AgentRunUsageChart telemetry={telemetry} />);
+    await user.click(screen.getByRole("button", { name: "Show output tokens only" }));
+    expect(screen.getByRole("img", { name: "Output tokens by turn" })).toBeInTheDocument();
+    expect(screen.queryByTestId("usage-bar-input")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("usage-bar-output")).toHaveLength(2);
   });
 });
