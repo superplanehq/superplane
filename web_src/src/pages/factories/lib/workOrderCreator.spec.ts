@@ -69,11 +69,7 @@ describe("workOrderOwnerDisplay", () => {
         : null;
 
     expect(
-      workOrderOwnerDisplay(
-        { createdBy: { user: { id: "user-1", name: "Ada" } } },
-        FALLBACK_OWNER,
-        resolveUser,
-      ),
+      workOrderOwnerDisplay({ createdBy: { user: { id: "user-1", name: "Ada" } } }, FALLBACK_OWNER, resolveUser),
     ).toEqual({
       id: "user-1",
       name: "Ada",
@@ -87,11 +83,7 @@ describe("workOrderOwnerDisplay", () => {
       userId ? { id: userId, name: name ?? "Member", initials: "AD" } : null;
 
     expect(
-      workOrderOwnerDisplay(
-        { createdBy: { user: { id: "user-1", name: "Ada" } } },
-        FALLBACK_OWNER,
-        resolveUser,
-      ),
+      workOrderOwnerDisplay({ createdBy: { user: { id: "user-1", name: "Ada" } } }, FALLBACK_OWNER, resolveUser),
     ).toEqual({
       id: "user-1",
       name: "Ada",
