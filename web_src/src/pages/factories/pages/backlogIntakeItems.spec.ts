@@ -142,5 +142,6 @@ describe("searchBacklogIntakeItems", () => {
     expect(searchPlaceholderForIntake("GitHub issues")).toBe("Import from GitHub issue");
     expect(searchPlaceholderForIntake("Sentry exceptions")).toBe("Import from Sentry exception");
     expect(searchPlaceholderForIntake("PagerDuty incidents")).toBe("Import from PagerDuty incident");
+    expect(searchPlaceholderForIntake("Productive.io tasks")).toBe("Import from Productive.io task");
   });
 });
