@@ -4,14 +4,14 @@ import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-
 
 import { requestCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/canvasAgentSidebarOpenRequest";
 import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
-import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
+import { RequirePermission } from "@/components/PermissionGate";
 import { AccountProvider } from "@/contexts/AccountProvider";
 import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -25,18 +25,13 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
-  FactorySettingsAutomationsPage,
-  FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsRepositoryPage,
-  FactorySettingsModelsPage,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
-  OrganizationSettingsOverviewPage,
   OverviewPage,
   VelocityPage,
   WikiPage,
@@ -46,40 +41,21 @@ import {
 import type { FactoriesFixture } from "@/pages/factories/__fixtures__/handlers";
 import { createFactoryLinePath, editFactoryLinePath } from "@/pages/factories/lib/factoryPagePaths";
 import {
-  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
-  LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
-  WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
+import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
-import {
-  OrganizationIntegrationDetailsPage,
-  OrganizationIntegrationSetupPage,
-} from "@/pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
-import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
-import {
-  FactoryOrganizationApiKeyDetailPage,
-  FactoryOrganizationApiKeysPage,
-  FactoryOrganizationLLMModelsPage,
-  FactoryOrganizationMembersPage,
-  FactoryOrganizationSecretDetailPage,
-  FactoryOrganizationSecretsPage,
-} from "@/pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import { HomePage } from "@/pages/home";
 import { homePageIds, type HomePageFixture, type StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { NewAppPage } from "@/pages/home/NewAppPage";
 import { OrganizationSettings } from "@/pages/organization/settings";
 import type { AgentSuggestion } from "@/ui/CanvasPage";
 import { TooltipProvider } from "@/ui/tooltip";
-
-import { FactorySettingsAccountNotificationsPage } from "@/pages/factories/pages/settings/FactorySettingsAccountNotificationsPage";
-import { FactorySettingsAccountProfilePage } from "@/pages/factories/pages/settings/FactorySettingsAccountProfilePage";
-import { FactorySettingsAccountSecurityPage } from "@/pages/factories/pages/settings/FactorySettingsAccountSecurityPage";
 
 import { createOrgWorkspaceFixtureFetch } from "./createOrgWorkspaceFixtureFetch";
 
@@ -258,165 +234,15 @@ function factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage: Comp
   );
 }
 
-const factorySettingsStorybookRoutes = [
-  <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route
-    key="factory-settings-account-general"
-    path="account/general"
-    element={<Navigate to="../profile" replace />}
-  />,
-  <Route
-    key="factory-settings-account-profile"
-    path="account/profile"
-    element={<FactorySettingsAccountProfilePage />}
-  />,
-  <Route
-    key="factory-settings-account-linked-accounts"
-    path="account/linked-accounts"
-    element={<AccountLinkedAccountsRedirect />}
-  />,
-  <Route
-    key="factory-settings-account-security"
-    path="account/security"
-    element={<FactorySettingsAccountSecurityPage />}
-  />,
-  <Route
-    key="factory-settings-account-notifications"
-    path="account/notifications"
-    element={<FactorySettingsAccountNotificationsPage />}
-  />,
-  <Route
-    key="factory-settings-workspace-general"
-    path="workspace/general"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsGeneralPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-workspace-repository"
-    path="workspace/repository"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsRepositoryPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-workspace-automations"
-    path="workspace/automations"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <FactorySettingsAutomationsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-workspace-models"
-    path="workspace/models"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
-          <FactorySettingsModelsPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
-  />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
-  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
-  <Route
-    key="factory-settings-organization-general"
-    path="organization/general"
-    element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsOverviewPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-members"
-    path="organization/members"
-    element={
-      <RequirePermission resource="members" action="read">
-        <FactoryOrganizationMembersPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integrations"
-    path="organization/integrations"
-    element={
-      <RequirePermission resource="integrations" action="read">
-        <OrganizationSettingsIntegrationsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-models"
-    path="organization/models"
-    element={
-      <RequirePermission resource="org" action="read">
-        <FactoryOrganizationLLMModelsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integration-setup"
-    path="organization/integrations/:integrationName/setup"
-    element={
-      <RequireAnyPermission
-        checks={[
-          { resource: "integrations", action: "create" },
-          { resource: "integrations", action: "update" },
-        ]}
-      >
-        <OrganizationIntegrationSetupPage />
-      </RequireAnyPermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-integration-detail"
-    path="organization/integrations/:integrationId"
-    element={<OrganizationIntegrationDetailsPage />}
-  />,
-  <Route
-    key="factory-settings-organization-api-keys"
-    path="organization/api-keys"
-    element={
-      <RequirePermission resource="api_keys" action="read">
-        <FactoryOrganizationApiKeysPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-api-key-detail"
-    path="organization/api-keys/:id"
-    element={
-      <RequirePermission resource="api_keys" action="read">
-        <FactoryOrganizationApiKeyDetailPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-secrets"
-    path="organization/secrets"
-    element={
-      <RequirePermission resource="secrets" action="read">
-        <FactoryOrganizationSecretsPage />
-      </RequirePermission>
-    }
-  />,
-  <Route
-    key="factory-settings-organization-secret-detail"
-    path="organization/secrets/:secretId"
-    element={
-      <RequirePermission resource="secrets" action="read">
-        <FactoryOrganizationSecretDetailPage />
-      </RequirePermission>
-    }
-  />,
-];
+function factorySettingsHarnessRoutes(OrganizationSpendingPage: ComponentType) {
+  return [
+    ...factorySettingsSectionRoutes.filter((route) => {
+      return route.key !== "factory-settings-organization-spending" && route.key !== "factory-settings-legacy";
+    }),
+    factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage),
+    <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,
+  ];
+}
 
 function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePageOverrides }) {
   const WikiRoutePage = pageOverrides?.wiki ?? WikiPage;
@@ -479,11 +305,9 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
             </Route>
           </Route>
           <Route path=":factoryKey/settings" element={factoryRoute(<FactorySettingsLayout />)}>
-            {factorySettingsStorybookRoutes}
-            {factorySettingsOrganizationSpendingRoute(
+            {factorySettingsHarnessRoutes(
               pageOverrides?.organizationSpending ?? OrganizationSettingsWorkspaceUsagePage,
             )}
-            <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />
           </Route>
           <Route
             path=":factoryKey/organization/*"
