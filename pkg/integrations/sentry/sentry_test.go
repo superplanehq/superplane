@@ -863,6 +863,7 @@ func Test__Sentry__Instructions(t *testing.T) {
 
 	instructions := impl.Instructions()
 
+	assert.Contains(t, instructions, "Click **Connect**")
 	assert.Contains(t, instructions, SentryPersonalTokensURL)
 	assert.Contains(t, instructions, "User Token")
 	assert.Contains(t, instructions, "Token Permissions")

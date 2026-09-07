@@ -10,6 +10,7 @@ import { analytics } from "@/lib/analytics";
 import {
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
+  usesHostedSentryInstall,
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
@@ -18,6 +19,7 @@ import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } 
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
 import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { persistSentrySetupReturnPath, startDirectSentryConnect } from "@/lib/startDirectSentryConnect";
 import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
@@ -184,6 +186,24 @@ function useIntegrationCatalogActions({
           update: persistGitHubSetupReturnPath(organizationId),
         }).catch((error) => {
           showErrorToast(getUsageLimitToastMessage(error, "Failed to connect GitHub"));
+        });
+        return;
+      }
+      if (usesHostedSentryInstall(integration)) {
+        analytics.integrationConnectStart("sentry", "integrations_page", organizationId);
+        void startDirectSentryConnect({
+          organizationId,
+          returnTo: integrationsBasePath,
+          existingNames: integrationNames,
+          connected: organizationIntegrations ?? [],
+          currentUserId,
+          create: async (payload) => {
+            const response = await createIntegrationMutation.mutateAsync(payload);
+            return response.data;
+          },
+          update: persistSentrySetupReturnPath(organizationId),
+        }).catch((error) => {
+          showErrorToast(getUsageLimitToastMessage(error, "Failed to connect Sentry"));
         });
         return;
       }

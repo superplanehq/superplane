@@ -4,6 +4,7 @@ import {
   isCapabilityBasedIntegrationDefinition,
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
+  usesHostedSentryInstall,
   usesPrivateGitHubAppWizard,
 } from "./integrations";
 
@@ -13,6 +14,15 @@ describe("usesHostedGitHubAppInstall", () => {
     expect(usesHostedGitHubAppInstall({ name: "github", hostedAppInstall: false })).toBe(false);
     expect(usesHostedGitHubAppInstall({ name: "slack", hostedAppInstall: true })).toBe(false);
     expect(usesHostedGitHubAppInstall(undefined)).toBe(false);
+  });
+});
+
+describe("usesHostedSentryInstall", () => {
+  it("is true only for Sentry with hostedAppInstall", () => {
+    expect(usesHostedSentryInstall({ name: "sentry", hostedAppInstall: true })).toBe(true);
+    expect(usesHostedSentryInstall({ name: "sentry", hostedAppInstall: false })).toBe(false);
+    expect(usesHostedSentryInstall({ name: "github", hostedAppInstall: true })).toBe(false);
+    expect(usesHostedSentryInstall(undefined)).toBe(false);
   });
 });
 

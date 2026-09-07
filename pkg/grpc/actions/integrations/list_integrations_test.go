@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	ghub "github.com/superplanehq/superplane/pkg/integrations/github"
+	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
@@ -307,6 +308,38 @@ func TestListIntegrationsHostedGitHubAppInstall(t *testing.T) {
 		require.Len(t, resp.Integrations, 1)
 		require.True(t, resp.Integrations[0].HostedAppInstall)
 		require.True(t, resp.Integrations[0].LegacySetupOnly)
+	})
+}
+
+func TestListIntegrationsHostedSentryInstall(t *testing.T) {
+	setup := support.Setup(t)
+	reg := &registry.Registry{
+		Integrations: map[string]core.Integration{
+			"sentry": &sentry.Sentry{},
+		},
+	}
+	require.NoError(t, models.EnableExperimentalFeature(setup.Organization.ID, features.FeatureFactorySentryIntake))
+
+	t.Run("false without hosted app env", func(t *testing.T) {
+		t.Setenv(appconfig.EnvSentryAppClientID, "")
+		t.Setenv(appconfig.EnvSentryAppClientSecret, "")
+		t.Setenv(appconfig.EnvSentryAppSlug, "")
+
+		resp, err := ListIntegrations(contextWithOrganizationID(setup.Organization.ID.String()), reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.False(t, resp.Integrations[0].HostedAppInstall)
+	})
+
+	t.Run("true when factory sentry intake and env are set", func(t *testing.T) {
+		t.Setenv(appconfig.EnvSentryAppClientID, "client-id")
+		t.Setenv(appconfig.EnvSentryAppClientSecret, "client-secret")
+		t.Setenv(appconfig.EnvSentryAppSlug, "superplane")
+
+		resp, err := ListIntegrations(contextWithOrganizationID(setup.Organization.ID.String()), reg)
+		require.NoError(t, err)
+		require.Len(t, resp.Integrations, 1)
+		require.True(t, resp.Integrations[0].HostedAppInstall)
 	})
 }
 

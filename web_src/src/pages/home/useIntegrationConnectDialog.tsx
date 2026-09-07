@@ -11,6 +11,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
+  usesHostedSentryInstall,
   usesPrivateGitHubAppWizard,
 } from "@/lib/integrations";
 import { connectPrivateGitHubApp } from "@/lib/privateGitHubApp";
@@ -19,6 +20,7 @@ import {
   persistGitHubSetupReturnPath,
   startDirectGitHubConnect,
 } from "@/lib/startDirectGitHubConnect";
+import { persistSentrySetupReturnPath, startDirectSentryConnect } from "@/lib/startDirectSentryConnect";
 import { showErrorToast } from "@/lib/toast";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 
@@ -124,6 +126,7 @@ export function useIntegrationConnectDialog({
     [organizationId, dialogIntegrationName, dialogMode, dialogPendingInstance?.metadata?.id, selections],
   );
   const githubConnect = githubConnectFlags(availableIntegrations);
+  const sentryHosted = usesHostedSentryInstall(availableIntegrations.find((item) => item.name === "sentry"));
   const { openCapabilitySetup, openCreateIntegrationModal, openConnectDialog, openConfigureDialog } =
     useHomeIntegrationConnectActions({
       organizationId,
@@ -145,10 +148,23 @@ export function useIntegrationConnectDialog({
     currentUserResolved: meLoaded || meFailed,
     createIntegration: createIntegrationMutation.mutateAsync,
   });
+  const connectSentryWithoutDialog = useHostedSentryConnect({
+    organizationId,
+    returnTo,
+    connected,
+    existingIntegrationNames,
+    currentUserId: me?.id,
+    currentUserResolved: meLoaded || meFailed,
+    createIntegration: createIntegrationMutation.mutateAsync,
+  });
 
   const requestConnect = (integrationName: string) => {
     if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog();
+      return;
+    }
+    if (integrationName === "sentry" && sentryHosted) {
+      void connectSentryWithoutDialog();
       return;
     }
     openConnectDialog(integrationName);
@@ -184,6 +200,10 @@ export function useIntegrationConnectDialog({
   const createNew = (integrationName: string) => {
     if (integrationName === "github" && githubConnect.hosted) {
       void connectGitHubWithoutDialog(true);
+      return;
+    }
+    if (integrationName === "sentry" && sentryHosted) {
+      void connectSentryWithoutDialog(true);
       return;
     }
     openCreateIntegrationModal(integrationName);
@@ -342,4 +362,86 @@ function useHostedGitHubConnect({
   }, [connectGitHubWithoutDialog, currentUserId, currentUserResolved]);
 
   return connectGitHubWithoutDialog;
+}
+
+function useHostedSentryConnect({
+  organizationId,
+  returnTo,
+  connected,
+  existingIntegrationNames,
+  currentUserId,
+  currentUserResolved,
+  createIntegration,
+}: {
+  organizationId: string;
+  returnTo?: string;
+  connected: OrganizationsIntegration[];
+  existingIntegrationNames: Set<string>;
+  currentUserId?: string;
+  currentUserResolved: boolean;
+  createIntegration: (payload: {
+    integrationName: string;
+    name: string;
+    configuration?: Record<string, unknown>;
+  }) => Promise<{ data: OrganizationsCreateIntegrationResponse }>;
+}) {
+  const pendingSentryConnectRef = useRef<false | { forceNew: boolean }>(false);
+
+  const connectSentryWithoutDialog = useCallback(
+    async (forceNew = false) => {
+      const userGate = hostedGitHubConnectUserGate(currentUserId, currentUserResolved);
+      if (userGate !== "run") {
+        if (userGate === "queue") {
+          pendingSentryConnectRef.current = { forceNew };
+        } else {
+          pendingSentryConnectRef.current = false;
+          showErrorToast("Failed to connect Sentry");
+        }
+        return;
+      }
+
+      pendingSentryConnectRef.current = false;
+      try {
+        await startDirectSentryConnect({
+          organizationId,
+          returnTo,
+          existingNames: existingIntegrationNames,
+          connected,
+          currentUserId,
+          forceNew,
+          create: async (payload) => {
+            const response = await createIntegration(payload);
+            return response.data;
+          },
+          update: persistSentrySetupReturnPath(organizationId),
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to connect Sentry"));
+      }
+    },
+    [
+      connected,
+      createIntegration,
+      currentUserId,
+      currentUserResolved,
+      existingIntegrationNames,
+      organizationId,
+      returnTo,
+    ],
+  );
+
+  useEffect(() => {
+    if (!pendingSentryConnectRef.current) {
+      return;
+    }
+    if (hostedGitHubConnectUserGate(currentUserId, currentUserResolved) === "queue") {
+      return;
+    }
+
+    const { forceNew } = pendingSentryConnectRef.current;
+    pendingSentryConnectRef.current = false;
+    void connectSentryWithoutDialog(forceNew);
+  }, [connectSentryWithoutDialog, currentUserId, currentUserResolved]);
+
+  return connectSentryWithoutDialog;
 }

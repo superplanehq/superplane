@@ -682,6 +682,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/bind", s.HandleGitHubAppBind).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	sentryAppUserRoute := r.NewRoute().Subrouter()
+	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/start", s.HandleSentryAppStart).Methods("GET")
+	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()

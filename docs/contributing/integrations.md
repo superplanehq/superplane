@@ -11,6 +11,7 @@ This guide explains how to add new integration and extend existing integration w
 - [Adding Components](#adding-components)
 - [Adding Frontend Mappers](#adding-frontend-mappers)
 - [Example: GitHub Issues Trigger](#example-github-issues-trigger)
+- [Public Sentry app](sentry-public-app.md)
 
 ## Overview
 

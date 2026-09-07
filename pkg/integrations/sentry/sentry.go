@@ -86,6 +86,7 @@ type Configuration struct {
 	IntegrationName string `json:"integrationName" mapstructure:"integrationName"`
 	UserToken       string `json:"userToken" mapstructure:"userToken"`
 	ClientSecret    string `json:"clientSecret" mapstructure:"clientSecret"`
+	SetupReturnPath string `json:"setupReturnPath" mapstructure:"setupReturnPath"`
 }
 
 type Metadata struct {
@@ -93,6 +94,17 @@ type Metadata struct {
 	Organization *OrganizationSummary `json:"organization,omitempty" mapstructure:"organization,omitempty"`
 	Projects     []ProjectSummary     `json:"projects" mapstructure:"projects"`
 	Teams        []TeamSummary        `json:"teams" mapstructure:"teams"`
+	// HostedApp is true when this connection installs SuperPlane's public
+	// Sentry app. Credentials stay on the process, not on the integration.
+	HostedApp bool `json:"hostedApp" mapstructure:"hostedApp"`
+	// InstallationID is the Sentry app installation UUID.
+	InstallationID string `json:"installationId" mapstructure:"installationId"`
+	// State is the CSRF nonce written before the external-install redirect.
+	State string `json:"state" mapstructure:"state"`
+	// StartedByUserID is the SuperPlane user who started this hosted install.
+	StartedByUserID string `json:"startedByUserID,omitempty" mapstructure:"startedByUserID,omitempty"`
+	// SetupReturnPath is the in-app path to open after Sentry setup.
+	SetupReturnPath string `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
 }
 
 type OrganizationSummary struct {
@@ -150,6 +162,10 @@ func (s *Sentry) Instructions() string {
 	return `
 
 **Setup steps:**
+1. Click **Connect**. Select the Sentry organization. SuperPlane installs the SuperPlane app and configures issue webhooks.
+
+If Connect is not available, use a personal token and an internal integration:
+
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
@@ -221,6 +237,12 @@ func (s *Sentry) Triggers() []core.Trigger {
 }
 
 func (s *Sentry) Sync(ctx core.SyncContext) error {
+	metadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.HostedApp || UseHostedApp(ctx.OrganizationID) {
+		return s.syncHostedApp(ctx)
+	}
+
 	config, err := s.loadConfiguration(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -445,16 +467,43 @@ func sameStringSet(a, b []string) bool {
 }
 
 func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return nil
+	}
+	if !metadata.HostedApp || strings.TrimSpace(metadata.InstallationID) == "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		ctx.Logger.Warnf("failed to create Sentry client for uninstall: %v", err)
+		return nil
+	}
+
+	if err := client.DeleteSentryAppInstallation(metadata.InstallationID); err != nil {
+		var sentryAPIError *apiError
+		if errors.As(err, &sentryAPIError) && sentryAPIError.StatusCode == http.StatusNotFound {
+			return nil
+		}
+		return fmt.Errorf("failed to delete Sentry installation: %w", err)
+	}
+
 	return nil
 }
 
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
-	if !strings.HasSuffix(ctx.Request.URL.Path, "/events") {
-		ctx.Response.WriteHeader(http.StatusNotFound)
+	path := ctx.Request.URL.Path
+	if strings.HasSuffix(path, "/setup") {
+		s.afterHostedSetup(ctx)
+		return
+	}
+	if strings.HasSuffix(path, "/events") || strings.HasSuffix(path, "/webhook") {
+		s.handleWebhook(ctx)
 		return
 	}
 
-	s.handleWebhook(ctx)
+	ctx.Response.WriteHeader(http.StatusNotFound)
 }
 
 func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
@@ -472,13 +521,16 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if strings.TrimSpace(config.ClientSecret) == "" {
+	metadata := Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	secret := webhookVerifySecret(config, metadata)
+	if len(secret) == 0 {
 		ctx.Logger.Warn("missing sentry client secret for webhook signature verification")
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
-	if err := verifyWebhookSignature(ctx.Request.Header.Get("Sentry-Hook-Signature"), body, []byte(config.ClientSecret)); err != nil {
+	if err := VerifyWebhookSignature(ctx.Request.Header.Get("Sentry-Hook-Signature"), body, secret); err != nil {
 		ctx.Logger.Warnf("invalid sentry webhook signature: %v", err)
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
@@ -510,6 +562,12 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		Installation: payload.Installation,
 		Data:         payload.Data,
 		Actor:        payload.Actor,
+	}
+
+	if resource == "installation" && payload.Action == "deleted" {
+		ctx.Integration.Error("Sentry uninstalled SuperPlane")
+		ctx.Response.WriteHeader(http.StatusOK)
+		return
 	}
 
 	if err := s.dispatchWebhookMessage(ctx, message); err != nil {
@@ -931,7 +989,19 @@ func (s *Sentry) loadConfiguration(integration core.IntegrationContext) (Configu
 		IntegrationName: optionalConfig(integration, "integrationName"),
 		UserToken:       optionalConfig(integration, "userToken"),
 		ClientSecret:    clientSecret,
+		SetupReturnPath: optionalConfig(integration, "setupReturnPath"),
 	}, nil
+}
+
+func webhookVerifySecret(config Configuration, metadata Metadata) []byte {
+	if metadata.HostedApp {
+		app, ok := HostedAppFromEnv()
+		if ok {
+			return []byte(app.ClientSecret)
+		}
+	}
+
+	return []byte(config.ClientSecret)
 }
 
 func optionalConfig(integration core.IntegrationContext, name string) string {
@@ -1018,7 +1088,7 @@ func eventsURL(ctx core.SyncContext) string {
 	return fmt.Sprintf("%s/api/v1/integrations/%s/events", baseURL, ctx.Integration.ID().String())
 }
 
-func verifyWebhookSignature(signature string, body, secret []byte) error {
+func VerifyWebhookSignature(signature string, body, secret []byte) error {
 	signature = strings.TrimSpace(signature)
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {

@@ -46,6 +46,19 @@ func wrapReleaseScopeError(err error) error {
 }
 
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
+	}
+
+	if metadata.Organization == nil || metadata.Organization.Slug == "" {
+		return nil, fmt.Errorf("Sentry organization is not connected")
+	}
+
+	if metadata.HostedApp {
+		return newHostedClient(httpContext, integration, metadata)
+	}
+
 	baseURL, err := integration.GetConfig("baseUrl")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sentry base URL: %w", err)
@@ -60,19 +73,29 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		return nil, fmt.Errorf("Sentry user token is missing")
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("failed to decode sentry metadata: %w", err)
-	}
-
-	if metadata.Organization == nil || metadata.Organization.Slug == "" {
-		return nil, fmt.Errorf("Sentry organization is not connected")
-	}
-
 	return &Client{
 		httpContext: httpContext,
 		baseURL:     normalizeBaseURL(string(baseURL)),
 		userToken:   strings.TrimSpace(string(userToken)),
+		orgSlug:     metadata.Organization.Slug,
+	}, nil
+}
+
+func newHostedClient(httpContext core.HTTPContext, integration core.IntegrationContext, metadata Metadata) (*Client, error) {
+	app, ok := HostedAppFromEnv()
+	if !ok {
+		return nil, fmt.Errorf("hosted Sentry app is not configured")
+	}
+
+	token, err := ensureInstallationToken(httpContext, integration, app, metadata.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{
+		httpContext: httpContext,
+		baseURL:     app.BaseURL,
+		userToken:   token,
 		orgSlug:     metadata.Organization.Slug,
 	}, nil
 }
@@ -83,6 +106,24 @@ func NewAPIClient(httpContext core.HTTPContext, baseURL, userToken string) *Clie
 		baseURL:     normalizeBaseURL(baseURL),
 		userToken:   strings.TrimSpace(userToken),
 	}
+}
+
+func (c *Client) MarkSentryAppInstallationInstalled(installationID string) error {
+	_, err := c.doJSON(
+		http.MethodPut,
+		"/api/0/sentry-app-installations/"+url.PathEscape(installationID)+"/",
+		map[string]string{"status": "installed"},
+	)
+	return err
+}
+
+func (c *Client) DeleteSentryAppInstallation(installationID string) error {
+	_, err := c.doJSON(
+		http.MethodDelete,
+		"/api/0/sentry-app-installations/"+url.PathEscape(installationID)+"/",
+		nil,
+	)
+	return err
 }
 
 type Organization struct {

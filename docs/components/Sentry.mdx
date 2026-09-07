@@ -30,6 +30,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 **Setup steps:**
+1. Click **Connect**. Select the Sentry organization. SuperPlane installs the SuperPlane app and configures issue webhooks.
+
+If Connect is not available, use a personal token and an internal integration:
+
 1. Create a [personal auth token](https://sentry.io/settings/account/api/auth-tokens/) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
@@ -67,7 +71,7 @@ The trigger emits the full Sentry webhook payload, including:
 
 ### Setup
 
-This trigger uses the webhook URL configured on your Sentry internal integration. SuperPlane verifies each webhook signature using your Sentry client secret before routing the event to matching triggers.
+This trigger uses issue webhooks from the SuperPlane Sentry app, or from a Sentry internal integration when Connect is not available. SuperPlane verifies each webhook signature before routing the event to matching triggers.
 
 ### Example Data
 

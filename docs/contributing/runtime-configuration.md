@@ -12,3 +12,6 @@ SuperPlane reads a small set of environment variables at runtime to tune executi
 Invalid or non-positive values are ignored; the default is used instead.
 
 Set these on the SuperPlane API and worker processes. Changes take effect on the next process start (or immediately on the next read, depending on the variable).
+
+The public Sentry app uses a separate set of process variables. See
+[Public Sentry app](sentry-public-app.md).

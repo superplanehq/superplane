@@ -3,6 +3,7 @@ import {
   isCapabilityBasedIntegration,
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
+  usesHostedSentryInstall,
 } from "@/lib/integrations";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
@@ -55,7 +56,7 @@ export function useHomeIntegrationConnectActions({
   const openConnectDialog = (integrationName: string) => {
     const definition = availableIntegrations.find((item) => item.name === integrationName);
     // Hosted Connect is started by requestConnect, not this dialog.
-    if (usesHostedGitHubAppInstall(definition)) {
+    if (usesHostedGitHubAppInstall(definition) || usesHostedSentryInstall(definition)) {
       return;
     }
     if (definition && isCapabilityBasedIntegrationDefinition(definition)) {

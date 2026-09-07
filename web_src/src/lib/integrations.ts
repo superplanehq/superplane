@@ -17,6 +17,10 @@ export function usesHostedGitHubAppInstall(definition?: IntegrationsIntegrationD
   return definition?.name === "github" && definition.hostedAppInstall === true;
 }
 
+export function usesHostedSentryInstall(definition?: IntegrationsIntegrationDefinition): boolean {
+  return definition?.name === "sentry" && definition.hostedAppInstall === true;
+}
+
 /** Show Create your own GitHub App beside hosted Connect. */
 export function offersPrivateGitHubAppSetup(definition?: IntegrationsIntegrationDefinition): boolean {
   return usesHostedGitHubAppInstall(definition);

@@ -474,3 +474,22 @@ func ListGitHubIntegrationsByInstallationID(tx *gorm.DB, installationID string) 
 	}
 	return integrations, nil
 }
+
+// ListSentryIntegrationsByInstallationID finds Sentry connections bound to a
+// public Sentry app installation. One installation can belong to more than one
+// SuperPlane organization.
+func ListSentryIntegrationsByInstallationID(tx *gorm.DB, installationID string) ([]Integration, error) {
+	if installationID == "" {
+		return nil, nil
+	}
+
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'installationId' = ?", "sentry", installationID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}
