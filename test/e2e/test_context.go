@@ -70,6 +70,10 @@ func (s *TestContext) Start() {
 		os.Setenv("GOOGLE_CLIENT_ID", "e2e-google-client-id")
 		os.Setenv("GOOGLE_CLIENT_SECRET", "e2e-google-client-secret")
 	}
+	if os.Getenv("GITHUB_CLIENT_ID") == "" {
+		os.Setenv("GITHUB_CLIENT_ID", "e2e-github-client-id")
+		os.Setenv("GITHUB_CLIENT_SECRET", "e2e-github-client-secret")
+	}
 
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()
