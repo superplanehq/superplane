@@ -26,7 +26,7 @@ export function OrganizationSettingsWorkspaceUsagePage() {
   const [customOpen, setCustomOpen] = useState(false);
   const [modelFilters, setModelFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
   const [machineFilters, setMachineFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
-  const [modelBreakdown, setModelBreakdown] = useState<SpendingBreakdown>("workspace");
+  const [modelBreakdown, setModelBreakdown] = useState<SpendingBreakdown>("funding_source");
   const [machineBreakdown, setMachineBreakdown] = useState<SpendingBreakdown>("workspace");
 
   const range = useMemo(() => {

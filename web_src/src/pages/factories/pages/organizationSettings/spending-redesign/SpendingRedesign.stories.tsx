@@ -143,7 +143,7 @@ function renderSpending(Page: ComponentType) {
   );
 }
 
-/** Default explorer: last 30 days, all workspaces, stacked by workspace. */
+/** Default explorer: last 30 days, all workspaces, stacked by source. */
 export const LastThirtyDays: Story = {
   name: "Last 30 days",
   render: () => renderSpending(LastThirtyDaysPage),

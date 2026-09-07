@@ -154,6 +154,16 @@ describe("filterSpendingEvents", () => {
     );
     expect(matched.map((item) => item.id)).toEqual(["week-gpt"]);
   });
+
+  it("keeps Your-keys model rows when the source filter is byok", () => {
+    const matched = filterSpendingEvents(
+      ledger,
+      rangeForPreset("week", NOW),
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "byok" },
+      "model",
+    );
+    expect(matched.map((item) => item.id)).toEqual(["week-gpt"]);
+  });
 });
 
 describe("buildSpendingReport", () => {
@@ -215,12 +225,27 @@ describe("buildSpendingReport", () => {
     expect(report.breakdown[0]).toMatchObject({ id: "anthropic/sonnet", label: "claude-sonnet-4-6" });
     expect(report.seriesKeys[0].label).toBe("claude-sonnet-4-6");
   });
+
+  it("groups model spend by SuperPlane-hosted and Your keys", () => {
+    const report = buildSpendingReport({
+      events: ledger,
+      range: rangeForPreset("week", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "funding_source",
+      catalogs,
+      usageKind: "model",
+    });
+    expect(report.breakdown.map((row) => row.id)).toEqual(["hosted", "byok"]);
+    expect(report.breakdown.map((row) => row.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
+    expect(report.seriesKeys.map((item) => item.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
+  });
 });
 
 describe("filter helpers", () => {
   it("reports an active single-select filter set", () => {
     expect(hasActiveSpendingFilters(EMPTY_SPENDING_FILTERS)).toBe(false);
     expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, model: "openai/gpt-4o" })).toBe(true);
+    expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" })).toBe(true);
   });
 
   it("labels filter triggers with the selected name", () => {
@@ -235,7 +260,12 @@ describe("filter helpers", () => {
   });
 
   it("exposes group-by options for each usage section", () => {
-    expect(MODEL_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "model"]);
+    expect(MODEL_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual([
+      "funding_source",
+      "workspace",
+      "user",
+      "model",
+    ]);
     expect(MACHINE_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "machine"]);
   });
 });
