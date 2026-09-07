@@ -61,6 +61,15 @@ WHERE ptype = 'g'
   AND v0 IN ('/roles/org_owner', '/roles/org_admin', '/roles/org_viewer')
   AND v1 IN ('/roles/org_admin', '/roles/org_viewer');
 
+-- If a custom org_operator already exists, drop leftover viewer metadata
+-- instead of renaming it into a unique collision.
+DELETE FROM role_metadata AS viewer
+USING role_metadata AS operator
+WHERE viewer.role_name = 'org_viewer'
+  AND operator.role_name = 'org_operator'
+  AND viewer.domain_type = operator.domain_type
+  AND viewer.domain_id = operator.domain_id;
+
 UPDATE role_metadata
 SET role_name = 'org_operator',
     display_name = 'Operator',
@@ -85,7 +94,8 @@ SELECT
   'Maintainer',
   'Can create and edit automations, set integrations, and change models.'
 FROM role_metadata
-WHERE role_name = 'org_admin';
+WHERE role_name = 'org_admin'
+ON CONFLICT (role_name, domain_type, domain_id) DO NOTHING;
 
 UPDATE role_metadata
 SET display_name = 'Admin',
