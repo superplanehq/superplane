@@ -48,6 +48,7 @@ func UpdateWorkOrder(
 	}
 
 	db := database.DB(ctx)
+	var staleKeys []string
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -65,7 +66,7 @@ func UpdateWorkOrder(
 		if description == nil {
 			return nil
 		}
-		return storedfiles.BindDescriptionFiles(
+		keys, bindErr := storedfiles.BindDescriptionFiles(
 			ctx,
 			tx,
 			blob.Current(),
@@ -74,9 +75,14 @@ func UpdateWorkOrder(
 			order.ID,
 			*description,
 		)
+		staleKeys = keys
+		return bindErr
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order")
+	}
+	if err := storedfiles.DeleteObjects(ctx, blob.Current(), staleKeys); err != nil {
+		log.WithError(err).Warnf("Failed to delete old workspace file objects for order %s", orderID)
 	}
 
 	if err := messages.PublishFactoryWorkOrderUpdated(

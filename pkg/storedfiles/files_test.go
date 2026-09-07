@@ -56,13 +56,23 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 	assert.Equal(t, int64(9), loaded.SizeBytes)
 
 	description := "See ![bug](" + blob.FileRef(file.ID) + ")"
-	require.NoError(t, BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description))
+	sourceKey := loaded.StorageKey
+	staleKeys, err := BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
+	require.NoError(t, err)
+	require.Equal(t, []string{sourceKey}, staleKeys)
+	_, err = provider.Head(t.Context(), sourceKey)
+	require.NoError(t, err)
+	require.NoError(t, DeleteObjects(t.Context(), provider, staleKeys))
+	_, err = provider.Head(t.Context(), sourceKey)
+	assert.ErrorIs(t, err, blob.ErrNotFound)
 
 	reparented, err := models.FindFile(db, file.ID)
 	require.NoError(t, err)
 	assert.Equal(t, blob.ScopeTask, reparented.Scope)
 	assert.Equal(t, order.ID, *reparented.WorkOrderID)
 	assert.Contains(t, reparented.StorageKey, "/tasks/"+order.ID.String()+"/")
+	_, err = provider.Head(t.Context(), reparented.StorageKey)
+	require.NoError(t, err)
 }
 
 func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
@@ -89,7 +99,7 @@ func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
 
-	err = BindDescriptionFiles(
+	_, err = BindDescriptionFiles(
 		t.Context(),
 		db,
 		provider,

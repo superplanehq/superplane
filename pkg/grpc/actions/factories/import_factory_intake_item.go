@@ -78,6 +78,7 @@ func ImportFactoryIntakeItem(
 
 	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
 	var order *models.FactoryWorkOrder
+	var staleKeys []string
 	err = db.Transaction(func(tx *gorm.DB) error {
 		created, err := factory.CreateWorkOrderWithOrigin(
 			tx,
@@ -117,10 +118,15 @@ func ImportFactoryIntakeItem(
 				}
 			}
 		}
-		return storedfiles.BindDescriptionFiles(ctx, tx, blob.Current(), orgID, factory.ID, order.ID, order.Description)
+		keys, bindErr := storedfiles.BindDescriptionFiles(ctx, tx, blob.Current(), orgID, factory.ID, order.ID, order.Description)
+		staleKeys = keys
+		return bindErr
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
+	}
+	if err := storedfiles.DeleteObjects(ctx, blob.Current(), staleKeys); err != nil {
+		log.WithError(err).Warnf("Failed to delete old workspace file objects for order %s", order.ID)
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)

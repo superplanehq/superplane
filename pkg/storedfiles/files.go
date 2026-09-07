@@ -30,15 +30,15 @@ func BindDescriptionFiles(
 	provider blob.Provider,
 	organizationID, factoryID, workOrderID uuid.UUID,
 	markdown string,
-) error {
+) ([]string, error) {
 	ids := blob.FileIDsInMarkdown(markdown)
 	if len(ids) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	files, err := models.ListFilesByIDs(tx, ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	byID := map[uuid.UUID]models.File{}
 	for _, file := range files {
@@ -47,19 +47,24 @@ func BindDescriptionFiles(
 
 	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	var staleKeys []string
 	for _, id := range ids {
 		file, ok := byID[id]
 		if !ok {
-			return fmt.Errorf("%w: %s", models.ErrFileNotFound, id)
+			return nil, fmt.Errorf("%w: %s", models.ErrFileNotFound, id)
 		}
-		if err := bindFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, workOrderID, &file, &openCount); err != nil {
-			return err
+		staleKey, err := bindFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, workOrderID, &file, &openCount)
+		if err != nil {
+			return nil, err
+		}
+		if staleKey != "" {
+			staleKeys = append(staleKeys, staleKey)
 		}
 	}
-	return nil
+	return staleKeys, nil
 }
 
 func bindFileToWorkOrder(
@@ -69,34 +74,35 @@ func bindFileToWorkOrder(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	file *models.File,
 	openCount *int64,
-) error {
+) (string, error) {
 	if file.State != models.FileStateReady {
-		return fmt.Errorf("%w: %s", models.ErrFileNotReady, file.ID)
+		return "", fmt.Errorf("%w: %s", models.ErrFileNotReady, file.ID)
 	}
 	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
-		return models.ErrFileForeignReference
+		return "", models.ErrFileForeignReference
 	}
 	if file.FactoryID == nil || *file.FactoryID != factoryID {
-		return models.ErrFileForeignReference
+		return "", models.ErrFileForeignReference
 	}
 
 	switch file.Scope {
 	case blob.ScopeTask:
 		if file.WorkOrderID == nil || *file.WorkOrderID != workOrderID {
-			return models.ErrFileForeignReference
+			return "", models.ErrFileForeignReference
 		}
-		return nil
+		return "", nil
 	case blob.ScopeWorkspace:
 		if *openCount >= models.MaxFilesPerWorkOrder {
-			return fmt.Errorf("%w: task file limit is %d", models.ErrFileQuotaExceeded, models.MaxFilesPerWorkOrder)
+			return "", fmt.Errorf("%w: task file limit is %d", models.ErrFileQuotaExceeded, models.MaxFilesPerWorkOrder)
 		}
-		if err := reparentWorkspaceFile(ctx, tx, provider, workOrderID, file); err != nil {
-			return err
+		staleKey, err := reparentWorkspaceFile(ctx, tx, provider, workOrderID, file)
+		if err != nil {
+			return "", err
 		}
 		*openCount++
-		return nil
+		return staleKey, nil
 	default:
-		return models.ErrFileForeignReference
+		return "", models.ErrFileForeignReference
 	}
 }
 
@@ -106,9 +112,9 @@ func reparentWorkspaceFile(
 	provider blob.Provider,
 	workOrderID uuid.UUID,
 	file *models.File,
-) error {
+) (string, error) {
 	if provider == nil {
-		return blob.ErrProviderNotConfigured
+		return "", blob.ErrProviderNotConfigured
 	}
 	orgID := uuid.Nil
 	if file.OrganizationID != nil {
@@ -120,23 +126,45 @@ func reparentWorkspaceFile(
 	}
 	nextKey, err := blob.ObjectKey(file.InstallationID, blob.ScopeTask, orgID, factoryID, workOrderID, file.ID)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	staleKey := ""
 	if nextKey != file.StorageKey {
 		reader, err := provider.Get(ctx, file.StorageKey)
 		if err != nil {
-			return err
+			return "", err
 		}
 		putErr := provider.Put(ctx, nextKey, reader, blob.PutOptions{ContentType: file.ContentType})
 		_ = reader.Close()
 		if putErr != nil {
-			return putErr
+			return "", putErr
 		}
-		if err := provider.Delete(ctx, file.StorageKey); err != nil {
-			return err
+		staleKey = file.StorageKey
+	}
+	if err := file.ReparentToTask(tx, workOrderID, nextKey); err != nil {
+		if staleKey != "" {
+			_ = provider.Delete(ctx, nextKey)
+		}
+		return "", err
+	}
+	return staleKey, nil
+}
+
+func DeleteObjects(ctx context.Context, provider blob.Provider, keys []string) error {
+	if provider == nil || len(keys) == 0 {
+		return nil
+	}
+	var first error
+	for _, key := range keys {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		if err := provider.Delete(ctx, key); err != nil && !errors.Is(err, blob.ErrNotFound) && first == nil {
+			first = err
 		}
 	}
-	return file.ReparentToTask(tx, workOrderID, nextKey)
+	return first
 }
 
 func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, file *models.File, body io.Reader) error {

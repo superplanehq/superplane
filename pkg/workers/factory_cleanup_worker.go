@@ -74,6 +74,55 @@ func (w *FactoryCleanupWorker) LockAndProcessFactory(factory models.Factory) err
 		return nil
 	}
 
+	readyForDomain, err := w.commitFactoryFileCleanup(factory)
+	if err != nil || !readyForDomain {
+		return err
+	}
+	return w.commitFactoryDomainCleanup(factory)
+}
+
+func (w *FactoryCleanupWorker) commitFactoryFileCleanup(factory models.Factory) (bool, error) {
+	var readyForDomain bool
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockDeletedFactory(tx, factory.ID)
+		if err != nil {
+			w.logger.Infof("Factory %s already being processed - skipping", factory.ID)
+			return nil
+		}
+
+		if err := locked.SoftDeleteCanvases(tx); err != nil {
+			return fmt.Errorf("soft delete factory canvases: %w", err)
+		}
+
+		remainingCanvases, err := locked.CountCanvases(tx)
+		if err != nil {
+			return fmt.Errorf("count factory canvases: %w", err)
+		}
+		if remainingCanvases > 0 {
+			w.logger.Infof("Factory %s still has %d canvases - waiting for canvas cleanup", locked.ID, remainingCanvases)
+			return nil
+		}
+
+		if err := deleteFactoryFileObjects(tx, locked.ID, w.maxResourcesPerTick); err != nil {
+			return fmt.Errorf("delete factory file objects: %w", err)
+		}
+
+		var remainingFiles int64
+		if err := tx.Model(&models.File{}).Where("factory_id = ?", locked.ID).Limit(1).Count(&remainingFiles).Error; err != nil {
+			return fmt.Errorf("count remaining factory files: %w", err)
+		}
+		if remainingFiles > 0 {
+			w.logger.Infof("Factory %s still has files - waiting for object cleanup", locked.ID)
+			return nil
+		}
+
+		readyForDomain = true
+		return nil
+	})
+	return readyForDomain, err
+}
+
+func (w *FactoryCleanupWorker) commitFactoryDomainCleanup(factory models.Factory) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockDeletedFactory(tx, factory.ID)
 		if err != nil {
@@ -81,51 +130,21 @@ func (w *FactoryCleanupWorker) LockAndProcessFactory(factory models.Factory) err
 			return nil
 		}
 
-		return w.processFactory(tx, locked)
+		deleted, complete, err := models.NewFactoryResourceCleaner(tx, locked).
+			WithLimit(w.maxResourcesPerTick).
+			Run()
+		if err != nil {
+			return err
+		}
+
+		if !complete {
+			w.logger.Infof("Partially cleaned factory %s (deleted %d rows this tick)", locked.ID, deleted)
+			return nil
+		}
+
+		w.logger.Infof("Successfully cleaned up factory %s", locked.ID)
+		return nil
 	})
-}
-
-func (w *FactoryCleanupWorker) processFactory(tx *gorm.DB, factory *models.Factory) error {
-	if err := factory.SoftDeleteCanvases(tx); err != nil {
-		return fmt.Errorf("soft delete factory canvases: %w", err)
-	}
-
-	remainingCanvases, err := factory.CountCanvases(tx)
-	if err != nil {
-		return fmt.Errorf("count factory canvases: %w", err)
-	}
-	if remainingCanvases > 0 {
-		w.logger.Infof("Factory %s still has %d canvases - waiting for canvas cleanup", factory.ID, remainingCanvases)
-		return nil
-	}
-
-	if err := deleteFactoryFileObjects(tx, factory.ID, w.maxResourcesPerTick); err != nil {
-		return fmt.Errorf("delete factory file objects: %w", err)
-	}
-
-	var remainingFiles int64
-	if err := tx.Model(&models.File{}).Where("factory_id = ?", factory.ID).Limit(1).Count(&remainingFiles).Error; err != nil {
-		return fmt.Errorf("count remaining factory files: %w", err)
-	}
-	if remainingFiles > 0 {
-		w.logger.Infof("Factory %s still has files - waiting for object cleanup", factory.ID)
-		return nil
-	}
-
-	deleted, complete, err := models.NewFactoryResourceCleaner(tx, factory).
-		WithLimit(w.maxResourcesPerTick).
-		Run()
-	if err != nil {
-		return err
-	}
-
-	if !complete {
-		w.logger.Infof("Partially cleaned factory %s (deleted %d rows this tick)", factory.ID, deleted)
-		return nil
-	}
-
-	w.logger.Infof("Successfully cleaned up factory %s", factory.ID)
-	return nil
 }
 
 func deleteFactoryFileObjects(tx *gorm.DB, factoryID uuid.UUID, limit int) error {
