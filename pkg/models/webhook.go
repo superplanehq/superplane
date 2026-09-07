@@ -78,6 +78,21 @@ func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
 }
 
+// FailNodes puts every node that waits on this webhook into the error state,
+// with the reason it could not be registered. A trigger without a registered
+// webhook receives nothing, so it must not keep reporting itself ready.
+func (w *Webhook) FailNodes(tx *gorm.DB, reason string) error {
+	return tx.Model(&CanvasNode{}).
+		Where("webhook_id = ?", w.ID).
+		Where("deleted_at IS NULL").
+		Updates(map[string]any{
+			"state":        CanvasNodeStateError,
+			"state_reason": reason,
+			"updated_at":   time.Now(),
+		}).
+		Error
+}
+
 func FindWebhook(id uuid.UUID) (*Webhook, error) {
 	var webhook Webhook
 	err := database.Conn().
