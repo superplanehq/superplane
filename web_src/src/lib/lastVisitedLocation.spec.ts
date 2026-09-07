@@ -50,10 +50,7 @@ describe("lastVisitedLocation", () => {
     window.localStorage.setItem(LAST_VISITED_LOCATION_STORAGE_KEY, JSON.stringify(["/acme"]));
     expect(readLastVisitedLocation("account-1", "acme")).toBeNull();
 
-    window.localStorage.setItem(
-      LAST_VISITED_LOCATION_STORAGE_KEY,
-      JSON.stringify({ "account-1:acme": "//evil.com" }),
-    );
+    window.localStorage.setItem(LAST_VISITED_LOCATION_STORAGE_KEY, JSON.stringify({ "account-1:acme": "//evil.com" }));
     expect(readLastVisitedLocation("account-1", "acme")).toBeNull();
   });
 
