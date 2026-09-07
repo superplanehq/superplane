@@ -4,6 +4,7 @@ import { useCallback } from "react";
 
 import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   intakeSettingsToApi,
   type IntakeAutomationRun,
@@ -37,6 +38,7 @@ export function IntakeSettingsHost({
   onClose,
 }: IntakeSettingsHostProps) {
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
+  const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
   const runs = useIntakeAutomationRuns(organizationId, factoryId, intake);
   const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
   const editAutomationHref = intake.appId
@@ -76,6 +78,16 @@ export function IntakeSettingsHost({
       }
       onOpenRun={onOpenRun}
       editAutomationHref={editAutomationHref}
+      agent={
+        agent.agentNode
+          ? {
+              draft: agent.draft ?? undefined,
+              isLoading: agent.isLoading || !agent.draft,
+              organizationId,
+              onSave: agent.save,
+            }
+          : undefined
+      }
       onClose={onClose}
       initialTab={initialTab}
       fixed
