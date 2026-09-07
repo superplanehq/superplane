@@ -122,61 +122,34 @@ export function BacklogColumn({
         keepChildrenWhenEmpty
         className={surfaceClassName ? undefined : "bg-muted"}
         actions={
-          <div className="flex shrink-0 items-center gap-0.5">
-            <BacklogCreatePopover {...createPopover} />
-            <ColumnAutomationsHeaderSlot
-              title={title}
-              columnKey="backlog"
-              automations={automations}
-              open={automationsOpen}
-              onOpen={onOpenAutomations}
-              onClose={onCloseAutomations}
-              onAdd={onAddAutomation}
-              onRowAction={onAutomationRowAction}
-              lockOpen={automationsLockOpen}
-              testId="lines-backlog-automations"
-            />
-            <ColumnLaneMenu
-              title={title}
-              testId="lines-backlog-menu"
-              automationHref={automationHref}
-              onEdit={onOpenSettings}
-              onAddIntake={onAddIntake}
-              onOpenAutomations={onOpenAutomations}
-              colorId={colorId}
-              onColorChange={onColorChange}
-            />
-          </div>
+          <BacklogColumnHeaderActions
+            title={title}
+            createPopover={createPopover}
+            automations={automations}
+            automationsOpen={automationsOpen}
+            onOpenAutomations={onOpenAutomations}
+            onCloseAutomations={onCloseAutomations}
+            onAddAutomation={onAddAutomation}
+            onAutomationRowAction={onAutomationRowAction}
+            automationsLockOpen={automationsLockOpen}
+            automationHref={automationHref}
+            onOpenSettings={onOpenSettings}
+            onAddIntake={onAddIntake}
+            colorId={colorId}
+            onColorChange={onColorChange}
+          />
         }
-        banner={
-          intakePanel ? (
-            <BacklogIntakeSources
-              intakes={intakePanel.sources}
-              showAddIntake={intakePanel.showAddIntake}
-              onOpenSettings={intakePanel.onOpenSettings}
-              onAddIntake={intakePanel.onAddIntake}
-            />
-          ) : null
-        }
+        banner={intakePanel ? <BacklogColumnIntakeBanner panel={intakePanel} /> : null}
         testId="lines-backlog-column"
       >
-        <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
-          {orders.map((order) => (
-            <li key={order.id}>
-              <LineBoardOrderCard
-                order={order}
-                workOrderCardContext={workOrderCardContext}
-                onOpenWorkOrder={onOpenWorkOrder}
-                isAnalyzing={Boolean(order.id && analyzingOrderIds?.has(order.id))}
-              />
-            </li>
-          ))}
-          {atCapacity ? null : (
-            <li data-testid="lines-backlog-create-ghost-item">
-              <BacklogCreatePopover variant="ghost" {...createPopover} />
-            </li>
-          )}
-        </ul>
+        <BacklogColumnOrderList
+          orders={orders}
+          workOrderCardContext={workOrderCardContext}
+          onOpenWorkOrder={onOpenWorkOrder}
+          analyzingOrderIds={analyzingOrderIds}
+          atCapacity={atCapacity}
+          createPopover={createPopover}
+        />
       </WorkOrderBoardLane>
       <BacklogSettingsDialog
         open={settingsOpen}
@@ -188,6 +161,113 @@ export function BacklogColumn({
     </>
   );
 }
+
+function BacklogColumnHeaderActions({
+  title,
+  createPopover,
+  automations,
+  automationsOpen,
+  onOpenAutomations,
+  onCloseAutomations,
+  onAddAutomation,
+  onAutomationRowAction,
+  automationsLockOpen,
+  automationHref,
+  onOpenSettings,
+  onAddIntake,
+  colorId,
+  onColorChange,
+}: Pick<
+  BacklogColumnProps,
+  | "title"
+  | "automations"
+  | "automationsOpen"
+  | "onOpenAutomations"
+  | "onCloseAutomations"
+  | "onAddAutomation"
+  | "onAutomationRowAction"
+  | "automationsLockOpen"
+  | "automationHref"
+  | "onOpenSettings"
+  | "onAddIntake"
+  | "colorId"
+  | "onColorChange"
+> & {
+  createPopover: BacklogCreatePopoverProps;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <BacklogCreatePopover {...createPopover} />
+      <ColumnAutomationsHeaderSlot
+        title={title}
+        columnKey="backlog"
+        automations={automations}
+        open={automationsOpen}
+        onOpen={onOpenAutomations}
+        onClose={onCloseAutomations}
+        onAdd={onAddAutomation}
+        onRowAction={onAutomationRowAction}
+        lockOpen={automationsLockOpen}
+        testId="lines-backlog-automations"
+      />
+      <ColumnLaneMenu
+        title={title}
+        testId="lines-backlog-menu"
+        automationHref={automationHref}
+        onEdit={onOpenSettings}
+        onAddIntake={onAddIntake}
+        onOpenAutomations={onOpenAutomations}
+        colorId={colorId}
+        onColorChange={onColorChange}
+      />
+    </div>
+  );
+}
+
+function BacklogColumnIntakeBanner({ panel }: { panel: BacklogIntakePanel }) {
+  return (
+    <BacklogIntakeSources
+      intakes={panel.sources}
+      showAddIntake={panel.showAddIntake}
+      onOpenSettings={panel.onOpenSettings}
+      onAddIntake={panel.onAddIntake}
+    />
+  );
+}
+
+function BacklogColumnOrderList({
+  orders,
+  workOrderCardContext,
+  onOpenWorkOrder,
+  analyzingOrderIds,
+  atCapacity,
+  createPopover,
+}: Pick<BacklogColumnProps, "orders" | "workOrderCardContext" | "onOpenWorkOrder" | "analyzingOrderIds"> & {
+  atCapacity: boolean;
+  createPopover: BacklogCreatePopoverProps;
+}) {
+  return (
+    <ul className={workOrderKanbanLaneScrollClassName} data-testid="lines-backlog-column-scroll">
+      {orders.map((order) => (
+        <li key={order.id}>
+          <LineBoardOrderCard
+            order={order}
+            workOrderCardContext={workOrderCardContext}
+            onOpenWorkOrder={onOpenWorkOrder}
+            isAnalyzing={Boolean(order.id && analyzingOrderIds?.has(order.id))}
+          />
+        </li>
+      ))}
+      {atCapacity ? null : (
+        <li data-testid="lines-backlog-create-ghost-item">
+          <BacklogCreatePopover variant="ghost" {...createPopover} />
+        </li>
+      )}
+    </ul>
+  );
+}
+
+type BacklogCreatePopoverProps = ReturnType<typeof backlogCreatePopoverProps>;
 
 function backlogCreatePopoverProps(args: {
   canAdd: boolean;
