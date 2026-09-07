@@ -30,6 +30,9 @@ const (
 	prFeedbackDefaultMaximumAttempts = 3
 	prFeedbackMaximumAttemptsMin     = 1
 	prFeedbackMaximumAttemptsMax     = 10
+
+	prFeedbackDiscussionTemplateID = "pr-feedback:discussion"
+	prFeedbackChecksTemplateID     = "pr-feedback:checks"
 )
 
 var prFeedbackTriggerNodeIDs = []string{
