@@ -268,8 +268,123 @@ func Test__ListNodeQueueItems__HandlesPaginationWithTimestamp(t *testing.T) {
 	assert.False(t, secondResponse.HasNextPage)
 }
 
+func Test__ListNodeQueueItems__ReturnsConcurrencyMaxAndBlockingExecutions(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "node-1",
+				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	blockingRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	blockingExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", blockingRootEvent.ID, blockingRootEvent.ID)
+	require.NoError(t, database.Conn().Model(blockingExecution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateStarted,
+		"queue_name": "node-1",
+	}).Error)
+
+	waitingInputEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "node-1", "default", nil, map[string]interface{}{
+		"waiting": true,
+	})
+	queueItem := createNodeQueueItem(t, canvas.ID, "node-1", waitingInputEvent.ID, nil)
+	require.NoError(t, database.Conn().Model(queueItem).Update("queue_name", "node-1").Error)
+
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Items, 1)
+
+	item := response.Items[0]
+	assert.Equal(t, int32(1), item.ConcurrencyMax)
+	require.Len(t, item.BlockingExecutions, 1)
+	assert.Equal(t, blockingExecution.ID.String(), item.BlockingExecutions[0].Id)
+}
+
+func Test__ListNodeQueueItems__ReflectsConfiguredConcurrencyMaxWithNoBlockingExecutions(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID:         "node-1",
+				Name:           "Node 1",
+				Type:           models.NodeTypeComponent,
+				ConcurrencyMax: ptr(2),
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	inputEvent := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
+	createNodeQueueItem(t, canvas.ID, "node-1", inputEvent.ID, nil)
+
+	response, err := ListNodeQueueItems(context.Background(), database.DB(t.Context()), canvas, "node-1", 10, nil)
+	require.NoError(t, err)
+	require.Len(t, response.Items, 1)
+	assert.Equal(t, int32(2), response.Items[0].ConcurrencyMax)
+	assert.Empty(t, response.Items[0].BlockingExecutions)
+}
+
+func Test__DistinctNodeIDs__ReturnsUniqueNodeIDsInFirstSeenOrder(t *testing.T) {
+	ids := distinctNodeIDs([]models.CanvasNodeQueueItem{
+		{NodeID: "node-2"},
+		{NodeID: "node-1"},
+		{NodeID: "node-2"},
+	})
+
+	assert.Equal(t, []string{"node-2", "node-1"}, ids)
+}
+
+func Test__DistinctResolvedQueueNames__SkipsUnresolvedItemsAndDeduplicates(t *testing.T) {
+	names := distinctResolvedQueueNames([]models.CanvasNodeQueueItem{
+		{QueueName: ptr("queue-a")},
+		{QueueName: nil},
+		{QueueName: ptr("queue-a")},
+		{QueueName: ptr("queue-b")},
+	})
+
+	assert.Equal(t, []string{"queue-a", "queue-b"}, names)
+}
+
+func Test__BlockingExecutionsKey__DiffersByNodeEvenWithSameQueueName(t *testing.T) {
+	assert.NotEqual(t,
+		blockingExecutionsKey("node-1", "shared"),
+		blockingExecutionsKey("node-2", "shared"),
+	)
+}
+
+func Test__BlockingExecutionsInfo__ExecutionsForReturnsNilForUnresolvedQueueName(t *testing.T) {
+	info := blockingExecutionsInfo{
+		executionsByKey: map[string][]models.CanvasNodeExecution{
+			blockingExecutionsKey("node-1", "queue-a"): {{NodeID: "node-1"}},
+		},
+	}
+
+	assert.Nil(t, info.executionsFor(models.CanvasNodeQueueItem{NodeID: "node-1", QueueName: nil}))
+	assert.Len(t, info.executionsFor(models.CanvasNodeQueueItem{NodeID: "node-1", QueueName: ptr("queue-a")}), 1)
+	assert.Empty(t, info.executionsFor(models.CanvasNodeQueueItem{NodeID: "node-2", QueueName: ptr("queue-a")}))
+}
+
 func Test__SerializeNodeQueueItems__HandlesEmptyList(t *testing.T) {
-	result, err := SerializeNodeQueueItems(database.Conn(), []models.CanvasNodeQueueItem{})
+	result, err := SerializeNodeQueueItems(database.Conn(), uuid.New(), []models.CanvasNodeQueueItem{})
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }
@@ -304,6 +419,7 @@ func Test__SerializeNodeQueueItemsWithInputEvents__KeepsItemsWithMissingInput(t 
 				Data: models.NewJSONValue(map[string]any{"message": "queued"}),
 			},
 		},
+		blockingExecutionsInfo{},
 	)
 
 	require.NoError(t, err)

@@ -422,3 +422,163 @@ func createSubRunRecord(
 	require.NoError(t, database.Conn().Create(&run).Error)
 	return &run
 }
+
+func createOpenRun(t *testing.T, rootEvent *models.CanvasEvent) *models.CanvasRun {
+	var run *models.CanvasRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		run, err = models.FindOrCreateCanvasRunForRootEventInTransaction(tx, rootEvent)
+		if err != nil {
+			return err
+		}
+
+		return rootEvent.RoutedInTransaction(tx)
+	}))
+
+	return run
+}
+
+func createActiveExecutionInQueue(t *testing.T, run *models.CanvasRun, rootEventID uuid.UUID, nodeID, queueName string) *models.CanvasNodeExecution {
+	now := time.Now()
+	execution := models.CanvasNodeExecution{
+		ID:            uuid.New(),
+		WorkflowID:    run.WorkflowID,
+		NodeID:        nodeID,
+		RootEventID:   rootEventID,
+		RunID:         run.ID,
+		EventID:       rootEventID,
+		State:         models.CanvasNodeExecutionStateStarted,
+		QueueName:     &queueName,
+		Configuration: datatypes.NewJSONType(map[string]any{}),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+	require.NoError(t, database.Conn().Create(&execution).Error)
+	return &execution
+}
+
+func Test__SerializeCanvasRun__ScopesBlockingExecutionsPerNode(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "node-1",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: "node-2",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run := createOpenRun(t, rootEvent)
+
+	node1Execution := createActiveExecutionInQueue(t, run, rootEvent.ID, "node-1", "shared")
+	node2Execution := createActiveExecutionInQueue(t, run, rootEvent.ID, "node-2", "shared")
+
+	node1QueueItem := createNodeQueueItem(t, canvas.ID, "node-1", rootEvent.ID, nil)
+	require.NoError(t, database.Conn().Model(node1QueueItem).Update("queue_name", "shared").Error)
+	node1QueueItem.QueueName = ptr("shared")
+
+	node2QueueItem := createNodeQueueItem(t, canvas.ID, "node-2", rootEvent.ID, nil)
+	require.NoError(t, database.Conn().Model(node2QueueItem).Update("queue_name", "shared").Error)
+	node2QueueItem.QueueName = ptr("shared")
+
+	serializedRun, err := SerializeCanvasRun(
+		database.Conn(),
+		*run,
+		*rootEvent,
+		[]models.CanvasNodeExecution{*node1Execution, *node2Execution},
+		[]models.CanvasNodeQueueItem{*node1QueueItem, *node2QueueItem},
+		nil,
+		map[string][]models.CanvasRun{},
+	)
+	require.NoError(t, err)
+	require.Len(t, serializedRun.QueueItems, 2)
+
+	byNodeID := map[string]*pb.CanvasNodeQueueItem{}
+	for _, item := range serializedRun.QueueItems {
+		byNodeID[item.NodeId] = item
+	}
+
+	require.Len(t, byNodeID["node-1"].BlockingExecutions, 1)
+	assert.Equal(t, node1Execution.ID.String(), byNodeID["node-1"].BlockingExecutions[0].Id)
+
+	require.Len(t, byNodeID["node-2"].BlockingExecutions, 1)
+	assert.Equal(t, node2Execution.ID.String(), byNodeID["node-2"].BlockingExecutions[0].Id)
+}
+
+func Test__SerializeCanvasRuns__BatchesBlockingExecutionsAcrossRuns(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: "trigger", Type: models.NodeTypeTrigger},
+			{
+				NodeID: "node-1",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run1 := createOpenRun(t, rootEvent1)
+	execution1 := createActiveExecutionInQueue(t, run1, rootEvent1.ID, "node-1", "node-1")
+	queueItem1 := createNodeQueueItem(t, canvas.ID, "node-1", rootEvent1.ID, nil)
+	require.NoError(t, database.Conn().Model(queueItem1).Update("queue_name", "node-1").Error)
+	queueItem1.QueueName = ptr("node-1")
+
+	rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	run2 := createOpenRun(t, rootEvent2)
+	queueItem2 := createNodeQueueItem(t, canvas.ID, "node-1", rootEvent2.ID, nil)
+	require.NoError(t, database.Conn().Model(queueItem2).Update("queue_name", "node-1").Error)
+	queueItem2.QueueName = ptr("node-1")
+
+	serialized, err := SerializeCanvasRuns(
+		database.Conn(),
+		[]models.CanvasRun{*run1, *run2},
+		map[string]models.CanvasEvent{
+			run1.ID.String(): *rootEvent1,
+			run2.ID.String(): *rootEvent2,
+		},
+		map[string][]models.CanvasNodeExecution{
+			run1.ID.String(): {*execution1},
+		},
+		map[string][]models.CanvasNodeQueueItem{
+			run1.ID.String(): {*queueItem1},
+			run2.ID.String(): {*queueItem2},
+		},
+		map[string]models.CanvasRun{},
+		map[string][]models.CanvasRun{},
+	)
+	require.NoError(t, err)
+	require.Len(t, serialized, 2)
+
+	serializedByRunID := map[string]*pb.CanvasRun{}
+	for _, run := range serialized {
+		serializedByRunID[run.Id] = run
+	}
+
+	require.Len(t, serializedByRunID[run1.ID.String()].QueueItems, 1)
+	require.Len(t, serializedByRunID[run1.ID.String()].QueueItems[0].BlockingExecutions, 1)
+	assert.Equal(t, execution1.ID.String(), serializedByRunID[run1.ID.String()].QueueItems[0].BlockingExecutions[0].Id)
+
+	require.Len(t, serializedByRunID[run2.ID.String()].QueueItems, 1)
+	require.Len(t, serializedByRunID[run2.ID.String()].QueueItems[0].BlockingExecutions, 1)
+	assert.Equal(t, execution1.ID.String(), serializedByRunID[run2.ID.String()].QueueItems[0].BlockingExecutions[0].Id)
+}
