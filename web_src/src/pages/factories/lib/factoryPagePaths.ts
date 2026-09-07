@@ -158,6 +158,25 @@ export function prFeedbackHandlerIdFromSearch(search: string): string | null {
   return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
 }
 
+/** Opens the per-column Automations drawer. Value is a column key. */
+export const COLUMN_AUTOMATIONS_SEARCH_PARAM = "automations";
+
+export function factoryColumnAutomationsPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | null | undefined,
+  columnKey: string,
+) {
+  const params = new URLSearchParams();
+  params.set(COLUMN_AUTOMATIONS_SEARCH_PARAM, columnKey);
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function columnAutomationsKeyFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(COLUMN_AUTOMATIONS_SEARCH_PARAM);
+}
+
 export function factorySetupPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/setup`;
 }

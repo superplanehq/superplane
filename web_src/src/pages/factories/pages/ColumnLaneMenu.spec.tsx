@@ -192,6 +192,34 @@ describe("ColumnLaneMenu", () => {
     expect(onEdit).not.toHaveBeenCalled();
   });
 
+  it("offers Automations first when supplied", async () => {
+    const onOpenAutomations = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ColumnLaneMenu
+          title="Backlog"
+          testId="lines-backlog-menu"
+          onEdit={vi.fn()}
+          onOpenAutomations={onOpenAutomations}
+          colorId={null}
+          onColorChange={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    const automations = screen.getByTestId("lines-backlog-menu-automations");
+    expect(automations).toHaveTextContent("Automations");
+    expect(
+      automations.compareDocumentPosition(screen.getByTestId("lines-backlog-menu-edit")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    await user.click(automations);
+    expect(onOpenAutomations).toHaveBeenCalledTimes(1);
+  });
+
   it("offers Add intake ahead of the other actions when supplied", async () => {
     const onAddIntake = vi.fn();
     const user = userEvent.setup();
