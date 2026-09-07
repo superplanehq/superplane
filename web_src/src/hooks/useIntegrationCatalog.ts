@@ -18,6 +18,7 @@ import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } 
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
 import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { areRequiredCreateFieldsFilled } from "@/ui/IntegrationCreateDialog/configurationFields";
 import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
@@ -49,6 +50,9 @@ export function useIntegrationCatalog(organizationId: string) {
     () => filterIntegrationCatalog(integrationCatalog, filterQuery),
     [filterQuery, integrationCatalog],
   );
+  const canConnect =
+    Boolean(integrationName.trim()) &&
+    areRequiredCreateFieldsFilled(selectedIntegration?.configuration ?? [], configuration);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -86,6 +90,7 @@ export function useIntegrationCatalog(organizationId: string) {
     selectedInstructions: selectedIntegration?.instructions?.trim() ?? "",
     integrationName,
     setIntegrationName,
+    canConnect,
     configuration,
     setConfiguration,
     isModalOpen,
@@ -203,6 +208,14 @@ function useIntegrationCatalogActions({
     },
     handleConnect: async () => {
       if (!canCreateIntegrations || !selectedIntegration?.name) {
+        return;
+      }
+      if (!integrationName.trim()) {
+        showErrorToast("Integration name is required");
+        return;
+      }
+      if (!areRequiredCreateFieldsFilled(selectedIntegration.configuration ?? [], configuration)) {
+        showErrorToast("Enter every required field.");
         return;
       }
       try {
