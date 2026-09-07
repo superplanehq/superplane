@@ -396,14 +396,19 @@ func factoryIntegrationNames(value any) []string {
 	return names
 }
 
+// deriveFactoryInstallParams infers install parameters from the current
+// canvas nodes. Only static values qualify: template expressions such as
+// "{{ root().data.repository.full_name }}" resolve during a run, so
+// substituting them into trigger configurations produces webhooks that can
+// never provision.
 func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 	params := map[string]string{}
 	for _, node := range nodes {
-		if value := configString(node.Configuration, "repository"); value != "" && params["appRepository"] == "" {
+		if value := staticConfigString(node.Configuration, "repository"); value != "" && params["appRepository"] == "" {
 			params["appRepository"] = value
 			params["backlogRepository"] = value
 		}
-		if value := configString(node.Configuration, "base"); value != "" && params["defaultBranch"] == "" {
+		if value := staticConfigString(node.Configuration, "base"); value != "" && params["defaultBranch"] == "" {
 			params["defaultBranch"] = value
 		}
 		environment, _ := node.Configuration["environment"].([]any)
@@ -411,6 +416,9 @@ func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 			entry, _ := item.(map[string]any)
 			name, _ := entry["name"].(string)
 			value, _ := entry["value"].(string)
+			if containsTemplateExpression(value) {
+				continue
+			}
 			if name == "REPO" && value != "" && params["appRepository"] == "" {
 				params["appRepository"] = value
 			}
@@ -455,6 +463,20 @@ func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
 func configString(configuration map[string]any, key string) string {
 	value, _ := configuration[key].(string)
 	return value
+}
+
+// staticConfigString returns the configuration value for key, or an empty
+// string when the value contains a template expression.
+func staticConfigString(configuration map[string]any, key string) string {
+	value := configString(configuration, key)
+	if containsTemplateExpression(value) {
+		return ""
+	}
+	return value
+}
+
+func containsTemplateExpression(value string) bool {
+	return strings.Contains(value, "{{")
 }
 
 func materializeIntakeDefaults(
