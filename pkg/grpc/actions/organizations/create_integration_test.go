@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -396,5 +397,69 @@ func Test__CreateIntegration(t *testing.T) {
 		require.NotNil(t, response.Integration.Status.SetupState)
 		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
 		assert.Nil(t, response.Integration.Status.BrowserAction)
+	})
+
+	t.Run("missing required field -> invalid argument, no integration created", func(t *testing.T) {
+		integrationName := support.RandomName("required-field-app")
+		r.Registry.Integrations[integrationName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Configuration: []configuration.Field{
+				{Name: "apiKey", Label: "API Key", Type: configuration.FieldTypeString, Required: true, Sensitive: true},
+			},
+		})
+
+		name := support.RandomName("integration")
+		_, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationName, name, nil)
+		require.Error(t, err)
+		code, msg, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Contains(t, msg, "apiKey is required")
+
+		_, err = models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("required field present -> integration is created and synced", func(t *testing.T) {
+		integrationName := support.RandomName("required-field-app")
+		r.Registry.Integrations[integrationName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Configuration: []configuration.Field{
+				{Name: "apiKey", Label: "API Key", Type: configuration.FieldTypeString, Required: true, Sensitive: true},
+			},
+		})
+
+		appConfig, err := structpb.NewStruct(map[string]any{"apiKey": "sk-test"})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationName, name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.NotEqual(t, "error", response.Integration.Status.State)
+	})
+
+	t.Run("missing conditionally-required field is still created (left to Sync)", func(t *testing.T) {
+		integrationName := support.RandomName("conditional-field-app")
+		r.Registry.Integrations[integrationName] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			Configuration: []configuration.Field{
+				{Name: "mode", Label: "Mode", Type: configuration.FieldTypeString},
+				{
+					Name:               "token",
+					Label:              "Token",
+					Type:               configuration.FieldTypeString,
+					RequiredConditions: []configuration.RequiredCondition{{Field: "mode", Values: []string{"advanced"}}},
+				},
+			},
+		})
+
+		appConfig, err := structpb.NewStruct(map[string]any{"mode": "advanced"})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), integrationName, name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+
+		_, err = models.FindIntegrationByName(database.Conn(), r.Organization.ID, name)
+		require.NoError(t, err)
 	})
 }

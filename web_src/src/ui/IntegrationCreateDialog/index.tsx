@@ -16,6 +16,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useUpdateIntegration } from "@/hooks/useIntegrations";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { areRequiredConfigurationFieldsFilled } from "@/lib/components";
 import { selectCreateStepFields, selectVisibleFields, selectWebhookStepFields } from "./configurationFields";
 import { createWithGeneratedName, useGeneratedIntegrationName } from "./generatedName";
 import { IntegrationCreateDialogFooter } from "./IntegrationCreateDialogFooter";
@@ -122,6 +123,11 @@ export function IntegrationCreateDialog({
     };
   }, [integrationDefinition?.configuration, hiddenFieldNames, initialStepFieldNames]);
 
+  const requiredFieldsFilled = useMemo(() => {
+    const activeFields = pendingWebhookSetup ? webhookStepFields : createStepFields;
+    return areRequiredConfigurationFieldsFilled(activeFields, configuration);
+  }, [pendingWebhookSetup, webhookStepFields, createStepFields, configuration]);
+
   const isGitHub = integrationDefinition?.name === "github";
   const {
     name: effectiveIntegrationName,
@@ -203,6 +209,10 @@ export function IntegrationCreateDialog({
       showErrorToast("Integration name is required");
       return;
     }
+    if (!requiredFieldsFilled) {
+      showErrorToast("Fill in all required fields before connecting");
+      return;
+    }
 
     setCreateError(null);
     setIsCreatePending(true);
@@ -261,6 +271,7 @@ export function IntegrationCreateDialog({
     integrationDefinition?.name,
     organizationId,
     effectiveIntegrationName,
+    requiredFieldsFilled,
     configuration,
     existingIntegrationNames,
     githubBaseName,
@@ -275,6 +286,10 @@ export function IntegrationCreateDialog({
 
   const handleCompleteWebhookSetup = useCallback(async () => {
     if (!pendingWebhookSetup) return;
+    if (!requiredFieldsFilled) {
+      showErrorToast("Fill in all required fields before completing setup");
+      return;
+    }
 
     try {
       await updateIntegrationMutation.mutateAsync({
@@ -285,7 +300,15 @@ export function IntegrationCreateDialog({
     } catch {
       showErrorToast("Failed to complete setup");
     }
-  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, effectiveIntegrationName]);
+  }, [
+    pendingWebhookSetup,
+    requiredFieldsFilled,
+    configuration,
+    updateIntegrationMutation,
+    handleClose,
+    onCreated,
+    effectiveIntegrationName,
+  ]);
 
   if (!integrationDefinition) return null;
 
@@ -433,6 +456,7 @@ export function IntegrationCreateDialog({
           mutationPending={updateIntegrationMutation.isPending}
           isCreatePending={isCreatePending}
           integrationName={effectiveIntegrationName}
+          requiredFieldsFilled={requiredFieldsFilled}
           onCompleteWebhookSetup={handleCompleteWebhookSetup}
           onBrowserActionContinue={handleBrowserActionContinue}
           onBrowserActionConfigSave={handleBrowserActionConfigSave}

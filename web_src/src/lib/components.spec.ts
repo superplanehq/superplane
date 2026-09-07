@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigurationField } from "@/api-client";
 import {
+  areRequiredConfigurationFieldsFilled,
   filterVisibleConfiguration,
   isFieldRequired,
   isFieldVisible,
@@ -113,6 +114,51 @@ describe("components visibility helpers", () => {
     expect(isFieldRequired(alwaysRequired, {})).toBe(true);
     expect(isFieldRequired(conditionallyRequired, { provider: "github" })).toBe(true);
     expect(isFieldRequired(conditionallyRequired, { provider: "slack" })).toBe(false);
+  });
+});
+
+describe("areRequiredConfigurationFieldsFilled", () => {
+  it("is false when a required visible field is empty", () => {
+    const fields = [buildField({ name: "apiKey", required: true })];
+
+    expect(areRequiredConfigurationFieldsFilled(fields, { apiKey: "" })).toBe(false);
+    expect(areRequiredConfigurationFieldsFilled(fields, {})).toBe(false);
+  });
+
+  it("is true once the required field has a value", () => {
+    const fields = [buildField({ name: "apiKey", required: true })];
+
+    expect(areRequiredConfigurationFieldsFilled(fields, { apiKey: "sk-123" })).toBe(true);
+  });
+
+  it("only requires conditionally-required fields once their condition matches", () => {
+    const fields = [
+      buildField({ name: "provider" }),
+      buildField({
+        name: "token",
+        requiredConditions: [{ field: "provider", values: ["github"] }],
+      }),
+    ];
+
+    expect(areRequiredConfigurationFieldsFilled(fields, { provider: "slack" })).toBe(true);
+    expect(areRequiredConfigurationFieldsFilled(fields, { provider: "github" })).toBe(false);
+    expect(areRequiredConfigurationFieldsFilled(fields, { provider: "github", token: "abc" })).toBe(true);
+  });
+
+  it("ignores a required field that is hidden", () => {
+    const fields = [
+      buildField({ name: "adminKey", required: true, visibilityConditions: [{ field: "advanced", values: ["true"] }] }),
+    ];
+
+    expect(areRequiredConfigurationFieldsFilled(fields, { advanced: "false" })).toBe(true);
+    expect(areRequiredConfigurationFieldsFilled(fields, { advanced: "true" })).toBe(false);
+  });
+
+  it("treats an empty array as missing for a required multi-select field", () => {
+    const fields = [buildField({ name: "scopes", type: "multi-select", required: true })];
+
+    expect(areRequiredConfigurationFieldsFilled(fields, { scopes: [] })).toBe(false);
+    expect(areRequiredConfigurationFieldsFilled(fields, { scopes: ["repo"] })).toBe(true);
   });
 });
 
