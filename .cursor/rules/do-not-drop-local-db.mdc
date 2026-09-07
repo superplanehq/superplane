@@ -1,0 +1,26 @@
+---
+description: Never drop or recreate local databases without explicit user approval
+alwaysApply: true
+---
+
+# Do not drop the local database
+
+Never run drop, recreate, or volume-wipe database commands unless the user
+explicitly asked for that in this conversation. Ask first. Wait for a clear yes.
+
+`make db.migrate` and `make db.migrate.all` apply pending migrations only.
+They do not drop databases. Do not pair them with `db.delete`.
+
+## Forbidden without explicit approval
+
+- `make db.delete`
+- `make db.recreate.all.dangerous`
+- `make dev.setup.no.cache` (`docker compose down -v`)
+- `make dev.pr.clean.checkout`
+- `dropdb`, `DROP DATABASE`, `migrate drop`
+- Recreate sequences such as `db.delete` then `db.create` then `db.migrate`
+
+A golang-migrate error such as `no migration found for version` is not
+approval to drop `superplane_dev`. Stop and ask.
+
+To refresh `db/structure.sql`, run `make db.migrate.all` only.
