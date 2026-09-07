@@ -109,12 +109,12 @@ describe("matchFactoryPageFixture", () => {
 
     expect(body.factory?.name).toBe("New workspace");
     expect(body.factory?.id).toMatch(/^storybook-factory-/);
-    expect(body.factory?.key).toBe("NEWWO");
+    expect(body.factory?.key).toBe("newwo");
   });
 
   it("walks to a free key when the name-derived key is already taken", async () => {
     const fixture = structuredClone(defaultFactoriesFixture);
-    fixture.factories.push({ id: "taken-newwo", name: "Taken", key: "NEWWO", lines: [] });
+    fixture.factories.push({ id: "taken-newwo", name: "Taken", key: "newwo", lines: [] });
 
     const response = await fetchFactoryPageFixture(
       "/api/v1/factories",
@@ -126,7 +126,7 @@ describe("matchFactoryPageFixture", () => {
     );
     const body = (await response.json()) as { factory?: { key?: string } };
 
-    expect(body.factory?.key).toBe("NEWWA");
+    expect(body.factory?.key).toBe("newwa");
   });
 
   it("updates a task title and description", async () => {
