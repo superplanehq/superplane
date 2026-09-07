@@ -1030,6 +1030,8 @@ describe("line board work-order examples", () => {
     expect(analysis?.appId).toBe("canvas-backlog");
     expect(analysis?.runId).toBe("run-analysis");
     expect(fixture.openPhaseId).toBe("backlog-analysis-run-analysis");
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
   });
 
   // Scoring runs on the task before a line plans it. The log must read
@@ -1116,6 +1118,8 @@ describe("line board work-order examples", () => {
     expect(analysis[0].checks).toBeUndefined();
     expect(analysis[1].checks?.map((check) => check.name)).toEqual(["Confidence score"]);
     expect(fixture.openPhaseId).toBeUndefined();
+    expect(fixture.footer.note?.headline).toBe("This task is ready to start");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("appends matching PR feedback runs after line steps, oldest first", () => {

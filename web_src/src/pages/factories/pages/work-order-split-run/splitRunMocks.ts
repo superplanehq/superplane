@@ -38,7 +38,7 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
-import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
@@ -378,6 +378,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
+      analysisRuns: options?.analysisRuns,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -398,6 +399,7 @@ function reviewSurfaces(
     fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
+    analysisRuns?: BacklogAnalysisRun[];
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -408,7 +410,12 @@ function reviewSurfaces(
 
   if (displayStatus === "draft") {
     return surfaces(
-      buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order), status: displayStatus }),
+      buildSplitRunFooter({
+        kind: "draft",
+        note: draftFooterNote(order),
+        status: displayStatus,
+        isAnalyzing: hasActiveBacklogAnalysisRun(input.analysisRuns ?? []),
+      }),
       [],
       checks,
     );
