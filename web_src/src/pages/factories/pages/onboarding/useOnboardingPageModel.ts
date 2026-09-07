@@ -1,9 +1,16 @@
 import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
+import { organizationsDeleteIntegration } from "@/api-client/sdk.gen";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryQueryKeys, fetchFactoryApps, useCreateFactoryLine, useUpdateFactory } from "@/hooks/useFactoryData";
 import { fetchFactoryIntakes, useCreateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { fetchFactoryPRFeedbackHandlers, useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
-import { resolveGithubDefaultBranch, useIntegration, useIntegrationResources } from "@/hooks/useIntegrations";
+import {
+  integrationKeys,
+  resolveGithubDefaultBranch,
+  useIntegration,
+  useIntegrationResources,
+} from "@/hooks/useIntegrations";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -42,6 +49,7 @@ import { useFinishOnboarding } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
+import { unusedOnboardingVcsIntegrationId } from "./unusedOnboardingIntegration";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
@@ -271,6 +279,7 @@ function useOnboardingGithubConnectionSelected(args: {
   factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   setup: OnboardingSetupApi;
@@ -293,6 +302,27 @@ function useOnboardingGithubConnectionSelected(args: {
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Could not save the GitHub connection"));
       return;
+    }
+
+    const unusedId = unusedOnboardingVcsIntegrationId({
+      isInitial: args.factory?.onboarding?.initial === true,
+      previousId: args.factory?.onboarding?.vcsIntegrationId,
+      nextId: integrationId,
+      factories: args.factories,
+      currentFactoryId: args.factoryId,
+    });
+    if (unusedId) {
+      try {
+        await organizationsDeleteIntegration(
+          withOrganizationHeader({
+            organizationId: args.organizationId,
+            path: { id: args.organizationId, integrationId: unusedId },
+          }),
+        );
+        void queryClient.invalidateQueries({ queryKey: integrationKeys.connected(args.organizationId) });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Could not remove the unused GitHub connection"));
+      }
     }
 
     await advanceAfterGithubConnect({
@@ -341,6 +371,7 @@ function useOnboardingGithubConnectionsForPage(args: {
   factoryId: string;
   factoryKey: string;
   factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   searchParams: URLSearchParams;
