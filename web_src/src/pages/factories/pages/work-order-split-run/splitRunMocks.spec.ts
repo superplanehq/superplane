@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { createOrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -757,6 +758,57 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(names).not.toContain("#510");
     expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
     expect(names.filter((name) => name !== "description.md")).toEqual([]);
+  });
+
+  it("uses the org member lookup for the owner avatar when one is supplied", () => {
+    const resolveUser = createOrgUserDisplayLookup(
+      new Map([
+        [
+          "user-1",
+          {
+            id: "user-1",
+            name: "Ada Lovelace",
+            initials: "AL",
+            avatarUrl: "https://example.com/ada.png",
+          },
+        ],
+      ]),
+    );
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+      avatarUrl: "https://example.com/ada.png",
+    });
+  });
+
+  it("falls back to initials when the owner is not in the org member lookup", () => {
+    const resolveUser = createOrgUserDisplayLookup(new Map());
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+    });
   });
 });
 

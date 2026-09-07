@@ -38,6 +38,27 @@ export const VELOCITY_BREAKDOWN_COPY: Record<VelocityBreakdown, { title: string;
   },
 };
 
+/** How the cost chart adds up the period. */
+export type VelocityCostMode = "daily" | "cumulative";
+
+export const VELOCITY_COST_MODE_OPTIONS: { value: VelocityCostMode; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "cumulative", label: "Cumulative" },
+];
+
+export const VELOCITY_COST_MODE_COPY: Record<VelocityCostMode, string> = {
+  daily: "Spend of the tasks that closed each day, split between tokens and compute.",
+  cumulative: "Spend of the tasks that closed, added up over the period, split between tokens and compute.",
+};
+
+/** Spend of one thing, split by what the money paid for. */
+export interface VelocityCostSplit {
+  /** Model tokens. */
+  modelCostUsd: number;
+  /** Runner time a run used. */
+  computeCostUsd: number;
+}
+
 export interface VelocityPoint {
   day: string;
   people: number;
@@ -48,6 +69,10 @@ export interface VelocityPoint {
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
+  /** Spend of the day, which adds up to `costUsd`. */
+  cost: VelocityCostSplit;
+  /** Median spend of one task that closed on this day. */
+  medianTaskCost: VelocityCostSplit;
   /** Merged SuperPlane pull requests of the day, keyed by intake source. */
   intake: Record<string, number>;
 }
@@ -60,6 +85,10 @@ export interface VelocityTotals {
   costUsd: number;
   wasteCostUsd: number;
   tokens: number;
+  /** Part of `costUsd` spent on models. */
+  modelCostUsd: number;
+  /** Part of `costUsd` spent on runner compute. */
+  computeCostUsd: number;
   /**
    * Tasks that closed in the window, with or without a merge. A task counts
    * once, however many pull requests it opened, so this differs from the pull
@@ -133,6 +162,27 @@ function centsToUsd(value: string | number | undefined): number {
   return parseWorkOrderMetric(value) / 100;
 }
 
+/** The spend bands a day or a window reports. */
+type CostSplitSource = Pick<FactoriesDescribeFactoryVelocityDay, "modelCostCents" | "computeCostCents">;
+
+/**
+ * Splits a tracked cost into model spend and runner compute.
+ *
+ * A response that reports neither band comes from a server older than the
+ * split, so the whole amount counts as model spend. The stacked bands still
+ * add up to the total, and no compute spend is invented.
+ */
+function toCostSplit(source: CostSplitSource | undefined, costUsd: number): VelocityCostSplit {
+  if (!source || (source.modelCostCents === undefined && source.computeCostCents === undefined)) {
+    return { modelCostUsd: costUsd, computeCostUsd: 0 };
+  }
+
+  return {
+    modelCostUsd: centsToUsd(source.modelCostCents),
+    computeCostUsd: centsToUsd(source.computeCostCents),
+  };
+}
+
 /** Rounded share of `whole` that `part` holds, 0-100. */
 function sharePct(part: number, whole: number): number {
   if (whole <= 0) return 0;
@@ -155,6 +205,7 @@ function toTotals(totals: FactoriesDescribeFactoryVelocityTotals | undefined): V
     costUsd,
     wasteCostUsd: centsToUsd(totals?.wasteCostCents),
     tokens: parseWorkOrderMetric(totals?.tokens),
+    ...toCostSplit(totals, costUsd),
     tasksClosed,
     tasksWaste,
     taskWasteRate: sharePct(tasksWaste, tasksClosed),
@@ -171,15 +222,22 @@ function toPoint(point: FactoriesDescribeFactoryVelocityDay): VelocityPoint {
     if (count.key) intake[count.key] = count.merged ?? 0;
   }
 
+  const costUsd = centsToUsd(point.costCents);
+
   return {
     day: point.day ?? "",
     people,
     superplane,
     merged: people + superplane,
     waste: point.waste ?? 0,
-    costUsd: centsToUsd(point.costCents),
+    costUsd,
     wasteCostUsd: centsToUsd(point.wasteCostCents),
     tokens: parseWorkOrderMetric(point.tokens),
+    cost: toCostSplit(point, costUsd),
+    medianTaskCost: {
+      modelCostUsd: centsToUsd(point.medianTaskModelCostCents),
+      computeCostUsd: centsToUsd(point.medianTaskComputeCostCents),
+    },
     intake,
   };
 }

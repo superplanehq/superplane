@@ -242,7 +242,7 @@ function FactorySettingsSecretDetail({ secretId }: { secretId: string }) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("secrets", "update");
   const canDelete = canAct("secrets", "delete");
-  const { data: secret, isLoading, error } = useSecret(organizationId, SECRET_DOMAIN, secretId);
+  const { data: secret, isLoading, error, refetch: refetchSecret } = useSecret(organizationId, SECRET_DOMAIN, secretId);
   const updateNameMutation = useUpdateSecretName(organizationId, SECRET_DOMAIN, secretId);
   const setKeyMutation = useSetSecretKey(organizationId, SECRET_DOMAIN, secretId);
   const deleteKeyMutation = useDeleteSecretKey(organizationId, SECRET_DOMAIN, secretId);
@@ -287,7 +287,8 @@ function FactorySettingsSecretDetail({ secretId }: { secretId: string }) {
   const keys = secretKeyNames(secret);
   const trimmedRename = renameValue.trim();
   const canSaveRename = Boolean(trimmedRename) && trimmedRename !== secretName(secret);
-  const canAddKey = Boolean(newKeyName.trim() && newKeyValue.trim());
+  const trimmedNewKeyName = newKeyName.trim();
+  const canAddKey = Boolean(trimmedNewKeyName && newKeyValue.trim());
 
   return (
     <FactorySettingsPageFrame title="Secrets" subtitle="Edit this secret and its keys.">
@@ -453,14 +454,32 @@ function FactorySettingsSecretDetail({ secretId }: { secretId: string }) {
               variant="outline"
               disabled={!canUpdate || !canAddKey || setKeyMutation.isPending}
               onClick={() => {
-                void setKeyMutation
-                  .mutateAsync({ keyName: newKeyName.trim(), value: newKeyValue })
-                  .then(() => {
+                void (async () => {
+                  // Re-check against the freshest server data so a key added by
+                  // another tab or client after this page loaded is not silently
+                  // overwritten by the upserting set-key mutation.
+                  let latestKeys = keys;
+                  try {
+                    const { data: latestSecret } = await refetchSecret();
+                    if (latestSecret) {
+                      latestKeys = secretKeyNames(latestSecret);
+                    }
+                  } catch {
+                    // Fall back to the current snapshot if the refetch fails.
+                  }
+                  if (latestKeys.includes(trimmedNewKeyName)) {
+                    showErrorToast("Key already exists");
+                    return;
+                  }
+                  try {
+                    await setKeyMutation.mutateAsync({ keyName: trimmedNewKeyName, value: newKeyValue });
                     showSuccessToast("Key added.");
                     setNewKeyName("");
                     setNewKeyValue("");
-                  })
-                  .catch((addError) => showErrorToast(getApiErrorMessage(addError, "Failed to add the key.")));
+                  } catch (addError) {
+                    showErrorToast(getApiErrorMessage(addError, "Failed to add the key."));
+                  }
+                })();
               }}
             >
               Add key
