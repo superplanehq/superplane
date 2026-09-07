@@ -1,0 +1,28 @@
+{
+  "data": {
+    "comparison": {
+      "repository": "owner/repo",
+      "baseSha": "d34db33fd34db33fd34db33fd34db33fd34db33f",
+      "headSha": "c0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff",
+      "mergeBaseSha": "abc1234abc1234abc1234abc1234abc1234abc12",
+      "url": "https://github.com/owner/repo/compare/main...feature",
+      "changedFileCount": 1
+    },
+    "appliedFilters": {
+      "statuses": ["renamed"],
+      "paths": ["src/**"]
+    },
+    "files": [
+      {
+        "path": "src/new-name.ts",
+        "status": "renamed",
+        "additions": 3,
+        "deletions": 1,
+        "changes": 4,
+        "previousPath": "lib/old-name.ts"
+      }
+    ]
+  },
+  "timestamp": "2026-08-15T12:00:00Z",
+  "type": "github.commitComparison"
+}

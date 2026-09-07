@@ -88,6 +88,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 			PermissionContents: {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
+					{ReadOnly: true, Action: &contents.CompareCommits{}},
 					{ReadOnly: true, Action: &contents.GetRelease{}},
 					{ReadOnly: true, Trigger: &contents.OnBranchCreated{}},
 					{ReadOnly: true, Trigger: &contents.OnPush{}},
