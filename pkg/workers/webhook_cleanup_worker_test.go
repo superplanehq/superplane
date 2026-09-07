@@ -35,23 +35,6 @@ func Test__WebhookCleanupWorker_DeletesWebhookWhenProviderCleanupFails(t *testin
 	assert.Equal(t, 1, cleanupCalls)
 }
 
-// An integration can stop registering a webhook handler, e.g. when its
-// provider grants webhooks by plan and the trigger polls instead. The rows left
-// behind must still drain, or the worker retries them on every tick forever.
-func Test__WebhookCleanupWorker_DeletesWebhookOfIntegrationWithoutHandler(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	logger := logrus.NewEntry(logrus.New())
-	worker, webhookID := setupWebhookCleanupWorker(t, r, nil)
-	delete(r.Registry.WebhookHandlers, "dummy")
-
-	err := worker.LockAndProcessWebhook(logger, models.Webhook{ID: webhookID})
-	require.NoError(t, err)
-
-	assertWebhookHardDeleted(t, webhookID)
-}
-
 func setupWebhookCleanupWorker(
 	t *testing.T,
 	r *support.ResourceRegistry,

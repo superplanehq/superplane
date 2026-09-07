@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"golang.org/x/sync/semaphore"
@@ -22,25 +21,7 @@ import (
 
 const (
 	webhookProvisionerReasonSetupError = "setup_error"
-
-	// maxWebhookFailureReason bounds the text stored on a node, so a provider
-	// that answers with a long error body cannot fill the column.
-	maxWebhookFailureReason = 800
 )
-
-// webhookSetupFailureReason turns a provisioning error into the sentence shown
-// on the node. It names the integration side of the failure, because that is
-// where the fix usually is: a plan without webhooks, or a revoked token.
-func webhookSetupFailureReason(err error) string {
-	reason := fmt.Sprintf("Could not register the webhook with the integration: %v", err)
-
-	runes := []rune(reason)
-	if len(runes) > maxWebhookFailureReason {
-		return string(runes[:maxWebhookFailureReason]) + "..."
-	}
-
-	return reason
-}
 
 type WebhookProvisioner struct {
 	semaphore *semaphore.Weighted
@@ -316,17 +297,6 @@ func (w *WebhookProvisioner) handleProvisioningError(logger *log.Entry, webhook 
 				logger.Errorf("Error marking webhook as failed: %v", err)
 				return err
 			}
-
-			//
-			// A trigger whose webhook was never registered receives nothing.
-			// Record why on the nodes waiting for it, so a canvas shows the
-			// failure instead of a trigger that looks like it is listening.
-			//
-			if err := webhook.FailNodes(tx, webhookSetupFailureReason(originalErr)); err != nil {
-				logger.Errorf("Error failing the nodes waiting for the webhook: %v", err)
-				return err
-			}
-
 			return nil
 		}
 
