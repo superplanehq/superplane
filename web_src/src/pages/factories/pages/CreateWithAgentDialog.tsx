@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -428,13 +427,14 @@ function DraftWorkPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-draft">
       <p className="text-[12px] font-medium text-muted-foreground">{CREATE_WITH_AGENT_COPY.draftLabel}</p>
-      <Input
+      <Textarea
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
         disabled={failed}
+        rows={1}
         aria-label="Task title"
         data-testid="create-with-agent-draft-title"
-        className="mt-3 h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
+        className="mt-3 min-h-0 resize-none border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
       />
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
         <WorkOrderSplitRunDescription description={description} collapsible={false} />

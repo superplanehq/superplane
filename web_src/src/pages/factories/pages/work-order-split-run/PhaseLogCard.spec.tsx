@@ -471,4 +471,34 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByText("I can draft that.")).toBeInTheDocument();
     expect(screen.getByText("I can draft that.").closest("[data-testid='split-run-user-note']")).toBeNull();
   });
+
+  it("renders markdown in compact session log notes", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "Changed color to **size** with a `medium` option.",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("size").tagName).toBe("STRONG");
+    expect(screen.getByText("medium").tagName).toBe("CODE");
+    expect(screen.queryByText("**size**")).not.toBeInTheDocument();
+  });
 });

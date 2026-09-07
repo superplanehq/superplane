@@ -41,7 +41,14 @@ const BACK_TO_DRAFT = {
   icon: "undo-2",
 };
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
-const REFINE = { id: "refine", kind: "refine", label: "Refine", emphasis: "quiet" };
+const REFINE = {
+  id: "refine",
+  kind: "refine",
+  label: "Refine",
+  emphasis: "quiet",
+  icon: "sparkles",
+  tooltip: "Ask an agent to update this task.",
+};
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };

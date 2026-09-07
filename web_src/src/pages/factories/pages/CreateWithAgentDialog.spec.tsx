@@ -222,6 +222,21 @@ describe("CreateWithAgentDialog", () => {
     expect(within(draft).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
+  it("wraps a long draft title", () => {
+    const title = "Add a color field with a visual color picker to the Puppy entity";
+    renderDialog(
+      runningCreateWithAgentView({
+        right: { kind: "draft", draft: { title, description: "Add a color field." } },
+      }),
+    );
+
+    const field = screen.getByLabelText("Task title");
+    expect(field).toHaveValue(title);
+    expect(field.tagName).toBe("TEXTAREA");
+    expect(field).toHaveClass("wrap-anywhere");
+    expect(field).not.toHaveClass("truncate");
+  });
+
   it("renders preview description markdown like the task popup", () => {
     const order = {
       id: "wo-1",

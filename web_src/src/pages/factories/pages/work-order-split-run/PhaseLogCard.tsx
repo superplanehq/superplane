@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "@/components/Link/link";
+import { MarkdownContent } from "@/pages/app/Markdown";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
@@ -26,6 +27,8 @@ import { isRunnerComponent, mergeLiveStreamNotes, notesForLiveStream } from "./s
 /** One face and size for every log row, matched to the run log viewer. */
 const LOG_FACE = "font-mono text-[14px]";
 const PHASE_NAME_FACE = cn("flex min-w-0 items-center gap-1.5", LOG_FACE, "font-medium");
+const STREAM_NOTE_MARKDOWN =
+  "max-w-none font-sans text-[14px] leading-5 text-foreground [&_p:first-child]:mt-0 [&_p:last-child]:mb-0";
 
 function statusGlyph(status: SplitRunPhaseStatus): PhaseGlyphKind {
   if (status === "running") return "running";
@@ -985,14 +988,14 @@ function StreamTalkNote({ line, highlightUserTalk }: { line: SplitRunStreamLine;
     >
       <span className="inline-flex w-4 shrink-0" aria-hidden />
       {isUserTalk ? (
-        <div className="min-w-0 flex-1 rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
-          <span className="mb-0.5 block text-[11px] font-medium leading-none text-primary">{youLabel}</span>
-          <span className="whitespace-normal break-words leading-5 text-foreground">{line.componentName}</span>
+        <div className="min-w-0 flex-1 whitespace-normal break-words rounded-md border-l-2 border-primary/50 bg-primary/10 px-2 py-1">
+          <span className="mb-0.5 block font-sans text-[11px] font-medium leading-none text-primary">{youLabel}</span>
+          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
         </div>
       ) : (
-        <span className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
-          {line.componentName}
-        </span>
+        <div className="min-w-0 flex-1 whitespace-normal break-words py-0.5 leading-5 text-foreground">
+          <MarkdownContent content={line.componentName} variant="workspace" className={STREAM_NOTE_MARKDOWN} />
+        </div>
       )}
     </div>
   );

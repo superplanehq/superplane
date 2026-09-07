@@ -33,6 +33,8 @@ export const CREATE_WITH_AGENT_COPY = {
   create: "Create",
   update: "Update",
   skip: "Skip",
+  refine: "Refine",
+  refineTooltip: "Ask an agent to update this task.",
   refineFurther: "Refine further",
   openTask: "Open task",
   greeting: "The repository is ready. What do you want to do?",

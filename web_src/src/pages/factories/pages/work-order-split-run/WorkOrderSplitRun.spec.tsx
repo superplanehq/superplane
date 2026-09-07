@@ -732,6 +732,16 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
   });
 
+  it("shows a spark icon and tooltip on Refine", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const refine = within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" });
+    expect(refine.querySelector(".lucide-sparkles")).toBeInTheDocument();
+    await user.hover(refine);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
+  });
+
   it("puts artifacts on the right and check analyses under the description", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
