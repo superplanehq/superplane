@@ -245,6 +245,17 @@ func CountReadyTaskFiles(tx *gorm.DB, workOrderID uuid.UUID) (int64, error) {
 	return count, err
 }
 
+func CountOpenTaskFiles(tx *gorm.DB, workOrderID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&File{}).Where(
+		"work_order_id = ? AND scope = ? AND state IN ?",
+		workOrderID,
+		blob.ScopeTask,
+		[]string{FileStatePending, FileStateReady},
+	).Count(&count).Error
+	return count, err
+}
+
 func SumReadyOrganizationFileBytes(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
 	var total int64
 	err := tx.Model(&File{}).
@@ -261,6 +272,10 @@ func (f *File) MarkReady(tx *gorm.DB, sizeBytes int64, checksum string) error {
 	if sizeBytes > MaxFileBytes {
 		return fmt.Errorf("%w: file exceeds %d bytes", ErrFileQuotaExceeded, MaxFileBytes)
 	}
+	if err := ensureReadyFileQuota(tx, f, sizeBytes); err != nil {
+		return err
+	}
+
 	now := time.Now()
 	f.State = FileStateReady
 	f.SizeBytes = sizeBytes
@@ -319,13 +334,37 @@ func ensureFileQuota(tx *gorm.DB, params CreateFileParams) error {
 		}
 	}
 	if params.WorkOrderID != uuid.Nil {
-		count, err := CountReadyTaskFiles(tx, params.WorkOrderID)
+		count, err := CountOpenTaskFiles(tx, params.WorkOrderID)
 		if err != nil {
 			return err
 		}
 		if count >= MaxFilesPerWorkOrder {
 			return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
 		}
+	}
+	return nil
+}
+
+func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64) error {
+	if file.OrganizationID != nil {
+		total, err := SumReadyOrganizationFileBytes(tx, *file.OrganizationID)
+		if err != nil {
+			return err
+		}
+		if total+sizeBytes > MaxOrganizationFileBytes {
+			return fmt.Errorf("%w: organization storage limit reached", ErrFileQuotaExceeded)
+		}
+	}
+	if file.WorkOrderID == nil || file.Scope != blob.ScopeTask {
+		return nil
+	}
+
+	count, err := CountReadyTaskFiles(tx, *file.WorkOrderID)
+	if err != nil {
+		return err
+	}
+	if count >= MaxFilesPerWorkOrder {
+		return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
 	}
 	return nil
 }

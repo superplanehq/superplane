@@ -174,3 +174,45 @@ func TestCompleteUploadRejectsOversizedBody(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, models.FileStateFailed, loaded.State)
 }
+
+func TestCompleteUploadDeletesObjectWhenReadyQuotaExceeded(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	filler, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "filler.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	pending, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "next.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, filler, bytes.NewReader([]byte("png-bytes"))))
+	require.NoError(t, db.Model(filler).Update("size_bytes", models.MaxOrganizationFileBytes).Error)
+
+	err = CompleteUpload(t.Context(), db, provider, pending, bytes.NewReader([]byte("png-bytes")))
+	assert.ErrorIs(t, err, models.ErrFileQuotaExceeded)
+
+	loaded, err := models.FindFile(db, pending.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FileStateFailed, loaded.State)
+
+	_, err = provider.Head(t.Context(), pending.StorageKey)
+	assert.ErrorIs(t, err, blob.ErrNotFound)
+}

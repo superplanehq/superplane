@@ -45,7 +45,7 @@ func BindDescriptionFiles(
 		byID[file.ID] = file
 	}
 
-	readyCount, err := models.CountReadyTaskFiles(tx, workOrderID)
+	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func BindDescriptionFiles(
 		if !ok {
 			return fmt.Errorf("%w: %s", models.ErrFileNotFound, id)
 		}
-		if err := bindFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, workOrderID, &file, &readyCount); err != nil {
+		if err := bindFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, workOrderID, &file, &openCount); err != nil {
 			return err
 		}
 	}
@@ -68,7 +68,7 @@ func bindFileToWorkOrder(
 	provider blob.Provider,
 	organizationID, factoryID, workOrderID uuid.UUID,
 	file *models.File,
-	readyCount *int64,
+	openCount *int64,
 ) error {
 	if file.State != models.FileStateReady {
 		return fmt.Errorf("%w: %s", models.ErrFileNotReady, file.ID)
@@ -87,13 +87,13 @@ func bindFileToWorkOrder(
 		}
 		return nil
 	case blob.ScopeWorkspace:
-		if *readyCount >= models.MaxFilesPerWorkOrder {
+		if *openCount >= models.MaxFilesPerWorkOrder {
 			return fmt.Errorf("%w: task file limit is %d", models.ErrFileQuotaExceeded, models.MaxFilesPerWorkOrder)
 		}
 		if err := reparentWorkspaceFile(ctx, tx, provider, workOrderID, file); err != nil {
 			return err
 		}
-		*readyCount++
+		*openCount++
 		return nil
 	default:
 		return models.ErrFileForeignReference
@@ -172,7 +172,12 @@ func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, fi
 	if size <= 0 {
 		size = limited.read
 	}
-	return file.MarkReady(tx, size, hex.EncodeToString(hasher.Sum(nil)))
+	if err := file.MarkReady(tx, size, hex.EncodeToString(hasher.Sum(nil))); err != nil {
+		_ = provider.Delete(ctx, file.StorageKey)
+		_ = file.MarkFailed(tx)
+		return err
+	}
+	return nil
 }
 
 func DownloadURL(ctx context.Context, provider blob.Provider, file *models.File, ttl time.Duration) (string, error) {
@@ -218,7 +223,7 @@ func IngestRemoteImages(
 	}
 
 	next := markdown
-	readyCount, err := models.CountReadyTaskFiles(tx, workOrderID)
+	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
 	if err != nil {
 		return markdown, err
 	}
@@ -227,7 +232,7 @@ func IngestRemoteImages(
 		if allow != nil && !allow(rawURL) {
 			continue
 		}
-		if readyCount >= models.MaxFilesPerWorkOrder {
+		if openCount >= models.MaxFilesPerWorkOrder {
 			break
 		}
 		file, ingested, err := ingestOneImage(
@@ -245,7 +250,7 @@ func IngestRemoteImages(
 			continue
 		}
 		next = blob.ReplaceURL(next, rawURL, blob.FileRef(file.ID))
-		readyCount++
+		openCount++
 	}
 	return next, nil
 }
