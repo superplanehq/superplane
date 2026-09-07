@@ -17,6 +17,7 @@ export type PlanningSessionPayload = {
   canvasRunId?: string;
   waitState?: string;
   executionId?: string;
+  selectableModelKey?: string;
   messages?: PlanningSessionMessagePayload[];
   draft?: { title?: string; description?: string; workOrderId?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
@@ -52,6 +53,7 @@ export function createWithAgentViewFromSession(
     created: createdOrdersFromSession(session),
     right: planningSessionRightPane(session, extras.right),
     endConfirmOpen: extras.endConfirmOpen,
+    selectableModelKey: session.selectableModelKey ?? "",
     refining: Boolean(session.draft?.workOrderId?.trim()),
   };
 }

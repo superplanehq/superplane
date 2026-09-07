@@ -647,17 +647,24 @@ function LineDetail({
           }}
         />
       ) : null}
-      <LineCreateWithAgentDialog factoryKey={factoryKey} organizationId={organizationId} session={agentSession} />
+      <LineCreateWithAgentDialog
+        factoryKey={factoryKey}
+        factoryId={factoryId}
+        organizationId={organizationId}
+        session={agentSession}
+      />
     </div>
   );
 }
 
 function LineCreateWithAgentDialog({
   factoryKey,
+  factoryId,
   organizationId,
   session,
 }: {
   factoryKey: string;
+  factoryId: string;
   organizationId: string;
   session: ReturnType<typeof useCreateWithAgentSession>;
 }) {
@@ -667,6 +674,7 @@ function LineCreateWithAgentDialog({
       open={session.open}
       workspaceName={factoryKey}
       organizationId={organizationId}
+      factoryId={factoryId}
       view={view}
       onComposerChange={session.onComposerChange}
       onSend={session.onSend}
@@ -679,6 +687,7 @@ function LineCreateWithAgentDialog({
       onRequestClose={session.onRequestClose}
       onCancelEnd={session.onCancelEnd}
       onConfirmEnd={session.onConfirmEnd}
+      onSelectModel={session.onSelectModel}
     />
   );
 }

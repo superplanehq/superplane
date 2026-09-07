@@ -295,6 +295,15 @@ export interface FactoriesFixture {
   organizationWorkspaceUsage?: StorybookUsageReport;
   organizationSpendingReport?: StorybookSpendingReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
+  /**
+   * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
+   * Omit to treat every provider with a catalog as connected.
+   */
+  byokConnectedProviders?: string[];
+  /** Candidate model ids by provider. Falls back to the hosted catalog fixture. */
+  byokCandidatesByProvider?: Record<string, string[]>;
+  /** Selected model ids by provider. Defaults to the candidate list when connected. */
+  byokSelectedByProvider?: Record<string, string[]>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /**

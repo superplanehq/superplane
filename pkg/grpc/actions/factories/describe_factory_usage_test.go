@@ -62,7 +62,7 @@ func Test__DescribeFactoryUsage(t *testing.T) {
 		MachineType:     "e1-large-amd64",
 		FleetID:         "e1-large-amd64",
 		DurationSeconds: 90,
-		IdempotencyKey:  "runner:compute:factory-usage",
+		IdempotencyKey:  "runner:compute:factory-usage:" + uuid.New().String(),
 	}))
 
 	resp, err := DescribeFactoryUsage(context.Background(), r.Organization.ID.String(), &pb.DescribeFactoryUsageRequest{
