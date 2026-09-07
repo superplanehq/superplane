@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -55,8 +55,10 @@ describe("CreateWithAgentDialog", () => {
 
     expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
     expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.menu);
-    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent("Agent");
+    expect(screen.queryByTestId(`split-run-automation-header-${PLANNING_SESSION_PHASE_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-line-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-stream")).not.toHaveTextContent(CREATE_WITH_AGENT_COPY.menu);
+    expect(screen.getByTestId("create-with-agent-stream")).not.toHaveTextContent("Agent");
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.emptyHeadline)).toBeInTheDocument();
     expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.greeting);
     expect(screen.queryByTestId("create-with-agent-message-greet")).not.toBeInTheDocument();
@@ -80,13 +82,21 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent("acme/payments");
   });
 
-  it("shows the Automations stream while the machine is starting", () => {
+  it("shows a planning-session intro while the log is empty", () => {
     renderDialog(emptyCreateWithAgentView());
 
     expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineStarting);
-    expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-log-intro")).toHaveTextContent(CREATE_WITH_AGENT_COPY.logStarting);
+    expect(screen.queryByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).not.toBeInTheDocument();
     expect(screen.getByTestId("create-with-agent-composer")).toBeEnabled();
     expect(screen.queryByTestId("create-with-agent-activity-starting")).not.toBeInTheDocument();
+  });
+
+  it("hides the log intro after the agent writes", () => {
+    renderDialog(runningCreateWithAgentView());
+
+    expect(screen.queryByTestId("create-with-agent-log-intro")).not.toBeInTheDocument();
+    expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
   });
 
   it("asks before the session ends", () => {
@@ -173,6 +183,48 @@ describe("CreateWithAgentDialog", () => {
 
     screen.getByRole("button", { name: "NEW-1 Retry refunds" }).click();
     expect(onSelectCreated).toHaveBeenCalledWith(order);
+  });
+
+  it("renders draft description markdown like the task popup", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        right: {
+          kind: "draft",
+          draft: {
+            title: "Add a color attribute to puppies",
+            description: "## Data model\n\nAdd a `color` field.",
+          },
+        },
+      }),
+    );
+
+    const draft = screen.getByTestId("create-with-agent-draft");
+    expect(within(draft).getByRole("heading", { level: 2, name: "Data model" })).toBeInTheDocument();
+    expect(within(draft).queryByText(/## Data model/)).not.toBeInTheDocument();
+    expect(within(draft).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
+    expect(within(draft).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(screen.queryByTestId("create-with-agent-draft-description")).not.toBeInTheDocument();
+  });
+
+  it("renders preview description markdown like the task popup", () => {
+    const order = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Add a color attribute to puppies",
+      description: "## Data model\n\nAdd a `color` field.",
+    };
+    renderDialog(
+      runningCreateWithAgentView({
+        created: [order],
+        right: { kind: "preview", order },
+      }),
+    );
+
+    const preview = screen.getByTestId("create-with-agent-preview");
+    expect(within(preview).getByRole("heading", { level: 2, name: "Data model" })).toBeInTheDocument();
+    expect(within(preview).queryByText(/## Data model/)).not.toBeInTheDocument();
+    expect(within(preview).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
+    expect(within(preview).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 
   it("shows a read-only task without edit fields", () => {

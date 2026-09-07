@@ -22,6 +22,7 @@ import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { JumpToLatestPill } from "./work-order-split-run/JumpToLatestPill";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 import { SplitRunAttentionNote } from "./work-order-split-run/SplitRunAttentionNote";
+import { WorkOrderSplitRunDescription } from "./work-order-split-run/WorkOrderSplitRunDescription";
 import { useFollowLogScroll } from "./work-order-split-run/useFollowLogScroll";
 
 export type CreateWithAgentDialogProps = {
@@ -206,14 +207,18 @@ function CreateWithAgentStream({
           className="absolute inset-0 overflow-y-auto px-3 py-3"
           data-testid="create-with-agent-log"
         >
-          <PhaseLogCard
-            phase={planningSessionPhase(view)}
-            expanded
-            collapsible={false}
-            organizationId={organizationId}
-            canvasId={view.canvasId}
-            compactSessionLog
-          />
+          {showCreateWithAgentLogIntro(view) ? (
+            <CreateWithAgentLogIntro />
+          ) : (
+            <PhaseLogCard
+              phase={planningSessionPhase(view)}
+              expanded
+              collapsible={false}
+              organizationId={organizationId}
+              canvasId={view.canvasId}
+              compactSessionLog
+            />
+          )}
         </div>
         {follow.following ? null : (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="create-with-agent-older" />
@@ -264,6 +269,22 @@ function CreateWithAgentStream({
         </div>
       </form>
     </section>
+  );
+}
+
+function showCreateWithAgentLogIntro(view: CreateWithAgentView): boolean {
+  return view.machineStatus === "starting" && view.messages.length === 0;
+}
+
+function CreateWithAgentLogIntro() {
+  return (
+    <div
+      className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground"
+      data-testid="create-with-agent-log-intro"
+    >
+      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      <p>{CREATE_WITH_AGENT_COPY.logStarting}</p>
+    </div>
   );
 }
 
@@ -407,14 +428,9 @@ function DraftWorkPane({
         data-testid="create-with-agent-draft-title"
         className="mt-3 h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
       />
-      <Textarea
-        value={description}
-        onChange={(event) => onDescriptionChange(event.target.value)}
-        disabled={failed}
-        aria-label="Task description"
-        data-testid="create-with-agent-draft-description"
-        className="mt-3 min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
-      />
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        <WorkOrderSplitRunDescription description={description} canEdit={!failed} onSave={onDescriptionChange} />
+      </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button type="button" variant="ghost" disabled={failed} onClick={onSkip}>
           {CREATE_WITH_AGENT_COPY.skip}
@@ -445,9 +461,9 @@ function PreviewWorkPane({
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-preview">
       <p className="text-[12px] font-medium text-muted-foreground">{order.key}</p>
       <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.02em]">{order.title}</h2>
-      <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-relaxed text-muted-foreground">
-        {order.description}
-      </p>
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        <WorkOrderSplitRunDescription description={order.description} />
+      </div>
       <div className="mt-4 flex justify-end">
         <Button type="button" variant="outline" disabled={failed} onClick={() => onRefine(order)}>
           {CREATE_WITH_AGENT_COPY.refineFurther}

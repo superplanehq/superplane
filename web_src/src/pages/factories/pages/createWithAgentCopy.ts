@@ -19,6 +19,7 @@ export const CREATE_WITH_AGENT_COPY = {
   viewingOlder: "You are viewing older messages.",
   jumpToLatest: "Jump to latest",
   machineStarting: "The machine is starting",
+  logStarting: "Starting the planning session.",
   machineRunning: "Machine is running",
   machineWaiting: "Waiting for you",
   machineStopped: "The machine stopped",

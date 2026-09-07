@@ -459,23 +459,25 @@ export function PhaseLogCard({
             : undefined
         }
       >
-        <AutomationHeader
-          phase={phase}
-          expanded={expanded}
-          collapsible={collapsible}
-          producedArtifacts={producedArtifacts}
-          producedPullRequests={producedPullRequests}
-          onToggle={onToggle}
-          onStop={onStop}
-          onRerun={onRerun}
-          runHref={runHref}
-          editHref={editHref}
-          actionBusy={actionBusy}
-        />
+        {compactSessionLog ? null : (
+          <AutomationHeader
+            phase={phase}
+            expanded={expanded}
+            collapsible={collapsible}
+            producedArtifacts={producedArtifacts}
+            producedPullRequests={producedPullRequests}
+            onToggle={onToggle}
+            onStop={onStop}
+            onRerun={onRerun}
+            runHref={runHref}
+            editHref={editHref}
+            actionBusy={actionBusy}
+          />
+        )}
 
         {expanded ? (
           <ol
-            className={cn("mt-1 min-w-0 list-none leading-tight", LOG_FACE)}
+            className={cn("min-w-0 list-none leading-tight", LOG_FACE, !compactSessionLog && "mt-1")}
             data-testid={`split-run-stream-${phase.id}`}
             onClick={(event) => event.stopPropagation()}
           >
@@ -828,18 +830,25 @@ function StreamNode({
 
   return (
     <li className="min-w-0">
-      <StreamNodeHeader
-        line={line}
-        hasChildren={hasChildren}
-        highlighted={highlighted}
-        artifact={artifact}
-        pullRequest={pullRequest}
-        onSelect={onSelect}
-      />
+      {compactSessionLog ? null : (
+        <StreamNodeHeader
+          line={line}
+          hasChildren={hasChildren}
+          highlighted={highlighted}
+          artifact={artifact}
+          pullRequest={pullRequest}
+          onSelect={onSelect}
+        />
+      )}
       {hasChildren ? (
         <ol className="min-w-0">
           {steps.map((step) => (
-            <StreamStep key={step.line.id} step={step} highlightUserTalk={compactSessionLog} />
+            <StreamStep
+              key={step.line.id}
+              step={step}
+              highlightUserTalk={compactSessionLog}
+              stickyHeader={!compactSessionLog}
+            />
           ))}
         </ol>
       ) : null}
@@ -917,7 +926,15 @@ function StreamNodeHeader({
   );
 }
 
-function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup; highlightUserTalk?: boolean }) {
+function StreamStep({
+  step,
+  highlightUserTalk = false,
+  stickyHeader = true,
+}: {
+  step: ClaudeStepGroup;
+  highlightUserTalk?: boolean;
+  stickyHeader?: boolean;
+}) {
   const hasOutput = Boolean(step.line.detail);
   const hasBody = step.events.length > 0 || hasOutput;
   const showHeader = Boolean(step.line.componentName.trim() || step.line.componentType);
@@ -928,7 +945,7 @@ function StreamStep({ step, highlightUserTalk = false }: { step: ClaudeStepGroup
         <div
           data-testid={`split-run-stream-line-${step.line.id}`}
           {...streamLineAttrs(step.line.status)}
-          className={cn(STREAM_LINE_WRAP_ROW, hasBody && STICKY_STEP)}
+          className={cn(STREAM_LINE_WRAP_ROW, hasBody && stickyHeader && STICKY_STEP)}
         >
           {step.line.componentType ? (
             <span className={cn("mr-2 shrink-0", stepTypeTone(step.line.componentType))}>
