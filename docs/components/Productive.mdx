@@ -1,0 +1,115 @@
+---
+title: "Productive"
+---
+
+Create backlog items from tasks in Productive.io
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Task" href="#on-task" description="Listen to task events from Productive.io" />
+</CardGrid>
+
+## Instructions
+
+To configure Productive.io to work with SuperPlane:
+
+1. **Get an API token**: In Productive.io, open your profile, go to **API integrations**, and create a personal access token.
+2. **Get the organization id**: The organization id is the numeric id in your Productive.io URL, e.g. `app.productive.io/<organization-id>-name`.
+3. **Enter credentials**: Provide the API token and organization id in the integration configuration.
+
+<a id="on-task"></a>
+
+## On Task
+
+**Trigger key:** `productive.onTask`
+
+The On Task trigger starts a workflow execution when task events occur in a Productive.io project.
+
+### Use Cases
+
+- **Backlog intake**: Create a work order when a new task is added to a project
+- **Sync workflows**: Mirror Productive.io tasks into another tracker
+- **Notifications**: Alert a channel when a task is created or updated
+
+### Configuration
+
+- **Project** (required): Productive.io project to monitor
+- **Actions** (required): Which task actions to listen for (created, updated). Default: created.
+
+### Outputs
+
+- **Default channel**: Emits the Productive.io webhook envelope, including a `data` object with the
+  task `id` and `attributes` such as `title` and `description`.
+
+### Webhook Setup
+
+This trigger registers a Productive.io webhook automatically when configured, and removes it when the
+trigger is deleted.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "data": {
+      "attributes": {
+        "closed": false,
+        "created_at": "2026-03-26T19:29:35.841Z",
+        "description": "Retries fail silently after the third attempt.",
+        "task_number": 512,
+        "title": "Fix payment retries",
+        "updated_at": "2026-03-26T19:29:35.841Z"
+      },
+      "id": "98765",
+      "relationships": {
+        "assignee": {
+          "data": {
+            "id": "111",
+            "type": "people"
+          }
+        },
+        "project": {
+          "data": {
+            "id": "4321",
+            "type": "projects"
+          }
+        },
+        "task_list": {
+          "data": {
+            "id": "555",
+            "type": "task_lists"
+          }
+        }
+      },
+      "type": "tasks"
+    },
+    "included": [
+      {
+        "attributes": {
+          "name": "Payments"
+        },
+        "id": "4321",
+        "type": "projects"
+      },
+      {
+        "attributes": {
+          "email": "jane@example.com",
+          "first_name": "Jane",
+          "last_name": "Doe"
+        },
+        "id": "111",
+        "type": "people"
+      }
+    ],
+    "meta": {
+      "event": "task.created"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841Z",
+  "type": "productive.task"
+}
+```
+
