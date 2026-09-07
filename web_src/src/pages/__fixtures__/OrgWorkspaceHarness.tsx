@@ -57,6 +57,7 @@ import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetai
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
 import { OnboardingGate } from "@/pages/factories/pages/onboarding/OnboardingGate";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
+import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsBillingPage";
 import {
   OrganizationIntegrationDetailsPage,
   OrganizationIntegrationSetupPage,
@@ -391,6 +392,15 @@ const factorySettingsStorybookRoutes = [
     element={
       <RequirePermission resource="secrets" action="read">
         <FactoryOrganizationSecretDetailPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-billing"
+    path="organization/billing"
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsBillingPage />
       </RequirePermission>
     }
   />,

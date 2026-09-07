@@ -158,6 +158,14 @@ func (s *OrganizationService) CreateBillingPortalSession(
 	return organizations.CreateBillingPortalSession(ctx, orgID, req)
 }
 
+func (s *OrganizationService) ListOrganizationCreditGrants(
+	ctx context.Context,
+	req *pb.ListOrganizationCreditGrantsRequest,
+) (*pb.ListOrganizationCreditGrantsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListOrganizationCreditGrants(ctx, orgID, req)
+}
+
 func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.InviteLink) (*structpb.Struct, error) {
 	accountID, err := accountIDFromContext(ctx)
 	if err != nil {
