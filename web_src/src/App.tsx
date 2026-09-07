@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams 
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { useRecordLastLocation } from "./hooks/useRecordLastLocation";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -267,6 +268,7 @@ function PageObservabilityScope() {
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -292,13 +294,21 @@ export function OrganizationScope() {
         })
       : null;
   useEffect(() => {
-    if (!account?.id || !segment || isReserved || uidRedirectPath) {
+    if (!accountId || !segment || isReserved || uidRedirectPath) {
       return;
     }
     // Prefer the resolved slug so the last-visited value never carries a UID
     // forward into a later root redirect.
-    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
-  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
+    recordLastVisitedOrganization(accountId, resolvedSlug || segment);
+  }, [accountId, segment, isReserved, uidRedirectPath, resolvedSlug]);
+
+  // Remembers the exact screen the user is on (e.g. a pending approval) so
+  // they can resume it later, even after closing the browser or switching
+  // devices. Skipped while the URL still needs to redirect (reserved
+  // segment, stale UID) so we never persist a screen the user never
+  // actually settled on.
+  const organizationRouteForRecording = organizationRouteToRecord(isReserved, uidRedirectPath, resolvedSlug, segment);
+  useRecordLastLocation(organizationRouteForRecording, accountId, `${location.pathname}${location.search}`);
 
   if (isReserved) {
     return <Navigate to="/" replace />;
@@ -345,6 +355,19 @@ function LegacyAutomationsLineEditRedirect() {
   }>();
   if (!organizationId || !factoryKey || !lineId) return <Navigate to="/" replace />;
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
+}
+
+function organizationRouteToRecord(
+  isReserved: boolean,
+  uidRedirectPath: string | null,
+  resolvedSlug: string,
+  segment: string | undefined,
+): string | null {
+  if (isReserved || uidRedirectPath) {
+    return null;
+  }
+
+  return resolvedSlug || segment || null;
 }
 
 function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
