@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/gorm"
@@ -37,13 +38,32 @@ func seedIntake(
 	source string,
 	binding *intakeBinding,
 ) error {
-	// Only a bound GitHub intake can be read now. The other sources reach their
-	// items through the webhook alone.
+	// An unbound intake has nothing to read from. Its items arrive through the
+	// webhook alone.
 	installation := binding.installation()
-	if source != models.FactoryIntakeSourceGitHubIssues || installation == nil {
+	if installation == nil {
 		return nil
 	}
 
+	switch source {
+	case models.FactoryIntakeSourceGitHubIssues:
+		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceProductiveTasks:
+		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
+	}
+
+	// The remaining sources cannot be read yet, so they start empty.
+	return nil
+}
+
+func seedGitHubIssues(
+	ctx context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) error {
 	client, err := newIntakeGitHubClient(deps, tx, installation)
 	if err != nil {
 		return err
@@ -56,6 +76,46 @@ func seedIntake(
 	}
 
 	return emitIntakeEvents(tx, canvasID, intakeGitHubIssuePayloadType, payloads)
+}
+
+func seedProductiveTasks(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) error {
+	client, err := newIntakeProductiveClient(deps, tx, installation)
+	if err != nil {
+		return err
+	}
+
+	project, _ := binding.Configuration["project"].(string)
+	documents, err := client.ListNewestOpenTaskDocuments(project, intakeSeedSize)
+	if err != nil {
+		return fmt.Errorf("failed to list the tasks of project %s: %w", project, err)
+	}
+
+	return emitIntakeEvents(tx, canvasID, productive.TaskPayloadType, productiveTaskEvents(documents))
+}
+
+// productiveTaskEvents shapes each task of a newest-first page like the webhook
+// body the trigger would have delivered, so the rest of the graph cannot tell a
+// seeded task from a received one.
+func productiveTaskEvents(documents []map[string]any) []map[string]any {
+	events := make([]map[string]any, 0, len(documents))
+	for _, document := range documents {
+		events = append(events, map[string]any{
+			"meta": map[string]any{"event": productive.TaskCreatedEvent},
+			"data": document,
+		})
+	}
+
+	// The intake lists its runs newest first. Emitting the oldest task first
+	// keeps the newest task at the top, where the reader expects it.
+	slices.Reverse(events)
+
+	return events
 }
 
 func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*common.Client, error) {
@@ -71,6 +131,28 @@ func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *mo
 	client, err := common.NewClient(integrationContext, deps.Registry.HTTPContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to build GitHub client: %w", err)
+	}
+
+	return client, nil
+}
+
+func newIntakeProductiveClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*productive.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
 	}
 
 	return client, nil

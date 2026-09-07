@@ -11,6 +11,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   logfire: "Logfire",
   cursor: "Cursor",
   pagerduty: "PagerDuty",
+  productive: "Productive",
   slack: "Slack",
   digitalocean: "DigitalOcean",
   discord: "Discord",
