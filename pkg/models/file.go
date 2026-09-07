@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/blob"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -118,10 +119,6 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 		return nil, fmt.Errorf("%w: %s", ErrFileInvalid, err)
 	}
 
-	if err := ensureFileQuota(tx, params); err != nil {
-		return nil, err
-	}
-
 	now := time.Now()
 	file := &File{
 		ID:             id,
@@ -151,7 +148,13 @@ func CreatePendingFile(tx *gorm.DB, params CreateFileParams) (*File, error) {
 		file.CreatedByID = &createdBy
 	}
 
-	if err := tx.Create(file).Error; err != nil {
+	err = tx.Transaction(func(inner *gorm.DB) error {
+		if err := ensureFileQuota(inner, params); err != nil {
+			return err
+		}
+		return inner.Create(file).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return file, nil
@@ -272,24 +275,33 @@ func (f *File) MarkReady(tx *gorm.DB, sizeBytes int64, checksum string) error {
 	if sizeBytes > MaxFileBytes {
 		return fmt.Errorf("%w: file exceeds %d bytes", ErrFileQuotaExceeded, MaxFileBytes)
 	}
-	if err := ensureReadyFileQuota(tx, f, sizeBytes); err != nil {
-		return err
-	}
-
 	now := time.Now()
-	f.State = FileStateReady
-	f.SizeBytes = sizeBytes
-	f.UpdatedAt = now
 	updates := map[string]any{
 		"state":      FileStateReady,
 		"size_bytes": sizeBytes,
 		"updated_at": now,
 	}
 	if checksum != "" {
-		f.Checksum = &checksum
 		updates["checksum"] = checksum
 	}
-	return tx.Model(f).Updates(updates).Error
+
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := ensureReadyFileQuota(inner, f, sizeBytes); err != nil {
+			return err
+		}
+		return inner.Model(f).Updates(updates).Error
+	})
+	if err != nil {
+		return err
+	}
+
+	f.State = FileStateReady
+	f.SizeBytes = sizeBytes
+	f.UpdatedAt = now
+	if checksum != "" {
+		f.Checksum = &checksum
+	}
+	return nil
 }
 
 func (f *File) MarkFailed(tx *gorm.DB) error {
@@ -324,6 +336,9 @@ func (f *File) Delete(tx *gorm.DB) error {
 }
 
 func ensureFileQuota(tx *gorm.DB, params CreateFileParams) error {
+	if err := lockFileQuotaRows(tx, params.OrganizationID, params.WorkOrderID); err != nil {
+		return err
+	}
 	if params.OrganizationID != uuid.Nil {
 		total, err := SumReadyOrganizationFileBytes(tx, params.OrganizationID)
 		if err != nil {
@@ -346,6 +361,18 @@ func ensureFileQuota(tx *gorm.DB, params CreateFileParams) error {
 }
 
 func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64) error {
+	orgID := uuid.Nil
+	if file.OrganizationID != nil {
+		orgID = *file.OrganizationID
+	}
+	workOrderID := uuid.Nil
+	if file.WorkOrderID != nil {
+		workOrderID = *file.WorkOrderID
+	}
+	if err := lockFileQuotaRows(tx, orgID, workOrderID); err != nil {
+		return err
+	}
+
 	if file.OrganizationID != nil {
 		total, err := SumReadyOrganizationFileBytes(tx, *file.OrganizationID)
 		if err != nil {
@@ -365,6 +392,30 @@ func ensureReadyFileQuota(tx *gorm.DB, file *File, sizeBytes int64) error {
 	}
 	if count >= MaxFilesPerWorkOrder {
 		return fmt.Errorf("%w: task file limit is %d", ErrFileQuotaExceeded, MaxFilesPerWorkOrder)
+	}
+	return nil
+}
+
+func lockFileQuotaRows(tx *gorm.DB, organizationID, workOrderID uuid.UUID) error {
+	if organizationID != uuid.Nil {
+		var org Organization
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id").
+			Where("id = ?", organizationID).
+			First(&org).Error
+		if err != nil {
+			return err
+		}
+	}
+	if workOrderID != uuid.Nil {
+		var order FactoryWorkOrder
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id").
+			Where("id = ?", workOrderID).
+			First(&order).Error
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 	"time"
 
@@ -166,6 +167,69 @@ func TestMarkReadyRejectsWhenTaskAlreadyHasMaxReadyFiles(t *testing.T) {
 	loaded, err := FindFile(database.Conn(), extra.ID)
 	require.NoError(t, err)
 	assert.Equal(t, FileStatePending, loaded.State)
+}
+
+func TestMarkReadySerializesConcurrentTaskQuota(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "file-race-quota")
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Race quota", "", &userID, nil, nil)
+	require.NoError(t, err)
+
+	for i := 0; i < MaxFilesPerWorkOrder-1; i++ {
+		file, createErr := CreatePendingFile(database.Conn(), CreateFileParams{
+			Scope:          blob.ScopeTask,
+			OrganizationID: org.ID,
+			FactoryID:      factoryModel.ID,
+			WorkOrderID:    order.ID,
+			Filename:       "shot.png",
+			ContentType:    "image/png",
+			CreatedByID:    userID,
+		})
+		require.NoError(t, createErr)
+		require.NoError(t, file.MarkReady(database.Conn(), 1, "x"))
+	}
+
+	pending, err := CreatePendingFile(database.Conn(), CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: org.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    order.ID,
+		Filename:       "last.png",
+		ContentType:    "image/png",
+		CreatedByID:    userID,
+	})
+	require.NoError(t, err)
+	extra := insertPendingTaskFileBypassingQuota(t, org.ID, factoryModel.ID, order.ID, userID)
+
+	errCh := make(chan error, 2)
+	var start sync.WaitGroup
+	start.Add(2)
+	go func() {
+		start.Done()
+		start.Wait()
+		errCh <- pending.MarkReady(database.Conn(), 1, "a")
+	}()
+	go func() {
+		start.Done()
+		start.Wait()
+		errCh <- extra.MarkReady(database.Conn(), 1, "b")
+	}()
+
+	firstErr := <-errCh
+	secondErr := <-errCh
+	quotaFailures := 0
+	for _, markErr := range []error{firstErr, secondErr} {
+		if markErr == nil {
+			continue
+		}
+		assert.ErrorIs(t, markErr, ErrFileQuotaExceeded)
+		quotaFailures++
+	}
+	assert.Equal(t, 1, quotaFailures)
+
+	count, err := CountReadyTaskFiles(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(MaxFilesPerWorkOrder), count)
 }
 
 func TestMarkReadyRejectsWhenOrganizationBytesExceeded(t *testing.T) {
