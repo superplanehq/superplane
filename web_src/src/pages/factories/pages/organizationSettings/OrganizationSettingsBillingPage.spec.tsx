@@ -29,7 +29,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(await screen.findByRole("heading", { name: "Billing" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeDisabled();
 
-    const balance = screen.getByTestId("billing-credit-balance");
+    const balance = await screen.findByTestId("billing-credit-balance");
     expect(balance).toHaveTextContent("Remaining hosted credit");
     expect(balance).toHaveTextContent("$41.24");
     expect(balance).toHaveTextContent("SuperPlane grant");
