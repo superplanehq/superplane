@@ -57,8 +57,8 @@ describe("SpendingRedesignPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Model usage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "VM usage" })).toBeInTheDocument();
-    expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("Estimated spend");
-    expect(screen.getByTestId("spending-kpi-tokens")).toHaveTextContent("Tokens");
+    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("SuperPlane-hosted spend");
+    expect(screen.getByTestId("spending-kpi-byok")).toHaveTextContent("Your keys spend");
     expect(screen.getByTestId("spending-kpi-vm")).toHaveTextContent("VM time");
     expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
     expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 30 days");
@@ -66,7 +66,12 @@ describe("SpendingRedesignPage", () => {
     expect(screen.queryByRole("button", { name: "Custom range" })).not.toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
-        "Semaphore",
+        "SuperPlane-hosted",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
+        "Your keys",
       ),
     ).toBeInTheDocument();
     expect(
@@ -93,7 +98,7 @@ describe("SpendingRedesignPage", () => {
     renderPage();
 
     const range = screen.getByTestId("spending-period");
-    const kpi = screen.getByTestId("spending-kpi-spend");
+    const kpi = screen.getByTestId("spending-kpi-hosted");
     const models = screen.getByTestId("spending-model-usage");
 
     expect(range.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -121,9 +126,11 @@ describe("SpendingRedesignPage", () => {
     const machines = screen.getByTestId("spending-vm-usage");
 
     expect(within(models).getByTestId("spending-model-filter-models")).toBeInTheDocument();
+    expect(within(models).getByTestId("spending-model-filter-sources")).toBeInTheDocument();
     expect(within(models).queryByTestId("spending-model-filter-machines")).not.toBeInTheDocument();
     expect(within(machines).getByTestId("spending-vm-filter-machines")).toBeInTheDocument();
     expect(within(machines).queryByTestId("spending-vm-filter-models")).not.toBeInTheDocument();
+    expect(within(machines).queryByTestId("spending-vm-filter-sources")).not.toBeInTheDocument();
   });
 
   it("places a group-by dropdown after a separator in each usage explorer", () => {
@@ -136,7 +143,7 @@ describe("SpendingRedesignPage", () => {
 
     expect(within(models).getByTestId("spending-model-filter-bar")).toContainElement(modelGroupBy);
     expect(within(machines).getByTestId("spending-vm-filter-bar")).toContainElement(vmGroupBy);
-    expect(modelGroupBy).toHaveTextContent("Group by Workspaces");
+    expect(modelGroupBy).toHaveTextContent("Group by Source");
     expect(vmGroupBy).toHaveTextContent("Group by Workspaces");
   });
 
@@ -165,13 +172,29 @@ describe("SpendingRedesignPage", () => {
     );
   });
 
-  it("offers model grouping only on model usage", async () => {
+  it("offers source grouping on model usage", async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-group-by"));
+    expect(screen.getByRole("menuitemradio", { name: "Source" })).toBeInTheDocument();
     expect(screen.getByRole("menuitemradio", { name: "Models" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitemradio", { name: "Machine types" })).not.toBeInTheDocument();
+  });
+
+  it("filters model usage to Your keys", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const models = screen.getByTestId("spending-model-usage");
+    await user.click(within(models).getByTestId("spending-model-filter-sources"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Your keys" }));
+
+    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Your keys");
+    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Your keys")).toBeInTheDocument();
+    expect(
+      within(within(models).getByTestId("spending-model-breakdown")).queryByText("SuperPlane-hosted"),
+    ).not.toBeInTheDocument();
   });
 
   it("offers machine-type grouping only on VM usage", async () => {
@@ -181,31 +204,34 @@ describe("SpendingRedesignPage", () => {
     await user.click(within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-group-by"));
     expect(screen.getByRole("menuitemradio", { name: "Machine types" })).toBeInTheDocument();
     expect(screen.queryByRole("menuitemradio", { name: "Models" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: "Source" })).not.toBeInTheDocument();
   });
 
   it("narrows totals when the last 7 days are selected", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const monthSpend = screen.getByTestId("spending-kpi-spend").textContent;
+    const monthSpend = screen.getByTestId("spending-kpi-hosted").textContent;
     await user.click(screen.getByTestId("spending-period"));
     await user.click(screen.getByRole("radio", { name: "Last 7 days" }));
     expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 7 days");
-    expect(screen.getByTestId("spending-kpi-spend").textContent).not.toBe(monthSpend);
+    expect(screen.getByTestId("spending-kpi-hosted").textContent).not.toBe(monthSpend);
   });
 
   it("keeps organization KPI totals when a workspace filter is applied", async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const spend = screen.getByTestId("spending-kpi-spend").textContent;
-    const tokens = screen.getByTestId("spending-kpi-tokens").textContent;
+    const hosted = screen.getByTestId("spending-kpi-hosted").textContent;
+    const byok = screen.getByTestId("spending-kpi-byok").textContent;
     const models = screen.getByTestId("spending-model-usage");
+    await user.click(within(models).getByTestId("spending-model-group-by"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Workspaces" }));
     await user.click(within(models).getByTestId("spending-model-filter-workspaces"));
     await user.click(screen.getByRole("menuitemradio", { name: "Semaphore" }));
 
-    expect(screen.getByTestId("spending-kpi-spend").textContent).toBe(spend);
-    expect(screen.getByTestId("spending-kpi-tokens").textContent).toBe(tokens);
+    expect(screen.getByTestId("spending-kpi-hosted").textContent).toBe(hosted);
+    expect(screen.getByTestId("spending-kpi-byok").textContent).toBe(byok);
     expect(
       within(within(models).getByTestId("spending-model-breakdown")).queryByText("Acme onboarding"),
     ).not.toBeInTheDocument();
@@ -228,10 +254,14 @@ describe("SpendingRedesignPage", () => {
     renderPage();
 
     const models = screen.getByTestId("spending-model-usage");
+    await user.click(within(models).getByTestId("spending-model-group-by"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Workspaces" }));
     await user.click(within(models).getByTestId("spending-model-filter-workspaces"));
     await user.click(screen.getByRole("menuitemradio", { name: "Semaphore" }));
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Semaphore");
 
+    await user.click(within(models).getByTestId("spending-model-group-by"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Workspaces" }));
     await user.click(within(models).getByTestId("spending-model-filter-workspaces"));
     await user.click(screen.getByRole("menuitemradio", { name: "Acme onboarding" }));
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Acme onboarding");
@@ -248,6 +278,8 @@ describe("SpendingRedesignPage", () => {
     renderPage();
 
     const models = screen.getByTestId("spending-model-usage");
+    await user.click(within(models).getByTestId("spending-model-group-by"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Workspaces" }));
     await user.click(within(models).getByTestId("spending-model-filter-workspaces"));
     await user.click(screen.getByRole("menuitemradio", { name: "Semaphore" }));
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Semaphore");
@@ -270,8 +302,9 @@ describe("SpendingRedesignPage", () => {
     const vmTable = within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-breakdown");
 
     expect(within(modelTable).getByText("Spend")).toBeInTheDocument();
-    expect(within(modelTable).queryByText("Tokens")).not.toBeInTheDocument();
+    expect(within(modelTable).getByText("Tokens")).toBeInTheDocument();
     expect(within(vmTable).getByText("Spend")).toBeInTheDocument();
+    expect(within(vmTable).queryByText("Tokens")).not.toBeInTheDocument();
     expect(within(vmTable).queryByText("Time")).not.toBeInTheDocument();
   });
 

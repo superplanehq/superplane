@@ -154,7 +154,7 @@ export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
     initialPeriod = "month",
     initialModelFilters = EMPTY_SPENDING_FILTERS,
     initialMachineFilters = EMPTY_SPENDING_FILTERS,
-    initialModelBreakdown = "workspace",
+    initialModelBreakdown = "funding_source",
     initialMachineBreakdown = "workspace",
     initialCustomRange,
     kpiTotals: kpiTotalsProp,

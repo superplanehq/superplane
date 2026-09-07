@@ -265,6 +265,15 @@ func fundingSourceIsHosted(source string) bool {
 	return strings.TrimSpace(source) == UsageFundingSourceHosted
 }
 
+// ParseUsageFundingSource accepts hosted or byok. Empty input is an error.
+func ParseUsageFundingSource(source string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(source))
+	if normalized == UsageFundingSourceHosted || normalized == UsageFundingSourceBYOK {
+		return normalized, nil
+	}
+	return "", fmt.Errorf("unsupported usage funding source: %s", source)
+}
+
 func usageIdempotencyKey(key string) string {
 	if trimmed := strings.TrimSpace(key); trimmed != "" {
 		return trimmed
@@ -284,6 +293,7 @@ type UsageReportFilter struct {
 	Model          string
 	MachineType    string
 	TaskOwnerID    *uuid.UUID
+	FundingSource  string
 }
 
 // UsageTotals is a token, duration, and cost sum.
@@ -528,6 +538,9 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 	}
 	if filter.MachineType != "" {
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
+	}
+	if filter.FundingSource != "" {
+		query = query.Where("workspace_usage_events.funding_source = ?", filter.FundingSource)
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)

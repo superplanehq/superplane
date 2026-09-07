@@ -13,16 +13,20 @@ import (
 )
 
 const (
-	SpendingGroupByWorkspace = "workspace"
-	SpendingGroupByUser      = "user"
-	SpendingGroupByModel     = "model"
-	SpendingGroupByMachine   = "machine"
+	SpendingGroupByWorkspace     = "workspace"
+	SpendingGroupByUser          = "user"
+	SpendingGroupByModel         = "model"
+	SpendingGroupByMachine       = "machine"
+	SpendingGroupByFundingSource = "funding_source"
 
 	SpendingTimeGrainHour  = "hour"
 	SpendingTimeGrainDay   = "day"
 	SpendingTimeGrainMonth = "month"
 
 	spendingOtherSeriesID = "other"
+
+	spendingFundingSourceHostedLabel = "SuperPlane-hosted"
+	spendingFundingSourceBYOKLabel   = "Your keys"
 )
 
 const spendingReportMaxSpan = 366 * 24 * time.Hour
@@ -90,7 +94,7 @@ type SpendingCatalogs struct {
 
 // SpendingExplorerReport is the filtered chart and table payload for one usage kind.
 type SpendingExplorerReport struct {
-	Totals     UsageTotals
+	Totals     SpendingKPITotals
 	Breakdown  []SpendingBreakdownRow
 	SeriesKeys []SpendingSeriesKey
 	Series     []SpendingSeriesPoint
@@ -109,14 +113,15 @@ func ValidateSpendingReportWindow(since, until time.Time) error {
 
 // SummarizeSpendingKPITotals returns org-wide totals for model and compute usage in a window.
 func SummarizeSpendingKPITotals(tx *gorm.DB, filter UsageReportFilter) (SpendingKPITotals, error) {
-	var row struct {
-		CostMicros       int64
-		TotalTokens      int64
-		DurationSeconds  int64
-		HostedCostMicros int64
-		BYOKCostMicros   int64
+	var totals SpendingKPITotals
+	if err := scanSpendingKPITotals(spendingScopedQuery(tx, filter, false), &totals); err != nil {
+		return SpendingKPITotals{}, err
 	}
-	err := spendingScopedQuery(tx, filter, false).
+	return totals, nil
+}
+
+func scanSpendingKPITotals(query *gorm.DB, totals *SpendingKPITotals) error {
+	return query.
 		Select(`
 			COALESCE(SUM(cost_micros), 0) AS cost_micros,
 			COALESCE(SUM(total_tokens), 0) AS total_tokens,
@@ -124,17 +129,7 @@ func SummarizeSpendingKPITotals(tx *gorm.DB, filter UsageReportFilter) (Spending
 			COALESCE(SUM(CASE WHEN funding_source = ? THEN cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
 			COALESCE(SUM(CASE WHEN funding_source != ? THEN cost_micros ELSE 0 END), 0) AS byok_cost_micros`,
 			UsageFundingSourceHosted, UsageFundingSourceHosted).
-		Scan(&row).Error
-	if err != nil {
-		return SpendingKPITotals{}, err
-	}
-	return SpendingKPITotals{
-		CostMicros:       row.CostMicros,
-		TotalTokens:      row.TotalTokens,
-		DurationSeconds:  row.DurationSeconds,
-		HostedCostMicros: row.HostedCostMicros,
-		BYOKCostMicros:   row.BYOKCostMicros,
-	}, nil
+		Scan(totals).Error
 }
 
 // SummarizeSpendingExplorer returns filtered totals, breakdown rows, and stacked series.
@@ -153,11 +148,8 @@ func SummarizeSpendingExplorer(
 		return SpendingExplorerReport{}, err
 	}
 
-	var totals UsageTotals
-	err = spendingScopedQuery(tx, filter, joinWorkOrders).
-		Select(usageSumSelect).
-		Scan(&totals).Error
-	if err != nil {
+	var totals SpendingKPITotals
+	if err := scanSpendingKPITotals(spendingScopedQuery(tx, filter, joinWorkOrders), &totals); err != nil {
 		return SpendingExplorerReport{}, err
 	}
 
@@ -505,6 +497,8 @@ func spendingGroupExpressions(groupBy string) (idExpr string, groupExpr string) 
 		return "workspace_usage_events.provider || '/' || workspace_usage_events.model", "workspace_usage_events.provider, workspace_usage_events.model"
 	case SpendingGroupByMachine:
 		return "workspace_usage_events.machine_type", "workspace_usage_events.machine_type"
+	case SpendingGroupByFundingSource:
+		return "workspace_usage_events.funding_source", "workspace_usage_events.funding_source"
 	default:
 		return "COALESCE(workspace_usage_events.factory_id::text, '')", "COALESCE(workspace_usage_events.factory_id::text, '')"
 	}
@@ -535,6 +529,8 @@ func normalizeSpendingGroupBy(groupBy, usageKind string) string {
 			return SpendingGroupByWorkspace
 		}
 		return SpendingGroupByMachine
+	case SpendingGroupByFundingSource:
+		return SpendingGroupByFundingSource
 	default:
 		return SpendingGroupByWorkspace
 	}
@@ -559,6 +555,8 @@ func otherSpendingSeriesLabel(groupBy string) string {
 		return "Other models"
 	case SpendingGroupByMachine:
 		return "Other machines"
+	case SpendingGroupByFundingSource:
+		return "Other sources"
 	default:
 		return "Other workspaces"
 	}
@@ -643,6 +641,12 @@ func monthSeriesLabel(value time.Time) string {
 }
 
 func spendingLabelMap(catalogs SpendingCatalogs, groupBy string) map[string]string {
+	if groupBy == SpendingGroupByFundingSource {
+		return map[string]string{
+			UsageFundingSourceHosted: spendingFundingSourceHostedLabel,
+			UsageFundingSourceBYOK:   spendingFundingSourceBYOKLabel,
+		}
+	}
 	items := catalogs.Workspaces
 	switch groupBy {
 	case SpendingGroupByUser:
