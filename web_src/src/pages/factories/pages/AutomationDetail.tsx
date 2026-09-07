@@ -7,17 +7,23 @@ import { formatTimeAgo } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { linesUsingAutomation } from "../lib/automationLineUsage";
 import {
   findWorkOrderForAutomationRun,
   listFactoryAutomationRuns,
   resolveFactoryAutomationStatusFromCanvasRuns,
   type FactoryAutomationRunCard,
 } from "../lib/factoryAutomationStatus";
-import { automationsPath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { automationsPath, factoryAppRunPath, factoryLineDetailPath } from "../lib/factoryPagePaths";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { type AutomationCardActions } from "./automationCardActions";
-import { AutomationHeaderActions, DeleteAutomationDialog, StatusTick } from "./automationsPageParts";
+import {
+  AutomationHeaderActions,
+  AutomationUsedByLines,
+  DeleteAutomationDialog,
+  StatusTick,
+} from "./automationsPageParts";
 import { factorySectionBodyClassName, factorySectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { LineVelocityPanel } from "./LineVelocityPanel";
 
@@ -72,6 +78,7 @@ export function AutomationDetail({
   const description = app.description?.trim();
   const subtitleParts = [status.label, description].filter(Boolean);
   const subtitle = subtitleParts.length > 0 ? subtitleParts.join(" · ") : undefined;
+  const usedByLines = linesUsingAutomation(factory?.lines, app.id);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="automations-detail">
@@ -83,6 +90,12 @@ export function AutomationDetail({
         backTestId="automations-detail-back"
         title={automationName}
         subtitle={subtitle}
+        belowRow={
+          <AutomationUsedByLines
+            lines={usedByLines}
+            lineHref={(lineId) => factoryLineDetailPath(organizationId, factoryKey, lineId)}
+          />
+        }
         actions={
           <AutomationHeaderActions
             name={automationName}
