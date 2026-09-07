@@ -68,6 +68,17 @@ func FindAccountLinkedAccount(tx *gorm.DB, accountID uuid.UUID, provider string)
 	return &linked, nil
 }
 
+// FindAccountLinkedAccountByProviderID returns the account that claimed this
+// external identity for attribution, if any.
+func FindAccountLinkedAccountByProviderID(tx *gorm.DB, provider, providerID string) (*AccountLinkedAccount, error) {
+	var linked AccountLinkedAccount
+	err := tx.Where("provider = ? AND provider_id = ?", provider, providerID).First(&linked).Error
+	if err != nil {
+		return nil, err
+	}
+	return &linked, nil
+}
+
 // SaveAccountLinkedAccount links the identity to the account. It replaces the
 // identity the account previously linked for the same provider, so a member can
 // correct a wrong link without an extra step.

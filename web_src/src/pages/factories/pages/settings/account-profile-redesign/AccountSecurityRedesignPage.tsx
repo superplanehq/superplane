@@ -13,9 +13,12 @@ type AccountSecurityRedesignPageProps = {
   passwordSet: boolean;
   tokens: AccountRedesignToken[];
   ssoAccounts: AccountRedesignSsoAccount[];
+  githubLinkedUsername?: string | null;
   onChangePassword: () => void;
   onConnectSso: (provider: AccountRedesignSsoAccount["provider"]) => void;
   onDisconnectSso: (provider: AccountRedesignSsoAccount["provider"]) => void;
+  onLinkGithubForCredit?: () => void;
+  onRemoveGithubLink?: () => void;
   onCreateToken: (name: string) => string;
   onRevokeToken: (id: string) => void;
   hideMockDialogs?: boolean;
@@ -26,9 +29,12 @@ export function AccountSecurityRedesignPage({
   passwordSet,
   tokens,
   ssoAccounts,
+  githubLinkedUsername = null,
   onChangePassword,
   onConnectSso,
   onDisconnectSso,
+  onLinkGithubForCredit,
+  onRemoveGithubLink,
   onCreateToken,
   onRevokeToken,
   hideMockDialogs = false,
@@ -48,10 +54,13 @@ export function AccountSecurityRedesignPage({
       <AccountSecuritySignInCard
         passwordSet={passwordSet}
         ssoAccounts={ssoAccounts}
+        githubLinkedUsername={githubLinkedUsername}
         canDisconnectSso={canDisconnectSso}
         onChangePassword={() => (hideMockDialogs ? onChangePassword() : setPasswordOpen(true))}
         onConnectSso={onConnectSso}
         onDisconnect={setDisconnectProvider}
+        onLinkGithubForCredit={onLinkGithubForCredit}
+        onRemoveGithubLink={onRemoveGithubLink}
       />
       <AccountSecurityTokensCard
         tokens={tokens}

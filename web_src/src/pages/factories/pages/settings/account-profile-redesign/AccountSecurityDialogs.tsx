@@ -47,6 +47,37 @@ export function DisconnectSsoDialog({
   );
 }
 
+export function RemoveGithubLinkDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove the GitHub link</DialogTitle>
+          <DialogDescription>
+            SuperPlane stops crediting your pull requests to you. Your sign-in methods do not change.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Keep the link
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm}>
+            Remove link
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PasswordDialog({
   open,
   onOpenChange,

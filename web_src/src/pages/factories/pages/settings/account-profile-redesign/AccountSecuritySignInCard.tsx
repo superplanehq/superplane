@@ -1,24 +1,34 @@
+import { useState, type ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 
 import { FactorySettingsCard } from "../FactorySettingsCard";
+import { RemoveGithubLinkDialog } from "./AccountSecurityDialogs";
 import type { AccountRedesignSsoAccount } from "./accountProfileRedesignMocks";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
+import { resolveGithubIdentityState } from "./accountGithubIdentity";
 import { SSO_PROVIDERS, type SsoProviderItem } from "./accountSecuritySso";
 
 export function AccountSecuritySignInCard({
   passwordSet,
   ssoAccounts,
   canDisconnectSso,
+  githubLinkedUsername = null,
   onChangePassword,
   onConnectSso,
   onDisconnect,
+  onLinkGithubForCredit,
+  onRemoveGithubLink,
 }: {
   passwordSet: boolean;
   ssoAccounts: AccountRedesignSsoAccount[];
   canDisconnectSso: boolean;
+  githubLinkedUsername?: string | null;
   onChangePassword: () => void;
   onConnectSso: (provider: AccountRedesignSsoAccount["provider"]) => void;
   onDisconnect: (item: SsoProviderItem) => void;
+  onLinkGithubForCredit?: () => void;
+  onRemoveGithubLink?: () => void;
 }) {
   return (
     <FactorySettingsCard title="Sign in methods" data-testid="account-redesign-signin">
@@ -41,6 +51,23 @@ export function AccountSecuritySignInCard({
           </li>
         ) : null}
         {SSO_PROVIDERS.map((item) => {
+          if (item.provider === "github") {
+            const account = ssoAccounts.find((entry) => entry.provider === "github");
+            return (
+              <li key={item.provider}>
+                <AccountSecurityGithubRow
+                  ssoIdentity={account?.identity ?? null}
+                  linkedUsername={githubLinkedUsername}
+                  canDisconnectSso={canDisconnectSso}
+                  onConnect={() => onConnectSso("github")}
+                  onDisconnect={() => onDisconnect(item)}
+                  onLinkForCredit={onLinkGithubForCredit}
+                  onRemoveLink={onRemoveGithubLink}
+                />
+              </li>
+            );
+          }
+
           const account = ssoAccounts.find((entry) => entry.provider === item.provider);
           const identity = account?.identity ?? null;
           return (
@@ -67,7 +94,7 @@ export function AccountSecuritySignInCard({
                     </Button>
                   ) : (
                     <Button type="button" size="sm" variant="outline" onClick={() => onConnectSso(item.provider)}>
-                      Sign in with {item.label}
+                      Connect
                     </Button>
                   )
                 }
@@ -80,6 +107,123 @@ export function AccountSecuritySignInCard({
         <p className="mt-3 text-[12px] text-muted-foreground">Keep at least one sign-in method.</p>
       ) : null}
     </FactorySettingsCard>
+  );
+}
+
+function AccountSecurityGithubRow({
+  ssoIdentity,
+  linkedUsername,
+  canDisconnectSso,
+  onConnect,
+  onDisconnect,
+  onLinkForCredit,
+  onRemoveLink,
+}: {
+  ssoIdentity: string | null;
+  linkedUsername: string | null;
+  canDisconnectSso: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onLinkForCredit?: () => void;
+  onRemoveLink?: () => void;
+}) {
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const state = resolveGithubIdentityState(ssoIdentity, linkedUsername);
+
+  let status: string;
+  let description: string;
+  let action: ReactNode;
+
+  switch (state.kind) {
+    case "none":
+      status = "Not connected";
+      description = "Connect GitHub to sign in, or link it to credit pull requests.";
+      action = (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={onConnect}>
+            Connect
+          </Button>
+          {onLinkForCredit ? (
+            <Button type="button" size="sm" variant="ghost" onClick={onLinkForCredit}>
+              Link for pull request credit
+            </Button>
+          ) : null}
+        </div>
+      );
+      break;
+    case "linked_only":
+      status = `Linked as ${state.username}`;
+      description = "SuperPlane uses this account to credit pull requests. This is not a sign-in method.";
+      action = (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={onConnect}>
+            Add as sign-in method
+          </Button>
+          {onRemoveLink ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setRemoveOpen(true)}>
+              Remove
+            </Button>
+          ) : null}
+        </div>
+      );
+      break;
+    case "sso":
+      if (state.split && state.creditUsername) {
+        status = `Connected as ${state.identity}`;
+        description = `You can sign in with this account. Pull request credit uses ${state.creditUsername}.`;
+        action = (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" disabled={!canDisconnectSso} onClick={onDisconnect}>
+              Disconnect
+            </Button>
+            {onRemoveLink ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setRemoveOpen(true)}>
+                Remove link
+              </Button>
+            ) : null}
+          </div>
+        );
+      } else {
+        status = `Connected as ${state.identity}`;
+        description = "You can sign in with this account. SuperPlane also uses it to credit pull requests.";
+        action = (
+          <Button type="button" size="sm" variant="ghost" disabled={!canDisconnectSso} onClick={onDisconnect}>
+            Disconnect
+          </Button>
+        );
+      }
+      break;
+  }
+
+  return (
+    <>
+      <SettingsActionRow
+        title={
+          <span className="inline-flex items-center gap-2">
+            <SsoProviderIcon provider="github" />
+            GitHub
+          </span>
+        }
+        description={
+          <>
+            <span className="block text-foreground">{status}</span>
+            <span className="block">{description}</span>
+          </>
+        }
+        testId="account-redesign-sso-github"
+        action={action}
+      />
+      {onRemoveLink ? (
+        <RemoveGithubLinkDialog
+          open={removeOpen}
+          onOpenChange={setRemoveOpen}
+          onConfirm={() => {
+            onRemoveLink();
+            setRemoveOpen(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

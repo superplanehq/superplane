@@ -110,6 +110,15 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if err := ensureExternalIdentityAvailable(sessionAccount.ID, gothUser); err != nil {
+		code := authErrorConnectInUse
+		if errors.Is(err, models.ErrSignInIdentityInUse) {
+			code = authErrorLinkFailed
+		}
+		http.Redirect(w, r, connectErrorRedirectURL(state.Redirect, code, gothUser.Provider), http.StatusSeeOther)
+		return
+	}
+
 	username := strings.TrimSpace(gothUser.NickName)
 	if username == "" {
 		http.Error(w, "Provider returned no username", http.StatusBadGateway)

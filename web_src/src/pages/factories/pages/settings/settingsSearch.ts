@@ -31,10 +31,11 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   entry("account", "profile", "Account", undefined, ["identity", "name", "avatar", "preferences"]),
   entry("account", "profile", "Identity", "account-redesign-identity", ["name", "primary email", "email", "avatar"]),
   entry("account", "profile", "Appearance", "account-redesign-appearance", ["theme", "light", "dark", "system"]),
-  entry("account", "profile", "GitHub for Velocity", "account-redesign-velocity-github", [
+  entry("account", "profile", "GitHub", "account-redesign-sso-github", [
     "github",
-    "velocity",
-    "pull requests",
+    "pull request credit",
+    "sign in",
+    "linked account",
   ]),
   entry("account", "profile", "Security", "account-redesign-security", [
     "sign in",

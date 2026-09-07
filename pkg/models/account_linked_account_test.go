@@ -60,6 +60,21 @@ func TestAccountLinkedAccount(t *testing.T) {
 		assert.ErrorIs(t, err, ErrLinkedAccountInUse)
 	})
 
+	t.Run("finds a linked identity by provider id", func(t *testing.T) {
+		account, err := CreateAccount("ByProvider", "byprovider@example.com")
+		require.NoError(t, err)
+
+		require.NoError(t, SaveAccountLinkedAccount(
+			database.Conn(),
+			NewAccountLinkedAccount(account.ID, ProviderGitHub, "provider-99", "by-provider", "", ""),
+		))
+
+		found, err := FindAccountLinkedAccountByProviderID(database.Conn(), ProviderGitHub, "provider-99")
+		require.NoError(t, err)
+		assert.Equal(t, account.ID, found.AccountID)
+		assert.Equal(t, "by-provider", found.Username)
+	})
+
 	t.Run("removes the link", func(t *testing.T) {
 		account, err := CreateAccount("Unlinker", "unlinker@example.com")
 		require.NoError(t, err)

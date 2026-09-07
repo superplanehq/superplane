@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,8 +13,10 @@ import { FactorySettingsAccountProfilePage } from "./FactorySettingsAccountProfi
 
 const accountState: {
   linked: AccountLinkedAccount[];
+  providers: Array<{ provider: string; username?: string; email?: string }>;
 } = {
   linked: [],
+  providers: [],
 };
 const refreshAccount = vi.fn(async () => undefined);
 const disconnectLinkedAccount = vi.fn(async (_provider: string) => undefined);
@@ -31,7 +33,7 @@ vi.mock("@/contexts/useAccount", () => ({
       avatar_url: "",
       installation_admin: false,
       has_password: true,
-      providers: [],
+      providers: accountState.providers,
       linked_accounts: accountState.linked,
     },
     refreshAccount,
@@ -49,6 +51,8 @@ vi.mock("@/lib/accountSettings", async (importOriginal) => {
     disconnectLinkedAccount: (provider: string) => disconnectLinkedAccount(provider),
     linkedAccountConnectHref: (provider: string, redirect: string) =>
       `/auth/${provider}?intent=connect&redirect=${encodeURIComponent(redirect)}`,
+    ssoLinkHref: (provider: string, redirect: string) =>
+      `/auth/${provider}?intent=link&redirect=${encodeURIComponent(redirect)}`,
   };
 });
 
@@ -72,33 +76,60 @@ function renderPage(path = "/settings/account/profile") {
   );
 }
 
-describe("FactorySettingsAccountProfilePage velocity GitHub", () => {
+describe("FactorySettingsAccountProfilePage GitHub identity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     accountState.linked = [];
+    accountState.providers = [];
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { assign, pathname: "/settings/account/profile", search: "" },
     });
   });
 
-  it("sends a member who linked nothing to the connect flow", async () => {
+  it("offers connect and pull-request credit when the member linked nothing", async () => {
     renderPage();
 
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent(
-      "This link does not change how you sign in",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Link GitHub" }));
+    const github = screen.getByTestId("account-redesign-sso-github");
+    expect(github).toHaveTextContent("Not connected");
+    expect(github).toHaveTextContent("Connect GitHub to sign in, or link it to credit pull requests.");
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
 
+    await userEvent.click(within(github).getByRole("button", { name: "Link for pull request credit" }));
     expect(assign).toHaveBeenCalledWith("/auth/github?intent=connect&redirect=%2Fsettings%2Faccount%2Fprofile");
   });
 
-  it("shows the linked login", () => {
+  it("starts SSO connect from the empty GitHub row", async () => {
+    renderPage();
+
+    await userEvent.click(
+      within(screen.getByTestId("account-redesign-sso-github")).getByRole("button", { name: "Connect" }),
+    );
+    expect(assign).toHaveBeenCalledWith("/auth/github?intent=link&redirect=%2Fsettings%2Faccount%2Fprofile");
+  });
+
+  it("shows the linked-only state", () => {
     accountState.linked = [{ provider: "github", username: "shiroyasha" }];
     renderPage();
 
-    expect(screen.getByText(/Linked as shiroyasha/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Link GitHub" })).not.toBeInTheDocument();
+    const github = screen.getByTestId("account-redesign-sso-github");
+    expect(github).toHaveTextContent("Linked as shiroyasha");
+    expect(within(github).getByRole("button", { name: "Add as sign-in method" })).toBeInTheDocument();
+    expect(within(github).queryByRole("button", { name: "Link for pull request credit" })).not.toBeInTheDocument();
+  });
+
+  it("shows SSO-connected GitHub without a second card", () => {
+    accountState.providers = [{ provider: "github", username: "shiroyasha" }];
+    accountState.linked = [{ provider: "github", username: "shiroyasha" }];
+    renderPage();
+
+    const github = screen.getByTestId("account-redesign-sso-github");
+    expect(github).toHaveTextContent("Connected as shiroyasha");
+    expect(github).toHaveTextContent(
+      "You can sign in with this account. SuperPlane also uses it to credit pull requests.",
+    );
+    expect(within(github).getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
   });
 
   it("removes the link after the member confirms", async () => {

@@ -11,6 +11,7 @@ import (
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -136,6 +137,10 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorLinkFailed, gothUser.Provider), http.StatusSeeOther)
 		return
 	}
+	if errors.Is(err, models.ErrLinkedAccountInUse) {
+		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorConnectInUse, gothUser.Provider), http.StatusSeeOther)
+		return
+	}
 	if err != nil {
 		log.Errorf("Error linking %s for account %s: %v", gothUser.Provider, sessionAccount.ID, err)
 		http.Error(w, "Failed to connect sign-in method", http.StatusInternalServerError)
@@ -146,15 +151,65 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 }
 
 func LinkProviderToAccount(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
+	if err := ensureExternalIdentityAvailable(account.ID, gothUser); err != nil {
+		return err
+	}
+
+	if err := updateAccountProviders(encryptor, account, gothUser); err != nil {
+		return err
+	}
+
+	return claimGitHubPullRequestCredit(account, gothUser)
+}
+
+// ensureExternalIdentityAvailable refuses a GitHub (or other) identity that
+// already belongs to a different SuperPlane account as a sign-in method or as a
+// pull-request credit link.
+func ensureExternalIdentityAvailable(accountID uuid.UUID, gothUser goth.User) error {
 	existing, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
-	if err == nil && existing.ID != account.ID {
+	if err == nil && existing.ID != accountID {
 		return models.ErrSignInIdentityInUse
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	return updateAccountProviders(encryptor, account, gothUser)
+	if !strings.EqualFold(gothUser.Provider, models.ProviderGitHub) {
+		return nil
+	}
+
+	linked, err := models.FindAccountLinkedAccountByProviderID(database.Conn(), models.ProviderGitHub, gothUser.UserID)
+	if err == nil && linked.AccountID != accountID {
+		return models.ErrLinkedAccountInUse
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	return nil
+}
+
+// claimGitHubPullRequestCredit stores the GitHub identity for authorship when
+// the member connects GitHub as a sign-in method. The claim grants no session
+// on its own; disconnecting SSO later leaves the link until the member removes it.
+func claimGitHubPullRequestCredit(account *models.Account, gothUser goth.User) error {
+	if !strings.EqualFold(gothUser.Provider, models.ProviderGitHub) {
+		return nil
+	}
+
+	username := strings.TrimSpace(gothUser.NickName)
+	if username == "" {
+		return nil
+	}
+
+	linked := models.NewAccountLinkedAccount(
+		account.ID,
+		models.ProviderGitHub,
+		gothUser.UserID,
+		username,
+		gothUser.Name,
+		gothUser.AvatarURL,
+	)
+	return models.SaveAccountLinkedAccount(database.Conn(), linked)
 }
 
 func linkSuccessRedirectURL(redirect, provider string) string {

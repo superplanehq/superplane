@@ -5,7 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { ACCOUNT_REDESIGN_NOTIFICATIONS, ACCOUNT_REDESIGN_SECURE_PROFILE } from "./accountProfileRedesignMocks";
+import {
+  ACCOUNT_REDESIGN_GITHUB_LINK_ONLY_PROFILE,
+  ACCOUNT_REDESIGN_NOTIFICATIONS,
+  ACCOUNT_REDESIGN_PASSWORD_ONLY_PROFILE,
+  ACCOUNT_REDESIGN_SECURE_PROFILE,
+} from "./accountProfileRedesignMocks";
 import { AccountNotificationsRedesignPage } from "./AccountNotificationsRedesignPage";
 import { AccountProfileRedesignPlayground } from "./AccountProfileRedesignPlayground";
 
@@ -42,8 +47,11 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(
       screen.getByText("Preferences, profile information, and security for your SuperPlane account."),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
-    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent(
+      "You can sign in with this account. SuperPlane also uses it to credit pull requests.",
+    );
     expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
     expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
@@ -75,12 +83,23 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(save).toBeDisabled();
   });
 
-  it("links GitHub for Velocity from Profile", async () => {
+  it("links GitHub for pull request credit when the member has no GitHub yet", async () => {
     const user = userEvent.setup();
-    renderPlayground();
+    render(
+      <ThemeProvider>
+        <TooltipProvider>
+          <AccountProfileRedesignPlayground
+            initialPage="profile"
+            initialProfile={ACCOUNT_REDESIGN_PASSWORD_ONLY_PROFILE}
+          />
+        </TooltipProvider>
+      </ThemeProvider>,
+    );
 
-    await user.click(screen.getByRole("button", { name: "Link GitHub" }));
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("Linked as ada");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Not connected");
+    await user.click(screen.getByRole("button", { name: "Link for pull request credit" }));
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Linked as ada");
+    expect(screen.getByRole("button", { name: "Add as sign-in method" })).toBeInTheDocument();
   });
 
   it("lets the user switch the profile email across sign-in methods", async () => {
@@ -167,13 +186,32 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-password")).toHaveTextContent("Password is set.");
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
-    expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect" })).toBeInTheDocument();
     expect(
       screen.getByText("This token acts as you. Organization API keys act as the organization."),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sessions")).not.toBeInTheDocument();
     expect(screen.queryByText("Two-factor authentication")).not.toBeInTheDocument();
-    expect(screen.getByTestId("account-redesign-velocity-github")).toHaveTextContent("GitHub for Velocity");
+    expect(screen.queryByTestId("account-redesign-velocity-github")).not.toBeInTheDocument();
+  });
+
+  it("shows linked-only GitHub with add-as-sign-in and remove actions", () => {
+    render(
+      <ThemeProvider>
+        <TooltipProvider>
+          <AccountProfileRedesignPlayground
+            initialPage="profile"
+            initialProfile={ACCOUNT_REDESIGN_GITHUB_LINK_ONLY_PROFILE}
+          />
+        </TooltipProvider>
+      </ThemeProvider>,
+    );
+
+    const github = screen.getByTestId("account-redesign-sso-github");
+    expect(github).toHaveTextContent("Linked as ada");
+    expect(github).toHaveTextContent("This is not a sign-in method.");
+    expect(within(github).getByRole("button", { name: "Add as sign-in method" })).toBeInTheDocument();
+    expect(within(github).getByRole("button", { name: "Remove" })).toBeInTheDocument();
   });
 
   it("connects Google and disconnects GitHub on the same account", async () => {
@@ -189,7 +227,9 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Connected as ada");
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Not connected");
 
-    await user.click(screen.getByRole("button", { name: "Sign in with Google" }));
+    await user.click(
+      within(screen.getByTestId("account-redesign-sso-google")).getByRole("button", { name: "Connect" }),
+    );
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
 
     await user.click(
@@ -197,7 +237,7 @@ describe("AccountProfileRedesignPlayground", () => {
     );
     await user.click(screen.getByRole("button", { name: "Disconnect GitHub" }));
 
-    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Not connected");
+    expect(screen.getByTestId("account-redesign-sso-github")).toHaveTextContent("Linked as ada");
     expect(screen.getByTestId("account-redesign-sso-google")).toHaveTextContent("Connected as ada@example.com");
   });
 

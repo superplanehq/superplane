@@ -278,6 +278,11 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	if err := rejectGitHubLoginWhenLinkedElsewhere(gothUser); err != nil {
+		a.handleProviderAuthError(w, r, gothUser, err)
+		return
+	}
+
 	account, wasCreated, err := a.findOrCreateAccountForProvider(gothUser, a.allowSignupFromRequest(r))
 	if err != nil {
 		a.handleProviderAuthError(w, r, gothUser, err)
@@ -291,7 +296,39 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	if err := claimGitHubPullRequestCredit(account, gothUser); err != nil {
+		log.Errorf("Error claiming GitHub authorship for %s: %v", gothUser.Email, err)
+		a.handleProviderAuthError(w, r, gothUser, err)
+		return
+	}
+
 	a.handleSuccessfulAuth(w, r, gothUser, wasCreated)
+}
+
+// rejectGitHubLoginWhenLinkedElsewhere blocks sign-up or login with a GitHub
+// identity that another account already claimed for pull request credit and that
+// is not yet a sign-in method. One GitHub user maps to one SuperPlane account.
+func rejectGitHubLoginWhenLinkedElsewhere(gothUser goth.User) error {
+	if !strings.EqualFold(gothUser.Provider, models.ProviderGitHub) {
+		return nil
+	}
+
+	_, err := models.FindAccountByProvider(gothUser.Provider, gothUser.UserID)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	_, err = models.FindAccountLinkedAccountByProviderID(database.Conn(), models.ProviderGitHub, gothUser.UserID)
+	if err == nil {
+		return models.ErrLinkedAccountInUse
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	return err
 }
 
 func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request, gothUser goth.User, err error) {
@@ -305,6 +342,11 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if errors.Is(err, models.ErrLinkedAccountInUse) || errors.Is(err, models.ErrSignInIdentityInUse) {
+		http.Redirect(w, r, providerIdentityInUseRedirectURL(r, gothUser.Provider, err), http.StatusSeeOther)
+		return
+	}
+
 	if errorStatusForAccountError(err) == http.StatusForbidden {
 		http.Error(w, err.Error(), http.StatusForbidden)
 		return
@@ -312,6 +354,18 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 
 	log.Errorf("Error finding/creating account for %s: %v", gothUser.Email, err)
 	http.Error(w, "Internal server error", http.StatusInternalServerError)
+}
+
+func providerIdentityInUseRedirectURL(r *http.Request, provider string, err error) string {
+	code := authErrorLinkFailed
+	if errors.Is(err, models.ErrLinkedAccountInUse) {
+		code = authErrorConnectInUse
+	}
+	redirect := getRedirectURL(r)
+	if redirect == "" || redirect == "/" {
+		return appendAuthQuery("/login", authErrorParam, code, provider)
+	}
+	return appendAuthQuery(redirect, authErrorParam, code, provider)
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, wasCreated bool) {

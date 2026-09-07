@@ -39,7 +39,7 @@ export interface AccountRedesignProfile {
   passwordSet: boolean;
   tokens: AccountRedesignToken[];
   ssoAccounts: AccountRedesignSsoAccount[];
-  velocityGithubUsername: string | null;
+  githubLinkedUsername: string | null;
   notifications: AccountRedesignNotifications;
 }
 
@@ -52,7 +52,7 @@ export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
     { provider: "github", identity: "ada", email: "ada@example.com" },
     { provider: "google", identity: null, email: null },
   ],
-  velocityGithubUsername: null,
+  githubLinkedUsername: "ada",
   notifications: ACCOUNT_REDESIGN_NOTIFICATIONS,
 };
 
@@ -75,4 +75,18 @@ export const ACCOUNT_REDESIGN_SECURE_PROFILE: AccountRedesignProfile = {
       createdAt: "Jan 4, 2026",
     },
   ],
+};
+
+export const ACCOUNT_REDESIGN_PASSWORD_ONLY_PROFILE: AccountRedesignProfile = {
+  ...ACCOUNT_REDESIGN_PROFILE,
+  ssoAccounts: [
+    { provider: "github", identity: null, email: null },
+    { provider: "google", identity: null, email: null },
+  ],
+  githubLinkedUsername: null,
+};
+
+export const ACCOUNT_REDESIGN_GITHUB_LINK_ONLY_PROFILE: AccountRedesignProfile = {
+  ...ACCOUNT_REDESIGN_PASSWORD_ONLY_PROFILE,
+  githubLinkedUsername: "ada",
 };

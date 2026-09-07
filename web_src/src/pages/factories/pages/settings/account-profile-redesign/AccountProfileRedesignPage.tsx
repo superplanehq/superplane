@@ -10,7 +10,6 @@ import { showSuccessToast } from "@/lib/toast";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../FactorySettingsCard";
 import { SettingsIdentityField } from "../settingsIdentityField";
 import { SettingsActionRow } from "./accountProfileRedesignParts";
-import { AccountProfileVelocityGithubCard } from "./AccountProfileVelocityGithubCard";
 
 const MAX_NAME_LENGTH = 80;
 
@@ -21,9 +20,6 @@ export function AccountProfileRedesignPage({
   onNameChange,
   onEmailChange,
   onSave,
-  velocityGithubUsername = null,
-  onLinkVelocityGithub,
-  onRemoveVelocityGithub,
   security,
   dangerZone,
 }: {
@@ -33,9 +29,6 @@ export function AccountProfileRedesignPage({
   onNameChange: (name: string) => void;
   onEmailChange?: (email: string) => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  velocityGithubUsername?: string | null;
-  onLinkVelocityGithub?: () => void;
-  onRemoveVelocityGithub?: () => void;
   security?: ReactNode;
   dangerZone?: ReactNode;
 }) {
@@ -91,14 +84,6 @@ export function AccountProfileRedesignPage({
           </LoadingButton>
         </div>
       </FactorySettingsCard>
-
-      {onLinkVelocityGithub && onRemoveVelocityGithub ? (
-        <AccountProfileVelocityGithubCard
-          username={velocityGithubUsername}
-          onLink={onLinkVelocityGithub}
-          onRemove={onRemoveVelocityGithub}
-        />
-      ) : null}
 
       {security}
 

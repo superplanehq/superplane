@@ -29,8 +29,8 @@ interface AccountProfileRedesignState {
   connectSso: (provider: AccountRedesignSsoProvider) => void;
   disconnectSso: (provider: AccountRedesignSsoProvider) => void;
   changePassword: () => void;
-  linkVelocityGithub: () => void;
-  removeVelocityGithub: () => void;
+  linkGithubForCredit: () => void;
+  removeGithubLink: () => void;
   createToken: (name: string) => string;
   revokeToken: (id: string) => void;
   setNotifications: (notifications: AccountRedesignNotifications) => void;
@@ -54,18 +54,23 @@ export function AccountProfileRedesignProvider({
     saveName: () => setProfile((current) => ({ ...current, name: current.name.trim() })),
     setEmail: (email) => setProfile((current) => ({ ...current, email })),
     connectSso: (provider) => {
-      setProfile((current) => ({
-        ...current,
-        ssoAccounts: current.ssoAccounts.map((account) =>
-          account.provider === provider
-            ? {
-                ...account,
-                identity: provider === "github" ? githubIdentity(current.name) : current.email,
-                email: account.email || current.email,
-              }
-            : account,
-        ),
-      }));
+      setProfile((current) => {
+        const identity = provider === "github" ? githubIdentity(current.name) : current.email;
+        return {
+          ...current,
+          ssoAccounts: current.ssoAccounts.map((account) =>
+            account.provider === provider
+              ? {
+                  ...account,
+                  identity,
+                  email: account.email || current.email,
+                }
+              : account,
+          ),
+          // GitHub SSO also claims pull request credit (mirrors the backend).
+          githubLinkedUsername: provider === "github" ? identity : current.githubLinkedUsername,
+        };
+      });
       showSuccessToast(provider === "github" ? "GitHub connected." : "Google connected.");
     },
     disconnectSso: (provider) => {
@@ -80,15 +85,15 @@ export function AccountProfileRedesignProvider({
       showSuccessToast(provider === "github" ? "GitHub disconnected." : "Google disconnected.");
     },
     changePassword: () => undefined,
-    linkVelocityGithub: () => {
+    linkGithubForCredit: () => {
       setProfile((current) => ({
         ...current,
-        velocityGithubUsername: githubIdentity(current.name),
+        githubLinkedUsername: githubIdentity(current.name),
       }));
       showSuccessToast("GitHub account linked.");
     },
-    removeVelocityGithub: () => {
-      setProfile((current) => ({ ...current, velocityGithubUsername: null }));
+    removeGithubLink: () => {
+      setProfile((current) => ({ ...current, githubLinkedUsername: null }));
       showSuccessToast("GitHub link removed.");
     },
     createToken: (name) => {
@@ -128,8 +133,8 @@ export function AccountProfileRedesignRoutePage() {
     setName,
     setEmail,
     saveName,
-    linkVelocityGithub,
-    removeVelocityGithub,
+    linkGithubForCredit,
+    removeGithubLink,
     changePassword,
     connectSso,
     disconnectSso,
@@ -150,18 +155,18 @@ export function AccountProfileRedesignRoutePage() {
       onNameChange={setName}
       onEmailChange={setEmail}
       onSave={saveName}
-      velocityGithubUsername={profile.velocityGithubUsername}
-      onLinkVelocityGithub={linkVelocityGithub}
-      onRemoveVelocityGithub={removeVelocityGithub}
       security={
         <AccountSecurityRedesignPage
           passwordSet={profile.passwordSet}
           tokens={profile.tokens}
           ssoAccounts={profile.ssoAccounts}
+          githubLinkedUsername={profile.githubLinkedUsername}
           embedded
           onChangePassword={changePassword}
           onConnectSso={connectSso}
           onDisconnectSso={disconnectSso}
+          onLinkGithubForCredit={linkGithubForCredit}
+          onRemoveGithubLink={removeGithubLink}
           onCreateToken={createToken}
           onRevokeToken={revokeToken}
         />
@@ -190,15 +195,27 @@ export function AccountNotificationsRedesignRoutePage() {
 }
 
 export function AccountSecurityRedesignRoutePage() {
-  const { profile, changePassword, connectSso, disconnectSso, createToken, revokeToken } = useAccountProfileRedesign();
+  const {
+    profile,
+    changePassword,
+    connectSso,
+    disconnectSso,
+    linkGithubForCredit,
+    removeGithubLink,
+    createToken,
+    revokeToken,
+  } = useAccountProfileRedesign();
   return (
     <AccountSecurityRedesignPage
       passwordSet={profile.passwordSet}
       tokens={profile.tokens}
       ssoAccounts={profile.ssoAccounts}
+      githubLinkedUsername={profile.githubLinkedUsername}
       onChangePassword={changePassword}
       onConnectSso={connectSso}
       onDisconnectSso={disconnectSso}
+      onLinkGithubForCredit={linkGithubForCredit}
+      onRemoveGithubLink={removeGithubLink}
       onCreateToken={createToken}
       onRevokeToken={revokeToken}
     />

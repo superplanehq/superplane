@@ -53,13 +53,15 @@ export function FactorySettingsAccountProfilePage() {
     return <p className="text-[13px] text-muted-foreground">Loading profile…</p>;
   }
 
-  const velocityGithub = (account.linked_accounts ?? []).find((linked) => linked.provider === "github");
+  const githubLinkedUsername =
+    (account.linked_accounts ?? []).find((linked) => linked.provider === "github")?.username ?? null;
   const tokens = tokensPanel.tokens.map((token) => ({
     id: token.id || "",
     name: token.name || "Unnamed",
     createdAt: token.createdAt ? new Date(token.createdAt).toLocaleDateString() : "Unknown",
     lastUsedAt: token.lastUsedAt ? new Date(token.lastUsedAt).toLocaleDateString() : undefined,
   }));
+  const redirectPath = `${location.pathname}${location.search}`;
 
   return (
     <>
@@ -96,30 +98,17 @@ export function FactorySettingsAccountProfilePage() {
             throw error;
           }
         }}
-        velocityGithubUsername={velocityGithub?.username ?? null}
-        onLinkVelocityGithub={() => {
-          window.location.assign(linkedAccountConnectHref("github", `${location.pathname}${location.search}`));
-        }}
-        onRemoveVelocityGithub={() => {
-          void disconnectLinkedAccount("github")
-            .then(async () => {
-              await refreshAccount();
-              showSuccessToast("GitHub link removed.");
-            })
-            .catch((error) => {
-              showErrorToast(getApiErrorMessage(error, "Failed to remove the linked account."));
-            });
-        }}
         security={
           <AccountSecurityRedesignPage
             passwordSet={account.has_password}
             tokens={tokens}
             ssoAccounts={ssoAccountsFromAccount(account.providers)}
+            githubLinkedUsername={githubLinkedUsername}
             hideMockDialogs
             embedded
             onChangePassword={() => setPasswordOpen(true)}
             onConnectSso={(provider) => {
-              window.location.assign(ssoLinkHref(provider, `${location.pathname}${location.search}`));
+              window.location.assign(ssoLinkHref(provider, redirectPath));
             }}
             onDisconnectSso={(provider) => {
               void disconnectAccountProvider(provider)
@@ -129,6 +118,19 @@ export function FactorySettingsAccountProfilePage() {
                 })
                 .catch((error) => {
                   showErrorToast(getApiErrorMessage(error, "Failed to disconnect sign-in method."));
+                });
+            }}
+            onLinkGithubForCredit={() => {
+              window.location.assign(linkedAccountConnectHref("github", redirectPath));
+            }}
+            onRemoveGithubLink={() => {
+              void disconnectLinkedAccount("github")
+                .then(async () => {
+                  await refreshAccount();
+                  showSuccessToast("GitHub link removed.");
+                })
+                .catch((error) => {
+                  showErrorToast(getApiErrorMessage(error, "Failed to remove the linked account."));
                 });
             }}
             onCreateToken={() => {

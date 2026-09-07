@@ -8,7 +8,7 @@ import { FactorySettingsLayout } from "../FactorySettingsLayout";
 
 /**
  * Account settings pages in the live factory settings chrome.
- * Profile is the shipped identity, security, and GitHub-for-Velocity page.
+ * Profile is the shipped identity and security page, including the unified GitHub control.
  */
 const meta = {
   title: "Factories/Pages/Settings/Account",

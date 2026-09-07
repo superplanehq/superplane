@@ -450,6 +450,48 @@ func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 	assert.Equal(t, r.Account.ID, linked.ID)
 }
 
+func TestLinkProviderToAccount_GitHubAlsoClaimsPullRequestCredit(t *testing.T) {
+	r := support.Setup(t)
+	account, err := models.CreateAccount("Credit Claimer", "credit-claimer@example.com")
+	require.NoError(t, err)
+
+	err = authentication.LinkProviderToAccount(
+		r.Encryptor,
+		account,
+		testGothUser(models.ProviderGitHub, "gh-credit-1", "credit-claimer@example.com"),
+	)
+	require.NoError(t, err)
+
+	provider, err := models.FindAccountByProvider(models.ProviderGitHub, "gh-credit-1")
+	require.NoError(t, err)
+	assert.Equal(t, account.ID, provider.ID)
+
+	linked, err := models.FindAccountLinkedAccount(database.Conn(), account.ID, models.ProviderGitHub)
+	require.NoError(t, err)
+	assert.Equal(t, "linked", linked.Username)
+	assert.Equal(t, "gh-credit-1", linked.ProviderID)
+}
+
+func TestLinkProviderToAccount_RefusesGitHubClaimedForCreditElsewhere(t *testing.T) {
+	r := support.Setup(t)
+	other, err := models.CreateAccount("Other", "other-credit@example.com")
+	require.NoError(t, err)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(other.ID, models.ProviderGitHub, "gh-taken", "taken-login", "", ""),
+	))
+
+	err = authentication.LinkProviderToAccount(
+		r.Encryptor,
+		r.Account,
+		testGothUser(models.ProviderGitHub, "gh-taken", "ada@example.com"),
+	)
+	assert.ErrorIs(t, err, models.ErrLinkedAccountInUse)
+
+	_, err = models.FindAccountByProvider(models.ProviderGitHub, "gh-taken")
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
 func testGothUser(provider, providerID, email string) goth.User {
 	return goth.User{
 		Provider: provider,
