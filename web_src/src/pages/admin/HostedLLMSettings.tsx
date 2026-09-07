@@ -25,6 +25,8 @@ import {
   type InstallationLLMSettings,
   type ProviderForm,
 } from "./hostedLLMSettingsApi";
+import { HostedLLMDefaultModelField } from "./HostedLLMDefaultModelField";
+import { defaultModelKeyFromSettings, hostedDefaultModelOptions, parseDefaultModelKey } from "./hostedLLMDefaultModel";
 
 export function HostedLLMSettings() {
   const model = useHostedLLMSettings();
@@ -70,6 +72,14 @@ export function HostedLLMSettings() {
               />
             ))}
           </div>
+          <HostedLLMDefaultModelField
+            options={model.defaultModelOptions}
+            value={model.defaultModelKey}
+            saving={model.savingDefaultModel}
+            changed={model.defaultModelChanged}
+            onChange={model.setDefaultModelKey}
+            onSave={model.saveDefaultModel}
+          />
         </>
       )}
     </section>
@@ -84,6 +94,8 @@ function useHostedLLMSettings() {
   const [warningPercent, setWarningPercent] = useState("20");
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [providers, setProviders] = useState<Record<string, ProviderForm>>({});
+  const [defaultModelKey, setDefaultModelKey] = useState("");
+  const [savingDefaultModel, setSavingDefaultModel] = useState(false);
 
   const applySettings = useCallback((data: InstallationLLMSettings) => {
     setSettings(data);
@@ -102,6 +114,7 @@ function useHostedLLMSettings() {
       }
       return next;
     });
+    setDefaultModelKey(defaultModelKeyFromSettings(data));
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -137,12 +150,33 @@ function useHostedLLMSettings() {
     }
   };
 
+  const saveDefaultModel = async () => {
+    setSavingDefaultModel(true);
+    try {
+      const parsed = parseDefaultModelKey(defaultModelKey);
+      applySettings(
+        await patchInstallationLLMPolicy({
+          default_hosted_provider: parsed.provider,
+          default_hosted_model: parsed.model,
+        }),
+      );
+      showSuccessToast("SuperPlane agent model updated");
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to update SuperPlane agent model");
+    } finally {
+      setSavingDefaultModel(false);
+    }
+  };
+
   const providerActions = useHostedLLMProviderActions(providers, setProviders, applySettings);
   const policyChanged =
     settings != null &&
     (dollarInputToCents(welcomeDollars) !== settings.welcome_grant_cents ||
       percentInputToBps(markupPercent) !== settings.markup_bps ||
       percentInputToBps(warningPercent) !== settings.warning_threshold_bps);
+  const savedDefaultModelKey = defaultModelKeyFromSettings(settings);
+  const defaultModelOptions = hostedDefaultModelOptions(settings?.providers ?? [], providers);
+  const defaultModelChanged = defaultModelKey !== savedDefaultModelKey;
 
   return {
     settings,
@@ -157,6 +191,12 @@ function useHostedLLMSettings() {
     providers,
     policyChanged,
     savePolicy,
+    defaultModelKey,
+    setDefaultModelKey,
+    defaultModelOptions,
+    defaultModelChanged,
+    savingDefaultModel,
+    saveDefaultModel,
     ...providerActions,
   };
 }

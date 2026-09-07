@@ -8,11 +8,9 @@ import (
 )
 
 type AgentCredentialsOptions struct {
-	SecretLabel       string
-	IntegrationName   string
-	IntegrationLabel  string
-	AllowHosted       bool
-	HostedDescription string
+	SecretLabel      string
+	IntegrationName  string
+	IntegrationLabel string
 }
 
 func AgentMachineTypeField() configuration.Field {
@@ -39,9 +37,6 @@ func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
 			label = "Integration"
 		}
 		options = append(options, configuration.FieldOption{Label: label, Value: CredentialsSourceIntegration})
-	}
-	if opts.AllowHosted {
-		options = append(options, configuration.FieldOption{Label: "SuperPlane hosted", Value: CredentialsSourceHosted})
 	}
 
 	schema := []configuration.Field{
@@ -85,36 +80,42 @@ func AgentCredentialsField(opts AgentCredentialsOptions) configuration.Field {
 		})
 	}
 
-	description := "API key or integration to use."
-	if opts.AllowHosted {
-		description = "Secret, integration, or SuperPlane-hosted credentials."
-		if opts.HostedDescription != "" {
-			description = opts.HostedDescription
-		}
-	}
-
 	return configuration.Field{
 		Name:        "credentials",
 		Label:       "Credentials",
 		Type:        configuration.FieldTypeObject,
 		Required:    true,
-		Description: description,
+		Description: "API key or integration to use.",
 		TypeOptions: &configuration.TypeOptions{
 			Object: &configuration.ObjectTypeOptions{Schema: schema},
 		},
 	}
 }
 
-func AgentModelField(provider, description, placeholder string) configuration.Field {
+func AgentModelField(provider string) configuration.Field {
 	return configuration.Field{
 		Name:        "model",
 		Label:       "Model",
 		Type:        configuration.FieldTypeHostedModel,
 		Required:    false,
-		Description: description,
-		Placeholder: placeholder,
+		Description: "Select a model from Organization LLM Models.",
+		Placeholder: "Select a model",
 		TypeOptions: &configuration.TypeOptions{
 			HostedModel: &configuration.HostedModelTypeOptions{Provider: provider},
+		},
+	}
+}
+
+func SuperPlaneAgentModelField() configuration.Field {
+	return configuration.Field{
+		Name:        "model",
+		Label:       "Model",
+		Type:        configuration.FieldTypeHostedModel,
+		Required:    false,
+		Description: "Select a SuperPlane-hosted model. The instance SuperPlane agent model is used when you do not select one.",
+		Placeholder: "Instance SuperPlane agent model",
+		TypeOptions: &configuration.TypeOptions{
+			HostedModel: &configuration.HostedModelTypeOptions{Provider: configuration.HostedModelAllProviders},
 		},
 	}
 }

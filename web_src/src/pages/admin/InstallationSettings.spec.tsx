@@ -33,6 +33,8 @@ const llmSettingsResponse = {
   welcome_grant_cents: 5000,
   markup_bps: 2000,
   warning_threshold_bps: 2000,
+  default_hosted_provider: "",
+  default_hosted_model: "",
   providers: [
     { provider: "anthropic", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },
     { provider: "openai", enabled: false, api_key_configured: false, base_url: "", allowed_models: [] },

@@ -114,10 +114,16 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
 	case errors.Is(err, models.ErrFactoryPlanningSessionBusy):
 		return grpcerrors.FailedPrecondition(err, "Too many Create with an Agent sessions are running.")
+	case errors.Is(err, models.ErrSelectableLLMModelIncomplete):
+		return grpcerrors.InvalidArgument(err, "Select a model from the list.")
+	case errors.Is(err, models.ErrSelectableLLMModelNotAllowed):
+		return grpcerrors.FailedPrecondition(err, "This workspace does not allow the selected model.")
 	case errors.Is(err, errPlanningClaudeRequired):
 		return grpcerrors.FailedPrecondition(err, "Connect Claude before you start Create with an Agent.")
 	case errors.Is(err, errPlanningGitHubRequired):
 		return grpcerrors.FailedPrecondition(err, "Connect GitHub before you start Create with an Agent.")
+	case errors.Is(err, errPlanningProviderRequired):
+		return grpcerrors.FailedPrecondition(err, "Connect this provider before you use the model.")
 	case errors.Is(err, errIntakeNotConnected):
 		return grpcerrors.FailedPrecondition(err, "Connect this intake first.")
 	case errors.Is(err, errIntakeSearchUnsupported):

@@ -68,7 +68,8 @@ const intakeAnalysisMachineType = runner.MachineTypeE1LargeAMD64
 var intakeAnalysisComponents = intakeAgentComponents()
 
 func intakeAgentComponents() []string {
-	components := make([]string, 0, len(intakeAgentSpecs))
+	components := make([]string, 0, len(intakeAgentSpecs)+1)
+	components = append(components, models.SuperPlaneRunnerComponent)
 	for _, spec := range intakeAgentSpecs {
 		components = append(components, spec.component)
 	}
@@ -120,6 +121,16 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		analysisSubject:   "PagerDuty incident",
 		createTitle:       "{{ root().data.incident.title }}",
 		createDescription: "{{ root().data.incident.html_url }}",
+	},
+	models.FactoryIntakeSourceProductiveTasks: {
+		name:                 "Productive.io tasks",
+		description:          "Create a work order when a Productive.io task is created.",
+		triggerComponent:     "productive.onTask",
+		triggerName:          "On Task",
+		triggerConfiguration: map[string]any{"actions": []any{"created"}},
+		analysisSubject:      "Productive.io task",
+		createTitle:          "{{ root().data.data.attributes.title }}",
+		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
 }
 
@@ -240,10 +251,8 @@ func intakeTriggerConfiguration(spec intakeSpec, binding *intakeBinding) map[str
 	return configuration
 }
 
-// intakeAnalysisConfiguration configures the runner that scores a work order.
-// The runner components reject a node without a machine type or credentials, so
-// the generated node names the machine and the credentials of the workspace
-// agent.
+// intakeAnalysisConfiguration sets the machine and steps. BYOK agents also
+// receive credentials and a model.
 func intakeAnalysisConfiguration(spec intakeSpec, agent *intakeAgent) map[string]any {
 	configuration := map[string]any{
 		"machineType": intakeAnalysisMachineType,

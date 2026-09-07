@@ -656,6 +656,18 @@ service Factories {
     };
   }
 
+  rpc ReloadPlanningSessionAgent(ReloadPlanningSessionAgentRequest) returns (ReloadPlanningSessionAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reload planning session agent";
+      description: "Keeps the Create with an Agent session and starts a new machine with the selected model";
+      tags: "Factory";
+    };
+  }
+
   rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
@@ -773,6 +785,7 @@ message FactoryOnboarding {
     AGENT_HARNESS_CLAUDE_CODE = 1;
     AGENT_HARNESS_CURSOR = 2;
     AGENT_HARNESS_CODEX = 3;
+    AGENT_HARNESS_SUPERPLANE = 4;
   }
 
   // Set when workspace setup finished. Null while onboarding is open.
@@ -918,6 +931,7 @@ message FactoryIntake {
     SOURCE_GITHUB_ISSUES = 1;
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
+    SOURCE_PRODUCTIVE_TASKS = 4;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
@@ -1006,6 +1020,9 @@ message CreateFactoryIntakeRequest {
   // Defaults to a name derived from the source when empty.
   string name = 3;
   optional int32 confidence_pct = 4;
+  // Optional integration and source resource selected during guided setup.
+  string integration_id = 5;
+  string resource_id = 6;
 }
 
 message CreateFactoryIntakeResponse {
@@ -2098,6 +2115,7 @@ message PlanningSession {
   string wait_state = 10;
   string execution_id = 11;
   PlanningSessionSurvey survey = 12;
+  string selectable_model_key = 13;
 }
 
 message StartPlanningSessionRequest {
@@ -2164,5 +2182,15 @@ message SkipPlanningSessionDraftRequest {
 }
 
 message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message ReloadPlanningSessionAgentRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string selectable_model_key = 3;
+}
+
+message ReloadPlanningSessionAgentResponse {
   PlanningSession session = 1;
 }

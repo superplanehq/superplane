@@ -194,4 +194,35 @@ describe("getExecutionDetails", () => {
     expect(props.customField).toBeDefined();
     expect(getStateMap("runnerCodex")).toBe(RUNNER_STATE_REGISTRY.stateMap);
   });
+
+  it("resolves runnerSuperPlane mapper and state registry", () => {
+    const mapper = getComponentBaseMapper("runnerSuperPlane");
+    const props = mapper.props({
+      node: {
+        id: "node-superplane-1",
+        name: "Run SuperPlane Agent",
+        componentName: "runnerSuperPlane",
+        isCollapsed: false,
+        configuration: {
+          machineType: "e1-large-amd64",
+        },
+        metadata: {},
+      },
+      nodes: [],
+      componentDefinition: {
+        name: "runnerSuperPlane",
+        label: "Run SuperPlane Agent",
+        description: "Runs a SuperPlane-hosted coding agent on a fleet runner",
+        icon: "code",
+        color: "#1D4ED8",
+      },
+      lastExecutions: [],
+      currentUser: undefined,
+      actions: { invokeNodeExecutionHook: async () => {} },
+      canvasMode: "live",
+    });
+
+    expect(props.customField).toBeDefined();
+    expect(getStateMap("runnerSuperPlane")).toBe(RUNNER_STATE_REGISTRY.stateMap);
+  });
 });
