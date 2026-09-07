@@ -2054,6 +2054,7 @@ message UsageByMachineType {
 message PlanningSessionDraft {
   string title = 1;
   string description = 2;
+  string work_order_id = 3;
 }
 
 message PlanningSessionCreatedOrder {
@@ -2098,6 +2099,7 @@ message PlanningSession {
 message StartPlanningSessionRequest {
   string factory_id = 1;
   string repository = 2;
+  string work_order_id = 3;
 }
 
 message StartPlanningSessionResponse {

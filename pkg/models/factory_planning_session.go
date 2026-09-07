@@ -74,6 +74,7 @@ type StartPlanningSessionParams struct {
 	Repository      string
 	CanvasID        uuid.UUID
 	Entrypoint      string
+	WorkOrderID     uuid.UUID
 }
 
 type FactoryPlanningSession struct {
@@ -153,6 +154,11 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		return nil, fmt.Errorf("%w: entrypoint must be onRun", ErrFactoryPlanningSessionInvalid)
 	}
 
+	refine, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, params.CanvasID)
 	if err != nil {
 		return nil, err
@@ -167,12 +173,7 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		Callbacks: datatypes.JSONSlice[core.RunCallback]{
 			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
 		},
-		Input: NewJSONValue(map[string]any{
-			"planning_session": map[string]any{
-				"factory_id": f.ID.String(),
-				"repository": repository,
-			},
-		}),
+		Input:     NewJSONValue(planningSessionRunInput(f, repository, refine)),
 		State:     CanvasRunStatePending,
 		CreatedAt: &now,
 		UpdatedAt: &now,
@@ -198,7 +199,42 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 	if err := tx.Create(session).Error; err != nil {
 		return nil, err
 	}
+	if refine != nil {
+		if err := session.attachRefineDraft(tx, refine); err != nil {
+			return nil, err
+		}
+	}
 	return session, nil
+}
+
+func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryWorkOrder, error) {
+	if workOrderID == uuid.Nil {
+		return nil, nil
+	}
+	order, err := f.FindWorkOrder(tx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return nil, fmt.Errorf("%w: work order is not a draft", ErrFactoryPlanningSessionInvalid)
+	}
+	return order, nil
+}
+
+func planningSessionRunInput(factoryModel *Factory, repository string, refine *FactoryWorkOrder) map[string]any {
+	planning := map[string]any{
+		"factory_id":         factoryModel.ID.String(),
+		"repository":         repository,
+		"refine_key":         "",
+		"refine_title":       "",
+		"refine_description": "",
+	}
+	if refine != nil {
+		planning["refine_key"] = factoryModel.WorkOrderKey(refine.Number)
+		planning["refine_title"] = refine.Title
+		planning["refine_description"] = refine.Description
+	}
+	return map[string]any{"planning_session": planning}
 }
 
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
