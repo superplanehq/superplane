@@ -183,4 +183,19 @@ describe("liveLogSections", () => {
     expect(state.sections[0].events).toEqual([]);
     expect(state.sections[0].lines).toEqual(["Cloning..."]);
   });
+
+  it("drops raw turn JSON so it does not appear as a log line", () => {
+    let state = startCommandSection(emptyState(), {
+      index: 5,
+      text: "Implementation",
+      startedAtMs: 1,
+      kind: "prompt",
+      preview: "You are implementing",
+    });
+    state = appendLineToLatestSection(state, '{"type":"turn","turn":1,"usage":{"input_tokens":2,"output_tokens":1}}');
+    state = appendLineToLatestSection(state, "Turn 1 · 3 tokens");
+
+    expect(state.sections[0].lines).toEqual(["Turn 1 · 3 tokens"]);
+    expect(state.sections[0].events).toEqual([{ kind: "note", text: "Turn 1 · 3 tokens" }]);
+  });
 });

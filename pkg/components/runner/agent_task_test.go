@@ -80,6 +80,7 @@ func TestBuildAgentBrokerTaskAppliesStepWorkingDirectory(t *testing.T) {
 	prepare := requireBrokerFile(t, files, "prepare.sh").Content
 	assert.Contains(t, prepare, `pwd -P >"$SUPERPLANE_TASK_DIR/task_cwd"`)
 	assert.Equal(t, LLMUsageScript, requireBrokerFile(t, files, "llm_usage.js").Content)
+	assert.Equal(t, TurnTelemetryScript, requireBrokerFile(t, files, "turn_telemetry.js").Content)
 }
 
 func TestBuildAgentBrokerTaskPreviewKeepsFullMultilineBody(t *testing.T) {

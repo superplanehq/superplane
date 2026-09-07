@@ -13,6 +13,14 @@ import {
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import {
+  applyPromptUsageRecord,
+  emptyAgentRunTelemetry,
+  emptyPromptUsageState,
+  promptUsageSeries,
+  startPromptUsageSeries,
+  type AgentPromptUsageState,
+} from "@/lib/agentRunTelemetry";
 
 const RECONNECT_DELAY_MS = 2000;
 
@@ -102,6 +110,7 @@ function createStreamHandlers(
   replayLineSkip: Map<number, number>,
   executionInFlight: boolean,
   setState: Dispatch<SetStateAction<LogState>>,
+  setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>,
 ): LiveLogStreamHandlers {
   return {
     onLogLine: (text) => setState((prev) => appendLineToLatestSection(prev, text, replayLineSkip)),
@@ -117,11 +126,23 @@ function createStreamHandlers(
         }
         return startCommandSection(prev, { index, text, startedAtMs, kind, preview });
       });
+      if (kind === "prompt") {
+        setUsage((prev) => startPromptUsageSeries(prev, text, index));
+      }
     },
     onCmdEnd: (index, status, durationMs) =>
       setState((prev) => completeCommandSection(prev, index, status, durationMs)),
-    onToolStart: (kind, text, id) => setState((prev) => startToolOnLatestSection(prev, kind, text, id)),
-    onToolEnd: (status, durationMs, id) => setState((prev) => endToolOnLatestSection(prev, status, durationMs, id)),
+    onToolStart: (kind, text, id, turn) => {
+      setState((prev) => startToolOnLatestSection(prev, kind, text, id));
+      setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_start", kind, text, id, turn }));
+    },
+    onToolEnd: (status, durationMs, id, turn) => {
+      setState((prev) => endToolOnLatestSection(prev, status, durationMs, id));
+      setUsage((prev) => applyPromptUsageRecord(prev, { type: "tool_end", status, duration_ms: durationMs, id, turn }));
+    },
+    onTurn: (turn, usage, message) => {
+      setUsage((prev) => applyPromptUsageRecord(prev, { type: "turn", turn, usage, message }));
+    },
   };
 }
 
@@ -155,6 +176,7 @@ type LiveLogSessionParams = {
   terminalAtMs: number | null;
   sessionAbort: AbortController;
   setState: Dispatch<SetStateAction<LogState>>;
+  setUsage: Dispatch<SetStateAction<AgentPromptUsageState>>;
   setActiveStream: (stream: LiveLogStream | null) => void;
 };
 
@@ -167,6 +189,7 @@ async function runLiveLogSession({
   terminalAtMs,
   sessionAbort,
   setState,
+  setUsage,
   setActiveStream,
 }: LiveLogSessionParams): Promise<void> {
   let reconnecting = false;
@@ -177,7 +200,7 @@ async function runLiveLogSession({
     const replayLineSkip = new Map<number, number>();
 
     try {
-      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, executionInFlight, setState));
+      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, executionInFlight, setState, setUsage));
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
@@ -234,6 +257,7 @@ export function useLiveLogStream(
   const organizationId = session?.organizationId || routeOrganizationId;
   const canvasId = session?.canvasId || routeCanvasId;
   const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isStreaming: true }));
+  const [usage, setUsage] = useState(emptyPromptUsageState);
 
   const scrollTrigger = useMemo(() => {
     const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
@@ -266,6 +290,7 @@ export function useLiveLogStream(
     const sessionAbort = new AbortController();
     let activeStream: LiveLogStream | null = null;
     setState({ ...initialLogState, isStreaming: true });
+    setUsage(emptyPromptUsageState());
 
     void runLiveLogSession({
       organizationId,
@@ -276,6 +301,7 @@ export function useLiveLogStream(
       terminalAtMs,
       sessionAbort,
       setState,
+      setUsage,
       setActiveStream: (stream) => {
         activeStream = stream;
       },
@@ -291,5 +317,7 @@ export function useLiveLogStream(
     };
   }, [organizationId, canvasId, executionId, executionInFlight, terminalCommandStatus, terminalAtMs]);
 
-  return { ...state, toggleSection, scrollRef };
+  const usageSeries = useMemo(() => promptUsageSeries(usage), [usage]);
+  const telemetry = usageSeries.at(-1)?.telemetry ?? emptyAgentRunTelemetry();
+  return { ...state, telemetry, usageSeries, toggleSection, scrollRef };
 }
