@@ -80,7 +80,13 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { source: FactoriesFactoryIntakeSource; name?: string; confidencePct?: number }) => {
+    mutationFn: async (input: {
+      source: FactoriesFactoryIntakeSource;
+      name?: string;
+      confidencePct?: number;
+      integrationId?: string;
+      resourceId?: string;
+    }) => {
       const response = await factoriesCreateFactoryIntake(
         withOrganizationHeader({
           organizationId,
@@ -89,6 +95,8 @@ export function useCreateFactoryIntake(organizationId: string, factoryId: string
             source: input.source,
             name: input.name,
             confidencePct: input.confidencePct,
+            integrationId: input.integrationId,
+            resourceId: input.resourceId,
           },
         }),
       );
