@@ -75,6 +75,7 @@ export function CreateWithAgentDialog({
             workspaceName={workspaceName}
             repository={view.repository}
             machineStatus={view.machineStatus}
+            refining={view.refining}
             onEndSession={onRequestClose}
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
@@ -118,11 +119,13 @@ function CreateWithAgentHeader({
   workspaceName,
   repository,
   machineStatus,
+  refining,
   onEndSession,
 }: {
   workspaceName: string;
   repository: string;
   machineStatus: CreateWithAgentView["machineStatus"];
+  refining: boolean;
   onEndSession: () => void;
 }) {
   const starting = machineStatus === "starting";
@@ -139,9 +142,13 @@ function CreateWithAgentHeader({
         <span className="truncate text-foreground">{workspaceName}</span>
         <span aria-hidden>/</span>
         <DialogTitle className="truncate text-[13px] font-medium text-foreground">
-          {CREATE_WITH_AGENT_COPY.title}
+          {refining ? CREATE_WITH_AGENT_COPY.titleRefine : CREATE_WITH_AGENT_COPY.title}
         </DialogTitle>
-        <DialogDescription className="sr-only">Create tasks with an agent in this workspace.</DialogDescription>
+        <DialogDescription className="sr-only">
+          {refining
+            ? "Refine this task with an agent in this workspace."
+            : "Create tasks with an agent in this workspace."}
+        </DialogDescription>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span
@@ -242,14 +249,20 @@ function CreateWithAgentStream({
       ) : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
-          {CREATE_WITH_AGENT_COPY.composerPlaceholder}
+          {view.refining
+            ? CREATE_WITH_AGENT_COPY.composerPlaceholderRefine
+            : CREATE_WITH_AGENT_COPY.composerPlaceholder}
         </label>
         <div className="flex items-end gap-2">
           <Textarea
             id="create-with-agent-composer"
             data-testid="create-with-agent-composer"
             value={view.composer}
-            placeholder={CREATE_WITH_AGENT_COPY.composerPlaceholder}
+            placeholder={
+              view.refining
+                ? CREATE_WITH_AGENT_COPY.composerPlaceholderRefine
+                : CREATE_WITH_AGENT_COPY.composerPlaceholder
+            }
             disabled={failed}
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {

@@ -141,27 +141,27 @@ describe("useCreateWithAgentSession", () => {
     });
   });
 
-  it("tells the agent when Refine starts on a backlog draft", async () => {
-    startPlanningSession.mockResolvedValue(session("session-1"));
-    sendPlanningSessionMessage.mockResolvedValue({
+  it("starts Refine with the draft work order and does not send a protocol note", async () => {
+    startPlanningSession.mockResolvedValue({
       ...session("session-1"),
-      draft: { title: "Retry refunds", description: "Stop double charges." },
+      draft: { title: "Retry refunds", description: "Stop double charges.", workOrderId: "wo-1" },
     });
     const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
 
     act(() => {
-      result.current.start({ key: "RF-105", title: "Retry refunds" });
+      result.current.start({ id: "wo-1", title: "Retry refunds", description: "Stop double charges." });
     });
 
     await waitFor(() => {
-      expect(sendPlanningSessionMessage).toHaveBeenCalledWith(
-        "org-1",
-        "factory-1",
-        "session-1",
-        "Refine RF-105: Retry refunds.",
-      );
+      expect(startPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "acme/payments", "wo-1");
     });
+    expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
     expect(result.current.open).toBe(true);
+    expect(result.current.view.refining).toBe(true);
+    expect(result.current.view.right).toEqual({
+      kind: "draft",
+      draft: { title: "Retry refunds", description: "Stop double charges." },
+    });
   });
 
   it("does not tell the agent when the title opens read-only", async () => {

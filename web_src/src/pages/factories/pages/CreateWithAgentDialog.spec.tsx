@@ -82,6 +82,18 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent("acme/payments");
   });
 
+  it("titles the dialog as Refine this task when the session already has a draft", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        refining: true,
+        right: { kind: "draft", draft: { title: "Retry refunds", description: "Stop double charges." } },
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: CREATE_WITH_AGENT_COPY.titleRefine })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: CREATE_WITH_AGENT_COPY.title })).not.toBeInTheDocument();
+  });
+
   it("shows a planning-session intro while the log is empty", () => {
     renderDialog(emptyCreateWithAgentView());
 

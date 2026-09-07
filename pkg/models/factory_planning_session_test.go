@@ -54,6 +54,70 @@ func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 }
 
+func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-start")
+	db := database.Conn()
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+
+	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, order.Title, session.Draft().Title)
+	assert.Equal(t, order.Description, session.Draft().Description)
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+	assert.Equal(t, order.ID.String(), ids[0])
+
+	var run CanvasRun
+	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
+	planning := planningSessionInputFromRun(t, run)
+	assert.Equal(t, factoryModel.WorkOrderKey(order.Number), planning["refine_key"])
+	assert.Equal(t, order.Title, planning["refine_title"])
+	assert.Equal(t, order.Description, planning["refine_description"])
+}
+
+func TestFactory_StartPlanningSession_RejectsOpenWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-open-start")
+	db := database.Conn()
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+
+	_, err = factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+		WorkOrderID:     order.ID,
+	})
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+}
+
+func planningSessionInputFromRun(t *testing.T, run CanvasRun) map[string]any {
+	t.Helper()
+	input, ok := run.Input.Data().(map[string]any)
+	require.True(t, ok)
+	planning, ok := input["planning_session"].(map[string]any)
+	require.True(t, ok)
+	return planning
+}
+
 func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-hb")

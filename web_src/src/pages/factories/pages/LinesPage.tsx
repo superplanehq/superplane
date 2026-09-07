@@ -633,13 +633,16 @@ function LineDetail({
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           onClose={onClosePeek}
           onRefine={() => {
-            const key = peekOrder.key?.trim();
+            const id = peekOrder.id?.trim();
             const title = peekOrder.title?.trim();
-            if (!key || !title) {
+            if (!id || !title) {
               return;
             }
-            onClosePeek();
-            agentSession.start({ key, title });
+            agentSession.start({
+              id,
+              title,
+              description: peekOrder.description ?? "",
+            });
           }}
         />
       ) : null}

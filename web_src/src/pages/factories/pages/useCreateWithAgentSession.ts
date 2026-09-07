@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CREATE_WITH_AGENT_COPY, planningRefineNote } from "./createWithAgentCopy";
+import { CREATE_WITH_AGENT_COPY, isPlanningRefineNote, planningRefineNote } from "./createWithAgentCopy";
 import {
   cancelCreateWithAgentEnd,
   emptyCreateWithAgentView,
@@ -24,8 +24,9 @@ import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./planningSessionView";
 
 export type PlanningRefineTarget = {
-  key: string;
+  id: string;
   title: string;
+  description?: string;
 };
 
 const POLL_MS = 1500;
@@ -263,26 +264,19 @@ function openPlanningSession({
   const generation = startGenerationRef.current + 1;
   startGenerationRef.current = generation;
   stopSession(sessionIdRef.current);
-  setView(emptyCreateWithAgentView(repository));
+  const refineTitle = refine?.title.trim() ?? "";
+  setView({
+    ...emptyCreateWithAgentView(repository),
+    refining: Boolean(refine?.id.trim()),
+    right: refineTitle
+      ? { kind: "draft", draft: { title: refineTitle, description: refine?.description?.trim() ?? "" } }
+      : { kind: "empty" },
+  });
   setSessionId("");
   setOpen(true);
-  void startPlanningSession(organizationId, factoryId, repository)
+  void startPlanningSession(organizationId, factoryId, repository, refine?.id.trim() ?? "")
     .then((session) => {
       applySession(session, generation);
-      const sessionId = session.id ?? "";
-      const key = refine?.key.trim() ?? "";
-      const title = refine?.title.trim() ?? "";
-      if (!sessionId || !key || !title) {
-        return;
-      }
-      return sendPlanningSessionMessage(organizationId, factoryId, sessionId, planningRefineNote(key, title))
-        .then((next) => applySession(next, generation))
-        .catch((error: unknown) => {
-          if (generation !== startGenerationRef.current) {
-            return;
-          }
-          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSend));
-        });
     })
     .catch((error: unknown) => {
       if (generation !== startGenerationRef.current) {
@@ -394,24 +388,26 @@ function sendPlanningText({
     return;
   }
   const generation = startGenerationRef.current;
-  setView((current) => ({
-    ...setCreateWithAgentComposer(current, ""),
-    survey: undefined,
-    messages: [
-      ...current.messages,
-      {
-        id: `local-${current.messages.length + 1}`,
-        kind: "text",
-        role: "user",
-        text: body,
-        // Sorts to the end immediately. The server round-trip replaces this
-        // with the persisted message, whose created_at keeps the same
-        // relative position so there is no visible jump.
-        createdAtMs: Date.now(),
-        ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
-      },
-    ],
-  }));
+  if (!isPlanningRefineNote(body)) {
+    setView((current) => ({
+      ...setCreateWithAgentComposer(current, ""),
+      survey: undefined,
+      messages: [
+        ...current.messages,
+        {
+          id: `local-${current.messages.length + 1}`,
+          kind: "text",
+          role: "user",
+          text: body,
+          // Sorts to the end immediately. The server round-trip replaces this
+          // with the persisted message, whose created_at keeps the same
+          // relative position so there is no visible jump.
+          createdAtMs: Date.now(),
+          ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
+        },
+      ],
+    }));
+  }
   void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)
     .then((session) => applySession(session, generation))
     .catch((error: unknown) => {

@@ -137,15 +137,22 @@ func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) (bool
 	if order == nil {
 		return false, nil
 	}
-	if err := s.attachCreatedWorkOrder(tx, order.ID); err != nil {
+	if err := s.attachRefineDraft(tx, order); err != nil {
 		return false, err
+	}
+	return true, nil
+}
+
+func (s *FactoryPlanningSession) attachRefineDraft(tx *gorm.DB, order *FactoryWorkOrder) error {
+	if err := s.attachCreatedWorkOrder(tx, order.ID); err != nil {
+		return err
 	}
 	s.setDraft(PlanningSessionDraft{
 		Title:       order.Title,
 		Description: order.Description,
 		WorkOrderID: order.ID.String(),
 	})
-	return true, nil
+	return s.saveDraft(tx)
 }
 
 func (s *FactoryPlanningSession) findRefineWorkOrder(tx *gorm.DB, factoryModel *Factory, key string) (*FactoryWorkOrder, error) {
