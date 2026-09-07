@@ -13,6 +13,7 @@ import {
   phaseIndexFromColumnKey,
   takenCatalogIds,
 } from "./columnAutomations";
+import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
 import type { LinePhaseColumn } from "./linePhaseRuns";
 
 const GITHUB_INTAKE: FactoriesFactoryIntake = {
@@ -227,12 +228,7 @@ describe("catalogForColumn", () => {
     });
 
     expect(takenCatalogIds(automations, catalog)).toEqual(["github-issues", "analysis"]);
-    expect(catalog.map((entry) => entry.id)).toEqual([
-      "github-issues",
-      "sentry-exceptions",
-      "pagerduty-incidents",
-      "analysis",
-    ]);
+    expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
   it("keeps phase catalog entries available after one agent exists", () => {
