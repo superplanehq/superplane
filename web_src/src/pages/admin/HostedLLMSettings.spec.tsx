@@ -1,10 +1,18 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { HostedLLMSettings } from "./HostedLLMSettings";
+import type { InstallationLLMSettings } from "./hostedLLMSettingsApi";
 
-const settingsWithOpenRouterModels = {
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+const settingsWithOpenRouterModels: InstallationLLMSettings = {
   welcome_grant_cents: 5000,
   markup_bps: 2000,
   warning_threshold_bps: 2000,
@@ -68,5 +76,82 @@ describe("HostedLLMSettings", () => {
     await user.type(screen.getByTestId("installation-llm-openrouter-model-search"), "does-not-exist");
 
     expect(screen.getByText("No models match this search.")).toBeInTheDocument();
+  });
+
+  it("lists SuperPlane agent models from a saved OpenRouter allowlist when the switch is off", async () => {
+    mockSettingsFetch({
+      ...settingsWithOpenRouterModels,
+      providers: settingsWithOpenRouterModels.providers.map((provider) =>
+        provider.provider === "openrouter" ? { ...provider, enabled: false } : provider,
+      ),
+    });
+
+    render(<HostedLLMSettings />);
+
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    expect(trigger).toHaveTextContent("No SuperPlane agent model");
+    await userEvent.click(trigger);
+    expect(await screen.findByRole("option", { name: "OpenRouter - openai/gpt-4.1" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" })).toBeInTheDocument();
+  });
+
+  it("lists SuperPlane agent models as provider - model", async () => {
+    mockSettingsFetch({
+      ...settingsWithOpenRouterModels,
+      default_hosted_provider: "openrouter",
+      default_hosted_model: "openai/gpt-4.1",
+    });
+
+    render(<HostedLLMSettings />);
+
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    expect(trigger).toHaveTextContent("OpenRouter - openai/gpt-4.1");
+    await userEvent.click(trigger);
+    expect(await screen.findByRole("option", { name: "OpenRouter - openai/gpt-4.1" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" })).toBeInTheDocument();
+  });
+
+  it("saves the selected SuperPlane agent model", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      const body =
+        method === "PATCH"
+          ? {
+              ...settingsWithOpenRouterModels,
+              default_hosted_provider: "openrouter",
+              default_hosted_model: "anthropic/claude-sonnet-4",
+            }
+          : {
+              ...settingsWithOpenRouterModels,
+              default_hosted_provider: "openrouter",
+              default_hosted_model: "openai/gpt-4.1",
+            };
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<HostedLLMSettings />);
+
+    const trigger = await screen.findByTestId("installation-llm-default-model");
+    await user.click(trigger);
+    await user.click(await screen.findByRole("option", { name: "OpenRouter - anthropic/claude-sonnet-4" }));
+    await user.click(screen.getByTestId("installation-llm-default-model-save"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/admin/api/installation/llm-settings",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({
+            default_hosted_provider: "openrouter",
+            default_hosted_model: "anthropic/claude-sonnet-4",
+          }),
+        }),
+      );
+    });
   });
 });

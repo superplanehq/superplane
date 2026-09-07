@@ -28,11 +28,15 @@ async function planningSessionRequest(
   return body.session;
 }
 
-export function startPlanningSession(organizationId: string, factoryId: string, repository = "") {
+export function startPlanningSession(organizationId: string, factoryId: string, repository = "", workOrderId = "") {
   const trimmed = repository.trim();
+  const refineId = workOrderId.trim();
   return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions`, {
     method: "POST",
-    body: JSON.stringify(trimmed ? { repository: trimmed } : {}),
+    body: JSON.stringify({
+      ...(trimmed ? { repository: trimmed } : {}),
+      ...(refineId ? { work_order_id: refineId } : {}),
+    }),
   });
 }
 
@@ -94,4 +98,20 @@ export function skipPlanningSessionDraft(organizationId: string, factoryId: stri
     method: "POST",
     body: "{}",
   });
+}
+
+export function reloadPlanningSessionAgent(
+  organizationId: string,
+  factoryId: string,
+  sessionId: string,
+  selectableModelKey: string,
+) {
+  return planningSessionRequest(
+    organizationId,
+    `/api/v1/factories/${factoryId}/planning-sessions/${sessionId}/reload-agent`,
+    {
+      method: "POST",
+      body: JSON.stringify({ selectableModelKey }),
+    },
+  );
 }

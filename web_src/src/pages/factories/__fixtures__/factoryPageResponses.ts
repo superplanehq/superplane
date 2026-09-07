@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   MeNotificationSettings,
   FactoriesWorkOrder,
@@ -284,6 +285,8 @@ export interface FactoriesFixture {
   appsByFactoryId: Record<string, FactoryApp[]>;
   /** Intakes the workspace declared. Created intakes are appended here. */
   intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
+  /** PR feedback handlers the workspace declared. */
+  prFeedbackHandlersByFactoryId?: Record<string, FactoriesFactoryPrFeedbackHandler[]>;
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;
@@ -295,6 +298,15 @@ export interface FactoriesFixture {
   organizationWorkspaceUsage?: StorybookUsageReport;
   organizationSpendingReport?: StorybookSpendingReport;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
+  /**
+   * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
+   * Omit to treat every provider with a catalog as connected.
+   */
+  byokConnectedProviders?: string[];
+  /** Candidate model ids by provider. Falls back to the hosted catalog fixture. */
+  byokCandidatesByProvider?: Record<string, string[]>;
+  /** Selected model ids by provider. Defaults to the candidate list when connected. */
+  byokSelectedByProvider?: Record<string, string[]>;
   /** Per-user notification settings backing `/api/v1/me/notification-settings`. */
   notificationSettings?: MeNotificationSettings;
   /**

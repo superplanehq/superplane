@@ -58,6 +58,28 @@ func TestRunPromptMarksFilesystemToolErrorsFailed(t *testing.T) {
 	assert.Contains(t, result.output, `"kind":"read"`)
 }
 
+func TestRunPromptRecordsPerResponseTurnUsage(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 2})
+	payload := resultPayload(t, result.resultFile)
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok)
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok)
+	require.Len(t, turns, 3)
+	for i, raw := range turns {
+		turn, ok := raw.(map[string]any)
+		require.True(t, ok)
+		usage, ok := turn["usage"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, float64(11), usage["input_tokens"], "turn %d input", i+1)
+		assert.Equal(t, float64(3), usage["output_tokens"], "turn %d output", i+1)
+	}
+	usage, ok := payload["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(33), usage["input_tokens"])
+	assert.Equal(t, float64(9), usage["output_tokens"])
+}
+
 func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 	result := runOpenRouterPrompt(t, promptHarness{alwaysTools: true, maxTurns: 4, failOnRequest: 2})
 	assert.Equal(t, 1, result.exitCode)
@@ -78,6 +100,24 @@ func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 	assert.Equal(t, float64(11), sidecarUsage["input_tokens"])
 	assert.Equal(t, float64(3), sidecarUsage["output_tokens"])
 	assert.InDelta(t, 0.002, sidecar["total_cost_usd"], 1e-9)
+
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), telemetry["num_turns"])
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok)
+	require.Len(t, turns, 1)
+	first, ok := turns[0].(map[string]any)
+	require.True(t, ok)
+	tools, ok := first["tools"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, tools)
+	tool, ok := tools[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "bash", tool["kind"])
+	assert.Equal(t, "true", tool["text"])
+	assert.Contains(t, result.output, `"type":"turn"`)
+	assert.Contains(t, result.output, `"turn":1`)
 }
 
 type promptHarness struct {
@@ -113,6 +153,11 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	usageBody, err := os.ReadFile(usageScript)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "llm_usage.js"), usageBody, 0o644))
+	telemetryScript, err := filepath.Abs("../turn_telemetry.js")
+	require.NoError(t, err)
+	telemetryBody, err := os.ReadFile(telemetryScript)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "turn_telemetry.js"), telemetryBody, 0o644))
 
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
@@ -225,6 +270,8 @@ func TestRunPromptPlanningAdvertisesPlanningToolsNotWriteEdit(t *testing.T) {
 	assert.NotContains(t, names, "write")
 	assert.NotContains(t, names, "edit")
 	assert.Empty(t, result.planningRequests)
+	require.Len(t, result.chatRequests, 1)
+	assert.NotContains(t, result.output, "asking it to use tools")
 }
 
 func TestRunPromptPlanningProposeDraftPostsToDraftsEndpoint(t *testing.T) {

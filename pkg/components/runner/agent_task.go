@@ -24,6 +24,7 @@ type AgentBrokerTaskInput struct {
 func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
 	files = []BrokerTaskFile{
 		LLMUsageTaskFile(),
+		TurnTelemetryTaskFile(),
 		{Path: input.RunScriptName, Content: input.RunScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: input.PrepareScript, Mode: "0644"},
 	}

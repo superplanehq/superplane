@@ -47,13 +47,15 @@ func Test__StartPlanningSession__CreatesSessionAndPendingRun(t *testing.T) {
 		if node.Type == models.NodeTypeComponent {
 			hasAgent = true
 			prompt := planningCanvasPromptFromConfig(node.Configuration.Data())
-			assert.Contains(t, prompt, "Greet the user in plain text")
+			assert.Contains(t, prompt, "greet the user in plain text")
 			assert.Contains(t, prompt, "Use survey to ask one or more questions")
 			assert.NotContains(t, prompt, "say:")
 			assert.NotContains(t, prompt, "with say")
 			assert.Contains(t, prompt, "Do not call wait_for_user")
 			assert.Contains(t, prompt, "When the user creates or skips a draft")
 			assert.Contains(t, prompt, "When the user starts a refine")
+			assert.Contains(t, prompt, "planning_session.refine_key")
+			assert.Contains(t, prompt, "If the refine key is not empty")
 			assert.NotContains(t, prompt, "Start by calling wait_for_user")
 		}
 	}
@@ -153,6 +155,86 @@ func Test__StartPlanningSession__KeepsExistingCanvasPrompt(t *testing.T) {
 	assert.Equal(t, "Custom planning prompt.", planningAgentPrompt(t, r.Organization.ID, factoryModel.ID))
 }
 
+func Test__StartPlanningSession__AttachesDraftWorkOrder(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	resp, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:   factoryModel.ID.String(),
+		Repository:  "acme/payments",
+		WorkOrderId: order.ID.String(),
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp.Session.Draft)
+	assert.Equal(t, "Retry refunds", resp.Session.Draft.Title)
+	assert.Equal(t, "Stop double charges.", resp.Session.Draft.Description)
+	assert.Equal(t, order.ID.String(), resp.Session.Draft.WorkOrderId)
+	require.Len(t, resp.Session.Created, 1)
+	assert.Equal(t, order.ID.String(), resp.Session.Created[0].Id)
+
+	session, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(resp.Session.Id))
+	require.NoError(t, err)
+	var run models.CanvasRun
+	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
+	input, ok := run.Input.Data().(map[string]any)
+	require.True(t, ok)
+	planning, ok := input["planning_session"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, factoryModel.WorkOrderKey(order.Number), planning["refine_key"])
+}
+
+func Test__StartPlanningSession__SyncsStockGreetCloser(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+
+	canvas, err := models.FindPlanningCanvas(database.DB(t.Context()), r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
+	require.NoError(t, err)
+	rewrote := false
+	for i := range nodes {
+		if nodes[i].Type != models.NodeTypeComponent {
+			continue
+		}
+		config := nodes[i].Configuration.Data()
+		for _, step := range planningCanvasConfigSteps(config["steps"]) {
+			if _, ok := step["prompt"]; ok {
+				step["prompt"] = "You are in a SuperPlane planning session.\n\nGreet the user in plain text. Then stop."
+				rewrote = true
+			}
+		}
+		nodes[i].Configuration = datatypes.NewJSONType(config)
+		require.NoError(t, database.DB(t.Context()).Model(&nodes[i]).Select("Configuration").Updates(&nodes[i]).Error)
+	}
+	require.True(t, rewrote)
+	require.NoError(t, rewritePlanningCanvasLivePrompt(t, canvas.ID, "You are in a SuperPlane planning session.\n\nGreet the user in plain text. Then stop."))
+
+	_, err = StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	prompt := planningAgentPrompt(t, r.Organization.ID, factoryModel.ID)
+	assert.Contains(t, prompt, "planning_session.refine_key")
+	assert.Contains(t, prompt, "If the refine key is not empty")
+	assert.Contains(t, planningLiveAgentPrompt(t, canvas.ID), "planning_session.refine_key")
+}
+
 func Test__StartPlanningSession__KeepsPreviousSessionForSameUser(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -244,7 +326,7 @@ func Test__StartPlanningSession__RejectsEleventhSessionAtDefaultCap(t *testing.T
 	require.Error(t, err)
 }
 
-func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
+func Test__StartPlanningSession__UsesSuperPlaneAndDefaultParallelism(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	setupPlanningStart(t, r.Organization.ID)
@@ -260,19 +342,19 @@ func Test__StartPlanningSession__UsesClaudeAndDefaultParallelism(t *testing.T) {
 	require.NoError(t, err)
 	nodes, err := models.FindCanvasNodesInTransaction(database.DB(t.Context()), canvas.ID)
 	require.NoError(t, err)
-	foundClaude := false
+	foundAgent := false
 	for _, node := range nodes {
 		if node.Type == models.NodeTypeComponent {
-			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 			require.NotNil(t, node.ConcurrencyMax)
 			assert.Equal(t, models.DefaultFactoryLineStepMaxParallelism, *node.ConcurrencyMax)
-			foundClaude = true
+			foundAgent = true
 		}
 	}
-	assert.True(t, foundClaude)
+	assert.True(t, foundAgent)
 }
 
-func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
+func Test__StartPlanningSession__UsesSuperPlaneWhenSetupIsCodex(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	db := database.DB(t.Context())
@@ -295,7 +377,7 @@ func Test__StartPlanningSession__KeepsClaudeWhenSetupIsCodex(t *testing.T) {
 	require.NoError(t, err)
 	for _, node := range nodes {
 		if node.Type == models.NodeTypeComponent {
-			assert.Equal(t, "runnerClaudeCode", node.ComponentName())
+			assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
 			return
 		}
 	}
@@ -420,6 +502,85 @@ func Test__PlanningSession__MessageDraftCreateAndEnd(t *testing.T) {
 	assert.Equal(t, models.PlanningSessionStateEnded, ended.Session.State)
 }
 
+func Test__ReloadPlanningSessionAgent__KeepsSessionAndLiveCanvas(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	setupPlanningStart(t, r.Organization.ID)
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	started, err := StartPlanningSession(ctx, r.Organization.ID.String(), &pb.StartPlanningSessionRequest{
+		FactoryId:  factoryModel.ID.String(),
+		Repository: "acme/payments",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, started.Session.CanvasRunId)
+	originalRunID := started.Session.CanvasRunId
+
+	_, err = SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: factoryModel.ID.String(),
+		SessionId: started.Session.Id,
+		Text:      "Add a Size field.",
+	})
+	require.NoError(t, err)
+
+	reloaded, err := ReloadPlanningSessionAgent(ctx, r.Organization.ID.String(), &pb.ReloadPlanningSessionAgentRequest{
+		FactoryId:          factoryModel.ID.String(),
+		SessionId:          started.Session.Id,
+		SelectableModelKey: "hosted::anthropic::sonnet",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, reloaded.Session)
+	assert.Equal(t, started.Session.Id, reloaded.Session.Id)
+	assert.Equal(t, models.PlanningSessionStateRunning, reloaded.Session.State)
+	assert.NotEqual(t, originalRunID, reloaded.Session.CanvasRunId)
+	assert.Equal(t, "hosted::anthropic::sonnet", reloaded.Session.SelectableModelKey)
+	require.Len(t, reloaded.Session.Messages, 1)
+	assert.Equal(t, "Add a Size field.", reloaded.Session.Messages[0].Text)
+
+	canvas, err := models.FindPlanningCanvas(db, r.Organization.ID, factoryModel.ID)
+	require.NoError(t, err)
+	liveVersion, err := models.FindLiveCanvasVersionInTransaction(db, canvas.ID)
+	require.NoError(t, err)
+	for _, node := range []models.Node(liveVersion.Nodes) {
+		if node.ID != planningCanvasAgentNodeID {
+			continue
+		}
+		assert.NotEqual(t, "hosted::anthropic::sonnet", node.Configuration["model"])
+		assert.NotContains(t, planningCanvasPromptFromConfig(node.Configuration), "Prior messages")
+	}
+
+	run, err := models.FindCanvasRunInTransaction(db, canvas.ID, uuid.MustParse(reloaded.Session.CanvasRunId))
+	require.NoError(t, err)
+	assert.NotEqual(t, liveVersion.ID, run.VersionID)
+	input, ok := run.Input.Data().(map[string]any)
+	require.True(t, ok)
+	planning, ok := input["planning_session"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "hosted::anthropic::sonnet", planning["selectable_model_key"])
+	version, err := models.FindCanvasVersionInTransaction(db, canvas.ID, run.VersionID)
+	require.NoError(t, err)
+	foundAgent := false
+	for _, node := range []models.Node(version.Nodes) {
+		if node.ID != planningCanvasAgentNodeID {
+			continue
+		}
+		foundAgent = true
+		assert.Equal(t, models.SuperPlaneRunnerComponent, node.ComponentName())
+		assert.Equal(t, "hosted::anthropic::sonnet", node.Configuration["model"])
+		assert.Equal(t, "anthropic", node.Configuration["hostedProvider"])
+		assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration), "Add a Size field.")
+		assert.Contains(t, planningCanvasPromptFromConfig(node.Configuration), "Do not greet as if the session is new")
+	}
+	assert.True(t, foundAgent)
+
+	require.NoError(t, models.EndPlanningSessionForFinishedRun(db, uuid.MustParse(originalRunID), models.CanvasRunResultCancelled))
+	session, err := models.FindPlanningSession(db, r.Organization.ID, factoryModel.ID, uuid.MustParse(started.Session.Id))
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, session.State)
+}
+
 func setupPlanningStart(t *testing.T, organizationID uuid.UUID) {
 	t.Helper()
 	upsertHostedOnboardingProvider(t, database.DB(t.Context()))
@@ -439,4 +600,35 @@ func planningAgentPrompt(t *testing.T, organizationID, factoryID uuid.UUID) stri
 	}
 	t.Fatal("missing planning agent")
 	return ""
+}
+
+func planningLiveAgentPrompt(t *testing.T, canvasID uuid.UUID) string {
+	t.Helper()
+	live, err := models.FindLiveCanvasVersionInTransaction(database.DB(t.Context()), canvasID)
+	require.NoError(t, err)
+	for _, node := range live.Nodes {
+		if node.Type == models.NodeTypeComponent {
+			return planningCanvasPromptFromConfig(node.Configuration)
+		}
+	}
+	t.Fatal("missing planning agent in live version")
+	return ""
+}
+
+func rewritePlanningCanvasLivePrompt(t *testing.T, canvasID uuid.UUID, prompt string) error {
+	t.Helper()
+	live, err := models.FindLiveCanvasVersionInTransaction(database.DB(t.Context()), canvasID)
+	if err != nil {
+		return err
+	}
+	nodes := append([]models.Node(nil), live.Nodes...)
+	for i := range nodes {
+		for _, step := range planningCanvasConfigSteps(nodes[i].Configuration["steps"]) {
+			if _, ok := step["prompt"]; ok {
+				step["prompt"] = prompt
+			}
+		}
+	}
+	live.Nodes = datatypes.NewJSONSlice(nodes)
+	return database.DB(t.Context()).Model(live).Select("Nodes").Updates(live).Error
 }

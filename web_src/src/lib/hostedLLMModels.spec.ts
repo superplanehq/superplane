@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   compareModelLabels,
   filterModelIds,
+  hostedLLMModelKey,
+  hostedLLMTechnicalName,
+  hostedLLMTechnicalNameFromKey,
   hostedModelIds,
+  parseHostedLLMModelKey,
   pickHostedAnthropicModel,
   pickHostedModel,
   uniqueSortedModelIds,
@@ -83,5 +87,27 @@ describe("hostedModelIds", () => {
       "sonnet",
       "opus",
     ]);
+  });
+});
+
+describe("hostedLLMTechnicalName", () => {
+  it("uses provider/model for native Anthropic and OpenAI ids", () => {
+    expect(hostedLLMTechnicalName("anthropic", "claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6");
+    expect(hostedLLMTechnicalName("openai", "gpt-5")).toBe("openai/gpt-5");
+  });
+
+  it("keeps OpenRouter ids as provider/model", () => {
+    expect(hostedLLMTechnicalName("openrouter", "moonshotai/kimi-k2.6")).toBe("moonshotai/kimi-k2.6");
+  });
+});
+
+describe("hostedLLMModelKey", () => {
+  it("encodes and parses provider::model keys", () => {
+    expect(hostedLLMModelKey("openrouter", "anthropic/claude-sonnet-4")).toBe("openrouter::anthropic/claude-sonnet-4");
+    expect(parseHostedLLMModelKey("openrouter::anthropic/claude-sonnet-4")).toEqual({
+      provider: "openrouter",
+      model: "anthropic/claude-sonnet-4",
+    });
+    expect(hostedLLMTechnicalNameFromKey("anthropic::claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6");
   });
 });

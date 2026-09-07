@@ -43,6 +43,23 @@ describe("WorkOrderDescription", () => {
     expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
+  it("does not add Show more when collapse is off", () => {
+    render(
+      <div data-testid="description-pane" style={{ overflowY: "auto", padding: "24px 0" }}>
+        <WorkOrderDescription description="# Test description" collapsible={false} />
+      </div>,
+    );
+
+    const pane = screen.getByTestId("description-pane");
+    Object.defineProperty(pane, "clientHeight", { configurable: true, get: () => 520 });
+    const content = screen.getByTestId("work-order-description-markdown").parentElement;
+    Object.defineProperty(content!, "scrollHeight", { configurable: true, get: () => 640 });
+
+    act(() => notifyResize());
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(content).not.toHaveStyle({ maxHeight: "440px" });
+  });
+
   it("keeps the body open when it fits the scroll pane", () => {
     const contentHeight = 360;
     render(

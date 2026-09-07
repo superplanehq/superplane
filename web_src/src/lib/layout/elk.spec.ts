@@ -22,11 +22,11 @@ type ElkLayoutEngineInternals = {
 };
 
 describe("ElkLayoutEngine", () => {
-  it("reserves room for Claude Code steps in vertical layouts", () => {
+  it("reserves room for SuperPlane agent steps in vertical layouts", () => {
     const autoLayout = new ElkLayoutEngine();
     const node: ComponentsNode = {
       id: "agent",
-      component: "runnerClaudeCode",
+      component: "runnerSuperPlane",
       configuration: {
         steps: [{ name: "Clone Repo" }, { name: "Write Implementation Plan" }, { name: "Use plan as output" }],
       },

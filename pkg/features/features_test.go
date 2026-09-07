@@ -23,6 +23,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Sentry intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryProductiveIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryProductiveIntake, f.ID)
+		assert.Equal(t, "Factory Productive.io Intake", f.Label)
+		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -55,6 +63,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
 	assert.True(t, Exists(FeatureFactorySentryIntake))
+	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureFactoryDraftStartModel))
 	assert.True(t, Exists(FeatureFactoryRepositoryAnalysis))

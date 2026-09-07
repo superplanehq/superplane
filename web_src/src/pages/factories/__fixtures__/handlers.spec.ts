@@ -57,6 +57,16 @@ describe("matchFactoryPageFixture", () => {
       enabled: true,
       models: [expect.objectContaining({ id: "claude-sonnet-4-6" })],
     });
+
+    const selectable = await fetchFactoryPageFixture(
+      `/api/v1/organizations/${FACTORIES_ORGANIZATION_ID}/selectable-llm-models`,
+    );
+    await expect(selectable.json()).resolves.toMatchObject({
+      models: expect.arrayContaining([
+        expect.objectContaining({ key: "byok::anthropic::claude-sonnet-4-6" }),
+        expect.objectContaining({ key: "hosted::anthropic::claude-sonnet-4-6" }),
+      ]),
+    });
   });
 
   it("returns factory apps for the populated factory", async () => {
@@ -148,5 +158,40 @@ describe("matchFactoryPageFixture", () => {
   it("does not serve a separate line-metrics route", async () => {
     const response = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/line-metrics`);
     expect(response.status).toBe(404);
+  });
+
+  it("lists and creates PR feedback handlers", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const list = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      undefined,
+      fixture,
+    );
+    await expect(list.json()).resolves.toMatchObject({ handlers: [] });
+
+    const created = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      {
+        method: "POST",
+        body: JSON.stringify({ source: "SOURCE_PULL_REQUEST_CHECKS", name: "Fix pull request checks" }),
+      },
+      fixture,
+    );
+    await expect(created.json()).resolves.toMatchObject({
+      handler: {
+        name: "Fix pull request checks",
+        source: "SOURCE_PULL_REQUEST_CHECKS",
+        healthy: true,
+      },
+    });
+
+    const afterCreate = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/pr-feedback-handlers`,
+      undefined,
+      fixture,
+    );
+    const body = (await afterCreate.json()) as { handlers: Array<{ source?: string }> };
+    expect(body.handlers).toHaveLength(1);
+    expect(body.handlers[0]?.source).toBe("SOURCE_PULL_REQUEST_CHECKS");
   });
 });
