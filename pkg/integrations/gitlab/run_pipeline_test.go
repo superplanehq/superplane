@@ -225,3 +225,86 @@ func Test__RunPipeline__Poll__SchedulesNextWhenRunning(t *testing.T) {
 	assert.Equal(t, RunPipelinePollInterval, requestsCtx.Duration)
 	assert.Empty(t, executionState.Channel)
 }
+
+func Test__RunPipeline__Poll__FinishedPipeline(t *testing.T) {
+	tests := []struct {
+		name          string
+		status        string
+		expectChannel string
+	}{
+		{
+			name:          "successful pipeline emits on passed channel",
+			status:        "success",
+			expectChannel: PipelinePassedOutputChannel,
+		},
+		{
+			name:          "failed pipeline emits on failed channel",
+			status:        "failed",
+			expectChannel: PipelineFailedOutputChannel,
+		},
+		{
+			name:          "canceled pipeline emits on failed channel",
+			status:        "canceled",
+			expectChannel: PipelineFailedOutputChannel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			component := &RunPipeline{}
+			metadataCtx := &contexts.MetadataContext{
+				Metadata: RunPipelineExecutionMetadata{
+					Pipeline: &PipelineMetadata{
+						ID:     1001,
+						Status: "running",
+					},
+				},
+			}
+			requestsCtx := &contexts.RequestContext{}
+			executionState := &contexts.ExecutionStateContext{
+				KVs: map[string]string{},
+			}
+
+			err := component.HandleHook(core.ActionHookContext{
+				Name: RunPipelinePollAction,
+				Configuration: map[string]any{
+					"project": "123",
+					"ref":     "main",
+				},
+				Metadata: metadataCtx,
+				Integration: &contexts.IntegrationContext{
+					Configuration: map[string]any{
+						"authType":    AuthTypePersonalAccessToken,
+						"groupId":     "123",
+						"accessToken": "pat",
+						"baseUrl":     "https://gitlab.com",
+					},
+				},
+				HTTP: &contexts.HTTPContext{
+					Responses: []*http.Response{
+						GitlabMockResponse(http.StatusOK, `{
+							"id": 1001,
+							"iid": 73,
+							"project_id": 123,
+							"status": "`+tt.status+`",
+							"ref": "main"
+						}`),
+					},
+				},
+				Requests:       requestsCtx,
+				ExecutionState: executionState,
+				Logger:         log.NewEntry(log.New()),
+			})
+
+			require.NoError(t, err)
+			assert.Empty(t, requestsCtx.Action)
+			assert.Equal(t, tt.expectChannel, executionState.Channel)
+			assert.Equal(t, PipelinePayloadType, executionState.Type)
+
+			metadata, ok := metadataCtx.Metadata.(RunPipelineExecutionMetadata)
+			require.True(t, ok)
+			require.NotNil(t, metadata.Pipeline)
+			assert.Equal(t, tt.status, metadata.Pipeline.Status)
+		})
+	}
+}
