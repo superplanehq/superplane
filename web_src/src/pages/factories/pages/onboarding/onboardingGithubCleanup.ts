@@ -10,6 +10,32 @@ import type { UpdateOnboarding } from "./onboardingProvision";
 import { unusedOnboardingVcsIntegrationId } from "./unusedOnboardingIntegration";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
+export async function persistSelectedGithubConnection(args: {
+  setup: OnboardingSetupApi;
+  updateOnboarding: UpdateOnboarding;
+  organizationId: string;
+  factory: FactoriesFactory | null;
+  factories: FactoriesFactory[];
+  factoryId: string;
+  queryClient: QueryClient;
+  integrationId: string;
+  previousId: string | undefined;
+}): Promise<boolean> {
+  if (!(await saveSelectedGithubConnection(args, args.integrationId, args.previousId))) {
+    return false;
+  }
+  await deleteUnusedOnboardingIntegration({
+    organizationId: args.organizationId,
+    factory: args.factory,
+    factories: args.factories,
+    factoryId: args.factoryId,
+    previousId: args.previousId,
+    nextId: args.integrationId,
+    queryClient: args.queryClient,
+  });
+  return true;
+}
+
 export async function saveSelectedGithubConnection(
   args: {
     setup: OnboardingSetupApi;

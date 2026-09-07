@@ -294,6 +294,18 @@ func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
 	return validateOptionalUUID(config.ProvisionedLineID, ErrFactoryOnboardingInvalidLineID)
 }
 
+// CountFactoriesUsingVCSIntegration counts workspaces in the organization
+// that still store this integration as their version-control connection.
+func CountFactoriesUsingVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("onboarding_config->>'vcs_integration_id' = ?", integrationID.String()).
+		Count(&count).
+		Error
+	return count, err
+}
+
 // OrganizationIDsPendingInitialOnboardingOnly returns organizations whose
 // only workspaces are unfinished first-run setup. Organizations that also
 // have a completed workspace are omitted.
