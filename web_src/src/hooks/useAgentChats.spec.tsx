@@ -3,14 +3,22 @@ import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/r
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  agentsGetCanvasAgentChat,
   agentsListAgentChatMessages,
   agentsResetCanvasAgentChat,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
 import type { AgentMessagesPage } from "./useAgentChats";
-import { agentChatKeys, useAgentChatMessages, useResetCanvasAgentChat, useSendAgentChatMessage } from "./useAgentChats";
+import {
+  agentChatKeys,
+  useAgentChatMessages,
+  useCanvasAgentChat,
+  useResetCanvasAgentChat,
+  useSendAgentChatMessage,
+} from "./useAgentChats";
 
 vi.mock("@/api-client/sdk.gen", () => ({
+  agentsGetCanvasAgentChat: vi.fn(),
   agentsListAgentChatMessages: vi.fn(),
   agentsResetCanvasAgentChat: vi.fn(),
   agentsSendAgentChatMessage: vi.fn(),
@@ -21,6 +29,26 @@ function wrapper(queryClient: QueryClient) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
+
+describe("useCanvasAgentChat", () => {
+  it("reports a structured API error when chat setup fails", async () => {
+    type GetCanvasAgentChatResult = Awaited<ReturnType<typeof agentsGetCanvasAgentChat>>;
+    const apiError = { code: 14, message: "agents are not enabled on this installation" };
+    vi.mocked(agentsGetCanvasAgentChat).mockResolvedValue({
+      error: apiError,
+      request: new Request("https://superplane.test"),
+      response: new Response(null, { status: 503 }),
+    } as GetCanvasAgentChatResult);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { result } = renderHook(() => useCanvasAgentChat("canvas-1", "org-1", true), {
+      wrapper: wrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBe(apiError);
+  });
+});
 
 describe("useSendAgentChatMessage", () => {
   it("adds a local user message before the send request resolves", async () => {
