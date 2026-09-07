@@ -1,5 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Workflow } from "lucide-react";
+import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { PRFeedbackAutomationTab, PRFeedbackSettingsFooter } from "./PRFeedbackSettingsChrome";
@@ -9,10 +9,12 @@ import {
   PRFeedbackHealthSection,
   PRFeedbackTextField,
 } from "./PRFeedbackSettingsFields";
+import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
   appendUniqueTrimmedString,
+  prFeedbackSettingsTabs,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
 } from "./prFeedbackSettingsModel";
@@ -32,6 +34,7 @@ interface PRFeedbackSettingsPopupProps {
   deletePending?: boolean;
   saveError?: string;
   editAutomationHref?: string;
+  agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
   initialTab?: PRFeedbackSettingsTab;
@@ -51,13 +54,23 @@ export function PRFeedbackSettingsPopup({
   deletePending = false,
   saveError,
   editAutomationHref,
+  agent,
   onClose,
   fixed = true,
   initialTab = "general",
 }: PRFeedbackSettingsPopupProps) {
+  const tabs = prFeedbackSettingsTabs(Boolean(agent));
   const [draft, setDraft] = useState(settings);
-  const [tab, setTab] = useState<PRFeedbackSettingsTab>(initialTab);
+  const [tab, setTab] = useState<PRFeedbackSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const hasAgent = Boolean(agent);
+
+  useEffect(() => {
+    const next = prFeedbackSettingsTabs(hasAgent);
+    if (!next.includes(tab)) {
+      setTab("general");
+    }
+  }, [tab, hasAgent]);
 
   useEffect(() => {
     setDraft(settings);
@@ -76,6 +89,12 @@ export function PRFeedbackSettingsPopup({
               <Settings />
               {PR_FEEDBACK_SETTINGS_COPY.generalTab}
             </TabsTrigger>
+            {tabs.includes("agent") ? (
+              <TabsTrigger value="agent" data-testid="pr-feedback-settings-tab-agent">
+                <Bot />
+                {PR_FEEDBACK_SETTINGS_COPY.agentTab}
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="automation" data-testid="pr-feedback-settings-tab-automation">
               <Workflow />
               {PR_FEEDBACK_SETTINGS_COPY.automationTab}
@@ -91,6 +110,16 @@ export function PRFeedbackSettingsPopup({
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}
+        />
+      ) : tab === "agent" && agent ? (
+        <PlanningReviewEditor
+          key={agent.draft?.components[0]?.id ?? "agent"}
+          initialDraft={agent.draft}
+          onSave={agent.onSave}
+          organizationId={agent.organizationId}
+          isLoading={agent.isLoading}
+          showAutomationNote={false}
+          showCancel={false}
         />
       ) : (
         <PRFeedbackGeneralTab

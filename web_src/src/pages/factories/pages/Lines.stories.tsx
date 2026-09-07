@@ -220,6 +220,20 @@ export const LineBoardDoneAutomationsOpen: Story = {
   },
 };
 
+export const LineBoardAutomationView: Story = {
+  name: "Line board — automation view popup",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automationView=app-refund-implementer`}
+        factoriesFixture={columnAutomationsFixture}
+        appFixture={refundLineCanvasFixture()}
+      />
+    );
+  },
+};
+
 export const LineBoardAddAutomationPicker: Story = {
   name: "Line board — add automation picker",
   parameters: {

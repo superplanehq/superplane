@@ -11,7 +11,9 @@ import {
   factoryIntakePath,
   factoryPRFeedbackPath,
   factoryColumnAutomationsPath,
+  factoryColumnAutomationViewPath,
   columnAutomationsKeyFromSearch,
+  columnAutomationViewCanvasIdFromSearch,
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
@@ -163,6 +165,19 @@ describe("factoryColumnAutomationsPath", () => {
     expect(columnAutomationsKeyFromSearch("?automations=verify")).toBe("verify");
     expect(columnAutomationsKeyFromSearch("automations=done")).toBe("done");
     expect(columnAutomationsKeyFromSearch("")).toBeNull();
+  });
+});
+
+describe("factoryColumnAutomationViewPath", () => {
+  it("opens the line board on the automation view popup", () => {
+    expect(factoryColumnAutomationViewPath("org-1", "SP", "line-plan", "app-refund-implementer")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?automationView=app-refund-implementer",
+    );
+  });
+
+  it("reads the canvas id from the search string", () => {
+    expect(columnAutomationViewCanvasIdFromSearch("?automationView=app-1")).toBe("app-1");
+    expect(columnAutomationViewCanvasIdFromSearch("automations=phase-0")).toBeNull();
   });
 });
 
