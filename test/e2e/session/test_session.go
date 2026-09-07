@@ -403,6 +403,21 @@ func (s *TestSession) WaitUntilURLDoesNotContain(part string) {
 	s.t.Fatalf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL())
 }
 
+// WaitUntilURLContains polls until the current URL contains part. Use this
+// for redirects that a single-page app resolves after several async requests
+// (for example, the post-login redirect into an organization), where a fixed
+// sleep is not enough.
+func (s *TestSession) WaitUntilURLContains(part string) {
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for URL to contain %q, last URL was %q", part, s.page.URL())
+}
+
 func (s *TestSession) AssertURLContains(part string) {
 	s.t.Logf("Asserting URL contains %q", part)
 	current := s.page.URL()

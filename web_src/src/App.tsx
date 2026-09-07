@@ -1,10 +1,10 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { useEffect } from "react";
+import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
 import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
-import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
@@ -268,6 +268,7 @@ function PageObservabilityScope() {
 export function OrganizationScope() {
   const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
+  const accountId = account?.id;
   const location = useLocation();
 
   const isReserved = isReservedAppPathSegment(segment);
@@ -292,14 +293,13 @@ export function OrganizationScope() {
           organizationSlug: resolvedSlug,
         })
       : null;
-  useEffect(() => {
-    if (!account?.id || !segment || isReserved || uidRedirectPath) {
-      return;
-    }
-    // Prefer the resolved slug so the last-visited value never carries a UID
-    // forward into a later root redirect.
-    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
-  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
+  usePersistOrganizationLastLocation({
+    accountId,
+    resolvedSlug,
+    isReserved,
+    uidRedirectPath,
+    path: `${location.pathname}${location.search}`,
+  });
 
   if (isReserved) {
     return <Navigate to="/" replace />;

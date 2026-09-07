@@ -1,4 +1,4 @@
-import { Bot, Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, Workflow, XIcon } from "lucide-react";
+import { Bot, Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -25,15 +25,11 @@ interface ColumnLaneMenuProps {
   editLabel?: string;
   /** Opens the inline agent editor. */
   onEditAgent?: () => void;
-  /** Opens the automation configure canvas as a separate item above Edit. */
-  automationHref?: string | null;
   /** Opens the parallelism modal for canvas-backed phases. */
   onSetParallelism?: () => void;
   parallelism?: number;
   /** Opens the Add intake picker. Leads the menu when set. */
   onAddIntake?: () => void;
-  /** Opens the per-column Automations drawer. Leads the menu when set. */
-  onOpenAutomations?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -48,18 +44,15 @@ export function ColumnLaneMenu({
   onEdit,
   editLabel = "Edit",
   onEditAgent,
-  automationHref,
   onSetParallelism,
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   onAddIntake,
-  onOpenAutomations,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions =
-    canEdit || Boolean(onEditAgent || onSetParallelism || automationHref || onAddIntake || onOpenAutomations);
+  const hasActions = canEdit || Boolean(onEditAgent || onSetParallelism || onAddIntake);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -92,11 +85,9 @@ export function ColumnLaneMenu({
               canEdit={canEdit}
               onEdit={handleEdit}
               onEditAgent={onEditAgent}
-              automationHref={automationHref}
               onSetParallelism={onSetParallelism}
               parallelism={parallelism}
               onAddIntake={onAddIntake}
-              onOpenAutomations={onOpenAutomations}
             />
             <DropdownMenuSeparator className="my-0" />
           </>
@@ -113,42 +104,25 @@ function ColumnLaneMenuActions({
   canEdit,
   onEdit,
   onEditAgent,
-  automationHref,
   onSetParallelism,
   parallelism,
   onAddIntake,
-  onOpenAutomations,
 }: {
   testId: string;
   editLabel: string;
   canEdit: boolean;
   onEdit: () => void;
   onEditAgent?: () => void;
-  automationHref?: string | null;
   onSetParallelism?: () => void;
   parallelism: number;
   onAddIntake?: () => void;
-  onOpenAutomations?: () => void;
 }) {
-  const navigate = useNavigate();
   return (
     <div className="p-1">
-      {onOpenAutomations ? (
-        <DropdownMenuItem onSelect={onOpenAutomations} data-testid={`${testId}-automations`}>
-          <Workflow className="h-3.5 w-3.5" aria-hidden />
-          Automations
-        </DropdownMenuItem>
-      ) : null}
       {onAddIntake ? (
         <DropdownMenuItem onSelect={onAddIntake} data-testid={`${testId}-add-intake`}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Add intake
-        </DropdownMenuItem>
-      ) : null}
-      {automationHref ? (
-        <DropdownMenuItem onSelect={() => navigate(automationHref)} data-testid={`${testId}-edit-automation`}>
-          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-          Edit automation
         </DropdownMenuItem>
       ) : null}
       {onEditAgent ? (

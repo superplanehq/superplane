@@ -46,12 +46,7 @@ vi.mock("@/hooks/useBindGitHubInstallation", () => ({
   useBindGitHubInstallation: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
 }));
 
-const deleteFactoryMutateAsync = vi.fn().mockResolvedValue(undefined);
 const navigateSpy = vi.fn();
-
-vi.mock("@/hooks/useFactoryData", () => ({
-  useDeleteFactory: () => ({ mutateAsync: deleteFactoryMutateAsync, isPending: false }),
-}));
 
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
 
@@ -118,7 +113,6 @@ describe("FirstRunSetup", () => {
     factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
-    deleteFactoryMutateAsync.mockClear();
     navigateSpy.mockClear();
   });
 
@@ -294,28 +288,17 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 
-  it("shows the close control instead of Log out when another workspace exists", () => {
+  it("shows Log out and the organization switch when another workspace exists", () => {
     factories = [factory, { id: "factory-2" }];
 
     renderSetup(pageModel());
 
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-organization-switch")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
   });
 
-  it("deletes the placeholder workspace and returns to the workspace index on cancel", async () => {
-    factories = [factory, { id: "factory-2" }];
-    const user = userEvent.setup();
-
-    renderSetup(pageModel());
-
-    await user.click(screen.getByTestId("first-run-cancel"));
-
-    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/org-1/workspaces"));
-  });
-
-  it("shows the close control when another organization exists, even with no other workspace here", () => {
+  it("shows Log out and the organization switch when another organization exists", () => {
     factories = [factory];
     accountOrganizations = [
       { id: "org-1", name: "Acme" },
@@ -324,34 +307,30 @@ describe("FirstRunSetup", () => {
 
     renderSetup(pageModel());
 
-    expect(screen.getByTestId("first-run-cancel")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-organization-switch")).toBeInTheDocument();
   });
 
-  it("navigates to another organization on cancel, not back into onboarding, when this org has no other workspace", async () => {
-    factories = [factory];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co", slug: "other-co" },
-    ];
+  it("opens the current organization from the switch menu so the user can leave setup", async () => {
+    factories = [factory, { id: "factory-2" }];
     const user = userEvent.setup();
 
     renderSetup(pageModel());
 
-    await user.click(screen.getByTestId("first-run-cancel"));
+    await user.click(screen.getByTestId("first-run-organization-switch"));
+    await user.click(screen.getByTestId("first-run-organization-option-org-1"));
 
-    expect(deleteFactoryMutateAsync).toHaveBeenCalledWith("factory-1");
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith("/other-co"));
-    expect(navigateSpy).not.toHaveBeenCalledWith("/org-1/workspaces");
+    expect(navigateSpy).toHaveBeenCalledWith("/org-1");
   });
 
-  it("keeps Log out and hides the close control with a single org and single (placeholder) workspace", () => {
+  it("keeps Log out and hides the organization switch with a single org and single workspace", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
 
     renderSetup(pageModel());
 
     expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-organization-switch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
   });
 });

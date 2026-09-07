@@ -4,6 +4,7 @@ import {
   DEFAULT_GITHUB_INTAKE_SETTINGS,
   GITHUB_INTAKE_RUNS,
   isIntakeSettingsTab,
+  intakeSettingsTabs,
   intakePlacementActivity,
   intakePlacementLabel,
   intakeRelativeTime,
@@ -45,11 +46,14 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeRelativeTime(180)).toBe("3h ago");
   });
 
-  it("accepts only the three settings tabs", () => {
+  it("accepts the intake settings tabs", () => {
     expect(isIntakeSettingsTab("automation")).toBe(true);
     expect(isIntakeSettingsTab("runs")).toBe(true);
+    expect(isIntakeSettingsTab("agent")).toBe(true);
     expect(isIntakeSettingsTab("general")).toBe(true);
     expect(isIntakeSettingsTab("listen")).toBe(false);
+    expect(intakeSettingsTabs(false)).toEqual(["general", "runs", "automation"]);
+    expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "runs", "automation"]);
   });
 
   it("defaults the authors filter to off", () => {

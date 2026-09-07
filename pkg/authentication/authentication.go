@@ -143,6 +143,10 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if a.completePendingOAuthSignup(w, r) {
+		return
+	}
+
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err == nil {
 		a.finishProviderAuth(w, r, gothUser)
@@ -210,6 +214,10 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		a.completeProviderLink(w, r, mockUser, state)
+		return
+	}
+
+	if a.completePendingOAuthSignup(w, r) {
 		return
 	}
 
@@ -301,6 +309,7 @@ func (a *Handler) handleProviderAuthError(w http.ResponseWriter, r *http.Request
 	}
 
 	if errors.Is(err, errSignupRequired) {
+		a.setPendingOAuthSignupCookie(w, r, gothUser)
 		http.Redirect(w, r, getSignupRequiredRedirectURL(r), http.StatusSeeOther)
 		return
 	}
@@ -331,6 +340,8 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
+	clearPendingOAuthSignupCookie(w, r)
+
 	redirectURL := a.getPostAuthRedirectURL(r, wasCreated)
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
@@ -339,6 +350,7 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
 	ClearAccountCookie(w, r)
+	clearPendingOAuthSignupCookie(w, r)
 
 	http.Redirect(w, r, getPostLogoutRedirectURL(r), http.StatusTemporaryRedirect)
 }
@@ -561,6 +573,23 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if err := a.checkSignupPolicy(email, r); err != nil {
+		if errors.Is(err, errSignupRequired) {
+			writeSignupRequiredJSON(w)
+			return
+		}
+		if errors.Is(err, models.ErrAccountBlocked) {
+			successResponse()
+			return
+		}
+		if errors.Is(err, errSignupDisabled) {
+			http.Error(w, err.Error(), http.StatusForbidden)
+			return
+		}
+		successResponse()
+		return
+	}
+
 	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
 	if err != nil {
 		log.Errorf("Failed to count recent magic codes for %s: %v", email, err)
@@ -640,6 +669,10 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	// 2. Check signup policy without creating any records. Only reachable
 	//    with a valid code, so a 403 does not leak account existence.
 	if err := a.checkSignupPolicy(email, r); err != nil {
+		if errors.Is(err, errSignupRequired) {
+			writeSignupRequiredJSON(w)
+			return
+		}
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
 	}
@@ -1055,8 +1088,25 @@ func (a *Handler) SignupsBlockedByEnvironment() bool {
 	return a.blockSignup
 }
 
+func writeSignupRequiredJSON(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", jsonContentType)
+	w.WriteHeader(http.StatusForbidden)
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": authErrorSignupRequired}); err != nil {
+		log.Errorf("Error encoding signup required response: %v", err)
+	}
+}
+
+func inviteRedirectPath(r *http.Request) string {
+	formRedirect := strings.TrimSpace(r.FormValue("redirect"))
+	if isValidRedirectURL(formRedirect) {
+		return formRedirect
+	}
+
+	return getRedirectURL(r)
+}
+
 func allowSignupFromInvite(r *http.Request) bool {
-	redirectURL := getRedirectURL(r)
+	redirectURL := inviteRedirectPath(r)
 	if !strings.HasPrefix(redirectURL, "/invite/") {
 		return false
 	}
