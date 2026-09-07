@@ -1,3 +1,4 @@
+import { isPlanningRefineNote } from "./createWithAgentCopy";
 import type { CreateWithAgentCreatedOrder, CreateWithAgentMessage, CreateWithAgentView } from "./createWithAgentTypes";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 
@@ -17,7 +18,7 @@ export type PlanningSessionPayload = {
   waitState?: string;
   executionId?: string;
   messages?: PlanningSessionMessagePayload[];
-  draft?: { title?: string; description?: string } | null;
+  draft?: { title?: string; description?: string; workOrderId?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
   survey?: PlanningSessionSurveyPayload | null;
 };
@@ -69,6 +70,7 @@ export function createWithAgentViewFromSession(
     created,
     right,
     endConfirmOpen: extras.endConfirmOpen,
+    refining: Boolean(session.draft?.workOrderId?.trim()),
   };
 }
 
@@ -117,6 +119,9 @@ function createWithAgentMachineStatus(session: PlanningSessionPayload): CreateWi
 }
 
 function planningSessionMessageFromPayload(message: PlanningSessionMessagePayload): CreateWithAgentMessage[] {
+  if (message.role === "user" && message.text && isPlanningRefineNote(message.text)) {
+    return [];
+  }
   if (message.text && (message.role === "user" || message.role === "agent")) {
     const createdAtMs = parsePlanningMessageCreatedAt(message.createdAt);
     return [

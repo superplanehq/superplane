@@ -54,6 +54,70 @@ func TestFactory_StartPlanningSession_RequiresRepository(t *testing.T) {
 	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 }
 
+func TestFactory_StartPlanningSession_AttachesDraftWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-start")
+	db := database.Conn()
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+
+	session, err := factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+		WorkOrderID:     order.ID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, order.Title, session.Draft().Title)
+	assert.Equal(t, order.Description, session.Draft().Description)
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+	assert.Equal(t, order.ID.String(), ids[0])
+
+	var run CanvasRun
+	require.NoError(t, db.First(&run, "id = ?", session.CanvasRunID).Error)
+	planning := planningSessionInputFromRun(t, run)
+	assert.Equal(t, factoryModel.WorkOrderKey(order.Number), planning["refine_key"])
+	assert.Equal(t, order.Title, planning["refine_title"])
+	assert.Equal(t, order.Description, planning["refine_description"])
+}
+
+func TestFactory_StartPlanningSession_RejectsOpenWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-refine-open-start")
+	db := database.Conn()
+	canvas, entrypoint := createPlanningCanvas(t, org.ID, factoryModel.ID, userID)
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &userID, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &userID,
+	})
+	require.NoError(t, err)
+
+	_, err = factoryModel.StartPlanningSession(db, StartPlanningSessionParams{
+		CreatedByUserID: userID,
+		Repository:      "acme/payments",
+		CanvasID:        canvas.ID,
+		Entrypoint:      entrypoint,
+		WorkOrderID:     order.ID,
+	})
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+}
+
+func planningSessionInputFromRun(t *testing.T, run CanvasRun) map[string]any {
+	t.Helper()
+	input, ok := run.Input.Data().(map[string]any)
+	require.True(t, ok)
+	planning, ok := input["planning_session"].(map[string]any)
+	require.True(t, ok)
+	return planning
+}
+
 func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-hb")
@@ -336,6 +400,27 @@ func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
 	assert.NotEqual(t, note, result.Text)
 }
 
+func TestFactoryPlanningSession_FollowUpKeepsCurrentDraftInWaitText(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-follow-draft")
+	db := database.Conn()
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Add a color field with a visual color picker to the Puppy entity",
+		Description: "Add a color attribute and a picker on the Puppy form.",
+	}))
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "I actually want this to be about size and not color"))
+	assert.Equal(t, "I actually want this to be about size and not color", lastTextMessage(session, PlanningSessionMessageRoleUser))
+	result := session.Wait()
+	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
+	assert.Contains(t, result.Text, "Add a color field with a visual color picker to the Puppy entity")
+	assert.Contains(t, result.Text, "Add a color attribute and a picker on the Puppy form.")
+	assert.Contains(t, result.Text, "I actually want this to be about size and not color")
+	assert.Contains(t, result.Text, "this draft")
+	assert.NotEqual(t, "I actually want this to be about size and not color", result.Text)
+}
+
 func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine")
@@ -412,6 +497,67 @@ func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) 
 	assert.Equal(t, "Refine checkout: please.", lastTextMessage(session, PlanningSessionMessageRoleUser))
 	assert.Equal(t, "Refine checkout: please.", session.Wait().Text)
 	assert.Equal(t, "", session.Draft().WorkOrderID)
+}
+
+func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdatesSameTask(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-backlog")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)))
+	assert.Equal(t, order.Title, session.Draft().Title)
+	assert.Equal(t, order.Description, session.Draft().Description)
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+	assert.Equal(t, order.ID.String(), ids[0])
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds once",
+		Description: "Agent edit.",
+	}))
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+
+	updated, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, updated.ID)
+	assert.Equal(t, "Retry refunds once", updated.Title)
+	assert.Equal(t, "Agent edit.", updated.Description)
+	ids, err = session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+}
+
+func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-open")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &session.CreatedByUserID,
+	})
+	require.NoError(t, err)
+
+	note := PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, note))
+	assert.Equal(t, note, session.Wait().Text)
+	assert.Equal(t, "", session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	assert.Empty(t, ids)
 }
 
 func TestEndPlanningSessionForFinishedRun(t *testing.T) {

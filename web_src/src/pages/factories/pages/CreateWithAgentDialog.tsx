@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
@@ -22,6 +21,7 @@ import { PlanningSessionSurveyForm } from "./PlanningSessionSurveyForm";
 import { JumpToLatestPill } from "./work-order-split-run/JumpToLatestPill";
 import { PhaseLogCard } from "./work-order-split-run/PhaseLogCard";
 import { SplitRunAttentionNote } from "./work-order-split-run/SplitRunAttentionNote";
+import { WorkOrderSplitRunDescription } from "./work-order-split-run/WorkOrderSplitRunDescription";
 import { useFollowLogScroll } from "./work-order-split-run/useFollowLogScroll";
 
 export type CreateWithAgentDialogProps = {
@@ -33,7 +33,6 @@ export type CreateWithAgentDialogProps = {
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
   onDraftTitleChange: (title: string) => void;
-  onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
   onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
@@ -52,7 +51,6 @@ export function CreateWithAgentDialog({
   onSend,
   onSubmitSurvey,
   onDraftTitleChange,
-  onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
   onSelectCreated,
@@ -74,6 +72,7 @@ export function CreateWithAgentDialog({
             workspaceName={workspaceName}
             repository={view.repository}
             machineStatus={view.machineStatus}
+            refining={view.refining}
             onEndSession={onRequestClose}
           />
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
@@ -88,7 +87,6 @@ export function CreateWithAgentDialog({
               view={view}
               failed={view.machineStatus === "failed"}
               onDraftTitleChange={onDraftTitleChange}
-              onDraftDescriptionChange={onDraftDescriptionChange}
               onCreateDraft={onCreateDraft}
               onSkipDraft={onSkipDraft}
               onSelectCreated={onSelectCreated}
@@ -117,11 +115,13 @@ function CreateWithAgentHeader({
   workspaceName,
   repository,
   machineStatus,
+  refining,
   onEndSession,
 }: {
   workspaceName: string;
   repository: string;
   machineStatus: CreateWithAgentView["machineStatus"];
+  refining: boolean;
   onEndSession: () => void;
 }) {
   const starting = machineStatus === "starting";
@@ -138,9 +138,13 @@ function CreateWithAgentHeader({
         <span className="truncate text-foreground">{workspaceName}</span>
         <span aria-hidden>/</span>
         <DialogTitle className="truncate text-[13px] font-medium text-foreground">
-          {CREATE_WITH_AGENT_COPY.title}
+          {refining ? CREATE_WITH_AGENT_COPY.titleRefine : CREATE_WITH_AGENT_COPY.title}
         </DialogTitle>
-        <DialogDescription className="sr-only">Create tasks with an agent in this workspace.</DialogDescription>
+        <DialogDescription className="sr-only">
+          {refining
+            ? "Refine this task with an agent in this workspace."
+            : "Create tasks with an agent in this workspace."}
+        </DialogDescription>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span
@@ -206,14 +210,18 @@ function CreateWithAgentStream({
           className="absolute inset-0 overflow-y-auto px-3 py-3"
           data-testid="create-with-agent-log"
         >
-          <PhaseLogCard
-            phase={planningSessionPhase(view)}
-            expanded
-            collapsible={false}
-            organizationId={organizationId}
-            canvasId={view.canvasId}
-            compactSessionLog
-          />
+          {showCreateWithAgentLogIntro(view) ? (
+            <CreateWithAgentLogIntro />
+          ) : (
+            <PhaseLogCard
+              phase={planningSessionPhase(view)}
+              expanded
+              collapsible={false}
+              organizationId={organizationId}
+              canvasId={view.canvasId}
+              compactSessionLog
+            />
+          )}
         </div>
         {follow.following ? null : (
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="create-with-agent-older" />
@@ -237,14 +245,20 @@ function CreateWithAgentStream({
       ) : null}
       <form className="border-t border-border bg-background p-3" onSubmit={handleSubmit}>
         <label htmlFor="create-with-agent-composer" className="sr-only">
-          {CREATE_WITH_AGENT_COPY.composerPlaceholder}
+          {view.refining
+            ? CREATE_WITH_AGENT_COPY.composerPlaceholderRefine
+            : CREATE_WITH_AGENT_COPY.composerPlaceholder}
         </label>
         <div className="flex items-end gap-2">
           <Textarea
             id="create-with-agent-composer"
             data-testid="create-with-agent-composer"
             value={view.composer}
-            placeholder={CREATE_WITH_AGENT_COPY.composerPlaceholder}
+            placeholder={
+              view.refining
+                ? CREATE_WITH_AGENT_COPY.composerPlaceholderRefine
+                : CREATE_WITH_AGENT_COPY.composerPlaceholder
+            }
             disabled={failed}
             onChange={(event) => onComposerChange(event.target.value)}
             onKeyDown={(event) => {
@@ -267,6 +281,22 @@ function CreateWithAgentStream({
   );
 }
 
+function showCreateWithAgentLogIntro(view: CreateWithAgentView): boolean {
+  return view.machineStatus === "starting" && view.messages.length === 0;
+}
+
+function CreateWithAgentLogIntro() {
+  return (
+    <div
+      className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground"
+      data-testid="create-with-agent-log-intro"
+    >
+      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      <p>{CREATE_WITH_AGENT_COPY.logStarting}</p>
+    </div>
+  );
+}
+
 function machineStatusLabel(repository: string, machineStatus: CreateWithAgentView["machineStatus"]): string {
   if (machineStatus === "starting") {
     return CREATE_WITH_AGENT_COPY.machineStarting;
@@ -285,7 +315,6 @@ function CreateWithAgentWorkPane({
   view,
   failed,
   onDraftTitleChange,
-  onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
   onSelectCreated,
@@ -294,7 +323,6 @@ function CreateWithAgentWorkPane({
   view: CreateWithAgentView;
   failed: boolean;
   onDraftTitleChange: (title: string) => void;
-  onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
   onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
@@ -311,8 +339,8 @@ function CreateWithAgentWorkPane({
           title={view.right.draft.title}
           description={view.right.draft.description}
           failed={failed}
+          refining={view.refining}
           onTitleChange={onDraftTitleChange}
-          onDescriptionChange={onDraftDescriptionChange}
           onCreate={onCreateDraft}
           onSkip={onSkipDraft}
         />
@@ -383,38 +411,34 @@ function DraftWorkPane({
   title,
   description,
   failed,
+  refining,
   onTitleChange,
-  onDescriptionChange,
   onCreate,
   onSkip,
 }: {
   title: string;
   description: string;
   failed: boolean;
+  refining: boolean;
   onTitleChange: (title: string) => void;
-  onDescriptionChange: (description: string) => void;
   onCreate: () => void;
   onSkip: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-draft">
       <p className="text-[12px] font-medium text-muted-foreground">{CREATE_WITH_AGENT_COPY.draftLabel}</p>
-      <Input
+      <Textarea
         value={title}
         onChange={(event) => onTitleChange(event.target.value)}
         disabled={failed}
+        rows={1}
         aria-label="Task title"
         data-testid="create-with-agent-draft-title"
-        className="mt-3 h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
+        className="mt-3 min-h-0 resize-none border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
       />
-      <Textarea
-        value={description}
-        onChange={(event) => onDescriptionChange(event.target.value)}
-        disabled={failed}
-        aria-label="Task description"
-        data-testid="create-with-agent-draft-description"
-        className="mt-3 min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0"
-      />
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        <WorkOrderSplitRunDescription description={description} collapsible={false} />
+      </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button type="button" variant="ghost" disabled={failed} onClick={onSkip}>
           {CREATE_WITH_AGENT_COPY.skip}
@@ -425,7 +449,7 @@ function DraftWorkPane({
           disabled={failed || !title.trim()}
           onClick={onCreate}
         >
-          {CREATE_WITH_AGENT_COPY.create}
+          {refining ? CREATE_WITH_AGENT_COPY.update : CREATE_WITH_AGENT_COPY.create}
         </Button>
       </div>
     </div>
@@ -445,9 +469,9 @@ function PreviewWorkPane({
     <div className="flex min-h-0 flex-1 flex-col px-5 py-4" data-testid="create-with-agent-preview">
       <p className="text-[12px] font-medium text-muted-foreground">{order.key}</p>
       <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.02em]">{order.title}</h2>
-      <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-relaxed text-muted-foreground">
-        {order.description}
-      </p>
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+        <WorkOrderSplitRunDescription description={order.description} collapsible={false} />
+      </div>
       <div className="mt-4 flex justify-end">
         <Button type="button" variant="outline" disabled={failed} onClick={() => onRefine(order)}>
           {CREATE_WITH_AGENT_COPY.refineFurther}

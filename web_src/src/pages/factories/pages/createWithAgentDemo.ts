@@ -16,6 +16,7 @@ export function emptyCreateWithAgentView(repository = CREATE_WITH_AGENT_DEMO_REP
     created: [],
     right: { kind: "empty" },
     endConfirmOpen: false,
+    refining: false,
   };
 }
 

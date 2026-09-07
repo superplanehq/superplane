@@ -28,11 +28,15 @@ async function planningSessionRequest(
   return body.session;
 }
 
-export function startPlanningSession(organizationId: string, factoryId: string, repository = "") {
+export function startPlanningSession(organizationId: string, factoryId: string, repository = "", workOrderId = "") {
   const trimmed = repository.trim();
+  const refineId = workOrderId.trim();
   return planningSessionRequest(organizationId, `/api/v1/factories/${factoryId}/planning-sessions`, {
     method: "POST",
-    body: JSON.stringify(trimmed ? { repository: trimmed } : {}),
+    body: JSON.stringify({
+      ...(trimmed ? { repository: trimmed } : {}),
+      ...(refineId ? { work_order_id: refineId } : {}),
+    }),
   });
 }
 

@@ -2,7 +2,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CREATE_WITH_AGENT_COPY, planningRefineNote } from "./createWithAgentCopy";
+import { CREATE_WITH_AGENT_COPY, isPlanningRefineNote, planningRefineNote } from "./createWithAgentCopy";
 import {
   cancelCreateWithAgentEnd,
   emptyCreateWithAgentView,
@@ -22,6 +22,12 @@ import {
 } from "./planningSessionClient";
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./planningSessionView";
+
+export type PlanningRefineTarget = {
+  id: string;
+  title: string;
+  description?: string;
+};
 
 const POLL_MS = 1500;
 const DRAFT_SAVE_MS = 400;
@@ -138,21 +144,25 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     stopSession(id);
   }, [resetLocalSession, stopSession]);
 
-  const start = useCallback(() => {
-    openPlanningSession({
-      repository,
-      organizationId,
-      factoryId,
-      sessionIdRef,
-      startGenerationRef,
-      stopSession,
-      applySession,
-      resetLocalSession,
-      setView,
-      setSessionId,
-      setOpen,
-    });
-  }, [applySession, factoryId, organizationId, repository, resetLocalSession, stopSession]);
+  const start = useCallback(
+    (refine?: PlanningRefineTarget) => {
+      openPlanningSession({
+        repository,
+        organizationId,
+        factoryId,
+        refine,
+        sessionIdRef,
+        startGenerationRef,
+        stopSession,
+        applySession,
+        resetLocalSession,
+        setView,
+        setSessionId,
+        setOpen,
+      });
+    },
+    [applySession, factoryId, organizationId, repository, resetLocalSession, stopSession],
+  );
 
   const patchDraft = (title: string, description: string) =>
     savePlanningDraft({ title, description, sessionId, organizationId, factoryId, draftSaveTimer, setView });
@@ -228,6 +238,7 @@ function openPlanningSession({
   repository,
   organizationId,
   factoryId,
+  refine,
   sessionIdRef,
   startGenerationRef,
   stopSession,
@@ -240,6 +251,7 @@ function openPlanningSession({
   repository: string;
   organizationId: string;
   factoryId: string;
+  refine?: PlanningRefineTarget;
   sessionIdRef: { current: string };
   startGenerationRef: { current: number };
   stopSession: (id: string) => void;
@@ -252,11 +264,20 @@ function openPlanningSession({
   const generation = startGenerationRef.current + 1;
   startGenerationRef.current = generation;
   stopSession(sessionIdRef.current);
-  setView(emptyCreateWithAgentView(repository));
+  const refineTitle = refine?.title.trim() ?? "";
+  setView({
+    ...emptyCreateWithAgentView(repository),
+    refining: Boolean(refine?.id.trim()),
+    right: refineTitle
+      ? { kind: "draft", draft: { title: refineTitle, description: refine?.description?.trim() ?? "" } }
+      : { kind: "empty" },
+  });
   setSessionId("");
   setOpen(true);
-  void startPlanningSession(organizationId, factoryId, repository)
-    .then((session) => applySession(session, generation))
+  void startPlanningSession(organizationId, factoryId, repository, refine?.id.trim() ?? "")
+    .then((session) => {
+      applySession(session, generation);
+    })
     .catch((error: unknown) => {
       if (generation !== startGenerationRef.current) {
         return;
@@ -367,24 +388,26 @@ function sendPlanningText({
     return;
   }
   const generation = startGenerationRef.current;
-  setView((current) => ({
-    ...setCreateWithAgentComposer(current, ""),
-    survey: undefined,
-    messages: [
-      ...current.messages,
-      {
-        id: `local-${current.messages.length + 1}`,
-        kind: "text",
-        role: "user",
-        text: body,
-        // Sorts to the end immediately. The server round-trip replaces this
-        // with the persisted message, whose created_at keeps the same
-        // relative position so there is no visible jump.
-        createdAtMs: Date.now(),
-        ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
-      },
-    ],
-  }));
+  if (!isPlanningRefineNote(body)) {
+    setView((current) => ({
+      ...setCreateWithAgentComposer(current, ""),
+      survey: undefined,
+      messages: [
+        ...current.messages,
+        {
+          id: `local-${current.messages.length + 1}`,
+          kind: "text",
+          role: "user",
+          text: body,
+          // Sorts to the end immediately. The server round-trip replaces this
+          // with the persisted message, whose created_at keeps the same
+          // relative position so there is no visible jump.
+          createdAtMs: Date.now(),
+          ...(isPlanningSurveyReply(body) ? { origin: "survey" as const } : {}),
+        },
+      ],
+    }));
+  }
   void sendPlanningSessionMessage(organizationId, factoryId, sessionId, body)
     .then((session) => applySession(session, generation))
     .catch((error: unknown) => {
@@ -434,10 +457,6 @@ function createWithAgentViewActions({
       const description = view.right.kind === "draft" ? view.right.draft.description : "";
       patchDraft(title, description);
     },
-    onDraftDescriptionChange: (description: string) => {
-      const title = view.right.kind === "draft" ? view.right.draft.title : "";
-      patchDraft(title, description);
-    },
     onCreateDraft: () => {
       if (!sessionId) {
         return;
@@ -446,7 +465,12 @@ function createWithAgentViewActions({
       void createPlanningSessionWorkOrder(organizationId, factoryId, sessionId)
         .then((session) => applySession(session, generation))
         .catch((error: unknown) => {
-          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedCreate));
+          showErrorToast(
+            getApiErrorMessage(
+              error,
+              view.refining ? CREATE_WITH_AGENT_COPY.failedUpdate : CREATE_WITH_AGENT_COPY.failedCreate,
+            ),
+          );
         });
     },
     onSkipDraft: () => {

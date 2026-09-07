@@ -225,6 +225,8 @@ func TestRunPromptPlanningAdvertisesPlanningToolsNotWriteEdit(t *testing.T) {
 	assert.NotContains(t, names, "write")
 	assert.NotContains(t, names, "edit")
 	assert.Empty(t, result.planningRequests)
+	require.Len(t, result.chatRequests, 1)
+	assert.NotContains(t, result.output, "asking it to use tools")
 }
 
 func TestRunPromptPlanningProposeDraftPostsToDraftsEndpoint(t *testing.T) {
