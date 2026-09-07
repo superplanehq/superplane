@@ -24,6 +24,7 @@ type LiveLogRecord struct {
 	Preview    string `json:"preview,omitempty"`
 	Message    string `json:"message,omitempty"`
 	Index      *int   `json:"index,omitempty"`
+	Turn       *int   `json:"turn,omitempty"`
 	Status     string `json:"status,omitempty"`
 	DurationMS *int64 `json:"duration_ms,omitempty"`
 	StartedAt  *int64 `json:"started_at,omitempty"`

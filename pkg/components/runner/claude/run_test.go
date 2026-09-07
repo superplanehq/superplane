@@ -61,8 +61,10 @@ func TestFormatStreamJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_start", records[0]["type"])
 	assert.Equal(t, "bash", records[0]["kind"])
 	assert.Equal(t, "git status", records[0]["text"])
+	assert.Equal(t, float64(1), records[0]["turn"])
 	assert.NotEmpty(t, records[0]["id"])
 	assert.Contains(t, output, "On branch main")
+	assert.Contains(t, output, `"type":"turn"`)
 	end := records[len(records)-1]
 	assert.Equal(t, "tool_end", end["type"])
 	assert.Equal(t, "passed", end["status"])
@@ -86,6 +88,51 @@ func TestFormatStreamJsonLinesMatchesToolUseID(t *testing.T) {
 	assert.Equal(t, "read", records[3]["kind"])
 	assert.Equal(t, "passed", records[3]["status"])
 	assert.Regexp(t, `(?s)"kind":"bash".*boom.*"type":"tool_end".*"kind":"read".*package a`, output)
+	assert.Equal(t, float64(1), records[0]["turn"])
+	assert.Equal(t, float64(1), records[1]["turn"])
+}
+
+func TestFormatStreamJsonLinesEmitsTurnUsageAndStampsTools(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":100,"output_tokens":20},"content":[{"type":"text","text":"I will generate protobufs."},{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"make pb.gen"}}]}}`,
+		`{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_a","content":"ok"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":80,"output_tokens":10},"content":[{"type":"text","text":"done"}]}}`,
+		`{"type":"result","usage":{"input_tokens":180,"output_tokens":30},"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.Len(t, turns, 2)
+	assert.Equal(t, float64(1), turns[0]["turn"])
+	usage, ok := turns[0]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(100), usage["input_tokens"])
+	assert.Equal(t, float64(20), usage["output_tokens"])
+	assert.Equal(t, "I will generate protobufs.", turns[0]["message"])
+	assert.Equal(t, float64(2), turns[1]["turn"])
+	assert.Equal(t, "done", turns[1]["message"])
+
+	tools := liveLogRecords(t, output)
+	require.GreaterOrEqual(t, len(tools), 2)
+	assert.Equal(t, float64(1), tools[0]["turn"])
+	assert.Equal(t, "make pb.gen", tools[0]["text"])
+}
+
+func TestFormatStreamJsonLinesSkipsDuplicateAssistantUsage(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":5,"cache_read_input_tokens":1448},"content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":5,"cache_read_input_tokens":1448},"content":[{"type":"text","text":"partial"}]}}`,
+		`{"type":"assistant","message":{"usage":{"input_tokens":2,"output_tokens":21,"cache_read_input_tokens":5394},"content":[{"type":"tool_use","id":"toolu_a","name":"Bash","input":{"command":"git status"}}]}}`,
+		`{"type":"result","usage":{"input_tokens":100,"output_tokens":14190,"cache_read_input_tokens":1505585},"total_cost_usd":0.88,"num_turns":2}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	require.Len(t, turns, 2)
+	assert.Equal(t, float64(1), turns[0]["turn"])
+	assert.Equal(t, float64(2), turns[1]["turn"])
+	usage, ok := turns[1]["usage"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(21), usage["output_tokens"])
+	assert.NotContains(t, output, `"turn":3`)
 }
 
 func claudePermissionModeFromScript(t *testing.T, env map[string]string) string {
@@ -137,6 +184,25 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 			continue
 		}
 		if rec["type"] == "tool_start" || rec["type"] == "tool_end" {
+			records = append(records, rec)
+		}
+	}
+	return records
+}
+
+func typedLiveLogRecords(t *testing.T, output string, recordType string) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.HasPrefix(line, "{") {
+			continue
+		}
+		var rec map[string]any
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			continue
+		}
+		if rec["type"] == recordType {
 			records = append(records, rec)
 		}
 	}

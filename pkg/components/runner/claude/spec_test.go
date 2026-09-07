@@ -163,9 +163,10 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
 	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 7)
+	require.Len(t, task.Files, 8)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
+	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, task.Files, "turn_telemetry.js").Content)
 	prepare := requireTaskFile(t, task.Files, "prepare.sh").Content
 	assert.Contains(t, prepare, "claude CLI not found")
 	assert.Contains(t, prepare, "node not found")

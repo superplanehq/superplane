@@ -352,6 +352,7 @@ describe("PhaseLogCard phase actions", () => {
 
     expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });
 
   it("puts icon actions next to the expanded name without pill chrome", async () => {
@@ -375,6 +376,7 @@ describe("PhaseLogCard phase actions", () => {
     expect(edit).toHaveAttribute("href", EDIT_HREF);
     expect(screen.queryByText("View automation run")).not.toBeInTheDocument();
     expect(screen.queryByText("Edit automation")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
     expect(view.className).toMatch(/font-mono/);
     expect(view.className).not.toMatch(/rounded-full/);
     expect(view.className).not.toMatch(/border-border/);
@@ -475,6 +477,161 @@ describe("PhaseLogCard phase actions", () => {
 
     expect(screen.queryByRole("link", { name: "View automation run" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
+  });
+});
+
+function usageTelemetry(inputTokens: number, tools: Array<{ kind: string; text: string }>) {
+  return {
+    num_turns: 1,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      reasoning_tokens: 0,
+    },
+    tool_counts: Object.fromEntries(tools.map((tool) => [tool.kind, 1])),
+    turns: [
+      {
+        turn: 1,
+        usage: {
+          input_tokens: inputTokens,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          reasoning_tokens: 0,
+        },
+        tools,
+      },
+    ],
+  };
+}
+
+describe("PhaseLogCard usage", () => {
+  function renderCard(ui: ReactElement) {
+    return render(<MemoryRouter>{ui}</MemoryRouter>);
+  }
+
+  it("opens a usage dialog from the cost and token text", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: usageTelemetry(210, [
+        { kind: "bash", text: "git status" },
+        { kind: "read", text: "README.md" },
+      ]),
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 2 tool calls · 210 input")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Agent - Plan for GH Issue" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("heading", { name: "Plan usage" })).not.toBeInTheDocument();
+  });
+
+  it("shows a separate chart for each agent", async () => {
+    const user = userEvent.setup();
+    const implementUsage = {
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: usageTelemetry(180, [{ kind: "bash", text: "make test" }]),
+    };
+    const pullRequestUsage = {
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: usageTelemetry(40, [{ kind: "read", text: "PR.md" }]),
+    };
+    useLiveLogStreamMock.mockImplementation((executionId: string) =>
+      executionId === "exec-pr" ? pullRequestUsage : implementUsage,
+    );
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, name: "Implement", costCents: "80", totalTokens: "220" }}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "impl-agent",
+            nodeId: "impl-agent",
+            componentName: "Implement the change",
+            component: "runnerClaudeCode",
+            executionId: "exec-impl",
+          }),
+          line({
+            id: "pr-agent",
+            nodeId: "pr-agent",
+            componentName: "Write the pull request",
+            component: "runnerClaudeCode",
+            executionId: "exec-pr",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Implement usage" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Implement the change" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Write the pull request" })).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 180 input")).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 40 input")).toBeInTheDocument();
+  });
+
+  it("shows a separate chart for each prompt on one agent", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      usageSeries: [
+        { name: "Implementation", telemetry: usageTelemetry(180, [{ kind: "bash", text: "make test" }]) },
+        {
+          name: "Generate PR title and description",
+          telemetry: usageTelemetry(40, [{ kind: "bash", text: "git log main..feature" }]),
+        },
+      ],
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, name: "Implement", costCents: "80", totalTokens: "220" }}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "impl-agent",
+            nodeId: "impl-agent",
+            componentName: "Implement the change",
+            component: "runnerClaudeCode",
+            executionId: "exec-impl",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Implement usage" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Implementation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Generate PR title and description" })).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 180 input")).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 40 input")).toBeInTheDocument();
   });
 });
 

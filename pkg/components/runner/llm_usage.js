@@ -68,6 +68,32 @@ function sidecarHasUsage(sidecar) {
   );
 }
 
+function readPromptSeries(taskDir) {
+  const file = path.join(taskDir, "turn_telemetry_series.json");
+  if (!taskDir || !fs.existsSync(file)) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.series)) {
+      return [];
+    }
+    return parsed.series.filter((item) => item && typeof item === "object");
+  } catch (_err) {
+    return [];
+  }
+}
+
+function telemetryForResult(series) {
+  if (series.length === 0) {
+    return null;
+  }
+  if (series.length === 1) {
+    return series[0].telemetry || series[0];
+  }
+  return { prompts: series };
+}
+
 function accumulate(taskDir, payload) {
   if (!taskDir || !payload || typeof payload !== "object") {
     return readSidecar(taskDir || "");
@@ -89,7 +115,9 @@ function mergeResult(resultFile, taskDir) {
     return;
   }
   const sidecar = readSidecar(taskDir);
-  if (!sidecarHasUsage(sidecar) || !fs.existsSync(resultFile)) {
+  const series = readPromptSeries(taskDir);
+  const telemetry = telemetryForResult(series);
+  if ((!sidecarHasUsage(sidecar) && !telemetry) || !fs.existsSync(resultFile)) {
     return;
   }
   let parsed;
@@ -101,14 +129,18 @@ function mergeResult(resultFile, taskDir) {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return;
   }
-  const merged = Object.assign({}, parsed, {
-    usage: sidecar.usage,
-  });
-  if (sidecar.model) {
-    merged.model = sidecar.model;
+  const merged = Object.assign({}, parsed);
+  if (sidecarHasUsage(sidecar)) {
+    merged.usage = sidecar.usage;
+    if (sidecar.model) {
+      merged.model = sidecar.model;
+    }
+    if (asNumber(sidecar.total_cost_usd) > 0) {
+      merged.total_cost_usd = sidecar.total_cost_usd;
+    }
   }
-  if (asNumber(sidecar.total_cost_usd) > 0) {
-    merged.total_cost_usd = sidecar.total_cost_usd;
+  if (telemetry) {
+    merged.telemetry = telemetry;
   }
   fs.writeFileSync(resultFile, `${JSON.stringify(merged)}\n`);
 }

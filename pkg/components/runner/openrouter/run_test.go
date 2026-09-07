@@ -78,6 +78,24 @@ func TestRunPromptKeepsUsageWhenLaterChatFails(t *testing.T) {
 	assert.Equal(t, float64(11), sidecarUsage["input_tokens"])
 	assert.Equal(t, float64(3), sidecarUsage["output_tokens"])
 	assert.InDelta(t, 0.002, sidecar["total_cost_usd"], 1e-9)
+
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(1), telemetry["num_turns"])
+	turns, ok := telemetry["turns"].([]any)
+	require.True(t, ok)
+	require.Len(t, turns, 1)
+	first, ok := turns[0].(map[string]any)
+	require.True(t, ok)
+	tools, ok := first["tools"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, tools)
+	tool, ok := tools[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "bash", tool["kind"])
+	assert.Equal(t, "true", tool["text"])
+	assert.Contains(t, result.output, `"type":"turn"`)
+	assert.Contains(t, result.output, `"turn":1`)
 }
 
 type promptHarness struct {
@@ -113,6 +131,11 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	usageBody, err := os.ReadFile(usageScript)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "llm_usage.js"), usageBody, 0o644))
+	telemetryScript, err := filepath.Abs("../turn_telemetry.js")
+	require.NoError(t, err)
+	telemetryBody, err := os.ReadFile(telemetryScript)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "turn_telemetry.js"), telemetryBody, 0o644))
 
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
 const fs = require("fs");
