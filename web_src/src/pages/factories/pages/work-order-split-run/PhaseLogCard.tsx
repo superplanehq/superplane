@@ -1306,7 +1306,12 @@ function resolvedUsageSeries(
   return fallbackSeries;
 }
 
-function isAgentUsageLoading(canStream: boolean, hasTurns: boolean, isStreaming: boolean, nodeRunning: boolean): boolean {
+function isAgentUsageLoading(
+  canStream: boolean,
+  hasTurns: boolean,
+  isStreaming: boolean,
+  nodeRunning: boolean,
+): boolean {
   return canStream && !hasTurns && (isStreaming || nodeRunning);
 }
 
