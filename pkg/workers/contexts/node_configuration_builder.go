@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,11 +15,13 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -1099,6 +1102,9 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, err
 	}
 	attachOrderOrigin(order, payload)
+	if err := attachOrderFiles(b.tx, order, payload); err != nil {
+		return nil, err
+	}
 
 	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
 	if err != nil {
@@ -1202,6 +1208,34 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	files, err := models.ListReadyTaskFiles(tx, order.ID)
+	if err != nil {
+		return fmt.Errorf("order() could not load files: %w", err)
+	}
+
+	ttl := blob.DispatchDownloadTTL(0)
+	urls := map[uuid.UUID]string{}
+	filePayloads := make([]any, 0, len(files))
+	for i := range files {
+		downloadURL, err := storedfiles.DownloadURL(context.Background(), blob.Current(), &files[i], ttl)
+		if err != nil {
+			return fmt.Errorf("order() could not mint a file URL: %w", err)
+		}
+		urls[files[i].ID] = downloadURL
+		filePayloads = append(filePayloads, map[string]any{
+			"id":           files[i].ID.String(),
+			"filename":     files[i].Filename,
+			"content_type": files[i].ContentType,
+			"size_bytes":   files[i].SizeBytes,
+			"url":          downloadURL,
+		})
+	}
+	payload["description"] = blob.RewriteFileRefs(order.Description, urls)
+	payload["files"] = filePayloads
+	return nil
 }
 
 // resolveOrderRepository keeps orders created before repository snapshots
