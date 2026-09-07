@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, History, Settings, Workflow } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
@@ -182,7 +182,7 @@ function IntakeSettingsTabPanel({
   savePending?: boolean;
   saveError?: string;
   onUpdate: <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => void;
-  onDraftChange: (next: IntakeSourceSettings) => void;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -245,7 +245,7 @@ function IntakeGeneralTab({
   savePending?: boolean;
   saveError?: string;
   onUpdate: <K extends keyof IntakeSourceSettings>(key: K, value: IntakeSourceSettings[K]) => void;
-  onDraftChange: (next: IntakeSourceSettings) => void;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   onClose: () => void;
 }) {
