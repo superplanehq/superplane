@@ -122,6 +122,88 @@ func Test__Client__GetProject(t *testing.T) {
 	})
 }
 
+func Test__Client__ListTasks(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{"id":"91","type":"tasks","attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."}},
+			{"id":"92","type":"tasks","attributes":{"task_number":"513","title":"Add retry metrics","description":null}}
+		]}`),
+	}}
+
+	tasks, err := testClient(t, httpContext).ListTasks("42", "retry", 10)
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+	assert.Equal(t, Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+	}, tasks[0])
+	assert.Equal(t, "513", tasks[1].Number)
+
+	require.Len(t, httpContext.Requests, 1)
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "retry", query.Get("filter[query]"))
+	assert.Equal(t, "1", query.Get("filter[status]"))
+	assert.Equal(t, "10", query.Get("page[size]"))
+}
+
+func Test__Client__ListNewestOpenTaskDocuments(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":[
+			{
+				"id":"91",
+				"type":"tasks",
+				"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."},
+				"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
+			}
+		]}`),
+	}}
+
+	documents, err := testClient(t, httpContext).ListNewestOpenTaskDocuments("42", 30)
+	require.NoError(t, err)
+	require.Len(t, documents, 1)
+
+	// The whole resource travels, because a seeded task is read the way the
+	// webhook delivers it.
+	assert.Equal(t, "91", documents[0]["id"])
+	assert.Equal(t, "tasks", documents[0]["type"])
+	assert.Contains(t, documents[0], "relationships")
+	attributes, ok := documents[0]["attributes"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Fix payment retries", attributes["title"])
+
+	require.Len(t, httpContext.Requests, 1)
+	query := httpContext.Requests[0].URL.Query()
+	assert.Equal(t, "42", query.Get("filter[project_id]"))
+	assert.Equal(t, "1", query.Get("filter[status]"))
+	assert.Equal(t, "-created_at", query.Get("sort"))
+	assert.Equal(t, "30", query.Get("page[size]"))
+}
+
+func Test__Client__GetTask(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		jsonResponse(`{"data":{
+			"id":"91",
+			"type":"tasks",
+			"attributes":{"task_number":512,"title":"Fix payment retries","description":"Retries fail silently."},
+			"relationships":{"project":{"data":{"type":"projects","id":"42"}}}
+		}}`),
+	}}
+
+	task, err := testClient(t, httpContext).GetTask("91")
+	require.NoError(t, err)
+	assert.Equal(t, &Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+		ProjectID:   "42",
+	}, task)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/tasks/91")
+}
+
 func Test__Client__CreateWebhook(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(`{"data":{"id":"w1","type":"webhooks"}}`),

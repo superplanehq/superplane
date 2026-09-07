@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -107,9 +109,16 @@ func (c *Client) ValidateCredentials() error {
 // resourceDocument is a single JSON:API resource, trimmed to the fields this
 // client reads.
 type resourceDocument struct {
-	ID         string         `json:"id"`
-	Type       string         `json:"type"`
-	Attributes map[string]any `json:"attributes"`
+	ID            string                          `json:"id"`
+	Type          string                          `json:"type"`
+	Attributes    map[string]any                  `json:"attributes"`
+	Relationships map[string]resourceRelationship `json:"relationships"`
+}
+
+type resourceRelationship struct {
+	Data struct {
+		ID string `json:"id"`
+	} `json:"data"`
 }
 
 type resourceListResponse struct {
@@ -127,9 +136,42 @@ type Project struct {
 	Name string `json:"name"`
 }
 
+// Task is a Productive.io task that can seed a factory intake.
+type Task struct {
+	ID          string
+	Number      string
+	Title       string
+	Description string
+	ProjectID   string
+}
+
 func projectFromDocument(doc resourceDocument) Project {
 	name, _ := doc.Attributes["name"].(string)
 	return Project{ID: doc.ID, Name: name}
+}
+
+func taskFromDocument(doc resourceDocument) Task {
+	title, _ := doc.Attributes["title"].(string)
+	description, _ := doc.Attributes["description"].(string)
+	projectID := doc.Relationships["project"].Data.ID
+	return Task{
+		ID:          doc.ID,
+		Number:      stringAttribute(doc.Attributes["task_number"]),
+		Title:       title,
+		Description: description,
+		ProjectID:   projectID,
+	}
+}
+
+func stringAttribute(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	default:
+		return ""
+	}
 }
 
 // ListProjects returns every project of the organization. Productive.io
@@ -181,6 +223,78 @@ func (c *Client) GetProject(id string) (*Project, error) {
 
 	project := projectFromDocument(response.Data)
 	return &project, nil
+}
+
+// ListTasks returns open tasks from one project, optionally filtered by text.
+func (c *Client) ListTasks(projectID, query string, limit int) ([]Task, error) {
+	body, err := c.execRequest(http.MethodGet, c.taskListURL(projectID, query, limit), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := resourceListResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parsing tasks: %v", err)
+	}
+
+	tasks := make([]Task, 0, len(response.Data))
+	for _, doc := range response.Data {
+		tasks = append(tasks, taskFromDocument(doc))
+	}
+	return tasks, nil
+}
+
+// ListNewestOpenTaskDocuments returns the untrimmed JSON:API resource of each
+// open task in the project, newest first. Seeding an intake replays these
+// through the graph the webhook feeds, and that graph reads attributes Task
+// does not keep.
+func (c *Client) ListNewestOpenTaskDocuments(projectID string, limit int) ([]map[string]any, error) {
+	body, err := c.execRequest(http.MethodGet, c.taskListURL(projectID, "", limit), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := struct {
+		Data []map[string]any `json:"data"`
+	}{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parsing tasks: %v", err)
+	}
+
+	return response.Data, nil
+}
+
+// taskListURL asks for the open tasks of one project, newest first.
+func (c *Client) taskListURL(projectID, query string, limit int) string {
+	params := url.Values{}
+	params.Set("filter[project_id]", projectID)
+	params.Set("filter[status]", "1")
+	params.Set("page[size]", strconv.Itoa(limit))
+	params.Set("sort", "-created_at")
+	if strings.TrimSpace(query) != "" {
+		params.Set("filter[query]", strings.TrimSpace(query))
+	}
+
+	return fmt.Sprintf("%s/tasks?%s", c.BaseURL, params.Encode())
+}
+
+// GetTask returns one task by its Productive.io resource id.
+func (c *Client) GetTask(id string) (*Task, error) {
+	body, err := c.execRequest(http.MethodGet, fmt.Sprintf("%s/tasks/%s", c.BaseURL, url.PathEscape(id)), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response := resourceResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("error parsing task: %v", err)
+	}
+	if response.Data.ID == "" {
+		return nil, fmt.Errorf("task %s not found", id)
+	}
+
+	task := taskFromDocument(response.Data)
+	return &task, nil
 }
 
 // Webhook is a Productive.io webhook subscription.
