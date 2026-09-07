@@ -1,17 +1,24 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -30,6 +37,9 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+
+	encryptor crypto.Encryptor
+	registry  *registry.Registry
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -63,6 +73,12 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	return c
 }
 
+func (c *FactoryContext) WithRemoteImageIngest(encryptor crypto.Encryptor, registry *registry.Registry) *FactoryContext {
+	c.encryptor = encryptor
+	c.registry = registry
+	return c
+}
+
 func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, error) {
 	// A run already tied to another work order must not spawn a new one.
 	_, err := models.FindWorkOrderExecutionByRunID(c.tx, c.execution.RunID)
@@ -89,6 +105,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 
 	EmitWorkOrderCreated(c.tx, f, order)
+	c.ingestGitHubImages(order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), nil
 }
@@ -124,6 +141,71 @@ func (c *FactoryContext) originFromSourceRun(sourceRunID uuid.UUID) *models.Work
 	}
 
 	return models.OriginFromIntakeRootEvent(event)
+}
+
+func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
+	if order == nil || c.registry == nil || c.encryptor == nil {
+		return
+	}
+	if len(blob.HTTPImageURLs(order.Description)) == 0 {
+		return
+	}
+	client := c.githubClientForCanvas()
+	if client == nil {
+		return
+	}
+	next, err := storedfiles.IngestRemoteImages(
+		context.Background(),
+		c.tx,
+		blob.Current(),
+		func(ctx context.Context, req *http.Request) (*http.Response, error) {
+			return client.HTTPDo(req.WithContext(ctx))
+		},
+		blob.IsGitHubImageURL,
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		nil,
+		order.Description,
+	)
+	if err != nil || next == order.Description {
+		return
+	}
+	_ = order.UpdateContent(c.tx, nil, &next)
+}
+
+func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(c.tx, []uuid.UUID{c.canvas.ID})
+	if err != nil {
+		return nil
+	}
+	spec, ok := specs[c.canvas.ID]
+	if !ok {
+		return nil
+	}
+	for i := range spec.Nodes {
+		node := spec.Nodes[i]
+		if node.ComponentName() != "github.onIssue" || node.IntegrationID == nil {
+			continue
+		}
+		integrationID, err := uuid.Parse(strings.TrimSpace(*node.IntegrationID))
+		if err != nil {
+			continue
+		}
+		integration, err := models.FindIntegrationInTransaction(c.tx, c.canvas.OrganizationID, integrationID)
+		if err != nil || integration.State != models.IntegrationStateReady {
+			continue
+		}
+		client, err := githubcommon.NewClient(
+			NewIntegrationContext(c.tx, nil, integration, c.encryptor, c.registry, nil),
+			c.registry.HTTPContextInTransaction(c.tx),
+		)
+		if err != nil {
+			continue
+		}
+		return client
+	}
+	return nil
 }
 
 func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {

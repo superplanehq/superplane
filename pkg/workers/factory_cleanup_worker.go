@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 )
 
 type FactoryCleanupWorker struct {
@@ -96,6 +99,10 @@ func (w *FactoryCleanupWorker) processFactory(tx *gorm.DB, factory *models.Facto
 		return nil
 	}
 
+	if err := deleteFactoryFileObjects(tx, factory.ID, w.maxResourcesPerTick); err != nil {
+		return fmt.Errorf("delete factory file objects: %w", err)
+	}
+
 	deleted, complete, err := models.NewFactoryResourceCleaner(tx, factory).
 		WithLimit(w.maxResourcesPerTick).
 		Run()
@@ -109,5 +116,20 @@ func (w *FactoryCleanupWorker) processFactory(tx *gorm.DB, factory *models.Facto
 	}
 
 	w.logger.Infof("Successfully cleaned up factory %s", factory.ID)
+	return nil
+}
+
+func deleteFactoryFileObjects(tx *gorm.DB, factoryID uuid.UUID, limit int) error {
+	files, err := models.ListFilesForFactory(tx, factoryID, limit)
+	if err != nil {
+		return err
+	}
+	provider := blob.Current()
+	ctx := context.Background()
+	for i := range files {
+		if err := storedfiles.DeleteObjectAndRow(ctx, tx, provider, &files[i]); err != nil {
+			return err
+		}
+	}
 	return nil
 }

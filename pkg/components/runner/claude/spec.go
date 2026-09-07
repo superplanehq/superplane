@@ -144,6 +144,9 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 		Kind:    runner.LiveLogKindSetup,
 	}
 	commands := append([]runner.BrokerCommand{prepareCommand}, setupCommands...)
+	if fetch := runner.AttachmentFetchCommand(runner.CollectTaskAttachmentsFromSteps(spec.Steps)); fetch != nil {
+		commands = append(commands, *fetch)
+	}
 	return ClaudeCodeBrokerTask{
 		Commands: append(commands, stepCommands...),
 		Files:    files,

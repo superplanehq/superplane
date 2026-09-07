@@ -66,6 +66,7 @@
     "@tippyjs/react": "^4.2.6",
     "@tiptap/core": "^3.30.0",
     "@tiptap/extension-bubble-menu": "^3.30.0",
+    "@tiptap/extension-image": "^3.30.0",
     "@tiptap/extension-placeholder": "^3.30.0",
     "@tiptap/extension-underline": "^3.30.0",
     "@tiptap/markdown": "^3.30.0",

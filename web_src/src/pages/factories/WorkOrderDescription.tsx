@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
+import type { FilesFile } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { rewriteWorkOrderFileRefs } from "@/lib/workOrderFiles";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ChevronDown } from "lucide-react";
@@ -21,9 +23,10 @@ interface WorkOrderDescriptionProps {
   className?: string;
   /** When false, always show the full markdown. Default is true. */
   collapsible?: boolean;
+  files?: FilesFile[];
 }
 
-export function WorkOrderDescription({ description, className, collapsible = true }: WorkOrderDescriptionProps) {
+export function WorkOrderDescription({ description, className, collapsible = true, files }: WorkOrderDescriptionProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [needsToggle, setNeedsToggle] = useState(false);
@@ -57,9 +60,11 @@ export function WorkOrderDescription({ description, className, collapsible = tru
       }
     }
     return () => observer.disconnect();
-  }, [description, collapsible]);
+  }, [description, files, collapsible]);
 
-  if (!description.trim()) {
+  const rendered = rewriteWorkOrderFileRefs(description, files);
+
+  if (!rendered.trim()) {
     return null;
   }
 
@@ -70,7 +75,7 @@ export function WorkOrderDescription({ description, className, collapsible = tru
     <section className={className} data-testid="work-order-description">
       <div className="relative">
         <div ref={contentRef} style={clamp ? { maxHeight: `${collapsedMaxHeight}px`, overflow: "hidden" } : undefined}>
-          <MarkdownContent content={description} variant="workspace" data-testid="work-order-description-markdown" />
+          <MarkdownContent content={rendered} variant="workspace" data-testid="work-order-description-markdown" />
         </div>
         {showFade ? (
           <div

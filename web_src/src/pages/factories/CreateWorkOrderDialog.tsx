@@ -3,6 +3,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -34,6 +35,7 @@ function CreateWorkOrderDialogSession({
 }) {
   const { organizationId, factoryId, factory } = useFactoriesLayout();
   const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -92,8 +94,10 @@ function CreateWorkOrderDialogSession({
             <WorkOrderDescriptionEditor
               value={composer.description}
               maxLength={composer.maxDescriptionLength}
-              disabled={composer.isCreating}
+              disabled={composer.isCreating || fileUpload.isUploading}
               onChange={composer.updateDescription}
+              onUploadFiles={fileUpload.uploadFiles}
+              isUploading={fileUpload.isUploading}
             />
           </div>
         </div>

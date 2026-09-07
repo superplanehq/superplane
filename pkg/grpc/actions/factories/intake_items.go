@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -91,6 +92,10 @@ func newGitHubIntakeItemSource(
 	}
 
 	return &gitHubIntakeItemSource{github: client, repository: repository}, nil
+}
+
+func (s *gitHubIntakeItemSource) RemoteFetch(ctx context.Context, req *http.Request) (*http.Response, error) {
+	return s.github.HTTPDo(req.WithContext(ctx))
 }
 
 func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {

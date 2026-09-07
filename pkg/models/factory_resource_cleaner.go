@@ -150,6 +150,16 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 		return deleted, false, nil
 	}
 
+	count, err = deleteRowsLimited(c.tx, &File{}, remaining, "factory_id = ?", c.factory.ID)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete factory files: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
 	count, err = deleteOrphanFactoryWorkOrdersLimited(c.tx, c.factory.ID, remaining)
 	if err != nil {
 		return deleted, false, fmt.Errorf("delete factory work orders: %w", err)
@@ -206,7 +216,7 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 }
 
 func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
-	var executions, dispatches, orders, lines, intakes, handlers, pullRequests int64
+	var executions, dispatches, orders, lines, intakes, handlers, pullRequests, files int64
 	if err := c.tx.Model(&FactoryWorkOrderExecution{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&executions).Error; err != nil {
 		return false, err
 	}
@@ -228,7 +238,10 @@ func (c *FactoryResourceCleaner) factoryDomainEmpty() (bool, error) {
 	if err := c.tx.Model(&FactoryPullRequest{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&pullRequests).Error; err != nil {
 		return false, err
 	}
-	return executions == 0 && dispatches == 0 && orders == 0 && lines == 0 && intakes == 0 && handlers == 0 && pullRequests == 0, nil
+	if err := c.tx.Model(&File{}).Where("factory_id = ?", c.factory.ID).Limit(1).Count(&files).Error; err != nil {
+		return false, err
+	}
+	return executions == 0 && dispatches == 0 && orders == 0 && lines == 0 && intakes == 0 && handlers == 0 && pullRequests == 0 && files == 0, nil
 }
 
 func deleteFactoryAssigneesLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) (int64, error) {
