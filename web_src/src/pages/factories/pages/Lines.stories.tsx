@@ -17,6 +17,7 @@ import {
   noIntakeFactoriesFixture,
   severalIntakeFactoriesFixture,
 } from "../__fixtures__/backlogIntakeItemFixtures";
+import { LOW_CREDIT_USAGE_REPORT, SPENT_CREDIT_USAGE_REPORT } from "../__fixtures__/usageReportFixtures";
 import { LinesPage } from "./LinesPage";
 
 /**
@@ -156,6 +157,34 @@ export const LineDetailFivePhases: Story = {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={fiveStepLineFactoriesFixture}
+      />
+    );
+  },
+};
+
+/** Remaining hosted credit is empty. The board shows a red banner above the header. */
+export const LineBoardHostedCreditEmpty: Story = {
+  name: "Line board — hosted credit empty",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT }}
+      />
+    );
+  },
+};
+
+/** Remaining hosted credit is above zero but at or below $20. The board shows an amber warning banner. */
+export const LineBoardHostedCreditLow: Story = {
+  name: "Line board — hosted credit low",
+  render: () => {
+    const line = REFUND_FACTORY_LINES[0];
+    return (
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
+        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT }}
       />
     );
   },

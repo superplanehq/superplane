@@ -3,20 +3,43 @@ import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceU
 
 import { HostedCreditEmptyBanner } from "../HostedCreditEmptyBanner";
 import { factorySettingsSectionPath } from "./factoryPagePaths";
-import { shouldShowHostedCreditEmptyBanner } from "./hostedCreditEmpty";
+import { hostedCreditWarningLevel } from "./hostedCreditEmpty";
 
-export function useHostedCreditEmptyBanner(organizationId: string, factoryKey: string) {
+/** Stable no-op: there is no billing page yet, so the board's action button does nothing (for now). */
+function noopGoToBilling() {}
+
+/**
+ * Where the banner's action button should send the user. Tasks and Missions
+ * already have an Organization Spending page to link to; the board does not
+ * have a billing destination yet, so its button is a no-op.
+ */
+type HostedCreditBannerAction = "spending" | "billing";
+
+export function useHostedCreditEmptyBanner(
+  organizationId: string,
+  factoryKey: string,
+  options: { action?: HostedCreditBannerAction } = {},
+) {
   const { canAct } = usePermissions();
   const spend = useOrganizationWorkspaceUsage(organizationId);
-  if (!spend.data || !shouldShowHostedCreditEmptyBanner(spend.data)) {
+  const level = spend.data ? hostedCreditWarningLevel(spend.data) : null;
+  if (!level) {
     return undefined;
   }
 
+  const action = options.action ?? "spending";
+
   return (
     <HostedCreditEmptyBanner
-      billingEnabled={spend.data.billingEnabled === true}
+      level={level}
+      billingEnabled={spend.data?.billingEnabled === true}
       canManageBilling={canAct("org", "update")}
-      spendingHref={factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending")}
+      spendingHref={
+        action === "spending"
+          ? factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending")
+          : undefined
+      }
+      onGoToBilling={action === "billing" ? noopGoToBilling : undefined}
     />
   );
 }
