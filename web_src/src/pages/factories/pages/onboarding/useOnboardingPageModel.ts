@@ -22,6 +22,7 @@ import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import {
   githubIntegrationOwner,
+  githubOwnerFromConnections,
   nameOrganizationFromGitHubOwner,
   shouldNameOrganizationFromGitHub,
 } from "./initialOnboardingOrganization";
@@ -504,6 +505,14 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
+    githubOwner: githubOwnerFromConnections(
+      [...githubConnections.readyInstances, ...githubConnections.allInstances],
+      githubIntegrationId,
+    ),
+    updateOrganization: async (identity) => {
+      const response = await updateOrganization.mutateAsync(identity);
+      return response.data?.organization?.metadata?.slug;
+    },
   });
   const finishSetup = useFinishSetupAction({
     organizationId: args.organizationId,
