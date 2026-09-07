@@ -39,8 +39,6 @@ export type BacklogColumnProps = {
   analyzingOrderIds?: ReadonlySet<string>;
   /** Intakes that open tasks in this backlog, listed at its head. */
   intakePanel?: BacklogIntakePanel;
-  /** Configure link for the factory Backlog automation, when one exists. */
-  automationHref?: string | null;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
   /** Column automations for the header indicator. Hidden when unset. */
@@ -84,7 +82,6 @@ export function BacklogColumn({
   onOpenWorkOrder,
   analyzingOrderIds,
   intakePanel,
-  automationHref,
   onAddIntake,
   automations,
   onOpenAutomations,
@@ -132,7 +129,6 @@ export function BacklogColumn({
             onAddAutomation={onAddAutomation}
             onAutomationRowAction={onAutomationRowAction}
             automationsLockOpen={automationsLockOpen}
-            automationHref={automationHref}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
             colorId={colorId}
@@ -172,7 +168,6 @@ function BacklogColumnHeaderActions({
   onAddAutomation,
   onAutomationRowAction,
   automationsLockOpen,
-  automationHref,
   onOpenSettings,
   onAddIntake,
   colorId,
@@ -187,7 +182,6 @@ function BacklogColumnHeaderActions({
   | "onAddAutomation"
   | "onAutomationRowAction"
   | "automationsLockOpen"
-  | "automationHref"
   | "onOpenSettings"
   | "onAddIntake"
   | "colorId"
@@ -213,10 +207,8 @@ function BacklogColumnHeaderActions({
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"
-        automationHref={automationHref}
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
-        onOpenAutomations={onOpenAutomations}
         colorId={colorId}
         onColorChange={onColorChange}
       />
