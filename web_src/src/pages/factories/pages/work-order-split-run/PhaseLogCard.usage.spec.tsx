@@ -204,4 +204,128 @@ describe("PhaseLogCard usage", () => {
     expect(screen.getByText("1 turn · 1 tool call · 180 input")).toBeInTheDocument();
     expect(screen.getByText("1 turn · 1 tool call · 40 input")).toBeInTheDocument();
   });
+
+  it("loads the chart from a collapsed run without opening the log", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      telemetry: usageTelemetry(210, [{ kind: "bash", text: "git status" }]),
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByText("1 turn · 1 tool call · 210 input")).toBeInTheDocument();
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while usage is still fetching on a collapsed run", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      isStreaming: true,
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("keeps the loading state while a running run reconnects without turns", async () => {
+    const user = userEvent.setup();
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      isStreaming: false,
+    });
+
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", costCents: "0", totalTokens: "210", duration: "12s" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while the run stream is still loading", async () => {
+    const user = userEvent.setup();
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded={false}
+        streamLoading
+        organizationId="org-1"
+        canvasId="canvas-1"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(await screen.findByRole("heading", { name: "Plan usage" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading usage...");
+    expect(screen.queryByText("No usage data yet.")).not.toBeInTheDocument();
+  });
+
+  it("notifies the parent when the usage dialog opens from a collapsed run", async () => {
+    const user = userEvent.setup();
+    const onUsageOpenChange = vi.fn();
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, costCents: "45", totalTokens: "210" }}
+        expanded={false}
+        onUsageOpenChange={onUsageOpenChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show usage" }));
+    expect(onUsageOpenChange).toHaveBeenCalledWith(true);
+  });
 });
