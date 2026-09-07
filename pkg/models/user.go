@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type User struct {
@@ -551,18 +553,44 @@ func SetUserIsOwner(tx *gorm.DB, userID uuid.UUID, isOwner bool) error {
 	return tx.Model(&User{}).Where("id = ?", userID).Update("is_owner", isOwner).Error
 }
 
+var ErrLastOrganizationOwner = errors.New("cannot remove the last organization owner")
+
 func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
 	var users []User
 	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("is_owner = ?", true).
 		Where("type = ?", UserTypeHuman).
+		Order("id").
 		Find(&users).
 		Error
 	if err != nil {
 		return nil, err
 	}
 	return users, nil
+}
+
+func LockOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	return ListOrganizationOwners(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
+}
+
+func RefuseIfLastOrganizationOwner(tx *gorm.DB, orgID, userID uuid.UUID) error {
+	owners, err := LockOrganizationOwners(tx, orgID)
+	if err != nil {
+		return err
+	}
+
+	if len(owners) > 1 {
+		return nil
+	}
+
+	for i := range owners {
+		if owners[i].ID == userID {
+			return ErrLastOrganizationOwner
+		}
+	}
+
+	return nil
 }
 
 func ListOrganizationOwnerIDs(tx *gorm.DB, orgID uuid.UUID) ([]string, error) {

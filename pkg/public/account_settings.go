@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -248,12 +247,11 @@ func (s *Server) refuseAccountDeleteGuards(r *http.Request, tx *gorm.DB, account
 			continue
 		}
 
-		ownerIDs, err := models.ListOrganizationOwnerIDs(tx, organization.ID)
-		if err != nil {
+		if err := models.RefuseIfLastOrganizationOwner(tx, organization.ID, user.ID); err != nil {
+			if errors.Is(err, models.ErrLastOrganizationOwner) {
+				return models.ErrAccountDeleteLastUncreatedOwner
+			}
 			return err
-		}
-		if len(ownerIDs) <= 1 && slices.Contains(ownerIDs, user.ID.String()) {
-			return models.ErrAccountDeleteLastUncreatedOwner
 		}
 	}
 
