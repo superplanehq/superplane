@@ -61,15 +61,19 @@ export function FactorySettingsGeneralPage() {
       setNameError("Name is required.");
       return;
     }
-    if (!isValidWorkspaceKey(key)) {
-      setKeyError(`Use ${WORKSPACE_KEY_MIN_LENGTH} to ${WORKSPACE_KEY_MAX_LENGTH} uppercase letters.`);
+    // Only validate the key when it changed. A workspace created before keys
+    // became lowercase-only can still carry an uppercase key; renaming it
+    // must not fail validation for a key the user did not touch.
+    const keyChanged = key !== savedKey;
+    if (keyChanged && !isValidWorkspaceKey(key)) {
+      setKeyError(`Use ${WORKSPACE_KEY_MIN_LENGTH} to ${WORKSPACE_KEY_MAX_LENGTH} lowercase letters.`);
       return;
     }
     try {
       const nextSettingsPath = factorySettingsGeneralPathAfterKeyChange(organizationId, savedKey, key);
       await updateFactory.mutateAsync({
         name: trimmedName,
-        ...(key !== savedKey ? { key } : {}),
+        ...(keyChanged ? { key } : {}),
       });
       showSuccessToast("Workspace updated.");
       if (nextSettingsPath) {
@@ -195,7 +199,7 @@ function WorkspaceDetailsSection({
             onChange={(event) => onKeyChange(event.target.value)}
             maxLength={WORKSPACE_KEY_MAX_LENGTH}
             disabled={!canUpdate}
-            className="max-w-xs uppercase tracking-wider"
+            className="max-w-xs tracking-wider"
             autoComplete="off"
           />
           <p className="text-[12px] text-muted-foreground">
