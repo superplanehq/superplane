@@ -10,12 +10,28 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
+
+func Test__ProductiveTaskItem(t *testing.T) {
+	item := productiveTaskItem(productive.Task{
+		ID:          "91",
+		Number:      "512",
+		Title:       "Fix payment retries",
+		Description: "Retries fail silently.",
+	}, "12345")
+
+	assert.Equal(t, "91", item.ID)
+	assert.Equal(t, "#512", item.Key)
+	assert.Equal(t, "Fix payment retries", item.Title)
+	assert.Equal(t, "Retries fail silently.", item.Body)
+	assert.Equal(t, "https://app.productive.io/12345/tasks/91", item.URL)
+}
 
 type stubIntakeItemSource struct {
 	items []IntakeItem

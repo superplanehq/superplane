@@ -125,7 +125,13 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, logger
 
 	handler, err := w.registry.GetWebhookHandler(instance.AppName)
 	if err != nil {
-		return err
+		//
+		// An integration that registers no webhook handler has no remote
+		// subscription left to remove, so the row is the only thing to clean
+		// up. Returning the error instead would retry every tick forever.
+		//
+		logger.Infof("Integration %s has no webhook handler - removing the webhook record only", instance.AppName)
+		return tx.Unscoped().Delete(webhook).Error
 	}
 
 	err = handler.Cleanup(core.WebhookHandlerContext{
