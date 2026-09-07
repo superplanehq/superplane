@@ -3,7 +3,7 @@ import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
@@ -56,6 +56,7 @@ function ClassicHomePage() {
   const canCreateCanvases = canAct("canvases", "create");
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
+  const allCanvasNames = useMemo(() => canvases.map((c) => c.name), [canvases]);
 
   const isHomePageLoading = isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0);
   useReportPageReady(!isHomePageLoading && !!account && !!organizationId, {
@@ -102,6 +103,7 @@ function ClassicHomePage() {
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
+            allCanvasNames={allCanvasNames}
           />
         )}
       </div>
@@ -130,6 +132,7 @@ function Content({
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
+  allCanvasNames,
 }: {
   filteredCanvases: CanvasCardData[];
   preferredFilteredCanvases: CanvasCardData[];
@@ -142,6 +145,7 @@ function Content({
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
+  allCanvasNames: string[];
 }) {
   const folderedLayout = buildFolderedLayout(
     preferredFilteredCanvases,
@@ -177,6 +181,7 @@ function Content({
           canMoveDown={
             canvasFolders.findIndex((canvasFolder) => canvasFolder.id === folder.id) < canvasFolders.length - 1
           }
+          allCanvasNames={allCanvasNames}
         />
       ))}
 
@@ -188,9 +193,11 @@ function Content({
             organizationId={organizationId}
             onEditCanvas={onEditCanvas}
             onToggleStar={onToggleStar}
+            canCreateCanvases={canCreateCanvases}
             canUpdateCanvases={canUpdateCanvases}
             canDeleteCanvases={canDeleteCanvases}
             permissionsLoading={permissionsLoading}
+            allCanvasNames={allCanvasNames}
           />
         </section>
       ) : null}
