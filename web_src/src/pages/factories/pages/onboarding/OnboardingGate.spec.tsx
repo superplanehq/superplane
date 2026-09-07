@@ -30,6 +30,7 @@ function renderRoute(path: string) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
+        <Route path="/onboarding" element={<CurrentPath />} />
         <Route path="/org-1/workspaces/PAY" element={<Layout />}>
           <Route element={<OnboardingGate />}>
             <Route path="overview" element={<CurrentPath />} />
@@ -50,6 +51,19 @@ describe("OnboardingGate", () => {
 
   it("redirects an incomplete workspace to setup", async () => {
     renderRoute("/org-1/workspaces/PAY/overview");
+
+    expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+  });
+
+  it("sends an incomplete initial workspace from the org path to account onboarding", async () => {
+    factory = { id: "factory-1", onboarding: { initial: true } };
+    renderRoute("/org-1/workspaces/PAY/setup");
+
+    expect(await screen.findByText("/onboarding")).toBeInTheDocument();
+  });
+
+  it("keeps a non-initial incomplete workspace on the org setup route", async () => {
+    renderRoute("/org-1/workspaces/PAY/setup");
 
     expect(await screen.findByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
   });

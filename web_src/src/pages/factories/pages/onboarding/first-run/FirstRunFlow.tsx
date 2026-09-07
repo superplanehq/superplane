@@ -41,11 +41,12 @@ export function FirstRunFlow({
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [stageIndex, setStageIndex] = useState(0);
 
-  const chromeFor = (stepIndex: number): FirstRunChrome => ({
+  const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
     email,
     onLogOut,
     stepIndex,
+    onBack,
   });
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        chrome={chromeFor(2)}
+        chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
         onEditConnection={() => setScreen("connect")}
         onContinue={() => {
@@ -102,7 +103,7 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
-        chrome={chromeFor(3)}
+        chrome={chromeFor(3, () => setScreen("choose"))}
         onSelectTicketSource={setTicketSource}
         onAnalyzeTickets={() => {
           if (!ticketSource) return;

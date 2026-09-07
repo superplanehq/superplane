@@ -149,6 +149,12 @@ export function useOnboardingSetupState(
     [resetIssuesState, suggestWorkspaceName],
   );
 
+  const clearRepository = useCallback(() => {
+    setSelectedRepo(null);
+    setRepoCommitted(false);
+    resetIssuesState();
+  }, [resetIssuesState]);
+
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);
   }, []);
@@ -230,6 +236,7 @@ export function useOnboardingSetupState(
     selectVcsHost,
     selectedRepo,
     selectRepo,
+    clearRepository,
     repoCommitted,
     commitRepoStep,
     issuesRepo: backlogRepo,
