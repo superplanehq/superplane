@@ -1412,12 +1412,7 @@ function VerifyColumn({
             lockOpen={automationsLockOpen}
             testId="lines-verify-automations"
           />
-          <ColumnLaneMenu
-            title={title}
-            testId="lines-verify-menu"
-            colorId={colorId}
-            onColorChange={onColorChange}
-          />
+          <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
         </div>
       }
       banner={<LaneListenerList listeners={listeners} testId="lines-verify-listeners" />}
@@ -1499,12 +1494,7 @@ function DoneColumn({
             lockOpen={automationsLockOpen}
             testId="lines-done-automations"
           />
-          <ColumnLaneMenu
-            title={title}
-            testId="lines-done-menu"
-            colorId={colorId}
-            onColorChange={onColorChange}
-          />
+          <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
         </div>
       }
       testId="lines-done-column"
