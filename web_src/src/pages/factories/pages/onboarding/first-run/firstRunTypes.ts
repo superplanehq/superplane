@@ -12,6 +12,7 @@ export type FirstRunChrome = {
   stepIndex: number;
   /** Number of step dots. Set it when the flow skips a screen. */
   stepCount?: number;
+  onBack?: () => void;
 };
 
 export type FirstRunTicketSource = "github-issues" | "jira" | "linear";

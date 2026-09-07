@@ -63,6 +63,25 @@ describe("FirstRunChooseScreen", () => {
     }
   });
 
+  it("calls onBack from the shell when Back is clicked", async () => {
+    const user = userEvent.setup();
+    const onBack = vi.fn();
+
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository="octo/repo"
+        chrome={{ stepIndex: 2, onBack }}
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(onBack).toHaveBeenCalled();
+  });
+
   it("disables continue until a repository is selected", () => {
     render(
       <FirstRunChooseScreen

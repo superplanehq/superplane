@@ -27,6 +27,21 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issueCount).toBeUndefined();
   });
 
+  it("clears the selected repository when the GitHub connection changes", () => {
+    const connected = new Set<IntegrationId>(["github"]);
+    const { result } = renderHook(() => useOnboardingSetupState("Payments", { connected, simulateDiscovery: false }));
+
+    act(() => {
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/payments");
+    });
+    expect(result.current.selectedRepo).toBe("acme/payments");
+
+    act(() => result.current.clearRepository());
+    expect(result.current.selectedRepo).toBeNull();
+    expect(result.current.repoReady).toBe(false);
+  });
+
   it("marks the agent step ready when remaining credit is greater than zero", () => {
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {
