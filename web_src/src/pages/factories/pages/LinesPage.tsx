@@ -11,6 +11,7 @@ import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from 
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
@@ -667,6 +668,7 @@ function LineBoardSplitRunPopup({
   const { data: peekHandlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const prFeedbackRuns = useWorkOrderPRFeedbackLog(peekPullRequests, peekHandlers);
   const closer = useSplitRunFooterCloser(organizationId, factoryId, peekOrder);
+  const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   return (
     <WorkOrderSplitRunPopup
@@ -686,6 +688,7 @@ function LineBoardSplitRunPopup({
         analysisRuns,
         stoppedBy: closer.actor,
         closer,
+        resolveUser,
       })}
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
