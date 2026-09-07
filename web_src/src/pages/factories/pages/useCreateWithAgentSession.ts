@@ -457,10 +457,6 @@ function createWithAgentViewActions({
       const description = view.right.kind === "draft" ? view.right.draft.description : "";
       patchDraft(title, description);
     },
-    onDraftDescriptionChange: (description: string) => {
-      const title = view.right.kind === "draft" ? view.right.draft.title : "";
-      patchDraft(title, description);
-    },
     onCreateDraft: () => {
       if (!sessionId) {
         return;
@@ -469,7 +465,12 @@ function createWithAgentViewActions({
       void createPlanningSessionWorkOrder(organizationId, factoryId, sessionId)
         .then((session) => applySession(session, generation))
         .catch((error: unknown) => {
-          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedCreate));
+          showErrorToast(
+            getApiErrorMessage(
+              error,
+              view.refining ? CREATE_WITH_AGENT_COPY.failedUpdate : CREATE_WITH_AGENT_COPY.failedCreate,
+            ),
+          );
         });
     },
     onSkipDraft: () => {

@@ -34,7 +34,6 @@ export type CreateWithAgentDialogProps = {
   onSend: () => void;
   onSubmitSurvey: (text: string) => void;
   onDraftTitleChange: (title: string) => void;
-  onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
   onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
@@ -53,7 +52,6 @@ export function CreateWithAgentDialog({
   onSend,
   onSubmitSurvey,
   onDraftTitleChange,
-  onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
   onSelectCreated,
@@ -90,7 +88,6 @@ export function CreateWithAgentDialog({
               view={view}
               failed={view.machineStatus === "failed"}
               onDraftTitleChange={onDraftTitleChange}
-              onDraftDescriptionChange={onDraftDescriptionChange}
               onCreateDraft={onCreateDraft}
               onSkipDraft={onSkipDraft}
               onSelectCreated={onSelectCreated}
@@ -319,7 +316,6 @@ function CreateWithAgentWorkPane({
   view,
   failed,
   onDraftTitleChange,
-  onDraftDescriptionChange,
   onCreateDraft,
   onSkipDraft,
   onSelectCreated,
@@ -328,7 +324,6 @@ function CreateWithAgentWorkPane({
   view: CreateWithAgentView;
   failed: boolean;
   onDraftTitleChange: (title: string) => void;
-  onDraftDescriptionChange: (description: string) => void;
   onCreateDraft: () => void;
   onSkipDraft: () => void;
   onSelectCreated: (order: CreateWithAgentCreatedOrder) => void;
@@ -345,8 +340,8 @@ function CreateWithAgentWorkPane({
           title={view.right.draft.title}
           description={view.right.draft.description}
           failed={failed}
+          refining={view.refining}
           onTitleChange={onDraftTitleChange}
-          onDescriptionChange={onDraftDescriptionChange}
           onCreate={onCreateDraft}
           onSkip={onSkipDraft}
         />
@@ -417,16 +412,16 @@ function DraftWorkPane({
   title,
   description,
   failed,
+  refining,
   onTitleChange,
-  onDescriptionChange,
   onCreate,
   onSkip,
 }: {
   title: string;
   description: string;
   failed: boolean;
+  refining: boolean;
   onTitleChange: (title: string) => void;
-  onDescriptionChange: (description: string) => void;
   onCreate: () => void;
   onSkip: () => void;
 }) {
@@ -442,12 +437,7 @@ function DraftWorkPane({
         className="mt-3 h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none focus-visible:ring-0"
       />
       <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-        <WorkOrderSplitRunDescription
-          description={description}
-          canEdit={!failed}
-          collapsible={false}
-          onSave={onDescriptionChange}
-        />
+        <WorkOrderSplitRunDescription description={description} collapsible={false} />
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button type="button" variant="ghost" disabled={failed} onClick={onSkip}>
@@ -459,7 +449,7 @@ function DraftWorkPane({
           disabled={failed || !title.trim()}
           onClick={onCreate}
         >
-          {CREATE_WITH_AGENT_COPY.create}
+          {refining ? CREATE_WITH_AGENT_COPY.update : CREATE_WITH_AGENT_COPY.create}
         </Button>
       </div>
     </div>

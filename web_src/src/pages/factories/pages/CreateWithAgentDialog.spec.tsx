@@ -37,7 +37,6 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       onSend={noop}
       onSubmitSurvey={noop}
       onDraftTitleChange={noop}
-      onDraftDescriptionChange={noop}
       onCreateDraft={noop}
       onSkipDraft={noop}
       onSelectCreated={noop}
@@ -92,6 +91,12 @@ describe("CreateWithAgentDialog", () => {
 
     expect(screen.getByRole("heading", { name: CREATE_WITH_AGENT_COPY.titleRefine })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: CREATE_WITH_AGENT_COPY.title })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.update })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("create-with-agent-draft")).queryByRole("button", {
+        name: CREATE_WITH_AGENT_COPY.create,
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a planning-session intro while the log is empty", () => {
@@ -122,7 +127,6 @@ describe("CreateWithAgentDialog", () => {
         onSend={noop}
         onSubmitSurvey={noop}
         onDraftTitleChange={noop}
-        onDraftDescriptionChange={noop}
         onCreateDraft={noop}
         onSkipDraft={noop}
         onSelectCreated={noop}
@@ -176,7 +180,6 @@ describe("CreateWithAgentDialog", () => {
         onSend={noop}
         onSubmitSurvey={noop}
         onDraftTitleChange={noop}
-        onDraftDescriptionChange={noop}
         onCreateDraft={noop}
         onSkipDraft={noop}
         onSelectCreated={onSelectCreated}
@@ -214,7 +217,7 @@ describe("CreateWithAgentDialog", () => {
     expect(within(draft).getByRole("heading", { level: 2, name: "Data model" })).toBeInTheDocument();
     expect(within(draft).queryByText(/## Data model/)).not.toBeInTheDocument();
     expect(within(draft).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
-    expect(within(draft).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+    expect(within(draft).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("create-with-agent-draft-description")).not.toBeInTheDocument();
     expect(within(draft).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });

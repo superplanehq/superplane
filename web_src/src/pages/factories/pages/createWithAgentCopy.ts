@@ -31,6 +31,7 @@ export const CREATE_WITH_AGENT_COPY = {
   draftLabel: "Draft task",
   sessionList: "This session",
   create: "Create",
+  update: "Update",
   skip: "Skip",
   refineFurther: "Refine further",
   openTask: "Open task",
@@ -42,6 +43,7 @@ export const CREATE_WITH_AGENT_COPY = {
   failedSurvey: "Failed to send the answers.",
   failedDraft: "Failed to save the draft.",
   failedCreate: "Failed to create the task.",
+  failedUpdate: "Failed to update the task.",
   failedSkip: "Failed to skip the draft.",
 } as const;
 

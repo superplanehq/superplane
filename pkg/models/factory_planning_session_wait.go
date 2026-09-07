@@ -111,5 +111,27 @@ func planningWaitText(text string, refined bool, draft PlanningSessionDraft) str
 	if refined {
 		return planningRefinePrompt(text, draft)
 	}
-	return text
+	return planningDraftFollowUpPrompt(text, draft)
+}
+
+func planningDraftFollowUpPrompt(text string, draft PlanningSessionDraft) string {
+	if strings.TrimSpace(draft.Title) == "" && strings.TrimSpace(draft.Description) == "" && strings.TrimSpace(draft.WorkOrderID) == "" {
+		return text
+	}
+	var b strings.Builder
+	b.WriteString("The user is talking about this draft. Do not ask which task they mean.\n\n")
+	if title := strings.TrimSpace(draft.Title); title != "" {
+		b.WriteString("Title: ")
+		b.WriteString(title)
+		b.WriteString("\n\n")
+	}
+	if description := strings.TrimSpace(draft.Description); description != "" {
+		b.WriteString("Description:\n")
+		b.WriteString(description)
+		b.WriteString("\n\n")
+	}
+	b.WriteString("User message:\n")
+	b.WriteString(text)
+	b.WriteString("\n\nApply this change to this draft. When they asked you to change it, call propose_draft with the updated title and description.")
+	return b.String()
 }

@@ -671,7 +671,6 @@ function LineCreateWithAgentDialog({
       onSend={session.onSend}
       onSubmitSurvey={session.onSubmitSurvey}
       onDraftTitleChange={session.onDraftTitleChange}
-      onDraftDescriptionChange={session.onDraftDescriptionChange}
       onCreateDraft={session.onCreateDraft}
       onSkipDraft={session.onSkipDraft}
       onSelectCreated={session.onSelectCreated}

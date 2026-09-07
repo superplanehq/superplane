@@ -400,6 +400,27 @@ func TestFactoryPlanningSession_RefineNoteAsksWhatToChange(t *testing.T) {
 	assert.NotEqual(t, note, result.Text)
 }
 
+func TestFactoryPlanningSession_FollowUpKeepsCurrentDraftInWaitText(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-follow-draft")
+	db := database.Conn()
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Add a color field with a visual color picker to the Puppy entity",
+		Description: "Add a color attribute and a picker on the Puppy form.",
+	}))
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, "I actually want this to be about size and not color"))
+	assert.Equal(t, "I actually want this to be about size and not color", lastTextMessage(session, PlanningSessionMessageRoleUser))
+	result := session.Wait()
+	assert.Equal(t, PlanningWaitKindMessage, result.Kind)
+	assert.Contains(t, result.Text, "Add a color field with a visual color picker to the Puppy entity")
+	assert.Contains(t, result.Text, "Add a color attribute and a picker on the Puppy form.")
+	assert.Contains(t, result.Text, "I actually want this to be about size and not color")
+	assert.Contains(t, result.Text, "this draft")
+	assert.NotEqual(t, "I actually want this to be about size and not color", result.Text)
+}
+
 func TestFactoryPlanningSession_RefineNoteReloadsDraftAndUpdatesSameTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-refine")
