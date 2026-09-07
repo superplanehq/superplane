@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 )
 
 func Test__IsGeneratedInstallationName(t *testing.T) {
@@ -15,13 +17,31 @@ func Test__IsGeneratedInstallationName(t *testing.T) {
 	assert.False(t, IsGeneratedInstallationName("My GitHub"))
 }
 
-func Test__NextOwnerInstallationName(t *testing.T) {
-	assert.Equal(t, "github-acme", NextOwnerInstallationName("Acme", nil))
-	assert.Equal(t, "github-acme", NextOwnerInstallationName("Acme", func(string) bool { return false }))
+func Test__OwnerInstallationName(t *testing.T) {
+	assert.Equal(t, "github-acme", OwnerInstallationName("Acme"))
+	assert.Equal(t, "github-acme", OwnerInstallationName(" acme "))
+}
 
-	taken := map[string]bool{"github-acme": true}
-	assert.Equal(t, "github-acme (1)", NextOwnerInstallationName("Acme", func(name string) bool { return taken[name] }))
+func Test__GeneratedOwnerInstallationName(t *testing.T) {
+	name, ok := GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "github",
+		InstallationName: "github",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Acme"}),
+	})
+	assert.True(t, ok)
+	assert.Equal(t, "github-acme", name)
 
-	taken["github-acme (1)"] = true
-	assert.Equal(t, "github-acme (2)", NextOwnerInstallationName("Acme", func(name string) bool { return taken[name] }))
+	_, ok = GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "github",
+		InstallationName: "github-acme",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Acme"}),
+	})
+	assert.False(t, ok)
+
+	_, ok = GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "slack",
+		InstallationName: "github",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Acme"}),
+	})
+	assert.False(t, ok)
 }

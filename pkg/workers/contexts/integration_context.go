@@ -337,8 +337,10 @@ func (c *IntegrationContext) Persist() error {
 	}
 
 	return c.tx.Transaction(func(inner *gorm.DB) error {
-		if err := github.RenameGeneratedInstallation(inner, c.integration); err != nil {
-			return err
+		if name, ok := github.GeneratedOwnerInstallationName(c.integration); ok {
+			if err := c.integration.AssignUniqueInstallationName(inner, name); err != nil {
+				return err
+			}
 		}
 		return inner.Save(c.integration).Error
 	})
