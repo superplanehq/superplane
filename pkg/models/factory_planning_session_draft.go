@@ -1,8 +1,10 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,22 +130,75 @@ func (s *FactoryPlanningSession) applyRefineNote(tx *gorm.DB, text string) (bool
 	if err != nil {
 		return false, err
 	}
-	orders, err := s.CreatedOrders(tx)
+	order, err := s.findRefineWorkOrder(tx, factoryModel, key)
 	if err != nil {
 		return false, err
+	}
+	if order == nil {
+		return false, nil
+	}
+	if err := s.attachCreatedWorkOrder(tx, order.ID); err != nil {
+		return false, err
+	}
+	s.setDraft(PlanningSessionDraft{
+		Title:       order.Title,
+		Description: order.Description,
+		WorkOrderID: order.ID.String(),
+	})
+	return true, nil
+}
+
+func (s *FactoryPlanningSession) findRefineWorkOrder(tx *gorm.DB, factoryModel *Factory, key string) (*FactoryWorkOrder, error) {
+	orders, err := s.CreatedOrders(tx)
+	if err != nil {
+		return nil, err
 	}
 	for i := range orders {
 		if factoryModel.WorkOrderKey(orders[i].Number) != key {
 			continue
 		}
-		s.setDraft(PlanningSessionDraft{
-			Title:       orders[i].Title,
-			Description: orders[i].Description,
-			WorkOrderID: orders[i].ID.String(),
-		})
-		return true, nil
+		return &orders[i], nil
 	}
-	return false, nil
+	return factoryModel.findDraftWorkOrderByKey(tx, key)
+}
+
+func (f *Factory) findDraftWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	number, ok := f.workOrderNumberFromKey(key)
+	if !ok {
+		return nil, nil
+	}
+	var order FactoryWorkOrder
+	err := tx.Where("organization_id = ? AND factory_id = ? AND number = ?", f.OrganizationID, f.ID, number).First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return nil, nil
+	}
+	return &order, nil
+}
+
+func (f *Factory) workOrderNumberFromKey(key string) (int64, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimSpace(key), f.Key+"-")
+	if !ok {
+		return 0, false
+	}
+	number, err := strconv.ParseInt(rest, 10, 64)
+	if err != nil || number <= 0 {
+		return 0, false
+	}
+	return number, true
+}
+
+func (s *FactoryPlanningSession) attachCreatedWorkOrder(tx *gorm.DB, orderID uuid.UUID) error {
+	link := FactoryPlanningSessionWorkOrder{
+		SessionID:   s.ID,
+		WorkOrderID: orderID,
+	}
+	return tx.Where(link).Attrs(FactoryPlanningSessionWorkOrder{CreatedAt: time.Now()}).FirstOrCreate(&link).Error
 }
 
 func (s *FactoryPlanningSession) updateCreatedWorkOrder(

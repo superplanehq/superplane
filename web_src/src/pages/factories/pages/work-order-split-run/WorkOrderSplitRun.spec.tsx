@@ -708,6 +708,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
@@ -719,6 +720,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await openLogTab(user);
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");

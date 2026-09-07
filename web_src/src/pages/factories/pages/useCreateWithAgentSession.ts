@@ -23,6 +23,11 @@ import {
 import { isPlanningSurveyReply } from "./planningSessionSurvey";
 import { createWithAgentViewFromSession, type PlanningSessionPayload } from "./planningSessionView";
 
+export type PlanningRefineTarget = {
+  key: string;
+  title: string;
+};
+
 const POLL_MS = 1500;
 const DRAFT_SAVE_MS = 400;
 const UNMOUNT_END_MS = 100;
@@ -138,21 +143,25 @@ export function useCreateWithAgentSession(repository: string, organizationId: st
     stopSession(id);
   }, [resetLocalSession, stopSession]);
 
-  const start = useCallback(() => {
-    openPlanningSession({
-      repository,
-      organizationId,
-      factoryId,
-      sessionIdRef,
-      startGenerationRef,
-      stopSession,
-      applySession,
-      resetLocalSession,
-      setView,
-      setSessionId,
-      setOpen,
-    });
-  }, [applySession, factoryId, organizationId, repository, resetLocalSession, stopSession]);
+  const start = useCallback(
+    (refine?: PlanningRefineTarget) => {
+      openPlanningSession({
+        repository,
+        organizationId,
+        factoryId,
+        refine,
+        sessionIdRef,
+        startGenerationRef,
+        stopSession,
+        applySession,
+        resetLocalSession,
+        setView,
+        setSessionId,
+        setOpen,
+      });
+    },
+    [applySession, factoryId, organizationId, repository, resetLocalSession, stopSession],
+  );
 
   const patchDraft = (title: string, description: string) =>
     savePlanningDraft({ title, description, sessionId, organizationId, factoryId, draftSaveTimer, setView });
@@ -228,6 +237,7 @@ function openPlanningSession({
   repository,
   organizationId,
   factoryId,
+  refine,
   sessionIdRef,
   startGenerationRef,
   stopSession,
@@ -240,6 +250,7 @@ function openPlanningSession({
   repository: string;
   organizationId: string;
   factoryId: string;
+  refine?: PlanningRefineTarget;
   sessionIdRef: { current: string };
   startGenerationRef: { current: number };
   stopSession: (id: string) => void;
@@ -256,7 +267,23 @@ function openPlanningSession({
   setSessionId("");
   setOpen(true);
   void startPlanningSession(organizationId, factoryId, repository)
-    .then((session) => applySession(session, generation))
+    .then((session) => {
+      applySession(session, generation);
+      const sessionId = session.id ?? "";
+      const key = refine?.key.trim() ?? "";
+      const title = refine?.title.trim() ?? "";
+      if (!sessionId || !key || !title) {
+        return;
+      }
+      return sendPlanningSessionMessage(organizationId, factoryId, sessionId, planningRefineNote(key, title))
+        .then((next) => applySession(next, generation))
+        .catch((error: unknown) => {
+          if (generation !== startGenerationRef.current) {
+            return;
+          }
+          showErrorToast(getApiErrorMessage(error, CREATE_WITH_AGENT_COPY.failedSend));
+        });
+    })
     .catch((error: unknown) => {
       if (generation !== startGenerationRef.current) {
         return;

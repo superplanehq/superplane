@@ -41,19 +41,20 @@ const BACK_TO_DRAFT = {
   icon: "undo-2",
 };
 const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const REFINE = { id: "refine", kind: "refine", label: "Refine", emphasis: "quiet" };
 const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
 const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
 
 describe("buildSplitRunFooter", () => {
-  it("keeps a draft note with Reject and Start", () => {
+  it("keeps a draft note with Refine, Reject, and Start", () => {
     expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
       kind: "draft",
       sentence: "This task is a draft.",
       note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
       attentionCard: true,
-      actions: [REJECT, START],
+      actions: [REFINE, REJECT, START],
     });
   });
 

@@ -141,6 +141,29 @@ describe("useCreateWithAgentSession", () => {
     });
   });
 
+  it("tells the agent when Refine starts on a backlog draft", async () => {
+    startPlanningSession.mockResolvedValue(session("session-1"));
+    sendPlanningSessionMessage.mockResolvedValue({
+      ...session("session-1"),
+      draft: { title: "Retry refunds", description: "Stop double charges." },
+    });
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start({ key: "RF-105", title: "Retry refunds" });
+    });
+
+    await waitFor(() => {
+      expect(sendPlanningSessionMessage).toHaveBeenCalledWith(
+        "org-1",
+        "factory-1",
+        "session-1",
+        "Refine RF-105: Retry refunds.",
+      );
+    });
+    expect(result.current.open).toBe(true);
+  });
+
   it("does not tell the agent when the title opens read-only", async () => {
     startPlanningSession.mockResolvedValue({
       ...session("session-1"),

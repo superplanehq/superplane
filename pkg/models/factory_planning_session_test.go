@@ -414,6 +414,67 @@ func TestFactoryPlanningSession_RefineNoteLeavesOrdinaryChatAlone(t *testing.T) 
 	assert.Equal(t, "", session.Draft().WorkOrderID)
 }
 
+func TestFactoryPlanningSession_RefineNoteAttachesExistingBacklogDraftAndUpdatesSameTask(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-backlog")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	require.NoError(t, err)
+
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)))
+	assert.Equal(t, order.Title, session.Draft().Title)
+	assert.Equal(t, order.Description, session.Draft().Description)
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+	assert.Equal(t, order.ID.String(), ids[0])
+
+	require.NoError(t, session.ProposeDraft(db, PlanningSessionDraft{
+		Title:       "Retry refunds once",
+		Description: "Agent edit.",
+	}))
+	assert.Equal(t, order.ID.String(), session.Draft().WorkOrderID)
+
+	updated, err := session.CreateDraftWorkOrder(db, factoryModel, session.CreatedByUserID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, updated.ID)
+	assert.Equal(t, "Retry refunds once", updated.Title)
+	assert.Equal(t, "Agent edit.", updated.Description)
+	ids, err = session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	require.Len(t, ids, 1)
+}
+
+func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-refine-open")
+	db := database.Conn()
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &session.CreatedByUserID, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
+		ToState: FactoryWorkOrderStateOpen,
+		Actor:   &session.CreatedByUserID,
+	})
+	require.NoError(t, err)
+
+	note := PlanningRefineNote(factoryModel.WorkOrderKey(order.Number), order.Title)
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, session.SendUserMessage(db, note))
+	assert.Equal(t, note, session.Wait().Text)
+	assert.Equal(t, "", session.Draft().WorkOrderID)
+	ids, err := session.CreatedWorkOrderIDs(db)
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+}
+
 func TestEndPlanningSessionForFinishedRun(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-run-fail")
