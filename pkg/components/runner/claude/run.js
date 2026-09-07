@@ -221,6 +221,7 @@ function createFormatter(promptFile) {
   let textBuf = "";
   let lastLine = "";
   let resultLine = "";
+  let streamMessageId = "";
   const telemetry = loadTurnTelemetry();
   const tools = createToolTracker(telemetry);
 
@@ -248,6 +249,7 @@ function createFormatter(promptFile) {
           formatSystem(event);
           break;
         case "stream_event": {
+          streamMessageId = applyStreamTelemetry(event, telemetry, streamMessageId);
           const next = formatStreamEvent(event, streamedText, inText, textBuf);
           streamedText = next.streamedText;
           inText = next.inText;
@@ -280,6 +282,7 @@ function createFormatter(promptFile) {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
+          telemetry.applyBilledUsage(event.usage);
           resultLine = line;
           formatResult(event);
           break;
@@ -434,6 +437,27 @@ function formatSystem(event) {
     println(`mcp errors: ${JSON.stringify(event.mcp_server_errors)}`);
   }
   println();
+}
+
+function applyStreamTelemetry(event, telemetry, streamMessageId) {
+  const payload = event && event.event;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return streamMessageId;
+  }
+  if (payload.type === "message_start") {
+    const message = payload.message && typeof payload.message === "object" ? payload.message : {};
+    const messageId = message.id != null && String(message.id).trim() ? String(message.id).trim() : "";
+    telemetry.beginTurn(message.usage || payload.usage, { messageId });
+    return messageId;
+  }
+  if (payload.type === "message_delta" && payload.usage) {
+    if (streamMessageId) {
+      telemetry.beginTurn(payload.usage, { messageId: streamMessageId });
+      return streamMessageId;
+    }
+    telemetry.mergeCurrentUsage(payload.usage);
+  }
+  return streamMessageId;
 }
 
 function formatStreamEvent(event, streamedText, inText, textBuf) {

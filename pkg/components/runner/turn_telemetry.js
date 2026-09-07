@@ -82,6 +82,32 @@ function resolveCumulative(previous, incoming) {
   return addUsage({ ...previous }, next);
 }
 
+function preferCompleteUsage(previous, incoming) {
+  const prev = normalizeUsage(previous);
+  const next = normalizeUsage(incoming);
+  const usage = {
+    input_tokens: Math.max(prev.input_tokens, next.input_tokens),
+    output_tokens: Math.max(prev.output_tokens, next.output_tokens),
+    cache_read_input_tokens: Math.max(prev.cache_read_input_tokens, next.cache_read_input_tokens),
+    cache_creation_input_tokens: Math.max(prev.cache_creation_input_tokens, next.cache_creation_input_tokens),
+    reasoning_tokens: Math.max(prev.reasoning_tokens, next.reasoning_tokens),
+  };
+  const prevCost = prev.total_cost_usd;
+  const nextCost = next.total_cost_usd;
+  if (prevCost != null || nextCost != null) {
+    usage.total_cost_usd = Math.max(asNumber(prevCost), asNumber(nextCost));
+  }
+  return usage;
+}
+
+function billedUsageGaps(turns, billed) {
+  const recorded = (turns || []).reduce((total, turn) => addUsage(total, turn.usage), emptyUsage());
+  return {
+    output_tokens: Math.max(0, asNumber(billed.output_tokens) - recorded.output_tokens),
+    reasoning_tokens: Math.max(0, asNumber(billed.reasoning_tokens) - recorded.reasoning_tokens),
+  };
+}
+
 function emptyState() {
   return { currentTurn: 0, turns: [], lastMessageId: "" };
 }
@@ -220,7 +246,20 @@ function createTurnTelemetry(options) {
       const messageId = opts.messageId != null ? String(opts.messageId) : "";
       const incoming = normalizeUsage(usage);
       const previous = currentSnapshot(state);
-      if (messageId && state.lastMessageId === messageId) {
+      if (messageId && state.lastMessageId === messageId && previous) {
+        const nextUsage = preferCompleteUsage(previous.usage, incoming);
+        const nextMessage = opts.message != null && String(opts.message).trim() ? String(opts.message).trim() : "";
+        const usageChanged = !usageEquals(previous.usage, nextUsage);
+        const messageChanged = Boolean(nextMessage && nextMessage !== previous.message);
+        if (!usageChanged && !messageChanged) {
+          return state.currentTurn;
+        }
+        previous.usage = nextUsage;
+        if (nextMessage) {
+          previous.message = nextMessage;
+        }
+        persist();
+        emitTurn(previous);
         return state.currentTurn;
       }
       if (
@@ -245,6 +284,21 @@ function createTurnTelemetry(options) {
       persist();
       emitTurn(snapshot);
       return state.currentTurn;
+    },
+    mergeCurrentUsage(usage) {
+      const snapshot = currentSnapshot(state);
+      const incoming = normalizeUsage(usage);
+      if (!snapshot) {
+        return this.beginTurn(incoming);
+      }
+      const nextUsage = preferCompleteUsage(snapshot.usage, incoming);
+      if (usageEquals(snapshot.usage, nextUsage)) {
+        return snapshot.turn;
+      }
+      snapshot.usage = nextUsage;
+      persist();
+      emitTurn(snapshot);
+      return snapshot.turn;
     },
     updateCurrentUsage(usage, totalCostUsd) {
       const snapshot = currentSnapshot(state);
@@ -300,11 +354,32 @@ function createTurnTelemetry(options) {
     snapshot() {
       return buildTelemetry(state);
     },
+    applyBilledUsage(usage) {
+      const snapshot = currentSnapshot(state);
+      if (!snapshot) {
+        return 0;
+      }
+      const gaps = billedUsageGaps(state.turns, normalizeUsage(usage));
+      if (gaps.output_tokens === 0 && gaps.reasoning_tokens === 0) {
+        return snapshot.turn;
+      }
+      snapshot.usage = {
+        ...normalizeUsage(snapshot.usage),
+        output_tokens: asNumber(snapshot.usage.output_tokens) + gaps.output_tokens,
+        reasoning_tokens: asNumber(snapshot.usage.reasoning_tokens) + gaps.reasoning_tokens,
+      };
+      persist();
+      emitTurn(snapshot);
+      return snapshot.turn;
+    },
     attachToResult(result, extra) {
       if (!result || typeof result !== "object" || Array.isArray(result)) {
         return result;
       }
       const opts = extra && typeof extra === "object" && !Array.isArray(extra) ? extra : {};
+      if (result.usage) {
+        this.applyBilledUsage(result.usage);
+      }
       const telemetry = buildTelemetry(state);
       if (result.usage) {
         telemetry.usage = normalizeUsage(result.usage);
@@ -346,6 +421,7 @@ module.exports = {
   emptyUsage,
   normalizeUsage,
   resolveCumulative,
+  preferCompleteUsage,
   usageEquals,
   readPromptSeries,
   appendPromptSeries,
