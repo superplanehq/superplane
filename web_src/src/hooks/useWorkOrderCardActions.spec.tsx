@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "./useFactoryData";
+import { useDispatchWorkOrder, useReorderWorkOrder, useUpdateWorkOrderAssignees } from "./useFactoryData";
 import { useWorkOrderCardActions } from "./useWorkOrderCardActions";
 
 vi.mock("./useFactoryData", () => ({
   useDispatchWorkOrder: vi.fn(),
   useUpdateWorkOrderAssignees: vi.fn(),
+  useReorderWorkOrder: vi.fn(),
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -29,6 +30,9 @@ function mockMutations() {
     mutateAsync: vi.fn(),
     isPending: false,
   } as unknown as ReturnType<typeof useUpdateWorkOrderAssignees>);
+  vi.mocked(useReorderWorkOrder).mockReturnValue({
+    mutateAsync: vi.fn(),
+  } as unknown as ReturnType<typeof useReorderWorkOrder>);
   return { finishDispatch: () => resolveDispatch?.() };
 }
 
