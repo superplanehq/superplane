@@ -15,6 +15,24 @@ export function isSafeRedirectPath(path: string | null | undefined): path is str
   return true;
 }
 
+/** True when path is an in-app URL for this organization slug. */
+export function pathBelongsToOrganization(path: string, organizationSlug: string): boolean {
+  if (!organizationSlug || !isSafeRedirectPath(path)) {
+    return false;
+  }
+
+  const prefix = `/${organizationSlug}`;
+  if (path === prefix) {
+    return true;
+  }
+  if (!path.startsWith(prefix)) {
+    return false;
+  }
+
+  const next = path[prefix.length];
+  return next === "/" || next === "?" || next === "#";
+}
+
 /** Decodes and validates a redirect path pulled from a URL query parameter. */
 export function getSafeRedirectPath(rawRedirect: string | null | undefined): string | null {
   if (!rawRedirect) {

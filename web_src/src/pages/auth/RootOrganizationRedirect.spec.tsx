@@ -7,7 +7,13 @@ import { RootOrganizationRedirect } from "./RootOrganizationRedirect";
 
 const accountState = vi.hoisted(() => ({ account: { id: "account-1" } as { id: string } | null }));
 const organizationsState = vi.hoisted(() => ({
-  data: [{ id: "org-uuid-1", slug: "acme", name: "Acme" }] as Array<{ id: string; slug?: string; name: string }>,
+  data: [{ id: "org-uuid-1", slug: "acme", name: "Acme" }] as Array<{
+    id: string;
+    slug?: string;
+    name: string;
+    lastLocationPath?: string;
+    lastLocationUpdatedAt?: string;
+  }>,
   isLoading: false,
   isError: false,
 }));
@@ -15,6 +21,15 @@ const lastLocationState = vi.hoisted(() => ({
   data: null as string | null,
   isLoading: false,
   isError: false,
+}));
+const experimentalState = vi.hoisted(() => ({
+  has: (_feature?: string): boolean => false,
+  enabledExperimentalFeatures: [] as string[],
+  isLoading: false,
+}));
+const workspacesState = vi.hoisted(() => ({
+  data: [] as Array<{ key?: string; onboarding?: { completedAt?: string } }>,
+  isLoading: false,
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -26,7 +41,11 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({ has: () => false, enabledExperimentalFeatures: [], isLoading: false }),
+  useExperimentalFeature: () => experimentalState,
+}));
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useFactories: () => workspacesState,
 }));
 
 vi.mock("@/hooks/useLastLocation", () => ({
@@ -60,6 +79,10 @@ describe("RootOrganizationRedirect", () => {
     lastLocationState.data = null;
     lastLocationState.isLoading = false;
     lastLocationState.isError = false;
+    experimentalState.has = () => false;
+    experimentalState.isLoading = false;
+    workspacesState.data = [];
+    workspacesState.isLoading = false;
     window.localStorage.clear();
   });
 
@@ -102,5 +125,48 @@ describe("RootOrganizationRedirect", () => {
 
     expect(screen.getByText("Loading...")).toBeInTheDocument();
     expect(screen.queryByTestId("location")).not.toBeInTheDocument();
+  });
+
+  it("picks the organization with the newest saved screen when last visited is gone", async () => {
+    organizationsState.data = [
+      { id: "org-old", slug: "puppies-inc", name: "Old", lastLocationUpdatedAt: "2026-02-01T00:00:00.000Z" },
+      {
+        id: "org-live",
+        slug: "acme",
+        name: "Acme",
+        lastLocationPath: "/acme/apps/deploy?run=9",
+        lastLocationUpdatedAt: "2026-09-01T00:00:00.000Z",
+      },
+    ];
+    window.localStorage.setItem("superplane:last-visited-organization", JSON.stringify({ "account-1": "gone-slug" }));
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/acme");
+    });
+  });
+
+  it("sends an incomplete workspace to setup when factories are on", async () => {
+    experimentalState.has = () => true;
+    workspacesState.data = [{ key: "PAY", onboarding: {} }];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/acme/workspaces/PAY/setup");
+    });
+  });
+
+  it("prefers a saved screen over incomplete workspace setup", async () => {
+    experimentalState.has = () => true;
+    lastLocationState.data = "/acme/apps/deploy?run=42";
+    workspacesState.data = [{ key: "PAY", onboarding: {} }];
+
+    renderRedirect();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent("/acme/apps/deploy?run=42");
+    });
   });
 });

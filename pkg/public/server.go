@@ -1486,12 +1486,14 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	type Organization struct {
-		ID          string `json:"id"`
-		Slug        string `json:"slug"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CanvasCount int64  `json:"canvasCount"`
-		MemberCount int64  `json:"memberCount"`
+		ID                    string `json:"id"`
+		Slug                  string `json:"slug"`
+		Name                  string `json:"name"`
+		Description           string `json:"description"`
+		CanvasCount           int64  `json:"canvasCount"`
+		MemberCount           int64  `json:"memberCount"`
+		LastLocationPath      string `json:"lastLocationPath,omitempty"`
+		LastLocationUpdatedAt string `json:"lastLocationUpdatedAt,omitempty"`
 	}
 
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
@@ -1517,17 +1519,32 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	lastLocations, err := models.ListUserLastLocationsForAccount(database.DB(r.Context()), account.ID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	lastLocationByOrg := make(map[string]models.UserLastLocation, len(lastLocations))
+	for _, location := range lastLocations {
+		lastLocationByOrg[location.OrganizationID.String()] = location
+	}
+
 	response := []Organization{}
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
-		response = append(response, Organization{
+		item := Organization{
 			ID:          organization.ID.String(),
 			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],
 			MemberCount: memberCounts[orgID],
-		})
+		}
+		if location, ok := lastLocationByOrg[orgID]; ok {
+			item.LastLocationPath = location.Path
+			item.LastLocationUpdatedAt = location.UpdatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		response = append(response, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

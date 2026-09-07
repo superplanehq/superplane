@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,6 +53,29 @@ func IsValidUserLastLocationPath(path string) bool {
 	return true
 }
 
+// PathBelongsToOrganization reports whether path is an in-app URL for slug.
+// Accepts "/{slug}", "/{slug}/...", "/{slug}?...", and "/{slug}#...".
+func PathBelongsToOrganization(path, slug string) bool {
+	if slug == "" || !IsValidUserLastLocationPath(path) {
+		return false
+	}
+
+	prefix := "/" + slug
+	if path == prefix {
+		return true
+	}
+	if !strings.HasPrefix(path, prefix) {
+		return false
+	}
+
+	switch path[len(prefix)] {
+	case '/', '?', '#':
+		return true
+	default:
+		return false
+	}
+}
+
 func FindUserLastLocation(tx *gorm.DB, organizationID, userID uuid.UUID) (*UserLastLocation, error) {
 	var location UserLastLocation
 	err := tx.
@@ -74,6 +98,14 @@ func SetUserLastLocation(tx *gorm.DB, organizationID, userID uuid.UUID, path str
 		return nil, ErrUserLastLocationPathInvalid
 	}
 
+	organization, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if err != nil {
+		return nil, err
+	}
+	if !PathBelongsToOrganization(path, organization.Slug) {
+		return nil, ErrUserLastLocationPathInvalid
+	}
+
 	now := time.Now()
 	location := &UserLastLocation{
 		OrganizationID: organizationID,
@@ -83,7 +115,7 @@ func SetUserLastLocation(tx *gorm.DB, organizationID, userID uuid.UUID, path str
 		UpdatedAt:      now,
 	}
 
-	err := tx.
+	err = tx.
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "organization_id"}, {Name: "user_id"}},
 			DoUpdates: clause.AssignmentColumns([]string{"path", "updated_at"}),
@@ -95,4 +127,18 @@ func SetUserLastLocation(tx *gorm.DB, organizationID, userID uuid.UUID, path str
 	}
 
 	return FindUserLastLocation(tx, organizationID, userID)
+}
+
+// ListUserLastLocationsForAccount returns saved resume paths for every
+// active organization the account still belongs to.
+func ListUserLastLocationsForAccount(tx *gorm.DB, accountID uuid.UUID) ([]UserLastLocation, error) {
+	var locations []UserLastLocation
+	err := tx.
+		Model(&UserLastLocation{}).
+		Joins("JOIN users ON users.id = user_last_locations.user_id AND users.deleted_at IS NULL").
+		Joins("JOIN organizations ON organizations.id = user_last_locations.organization_id AND organizations.deleted_at IS NULL").
+		Where("users.account_id = ?", accountID).
+		Find(&locations).
+		Error
+	return locations, err
 }

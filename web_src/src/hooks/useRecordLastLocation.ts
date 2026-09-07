@@ -8,6 +8,19 @@ import { saveLastLocation } from "./useLastLocation";
 // same-browser fallback.
 const SAVE_DEBOUNCE_MS = 1500;
 
+type LastLocationSnapshot = {
+  organizationRoute: string | null;
+  accountId: string | null | undefined;
+  path: string;
+};
+
+function flushLastLocation(snapshot: LastLocationSnapshot): void {
+  if (!snapshot.organizationRoute || !snapshot.accountId) {
+    return;
+  }
+  void saveLastLocation(snapshot.organizationRoute, snapshot.path);
+}
+
 /**
  * Records `path` as the account's "resume where you left off" screen for
  * the given organization: instantly to local storage, and (debounced) to
@@ -21,6 +34,8 @@ export function useRecordLastLocation(
   path: string,
 ): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRef = useRef<LastLocationSnapshot>({ organizationRoute, accountId, path });
+  latestRef.current = { organizationRoute, accountId, path };
 
   useEffect(() => {
     if (!organizationRoute || !accountId) {
@@ -33,13 +48,26 @@ export function useRecordLastLocation(
       clearTimeout(timerRef.current);
     }
     timerRef.current = setTimeout(() => {
-      void saveLastLocation(organizationRoute, path);
+      timerRef.current = null;
+      flushLastLocation({ organizationRoute, accountId, path });
     }, SAVE_DEBOUNCE_MS);
 
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, [organizationRoute, accountId, path]);
+
+  useEffect(() => {
+    const onLeave = () => {
+      flushLastLocation(latestRef.current);
+    };
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      window.removeEventListener("pagehide", onLeave);
+      flushLastLocation(latestRef.current);
+    };
+  }, []);
 }

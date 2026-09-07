@@ -23,15 +23,14 @@ func Test__DescribeLastLocation(t *testing.T) {
 	})
 
 	t.Run("returns the saved location", func(t *testing.T) {
-		_, err := SaveLastLocation(ctx, &pb.SaveLastLocationRequest{
-			Path: "/acme/apps/deploy?run=42&node=approve-1",
-		})
+		path := "/" + r.Organization.Slug + "/apps/deploy?run=42&node=approve-1"
+		_, err := SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: path})
 		require.NoError(t, err)
 
 		resp, err := DescribeLastLocation(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, resp.LastLocation)
-		assert.Equal(t, "/acme/apps/deploy?run=42&node=approve-1", resp.LastLocation.Path)
+		assert.Equal(t, path, resp.LastLocation.Path)
 		assert.NotNil(t, resp.LastLocation.UpdatedAt)
 	})
 
@@ -48,13 +47,22 @@ func Test__SaveLastLocation(t *testing.T) {
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
 	t.Run("persists and overwrites the previous location", func(t *testing.T) {
-		resp, err := SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: "/acme/apps/deploy?run=1"})
+		first := "/" + r.Organization.Slug + "/apps/deploy?run=1"
+		second := "/" + r.Organization.Slug + "/apps/deploy?run=2"
+		resp, err := SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: first})
 		require.NoError(t, err)
-		assert.Equal(t, "/acme/apps/deploy?run=1", resp.LastLocation.Path)
+		assert.Equal(t, first, resp.LastLocation.Path)
 
-		resp, err = SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: "/acme/apps/deploy?run=2"})
+		resp, err = SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: second})
 		require.NoError(t, err)
-		assert.Equal(t, "/acme/apps/deploy?run=2", resp.LastLocation.Path)
+		assert.Equal(t, second, resp.LastLocation.Path)
+	})
+
+	t.Run("rejects a path that belongs to another organization", func(t *testing.T) {
+		_, err := SaveLastLocation(ctx, &pb.SaveLastLocationRequest{Path: "/other-org/apps"})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
 	})
 
 	t.Run("rejects a missing path", func(t *testing.T) {
@@ -74,7 +82,7 @@ func Test__SaveLastLocation(t *testing.T) {
 	})
 
 	t.Run("unauthenticated", func(t *testing.T) {
-		_, err := SaveLastLocation(context.Background(), &pb.SaveLastLocationRequest{Path: "/acme"})
+		_, err := SaveLastLocation(context.Background(), &pb.SaveLastLocationRequest{Path: "/" + r.Organization.Slug})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, code)

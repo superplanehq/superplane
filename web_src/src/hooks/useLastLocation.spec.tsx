@@ -73,6 +73,11 @@ describe("fetchLastLocationPath", () => {
     meDescribeLastLocation.mockRejectedValue(new Error("boom"));
     await expect(fetchLastLocationPath("acme")).resolves.toBeNull();
   });
+
+  it("returns null when the saved path belongs to another organization", async () => {
+    meDescribeLastLocation.mockResolvedValue({ data: { lastLocation: { path: "/other/apps" } } });
+    await expect(fetchLastLocationPath("acme")).resolves.toBeNull();
+  });
 });
 
 describe("saveLastLocation", () => {
@@ -92,6 +97,11 @@ describe("saveLastLocation", () => {
 
   it("does not call the backend for an unsafe path", async () => {
     await saveLastLocation("acme", "//evil.com");
+    expect(meSaveLastLocation).not.toHaveBeenCalled();
+  });
+
+  it("does not call the backend for another organization's path", async () => {
+    await saveLastLocation("acme", "/other/apps");
     expect(meSaveLastLocation).not.toHaveBeenCalled();
   });
 

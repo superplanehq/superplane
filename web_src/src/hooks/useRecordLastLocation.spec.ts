@@ -59,4 +59,12 @@ describe("useRecordLastLocation", () => {
 
     expect(saveLastLocation).not.toHaveBeenCalled();
   });
+
+  it("flushes the latest path when the hook unmounts", () => {
+    const { unmount } = renderHook(() => useRecordLastLocation("acme", "account-1", "/acme/apps/deploy?run=1"));
+
+    unmount();
+
+    expect(saveLastLocation).toHaveBeenCalledWith("acme", "/acme/apps/deploy?run=1");
+  });
 });

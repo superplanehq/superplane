@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { meDescribeLastLocation, meSaveLastLocation } from "@/api-client";
-import { isSafeRedirectPath } from "@/lib/safeRedirectPath";
+import { isSafeRedirectPath, pathBelongsToOrganization } from "@/lib/safeRedirectPath";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 const lastLocationKey = (organizationRoute: string) => ["me", organizationRoute, "last-location"] as const;
@@ -15,7 +15,7 @@ export async function fetchLastLocationPath(organizationRoute: string): Promise<
   try {
     const response = await meDescribeLastLocation(withOrganizationHeader({ organizationId: organizationRoute }));
     const path = response.data?.lastLocation?.path;
-    return path && isSafeRedirectPath(path) ? path : null;
+    return path && isSafeRedirectPath(path) && pathBelongsToOrganization(path, organizationRoute) ? path : null;
   } catch {
     return null;
   }
@@ -45,7 +45,7 @@ export function useLastLocation(organizationRoute: string | null) {
  * current browser if the request fails.
  */
 export async function saveLastLocation(organizationRoute: string, path: string): Promise<void> {
-  if (!organizationRoute || !isSafeRedirectPath(path)) {
+  if (!organizationRoute || !isSafeRedirectPath(path) || !pathBelongsToOrganization(path, organizationRoute)) {
     return;
   }
 

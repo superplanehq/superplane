@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getSafeRedirectPath, isSafeRedirectPath } from "./safeRedirectPath";
+import { getSafeRedirectPath, isSafeRedirectPath, pathBelongsToOrganization } from "./safeRedirectPath";
 
 describe("isSafeRedirectPath", () => {
   it("accepts relative in-app paths", () => {
@@ -19,6 +19,19 @@ describe("isSafeRedirectPath", () => {
     expect(isSafeRedirectPath("//evil.com")).toBe(false);
     expect(isSafeRedirectPath("\\\\evil.com")).toBe(false);
     expect(isSafeRedirectPath("https://evil.com")).toBe(false);
+  });
+});
+
+describe("pathBelongsToOrganization", () => {
+  it("accepts the organization root and nested screens", () => {
+    expect(pathBelongsToOrganization("/acme", "acme")).toBe(true);
+    expect(pathBelongsToOrganization("/acme/apps/deploy?run=1", "acme")).toBe(true);
+    expect(pathBelongsToOrganization("/acme#node", "acme")).toBe(true);
+  });
+
+  it("rejects another organization's path and a slug prefix match", () => {
+    expect(pathBelongsToOrganization("/other/apps", "acme")).toBe(false);
+    expect(pathBelongsToOrganization("/acme-2/apps", "acme")).toBe(false);
   });
 });
 

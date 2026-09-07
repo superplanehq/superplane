@@ -21,7 +21,6 @@ import {
 } from "@/lib/signupAnalytics";
 import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
 import { getSafeRedirectPath } from "@/lib/safeRedirectPath";
-import { fetchLastLocationPath } from "@/hooks/useLastLocation";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
@@ -288,33 +287,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
-      try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = (await orgsResponse.json()) as Array<{ id?: string; slug?: string }>;
-          if (organizations.length === 1) {
-            // Prefer the slug so the address bar never shows the org UID.
-            // The UID fallback only fires for an organization without a
-            // slug yet; OrganizationScope corrects that case on arrival.
-            const orgRef = organizations[0].slug || organizations[0].id;
-            if (orgRef) {
-              // Resume the last screen the account was on in this
-              // organization (e.g. a pending approval) instead of always
-              // landing on the home page.
-              const resumePath = await fetchLastLocationPath(orgRef);
-              window.location.href = resumePath || `/${orgRef}`;
-              return;
-            }
-          }
-        }
-      } catch {
-        // fall through to default redirect
-      }
-
-      window.location.href = finalURL;
+      // RootOrganizationRedirect picks the last organization and screen.
+      // Do not pick organizations[0] here — that sent people to abandoned orgs.
+      window.location.href = "/";
     },
     [redirectTarget],
   );
