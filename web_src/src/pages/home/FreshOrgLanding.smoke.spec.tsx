@@ -108,4 +108,15 @@ describe("FreshOrgLanding", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(panel).toBeInTheDocument();
   });
+
+  it("asks for an app name when creating a blank app", async () => {
+    const user = userEvent.setup();
+    render(<HomePageHarness fixture={emptyHomePageFixture} pathSuffix="apps/new" />);
+
+    await screen.findByRole("heading", { name: "Create a new app" }, { timeout: 5000 });
+    await user.click(screen.getByRole("button", { name: /create a blank app/i }));
+
+    expect(await screen.findByRole("dialog", { name: /create app/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/app name/i)).toBeInTheDocument();
+  });
 });
