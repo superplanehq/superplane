@@ -1034,6 +1034,20 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
   });
 
+  // A freshly created draft is known to be analyzing before its run appears in
+  // the polled list. The optimistic flag keeps the popup in step with the board.
+  it("shows the analyzing state from the pending flag before a run appears", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      analysisRuns: [],
+      isAnalyzing: true,
+    });
+
+    expect(fixture.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).not.toContain("Reject");
+  });
+
   // Scoring runs on the task before a line plans it. The log must read
   // in that order: the intake that created the order, the score, then the plan.
   it("puts the Backlog analysis before the line steps", () => {

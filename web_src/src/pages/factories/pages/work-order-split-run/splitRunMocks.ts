@@ -329,6 +329,12 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /**
+   * Whether the Backlog automation is still scoring this draft. Covers the
+   * optimistic window where a fresh draft is known to be analyzing before its
+   * run appears in `analysisRuns`, so the popup matches the board card.
+   */
+  isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
 };
@@ -379,6 +385,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
       analysisRuns: options?.analysisRuns,
+      isAnalyzing: options?.isAnalyzing,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -400,6 +407,7 @@ function reviewSurfaces(
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
     analysisRuns?: BacklogAnalysisRun[];
+    isAnalyzing?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -414,7 +422,7 @@ function reviewSurfaces(
         kind: "draft",
         note: draftFooterNote(order),
         status: displayStatus,
-        isAnalyzing: hasActiveBacklogAnalysisRun(input.analysisRuns ?? []),
+        isAnalyzing: draftIsAnalyzing(input),
       }),
       [],
       checks,
@@ -445,6 +453,15 @@ function reviewSurfaces(
     );
   }
   return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
+}
+
+/**
+ * Whether a draft is still being scored. The optimistic `isAnalyzing` flag
+ * covers the window before a fresh draft's run appears in `analysisRuns`, so
+ * the popup matches the board card even during run discovery.
+ */
+function draftIsAnalyzing(input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] }): boolean {
+  return Boolean(input.isAnalyzing) || hasActiveBacklogAnalysisRun(input.analysisRuns ?? []);
 }
 
 function stoppedReviewSurface(
