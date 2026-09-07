@@ -24,6 +24,8 @@ import { LinesBoardSpecHarness } from "./linesPageSpecRender";
 import { canvasQuery, canvasWithoutAgent, implementerCanvas } from "./linesPageCanvasFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "./onboarding/first-run/reviewCandidates";
 
+const LANE_BANNERS: FactoryPreviewFlags = { addIntakeControl: false, columnAutomations: false };
+
 function renderLinesBoard(
   path = `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
   openCreateWorkOrder = vi.fn(),
@@ -357,7 +359,7 @@ describe("LinesPage board", () => {
 
   it("lists the intakes at the head of the Backlog column, without a drawer", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     const backlog = screen.getByTestId("lines-backlog-column");
     expect(within(backlog).getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
@@ -368,33 +370,28 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
   });
 
-  it("hides lane banners and shows the automations indicator when the preview is on", () => {
+  it("shows the automations menu on every column and hides lane banners", () => {
     useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), REFUND_FACTORY, {
-      addIntakeControl: true,
-      columnAutomations: true,
-    });
+    renderLinesBoard();
 
     const backlog = screen.getByTestId("lines-backlog-column");
     expect(within(backlog).queryByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-listener-handler-discussion")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-backlog-automations")).toHaveTextContent("3");
+    expect(screen.getByTestId("lines-phase-0-automations")).toBeInTheDocument();
     expect(screen.getByTestId("lines-verify-automations")).toHaveTextContent("1");
     expect(screen.getByTestId("lines-done-automations")).toBeInTheDocument();
   });
 
-  it("opens the backlog automations drawer from the indicator", async () => {
+  it("opens the backlog automations menu from the indicator", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), REFUND_FACTORY, {
-      addIntakeControl: true,
-      columnAutomations: true,
-    });
+    renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-backlog-automations"));
 
@@ -413,16 +410,37 @@ describe("LinesPage board", () => {
   it("opens intake settings when an automation row is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`,
-      vi.fn(),
-      REFUND_FACTORY,
-      { addIntakeControl: true, columnAutomations: true },
-    );
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
 
     await user.click(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+  });
+
+  it("opens the phase automations menu from the indicator", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-phase-0-automations"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`,
+    );
+    expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automations-add")).toBeInTheDocument();
+  });
+
+  it("opens the verify and done automations menus from the indicators", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-verify-automations"));
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automations=verify");
+    expect(screen.getByRole("heading", { name: "Verify automations" })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("lines-done-automations"));
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automations=done");
+    expect(screen.getByRole("heading", { name: "Done automations" })).toBeInTheDocument();
   });
 
   it("names each Verify listener from its source", async () => {
@@ -433,7 +451,7 @@ describe("LinesPage board", () => {
       ],
     });
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     const verify = screen.getByTestId("lines-verify-column");
     expect(within(verify).getByTestId("lines-verify-listener-handler-discussion")).toHaveTextContent(
@@ -452,7 +470,7 @@ describe("LinesPage board", () => {
 
   it("opens the source picker from the Verify column header", async () => {
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.queryByTestId("lines-verify-listener-pr-feedback")).not.toBeInTheDocument();
     const verify = screen.getByTestId("lines-verify-column");
@@ -481,7 +499,7 @@ describe("LinesPage board", () => {
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
     expect(screen.getByTestId("add-pr-feedback-template-discussion")).toBeDisabled();
@@ -495,7 +513,7 @@ describe("LinesPage board", () => {
         { id: "intake-triage", canvasId: "app-triage", name: "Triage issues", source: "SOURCE_GITHUB_ISSUES" },
       ],
     });
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
       "Listening to GitHub issues",
@@ -506,7 +524,7 @@ describe("LinesPage board", () => {
   it("creates an intake from the picker and opens its canvas", async () => {
     createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, { addIntakeControl: true, columnAutomations: false });
 
     await user.click(screen.getByTestId("line-intake-add"));
     await user.click(screen.getByTestId("add-intake-template-github-issues"));
@@ -533,7 +551,7 @@ describe("LinesPage board", () => {
     enabledExperimentalFeatures.add("factory_sentry_intake");
     createFactoryIntakeMutateAsync.mockResolvedValueOnce({ id: "intake-new", canvasId: "canvas-new" });
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
@@ -561,6 +579,7 @@ describe("LinesPage board", () => {
       `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`,
       vi.fn(),
       ACME_ONBOARDING_FACTORY,
+      LANE_BANNERS,
     );
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
@@ -573,7 +592,7 @@ describe("LinesPage board", () => {
   it("opens intake settings from the row and links to the factory canvas editor", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
     await user.click(screen.getByRole("tab", { name: "Automation" }));
@@ -595,7 +614,7 @@ describe("LinesPage board", () => {
       ],
     });
     const user = userEvent.setup();
-    renderLinesBoard();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
@@ -606,6 +625,9 @@ describe("LinesPage board", () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     renderLinesBoard(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
+      vi.fn(),
+      REFUND_FACTORY,
+      LANE_BANNERS,
     );
 
     expect(screen.getByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
