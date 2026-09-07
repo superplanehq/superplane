@@ -30,23 +30,43 @@ func Test__CreateFactory(t *testing.T) {
 			Key:  "chos",
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "CHOS", response.Factory.Key)
+		assert.Equal(t, "chos", response.Factory.Key)
+	})
+
+	t.Run("normalizes an uppercase key the caller sent to lowercase", func(t *testing.T) {
+		response, err := CreateFactory(context.Background(), r.Organization.ID.String(), &pb.CreateFactoryRequest{
+			Name: support.RandomName("factory"),
+			Key:  "CHOU",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "chou", response.Factory.Key)
 	})
 
 	t.Run("duplicate key -> error", func(t *testing.T) {
 		_, err := CreateFactory(context.Background(), r.Organization.ID.String(), &pb.CreateFactoryRequest{
 			Name: support.RandomName("factory"),
-			Key:  "DUPE",
+			Key:  "dupe",
 		})
 		require.NoError(t, err)
 
 		_, err = CreateFactory(context.Background(), r.Organization.ID.String(), &pb.CreateFactoryRequest{
 			Name: support.RandomName("factory"),
-			Key:  "DUPE",
+			Key:  "dupe",
 		})
 		code, _, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.AlreadyExists, code)
+	})
+
+	t.Run("invalid key -> error with lowercase message", func(t *testing.T) {
+		_, err := CreateFactory(context.Background(), r.Organization.ID.String(), &pb.CreateFactoryRequest{
+			Name: support.RandomName("factory"),
+			Key:  "way-too-long",
+		})
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, code)
+		assert.Equal(t, "workspace key must be 2 to 5 lowercase letters", message)
 	})
 
 	// Callers that omit the key never picked one, so sharing leading
@@ -56,7 +76,7 @@ func Test__CreateFactory(t *testing.T) {
 			Name: "Payments platform",
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "PAYME", first.Factory.Key)
+		assert.Equal(t, "payme", first.Factory.Key)
 
 		second, err := CreateFactory(context.Background(), r.Organization.ID.String(), &pb.CreateFactoryRequest{
 			Name: "Payments platform reboot",
