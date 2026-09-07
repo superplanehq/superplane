@@ -55,6 +55,10 @@ func DescribeOrganizationWorkspaceUsage(
 
 	billingEnabled, hasCustomer := billingState(ctx, organizationID)
 	ledger := totals.Add(computeTotals)
+	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(db)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
+	}
 
 	return &pb.DescribeOrganizationWorkspaceUsageResponse{
 		TotalTokens:            ledger.TotalTokens,
@@ -72,6 +76,8 @@ func DescribeOrganizationWorkspaceUsage(
 		Invoices:               listHostedCreditInvoices(ctx, organizationID, billingEnabled, hasCustomer),
 		TotalDurationSeconds:   ledger.DurationSeconds,
 		ByMachineType:          serializeUsageByMachineType(byMachine),
+		DefaultHostedProvider:  defaultModel.Provider,
+		DefaultHostedModel:     defaultModel.Model,
 	}, nil
 }
 

@@ -3,13 +3,16 @@ package canvases
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func SerializeCanvas(
@@ -18,6 +21,23 @@ func SerializeCanvas(
 	user *models.User,
 	status *pb.Canvas_Status,
 ) (*pb.Canvas, error) {
+	return serializePreparedCanvas(nil, canvas, liveVersion, user, status)
+}
+
+func serializePreparedCanvas(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	liveVersion *models.CanvasVersion,
+	user *models.User,
+	status *pb.Canvas_Status,
+) (*pb.Canvas, error) {
+	prepared := liveVersion
+	if canvas != nil && liveVersion != nil {
+		clone := *liveVersion
+		clone.Nodes = prepareCanvasNodesForResponse(tx, canvas, liveVersion.Nodes)
+		prepared = &clone
+	}
+
 	var createdBy *pb.UserRef
 	if user != nil {
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
@@ -53,8 +73,8 @@ func SerializeCanvas(
 			DismissedAgentSuggestionIds: append([]string(nil), canvas.DismissedAgentSuggestionIDs...),
 		},
 		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(liveVersion.Nodes),
-			Edges: actions.EdgesToProto(liveVersion.Edges),
+			Nodes: actions.NodesToProto(prepared.Nodes),
+			Edges: actions.EdgesToProto(prepared.Edges),
 		},
 		Status: status,
 	}, nil
@@ -70,7 +90,23 @@ func serializeCanvas(
 	ctx, done := telemetry.Span(ctx, "canvases.serialize")
 	defer done(&err)
 
-	return SerializeCanvas(canvas, liveVersion, user, status)
+	return serializePreparedCanvas(database.DB(ctx), canvas, liveVersion, user, status)
+}
+
+func prepareCanvasNodesForResponse(tx *gorm.DB, canvas *models.Canvas, nodes []models.Node) []models.Node {
+	prepared := make([]models.Node, len(nodes))
+	copy(prepared, nodes)
+	for i := range prepared {
+		if prepared[i].Configuration != nil {
+			prepared[i].Configuration = maps.Clone(prepared[i].Configuration)
+		}
+	}
+	models.RewriteHostedProviderRunnerNodes(prepared)
+	if tx == nil || canvas == nil {
+		return prepared
+	}
+	_ = models.AnnotateSuperPlaneRunnerNodes(tx, canvas.OrganizationID, canvas.FactoryID, prepared)
+	return prepared
 }
 
 func SerializeCanvasRunRef(run models.CanvasRun) *pb.CanvasRunRef {

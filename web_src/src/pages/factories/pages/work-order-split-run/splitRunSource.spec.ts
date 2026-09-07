@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PRIMARY_FACTORY_ID } from "../../__fixtures__/factoryPageIds";
+import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
   DRAFT_WORK_ORDER,
   OPEN_WORK_ORDER_SECONDARY,
@@ -145,6 +145,41 @@ describe("splitRunSourceForOrder", () => {
         person: expect.objectContaining({ name: "Leonardo DiCaprio" }),
       }),
     );
+  });
+
+  it("resolves the source person's avatar from the org members list when one is available", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId
+        ? { id: userId, name: name ?? "Member", initials: "M", avatarUrl: "https://example.com/avatar.jpg" }
+        : null;
+
+    const source = splitRunSourceForOrder(DRAFT_WORK_ORDER, resolveUser);
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "manual",
+        person: expect.objectContaining({
+          id: STORYBOOK_ME_USER_ID,
+          name: "Leonardo DiCaprio",
+          avatarUrl: "https://example.com/avatar.jpg",
+        }),
+      }),
+    );
+  });
+
+  it("falls back to initials when the org member has no avatar image", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId ? { id: userId, name: name ?? "Member", initials: "M" } : null;
+
+    const source = splitRunSourceForOrder(DRAFT_WORK_ORDER, resolveUser);
+    expect(source).toEqual(
+      expect.objectContaining({
+        kind: "manual",
+        person: expect.objectContaining({ id: STORYBOOK_ME_USER_ID, name: "Leonardo DiCaprio" }),
+      }),
+    );
+    if (source.kind === "manual") {
+      expect(source.person.avatarUrl).toBeUndefined();
+    }
   });
 
   it("fills Source for every task on the populated line board", () => {

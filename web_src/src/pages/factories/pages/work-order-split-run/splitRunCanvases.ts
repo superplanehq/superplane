@@ -5,6 +5,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import { parseCanvasYamlMetadata, parseCanvasYamlToSpec } from "@/pages/app/lib/canvas-yaml-staging";
+import { AGENT_HARNESS_COMPONENTS } from "@/lib/agentRunnerSteps";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
 import {
@@ -178,7 +179,7 @@ function takenNodeIds(
         continue;
       }
       const source = nodes.find((node) => node.id === id);
-      if (edge.channel === "passed" && status === "running" && source?.component === "runnerClaudeCode") {
+      if (edge.channel === "passed" && status === "running" && isAgentHarnessNode(source)) {
         continue;
       }
       if (outgoing.length === 1 || edge.channel === preferred || edge.channel === "default") {
@@ -294,7 +295,10 @@ function paintMetrics(nodes: ComponentsNode[], taken: Set<string>, phase: SplitR
 const COMPONENT_PRESENTATION: Record<string, { title: string; iconSlug: string; iconSrc?: string }> = {
   onRun: { title: "On Run", iconSlug: "play" },
   runnerBash: { title: "Run Bash", iconSlug: "code" },
+  runnerSuperPlane: { title: "Run SuperPlane Agent", iconSlug: "code" },
   runnerClaudeCode: { title: "Run Claude Code", iconSlug: "code" },
+  runnerCodex: { title: "Run Codex", iconSlug: "code" },
+  runnerOpenRouter: { title: "Run OpenRouter Agent", iconSlug: "code" },
   runnerJS: { title: "Run JavaScript", iconSlug: "code" },
   if: { title: "If", iconSlug: "split" },
   filter: { title: "Filter", iconSlug: "funnel" },
@@ -469,6 +473,10 @@ function appendRichStreamNode({
   return tick;
 }
 
+function isAgentHarnessNode(node: ComponentsNode | undefined): boolean {
+  return Boolean(node?.component && AGENT_HARNESS_COMPONENTS.has(node.component));
+}
+
 export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
   if (node.type === "TYPE_TRIGGER") {
     return "trigger";
@@ -480,7 +488,7 @@ export function streamKindForNode(node: ComponentsNode): SplitRunStreamKind {
   if (component === "if") {
     return "if";
   }
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {
@@ -518,7 +526,7 @@ function hidesProducedOutputs(kind: "agent" | "check" | "artifact" | "simple", n
 function classifyNode(node: ComponentsNode): "agent" | "check" | "artifact" | "simple" {
   const component = node.component ?? "";
   const name = `${node.name ?? ""} ${componentPresentation(component).title}`.toLowerCase();
-  if (component === "runnerClaudeCode") {
+  if (AGENT_HARNESS_COMPONENTS.has(component)) {
     return "agent";
   }
   if (component === "reportWorkOrderCheck") {

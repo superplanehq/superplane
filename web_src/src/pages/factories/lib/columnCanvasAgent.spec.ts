@@ -66,6 +66,15 @@ describe("findAgentNodes", () => {
     const trigger = agentNode({ id: "not-an-action", type: "TYPE_TRIGGER" });
     expect(findAgentNodes({ nodes: [trigger] })).toEqual([]);
   });
+
+  it("returns SuperPlane harness actions", () => {
+    const superplane = agentNode({
+      id: "superplane-agent",
+      component: "runnerSuperPlane",
+      configuration: { machineType: "e1-large-amd64", steps: implementerSteps },
+    });
+    expect(findAgentNodes({ nodes: [triggerNode(), superplane] })).toEqual([superplane]);
+  });
 });
 
 describe("primaryAgentNode", () => {

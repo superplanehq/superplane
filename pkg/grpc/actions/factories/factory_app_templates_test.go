@@ -113,7 +113,10 @@ func TestMaterializePlanningTemplateUsesPlanningModel(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
 	require.NoError(t, err)
-	assert.Equal(t, "claude-opus-4-6", findYAMLNode(t, canvas, "planner-agent-no-issue").Configuration["model"])
+	agent := findYAMLNode(t, canvas, "planner-agent-no-issue")
+	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.Nil(t, agent.Configuration["model"])
+	assert.Nil(t, agent.Configuration["credentials"])
 }
 
 func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
@@ -135,7 +138,9 @@ func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Create with an Agent", canvas.Metadata.Name)
 	agent := findYAMLNode(t, canvas, "planning-agent")
-	assert.Equal(t, "claude-opus-4-6", agent.Configuration["model"])
+	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
+	assert.Nil(t, agent.Configuration["model"])
+	assert.Nil(t, agent.Configuration["credentials"])
 	require.NotNil(t, agent.Concurrency)
 	require.NotNil(t, agent.Concurrency.Max)
 	assert.Equal(t, 10, *agent.Concurrency.Max)

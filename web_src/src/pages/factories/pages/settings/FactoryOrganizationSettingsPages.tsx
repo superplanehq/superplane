@@ -4,6 +4,7 @@ import { Members } from "@/pages/organization/settings/Members";
 
 import { FactorySettingsApiKeysPage } from "./FactorySettingsApiKeysPage";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
+import { FactorySettingsOrganizationLLMModelsPage } from "./FactorySettingsOrganizationLLMModelsPage";
 import { FactorySettingsSecretsPage } from "./FactorySettingsSecretsPage";
 
 function useOrganizationId() {
@@ -34,4 +35,8 @@ export function FactoryOrganizationSecretsPage() {
 
 export function FactoryOrganizationSecretDetailPage() {
   return <FactorySettingsSecretsPage />;
+}
+
+export function FactoryOrganizationLLMModelsPage() {
+  return <FactorySettingsOrganizationLLMModelsPage />;
 }

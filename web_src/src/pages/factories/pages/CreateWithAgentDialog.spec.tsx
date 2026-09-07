@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
+  CREATE_WITH_AGENT_DEMO_MODELS,
   emptyCreateWithAgentView,
   failedCreateWithAgentView,
   runningCreateWithAgentView,
@@ -33,11 +34,11 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       open
       workspaceName="Refunds"
       view={view}
+      models={CREATE_WITH_AGENT_DEMO_MODELS}
       onComposerChange={noop}
       onSend={noop}
       onSubmitSurvey={noop}
       onDraftTitleChange={noop}
-      onDraftDescriptionChange={noop}
       onCreateDraft={noop}
       onSkipDraft={noop}
       onSelectCreated={noop}
@@ -45,6 +46,7 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       onRequestClose={noop}
       onCancelEnd={noop}
       onConfirmEnd={noop}
+      onSelectModel={noop}
     />,
   );
 }
@@ -55,8 +57,10 @@ describe("CreateWithAgentDialog", () => {
 
     expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
     expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
-    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.menu);
-    expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent("Agent");
+    expect(screen.queryByTestId(`split-run-automation-header-${PLANNING_SESSION_PHASE_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-line-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-stream")).not.toHaveTextContent(CREATE_WITH_AGENT_COPY.menu);
+    expect(screen.getByTestId("create-with-agent-stream")).not.toHaveTextContent("Agent");
     expect(screen.getByText(CREATE_WITH_AGENT_COPY.emptyHeadline)).toBeInTheDocument();
     expect(screen.getByTestId("create-with-agent-stream")).toHaveTextContent(CREATE_WITH_AGENT_COPY.greeting);
     expect(screen.queryByTestId("create-with-agent-message-greet")).not.toBeInTheDocument();
@@ -80,13 +84,79 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent("acme/payments");
   });
 
-  it("shows the Automations stream while the machine is starting", () => {
+  it("titles the dialog as Refine this task when the session already has a draft", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        refining: true,
+        right: { kind: "draft", draft: { title: "Retry refunds", description: "Stop double charges." } },
+      }),
+    );
+
+    expect(screen.getByRole("heading", { name: CREATE_WITH_AGENT_COPY.titleRefine })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: CREATE_WITH_AGENT_COPY.title })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.update })).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("create-with-agent-draft")).queryByRole("button", {
+        name: CREATE_WITH_AGENT_COPY.create,
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a planning-session intro while the log is empty", () => {
     renderDialog(emptyCreateWithAgentView());
 
     expect(screen.getByTestId("create-with-agent-machine")).toHaveTextContent(CREATE_WITH_AGENT_COPY.machineStarting);
-    expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId("create-with-agent-log-intro")).toHaveTextContent(CREATE_WITH_AGENT_COPY.logStarting);
+    expect(screen.queryByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).not.toBeInTheDocument();
     expect(screen.getByTestId("create-with-agent-composer")).toBeEnabled();
     expect(screen.queryByTestId("create-with-agent-activity-starting")).not.toBeInTheDocument();
+  });
+
+  it("shows the model in the title bar and opens the picker", async () => {
+    const user = userEvent.setup();
+    const onSelectModel = vi.fn();
+    render(
+      <CreateWithAgentDialog
+        open
+        workspaceName="Refunds"
+        view={runningCreateWithAgentView()}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
+        onComposerChange={noop}
+        onSend={noop}
+        onSubmitSurvey={noop}
+        onDraftTitleChange={noop}
+        onCreateDraft={noop}
+        onSkipDraft={noop}
+        onSelectCreated={noop}
+        onRefineCreated={noop}
+        onRequestClose={noop}
+        onCancelEnd={noop}
+        onConfirmEnd={noop}
+        onSelectModel={onSelectModel}
+      />,
+    );
+
+    const trigger = screen.getByTestId("create-with-agent-model");
+    expect(trigger).toHaveTextContent(CREATE_WITH_AGENT_COPY.usingModel("anthropic/claude-sonnet-4-6"));
+    await user.click(trigger);
+    const picker = screen.getByTestId("create-with-agent-model-picker");
+    expect(picker).toHaveTextContent("SuperPlane");
+    expect(picker).toHaveTextContent("Your keys");
+    await user.click(screen.getByTestId("create-with-agent-model-option-byok::anthropic::claude-sonnet-4-6"));
+    expect(onSelectModel).toHaveBeenCalledWith("byok::anthropic::claude-sonnet-4-6");
+  });
+
+  it("turns the model picker off while the machine starts", () => {
+    renderDialog(emptyCreateWithAgentView());
+
+    expect(screen.getByTestId("create-with-agent-model")).toBeDisabled();
+  });
+
+  it("hides the log intro after the agent writes", () => {
+    renderDialog(runningCreateWithAgentView());
+
+    expect(screen.queryByTestId("create-with-agent-log-intro")).not.toBeInTheDocument();
+    expect(screen.getByTestId(`split-run-phase-${PLANNING_SESSION_PHASE_ID}`)).toBeInTheDocument();
   });
 
   it("asks before the session ends", () => {
@@ -96,11 +166,11 @@ describe("CreateWithAgentDialog", () => {
         open
         workspaceName="Refunds"
         view={runningCreateWithAgentView({ endConfirmOpen: true })}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
         onComposerChange={noop}
         onSend={noop}
         onSubmitSurvey={noop}
         onDraftTitleChange={noop}
-        onDraftDescriptionChange={noop}
         onCreateDraft={noop}
         onSkipDraft={noop}
         onSelectCreated={noop}
@@ -150,11 +220,11 @@ describe("CreateWithAgentDialog", () => {
         open
         workspaceName="Refunds"
         view={runningCreateWithAgentView({ created: [order] })}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
         onComposerChange={noop}
         onSend={noop}
         onSubmitSurvey={noop}
         onDraftTitleChange={noop}
-        onDraftDescriptionChange={noop}
         onCreateDraft={noop}
         onSkipDraft={noop}
         onSelectCreated={onSelectCreated}
@@ -173,6 +243,65 @@ describe("CreateWithAgentDialog", () => {
 
     screen.getByRole("button", { name: "NEW-1 Retry refunds" }).click();
     expect(onSelectCreated).toHaveBeenCalledWith(order);
+  });
+
+  it("renders draft description markdown like the task popup", () => {
+    renderDialog(
+      runningCreateWithAgentView({
+        right: {
+          kind: "draft",
+          draft: {
+            title: "Add a color attribute to puppies",
+            description: "## Data model\n\nAdd a `color` field.",
+          },
+        },
+      }),
+    );
+
+    const draft = screen.getByTestId("create-with-agent-draft");
+    expect(within(draft).getByRole("heading", { level: 2, name: "Data model" })).toBeInTheDocument();
+    expect(within(draft).queryByText(/## Data model/)).not.toBeInTheDocument();
+    expect(within(draft).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
+    expect(within(draft).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("create-with-agent-draft-description")).not.toBeInTheDocument();
+    expect(within(draft).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("wraps a long draft title", () => {
+    const title = "Add a color field with a visual color picker to the Puppy entity";
+    renderDialog(
+      runningCreateWithAgentView({
+        right: { kind: "draft", draft: { title, description: "Add a color field." } },
+      }),
+    );
+
+    const field = screen.getByLabelText("Task title");
+    expect(field).toHaveValue(title);
+    expect(field.tagName).toBe("TEXTAREA");
+    expect(field).toHaveClass("wrap-anywhere");
+    expect(field).not.toHaveClass("truncate");
+  });
+
+  it("renders preview description markdown like the task popup", () => {
+    const order = {
+      id: "wo-1",
+      key: "NEW-1",
+      title: "Add a color attribute to puppies",
+      description: "## Data model\n\nAdd a `color` field.",
+    };
+    renderDialog(
+      runningCreateWithAgentView({
+        created: [order],
+        right: { kind: "preview", order },
+      }),
+    );
+
+    const preview = screen.getByTestId("create-with-agent-preview");
+    expect(within(preview).getByRole("heading", { level: 2, name: "Data model" })).toBeInTheDocument();
+    expect(within(preview).queryByText(/## Data model/)).not.toBeInTheDocument();
+    expect(within(preview).getByTestId("work-order-description-markdown")).toHaveTextContent("Add a color field.");
+    expect(within(preview).queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(within(preview).queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
   });
 
   it("shows a read-only task without edit fields", () => {

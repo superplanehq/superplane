@@ -58,6 +58,7 @@ export function SplitRunReview({
   canAct = true,
   onStart,
   onReject,
+  onRefine,
   onBackToDraft,
   onStop,
   startBusy = false,
@@ -73,6 +74,7 @@ export function SplitRunReview({
   canAct?: boolean;
   onStart?: () => void | Promise<void>;
   onReject?: () => void | Promise<void>;
+  onRefine?: () => void;
   onBackToDraft?: () => void | Promise<void>;
   onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
   startBusy?: boolean;
@@ -92,6 +94,10 @@ export function SplitRunReview({
     }
     if (action.kind === "reject") {
       void onReject?.();
+      return;
+    }
+    if (action.kind === "refine") {
+      onRefine?.();
       return;
     }
     if (action.kind === "approve") {

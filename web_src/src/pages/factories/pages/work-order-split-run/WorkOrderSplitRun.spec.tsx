@@ -708,6 +708,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     const start = within(note).getByRole("button", { name: "Start" });
     expect(start).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(start.parentElement).toHaveClass("shrink-0");
     expect(start.parentElement).not.toHaveClass("mt-3");
@@ -719,6 +720,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await openLogTab(user);
     expect(screen.getByTestId("split-run-log-pane").className).not.toContain("minmax(0,3fr)_minmax(0,2fr)");
     expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
     expect(within(note).getByRole("button", { name: "Reject" })).toBeInTheDocument();
     const backlog = screen.getByTestId("split-run-phase-backlog");
     expect(within(backlog).getByRole("button", { name: "Backlog" })).toHaveAttribute("aria-expanded", "false");
@@ -728,6 +730,16 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(backlog).getAllByRole("button", { name: "description.md" }).length).toBeGreaterThan(0);
     expect(screen.queryByText("On Issue Label")).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-checks")).not.toBeInTheDocument();
+  });
+
+  it("shows a spark icon and tooltip on Refine", async () => {
+    const user = userEvent.setup();
+    renderPopup({ fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER) });
+
+    const refine = within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" });
+    expect(refine.querySelector(".lucide-sparkles")).toBeInTheDocument();
+    await user.hover(refine);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
   });
 
   it("puts artifacts on the right and check analyses under the description", () => {

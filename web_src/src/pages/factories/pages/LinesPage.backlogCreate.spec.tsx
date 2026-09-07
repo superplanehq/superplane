@@ -8,6 +8,7 @@ import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
   ACME_ONBOARDING_LINE_ID,
+  DRAFT_WORK_ORDER,
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
   PRIMARY_FACTORY_KEY,
@@ -212,6 +213,57 @@ describe("LinesPage backlog create", () => {
     await waitFor(() => {
       expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
     });
+  });
+
+  it("opens the agent session from Refine on a backlog draft", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        session: {
+          id: "session-1",
+          repository: "acme/payments",
+          canvasRunId: "run-1",
+          messages: [],
+          draft: {
+            title: DRAFT_WORK_ORDER.title,
+            description: DRAFT_WORK_ORDER.description,
+            workOrderId: DRAFT_WORK_ORDER.id,
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    useFactoryWorkOrders.mockReturnValue({ data: [DRAFT_WORK_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), {
+      ...REFUND_FACTORY,
+      onboarding: { ...REFUND_FACTORY.onboarding, appRepository: "acme/payments" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "Open Draft: rework refund telemetry" }));
+    await user.click(within(screen.getByTestId("split-run-attention-note")).getByRole("button", { name: "Refine" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
+    });
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/105`,
+    );
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some(([url, init]) => {
+          return (
+            String(url).includes("/planning-sessions") &&
+            !String(url).includes("/messages") &&
+            init?.method === "POST" &&
+            String(init?.body).includes(`"work_order_id":"${DRAFT_WORK_ORDER.id}"`)
+          );
+        }),
+      ).toBe(true);
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/messages"))).toBe(false);
+    expect(screen.getByRole("heading", { name: "Refine this task" })).toBeInTheDocument();
   });
 
   it("starts the session with the workspace repository, not the demo repo", async () => {

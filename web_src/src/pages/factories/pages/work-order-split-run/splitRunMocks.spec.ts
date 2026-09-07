@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder, FactoriesWorkOrderExecution, FactoriesWorkOrderLineDispatch } from "@/api-client";
+import { createOrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -169,7 +170,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(note?.text).toContain("**plan.md**");
     expect(note?.text).toContain("Confidence 5/5 (High):");
     expect(note?.text).toContain("- The GitHub issue names retryable status codes and a hard attempt limit.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("pins a pull request review on a waiting implement card", () => {
@@ -744,7 +745,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footer.note?.headline).toBe("This task is ready to start");
     expect(fixture.footer.note?.text).toContain("Then click Start to send it to the line.");
-    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Start"]);
+    expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Refine", "Reject", "Start"]);
   });
 
   it("omits invented files and ledger pull requests for a live order", () => {
@@ -757,6 +758,57 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(names).not.toContain("#510");
     expect(names.some((name) => name.startsWith("feature/"))).toBe(false);
     expect(names.filter((name) => name !== "description.md")).toEqual([]);
+  });
+
+  it("uses the org member lookup for the owner avatar when one is supplied", () => {
+    const resolveUser = createOrgUserDisplayLookup(
+      new Map([
+        [
+          "user-1",
+          {
+            id: "user-1",
+            name: "Ada Lovelace",
+            initials: "AL",
+            avatarUrl: "https://example.com/ada.png",
+          },
+        ],
+      ]),
+    );
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+      avatarUrl: "https://example.com/ada.png",
+    });
+  });
+
+  it("falls back to initials when the owner is not in the org member lookup", () => {
+    const resolveUser = createOrgUserDisplayLookup(new Map());
+
+    const fixture = splitRunFixtureForWorkOrder(
+      order({
+        title: "Ship idempotent refund retries",
+        state: "STATE_OPEN",
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      }),
+      { resolveUser },
+    );
+
+    expect(fixture.owner).toEqual({
+      id: "user-1",
+      name: "Ada Lovelace",
+      initials: "AL",
+    });
   });
 });
 
