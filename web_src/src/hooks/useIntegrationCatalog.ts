@@ -18,6 +18,7 @@ import { integrationDetailPath, integrationSetupPath, useIntegrationsBasePath } 
 import { getNextIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
 import { buildIntegrationCatalog, filterIntegrationCatalog, integrationNameSet } from "@/lib/integrationCatalog";
 import { persistGitHubSetupReturnPath, startDirectGitHubConnect } from "@/lib/startDirectGitHubConnect";
+import { areRequiredCreateFieldsFilled } from "@/ui/IntegrationCreateDialog/configurationFields";
 import { useMe } from "@/hooks/useMe";
 
 const INTEGRATION_SURVEY_NAME = "Integration Survey";
@@ -49,6 +50,9 @@ export function useIntegrationCatalog(organizationId: string) {
     () => filterIntegrationCatalog(integrationCatalog, filterQuery),
     [filterQuery, integrationCatalog],
   );
+  const canConnect =
+    Boolean(integrationName.trim()) &&
+    areRequiredCreateFieldsFilled(selectedIntegration?.configuration ?? [], configuration);
 
   useReportPageReady(!isLoading && !permissionsLoading);
 
@@ -86,6 +90,7 @@ export function useIntegrationCatalog(organizationId: string) {
     selectedInstructions: selectedIntegration?.instructions?.trim() ?? "",
     integrationName,
     setIntegrationName,
+    canConnect,
     configuration,
     setConfiguration,
     isModalOpen,
@@ -201,28 +206,20 @@ function useIntegrationCatalogActions({
       setIsModalOpen(true);
       analytics.integrationConnectStart(integration.name ?? "", "integrations_page", organizationId);
     },
-    handleConnect: async () => {
-      if (!canCreateIntegrations || !selectedIntegration?.name) {
-        return;
-      }
-      try {
-        const result = await createIntegrationMutation.mutateAsync({
-          integrationName: selectedIntegration.name,
-          name: integrationName,
-          configuration,
-        });
-        setIsModalOpen(false);
-        setSelectedIntegration(null);
-        setIntegrationName("");
-        setConfiguration({});
-        const createdId = result.data?.integration?.metadata?.id;
-        if (createdId) {
-          navigate(integrationDetailPath(integrationsBasePath, createdId));
-        }
-      } catch (error) {
-        showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
-      }
-    },
+    handleConnect: () =>
+      submitCatalogConnect({
+        canCreateIntegrations,
+        selectedIntegration,
+        integrationName,
+        configuration,
+        createIntegrationMutation,
+        integrationsBasePath,
+        navigate,
+        setIsModalOpen,
+        setSelectedIntegration,
+        setIntegrationName,
+        setConfiguration,
+      }),
     handleRequestIntegration: () => {
       analytics.integrationRequested(organizationId);
     },
@@ -246,6 +243,62 @@ function useIntegrationCatalogActions({
       }
     },
   };
+}
+
+async function submitCatalogConnect({
+  canCreateIntegrations,
+  selectedIntegration,
+  integrationName,
+  configuration,
+  createIntegrationMutation,
+  integrationsBasePath,
+  navigate,
+  setIsModalOpen,
+  setSelectedIntegration,
+  setIntegrationName,
+  setConfiguration,
+}: {
+  canCreateIntegrations: boolean;
+  selectedIntegration: IntegrationsIntegrationDefinition | null;
+  integrationName: string;
+  configuration: Record<string, unknown>;
+  createIntegrationMutation: ReturnType<typeof useCreateIntegration>;
+  integrationsBasePath: string;
+  navigate: ReturnType<typeof useNavigate>;
+  setIsModalOpen: (open: boolean) => void;
+  setSelectedIntegration: (integration: IntegrationsIntegrationDefinition | null) => void;
+  setIntegrationName: (name: string) => void;
+  setConfiguration: (configuration: Record<string, unknown>) => void;
+}) {
+  if (!canCreateIntegrations || !selectedIntegration?.name) {
+    return;
+  }
+  if (!integrationName.trim()) {
+    showErrorToast("Integration name is required");
+    return;
+  }
+  if (!areRequiredCreateFieldsFilled(selectedIntegration.configuration ?? [], configuration)) {
+    showErrorToast("Enter every required field.");
+    return;
+  }
+
+  try {
+    const result = await createIntegrationMutation.mutateAsync({
+      integrationName: selectedIntegration.name,
+      name: integrationName,
+      configuration,
+    });
+    setIsModalOpen(false);
+    setSelectedIntegration(null);
+    setIntegrationName("");
+    setConfiguration({});
+    const createdId = result.data?.integration?.metadata?.id;
+    if (createdId) {
+      navigate(integrationDetailPath(integrationsBasePath, createdId));
+    }
+  } catch (error) {
+    showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+  }
 }
 
 function startCatalogPrivateGitHubApp({

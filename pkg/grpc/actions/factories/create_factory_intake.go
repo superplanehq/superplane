@@ -103,7 +103,10 @@ func CreateFactoryIntake(
 		log.Warnf("factory %s: intake starts without a Backlog scorer: %v", factory.ID, err)
 	}
 
-	binding := resolveIntakeBinding(db, factory, source)
+	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), req.GetResourceId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
 		OrganizationID: orgID,
 		FactoryID:      factoryID,

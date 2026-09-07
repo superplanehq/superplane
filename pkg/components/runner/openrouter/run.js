@@ -194,6 +194,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   let exitCode = 1;
   const startedAt = Date.now();
   const turnLimit = resolveMaxTurns(maxTurns);
+  const telemetry = loadTurnTelemetry();
 
   try {
     for (let turn = 0; turn < turnLimit; turn += 1) {
@@ -205,6 +206,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       const message = (response.choices && response.choices[0] && response.choices[0].message) || {};
       messages.push(message);
       const text = assistantText(message);
+      telemetry.beginTurn(turnUsageFromResponse(response.usage), { message: text, forceNew: true });
       if (text) {
         lastText = text;
         process.stdout.write(`${lastText}\n`);
@@ -225,25 +227,29 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
         const name = call.function && call.function.name;
         const args = parseArgs(call.function && call.function.arguments);
         const kind = String(name || "tool").toLowerCase();
-        const startedAt = Date.now();
-        writeLiveLogRecord({
-          type: "tool_start",
-          id: call.id,
-          kind,
-          text: toolPreview(kind, args),
-          started_at: startedAt,
-        });
+        const toolStartedAt = Date.now();
+        writeLiveLogRecord(
+          telemetry.stampToolStart({
+            type: "tool_start",
+            id: call.id,
+            kind,
+            text: toolPreview(kind, args),
+            started_at: toolStartedAt,
+          }),
+        );
         const result = await dispatchTool(name, args, { planning, planningHelpers });
         if (result.output) {
           process.stdout.write(`${result.output}\n`);
         }
-        writeLiveLogRecord({
-          type: "tool_end",
-          id: call.id,
-          kind,
-          status: result.failed ? "failed" : "passed",
-          duration_ms: Math.max(0, Date.now() - startedAt),
-        });
+        writeLiveLogRecord(
+          telemetry.stampToolEnd({
+            type: "tool_end",
+            id: call.id,
+            kind,
+            status: result.failed ? "failed" : "passed",
+            duration_ms: Math.max(0, Date.now() - toolStartedAt),
+          }),
+        );
         messages.push({
           role: "tool",
           tool_call_id: call.id,
@@ -257,6 +263,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       lastText = wrapUp.text;
       costMicros += wrapUp.costMicros;
       numTurns += 1;
+      telemetry.beginTurn(turnUsageFromResponse(wrapUp.usage), { message: lastText, forceNew: true });
     }
     exitCode = 0;
     return 0;
@@ -265,7 +272,7 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
     exitCode = 1;
     return 1;
   } finally {
-    writeResult(resultFile, model, usage, costMicros, lastText);
+    writeResult(resultFile, model, usage, costMicros, lastText, telemetry);
     formatTurnResult({
       is_error: exitCode !== 0,
       num_turns: numTurns || 1,
@@ -295,7 +302,7 @@ function formatTurnResult(event) {
   process.stdout.write(`${parts.join(" · ")}\n`);
 }
 
-function writeResult(resultFile, model, usage, costMicros, lastText) {
+function writeResult(resultFile, model, usage, costMicros, lastText, telemetry) {
   const payload = {
     type: "result",
     result: lastText,
@@ -305,8 +312,26 @@ function writeResult(resultFile, model, usage, costMicros, lastText) {
   if (costMicros > 0) {
     payload.total_cost_usd = costMicros / 1000000;
   }
+  if (telemetry) {
+    telemetry.attachToResult(payload);
+  }
   fs.writeFileSync(resultFile, `${JSON.stringify(payload)}\n`);
   accumulateLLMUsage(payload);
+}
+
+function loadTurnTelemetry() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR;
+  const candidates = [];
+  if (taskDir) {
+    candidates.push(path.join(taskDir, "turn_telemetry.js"));
+  }
+  candidates.push(path.join(__dirname, "..", "turn_telemetry.js"));
+  for (const file of candidates) {
+    if (fs.existsSync(file)) {
+      return require(file).createTurnTelemetry();
+    }
+  }
+  return require("../turn_telemetry").createTurnTelemetry();
 }
 
 function resolveMaxTurns(maxTurns) {
@@ -380,7 +405,23 @@ async function requestWrapUp(baseURL, apiKey, model, messages, usage, lastText, 
   return {
     text: text || lastText,
     costMicros: usageCostMicros(response.usage),
+    usage: response.usage,
   };
+}
+
+function turnUsageFromResponse(usage) {
+  const turn = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    reasoning_tokens: 0,
+  };
+  addUsage(turn, usage);
+  const costMicros = usageCostMicros(usage);
+  if (costMicros > 0) {
+    turn.total_cost_usd = costMicros / 1000000;
+  }
+  return turn;
 }
 
 async function chat(baseURL, apiKey, model, messages, withTools, tools = TOOLS) {

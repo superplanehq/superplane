@@ -338,6 +338,12 @@ func renderRunnerLogRecord(stdout io.Writer, record runneraction.LiveLogRecord) 
 	case "tool_end":
 		_, err := fmt.Fprintf(stdout, "  # tool %s (%dms)\n", record.Status, int64Value(record.DurationMS))
 		return err
+	case "turn":
+		if record.Turn != nil {
+			_, err := fmt.Fprintf(stdout, "# turn %d\n", *record.Turn)
+			return err
+		}
+		return nil
 	default:
 		return nil
 	}
