@@ -16,6 +16,7 @@ export type PlanningSessionPayload = {
   canvasRunId?: string;
   waitState?: string;
   executionId?: string;
+  selectableModelKey?: string;
   messages?: PlanningSessionMessagePayload[];
   draft?: { title?: string; description?: string } | null;
   created?: Array<{ id?: string; key?: string; title?: string; description?: string }>;
@@ -69,6 +70,7 @@ export function createWithAgentViewFromSession(
     created,
     right,
     endConfirmOpen: extras.endConfirmOpen,
+    selectableModelKey: session.selectableModelKey ?? "",
   };
 }
 

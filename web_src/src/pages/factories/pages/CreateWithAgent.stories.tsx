@@ -3,6 +3,7 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import {
+  CREATE_WITH_AGENT_DEMO_MODELS,
   CREATE_WITH_AGENT_DEMO_REPOSITORY,
   emptyCreateWithAgentView,
   failedCreateWithAgentView,
@@ -10,6 +11,7 @@ import {
   waitingCreateWithAgentView,
 } from "./createWithAgentDemo";
 import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
+import { CreateWithAgentModelPicker } from "./CreateWithAgentModelPicker";
 import type { CreateWithAgentView } from "./createWithAgentTypes";
 
 const createdOrder = {
@@ -28,7 +30,13 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-function StaticSession({ initial }: { initial: CreateWithAgentView }) {
+function StaticSession({
+  initial,
+  modelPickerOpen = false,
+}: {
+  initial: CreateWithAgentView;
+  modelPickerOpen?: boolean;
+}) {
   const [view, setView] = useState(initial);
   return (
     <MemoryRouter>
@@ -36,6 +44,9 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         open
         workspaceName="Refunds"
         view={view}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
+        modelPickerOpen={modelPickerOpen}
+        onModelPickerOpenChange={() => undefined}
         onComposerChange={(composer) => setView((current) => ({ ...current, composer }))}
         onSend={() => undefined}
         onSubmitSurvey={() => undefined}
@@ -60,6 +71,7 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
         onRequestClose={() => setView((current) => ({ ...current, endConfirmOpen: true }))}
         onCancelEnd={() => setView((current) => ({ ...current, endConfirmOpen: false }))}
         onConfirmEnd={() => undefined}
+        onSelectModel={(key) => setView((current) => ({ ...current, selectableModelKey: key }))}
       />
     </MemoryRouter>
   );
@@ -162,5 +174,27 @@ export const EndConfirm: Story = {
         endConfirmOpen: true,
       })}
     />
+  ),
+};
+
+export const ModelPickerOpen: Story = {
+  name: "Model picker open",
+  render: () => <StaticSession initial={runningCreateWithAgentView()} modelPickerOpen />,
+};
+
+export const HeaderControl: Story = {
+  name: "Title-bar model control",
+  render: () => (
+    <MemoryRouter>
+      <div className="flex justify-end p-8">
+        <CreateWithAgentModelPicker
+          models={CREATE_WITH_AGENT_DEMO_MODELS}
+          selectedKey="hosted::anthropic::claude-sonnet-4-6"
+          selectedLabel="anthropic/claude-sonnet-4-6"
+          open
+          onSelect={() => undefined}
+        />
+      </div>
+    </MemoryRouter>
   ),
 };

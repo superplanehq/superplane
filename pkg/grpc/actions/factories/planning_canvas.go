@@ -1,13 +1,13 @@
 package factories
 
 import (
+	"encoding/json"
 	"errors"
-	"slices"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
 	"gorm.io/datatypes"
@@ -21,8 +21,9 @@ const (
 )
 
 var (
-	errPlanningClaudeRequired = errors.New("claude is not connected")
-	errPlanningGitHubRequired = errors.New("github is not connected")
+	errPlanningClaudeRequired   = errors.New("claude is not connected")
+	errPlanningGitHubRequired   = errors.New("github is not connected")
+	errPlanningProviderRequired = errors.New("provider is not connected")
 )
 
 func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
@@ -153,8 +154,11 @@ func requirePlanningGitHub(tx *gorm.DB, factoryModel *models.Factory) error {
 }
 
 func planningCanvasAgent(tx *gorm.DB, factoryModel *models.Factory) (*intakeAgent, error) {
-	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil && agent.component() == "runnerClaudeCode" {
-		return agent, nil
+	if agent := resolveIntakeAgent(tx, factoryModel); agent != nil {
+		switch agent.component() {
+		case "runnerClaudeCode", models.SuperPlaneRunnerComponent:
+			return agent, nil
+		}
 	}
 	if agent := resolveClaudePlanningAgent(tx, factoryModel); agent != nil {
 		return agent, nil
@@ -174,28 +178,16 @@ func resolveClaudePlanningAgent(tx *gorm.DB, factoryModel *models.Factory) *inta
 			}
 		}
 	}
-	providers, err := models.ListHostedLLMProviders(tx)
-	if err != nil {
-		return nil
-	}
-	index := slices.IndexFunc(providers, func(provider models.HostedLLMProvider) bool {
-		return provider.Provider == models.UsageProviderAnthropic && provider.OffersHostedModels()
-	})
-	if index < 0 {
-		return nil
-	}
-	model := hostedIntakeModel(providers[index], "opus")
-	if model == "" {
-		return nil
-	}
-	return &intakeAgent{
-		Component:   "runnerClaudeCode",
-		Credentials: map[string]any{"source": runner.CredentialsSourceHosted},
-		Model:       model,
-	}
+	return intakeAgentFromHostedProvider(tx, factoryModel)
 }
 
 func planningTemplateAgent(agent *intakeAgent) *factoryTemplateAgent {
+	if agent.component() == models.SuperPlaneRunnerComponent {
+		return &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		}
+	}
 	out := &factoryTemplateAgent{
 		component: "runnerClaudeCode",
 		model:     agent.model(),
@@ -262,4 +254,100 @@ func planningCanvasConfigSteps(raw any) []map[string]any {
 	default:
 		return nil
 	}
+}
+
+const planningSessionRewindLimit = 20
+
+func clonePlanningCanvasNodes(nodes []models.Node) ([]models.Node, error) {
+	raw, err := json.Marshal(nodes)
+	if err != nil {
+		return nil, err
+	}
+	var cloned []models.Node
+	if err := json.Unmarshal(raw, &cloned); err != nil {
+		return nil, err
+	}
+	return cloned, nil
+}
+
+func applySelectableModelToPlanningNodes(tx *gorm.DB, orgID uuid.UUID, nodes []models.Node, model models.SelectableLLMModel, messages []models.PlanningSessionMessage) error {
+	component, err := models.SelectableLLMRunnerComponent(model)
+	if err != nil {
+		return err
+	}
+	credentials, err := models.SelectableLLMRunnerCredentials(tx, orgID, model)
+	if err != nil {
+		return err
+	}
+	for i := range nodes {
+		if nodes[i].ID != planningCanvasAgentNodeID {
+			continue
+		}
+		if nodes[i].Ref.Component == nil {
+			nodes[i].Ref.Component = &models.ComponentRef{}
+		}
+		nodes[i].Ref.Component.Name = component
+		if nodes[i].Configuration == nil {
+			nodes[i].Configuration = map[string]any{}
+		}
+		if credentials == nil {
+			delete(nodes[i].Configuration, "credentials")
+			delete(nodes[i].Configuration, "maxTurns")
+		} else {
+			nodes[i].Configuration["credentials"] = credentials
+		}
+		nodes[i].Configuration["model"] = models.SelectableLLMRunnerModel(model)
+		if hostedProvider := planningHostedProvider(model); hostedProvider != "" {
+			nodes[i].Configuration["hostedProvider"] = hostedProvider
+		} else {
+			delete(nodes[i].Configuration, "hostedProvider")
+		}
+		seedPlanningPromptRewind(nodes[i].Configuration, messages)
+		return nil
+	}
+	return fmt.Errorf("planning canvas has no planning-agent node")
+}
+
+func planningHostedProvider(model models.SelectableLLMModel) string {
+	if model.Source.ID != models.UsageFundingSourceHosted {
+		return ""
+	}
+	return model.Provider.ID
+}
+
+func seedPlanningPromptRewind(configuration map[string]any, messages []models.PlanningSessionMessage) {
+	if len(messages) == 0 {
+		return
+	}
+	steps := planningCanvasConfigSteps(configuration["steps"])
+	if len(steps) == 0 {
+		return
+	}
+	for _, step := range steps {
+		prompt, _ := step["prompt"].(string)
+		if strings.TrimSpace(prompt) == "" {
+			continue
+		}
+		step["prompt"] = planningSessionRewindPrompt(prompt, messages)
+		configuration["steps"] = steps
+		return
+	}
+}
+
+func planningSessionRewindPrompt(base string, messages []models.PlanningSessionMessage) string {
+	if len(messages) > planningSessionRewindLimit {
+		messages = messages[len(messages)-planningSessionRewindLimit:]
+	}
+	var b strings.Builder
+	b.WriteString("Continue this SuperPlane planning session. Prior messages:\n")
+	for _, message := range messages {
+		role := "User"
+		if message.Role == models.PlanningSessionMessageRoleAgent {
+			role = "Agent"
+		}
+		fmt.Fprintf(&b, "\n%s: %s\n", role, strings.TrimSpace(message.Text))
+	}
+	b.WriteString("\nDo not greet as if the session is new. Continue from the last message.\n\n")
+	b.WriteString(base)
+	return b.String()
 }

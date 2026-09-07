@@ -10,6 +10,7 @@ const sendPlanningSessionMessage = vi.fn();
 const updatePlanningSessionDraft = vi.fn();
 const createPlanningSessionWorkOrder = vi.fn();
 const skipPlanningSessionDraft = vi.fn();
+const reloadPlanningSessionAgent = vi.fn();
 
 vi.mock("./planningSessionClient", () => ({
   startPlanningSession: (...args: unknown[]) => startPlanningSession(...args),
@@ -19,6 +20,7 @@ vi.mock("./planningSessionClient", () => ({
   updatePlanningSessionDraft: (...args: unknown[]) => updatePlanningSessionDraft(...args),
   createPlanningSessionWorkOrder: (...args: unknown[]) => createPlanningSessionWorkOrder(...args),
   skipPlanningSessionDraft: (...args: unknown[]) => skipPlanningSessionDraft(...args),
+  reloadPlanningSessionAgent: (...args: unknown[]) => reloadPlanningSessionAgent(...args),
 }));
 
 const showErrorToast = vi.fn();
@@ -46,6 +48,7 @@ describe("useCreateWithAgentSession", () => {
     updatePlanningSessionDraft.mockReset();
     createPlanningSessionWorkOrder.mockReset();
     skipPlanningSessionDraft.mockReset();
+    reloadPlanningSessionAgent.mockReset();
     endPlanningSession.mockResolvedValue(session("ended"));
     describePlanningSession.mockResolvedValue(session("session-1"));
     showErrorToast.mockReset();
@@ -285,5 +288,43 @@ describe("useCreateWithAgentSession", () => {
     });
     expect(result.current.open).toBe(false);
     expect(result.current.view.canvasId).toBe("");
+  });
+
+  it("reloads the agent and keeps the session", async () => {
+    startPlanningSession.mockResolvedValue({
+      ...session("session-1"),
+      selectableModelKey: "hosted::anthropic::claude-sonnet-4-6",
+      executionId: "exec-1",
+    });
+    reloadPlanningSessionAgent.mockResolvedValue({
+      ...session("session-1"),
+      selectableModelKey: "byok::anthropic::claude-sonnet-4-6",
+      canvasRunId: "run-2",
+      executionId: "",
+    });
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start();
+    });
+    await waitFor(() => {
+      expect(result.current.view.canvasId).toBe("canvas-session-1");
+    });
+
+    act(() => {
+      result.current.onSelectModel("byok::anthropic::claude-sonnet-4-6");
+    });
+
+    await waitFor(() => {
+      expect(reloadPlanningSessionAgent).toHaveBeenCalledWith(
+        "org-1",
+        "factory-1",
+        "session-1",
+        "byok::anthropic::claude-sonnet-4-6",
+      );
+      expect(result.current.view.selectableModelKey).toBe("byok::anthropic::claude-sonnet-4-6");
+    });
+    expect(endPlanningSession).not.toHaveBeenCalled();
+    expect(result.current.view.canvasId).toBe("canvas-session-1");
   });
 });

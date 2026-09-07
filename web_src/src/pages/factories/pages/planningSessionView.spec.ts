@@ -250,4 +250,18 @@ describe("createWithAgentViewFromSession", () => {
 
     expect(view.messages[0]?.createdAtMs).toBeUndefined();
   });
+
+  it("carries the selected model key", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        selectableModelKey: "hosted::anthropic::claude-sonnet-4-6",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.selectableModelKey).toBe("hosted::anthropic::claude-sonnet-4-6");
+  });
 });

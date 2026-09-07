@@ -158,17 +158,24 @@ export function BacklogColumn({
         onSave={onSaveSettings}
         onClose={onCloseSettings}
       />
-      <BacklogCreateWithAgentDialog factoryKey={factoryKey} organizationId={organizationId} session={agentSession} />
+      <BacklogCreateWithAgentDialog
+        factoryKey={factoryKey}
+        factoryId={factoryId}
+        organizationId={organizationId}
+        session={agentSession}
+      />
     </>
   );
 }
 
 function BacklogCreateWithAgentDialog({
   factoryKey,
+  factoryId,
   organizationId,
   session,
 }: {
   factoryKey: string;
+  factoryId: string;
   organizationId: string;
   session: ReturnType<typeof useCreateWithAgentSession>;
 }) {
@@ -178,6 +185,7 @@ function BacklogCreateWithAgentDialog({
       open={session.open}
       workspaceName={factoryKey}
       organizationId={organizationId}
+      factoryId={factoryId}
       view={view}
       onComposerChange={session.onComposerChange}
       onSend={session.onSend}
@@ -191,6 +199,7 @@ function BacklogCreateWithAgentDialog({
       onRequestClose={session.onRequestClose}
       onCancelEnd={session.onCancelEnd}
       onConfirmEnd={session.onConfirmEnd}
+      onSelectModel={session.onSelectModel}
     />
   );
 }

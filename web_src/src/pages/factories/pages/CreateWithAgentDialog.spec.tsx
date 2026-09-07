@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import {
+  CREATE_WITH_AGENT_DEMO_MODELS,
   emptyCreateWithAgentView,
   failedCreateWithAgentView,
   runningCreateWithAgentView,
@@ -33,6 +34,7 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       open
       workspaceName="Refunds"
       view={view}
+      models={CREATE_WITH_AGENT_DEMO_MODELS}
       onComposerChange={noop}
       onSend={noop}
       onSubmitSurvey={noop}
@@ -45,6 +47,7 @@ function renderDialog(view: CreateWithAgentDialogProps["view"]) {
       onRequestClose={noop}
       onCancelEnd={noop}
       onConfirmEnd={noop}
+      onSelectModel={noop}
     />,
   );
 }
@@ -89,6 +92,47 @@ describe("CreateWithAgentDialog", () => {
     expect(screen.queryByTestId("create-with-agent-activity-starting")).not.toBeInTheDocument();
   });
 
+  it("shows the model in the title bar and opens the picker", async () => {
+    const user = userEvent.setup();
+    const onSelectModel = vi.fn();
+    render(
+      <CreateWithAgentDialog
+        open
+        workspaceName="Refunds"
+        view={runningCreateWithAgentView()}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
+        onComposerChange={noop}
+        onSend={noop}
+        onSubmitSurvey={noop}
+        onDraftTitleChange={noop}
+        onDraftDescriptionChange={noop}
+        onCreateDraft={noop}
+        onSkipDraft={noop}
+        onSelectCreated={noop}
+        onRefineCreated={noop}
+        onRequestClose={noop}
+        onCancelEnd={noop}
+        onConfirmEnd={noop}
+        onSelectModel={onSelectModel}
+      />,
+    );
+
+    const trigger = screen.getByTestId("create-with-agent-model");
+    expect(trigger).toHaveTextContent(CREATE_WITH_AGENT_COPY.usingModel("anthropic/claude-sonnet-4-6"));
+    await user.click(trigger);
+    const picker = screen.getByTestId("create-with-agent-model-picker");
+    expect(picker).toHaveTextContent("SuperPlane");
+    expect(picker).toHaveTextContent("Your keys");
+    await user.click(screen.getByTestId("create-with-agent-model-option-byok::anthropic::claude-sonnet-4-6"));
+    expect(onSelectModel).toHaveBeenCalledWith("byok::anthropic::claude-sonnet-4-6");
+  });
+
+  it("turns the model picker off while the machine starts", () => {
+    renderDialog(emptyCreateWithAgentView());
+
+    expect(screen.getByTestId("create-with-agent-model")).toBeDisabled();
+  });
+
   it("asks before the session ends", () => {
     const onConfirmEnd = vi.fn();
     render(
@@ -96,6 +140,7 @@ describe("CreateWithAgentDialog", () => {
         open
         workspaceName="Refunds"
         view={runningCreateWithAgentView({ endConfirmOpen: true })}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
         onComposerChange={noop}
         onSend={noop}
         onSubmitSurvey={noop}
@@ -150,6 +195,7 @@ describe("CreateWithAgentDialog", () => {
         open
         workspaceName="Refunds"
         view={runningCreateWithAgentView({ created: [order] })}
+        models={CREATE_WITH_AGENT_DEMO_MODELS}
         onComposerChange={noop}
         onSend={noop}
         onSubmitSurvey={noop}

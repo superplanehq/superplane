@@ -40,6 +40,10 @@ export const CREATE_WITH_AGENT_COPY = {
   failedDraft: "Failed to save the draft.",
   failedCreate: "Failed to create the task.",
   failedSkip: "Failed to skip the draft.",
+  failedReload: "Failed to reload the agent.",
+  usingModel: (label: string) => `Using ${label}`,
+  selectModel: "Select a model",
+  noModels: "No models are available.",
 } as const;
 
 export function planningRefineNote(key: string, title: string) {

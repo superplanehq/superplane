@@ -21,6 +21,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { appendCanvasToFolderMembership } from "./canvasFolderMembership";
 import {
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
   type FactoryAgentRewrite,
@@ -114,16 +115,8 @@ export async function materializeAndCommitFactoryTemplate(args: {
     const integrations = Object.entries(args.integrations).flatMap(([type, integration]) =>
       integration ? [{ type, id: integration.id, name: integration.name }] : [],
     );
-    const agent = args.agentRewrite
-      ? {
-          component: args.agentRewrite.component,
-          model: args.agentRewrite.model,
-          planningModel: args.agentRewrite.planningModel,
-          credentialSource: args.agentRewrite.credentials.source,
-          credentialIntegrationName:
-            args.agentRewrite.credentials.source === "integration" ? args.agentRewrite.credentials.name : undefined,
-        }
-      : undefined;
+    const rewrite = args.agentRewrite;
+    const agent = rewrite ? factoryAppTemplateAgentFromRewrite(rewrite) : undefined;
     const response = await factoriesMaterializeFactoryAppTemplate(
       withOrganizationHeader({
         organizationId: args.organizationId,

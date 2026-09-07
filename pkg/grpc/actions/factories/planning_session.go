@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -184,6 +186,109 @@ func SkipPlanningSessionDraft(ctx context.Context, organizationID string, req *p
 	return &pb.SkipPlanningSessionDraftResponse{Session: serialized}, nil
 }
 
+func ReloadPlanningSessionAgent(ctx context.Context, organizationID string, req *pb.ReloadPlanningSessionAgentRequest) (*pb.ReloadPlanningSessionAgentResponse, error) {
+	session, factoryModel, err := loadPlanningSession(ctx, organizationID, req.GetFactoryId(), req.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	if session.State == models.PlanningSessionStateEnded {
+		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionEnded, "failed to reload planning session agent")
+	}
+	if session.CanvasID == nil {
+		return nil, factoryErrorToStatus(models.ErrFactoryPlanningSessionInvalid, "failed to reload planning session agent")
+	}
+
+	db := database.DB(ctx)
+	selected, err := models.FindSelectableLLMModel(db, session.OrganizationID, &session.FactoryID, req.GetSelectableModelKey())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
+	}
+	if err := assertPlanningSelectableModelReady(db, session.OrganizationID, selected); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
+	}
+
+	oldRunID := session.CanvasRunID
+	var newRun *models.CanvasRun
+	err = db.Transaction(func(tx *gorm.DB) error {
+		if err := session.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if session.State == models.PlanningSessionStateEnded {
+			return models.ErrFactoryPlanningSessionEnded
+		}
+		canvas, err := models.FindCanvasInTransaction(tx, session.OrganizationID, *session.CanvasID)
+		if err != nil {
+			return err
+		}
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(tx, canvas.ID)
+		if err != nil {
+			return err
+		}
+		nodes, err := clonePlanningCanvasNodes([]models.Node(liveVersion.Nodes))
+		if err != nil {
+			return err
+		}
+		if err := applySelectableModelToPlanningNodes(tx, session.OrganizationID, nodes, selected, session.Messages); err != nil {
+			return err
+		}
+		now := time.Now()
+		version := models.CanvasVersion{
+			ID:            uuid.New(),
+			WorkflowID:    canvas.ID,
+			OwnerID:       &session.CreatedByUserID,
+			CommitMessage: "Create with an Agent model",
+			Nodes:         datatypes.NewJSONSlice(nodes),
+			Edges:         liveVersion.Edges,
+			ConsolePanels: liveVersion.ConsolePanels,
+			ConsoleLayout: liveVersion.ConsoleLayout,
+			CreatedAt:     &now,
+			UpdatedAt:     &now,
+		}
+		if err := tx.Create(&version).Error; err != nil {
+			return err
+		}
+		entrypoint, err := planningCanvasEntrypoint(tx, canvas.ID)
+		if err != nil {
+			return err
+		}
+		newRun = models.NewPlanningSessionRun(canvas.ID, version.ID, entrypoint, factoryModel.ID.String(), session.Repository, selected.Key)
+		if err := tx.Create(newRun).Error; err != nil {
+			return err
+		}
+		return session.AttachAgentRun(tx, newRun.ID, selected.Key)
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
+	}
+
+	if oldRunID != nil {
+		cancelPlanningSessionRunByID(ctx, db, session.OrganizationID, *session.CanvasID, *oldRunID)
+	}
+	if err := messages.NewCanvasRunMessage(session.CanvasID.String(), newRun.ID.String()).PublishPending(); err != nil {
+		log.WithError(err).Warnf("Failed to publish planning session run %s", newRun.ID)
+	}
+
+	serialized, err := serializePlanningSession(db, factoryModel, session)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to reload planning session agent")
+	}
+	return &pb.ReloadPlanningSessionAgentResponse{Session: serialized}, nil
+}
+
+func assertPlanningSelectableModelReady(tx *gorm.DB, orgID uuid.UUID, model models.SelectableLLMModel) error {
+	if model.Source.ID != models.UsageFundingSourceBYOK {
+		return nil
+	}
+	integration, err := models.FindReadyBYOKIntegration(tx, orgID, model.Provider.ID)
+	if err != nil {
+		return err
+	}
+	if integration == nil {
+		return errPlanningProviderRequired
+	}
+	return nil
+}
+
 func rejectIfPlanningSessionAtCap(tx *gorm.DB, factoryModel *models.Factory, canvasID uuid.UUID) error {
 	cap, err := planningSessionParallelismCap(tx, canvasID)
 	if err != nil {
@@ -269,13 +374,17 @@ func cancelPlanningSessionRun(ctx context.Context, db *gorm.DB, session *models.
 	if session.CanvasID == nil || session.CanvasRunID == nil {
 		return
 	}
-	canvas, err := models.FindCanvasInTransaction(db, session.OrganizationID, *session.CanvasID)
+	cancelPlanningSessionRunByID(ctx, db, session.OrganizationID, *session.CanvasID, *session.CanvasRunID)
+}
+
+func cancelPlanningSessionRunByID(ctx context.Context, db *gorm.DB, organizationID, canvasID, runID uuid.UUID) {
+	canvas, err := models.FindCanvasInTransaction(db, organizationID, canvasID)
 	if err != nil {
-		log.WithError(err).Warnf("Failed to load planning session canvas %s", session.CanvasID)
+		log.WithError(err).Warnf("Failed to load planning session canvas %s", canvasID)
 		return
 	}
-	if _, err := canvases.CancelRun(ctx, db, canvas, *session.CanvasRunID); err != nil {
-		log.WithError(err).Warnf("Failed to cancel planning session run %s", session.CanvasRunID)
+	if _, err := canvases.CancelRun(ctx, db, canvas, runID); err != nil {
+		log.WithError(err).Warnf("Failed to cancel planning session run %s", runID)
 	}
 }
 
@@ -328,6 +437,7 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 		return nil, err
 	}
 	out.ExecutionId = executionID
+	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
 		out.Draft = &pb.PlanningSessionDraft{Title: draft.Title, Description: draft.Description}
 	}
