@@ -24,7 +24,7 @@ There are many ways to contribute to SuperPlane:
 Getting started with SuperPlane development is fast. It only takes a couple of
 minutes to set up your local development environment!
 
-### Pre-requisites
+### Prerequisites
 
 The complete development is done inside of Docker, so you don't need any
 programming languages, databases, or other dependencies installed directly on
@@ -32,9 +32,14 @@ your machine. Everything runs in containers managed by Make and Docker.
 
 Before you begin, make sure you have the following:
 
-- You are running MacOS or Linux
+- You are running **macOS**, **Linux**, or **Windows with WSL2** (recommended for Windows)
 - [Make](https://www.gnu.org/software/make/)
-- [Docker](https://www.docker.com/)
+- [Docker](https://www.docker.com/) (Docker Desktop on Windows should use the WSL2 backend)
+
+> **Windows tip:** Clone and run the repo from your WSL2 filesystem (for example
+> `~/projects/superplane`), not from a `/mnt/c/...` path. That keeps Docker volume
+> mounts and file watching reliable. Open the WSL folder in VS Code or Cursor with
+> the Remote - WSL extension if you prefer a GUI editor.
 
 ### Forking and Cloning the Repository
 
