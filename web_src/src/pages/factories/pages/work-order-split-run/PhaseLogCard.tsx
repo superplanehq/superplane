@@ -410,6 +410,7 @@ export function PhaseLogCard({
   organizationId,
   canvasId,
   compactSessionLog = false,
+  streamLoading = false,
 }: {
   phase: SplitRunPhase;
   expanded: boolean;
@@ -429,12 +430,17 @@ export function PhaseLogCard({
   canvasId?: string;
   /** Collapse setup noise and bash in the Create with an Agent session log. */
   compactSessionLog?: boolean;
+  /** Live canvas or run details are still loading for this phase. */
+  streamLoading?: boolean;
 }) {
   const groups = groupSplitRunStream(stream ?? phase.stream);
   const producedArtifacts = artifactsProducedBySteps(groups, phase.artifacts);
   const producedPullRequests = pullRequestsProducedBySteps(groups);
   const rootRef = useRef<HTMLDivElement>(null);
   useLastRunningLine(rootRef, phase.status === "running");
+  const expectUsage = groups.some(
+    (group) => isRunnerComponent(group.line.component) && Boolean(group.line.executionId),
+  );
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -455,7 +461,7 @@ export function PhaseLogCard({
       data-testid={`split-run-phase-${phase.id}`}
       aria-current={expanded ? "step" : undefined}
     >
-      <PhaseAgentUsageProvider>
+      <PhaseAgentUsageProvider streamLoading={streamLoading} expectUsage={expectUsage}>
         <PhaseCollapsedUsageCollectors
           groups={groups}
           expanded={expanded}
@@ -870,13 +876,14 @@ function StreamNode({
   compactSessionLog: boolean;
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const { notes: liveNotes, usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
-  useReportPhaseAgentUsageSeries(
-    line.nodeId ?? line.id,
-    line.componentName,
-    usageSeries,
-    isRunnerComponent(line.component),
-  );
+  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries({
+    nodeId: line.nodeId ?? line.id,
+    fallbackName: line.componentName,
+    series: usageSeries,
+    enabled: isRunnerComponent(line.component),
+    loading: usageLoading,
+  });
   const merged = compactSessionLog
     ? mergePlanningSessionNotes(liveNotes, notes)
     : mergeLiveStreamNotes(liveNotes, notes);
@@ -1252,8 +1259,14 @@ function PhaseAgentUsageCollector({
   organizationId?: string;
   canvasId?: string;
 }) {
-  const { usageSeries } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
-  useReportPhaseAgentUsageSeries(line.nodeId ?? line.id, line.componentName, usageSeries, true);
+  const { usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  useReportPhaseAgentUsageSeries({
+    nodeId: line.nodeId ?? line.id,
+    fallbackName: line.componentName,
+    series: usageSeries,
+    enabled: true,
+    loading: usageLoading,
+  });
   return null;
 }
 
@@ -1261,7 +1274,12 @@ function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
-): { notes: SplitRunStreamLine[] | undefined; telemetry: AgentRunTelemetry; usageSeries: AgentPromptUsageSeries[] } {
+): {
+  notes: SplitRunStreamLine[] | undefined;
+  telemetry: AgentRunTelemetry;
+  usageSeries: AgentPromptUsageSeries[];
+  usageLoading: boolean;
+} {
   const canStream = Boolean(organizationId && canvasId && line.executionId && isRunnerComponent(line.component));
   const { sections, orphanLines, error, isStreaming, telemetry, usageSeries } = useLiveLogStream(
     canStream ? (line.executionId ?? "") : "",
@@ -1276,8 +1294,10 @@ function useRunnerNodeLiveNotes(
     [nextTelemetry],
   );
   const nextSeries = usageSeries && usageSeries.length > 0 ? usageSeries : fallbackSeries;
+  const hasTurns = nextSeries.some((item) => item.telemetry.turns.length > 0);
+  const usageLoading = canStream && isStreaming && !hasTurns;
   if (!canStream) {
-    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries };
+    return { notes: undefined, telemetry: nextTelemetry, usageSeries: nextSeries, usageLoading: false };
   }
   return {
     notes: notesForLiveStream({
@@ -1290,5 +1310,6 @@ function useRunnerNodeLiveNotes(
     }),
     telemetry: nextTelemetry,
     usageSeries: nextSeries,
+    usageLoading,
   };
 }
