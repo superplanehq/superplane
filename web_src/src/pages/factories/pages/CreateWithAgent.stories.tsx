@@ -46,13 +46,6 @@ function StaticSession({ initial }: { initial: CreateWithAgentView }) {
               : current,
           )
         }
-        onDraftDescriptionChange={(description) =>
-          setView((current) =>
-            current.right.kind === "draft"
-              ? { ...current, right: { kind: "draft", draft: { ...current.right.draft, description } } }
-              : current,
-          )
-        }
         onCreateDraft={() => undefined}
         onSkipDraft={() => undefined}
         onSelectCreated={(order) => setView((current) => ({ ...current, right: { kind: "preview", order } }))}

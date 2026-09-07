@@ -141,6 +141,29 @@ describe("useCreateWithAgentSession", () => {
     });
   });
 
+  it("starts Refine with the draft work order and does not send a protocol note", async () => {
+    startPlanningSession.mockResolvedValue({
+      ...session("session-1"),
+      draft: { title: "Retry refunds", description: "Stop double charges.", workOrderId: "wo-1" },
+    });
+    const { result } = renderHook(() => useCreateWithAgentSession("acme/payments", "org-1", "factory-1"));
+
+    act(() => {
+      result.current.start({ id: "wo-1", title: "Retry refunds", description: "Stop double charges." });
+    });
+
+    await waitFor(() => {
+      expect(startPlanningSession).toHaveBeenCalledWith("org-1", "factory-1", "acme/payments", "wo-1");
+    });
+    expect(sendPlanningSessionMessage).not.toHaveBeenCalled();
+    expect(result.current.open).toBe(true);
+    expect(result.current.view.refining).toBe(true);
+    expect(result.current.view.right).toEqual({
+      kind: "draft",
+      draft: { title: "Retry refunds", description: "Stop double charges." },
+    });
+  });
+
   it("does not tell the agent when the title opens read-only", async () => {
     startPlanningSession.mockResolvedValue({
       ...session("session-1"),

@@ -52,11 +52,16 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 		if findErr = rejectIfPlanningSessionAtCap(tx, factoryModel, canvas.ID); findErr != nil {
 			return findErr
 		}
+		workOrderID, parseErr := parseOptionalPlanningWorkOrderID(req.GetWorkOrderId())
+		if parseErr != nil {
+			return parseErr
+		}
 		session, findErr = factoryModel.StartPlanningSession(tx, models.StartPlanningSessionParams{
 			CreatedByUserID: userID,
 			Repository:      repository,
 			CanvasID:        canvas.ID,
 			Entrypoint:      entrypoint,
+			WorkOrderID:     workOrderID,
 		})
 		return findErr
 	})
@@ -241,6 +246,18 @@ func parseSessionID(sessionID string) (uuid.UUID, error) {
 	return id, nil
 }
 
+func parseOptionalPlanningWorkOrderID(workOrderID string) (uuid.UUID, error) {
+	raw := strings.TrimSpace(workOrderID)
+	if raw == "" {
+		return uuid.Nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, invalidArgument("invalid work order id")
+	}
+	return id, nil
+}
+
 func loadPlanningSession(
 	ctx context.Context,
 	organizationID, factoryID, sessionID string,
@@ -329,7 +346,11 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	}
 	out.ExecutionId = executionID
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
-		out.Draft = &pb.PlanningSessionDraft{Title: draft.Title, Description: draft.Description}
+		out.Draft = &pb.PlanningSessionDraft{
+			Title:       draft.Title,
+			Description: draft.Description,
+			WorkOrderId: draft.WorkOrderID,
+		}
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{

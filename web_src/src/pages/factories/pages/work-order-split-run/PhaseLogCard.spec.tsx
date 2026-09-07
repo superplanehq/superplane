@@ -401,6 +401,38 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(screen.getByRole("button", { name: "Read 1 file, ran 1 command" })).toBeInTheDocument();
   });
 
+  it("hides the automation and node headers in the compact session log", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "The repository is ready. What do you want to do?",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-automation-header-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-line-runner-agent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
+  });
+
   it("marks user replies in the compact session log", () => {
     render(
       <PhaseLogCard
@@ -438,5 +470,35 @@ describe("PhaseLogCard collapsed stream", () => {
     expect(userNote).toHaveTextContent("Add a Size field");
     expect(screen.getByText("I can draft that.")).toBeInTheDocument();
     expect(screen.getByText("I can draft that.").closest("[data-testid='split-run-user-note']")).toBeNull();
+  });
+
+  it("renders markdown in compact session log notes", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "Changed color to **size** with a `medium` option.",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("size").tagName).toBe("STRONG");
+    expect(screen.getByText("medium").tagName).toBe("CODE");
+    expect(screen.queryByText("**size**")).not.toBeInTheDocument();
   });
 });
