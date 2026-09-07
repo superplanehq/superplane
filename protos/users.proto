@@ -68,6 +68,7 @@ message User {
   message Status {
     repeated AccountProvider account_providers = 1;
     repeated RoleAssignment roles = 2;
+    bool is_owner = 3;
   }
 
   Metadata metadata = 1;
