@@ -6,7 +6,10 @@ import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
 import { BacklogIntakeSources } from "./BacklogIntakeSources";
 import { BacklogSettingsDialog } from "./BacklogSettingsDialog";
+import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
+import type { ColumnAutomation } from "../lib/columnAutomations";
+import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
 import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import { LineBoardOrderCard } from "./LineBoardOrderCard";
@@ -44,6 +47,15 @@ export type BacklogColumnProps = {
   automationHref?: string | null;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
+  /** Column automations for the header indicator. Hidden when unset. */
+  automations?: ColumnAutomation[];
+  /** Opens the Automations menu. Hidden when unset. */
+  onOpenAutomations?: () => void;
+  automationsOpen?: boolean;
+  onCloseAutomations?: () => void;
+  onAddAutomation?: () => void;
+  onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
+  automationsLockOpen?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -77,6 +89,13 @@ export function BacklogColumn({
   intakePanel,
   automationHref,
   onAddIntake,
+  automations,
+  onOpenAutomations,
+  automationsOpen,
+  onCloseAutomations,
+  onAddAutomation,
+  onAutomationRowAction,
+  automationsLockOpen,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -110,12 +129,25 @@ export function BacklogColumn({
         actions={
           <div className="flex shrink-0 items-center gap-0.5">
             <BacklogCreatePopover {...createPopover} />
+            <ColumnAutomationsHeaderSlot
+              title={title}
+              columnKey="backlog"
+              automations={automations}
+              open={automationsOpen}
+              onOpen={onOpenAutomations}
+              onClose={onCloseAutomations}
+              onAdd={onAddAutomation}
+              onRowAction={onAutomationRowAction}
+              lockOpen={automationsLockOpen}
+              testId="lines-backlog-automations"
+            />
             <ColumnLaneMenu
               title={title}
               testId="lines-backlog-menu"
               automationHref={automationHref}
               onEdit={onOpenSettings}
               onAddIntake={onAddIntake}
+              onOpenAutomations={onOpenAutomations}
               colorId={colorId}
               onColorChange={onColorChange}
             />

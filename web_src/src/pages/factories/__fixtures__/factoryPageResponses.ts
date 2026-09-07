@@ -4,6 +4,7 @@ import type {
   FactoriesFactoryIntake,
   FactoriesFactoryIntakeRun,
   FactoriesFactoryLine,
+  FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPullRequest,
   MeNotificationSettings,
   FactoriesWorkOrder,
@@ -284,6 +285,8 @@ export interface FactoriesFixture {
   appsByFactoryId: Record<string, FactoryApp[]>;
   /** Intakes the workspace declared. Created intakes are appended here. */
   intakesByFactoryId?: Record<string, FactoriesFactoryIntake[]>;
+  /** PR feedback handlers the workspace declared. */
+  prFeedbackHandlersByFactoryId?: Record<string, FactoriesFactoryPrFeedbackHandler[]>;
   /** Runs the intake produced, keyed by intake id. */
   intakeRunsByIntakeId?: Record<string, FactoriesFactoryIntakeRun[]>;
   usageByFactoryId?: Record<string, StorybookUsageReport>;

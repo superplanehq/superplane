@@ -7,6 +7,8 @@ import { createContext, useContext } from "react";
 export interface FactoryPreviewFlags {
   /** Show Add intake in the Intake drawer. */
   addIntakeControl: boolean;
+  /** Show the per-column Automations drawer and hide lane listener banners. */
+  columnAutomations?: boolean;
 }
 
 export const FactoryPreviewFlagsContext = createContext<FactoryPreviewFlags | null>(null);

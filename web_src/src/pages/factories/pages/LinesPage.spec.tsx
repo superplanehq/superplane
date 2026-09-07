@@ -368,6 +368,63 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
   });
 
+  it("hides lane banners and shows the automations indicator when the preview is on", () => {
+    useFactoryIntakes.mockReturnValue({ data: CONFIGURED_INTAKES });
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), REFUND_FACTORY, {
+      addIntakeControl: true,
+      columnAutomations: true,
+    });
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    expect(within(backlog).queryByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-listener-handler-discussion")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-backlog-automations")).toHaveTextContent("3");
+    expect(screen.getByTestId("lines-verify-automations")).toHaveTextContent("1");
+    expect(screen.getByTestId("lines-done-automations")).toBeInTheDocument();
+  });
+
+  it("opens the backlog automations drawer from the indicator", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`, vi.fn(), REFUND_FACTORY, {
+      addIntakeControl: true,
+      columnAutomations: true,
+    });
+
+    await user.click(screen.getByTestId("lines-backlog-automations"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`,
+    );
+    expect(screen.getByRole("heading", { name: "Backlog automations" })).toBeInTheDocument();
+    expect(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
+      "On GitHub issue → Create a task in Backlog",
+    );
+    expect(screen.getByTestId("column-automation-row-analysis-app-refund-backlog")).toHaveTextContent(
+      "On task in Backlog → Score the task",
+    );
+  });
+
+  it("opens intake settings when an automation row is clicked", async () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    const user = userEvent.setup();
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`,
+      vi.fn(),
+      REFUND_FACTORY,
+      { addIntakeControl: true, columnAutomations: true },
+    );
+
+    await user.click(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+  });
+
   it("names each Verify listener from its source", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
