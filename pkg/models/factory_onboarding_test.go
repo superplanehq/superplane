@@ -145,6 +145,35 @@ func Test__FactoryOnboarding(t *testing.T) {
 	})
 }
 
+func Test__OrganizationIDsPendingInitialOnboardingOnly(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	pendingOrg, err := models.CreateOrganization("pending-"+uuid.NewString(), "Pending Org")
+	require.NoError(t, err)
+	readyOrg, err := models.CreateOrganization("ready-"+uuid.NewString(), "Ready Org")
+	require.NoError(t, err)
+
+	pendingFactory, err := models.CreateFactory(db, pendingOrg.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, pendingFactory.SetInitialOnboardingAttempt(db, uuid.New()))
+
+	readyFactory, err := models.CreateFactory(db, readyOrg.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, readyFactory.SetInitialOnboardingAttempt(db, uuid.New()))
+	require.NoError(t, readyFactory.CompleteOnboarding(db, readyOnboardingPatch()))
+
+	pending, err := models.OrganizationIDsPendingInitialOnboardingOnly(db, []uuid.UUID{pendingOrg.ID, readyOrg.ID, r.Organization.ID})
+	require.NoError(t, err)
+
+	_, pendingListed := pending[pendingOrg.ID]
+	_, readyListed := pending[readyOrg.ID]
+	_, setupListed := pending[r.Organization.ID]
+	assert.True(t, pendingListed)
+	assert.False(t, readyListed)
+	assert.False(t, setupListed)
+}
+
 func readyOnboardingPatch() models.FactoryOnboardingPatch {
 	vcsID := uuid.New().String()
 	agentID := uuid.New().String()
