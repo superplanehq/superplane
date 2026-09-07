@@ -104,6 +104,7 @@ import {
   triggerRenderers as renderTriggerRenderers,
   eventStateRegistry as renderEventStateRegistry,
 } from "./render";
+import { componentMappers as vercelComponentMappers, triggerRenderers as vercelTriggerRenderers } from "./vercel";
 import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
@@ -345,6 +346,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   sendgrid: sendgridComponentMappers,
   sentry: sentryComponentMappers,
   render: renderComponentMappers,
+  vercel: vercelComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
   newrelic: newrelicComponentMappers,
@@ -395,6 +397,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   sendgrid: sendgridTriggerRenderers,
   sentry: sentryTriggerRenderers,
   render: renderTriggerRenderers,
+  vercel: vercelTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
   newrelic: newrelicTriggerRenderers,

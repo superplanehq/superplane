@@ -1,0 +1,13 @@
+{
+  "data": {
+    "deploymentId": "dpl_8f2vQkP3xWmTnYbZ",
+    "url": "my-app-9jaegn4en.vercel.app",
+    "name": "my-app",
+    "readyState": "READY",
+    "target": "production",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "createdAt": 1755850000000
+  },
+  "timestamp": "2026-08-22T08:00:00.000000Z",
+  "type": "vercel.deployment"
+}

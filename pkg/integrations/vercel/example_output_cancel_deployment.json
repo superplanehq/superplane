@@ -1,0 +1,13 @@
+{
+  "data": {
+    "deploymentId": "dpl_2nRtXwBq7cVdLpKa",
+    "name": "my-app",
+    "url": "my-app-git-feature.vercel.app",
+    "readyState": "CANCELED",
+    "target": "preview",
+    "projectId": "prj_5CAbe8NMyjRwDfPPgtZsitPV",
+    "createdAt": 1755846000000
+  },
+  "timestamp": "2026-08-22T08:05:00.000000Z",
+  "type": "vercel.deployment"
+}

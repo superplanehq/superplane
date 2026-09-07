@@ -112,7 +112,9 @@ var defaultRunTitleExpressions = map[string]string{
 	"sendgrid.onEmailEvent":               "{{ root().data.email }}",
 	"sentry.onIssue":                      "{{ root().data.data.issue.title }}",
 	"slack.onAppMention":                  "{{ root().data.event.text }}",
-	"teams.onMention":                     "{{ root().data.text }}",
-	"teams.onMessage":                     "{{ root().data.text }}",
-	"telegram.onMention":                  "{{ root().data.text }}",
+	"teams.onMention":      "{{ root().data.text }}",
+	"teams.onMessage":      "{{ root().data.text }}",
+	"telegram.onMention":   "{{ root().data.text }}",
+
+	"vercel.onDeployment": "{{ root().data.name }} {{ root().data.readyState }}",
 }
