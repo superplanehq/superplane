@@ -4,12 +4,14 @@ import {
   isCapabilityBasedIntegrationDefinition,
   usesHostedGitHubAppInstall,
 } from "@/lib/integrations";
+import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 type ConnectDialogMode = "create" | "resume";
 
 export function useHomeIntegrationConnectActions({
   organizationId,
+  returnTo,
   availableIntegrations,
   connected,
   pendingConnectKeyRef,
@@ -18,7 +20,8 @@ export function useHomeIntegrationConnectActions({
   setConfigureIntegrationId,
 }: {
   organizationId: string;
-  availableIntegrations: Array<{ name?: string }>;
+  returnTo?: string;
+  availableIntegrations: IntegrationsIntegrationDefinition[];
   connected: OrganizationsIntegration[];
   pendingConnectKeyRef: MutableRefObject<string | null>;
   setDialogMode: Dispatch<SetStateAction<ConnectDialogMode>>;
@@ -28,6 +31,7 @@ export function useHomeIntegrationConnectActions({
   const openCapabilitySetup = (integrationName: string, integrationId?: string) => {
     const path = `/${organizationId}/settings/integrations/${integrationName}/setup`;
     const href = integrationId ? `${path}?integrationId=${encodeURIComponent(integrationId)}` : path;
+    rememberIntegrationSetupReturn(organizationId, returnTo);
     // Keep factory setup on the current tab; finish GitHub install in a new one.
     window.open(href, "_blank", "noopener,noreferrer");
   };
@@ -49,9 +53,7 @@ export function useHomeIntegrationConnectActions({
    *   IntegrationCreateDialog + Sync browserAction (Continue on GitHub in the modal)
    */
   const openConnectDialog = (integrationName: string) => {
-    const definition = availableIntegrations.find((item) => item.name === integrationName) as
-      | IntegrationsIntegrationDefinition
-      | undefined;
+    const definition = availableIntegrations.find((item) => item.name === integrationName);
     // Hosted Connect is started by requestConnect, not this dialog.
     if (usesHostedGitHubAppInstall(definition)) {
       return;

@@ -54,9 +54,21 @@ export const ConnectError: Story = {
       githubConnected={false}
       connectError={FIRST_RUN_COPY.connect.connectError}
       chrome={firstRunStoryChrome(1)}
-      showPrivateApp
       onConnectGitHub={() => undefined}
-      onCreatePrivateApp={() => undefined}
+      onContinue={() => undefined}
+    />
+  ),
+};
+
+export const ConnectInstallRequested: Story = {
+  name: "2d Connect GitHub (waiting for approval)",
+  render: () => (
+    <FirstRunConnectScreen
+      githubConnected={false}
+      installRequested
+      githubOrganization="acme"
+      chrome={firstRunStoryChrome(1)}
+      onConnectGitHub={() => undefined}
       onContinue={() => undefined}
     />
   ),

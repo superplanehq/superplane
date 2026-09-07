@@ -1,7 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
@@ -14,8 +12,8 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
-import { HomeFactoriesLink } from "./HomeFactoriesLink";
 import { HomePageShell } from "./HomePageShell";
+import { RequireClassicAppsSurface } from "./RequireClassicAppsSurface";
 import { applyCanvasAppPreferences } from "./canvasAppPreferencePresentation";
 import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
@@ -25,6 +23,14 @@ import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 
 export function HomePage() {
+  return (
+    <RequireClassicAppsSurface>
+      <ClassicHomePage />
+    </RequireClassicAppsSurface>
+  );
+}
+
+function ClassicHomePage() {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,8 +38,6 @@ export function HomePage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const {
     editingCanvas,
     openEdit,
@@ -68,15 +72,13 @@ export function HomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases && !factoriesEnabled) {
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError && canCreateCanvases) {
     return <Navigate to={`/${organizationId}/apps/new`} replace />;
   }
 
   return (
     <HomePageShell>
       <div className="mx-auto w-full max-w-6xl p-8">
-        {factoriesEnabled ? <HomeFactoriesLink organizationId={organizationId} /> : null}
-
         <Header />
 
         <div className="mb-6">

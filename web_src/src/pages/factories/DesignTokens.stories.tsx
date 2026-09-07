@@ -44,6 +44,10 @@ const OUTLINE_TOKENS: { name: string; description: string; className: string }[]
   { name: "--ring", description: "Focus ring", className: "border-2 border-ring" },
 ];
 
+const FIELD_TOKENS: { name: string; description: string; className: string }[] = [
+  { name: "--field", description: "Form field fills", className: "bg-[var(--field)] text-foreground" },
+];
+
 const RADIUS_STEPS: { name: string; className: string }[] = [
   { name: "sm (calc(--radius - 4px))", className: "rounded-sm" },
   { name: "md (calc(--radius - 2px))", className: "rounded-md" },
@@ -123,6 +127,7 @@ function DesignTokensGallery() {
       <SwatchGrid title="Semantic surfaces" items={SEMANTIC_TOKENS} />
       <SwatchGrid title="Sidebar surfaces" items={SIDEBAR_TOKENS} />
       <SwatchGrid title="Outlines &amp; focus" items={OUTLINE_TOKENS} />
+      <SwatchGrid title="Form fields" items={FIELD_TOKENS} />
 
       <section className="space-y-3">
         <h3 className="text-[13px] font-medium tracking-[-0.01em] text-foreground">Radius scale</h3>

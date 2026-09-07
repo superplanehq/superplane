@@ -1,5 +1,6 @@
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { Avatar } from "@/components/Avatar/avatar";
+import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
+import { useAccount } from "@/contexts/useAccount";
 import { useTheme } from "@/contexts/useTheme";
 import { isThemePreference } from "@/lib/themePreference";
 import type { ThemePreference } from "@/lib/themePreference";
@@ -9,7 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -19,17 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import {
-  ArrowRightLeft,
-  Building2,
-  Check,
-  LayoutGrid,
-  LogOut,
-  Plus,
-  Settings,
-  SunMoon,
-  User as UserIcon,
-} from "lucide-react";
+import { ArrowRightLeft, LogOut, Settings, Shield, SunMoon, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
@@ -64,7 +54,7 @@ export function SidebarUserMenu({
   defaultOpen = false,
 }: SidebarUserMenuProps) {
   const navigate = useNavigate();
-  const homeHref = `/${organizationId}`;
+  const { account } = useAccount();
   const profileHref = factoryKey
     ? factorySettingsSectionPath(organizationId, factoryKey, "account", "general")
     : `/${organizationId}/settings/profile`;
@@ -108,20 +98,22 @@ export function SidebarUserMenu({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className={MENU_ITEM_CLASS}
-            onClick={() => navigate(homeHref)}
-            data-testid="factories-sidebar-back-to-apps"
-          >
-            <LayoutGrid aria-hidden />
-            Back to Apps
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className={MENU_ITEM_CLASS}
             onClick={() => navigate(profileHref)}
             data-testid="factories-sidebar-profile"
           >
             <UserIcon aria-hidden />
             Profile
           </DropdownMenuItem>
+          {account?.installation_admin ? (
+            <DropdownMenuItem
+              className={MENU_ITEM_CLASS}
+              onClick={() => navigate("/admin")}
+              data-testid="factories-sidebar-installation-admin"
+            >
+              <Shield aria-hidden />
+              Installation Admin
+            </DropdownMenuItem>
+          ) : null}
           <AppearanceMenuItem />
           <DropdownMenuSeparator />
           <DropdownMenuItem className={MENU_ITEM_CLASS} onClick={handleSignOut}>
@@ -164,15 +156,12 @@ function OrganizationMenuHeader({
       >
         <Settings className="size-3.5" aria-hidden />
       </DropdownMenuItem>
-      <OrganizationSwitchSub currentOrganizationId={organizationId} />
+      <OrganizationSwitchSub currentOrganizationRouteId={organizationId} />
     </div>
   );
 }
 
-function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationId: string }) {
-  const navigate = useNavigate();
-  const { data: organizations = [] } = useAccountOrganizations();
-
+function OrganizationSwitchSub({ currentOrganizationRouteId }: { currentOrganizationRouteId: string }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger
@@ -183,31 +172,14 @@ function OrganizationSwitchSub({ currentOrganizationId }: { currentOrganizationI
         <ArrowRightLeft className="size-3.5" aria-hidden />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent className="w-64" data-testid="factories-sidebar-organization-switch-menu">
-          <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
-          {organizations.map((organization) => {
-            const isCurrent = organization.id === currentOrganizationId;
-            return (
-              <DropdownMenuItem
-                key={organization.id}
-                onClick={() => {
-                  if (!isCurrent) {
-                    navigate(`/${organization.id}`);
-                  }
-                }}
-                data-testid={`factories-sidebar-organization-option-${organization.id}`}
-              >
-                <Building2 className="h-3.5 w-3.5" aria-hidden />
-                <span className="truncate">{organization.name}</span>
-                {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
-              </DropdownMenuItem>
-            );
-          })}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/create")} data-testid="factories-sidebar-organization-create">
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Create new organization
-          </DropdownMenuItem>
+        <DropdownMenuSubContent
+          className="max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto"
+          data-testid="factories-sidebar-organization-switch-menu"
+        >
+          <OrganizationSwitchMenu
+            currentOrganizationRouteId={currentOrganizationRouteId}
+            testIdPrefix="factories-sidebar"
+          />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>

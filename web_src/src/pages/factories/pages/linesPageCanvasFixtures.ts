@@ -10,7 +10,7 @@ export const implementerCanvas = {
       { id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun", configuration: {} },
       {
         id: "implementation-agent",
-        name: "Agent - Implement from order description",
+        name: "Implement From Task Description",
         type: "TYPE_ACTION",
         component: "runnerClaudeCode",
         concurrency: { max: 5 },

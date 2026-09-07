@@ -1,169 +1,114 @@
-import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
-import { useHostedCreditReturnRefresh } from "@/hooks/useHostedCreditReturnRefresh";
+import { useMemo, useState } from "react";
+import { useParams } from "react-router";
+
+import { useOrganizationSpendingReport } from "@/hooks/useOrganizationSpendingReport";
+import { SpendingRedesignPage } from "./spending-redesign/SpendingRedesignPage";
 import {
-  useCreateBillingPortalSession,
-  useCreateHostedCreditCheckout,
-  useHostedCreditProducts,
-} from "@/hooks/useLLMModelAllowlists";
-import { usePermissions } from "@/contexts/usePermissions";
-import { getApiErrorMessage } from "@/lib/errors";
-import { clearHostedCreditGrantSnapshot, rememberHostedCreditGrantSnapshot } from "@/lib/hostedCredit";
-import { showErrorToast } from "@/lib/toast";
-import { parseWorkOrderMetric } from "../../lib/workOrderUsage";
-import { useParams, useSearchParams } from "react-router";
-import { BYOKModelsCard } from "@/pages/organization/settings/BYOKModelsCard";
-import { HostedCreditSummary } from "@/pages/organization/settings/HostedCreditSummary";
-import { factoryCardClassName } from "../factoryPageLayoutStyles";
-import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
+  EMPTY_SPENDING_FILTERS,
+  quantizeSpendingNow,
+  rangeForPreset,
+  type SpendingBreakdown,
+  type SpendingDateRange,
+  type SpendingFilters,
+  type SpendingPeriodPreset,
+} from "./spending-redesign/spendingRedesignLib";
 import {
-  WorkspaceUsageByMachineTypeTable,
-  WorkspaceUsageByModelTable,
-  WorkspaceUsageTotals,
-} from "../settings/WorkspaceUsageBreakdown";
+  mapSpendingCatalogs,
+  mapSpendingCreditSnapshot,
+  mapSpendingExplorerReport,
+  mapSpendingKpiTotals,
+} from "./spending-redesign/spendingReportMapper";
 
 export function OrganizationSettingsWorkspaceUsagePage() {
-  const { organizationId } = useParams<{ organizationId: string }>();
-  usePageTitle(["Spending"]);
-  const { data, isLoading, error, refetch } = useOrganizationWorkspaceUsage(organizationId || "");
-  const [searchParams] = useSearchParams();
-  const creditAdded = searchParams.get("credit") === "added";
+  const { organizationId = "" } = useParams<{ organizationId: string }>();
+  const [period, setPeriod] = useState<SpendingPeriodPreset>("month");
+  const [customRange, setCustomRange] = useState<SpendingDateRange | undefined>();
+  const [customOpen, setCustomOpen] = useState(false);
+  const [modelFilters, setModelFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
+  const [machineFilters, setMachineFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
+  const [modelBreakdown, setModelBreakdown] = useState<SpendingBreakdown>("workspace");
+  const [machineBreakdown, setMachineBreakdown] = useState<SpendingBreakdown>("workspace");
 
-  return (
-    <FactorySettingsPageFrame
-      title="Spending"
-      subtitle="Review factory token usage, VM time, and estimated spend for this organization."
-    >
-      <WorkspaceUsageBody
-        creditAdded={creditAdded}
-        data={data}
-        error={error}
-        isLoading={isLoading}
-        organizationId={organizationId || ""}
-        refetch={refetch}
-      />
-    </FactorySettingsPageFrame>
-  );
-}
+  const range = useMemo(() => {
+    // Quantize "now" so remounting this page (for example, switching to
+    // another settings tab and back) resolves to the same range and reuses
+    // the cached report instead of forcing a full reload. See
+    // `quantizeSpendingNow` for details.
+    const now = quantizeSpendingNow(new Date());
+    if (period === "custom") {
+      return customRange ?? rangeForPreset("week", now);
+    }
+    return rangeForPreset(period, now);
+  }, [customRange, period]);
 
-function WorkspaceUsageBody({
-  organizationId,
-  data,
-  isLoading,
-  error,
-  creditAdded,
-  refetch,
-}: {
-  organizationId: string;
-  data: ReturnType<typeof useOrganizationWorkspaceUsage>["data"];
-  isLoading: boolean;
-  error: unknown;
-  creditAdded: boolean;
-  refetch: ReturnType<typeof useOrganizationWorkspaceUsage>["refetch"];
-}) {
-  if (isLoading) {
-    return (
-      <FactorySettingsCard>
-        <p className="text-[13px] text-muted-foreground">Loading workspace usage...</p>
-      </FactorySettingsCard>
-    );
-  }
-  if (error || !data) {
-    return (
-      <FactorySettingsCard>
-        <p className="text-[13px] text-destructive">Unable to load workspace usage.</p>
-      </FactorySettingsCard>
-    );
-  }
-
-  return (
-    <WorkspaceUsageLoaded creditAdded={creditAdded} data={data} organizationId={organizationId} refetch={refetch} />
-  );
-}
-
-function WorkspaceUsageLoaded({
-  organizationId,
-  data,
-  creditAdded,
-  refetch,
-}: {
-  organizationId: string;
-  data: NonNullable<ReturnType<typeof useOrganizationWorkspaceUsage>["data"]>;
-  creditAdded: boolean;
-  refetch: ReturnType<typeof useOrganizationWorkspaceUsage>["refetch"];
-}) {
-  const { canAct } = usePermissions();
-  const grantTotalCents = parseWorkOrderMetric(data.grantTotalCents);
-  const billing = useHostedCreditActions(organizationId, data.billingEnabled === true, grantTotalCents);
-  const creditRefreshStatus = useHostedCreditReturnRefresh({
+  const modelQuery = useOrganizationSpendingReport({
     organizationId,
-    creditAdded,
-    grantTotalCents,
-    refetch,
+    range,
+    usageKind: "model",
+    filters: modelFilters,
+    groupBy: modelBreakdown,
+  });
+  const machineQuery = useOrganizationSpendingReport({
+    organizationId,
+    range,
+    usageKind: "compute",
+    filters: machineFilters,
+    groupBy: machineBreakdown,
   });
 
-  return (
-    <div className="flex flex-col gap-4">
-      <WorkspaceUsageTotals
-        periodDays={data.periodDays ?? 30}
-        totalTokens={parseWorkOrderMetric(data.totalTokens)}
-        totalCostCents={parseWorkOrderMetric(data.totalCostCents)}
-        totalDurationSeconds={parseWorkOrderMetric(data.totalDurationSeconds)}
-      />
-      <HostedCreditSummary
-        remainingCreditCents={data.remainingCreditCents}
-        grantTotalCents={data.grantTotalCents}
-        superplaneGrantCents={data.superplaneGrantCents}
-        purchasedCreditCents={data.purchasedCreditCents}
-        hostedBilledCents={data.hostedBilledCents}
-        remainingCreditWarning={data.remainingCreditWarning}
-        billingEnabled={data.billingEnabled}
-        hasBillingCustomer={data.hasBillingCustomer}
-        canManageBilling={canAct("org", "update")}
-        products={billing.products}
-        invoices={data.invoices}
-        creditRefreshStatus={creditRefreshStatus}
-        checkoutPending={billing.checkoutPending}
-        portalPending={billing.portalPending}
-        onAddCredit={billing.startCheckout}
-        onManageInvoices={billing.openInvoices}
-        cardClassName={`${factoryCardClassName} p-4`}
-        labelClassName="workspace-section-label"
-        valueClassName="workspace-page-title mt-1"
-      />
-      <BYOKModelsCard organizationId={organizationId} />
-      <WorkspaceUsageByModelTable byModel={data.byModel ?? []} />
-      <WorkspaceUsageByMachineTypeTable byMachineType={data.byMachineType ?? []} />
-    </div>
+  // `isLoading` is true only while there is no data at all yet (the very
+  // first load). `isFetching` also covers background refetches that happen
+  // while cached data from a previous mount is already on screen.
+  const isLoading = modelQuery.isLoading || machineQuery.isLoading;
+  const isFetching = modelQuery.isFetching || machineQuery.isFetching;
+  const error = modelQuery.error ?? machineQuery.error;
+  const baseResponse = modelQuery.data ?? machineQuery.data;
+
+  const catalogs = useMemo(() => mapSpendingCatalogs(baseResponse?.catalogs), [baseResponse?.catalogs]);
+  const credit = useMemo(() => mapSpendingCreditSnapshot(baseResponse?.credit), [baseResponse?.credit]);
+  const kpiTotals = useMemo(() => mapSpendingKpiTotals(baseResponse?.kpiTotals), [baseResponse?.kpiTotals]);
+  const modelReport = useMemo(
+    () => (modelQuery.data ? mapSpendingExplorerReport(modelQuery.data, range) : undefined),
+    [modelQuery.data, range],
   );
-}
+  const machineReport = useMemo(
+    () => (machineQuery.data ? mapSpendingExplorerReport(machineQuery.data, range) : undefined),
+    [machineQuery.data, range],
+  );
 
-function useHostedCreditActions(organizationId: string, billingEnabled: boolean, grantTotalCents: number) {
-  const productsQuery = useHostedCreditProducts(organizationId, billingEnabled);
-  const checkout = useCreateHostedCreditCheckout(organizationId);
-  const portal = useCreateBillingPortalSession(organizationId);
-
-  return {
-    products: productsQuery.data?.products ?? [],
-    checkoutPending: checkout.isPending,
-    portalPending: portal.isPending,
-    startCheckout: async (productId: string) => {
-      rememberHostedCreditGrantSnapshot(organizationId, grantTotalCents);
-      try {
-        const url = await checkout.mutateAsync(productId);
-        window.location.assign(url);
-      } catch (checkoutError) {
-        clearHostedCreditGrantSnapshot(organizationId);
-        showErrorToast(getApiErrorMessage(checkoutError, "Unable to start checkout."));
-      }
-    },
-    openInvoices: async () => {
-      try {
-        const url = await portal.mutateAsync();
-        window.location.assign(url);
-      } catch (portalError) {
-        showErrorToast(getApiErrorMessage(portalError, "Add hosted credit first."));
-      }
-    },
-  };
+  return (
+    <SpendingRedesignPage
+      catalogs={catalogs}
+      credit={credit}
+      customOpen={customOpen}
+      customRange={customRange}
+      errorMessage={error ? "Unable to load spending." : undefined}
+      isFetching={isFetching}
+      isLoading={isLoading}
+      kpiTotals={kpiTotals}
+      machineBreakdown={machineBreakdown}
+      machineFilters={machineFilters}
+      machineReport={machineReport}
+      modelBreakdown={modelBreakdown}
+      modelFilters={modelFilters}
+      modelReport={modelReport}
+      period={period}
+      range={range}
+      onCustomOpenChange={setCustomOpen}
+      onCustomRangeChange={(next) => {
+        setCustomRange(next);
+        setPeriod("custom");
+      }}
+      onMachineBreakdownChange={setMachineBreakdown}
+      onMachineFiltersChange={setMachineFilters}
+      onModelBreakdownChange={setModelBreakdown}
+      onModelFiltersChange={setModelFilters}
+      onPeriodChange={(next) => {
+        setPeriod(next);
+        if (next !== "custom") {
+          setCustomOpen(false);
+        }
+      }}
+    />
+  );
 }

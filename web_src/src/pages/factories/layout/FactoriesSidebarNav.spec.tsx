@@ -7,7 +7,7 @@ import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "
 import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
-function renderNav(path: string, showVelocity = false) {
+function renderNav(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <TooltipProvider>
@@ -17,7 +17,6 @@ function renderNav(path: string, showVelocity = false) {
           lineId={REFUND_LINE_PLAN_ID}
           canOpenSettings
           permissionsLoading={false}
-          showVelocity={showVelocity}
         />
       </TooltipProvider>
     </MemoryRouter>,
@@ -34,12 +33,12 @@ describe("FactoriesSidebarNav", () => {
     const nav = screen.getByTestId("factories-sidebar-nav");
     const controls = [
       screen.getByTestId("factories-nav-board"),
+      screen.getByTestId("factories-nav-velocity"),
       screen.getByTestId("factories-workspace-settings-link"),
     ];
 
-    expect(controls.map((node) => nav.contains(node))).toEqual([true, true]);
+    expect(controls.map((node) => nav.contains(node))).toEqual([true, true, true]);
     expect(screen.queryByTestId("factories-sidebar-create-work-order")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("factories-nav-velocity")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-intake")).not.toBeInTheDocument();
     expect(screen.queryByTestId("factories-nav-pr-feedback")).not.toBeInTheDocument();
     expect(screen.getByTestId("factories-nav-board")).toHaveAttribute(
@@ -66,8 +65,8 @@ describe("FactoriesSidebarNav", () => {
     expect(screen.getAllByTestId("factories-nav-board")[1]).toHaveAttribute("aria-current", "page");
   });
 
-  it("shows the Velocity link when showVelocity is true", () => {
-    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`, true);
+  it("shows the Velocity link", () => {
+    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`);
 
     const nav = screen.getByTestId("factories-sidebar-nav");
     const velocityLink = screen.getByTestId("factories-nav-velocity");
@@ -77,7 +76,7 @@ describe("FactoriesSidebarNav", () => {
   });
 
   it("marks the Velocity icon current on the velocity page", () => {
-    renderNav(`/${org}/workspaces/${key}/velocity`, true);
+    renderNav(`/${org}/workspaces/${key}/velocity`);
 
     expect(screen.getByTestId("factories-nav-velocity")).toHaveAttribute("aria-current", "page");
   });

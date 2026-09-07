@@ -74,12 +74,10 @@ export function FirstRunFlow({
       <FirstRunConnectScreen
         githubConnected={githubConnected}
         chrome={chromeFor(1)}
-        showPrivateApp
         onConnectGitHub={() => {
           setGithubConnected(true);
           setScreen("choose");
         }}
-        onCreatePrivateApp={() => undefined}
         onContinue={() => setScreen("choose")}
       />
     );

@@ -16,7 +16,7 @@ vi.mock("@/pages/app/lib/workflow-spec-files", () => ({
 
 const implementerNode: CanvasSpecNode = {
   id: "implementation-agent",
-  name: "Agent - Implement from order description",
+  name: "Implement From Task Description",
   type: "TYPE_ACTION",
   component: "runnerClaudeCode",
   concurrency: { max: 5 },
@@ -29,11 +29,11 @@ const canvas: CanvasesCanvas = {
 };
 
 const draft: PlanningReviewDraft = {
-  title: "Agent - Implement from order description",
+  title: "Implement From Task Description",
   components: [
     {
       id: "implementation-agent",
-      title: "Agent - Implement from order description",
+      title: "Implement From Task Description",
       description: "",
       expanded: true,
       configuration: { model: "opus", steps: [{ name: "Clone Repo", type: "bash", command: "git clone --depth 1" }] },

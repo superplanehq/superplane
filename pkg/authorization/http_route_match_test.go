@@ -63,6 +63,12 @@ func TestMatchHTTPRoute(t *testing.T) {
 			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/me/notification-settings"},
 			wantOK: true,
 		},
+		{
+			method: http.MethodGet,
+			path:   "/api/v1/factories/factory-123/line-runner-models",
+			want:   HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/line-runner-models"},
+			wantOK: true,
+		},
 	}
 
 	for _, tt := range tests {

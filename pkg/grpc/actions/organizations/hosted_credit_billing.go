@@ -20,8 +20,8 @@ func ListHostedCreditProducts(
 	orgID string,
 	_ *pb.ListHostedCreditProductsRequest,
 ) (*pb.ListHostedCreditProductsResponse, error) {
-	if _, err := uuid.Parse(orgID); err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+	if _, err := resolveOrganizationID(ctx, orgID); err != nil {
+		return nil, err
 	}
 	if !polar.Configured() {
 		return &pb.ListHostedCreditProductsResponse{}, nil
@@ -53,9 +53,9 @@ func CreateHostedCreditCheckout(
 	accountID string,
 	baseURL string,
 ) (*pb.CreateHostedCreditCheckoutResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 	if !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")
@@ -65,7 +65,7 @@ func CreateHostedCreditCheckout(
 		return nil, grpcerrors.InvalidArgument(nil, "product id is required")
 	}
 
-	email := actingUserEmail(ctx, orgID, accountID)
+	email := actingUserEmail(ctx, organizationID.String(), accountID)
 	if email == "" {
 		return nil, grpcerrors.FailedPrecondition(nil, "A user email is required to start checkout.")
 	}
@@ -119,9 +119,9 @@ func CreateBillingPortalSession(
 	orgID string,
 	_ *pb.CreateBillingPortalSessionRequest,
 ) (*pb.CreateBillingPortalSessionResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 	if !polar.Configured() {
 		return nil, grpcerrors.FailedPrecondition(nil, "hosted billing is not configured")

@@ -33,9 +33,7 @@ describe("PlanningReviewPopup", () => {
   it("uses the agent name as the title", () => {
     renderPopup();
 
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
     expect(screen.queryByTestId("planning-review-title-input")).not.toBeInTheDocument();
   });
 
@@ -59,9 +57,7 @@ describe("PlanningReviewPopup", () => {
 
     expect(screen.queryByTestId("planning-review-component-plan-agent")).not.toBeInTheDocument();
     expect(screen.getByTestId("planning-review-component-implementation-agent")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Agent - Implement from order description" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
   });
 
   it("notes that agents are part of an automation and links to the automation editor", () => {
@@ -98,7 +94,7 @@ describe("PlanningReviewPopup", () => {
   it("names the agent once, in the header, and describes it below the name", () => {
     renderPopup();
 
-    expect(screen.getAllByText("Agent - Implement from order description")).toHaveLength(1);
+    expect(screen.getAllByText("Implement From Task Description")).toHaveLength(1);
     expect(screen.getByTestId("planning-review-description")).toHaveTextContent(
       "Implement the approved plan and prepare the branch for review.",
     );

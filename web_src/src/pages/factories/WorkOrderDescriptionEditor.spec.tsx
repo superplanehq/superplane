@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
 
@@ -46,6 +46,17 @@ function stubClientRects(target: object) {
     value: () => emptyRects,
   });
 }
+
+afterEach(async () => {
+  // @tiptap/react schedules editor.destroy() on a ~1ms setTimeout after the
+  // component unmounts. Unmount now and flush that timer here, while the jsdom
+  // window still exists, so the destroy does not fire during environment
+  // teardown and throw "ReferenceError: window is not defined" (which Vitest
+  // reports as an unhandled error and fails the run even though every test
+  // passed).
+  cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+});
 
 describe("WorkOrderDescriptionEditor", () => {
   it("renders pasted markdown as a heading, paragraph, and list", async () => {

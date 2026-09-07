@@ -18,6 +18,9 @@ import (
 const (
 	velocityPeriodDaysDefault = 14
 	velocityPeriodDaysMax     = 30
+
+	velocityPeoplePageSizeDefault = 5
+	velocityPeoplePageSizeMax     = 50
 )
 
 // DescribeFactoryVelocity reports what a workspace shipped, how long the work
@@ -66,7 +69,7 @@ func DescribeFactoryVelocity(
 	currentOrders := collectVelocityOrders(rows, current)
 	previousOrders := collectVelocityOrders(rows, previous)
 
-	usage, err := models.SumUsageForWorkOrders(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
+	usage, err := models.SumUsageForWorkOrdersByKind(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
@@ -90,7 +93,23 @@ func DescribeFactoryVelocity(
 	totals := aggregateTotals(buckets, cohort.hasPeople)
 	previousTotals := aggregateTotals(previousBuckets, cohort.hasPeople)
 
-	people, err := buildVelocityPeople(db, orgID, currentOrders, cohort.merges, current)
+	peopleSortKey := velocityPeopleSortKeyFromProto(req.GetPeopleSort())
+	peopleSortDirection := velocitySortDirectionFromProto(req.GetPeopleSortDirection())
+	peoplePageSize := clampPeoplePageSize(int(req.GetPeoplePageSize()))
+	peopleOffset := int(req.GetPeopleOffset())
+	if peopleOffset < 0 {
+		peopleOffset = 0
+	}
+
+	people, peopleTotal, err := buildVelocityPeople(
+		db, orgID, currentOrders, cohort.merges, current,
+		peopleSortKey, peopleSortDirection, peoplePageSize, peopleOffset,
+	)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
+	}
+
+	automations, err := models.SummarizeFactoryAutomationRuns(db, factoryID, current.start, current.end)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
@@ -99,15 +118,19 @@ func DescribeFactoryVelocity(
 	for i := range buckets {
 		b := &buckets[i]
 		points = append(points, &pb.DescribeFactoryVelocityDay{
-			Day:              dayLabel(b.start),
-			Date:             timestamppb.New(b.start),
-			SuperplaneMerged: int32(b.superplaneMerged),
-			PeopleMerged:     int32(b.peopleMerged),
-			Waste:            int32(b.waste),
-			Intake:           serializeVelocityIntakeCounts(b.intake),
-			CostCents:        b.costCents,
-			Tokens:           b.tokens,
-			WasteCostCents:   b.wasteCostCents,
+			Day:                        dayLabel(b.start),
+			Date:                       timestamppb.New(b.start),
+			SuperplaneMerged:           int32(b.superplaneMerged),
+			PeopleMerged:               int32(b.peopleMerged),
+			Waste:                      int32(b.waste),
+			Intake:                     serializeVelocityIntakeCounts(b.intake),
+			CostCents:                  b.costCents,
+			ModelCostCents:             b.modelCostCents,
+			ComputeCostCents:           b.computeCostCents,
+			Tokens:                     b.tokens,
+			WasteCostCents:             b.wasteCostCents,
+			MedianTaskModelCostCents:   medianCents(b.taskModelCostCents),
+			MedianTaskComputeCostCents: medianCents(b.taskComputeCostCents),
 		})
 	}
 
@@ -127,7 +150,53 @@ func DescribeFactoryVelocity(
 		HasPreviousWindow: hasVelocityOutput(previousTotals),
 		IntakeSources:     serializeVelocityIntakeSources(currentOrders, cohort.agentMergedIn(current)),
 		People:            people,
+		PeopleTotal:       int32(peopleTotal),
+		PeopleHasMore:     peopleOffset+len(people) < peopleTotal,
+		Automations:       serializeVelocityAutomations(automations),
 	}, nil
+}
+
+func serializeVelocityAutomations(rows []models.FactoryAutomationRuns) []*pb.DescribeFactoryVelocityAutomation {
+	result := make([]*pb.DescribeFactoryVelocityAutomation, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, &pb.DescribeFactoryVelocityAutomation{
+			Id:                   row.CanvasID.String(),
+			Name:                 row.Name,
+			Runs:                 int32(row.Runs),
+			Failed:               int32(row.Failed),
+			CostCents:            row.CostCents(),
+			AverageDurationHours: row.AverageDurationHours(),
+		})
+	}
+	return result
+}
+
+// velocityPeopleSortKeyFromProto translates the wire enum to the internal sort
+// key. An unspecified value defaults to the total, which keeps existing
+// callers and the SDK's zero value ordered the way they were before sorting
+// became a request parameter.
+func velocityPeopleSortKeyFromProto(sort pb.DescribeFactoryVelocityRequest_PeopleSort) velocityPeopleSortKey {
+	switch sort {
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_FACTORY_MERGED:
+		return velocitySortFactoryMerged
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_AUTHORED_MERGED:
+		return velocitySortAuthoredMerged
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_MEDIAN_CYCLE_HOURS:
+		return velocitySortMedianCycleHours
+	case pb.DescribeFactoryVelocityRequest_PEOPLE_SORT_COST_USD:
+		return velocitySortCostUsd
+	default:
+		return velocitySortTotal
+	}
+}
+
+// velocitySortDirectionFromProto defaults an unspecified direction to
+// descending, matching today's "most active first" ordering.
+func velocitySortDirectionFromProto(direction pb.DescribeFactoryVelocityRequest_SortDirection) velocitySortDirection {
+	if direction == pb.DescribeFactoryVelocityRequest_SORT_DIRECTION_ASC {
+		return velocitySortAsc
+	}
+	return velocitySortDesc
 }
 
 // mergeCohort is the stored repository history both merge series are built
@@ -240,18 +309,26 @@ func serializeVelocityIntakeSources(
 }
 
 // buildVelocityPeople joins repository authorship with the work orders each
-// member opened. It reports no rows when the organization has no members with
-// activity, which is what a brand new workspace looks like.
+// member opened, sorts the result, and returns one page of it. It reports no
+// rows when the organization has no members with activity, which is what a
+// brand new workspace looks like.
+//
+// The total is counted before the offset and page size are applied, so the
+// caller can tell the reader how many people it has not shown yet.
 func buildVelocityPeople(
 	tx *gorm.DB,
 	orgID uuid.UUID,
 	orders map[uuid.UUID]*velocityOrder,
 	merges []models.FactoryVelocityRepositoryMerge,
 	window velocityWindow,
-) ([]*pb.DescribeFactoryVelocityPerson, error) {
+	sortKey velocityPeopleSortKey,
+	direction velocitySortDirection,
+	pageSize int,
+	offset int,
+) ([]*pb.DescribeFactoryVelocityPerson, int, error) {
 	members, err := models.ListFactoryVelocityMembers(tx, orgID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	builder := newVelocityPeopleBuilder(members)
@@ -267,7 +344,10 @@ func buildVelocityPeople(
 		builder.addFactoryOrder(order)
 	}
 
-	rows := builder.rowsByMergedDesc()
+	rows := builder.rowsSorted(sortKey, direction)
+	total := len(rows)
+	rows = pageVelocityPersonRows(rows, offset, pageSize)
+
 	out := make([]*pb.DescribeFactoryVelocityPerson, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, &pb.DescribeFactoryVelocityPerson{
@@ -282,7 +362,24 @@ func buildVelocityPeople(
 			MedianCycleHours: medianFloats(row.cycleHours),
 		})
 	}
-	return out, nil
+	return out, total, nil
+}
+
+// pageVelocityPersonRows slices a sorted row set to one page. An offset at or
+// past the end returns an empty page instead of panicking, which is what a
+// stale "Load more" click after the cohort shrank looks like.
+func pageVelocityPersonRows(rows []*velocityPersonRow, offset, pageSize int) []*velocityPersonRow {
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(rows) {
+		return []*velocityPersonRow{}
+	}
+	end := offset + pageSize
+	if end > len(rows) {
+		end = len(rows)
+	}
+	return rows[offset:end]
 }
 
 func clampPeriodDays(v int) int {
@@ -295,6 +392,19 @@ func clampPeriodDays(v int) int {
 	return v
 }
 
+// clampPeoplePageSize keeps the People page within [1, velocityPeoplePageSizeMax],
+// defaulting a non-positive value to velocityPeoplePageSizeDefault so a client
+// cannot request the whole table in one call.
+func clampPeoplePageSize(v int) int {
+	if v <= 0 {
+		return velocityPeoplePageSizeDefault
+	}
+	if v > velocityPeoplePageSizeMax {
+		return velocityPeoplePageSizeMax
+	}
+	return v
+}
+
 type dayBucket struct {
 	start            time.Time
 	end              time.Time
@@ -302,10 +412,20 @@ type dayBucket struct {
 	peopleMerged     int
 	waste            int
 	// Merged SuperPlane pull requests of the day, keyed by intake source.
-	intake         map[string]int
-	costCents      int64
-	tokens         int64
-	wasteCostCents int64
+	intake           map[string]int
+	costCents        int64
+	modelCostCents   int64
+	computeCostCents int64
+	tokens           int64
+	wasteCostCents   int64
+	// Work orders reported on the day. A work order counts once here, however
+	// many pull requests it opened.
+	tasksClosed int
+	tasksWaste  int
+	// Spend of every work order reported on the day, one entry per order and
+	// band. The median needs the whole sample, not a running sum.
+	taskModelCostCents   []int64
+	taskComputeCostCents []int64
 }
 
 // dayLabel names the axis tick of a day, as a weekday and a date.
@@ -462,8 +582,14 @@ func fillBuckets(
 			continue
 		}
 		buckets[idx].costCents += order.costCents
+		buckets[idx].modelCostCents += order.modelCostCents
+		buckets[idx].computeCostCents += order.computeCostCents
 		buckets[idx].tokens += order.tokens
+		buckets[idx].tasksClosed++
+		buckets[idx].taskModelCostCents = append(buckets[idx].taskModelCostCents, order.modelCostCents)
+		buckets[idx].taskComputeCostCents = append(buckets[idx].taskComputeCostCents, order.computeCostCents)
 		if !order.merged {
+			buckets[idx].tasksWaste++
 			buckets[idx].wasteCostCents += order.costCents
 		}
 	}
@@ -489,7 +615,8 @@ func fillBuckets(
 
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
 	sp, people, waste := 0, 0, 0
-	var costCents, tokens, wasteCostCents int64
+	tasksClosed, tasksWaste := 0, 0
+	var costCents, modelCostCents, computeCostCents, tokens, wasteCostCents int64
 	for _, b := range buckets {
 		sp += b.superplaneMerged
 		if hasPeople {
@@ -497,8 +624,12 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		}
 		waste += b.waste
 		costCents += b.costCents
+		modelCostCents += b.modelCostCents
+		computeCostCents += b.computeCostCents
 		tokens += b.tokens
 		wasteCostCents += b.wasteCostCents
+		tasksClosed += b.tasksClosed
+		tasksWaste += b.tasksWaste
 	}
 
 	totals := &pb.DescribeFactoryVelocityTotals{
@@ -506,8 +637,12 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		PeopleMerged:     int32(people),
 		Waste:            int32(waste),
 		CostCents:        costCents,
+		ModelCostCents:   modelCostCents,
+		ComputeCostCents: computeCostCents,
 		Tokens:           tokens,
 		WasteCostCents:   wasteCostCents,
+		TasksClosed:      int32(tasksClosed),
+		TasksWaste:       int32(tasksWaste),
 	}
 	totalMerged := sp + people
 	if totalMerged > 0 && hasPeople {

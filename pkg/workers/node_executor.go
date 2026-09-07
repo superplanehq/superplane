@@ -256,6 +256,8 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		pendingWorkOrderNotifications = append(pendingWorkOrderNotifications, notification)
 	}
 
+	runCancellations := &RunCancellationNotifier{}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -292,7 +294,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -339,6 +341,8 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 	}
 
+	runCancellations.Publish()
+
 	return nil
 }
 
@@ -351,6 +355,7 @@ func (w *NodeExecutor) executeActionNode(
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
 	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
 	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
+	runCancellations *RunCancellationNotifier,
 ) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
@@ -395,6 +400,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		CanvasName:     workflow.Name,
@@ -425,7 +431,6 @@ func (w *NodeExecutor) executeActionNode(
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
 	}
-
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {

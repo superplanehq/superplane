@@ -1,5 +1,6 @@
 import { EMPTY_USAGE_REPORT } from "./usageReportFixtures";
-import { EMPTY_FACTORY_VELOCITY } from "./velocityReportFixtures";
+import { DEFAULT_ORG_SPENDING_REPORT } from "./spendingReportFixtures";
+import { EMPTY_FACTORY_VELOCITY, paginateVelocityPeople } from "./velocityReportFixtures";
 import { factoryIntakeRoutes } from "./factoryIntakeHandlers";
 import {
   defaultFactoriesFixture,
@@ -70,6 +71,7 @@ interface RequestBody {
   start_step_index?: unknown;
   replaceActive?: unknown;
   replace_active?: unknown;
+  model?: unknown;
   result?: unknown;
   state?: unknown;
   steps?: unknown;
@@ -219,12 +221,13 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         const byPeriod = fixture.velocityByFactoryId?.[match[1]];
         const periodDays = Number(url.searchParams.get("periodDays") ?? 14);
         const report = byPeriod?.[periodDays] ?? byPeriod?.[14] ?? EMPTY_FACTORY_VELOCITY;
+        const paged = paginateVelocityPeople(report, url);
 
         // The page follows peopleSyncedAt to know a sync finished, so a report
         // read after a sync must carry the newer time.
         const syncedAt = velocitySyncedAt.get(match[1]);
-        if (!syncedAt) return { json: report };
-        return { json: { ...report, peopleSyncedAt: syncedAt, peopleSyncPending: false } };
+        if (!syncedAt) return { json: paged };
+        return { json: { ...paged, peopleSyncedAt: syncedAt, peopleSyncPending: false } };
       },
     },
     {
@@ -233,6 +236,17 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         velocitySynced(match[1]);
         return { json: { started: true } };
       },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/line-runner-models"),
+      resolve: () => ({
+        json: {
+          models: [
+            { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+            { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+          ],
+        },
+      }),
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/llm-models"),
@@ -448,6 +462,7 @@ function dispatchRequestOptions(request: RequestBody) {
     lineName: stringOrEmpty(request.lineName ?? request.line_name),
     startStepIndex: Number(request.startStepIndex ?? request.start_step_index ?? 0) || 0,
     replaceActive: request.replaceActive === true || request.replace_active === true,
+    model: stringOrEmpty(request.model),
   };
 }
 
@@ -467,7 +482,10 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   if (options.replaceActive) {
     cancelActiveDispatches(order, now);
   }
-  const newDispatch = buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex);
+  const newDispatch = {
+    ...buildDispatchedLineDispatch(line, options.lineName, now, apps, options.startStepIndex),
+    model: options.model,
+  };
   order.lineDispatches = [...(order.lineDispatches ?? []), newDispatch];
   return { json: { order } };
 }
@@ -612,6 +630,13 @@ function organizationWorkspaceUsageRoute(fixture: FactoriesFixture): FactoriesRo
   };
 }
 
+function organizationSpendingReportRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/spending-report"),
+    resolve: () => ({ json: fixture.organizationSpendingReport ?? DEFAULT_ORG_SPENDING_REPORT }),
+  };
+}
+
 function hostedLlmModelsRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
@@ -722,6 +747,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryPullRequestRoutes(fixture),
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
+    organizationSpendingReportRoute(fixture),
     hostedLlmModelsRoute(),
     byokModelsRoute(),
     hostedCreditProductsRoute(fixture),

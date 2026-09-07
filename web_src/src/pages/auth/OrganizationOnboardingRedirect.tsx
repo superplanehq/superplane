@@ -1,0 +1,120 @@
+import { useAccount } from "@/contexts/useAccount";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+
+import type { OnboardingWorkspaceResolution } from "../factories/pages/onboarding/onboardingWorkspaceResolutionContext";
+import { organizationNameFromAccount } from "./organizationNameFromAccount";
+
+export type ProvisionedWorkspace = {
+  organizationSlug: string;
+  workspaceKey: string;
+};
+
+interface OrganizationOnboardingRedirectProps {
+  renderWorkspace: (
+    workspace: ProvisionedWorkspace,
+    entryPath: string,
+    reresolveWorkspace: OnboardingWorkspaceResolution,
+  ) => ReactNode;
+}
+
+/** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
+export function OrganizationOnboardingRedirect({ renderWorkspace }: OrganizationOnboardingRedirectProps) {
+  const { account } = useAccount();
+  const queryClient = useQueryClient();
+  const hasStartedProvisioning = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const [workspace, setWorkspace] = useState<ProvisionedWorkspace | null>(null);
+  const workspaceRef = useRef<ProvisionedWorkspace | null>(null);
+  const owner = organizationNameFromAccount(account);
+  const onboardingAttempt = useRef(getOnboardingAttempt());
+
+  // A new organization can receive the slug of an earlier onboarding
+  // organization that was later renamed (for example, to the GitHub owner).
+  // Cached queries under that slug still hold the old organization's factory
+  // and connections, which would open the wizard mid-way, so the slug starts
+  // with a clean cache whenever the wizard adopts a different slug.
+  const adoptWorkspace = useCallback(
+    (provisioned: ProvisionedWorkspace) => {
+      if (workspaceRef.current?.organizationSlug !== provisioned.organizationSlug) {
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey.includes(provisioned.organizationSlug),
+        });
+      }
+      workspaceRef.current = provisioned;
+      setWorkspace(provisioned);
+    },
+    [queryClient],
+  );
+
+  useEffect(() => {
+    if (!account || hasStartedProvisioning.current) return;
+    if (!owner) {
+      setError("Could not start workspace setup. Add a name to your SuperPlane account and try again.");
+      return;
+    }
+
+    hasStartedProvisioning.current = true;
+    void provisionWorkspace(owner, onboardingAttempt.current.id)
+      .then(adoptWorkspace)
+      .catch((provisioningError: unknown) => {
+        setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
+      });
+  }, [account, owner, adoptWorkspace]);
+
+  // Re-runs the retry-safe onboarding endpoint for the same attempt, so a
+  // workspace can move to a new organization slug (for example, after the
+  // organization is renamed from the GitHub owner) without a page reload.
+  const reresolveWorkspace = useCallback(async () => {
+    if (!owner) return;
+    const result = await provisionWorkspace(owner, onboardingAttempt.current.id);
+    adoptWorkspace(result);
+  }, [owner, adoptWorkspace]);
+
+  if (workspace) {
+    return renderWorkspace(workspace, onboardingAttempt.current.entryPath, reresolveWorkspace);
+  }
+
+  if (!error) return null;
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+      <p className="text-sm text-destructive">{error}</p>
+    </main>
+  );
+}
+
+function getOnboardingAttempt(): { id: string; entryPath: string } {
+  const searchParams = new URLSearchParams(window.location.search);
+  searchParams.delete("auth_error");
+  searchParams.delete("auth_link_result");
+  searchParams.delete("linked_account");
+  searchParams.delete("provider");
+  let attemptID = searchParams.get("attempt");
+
+  if (!attemptID) {
+    attemptID = crypto.randomUUID();
+    searchParams.set("attempt", attemptID);
+  }
+
+  window.history.replaceState(null, "", `${window.location.pathname}?${searchParams}`);
+
+  return {
+    id: attemptID,
+    entryPath: `${window.location.pathname}?${searchParams}`,
+  };
+}
+
+async function provisionWorkspace(owner: string, attemptID: string): Promise<ProvisionedWorkspace> {
+  const response = await fetch("/account/onboarding", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ owner, attemptID }),
+  });
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return (await response.json()) as ProvisionedWorkspace;
+}

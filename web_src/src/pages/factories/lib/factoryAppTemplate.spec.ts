@@ -12,6 +12,7 @@ describe("resolveFactoryAppTemplate", () => {
     ["onrun-create-plan", "line-planning"],
     ["onrun-implement", "line-implementation"],
     ["on-pr-closed", "pr-closure"],
+    ["onrun-create-with-agent", "create-with-agent"],
   ])("matches %s to %s", (nodeId, templateId) => {
     expect(resolveFactoryAppTemplate(canvasWith([{ id: nodeId }]))?.id).toBe(templateId);
   });

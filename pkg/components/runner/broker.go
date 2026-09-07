@@ -193,7 +193,7 @@ func BrokerCommandsFromLines(lines []string) []BrokerCommand {
 		out = append(out, BrokerCommand{
 			Command: line,
 			Kind:    LiveLogKindBash,
-			Preview: LiveLogPreview(line),
+			Preview: LiveLogText(line),
 		})
 	}
 	return out

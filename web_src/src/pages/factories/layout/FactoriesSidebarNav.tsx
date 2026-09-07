@@ -12,8 +12,6 @@ interface FactoriesSidebarNavProps {
   lineId?: string;
   canOpenSettings: boolean;
   permissionsLoading: boolean;
-  /** Shows the Velocity rail link when the org has the `factory_velocity` experimental feature. */
-  showVelocity: boolean;
 }
 
 function railLinkClassName(isCurrent: boolean) {
@@ -48,11 +46,9 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: the line board, an optional
- * Velocity link, then settings. Velocity only shows when the organization
- * has the `factory_velocity` experimental feature enabled. Intakes and PR
- * feedback open from their listener rows on the board, so they do not need a
- * rail icon.
+ * Icon rail under the workspace switcher: the line board, the Velocity link,
+ * then settings. Intakes and PR feedback open from their listener rows on
+ * the board, so they do not need a rail icon.
  */
 export function FactoriesSidebarNav({
   organizationId,
@@ -60,7 +56,6 @@ export function FactoriesSidebarNav({
   lineId,
   canOpenSettings,
   permissionsLoading,
-  showVelocity,
 }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
@@ -73,15 +68,13 @@ export function FactoriesSidebarNav({
   return (
     <nav className="flex flex-col items-center gap-1 px-1.5" aria-label="Workspace" data-testid="factories-sidebar-nav">
       <RailNavLink to={boardHref} label="Board" Icon={Kanban} testId="factories-nav-board" isCurrent={boardCurrent} />
-      {showVelocity ? (
-        <RailNavLink
-          to={velocityHref}
-          label="Velocity"
-          Icon={Gauge}
-          testId="factories-nav-velocity"
-          isCurrent={velocityCurrent}
-        />
-      ) : null}
+      <RailNavLink
+        to={velocityHref}
+        label="Velocity"
+        Icon={Gauge}
+        testId="factories-nav-velocity"
+        isCurrent={velocityCurrent}
+      />
       <PermissionTooltip
         allowed={canOpenSettings || permissionsLoading}
         message="You don't have permission to open workspace settings."

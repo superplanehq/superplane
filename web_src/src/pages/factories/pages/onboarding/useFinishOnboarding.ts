@@ -17,6 +17,7 @@ import {
   type CreateFactoryIntake,
   type CreateFactoryPRFeedbackHandler,
   type InstallOnboardingApp,
+  type ListFactoryApps,
   type ListFactoryIntakes,
   type ListFactoryPRFeedbackHandlers,
   type UpdateOnboarding,
@@ -77,6 +78,7 @@ export async function provisionWorkspace(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
   appRepository: string;
@@ -129,6 +131,7 @@ export async function provisionWorkspace(args: {
     defaultBranch,
     agentRewrite: args.agentRewrite,
     installFactory: args.installFactory,
+    listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
   await provisionGithubIntake({
@@ -164,6 +167,7 @@ export function useFinishOnboarding(args: {
   createIntake: CreateFactoryIntake;
   listPRFeedbackHandlers: ListFactoryPRFeedbackHandlers;
   createPRFeedbackHandler: CreateFactoryPRFeedbackHandler;
+  listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
   remainingCreditCents: number;

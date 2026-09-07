@@ -95,7 +95,7 @@ export function splitRunPhaseRunHref(args: {
     return undefined;
   }
   return factoryAppSplitRunPath(organizationId, factoryKey, phase.appId, {
-    from: "work-order",
+    from: "task",
     orderNumber,
     lineId,
     runId: phase.runId,

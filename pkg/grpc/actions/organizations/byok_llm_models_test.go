@@ -92,26 +92,65 @@ func Test__ListBYOKLLMModels(t *testing.T) {
 	})
 
 	t.Run("candidate list failure", func(t *testing.T) {
-		integration, err := models.CreateIntegration(
-			uuid.New(),
-			r.Organization.ID,
-			"claude",
-			support.RandomName("claude"),
-			map[string]any{},
-		)
-		require.NoError(t, err)
-		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
-
-		r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-				return nil, fmt.Errorf("provider unavailable")
+		cases := []struct {
+			name         string
+			err          error
+			expectedCode codes.Code
+			expectedMsg  string
+		}{
+			{
+				name:         "auth error",
+				err:          core.NewProviderAPIError(401, "Claude credentials are invalid or expired", fmt.Errorf("unauthorized")),
+				expectedCode: codes.FailedPrecondition,
+				expectedMsg:  "Could not reach the model provider to list models. Check the connected API key and try again.",
 			},
-		})
+			{
+				name:         "transport/timeout error",
+				err:          core.NewProviderTransportError("request failed: context deadline exceeded", fmt.Errorf("context deadline exceeded")),
+				expectedCode: codes.FailedPrecondition,
+				expectedMsg:  "Could not reach the model provider to list models. Check the connected API key and try again.",
+			},
+			{
+				name:         "rate limited",
+				err:          core.NewProviderAPIError(429, "request got 429 code: too many requests", fmt.Errorf("too many requests")),
+				expectedCode: codes.ResourceExhausted,
+				expectedMsg:  "The model provider rate limited the request. Try again shortly.",
+			},
+			{
+				name:         "unknown/untyped error",
+				err:          fmt.Errorf("provider unavailable"),
+				expectedCode: codes.Internal,
+				expectedMsg:  "failed to list byok models",
+			},
+		}
 
-		_, err = ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
-			Provider: "anthropic",
-		})
-		assert.Equal(t, codes.Internal, grpcerrors.Code(err))
+		for _, tt := range cases {
+			t.Run(tt.name, func(t *testing.T) {
+				integration, err := models.CreateIntegration(
+					uuid.New(),
+					r.Organization.ID,
+					"claude",
+					support.RandomName("claude"),
+					map[string]any{},
+				)
+				require.NoError(t, err)
+				require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateReady).Error)
+
+				r.Registry.Integrations["claude"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+					ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+						return nil, tt.err
+					},
+				})
+
+				_, err = ListBYOKLLMModels(context.Background(), r.Registry, r.Organization.ID.String(), &pb.ListBYOKLLMModelsRequest{
+					Provider: "anthropic",
+				})
+				assert.Equal(t, tt.expectedCode, grpcerrors.Code(err))
+				message, ok := grpcerrors.HandlerMessage(err)
+				require.True(t, ok)
+				assert.Equal(t, tt.expectedMsg, message)
+			})
+		}
 	})
 }
 

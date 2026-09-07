@@ -66,6 +66,7 @@ func Test__ExecutionTerminator__InvokesComponentCancel(t *testing.T) {
 		Name: componentName,
 		CancelFunc: func(ctx core.ExecutionContext) error {
 			cancelCalled = true
+			assert.NotNil(t, ctx.Usage)
 			return nil
 		},
 	})

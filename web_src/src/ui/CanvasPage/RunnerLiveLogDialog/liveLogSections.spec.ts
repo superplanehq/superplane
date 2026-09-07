@@ -31,6 +31,17 @@ describe("liveLogSections", () => {
     expect(sectionTitle(state.sections[0])).toBe("You are implementing");
   });
 
+  it("uses only the first line of a multi-line preview for the compact title", () => {
+    const state = startCommandSection(emptyState(), {
+      index: 1,
+      text: "Implementation",
+      startedAtMs: 10,
+      kind: "prompt",
+      preview: "You are implementing\nthe rest of the prompt.",
+    });
+    expect(sectionTitle(state.sections[0])).toBe("You are implementing");
+  });
+
   it("nests tool output under a prompt section and keeps notes between tools", () => {
     let state = startCommandSection(emptyState(), {
       index: 5,

@@ -1,16 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  INTEGRATION_SETUP_RETURN_COOKIE,
   consumeIntegrationSetupReturn,
   consumeIntegrationSetupReturnIfArrived,
+  hasGitHubSetupRequest,
   hasIntegrationSetupStay,
   peekIntegrationSetupReturn,
   rememberIntegrationSetupReturn,
+  withGitHubSetupRequest,
 } from "./integrationSetupReturn";
+
+function setupReturnCookie(): string | undefined {
+  const prefix = `${INTEGRATION_SETUP_RETURN_COOKIE}=`;
+  return document.cookie
+    .split("; ")
+    .find((part) => part.startsWith(prefix))
+    ?.slice(prefix.length);
+}
 
 describe("integration setup return", () => {
   afterEach(() => {
     window.localStorage.clear();
+    document.cookie = `${INTEGRATION_SETUP_RETURN_COOKIE}=; Path=/; Max-Age=0`;
     vi.useRealTimers();
   });
 
@@ -21,6 +33,13 @@ describe("integration setup return", () => {
 
     consumeIntegrationSetupReturn("org-1");
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
+    expect(setupReturnCookie()).toBeUndefined();
+  });
+
+  it("mirrors the return path in a cookie for the GitHub callback", () => {
+    rememberIntegrationSetupReturn("org-1", "/org-1/workspaces/APP/setup?step=vcs&pick=newest");
+
+    expect(decodeURIComponent(setupReturnCookie() ?? "")).toBe("/org-1/workspaces/APP/setup?step=vcs&pick=newest");
   });
 
   it("consumes the marker only after the browser arrives on the stored page", () => {
@@ -39,6 +58,21 @@ describe("integration setup return", () => {
     expect(hasIntegrationSetupStay("")).toBe(false);
   });
 
+  it("copies a GitHub install request onto the stored return path", () => {
+    expect(hasGitHubSetupRequest("githubSetup=request")).toBe(true);
+    expect(hasGitHubSetupRequest("?githubSetup=request")).toBe(true);
+    expect(hasGitHubSetupRequest("")).toBe(false);
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs",
+    );
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request",
+    );
+    expect(withGitHubSetupRequest("/org-1/workspaces/APP/setup?step=vcs", "githubSetup=request&githubOrg=acme")).toBe(
+      "/org-1/workspaces/APP/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
+  });
+
   it("returns the path regardless of the integration the provider redirects to", () => {
     // The legacy connect creates a new integration id during the round trip, so
     // the marker must not depend on any specific integration id.
@@ -53,6 +87,12 @@ describe("integration setup return", () => {
 
     rememberIntegrationSetupReturn("org-1", "https://example.com");
     expect(peekIntegrationSetupReturn("org-1")).toBeNull();
+  });
+
+  it("accepts the account onboarding route as an integration return", () => {
+    rememberIntegrationSetupReturn("org-1", "/onboarding?attempt=attempt-1&step=vcs&pick=newest");
+
+    expect(peekIntegrationSetupReturn("org-1")).toBe("/onboarding?attempt=attempt-1&step=vcs&pick=newest");
   });
 
   it("expires a return path after fifteen minutes", () => {

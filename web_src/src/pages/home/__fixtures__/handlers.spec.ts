@@ -51,7 +51,7 @@ describe("createHomeFixtureFetch", () => {
     await expect(organizations.json()).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "SuperPlane" }),
-        expect.objectContaining({ id: "org-storybook-acme", name: "Acme" }),
+        expect.objectContaining({ id: "org-storybook-acme", slug: "acme", name: "Acme" }),
       ]),
     );
   });

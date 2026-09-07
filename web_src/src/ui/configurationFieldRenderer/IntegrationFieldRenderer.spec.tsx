@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConfigurationField, OrganizationsIntegration } from "@/api-client";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
@@ -82,6 +82,20 @@ describe("IntegrationFieldRenderer", () => {
       isLoading: false,
       error: null,
     } as ReturnType<typeof useConnectedIntegrations>);
+  });
+
+  afterAll(async () => {
+    // Radix Select renders its listbox inside a FocusScope that, on unmount,
+    // schedules focus restoration with setTimeout(0). Tests here open the
+    // Select and leave it mounted, so that timer is still pending when Testing
+    // Library unmounts during cleanup. If it fires after Vitest swaps in the
+    // next test file's jsdom realm, the callback builds a CustomEvent from the
+    // new realm and dispatches it on the old container, throwing
+    // "parameter 1 is not of type 'Event'" and failing the whole shard. Flush
+    // the pending timer here so it runs inside this file's realm.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
   });
 
   it("renders ready integrations and stores installation name on selection", async () => {

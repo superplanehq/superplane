@@ -6,7 +6,7 @@ export type PrArtifactState = "open" | "draft" | "closed" | "merged";
 const PR_ARTIFACT_STATES: readonly PrArtifactState[] = ["open", "draft", "closed", "merged"];
 
 // Keys we accept for the PR number in the free-form artifact data map.
-// The Add Work Order Artifact component's example uses `number`; some
+// The Add Task Artifact component's example uses `number`; some
 // authors reach for `prNumber`. Tolerate both so links render as `#1234`
 // regardless of which convention was used.
 const PR_NUMBER_KEYS = ["number", "prNumber"] as const;

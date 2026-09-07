@@ -48,6 +48,8 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		consoleFile:      "templates/line-app.console.yaml",
 		componentIntegrations: map[string]string{
 			"github.createPullRequest": "github",
+			"github.findPullRequest":   "github",
+			"github.updatePullRequest": "github",
 		},
 	},
 	"pr-closure": {
@@ -67,6 +69,12 @@ var factoryAppTemplates = map[string]factoryAppTemplate{
 		componentIntegrations: map[string]string{
 			"github.onIssue": "github",
 		},
+	},
+	"create-with-agent": {
+		id:               "create-with-agent",
+		entrypointNodeID: "onrun-create-with-agent",
+		canvasFile:       "templates/create-with-agent.canvas.yaml",
+		consoleFile:      "templates/create-with-agent.console.yaml",
 	},
 }
 
@@ -231,7 +239,7 @@ func rewriteFactoryAgent(node *yaml.Node, agent *factoryTemplateAgent) {
 		}
 	}
 	model := agent.model
-	if node.ID == "planner-agent-no-issue" && agent.planningModel != "" {
+	if (node.ID == "planner-agent-no-issue" || node.ID == "planning-agent") && agent.planningModel != "" {
 		model = agent.planningModel
 	}
 	node.Configuration["model"] = model

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
@@ -26,14 +27,26 @@ export function FirstRunShell({
   return (
     <div className="fixed inset-0 bg-background text-foreground" data-testid={testId}>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between px-6 py-5">
-        <button
-          type="button"
-          className="pointer-events-auto text-[13px] text-muted-foreground transition-colors hover:text-foreground"
-          onClick={chrome?.onLogOut}
-          data-testid="first-run-log-out"
-        >
-          {copy.logOut}
-        </button>
+        {chrome?.onCancel ? (
+          <button
+            type="button"
+            className="pointer-events-auto text-muted-foreground transition-colors hover:text-foreground"
+            onClick={chrome.onCancel}
+            aria-label={copy.close}
+            data-testid="first-run-cancel"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="pointer-events-auto text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+            onClick={chrome?.onLogOut}
+            data-testid="first-run-log-out"
+          >
+            {copy.logOut}
+          </button>
+        )}
         {identity ? (
           <p className="text-right text-[13px] leading-5 text-muted-foreground" data-testid="first-run-signed-in">
             <span className="block">{copy.loggedInAs}</span>

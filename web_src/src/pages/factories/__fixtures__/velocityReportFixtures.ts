@@ -1,10 +1,16 @@
 import type { FactoriesDescribeFactoryVelocityResponse } from "@/api-client";
+import { peoplePageSizeForOffset } from "../lib/velocityPeopleSort";
+
+type VelocityResponse = FactoriesDescribeFactoryVelocityResponse;
 
 /**
  * Storybook payloads for the workspace Velocity report. The series drift on
  * purpose: SuperPlane output climbs while review time grows, so the page shows
  * a mixed result instead of every metric improving at once.
  */
+
+/** Repository these reports are built from. Workspace setup must name the same one. */
+export const VELOCITY_REPOSITORY = "acme/refunds";
 
 const PEOPLE_AUTHORS = [
   { id: "user-darko", name: "Darko Fabijan", email: "darko@superplane.com", accountId: 20469, share: 0.24 },
@@ -25,6 +31,51 @@ const INTAKE_SHARES = [
   { key: "manual", label: "Manually created", share: 0.18 },
   { key: "automation", label: "Automation", share: 0.12 },
 ];
+
+/** Automations of the fixture workspace, with the run rate each one holds. */
+const AUTOMATION_SEEDS = [
+  { id: "app-refund-planner", name: "Refund Planner", runsPerDay: 4.1, failureRate: 0.04, hours: 0.35, costUsd: 1.42 },
+  {
+    id: "app-refund-implementer",
+    name: "Refund Implementer",
+    runsPerDay: 3.4,
+    failureRate: 0.09,
+    hours: 1.65,
+    costUsd: 2.86,
+  },
+  {
+    id: "app-refund-verifier",
+    name: "Refund Verifier",
+    runsPerDay: 3.1,
+    failureRate: 0.13,
+    hours: 0.62,
+    costUsd: 0.74,
+  },
+  { id: "app-pr-closure", name: "PR Closure", runsPerDay: 2.4, failureRate: 0.01, hours: 0.05, costUsd: 0.08 },
+  {
+    id: "app-github-issues-intake",
+    name: "GitHub issue intake",
+    runsPerDay: 5.2,
+    failureRate: 0.02,
+    hours: 0.03,
+    costUsd: 0.04,
+  },
+];
+
+/** Busiest automation first, so the rows that carry the spend read first. */
+function buildAutomations(periodDays: number) {
+  return AUTOMATION_SEEDS.map((seed) => {
+    const runs = Math.round(seed.runsPerDay * periodDays);
+    return {
+      id: seed.id,
+      name: seed.name,
+      runs,
+      failed: Math.round(runs * seed.failureRate),
+      averageDurationHours: seed.hours,
+      costCents: String(Math.round(runs * seed.costUsd * 100)),
+    };
+  }).sort((left, right) => right.runs - left.runs);
+}
 
 interface VelocityDaySeed {
   index: number;
@@ -54,6 +105,18 @@ function intakeCounts(superplane: number) {
 
 function buildDay({ index, periodDays, people, superplane, waste }: VelocityDaySeed) {
   const costCents = Math.round(superplane * 214 + waste * 185);
+  /* Compute takes a bigger cut on days with long reruns, so the band breathes. */
+  const computeShare = 0.18 + (index % 4) * 0.03;
+  const computeCostCents = Math.round(costCents * computeShare);
+
+  /* Medians move day to day, so neither line reads as a constant. */
+  const drift = 1 + 0.18 * Math.sin(index * 0.7);
+
+  /* A few long reruns pull the mean above the median, so the median sits under it. */
+  const tasksClosed = superplane + waste;
+  const medianTaskCostCents = tasksClosed > 0 ? Math.round((costCents / tasksClosed) * 0.78 * drift) : 0;
+  const medianTaskComputeCostCents = Math.round(medianTaskCostCents * computeShare);
+
   return {
     day: dayLabel(index, periodDays),
     superplaneMerged: superplane,
@@ -61,6 +124,10 @@ function buildDay({ index, periodDays, people, superplane, waste }: VelocityDayS
     waste,
     intake: intakeCounts(superplane),
     costCents: String(costCents),
+    modelCostCents: String(costCents - computeCostCents),
+    computeCostCents: String(computeCostCents),
+    medianTaskModelCostCents: String(medianTaskCostCents - medianTaskComputeCostCents),
+    medianTaskComputeCostCents: String(medianTaskComputeCostCents),
     tokens: String(superplane * 18_500 + waste * 12_400),
     wasteCostCents: String(waste * 185),
   };
@@ -83,6 +150,8 @@ function sumTotals(points: Point[]) {
   const peopleMerged = points.reduce((total, point) => total + point.peopleMerged, 0);
   const waste = points.reduce((total, point) => total + point.waste, 0);
   const costCents = points.reduce((total, point) => total + Number(point.costCents), 0);
+  const modelCostCents = points.reduce((total, point) => total + Number(point.modelCostCents ?? 0), 0);
+  const computeCostCents = points.reduce((total, point) => total + Number(point.computeCostCents ?? 0), 0);
   const tokens = points.reduce((total, point) => total + Number(point.tokens), 0);
   const wasteCostCents = points.reduce((total, point) => total + Number(point.wasteCostCents), 0);
   const merged = superplaneMerged + peopleMerged;
@@ -94,8 +163,13 @@ function sumTotals(points: Point[]) {
     superplaneSharePct: merged > 0 ? Math.round((superplaneMerged / merged) * 100) : 0,
     wastePct: superplaneMerged + waste > 0 ? Math.round((waste / (superplaneMerged + waste)) * 100) : 0,
     costCents: String(costCents),
+    modelCostCents: String(modelCostCents),
+    computeCostCents: String(computeCostCents),
     tokens: String(tokens),
     wasteCostCents: String(wasteCostCents),
+    // Every pull request of these payloads comes from a task of its own.
+    tasksClosed: superplaneMerged + waste,
+    tasksWaste: waste,
   };
 }
 
@@ -118,14 +192,16 @@ function distribute(total: number, shares: number[]): number[] {
   return result;
 }
 
-function buildPeople(totals: ReturnType<typeof sumTotals>) {
-  const shares = PEOPLE_AUTHORS.map((person) => person.share);
+type Author = { id: string; name: string; email: string; accountId: number; share: number };
+
+function buildPeople(totals: ReturnType<typeof sumTotals>, authors: Author[] = PEOPLE_AUTHORS) {
+  const shares = authors.map((person) => person.share);
   const authored = distribute(totals.peopleMerged, shares);
   const factoryMerged = distribute(totals.superplaneMerged, shares);
   const factoryWaste = distribute(totals.waste, shares);
   const costCents = Number(totals.costCents);
 
-  return PEOPLE_AUTHORS.map((person, index) => ({
+  return authors.map((person, index) => ({
     id: person.id,
     name: person.name,
     email: person.email,
@@ -137,6 +213,20 @@ function buildPeople(totals: ReturnType<typeof sumTotals>) {
     costCents: String(Math.round(costCents * person.share)),
   }));
 }
+
+/**
+ * A cohort large enough that the People table's "Show more" control has
+ * something to show. Named so the alphabetical order matches the default
+ * total-merged-descending sort closely enough for the Storybook fixture to
+ * read as a believable, stable first page.
+ */
+const MANY_PEOPLE_AUTHORS: Author[] = Array.from({ length: 14 }, (_, index) => ({
+  id: `contributor-${index + 1}`,
+  name: `Contributor ${String(index + 1).padStart(2, "0")}`,
+  email: `contributor${index + 1}@superplane.com`,
+  accountId: 900_000 + index,
+  share: 1 / 14,
+}));
 
 function intakeSources(points: Point[]) {
   const totals = new Map<string, number>();
@@ -152,7 +242,11 @@ function intakeSources(points: Point[]) {
   }));
 }
 
-function buildReport(periodDays: number, withComparison: boolean): FactoriesDescribeFactoryVelocityResponse {
+function buildReport(
+  periodDays: number,
+  withComparison: boolean,
+  authors: Author[] = PEOPLE_AUTHORS,
+): VelocityResponse {
   const points = buildPoints(periodDays, periodDays);
   const totals = sumTotals(points);
   const previous = sumTotals(buildPoints(periodDays, 0));
@@ -162,24 +256,25 @@ function buildReport(periodDays: number, withComparison: boolean): FactoriesDesc
     yesterday: { superplaneMerged: yesterday.superplaneMerged, waste: yesterday.waste },
     totals,
     points,
-    repository: "acme/refunds",
+    repository: VELOCITY_REPOSITORY,
     hasPeopleCohort: true,
     peopleSyncedAt: new Date().toISOString(),
     peopleSyncPending: false,
     previousTotals: previous,
     hasPreviousWindow: withComparison,
     intakeSources: intakeSources(points),
-    people: buildPeople(totals),
+    people: buildPeople(totals, authors),
+    automations: buildAutomations(periodDays),
   };
 }
 
-export const DEFAULT_FACTORY_VELOCITY: Record<number, FactoriesDescribeFactoryVelocityResponse> = {
+export const DEFAULT_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
   14: buildReport(14, true),
   30: buildReport(30, true),
 };
 
 /** A new workspace: nothing merged, nothing closed, nothing spent. */
-export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = {
+export const EMPTY_FACTORY_VELOCITY: VelocityResponse = {
   yesterday: { superplaneMerged: 0, waste: 0 },
   totals: {
     superplaneMerged: 0,
@@ -190,6 +285,8 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
     costCents: "0",
     tokens: "0",
     wasteCostCents: "0",
+    tasksClosed: 0,
+    tasksWaste: 0,
   },
   points: Array.from({ length: 14 }, (_, index) => ({
     day: dayLabel(index, 14),
@@ -201,6 +298,7 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
   hasPreviousWindow: false,
   intakeSources: [],
   people: [],
+  automations: [],
 };
 
 /**
@@ -208,7 +306,7 @@ export const EMPTY_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = 
  * the whole period, because Velocity reads repository history, but SuperPlane
  * has one day of output. There is no earlier period to compare with.
  */
-export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = (() => {
+export const EARLY_USAGE_FACTORY_VELOCITY: VelocityResponse = (() => {
   const report = buildReport(14, false);
   const points = (report.points ?? []).map((point, index, all) => {
     const isLastDay = index === all.length - 1;
@@ -219,6 +317,10 @@ export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityRespo
       waste: 0,
       intake: [],
       costCents: "0",
+      modelCostCents: "0",
+      computeCostCents: "0",
+      medianTaskModelCostCents: "0",
+      medianTaskComputeCostCents: "0",
       tokens: "0",
       wasteCostCents: "0",
     };
@@ -241,7 +343,7 @@ export const EARLY_USAGE_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityRespo
  * there, but the background sync has not stored the repository history yet, so
  * the People series and the SuperPlane share are withheld.
  */
-export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVelocityResponse = (() => {
+export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: VelocityResponse = (() => {
   const report = buildReport(14, true);
   const points = (report.points ?? []).map((point) => ({ ...point, peopleMerged: 0 }));
   const totals = sumTotals(points as Point[]);
@@ -256,3 +358,55 @@ export const PEOPLE_SYNC_PENDING_FACTORY_VELOCITY: FactoriesDescribeFactoryVeloc
     people: buildPeople(totals).map((person) => ({ ...person, authoredMerged: 0 })),
   };
 })();
+
+/**
+ * Fourteen people with activity, so the People table's "Show more" control has
+ * something to load. Every other fixture keeps the small default cohort so its
+ * story keeps rendering one page with no control.
+ */
+export const PEOPLE_LOAD_MORE_FACTORY_VELOCITY: Record<number, VelocityResponse> = {
+  14: buildReport(14, true, MANY_PEOPLE_AUTHORS),
+  30: buildReport(30, true, MANY_PEOPLE_AUTHORS),
+};
+
+type VelocityPerson = NonNullable<FactoriesDescribeFactoryVelocityResponse["people"]>[number];
+
+function totalMergedOf(person: VelocityPerson): number {
+  return (person.authoredMerged ?? 0) + (person.factoryMerged ?? 0);
+}
+
+const PEOPLE_SORT_VALUE: Partial<Record<string, (person: VelocityPerson) => number>> = {
+  PEOPLE_SORT_FACTORY_MERGED: (person) => person.factoryMerged ?? 0,
+  PEOPLE_SORT_AUTHORED_MERGED: (person) => person.authoredMerged ?? 0,
+  PEOPLE_SORT_MEDIAN_CYCLE_HOURS: (person) => person.medianCycleHours ?? 0,
+  PEOPLE_SORT_COST_USD: (person) => Number(person.costCents ?? 0),
+};
+
+/**
+ * Stands in for the backend's sort-then-page step: orders `report.people` by
+ * the request's `peopleSort`/`peopleSortDirection`, then slices to
+ * `peopleOffset`/`peoplePageSize`, so Storybook and the mock server exercise
+ * the same "Show more" contract the real API does.
+ */
+export function paginateVelocityPeople(report: VelocityResponse, url: URL): VelocityResponse {
+  const people = [...(report.people ?? [])];
+  const valueOf = PEOPLE_SORT_VALUE[url.searchParams.get("peopleSort") ?? ""] ?? totalMergedOf;
+  const ascending = url.searchParams.get("peopleSortDirection") === "SORT_DIRECTION_ASC";
+
+  people.sort((a, b) => {
+    const diff = valueOf(a) - valueOf(b);
+    if (diff !== 0) return ascending ? diff : -diff;
+    return (a.name ?? "").localeCompare(b.name ?? "");
+  });
+
+  const offset = Number(url.searchParams.get("peopleOffset") ?? 0);
+  const pageSize = Number(url.searchParams.get("peoplePageSize") ?? peoplePageSizeForOffset(offset));
+  const page = people.slice(offset, offset + pageSize);
+
+  return {
+    ...report,
+    people: page,
+    peopleTotal: people.length,
+    peopleHasMore: offset + page.length < people.length,
+  };
+}

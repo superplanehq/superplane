@@ -50,9 +50,15 @@ export type UpdateCanvasFolderMembershipFn = (
   membership: ReturnType<typeof appendCanvasToFolderMembership>,
 ) => Promise<unknown>;
 
-export async function stageAndCommitFactorySpecs(canvasId: string, canvasYaml: string, consoleYaml: string) {
+export async function stageAndCommitFactorySpecs(
+  organizationId: string,
+  canvasId: string,
+  canvasYaml: string,
+  consoleYaml: string,
+) {
   await canvasesPutCanvasStaging(
     withOrganizationHeader({
+      organizationId,
       path: { canvasId },
       body: {
         operations: [
@@ -64,15 +70,22 @@ export async function stageAndCommitFactorySpecs(canvasId: string, canvasYaml: s
   );
   await canvasesCommitCanvasStaging(
     withOrganizationHeader({
+      organizationId,
       path: { canvasId },
       body: { commitMessage: "Install factory template" },
     }),
   );
 }
 
-export async function invokeFactoryRun(canvasId: string, definition: FactoryDefinition, startingTaskPrompt: string) {
+export async function invokeFactoryRun(
+  organizationId: string,
+  canvasId: string,
+  definition: FactoryDefinition,
+  startingTaskPrompt: string,
+) {
   await canvasesInvokeNodeTriggerHook(
     withOrganizationHeader({
+      organizationId,
       path: {
         canvasId,
         nodeId: definition.run.nodeId,
@@ -139,7 +152,7 @@ export async function materializeAndCommitFactoryTemplate(args: {
     });
     consoleYaml = materializeFactoryConsole(args.definition, args.canvasName, args.canvasId);
   }
-  await stageAndCommitFactorySpecs(args.canvasId, canvasYaml, consoleYaml);
+  await stageAndCommitFactorySpecs(args.organizationId, args.canvasId, canvasYaml, consoleYaml);
 }
 
 function presentNames(items: { name?: string }[]): string[] {
@@ -209,10 +222,15 @@ async function createCanvasWithUniqueName(args: {
   throw new Error("Failed to create factory canvas");
 }
 
-async function resolveExistingFactoryCanvas(canvasId: string, fallbackName: string): Promise<FactoryCanvasHandle> {
+async function resolveExistingFactoryCanvas(
+  organizationId: string,
+  canvasId: string,
+  fallbackName: string,
+): Promise<FactoryCanvasHandle> {
   try {
     const response = await canvasesDescribeCanvas(
       withOrganizationHeader({
+        organizationId,
         path: { id: canvasId },
       }),
     );
@@ -238,7 +256,7 @@ export async function ensureFactoryCanvas(args: {
     if (args.pending?.canvasId === args.existingCanvasId) {
       return args.pending;
     }
-    return resolveExistingFactoryCanvas(args.existingCanvasId, args.definition.title);
+    return resolveExistingFactoryCanvas(args.organizationId, args.existingCanvasId, args.definition.title);
   }
 
   if (args.pending) return args.pending;

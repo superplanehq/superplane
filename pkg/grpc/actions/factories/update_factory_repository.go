@@ -21,8 +21,8 @@ import (
 const (
 	legacyAppRepositoryExpression = "{{ install_params.appRepository }}"
 	legacyDefaultBranchExpression = "{{ install_params.defaultBranch }}"
-	orderRepositoryExpression     = "{{ order().repository }}"
-	orderDefaultBranchExpression  = "{{ order().default_branch }}"
+	orderRepositoryExpression     = "{{ task().repository }}"
+	orderDefaultBranchExpression  = "{{ task().default_branch }}"
 )
 
 // UpdateFactoryRepository changes the repository that factory-managed

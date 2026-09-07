@@ -280,6 +280,10 @@ type UsageReportFilter struct {
 	UsageKind      string
 	Since          time.Time
 	Until          time.Time
+	Provider       string
+	Model          string
+	MachineType    string
+	TaskOwnerID    *uuid.UUID
 }
 
 // UsageTotals is a token, duration, and cost sum.
@@ -304,6 +308,14 @@ type UsageByMachineType struct {
 	CostMicros      int64
 }
 
+// UsageSplit is the ledger of one subject, divided by what the spend paid for.
+type UsageSplit struct {
+	// Model is spend on model tokens.
+	Model UsageTotals
+	// Compute is spend on runner machine time.
+	Compute UsageTotals
+}
+
 func (t UsageTotals) CostCents() int64 {
 	return pricebook.MicrosToCents(t.CostMicros)
 }
@@ -325,8 +337,21 @@ func (r UsageByMachineType) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
 }
 
+// Total is the whole ledger of the subject, both bands together.
+func (s UsageSplit) Total() UsageTotals {
+	return s.Model.Add(s.Compute)
+}
+
 type usageSumRow struct {
 	ID              uuid.UUID
+	TotalTokens     int64
+	DurationSeconds int64
+	CostMicros      int64
+}
+
+type usageKindSumRow struct {
+	ID              uuid.UUID
+	UsageKind       string
 	TotalTokens     int64
 	DurationSeconds int64
 	CostMicros      int64
@@ -363,6 +388,45 @@ func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID
 		return nil, err
 	}
 	return scanUsageSums(rows), nil
+}
+
+// SumUsageForWorkOrdersByKind returns ledger totals keyed by work order, with
+// model spend and compute spend reported apart. Missing IDs are absent from
+// the map (zero value).
+//
+// Anything that is not compute counts as model spend, so the two bands always
+// add up to what the work order cost.
+func SumUsageForWorkOrdersByKind(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]UsageSplit, error) {
+	if len(workOrderIDs) == 0 {
+		return map[uuid.UUID]UsageSplit{}, nil
+	}
+
+	var rows []usageKindSumRow
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("work_order_id AS id, usage_kind, "+usageSumSelect).
+		Where("work_order_id IN ?", workOrderIDs).
+		Group("work_order_id, usage_kind").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]UsageSplit, len(rows))
+	for _, row := range rows {
+		totals := UsageTotals{
+			TotalTokens:     row.TotalTokens,
+			DurationSeconds: row.DurationSeconds,
+			CostMicros:      row.CostMicros,
+		}
+		split := result[row.ID]
+		if row.UsageKind == UsageKindCompute {
+			split.Compute = split.Compute.Add(totals)
+		} else {
+			split.Model = split.Model.Add(totals)
+		}
+		result[row.ID] = split
+	}
+	return result, nil
 }
 
 // SumUsageForRunTrees returns ledger totals for each root run, including
@@ -432,21 +496,44 @@ func SumUsageForRunTrees(tx *gorm.DB, rootIDs []uuid.UUID) (map[uuid.UUID]UsageT
 }
 
 func usageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
-	query := tx.Model(&WorkspaceUsageEvent{}).Where("organization_id = ?", filter.OrganizationID)
+	joinWorkOrders := filter.TaskOwnerID != nil
+	return spendingScopedQuery(tx, filter, joinWorkOrders)
+}
+
+func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders bool) *gorm.DB {
+	query := tx.Model(&WorkspaceUsageEvent{})
+	if joinWorkOrders {
+		query = query.Joins("LEFT JOIN factory_work_orders ON factory_work_orders.id = workspace_usage_events.work_order_id")
+		if filter.TaskOwnerID != nil {
+			query = query.Where("factory_work_orders.created_by_id = ?", *filter.TaskOwnerID)
+		}
+	}
+	if filter.OrganizationID != uuid.Nil {
+		query = query.Where("workspace_usage_events.organization_id = ?", filter.OrganizationID)
+	}
 	if filter.FactoryID != nil {
-		query = query.Where("factory_id = ?", *filter.FactoryID)
+		query = query.Where("workspace_usage_events.factory_id = ?", *filter.FactoryID)
 	}
 	if filter.WorkOrderID != nil {
-		query = query.Where("work_order_id = ?", *filter.WorkOrderID)
+		query = query.Where("workspace_usage_events.work_order_id = ?", *filter.WorkOrderID)
 	}
 	if filter.UsageKind != "" {
-		query = query.Where("usage_kind = ?", filter.UsageKind)
+		query = query.Where("workspace_usage_events.usage_kind = ?", filter.UsageKind)
+	}
+	if filter.Provider != "" {
+		query = query.Where("workspace_usage_events.provider = ?", filter.Provider)
+	}
+	if filter.Model != "" {
+		query = query.Where("workspace_usage_events.model = ?", filter.Model)
+	}
+	if filter.MachineType != "" {
+		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
 	}
 	if !filter.Since.IsZero() {
-		query = query.Where("occurred_at >= ?", filter.Since)
+		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)
 	}
 	if !filter.Until.IsZero() {
-		query = query.Where("occurred_at < ?", filter.Until)
+		query = query.Where("workspace_usage_events.occurred_at < ?", filter.Until)
 	}
 	return query
 }

@@ -344,7 +344,7 @@ func renderRunnerLogRecord(stdout io.Writer, record runneraction.LiveLogRecord) 
 }
 
 func cmdStartTitle(record runneraction.LiveLogRecord) string {
-	if preview := strings.TrimSpace(record.Preview); preview != "" {
+	if preview := runneraction.LiveLogFirstLine(record.Preview); preview != "" {
 		return preview
 	}
 	return record.Text

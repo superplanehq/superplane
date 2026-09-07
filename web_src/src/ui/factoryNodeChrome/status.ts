@@ -11,6 +11,9 @@ const PASSED_EVENT_STATES = new Set([
   "true",
   "false",
   "done",
+  // github.findPullRequest channel outcomes — lookup finished, match or not.
+  "found",
+  "notFound",
 ]);
 
 const RUNNING_EVENT_STATES = new Set([

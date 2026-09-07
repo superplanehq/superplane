@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -407,7 +408,8 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
+		message := fmt.Sprintf("request failed: %v", err)
+		return nil, core.NewProviderTransportError(message, errors.New(message))
 	}
 	defer res.Body.Close()
 
@@ -417,7 +419,8 @@ func (c *Client) execRequestWithKey(ctx context.Context, method, URL string, bod
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		message := fmt.Sprintf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, core.NewProviderAPIError(res.StatusCode, message, errors.New(message))
 	}
 
 	return responseBody, nil

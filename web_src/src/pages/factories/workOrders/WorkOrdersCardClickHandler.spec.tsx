@@ -182,8 +182,8 @@ describe("WorkOrdersBoardView layout", () => {
 
     const { row } = renderView(WorkOrdersBoardView, [waiting]);
 
-    const chip = within(row).getByText("Run failed");
-    expect(chip.querySelector("svg")).toBeTruthy();
+    const chip = within(row).getByText("Run failed").closest("span[title]");
+    expect(chip?.querySelector("svg")).toBeTruthy();
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
@@ -423,6 +423,61 @@ describe("WorkOrderCard attention", () => {
     expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
   });
 
+  it("shows Waiting on status checks when a check wait is active", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            waitingOnChecksOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting on status checks")).toBeInTheDocument();
+    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+  });
+
+  it("shows Status checks passed after a check wait finishes", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            checksPassedOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
+    expect(screen.getByLabelText("Status checks passed")).toBeInTheDocument();
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting on status checks")).not.toBeInTheDocument();
+  });
+
+  it("shows Automatic fixes paused after the check handler hits the attempt limit", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            fixesPausedOrderIds={new Set(["wo-waiting"])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Automatic fixes paused")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+  });
+
   it("shows Addressing user feedback when a PR-feedback run is active", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -437,6 +492,25 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
+  });
+
+  it("shows the check-fix activity on the card while the fixer runs", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <WorkOrderCard
+            entry={buildWorkOrderListEntry(waitingOrder, factory)}
+            {...cardProps}
+            addressingFeedbackOrderIds={new Set(["wo-waiting"])}
+            addressingFeedbackLabels={new Map([["wo-waiting", "Fixing failed checks on d8b80c2"]])}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Fixing failed checks on d8b80c2")).toBeInTheDocument();
+    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });

@@ -75,7 +75,7 @@ function OrganizationSettingsLayoutContent({ organizationId }: { organizationId:
           <SettingsNavGroup organizationId={organizationId} items={ORGANIZATION_SETTINGS_NAV_ITEMS} />
         </nav>
       </aside>
-      <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-background">
+      <main className="flex min-h-screen min-w-0 flex-1 flex-col bg-sidebar dark:bg-background">
         <Outlet />
       </main>
     </div>

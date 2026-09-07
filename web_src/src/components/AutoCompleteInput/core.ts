@@ -111,10 +111,16 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     example: "run().url",
   },
   {
-    name: "order",
-    snippet: "order().",
+    name: "task",
+    snippet: "task().",
     description:
       "Returns the task for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, url, artifacts, and comments (the last three loaded when accessed).",
+    example: 'none(task().artifacts, {#.type == "pr"})',
+  },
+  {
+    name: "order",
+    snippet: "order().",
+    description: "Same as task(). Returns the task for this run when dispatched from a factory.",
     example: 'none(order().artifacts, {#.type == "pr"})',
   },
   {
@@ -1485,7 +1491,7 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
     return `__app${expr.slice(appMatch[0].length)}`;
   }
 
-  const orderMatch = expr.match(/^order\(\)/);
+  const orderMatch = expr.match(/^(?:order|task)\(\)/);
   if (orderMatch) {
     return `__order${expr.slice(orderMatch[0].length)}`;
   }

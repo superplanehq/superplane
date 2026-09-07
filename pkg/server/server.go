@@ -294,6 +294,13 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_PLANNING_SESSION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Planning Session Cleanup Worker")
+
+		w := workers.NewPlanningSessionCleanupWorker()
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		agentToolRegistry := agenttools.NewRegistry(agenttools.Dependencies{

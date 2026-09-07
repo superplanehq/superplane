@@ -143,5 +143,6 @@ describe("buildAutocompleteExampleObj", () => {
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
     expect(evaluateExpr("app().name", autocompleteContext!)).toBe("Deploy");
     expect(evaluateExpr("order().title", autocompleteContext!)).toBe("Ship feature");
+    expect(evaluateExpr("task().title", autocompleteContext!)).toBe("Ship feature");
   });
 });

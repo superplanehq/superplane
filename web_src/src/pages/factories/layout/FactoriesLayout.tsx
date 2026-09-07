@@ -2,31 +2,26 @@ import type { FactoriesFactory } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useFactoryWebsocket } from "@/hooks/useFactoryWebsocket";
-import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_FACTORY_VELOCITY } from "@/lib/experimentalFeatures";
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { Navigate, Outlet, useLocation, useNavigate, useParams } from "react-router";
+import { Navigate, Outlet, useLocation, useParams } from "react-router";
 import { CreateWorkOrderDialog } from "../CreateWorkOrderDialog";
 import {
   factoryRouteNeedsCanonicalRedirect,
   replaceFactoryKeySegment,
   resolveFactoryByKey,
 } from "../lib/factoryKeyResolution";
-import { factoryListPath, firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
+import { factoryListPath, firstFactoryLineId } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { useOnboardingStorybook } from "../pages/onboarding/useOnboardingStorybook";
 import { isFactoryOnboardingComplete } from "../pages/onboarding/onboardingStatus";
 import { FactoriesLayoutContext } from "./factoriesLayoutContext";
-import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
-import { SidebarUserMenu } from "./SidebarUserMenu";
+import { FactoriesSidebar } from "./FactoriesSidebar";
 import { useCreateWorkOrderDialogState } from "./useCreateWorkOrderDialogState";
-import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 function isOnboardingSidebarHidden(pendingWorkspaceId: string | undefined, factoryId: string) {
   return Boolean(pendingWorkspaceId && pendingWorkspaceId === factoryId);
@@ -112,11 +107,10 @@ function FactoriesLayoutContent({
   factories: FactoriesFactory[];
 }) {
   useFactoriesThemeClass();
-  const navigate = useNavigate();
   const { account } = useAccount();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const { data: organization } = useOrganization(organizationId);
-  const { data: factory, error: factoryError } = useFactory(organizationId, factoryId);
+  const { canAct } = usePermissions();
+  const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
+  const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { createWorkOrderOpen, openCreateWorkOrder, closeCreateWorkOrder, completeCreateWorkOrder } =
     useCreateWorkOrderDialogState(
       organizationId,
@@ -195,13 +189,6 @@ function FactoriesLayoutContent({
             factoryKey={factoryKey}
             factory={factory}
             factories={factories}
-            organizationName={organization?.metadata?.name ?? ""}
-            accountName={account?.name}
-            accountAvatarUrl={account?.avatar_url}
-            canOpenSettings={canAct("factories", "update")}
-            canCreateFactory={canAct("factories", "create")}
-            permissionsLoading={permissionsLoading}
-            onOpenCreateFactory={() => navigate(newFactoryPath(organizationId))}
           />
         )}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
@@ -220,70 +207,7 @@ function FactoriesLayoutContent({
   );
 }
 
-interface FactoriesSidebarProps {
-  organizationId: string;
-  factoryKey: string;
-  factory: FactoriesFactory;
-  factories: FactoriesFactory[];
-  organizationName: string;
-  accountName?: string | null;
-  accountAvatarUrl?: string | null;
-  canOpenSettings: boolean;
-  canCreateFactory: boolean;
-  permissionsLoading: boolean;
-  onOpenCreateFactory: () => void;
-}
-
-function FactoriesSidebar({
-  organizationId,
-  factoryKey,
-  factory,
-  factories,
-  organizationName,
-  accountName,
-  accountAvatarUrl,
-  canOpenSettings,
-  canCreateFactory,
-  permissionsLoading,
-  onOpenCreateFactory,
-}: FactoriesSidebarProps) {
-  const { lineId: routeLineId } = useParams<{ lineId?: string }>();
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const showVelocity = hasExperimentalFeature(FEATURE_FACTORY_VELOCITY);
-  return (
-    <aside
-      className="sticky top-0 flex h-screen w-[var(--workspace-navigation-width)] shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar text-sidebar-foreground"
-      data-testid="factories-sidebar"
-    >
-      <WorkspaceSwitcher
-        organizationId={organizationId}
-        factory={factory}
-        factories={factories}
-        canCreateFactory={canCreateFactory}
-        permissionsLoading={permissionsLoading}
-        onCreateFactory={onOpenCreateFactory}
-      />
-      <FactoriesSidebarNav
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        lineId={routeLineId ?? firstFactoryLineId(factory)}
-        canOpenSettings={canOpenSettings}
-        permissionsLoading={permissionsLoading}
-        showVelocity={showVelocity}
-      />
-      <div className="flex-1" />
-      <SidebarUserMenu
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        userName={accountName ?? "You"}
-        userAvatarUrl={accountAvatarUrl}
-        organizationName={organizationName || "Organization"}
-      />
-    </aside>
-  );
-}
-
-function FactoriesLayoutLoading() {
+export function FactoriesLayoutLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
       <p className="text-[13px] text-muted-foreground">Loading workspace…</p>
@@ -291,7 +215,7 @@ function FactoriesLayoutLoading() {
   );
 }
 
-function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
+export function FactoriesLayoutError({ organizationId }: { organizationId: string }) {
   return (
     <div
       className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground"

@@ -30,6 +30,11 @@ describe("normalizeFactoryNodeStatus", () => {
     expect(normalizeFactoryNodeStatus("rejected")).toBe("cancelled");
   });
 
+  it("maps findPullRequest channel outcomes so executed nodes are not Pending", () => {
+    expect(normalizeFactoryNodeStatus("found")).toBe("passed");
+    expect(normalizeFactoryNodeStatus("notFound")).toBe("passed");
+  });
+
   it("maps mapper success aliases from the eventStateMap success style", () => {
     const stateMap = {
       ...DEFAULT_EVENT_STATE_MAP,
@@ -113,6 +118,8 @@ describe("resolveFactoryRuntimeStatus", () => {
     expect(resolveFactoryRuntimeStatus({ eventState: "true", runIsActive: false })).toBe("passed");
     expect(resolveFactoryRuntimeStatus({ eventState: "success", runIsActive: false })).toBe("passed");
     expect(resolveFactoryRuntimeStatus({ eventState: "failed", runIsActive: false })).toBe("failed");
+    expect(resolveFactoryRuntimeStatus({ eventState: "found", runIsActive: false })).toBe("passed");
+    expect(resolveFactoryRuntimeStatus({ eventState: "notFound", runIsActive: false })).toBe("passed");
   });
 
   it("maps mapper success aliases when the run has finished", () => {

@@ -87,4 +87,20 @@ describe("DialogContent accessibility", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-describedby")).toBe("custom-description");
   });
+
+  it("uses theme surface tokens instead of a hardcoded dark gray fill", () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Title</DialogTitle>
+          <div>Body</div>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("bg-popover");
+    expect(dialog.className).toContain("border-border");
+    expect(dialog.className).not.toContain("dark:bg-gray-900");
+  });
 });

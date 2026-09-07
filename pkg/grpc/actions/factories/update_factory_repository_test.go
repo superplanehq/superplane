@@ -18,14 +18,14 @@ func TestReplaceConfigurationValues(t *testing.T) {
 	}
 
 	replaced, changed := replaceConfigurationValues(configuration, []configurationReplacement{
-		{from: "acme/old", to: "{{ order().repository }}"},
-		{from: "main", to: "{{ order().default_branch }}"},
+		{from: "acme/old", to: "{{ task().repository }}"},
+		{from: "main", to: "{{ task().default_branch }}"},
 	})
 
 	assert.True(t, changed)
 	assert.Equal(t, "acme/old", configuration["repository"])
-	assert.Equal(t, "{{ order().repository }}", replaced.(map[string]any)["repository"])
-	assert.Equal(t, "{{ order().default_branch }}", replaced.(map[string]any)["environment"].([]any)[1].(map[string]any)["value"])
+	assert.Equal(t, "{{ task().repository }}", replaced.(map[string]any)["repository"])
+	assert.Equal(t, "{{ task().default_branch }}", replaced.(map[string]any)["environment"].([]any)[1].(map[string]any)["value"])
 	assert.Equal(t, configuration["command"], replaced.(map[string]any)["command"])
 }
 

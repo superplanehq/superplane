@@ -11,6 +11,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{}, "gpt-5", "/task/planning_session_mcp.js")
+
+	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, args, "-m")
+	assert.Contains(t, args, "gpt-5")
+	assert.NotContains(t, args, "--sandbox")
+	assert.NotContains(t, args, "read-only")
+	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
+}
+
+func TestCodexExecArgsUsesReadOnlySandboxForPlanning(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	}, "gpt-5", "/task/planning_session_mcp.js")
+
+	assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, args, "--sandbox")
+	assert.Contains(t, args, "read-only")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, `approval_policy="never"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/planning_session_mcp.js"]`)
+}
+
+func TestPlanningEnabledFromScript(t *testing.T) {
+	assert.True(t, planningEnabledFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID": "session-1",
+	}))
+	assert.False(t, planningEnabledFromScript(t, map[string]string{}))
+}
+
 func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 	output := runCodexFormatter(t, []string{
 		`{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc git status"}}`,
@@ -49,6 +81,21 @@ func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(output, `"type":"tool_start"`))
 }
 
+func TestFormatTurnResultWritesClaudeStyleDoneLine(t *testing.T) {
+	output := runCodexTurnResult(t, map[string]any{
+		"is_error":       false,
+		"num_turns":      1,
+		"duration_ms":    1600,
+		"total_cost_usd": 0.0022,
+	})
+	assert.Equal(t, "✓ done · 1 turns · $0.0022 · 1.6s\n", output)
+}
+
+func TestFormatTurnResultWritesFailedLine(t *testing.T) {
+	output := runCodexTurnResult(t, map[string]any{"is_error": true, "num_turns": 1, "duration_ms": 900})
+	assert.Equal(t, "✗ failed · 1 turns · 0.9s\n", output)
+}
+
 func TestFormatCodexJsonLinesKeepsOverlappingOutputOnTheRightTool(t *testing.T) {
 	output := runCodexFormatter(t, []string{
 		`{"type":"item.started","item":{"id":"item_a","type":"command_execution","command":"echo a"}}`,
@@ -65,6 +112,54 @@ func TestFormatCodexJsonLinesKeepsOverlappingOutputOnTheRightTool(t *testing.T) 
 	assert.Equal(t, "item_a", records[2]["id"])
 	assert.Equal(t, "item_a", records[3]["id"])
 	assert.Regexp(t, `(?s)"id":"item_b".*bbb.*"type":"tool_end".*"id":"item_a".*aaa`, output)
+}
+
+func codexExecArgsFromScript(t *testing.T, env map[string]string, model, mcpScriptPath string) []string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	envPayload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command(
+		"node",
+		"-e",
+		`const { codexExecArgs } = require(process.argv[1]); process.stdout.write(JSON.stringify(codexExecArgs(JSON.parse(process.argv[2]), process.argv[3], process.argv[4])));`,
+		script,
+		string(envPayload),
+		model,
+		mcpScriptPath,
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var args []string
+	require.NoError(t, json.Unmarshal(out, &args))
+	return args
+}
+
+func planningEnabledFromScript(t *testing.T, env map[string]string) bool {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { planningEnabled } = require(process.argv[1]); process.stdout.write(JSON.stringify(planningEnabled(JSON.parse(process.argv[2]))));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var enabled bool
+	require.NoError(t, json.Unmarshal(out, &enabled))
+	return enabled
+}
+
+func runCodexTurnResult(t *testing.T, event map[string]any) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(event)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { formatTurnResult } = require(process.argv[1]); formatTurnResult(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
 }
 
 func runCodexFormatter(t *testing.T, lines []string) string {

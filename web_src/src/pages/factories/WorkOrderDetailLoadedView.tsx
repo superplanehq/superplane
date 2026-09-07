@@ -161,6 +161,7 @@ function WorkOrderDetailMainColumn({
           <WorkOrderStatusNotesSection
             notes={notesToShow}
             organizationId={organizationId}
+            factoryKey={factoryKey}
             displayStatus={displayStatus}
             isOpen={isOpen}
             isDispatchable={isDispatchable}
@@ -280,6 +281,7 @@ function WorkOrderDetailBodyAside({
 function WorkOrderStatusNotesSection({
   notes,
   organizationId,
+  factoryKey,
   displayStatus,
   isOpen,
   isDispatchable,
@@ -295,6 +297,7 @@ function WorkOrderStatusNotesSection({
 }: Pick<
   WorkOrderDetailLoadedViewProps,
   | "organizationId"
+  | "factoryKey"
   | "displayStatus"
   | "isOpen"
   | "isDispatchable"
@@ -327,6 +330,7 @@ function WorkOrderStatusNotesSection({
           key={note.key}
           note={note}
           organizationId={organizationId}
+          factoryKey={factoryKey}
           canClose={canClose}
           canManage={canManage}
           isBusy={isCompleting || isRejecting || isClosing || isUpdatingStatus}

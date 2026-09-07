@@ -78,7 +78,7 @@ func AcceptInviteLinkWithUsage(
 	} else if !user.DeletedAt.Valid {
 		tx.Rollback()
 		statusValue = "already_member"
-		return inviteLinkAcceptResponse(org.ID.String(), org.Name, statusValue)
+		return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
 	} else {
 		userCount, countErr := models.CountActiveHumanUsersByOrganizationInTransaction(tx, org.ID.String())
 		if countErr != nil {
@@ -110,12 +110,13 @@ func AcceptInviteLinkWithUsage(
 		return nil, grpcerrors.Internal(err, "failed to accept invite")
 	}
 
-	return inviteLinkAcceptResponse(org.ID.String(), org.Name, statusValue)
+	return inviteLinkAcceptResponse(org.ID.String(), org.Slug, org.Name, statusValue)
 }
 
-func inviteLinkAcceptResponse(organizationID, organizationName, statusValue string) (*structpb.Struct, error) {
+func inviteLinkAcceptResponse(organizationID, organizationSlug, organizationName, statusValue string) (*structpb.Struct, error) {
 	return structpb.NewStruct(map[string]interface{}{
 		"organization_id":   organizationID,
+		"organization_slug": organizationSlug,
 		"organization_name": organizationName,
 		"status":            statusValue,
 	})

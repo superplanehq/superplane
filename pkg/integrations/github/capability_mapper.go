@@ -65,6 +65,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Action: &checks.ListCheckRunsForRef{}},
+					{ReadOnly: true, Action: &checks.WaitForPullRequestChecks{}},
 					{ReadOnly: true, Trigger: &checks.OnCheckRun{}},
 				},
 			},
@@ -73,6 +74,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Trigger: &statuses.OnCommitStatus{}},
 					{ReadOnly: true, Action: &statuses.GetCombinedCommitStatus{}},
+					{ReadOnly: true, Action: &checks.WaitForPullRequestChecks{}},
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
 				},
 			},
@@ -138,6 +140,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: false, Action: &pulls.MarkPullRequestReadyForReview{}},
 					{ReadOnly: false, Action: &pulls.AddPullRequestReviewers{}},
 					{ReadOnly: false, Action: &pulls.UpdatePullRequest{}},
+					{ReadOnly: true, Action: &pulls.FindPullRequest{}},
 				},
 			},
 		},
@@ -146,9 +149,15 @@ func NewCapabilityMapper() *CapabilityMapper {
 
 func (m *CapabilityMapper) AllNames() []string {
 	out := []string{}
+	seen := map[string]bool{}
 	for _, group := range m.Groups {
 		for _, capability := range group.Capabilities {
-			out = append(out, m.capabilityName(capability))
+			name := m.capabilityName(capability)
+			if name == "" || seen[name] {
+				continue
+			}
+			seen[name] = true
+			out = append(out, name)
 		}
 	}
 	return out
@@ -163,11 +172,18 @@ func (m *CapabilityMapper) ForOwnerType(ownerType string) []string {
 
 func (m *CapabilityMapper) ForOrg() []string {
 	out := []string{}
+	seen := map[string]bool{}
 	for _, group := range m.Groups {
-		if group.PermissionScope == PermissionScopeOrganization || group.PermissionScope == PermissionScopeRepository {
-			for _, capability := range group.Capabilities {
-				out = append(out, m.capabilityName(capability))
+		if group.PermissionScope != PermissionScopeOrganization && group.PermissionScope != PermissionScopeRepository {
+			continue
+		}
+		for _, capability := range group.Capabilities {
+			name := m.capabilityName(capability)
+			if name == "" || seen[name] {
+				continue
 			}
+			seen[name] = true
+			out = append(out, name)
 		}
 	}
 
@@ -176,11 +192,18 @@ func (m *CapabilityMapper) ForOrg() []string {
 
 func (m *CapabilityMapper) ForUserAccount() []string {
 	out := []string{}
+	seen := map[string]bool{}
 	for _, group := range m.Groups {
-		if group.PermissionScope == PermissionScopeRepository {
-			for _, capability := range group.Capabilities {
-				out = append(out, m.capabilityName(capability))
+		if group.PermissionScope != PermissionScopeRepository {
+			continue
+		}
+		for _, capability := range group.Capabilities {
+			name := m.capabilityName(capability)
+			if name == "" || seen[name] {
+				continue
 			}
+			seen[name] = true
+			out = append(out, name)
 		}
 	}
 	return out
@@ -198,63 +221,38 @@ func (m *CapabilityMapper) capabilityName(capability CapabilityDef) string {
 	return ""
 }
 
-type LookupEntry struct {
-	Permission string
-
-	// Using uint8 here to easily compare if an access level is greater than another.
-	// 0. Read
-	// 1. Read & Write
-	Access uint8
-}
-
-func (m CapabilityMapper) buildLookup() map[string]LookupEntry {
-	out := map[string]LookupEntry{}
-	for resourceName, group := range m.Groups {
-		for _, c := range group.Capabilities {
-			var name string
-			if c.Action != nil {
-				name = c.Action.Name()
-			} else if c.Trigger != nil {
-				name = c.Trigger.Name()
-			}
-
-			level := uint8(0)
-			if !c.ReadOnly {
-				level = 1
-			}
-
-			out[name] = LookupEntry{Permission: resourceName, Access: level}
-		}
+func (m *CapabilityMapper) NewPermissionSet(capabilities []string) PermissionSet {
+	wanted := map[string]bool{}
+	for _, capability := range capabilities {
+		wanted[capability] = true
 	}
 
-	return out
-}
-
-func (m *CapabilityMapper) NewPermissionSet(capabilities []string) PermissionSet {
-	lookup := m.buildLookup()
 	out := PermissionSet{
 		Repository:   map[string]uint8{},
 		Organization: map[string]uint8{},
 	}
 
-	for _, capability := range capabilities {
-		c, ok := lookup[capability]
-		if !ok {
-			continue
-		}
+	for resourceName, group := range m.Groups {
+		for _, capability := range group.Capabilities {
+			name := m.capabilityName(capability)
+			if !wanted[name] {
+				continue
+			}
 
-		var x map[string]uint8
-		if m.Groups[c.Permission].PermissionScope == PermissionScopeRepository {
-			x = out.Repository
-		} else {
-			x = out.Organization
-		}
+			level := uint8(0)
+			if !capability.ReadOnly {
+				level = 1
+			}
 
-		if _, ok := x[c.Permission]; !ok {
-			x[c.Permission] = c.Access
-		} else {
-			if c.Access > x[c.Permission] {
-				x[c.Permission] = c.Access
+			var x map[string]uint8
+			if group.PermissionScope == PermissionScopeRepository {
+				x = out.Repository
+			} else {
+				x = out.Organization
+			}
+
+			if existing, ok := x[resourceName]; !ok || level > existing {
+				x[resourceName] = level
 			}
 		}
 	}

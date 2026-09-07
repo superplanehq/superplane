@@ -28,5 +28,10 @@ func TestGitHub__ResolveSecrets__PAT(t *testing.T) {
 		Integration: integrationCtx,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, []byte("ghp_test_token"), secrets[integrationSecretGitHubToken])
+	assert.Equal(t, []byte("ghp_test_token"), secrets.Values[integrationSecretGitHubToken])
+	assert.Contains(t, secrets.Usage, "GITHUB_TOKEN")
+	assert.Contains(t, secrets.Usage, "The gh CLI is already installed")
+	assert.Contains(t, secrets.Usage, "Do not download or install gh")
+	assert.NotContains(t, secrets.Usage, "ghp_test_token")
+	assert.Empty(t, secrets.Setup)
 }

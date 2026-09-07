@@ -9,7 +9,7 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return { pageKey: "organizationSelect", attributes: {} };
+    return { pageKey: "rootOrganizationRedirect", attributes: {} };
   }
 
   const [first, second, third, fourth] = segments;
@@ -18,8 +18,8 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "login", attributes: {} };
   }
 
-  if (first === "create") {
-    return { pageKey: "organizationCreate", attributes: {} };
+  if (first === "onboarding") {
+    return { pageKey: "organizationOnboarding", attributes: {} };
   }
 
   if (first === "setup") {
@@ -28,6 +28,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
 
   if (first === "install") {
     return { pageKey: "install", attributes: {} };
+  }
+
+  if (first === "github" && second === "approved") {
+    return { pageKey: "githubInstallApproved", attributes: {} };
   }
 
   if (first === "invite" && second) {

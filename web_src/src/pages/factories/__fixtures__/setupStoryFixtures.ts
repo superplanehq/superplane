@@ -4,7 +4,8 @@ import type { StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers
 import { defaultFactoriesFixture, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
 import type { StorybookUsageReport } from "./usageReportFixtures";
 
-const GITHUB_CONNECTION_ID = "storybook-github-connection";
+/** GitHub connection every workspace story shares. */
+export const GITHUB_CONNECTION_ID = "storybook-github-connection";
 const CLAUDE_CONNECTION_ID = "storybook-claude-connection";
 
 /** App repository the setup stories continue with. Served by the resources fixture. */

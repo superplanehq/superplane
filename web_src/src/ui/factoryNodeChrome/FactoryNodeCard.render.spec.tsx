@@ -10,7 +10,7 @@ describe("FactoryNodeCard", () => {
       <FactoryNodeCard
         title="Run Claude Code"
         componentLabel="Run Claude Code"
-        nodeName="Agent - No GH Issue Plan"
+        nodeName="Draft Implementation Plan"
         iconSlug="code"
         canvasMode="edit"
         body={<FactoryNodeStepList steps={["Clone repo", "Write implementation plan", "Use plan as output"]} />}

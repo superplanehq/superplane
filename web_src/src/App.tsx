@@ -3,10 +3,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MODELS } from "./lib/experimentalFeatures";
 import { recordLastVisitedOrganization } from "./lib/lastVisitedOrganization";
+import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
 import { isReservedAppPathSegment } from "./lib/reservedAppPaths";
 import { useConsumeIntegrationSetupReturnOnArrival } from "./hooks/useConsumeIntegrationSetupReturnOnArrival";
+import { useOrganization } from "./hooks/useOrganizationData";
+import { useRedirectIntegrationSetupReturn } from "./hooks/useRedirectIntegrationSetupReturn";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -20,9 +23,9 @@ import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequireAnyPermission, RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
-import OrganizationCreate from "./pages/auth/OrganizationCreate";
-import OrganizationSelect from "./pages/auth/OrganizationSelect";
+import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
+import { RootOrganizationRedirect } from "./pages/auth/RootOrganizationRedirect";
 import WelcomeSurvey from "./pages/auth/WelcomeSurvey";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import {
@@ -37,13 +40,15 @@ import {
   FactorySettingsAutomationsPage,
   FactorySettingsGeneralPage,
   FactorySettingsLayout,
-  FactorySettingsNotificationsPage,
-  FactorySettingsProfilePage,
+  FactorySettingsAccountNotificationsPage,
+  FactorySettingsAccountProfilePage,
+  FactorySettingsAccountSecurityPage,
   FactorySettingsRepositoryPage,
-  FactorySettingsUsagePage,
   FactorySettingsModelsPage,
   OrganizationSettingsOverviewPage,
   LegacyWorkOrderDetailRedirect,
+  LegacyWorkOrderPermalinkRedirect,
+  LegacyWorkOrdersRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
@@ -56,14 +61,20 @@ import {
   WorkspaceOverviewPage,
 } from "./pages/factories";
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
+import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
+import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
+import { OnboardingWorkspaceResolutionProvider } from "./pages/factories/pages/onboarding/OnboardingWorkspaceResolutionProvider";
 import {
+  AccountLinkedAccountsRedirect,
   LegacyFactoryOrganizationSettingsRedirect,
   LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
+  WorkspaceSpendingRedirect,
 } from "./pages/factories/pages/settings/FactorySettingsRedirects";
 import { HomePage } from "./pages/home";
 import { NewAppPage } from "./pages/home/NewAppPage";
+import { GitHubInstallApprovedPage } from "./pages/github/GitHubInstallApprovedPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import {
@@ -148,12 +159,15 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
-            <Route path="work-orders">
+            <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />
               <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
             </Route>
-            <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
+            <Route path="task/:orderNumber" element={<WorkOrderDetailPage />} />
+            {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
+            <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
+            <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
             <Route path="lines">
               <Route index element={<FactoryHomeRedirect />} />
               <Route path="new" element={<FactoryLineEditPageGate />} />
@@ -228,7 +242,7 @@ function AppRouter() {
               <Route path="login" element={<Login />} />
               <Route path="signup" element={<Login mode="signup" />} />
               <Route path="welcome" element={withAuthOnly(WelcomeSurvey)} />
-              <Route path="create" element={<OrganizationCreate />} />
+              <Route path="onboarding" element={withAuthOnly(OrganizationOnboardingRoute)} />
               <Route path="setup" element={<OwnerSetup />} />
               <Route path="admin" element={<AdminLayout />}>
                 <Route index element={<OrganizationsListAdmin />} />
@@ -237,9 +251,11 @@ function AppRouter() {
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
               </Route>
-              <Route path="" element={withAuthOnly(OrganizationSelect)} />
+              <Route path="" element={withAuthOnly(RootOrganizationRedirect)} />
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
               <Route path="install" element={withAuthOnly(InstallPage)} />
+              {/* GitHub App owners who approve an install request may not have a SuperPlane session. */}
+              <Route path="github/approved" element={<GitHubInstallApprovedPage />} />
               {organizationScopedRouteTree()}
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
@@ -250,24 +266,70 @@ function AppRouter() {
   );
 }
 
+function OrganizationOnboardingRoute() {
+  return (
+    <OrganizationOnboardingRedirect
+      renderWorkspace={(workspace, entryPath, reresolveWorkspace) => (
+        <OnboardingEntryPathProvider path={entryPath}>
+          <OnboardingWorkspaceResolutionProvider resolve={reresolveWorkspace}>
+            <InitialWorkspaceOnboarding
+              organizationId={workspace.organizationSlug}
+              factoryKey={workspace.workspaceKey}
+            />
+          </OnboardingWorkspaceResolutionProvider>
+        </OnboardingEntryPathProvider>
+      )}
+    />
+  );
+}
+
 function PageObservabilityScope() {
   usePageObservability();
   return null;
 }
 
-function OrganizationScope() {
-  const { organizationId } = useParams<{ organizationId: string }>();
+export function OrganizationScope() {
+  const { organizationId: segment } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
-  useConsumeIntegrationSetupReturnOnArrival(organizationId);
+  const location = useLocation();
 
+  const isReserved = isReservedAppPathSegment(segment);
+  // The route param accepts either the org slug or its UID, so resolve it
+  // once here and self-correct any UID URL to the slug below. Every other
+  // in-app link reuses this same `:organizationId` URL segment, so fixing
+  // it at this single boundary keeps the rest of the app slug-only.
+  const { data: organization } = useOrganization(segment ?? "", !isReserved && !!segment);
+  const resolvedId = organization?.metadata?.id ?? "";
+  const resolvedSlug = organization?.metadata?.slug ?? "";
+  useRedirectIntegrationSetupReturn(segment, resolvedSlug);
+  useConsumeIntegrationSetupReturnOnArrival(resolvedSlug || segment);
+
+  const uidRedirectPath =
+    !isReserved && segment
+      ? resolveOrganizationUidRedirect({
+          pathname: location.pathname,
+          search: location.search,
+          hash: location.hash,
+          segment,
+          organizationId: resolvedId,
+          organizationSlug: resolvedSlug,
+        })
+      : null;
   useEffect(() => {
-    if (account?.id && organizationId && !isReservedAppPathSegment(organizationId)) {
-      recordLastVisitedOrganization(account.id, organizationId);
+    if (!account?.id || !segment || isReserved || uidRedirectPath) {
+      return;
     }
-  }, [account?.id, organizationId]);
+    // Prefer the resolved slug so the last-visited value never carries a UID
+    // forward into a later root redirect.
+    recordLastVisitedOrganization(account.id, resolvedSlug || segment);
+  }, [account?.id, segment, isReserved, uidRedirectPath, resolvedSlug]);
 
-  if (isReservedAppPathSegment(organizationId)) {
+  if (isReserved) {
     return <Navigate to="/" replace />;
+  }
+
+  if (uidRedirectPath) {
+    return <Navigate to={uidRedirectPath} replace />;
   }
 
   return (
@@ -295,11 +357,30 @@ function FactoryLineEditPageGate() {
 
 const factorySettingsSectionRoutes = [
   <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
-  <Route key="factory-settings-account-general" path="account/general" element={<FactorySettingsProfilePage />} />,
+  <Route
+    key="factory-settings-account-general"
+    path="account/general"
+    element={<Navigate to="../profile" replace />}
+  />,
+  <Route
+    key="factory-settings-account-profile"
+    path="account/profile"
+    element={<FactorySettingsAccountProfilePage />}
+  />,
+  <Route
+    key="factory-settings-account-linked-accounts"
+    path="account/linked-accounts"
+    element={<AccountLinkedAccountsRedirect />}
+  />,
+  <Route
+    key="factory-settings-account-security"
+    path="account/security"
+    element={<FactorySettingsAccountSecurityPage />}
+  />,
   <Route
     key="factory-settings-account-notifications"
     path="account/notifications"
-    element={<FactorySettingsNotificationsPage />}
+    element={<FactorySettingsAccountNotificationsPage />}
   />,
   <Route key="factory-settings-workspace-general" path="workspace/general" element={<FactorySettingsGeneralPage />} />,
   <Route
@@ -312,8 +393,17 @@ const factorySettingsSectionRoutes = [
     path="workspace/automations"
     element={<FactorySettingsAutomationsPage />}
   />,
-  <Route key="factory-settings-workspace-models" path="workspace/models" element={<FactorySettingsModelsPage />} />,
-  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<FactorySettingsUsagePage />} />,
+  <Route
+    key="factory-settings-workspace-models"
+    path="workspace/models"
+    element={
+      <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MODELS}>
+        <FactorySettingsModelsPage />
+      </RequireExperimentalFeature>
+    }
+  />,
+  <Route key="factory-settings-workspace-spending" path="workspace/spending" element={<WorkspaceSpendingRedirect />} />,
+  <Route key="factory-settings-workspace-usage" path="workspace/usage" element={<WorkspaceSpendingRedirect />} />,
   <Route
     key="factory-settings-organization-general"
     path="organization/general"
@@ -406,9 +496,7 @@ const factorySettingsSectionRoutes = [
 
 function LegacyAutomationsNewLineRedirect() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
-  if (!organizationId || !factoryKey) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey) return <Navigate to="/" replace />;
   return <Navigate to={createFactoryLinePath(organizationId, factoryKey)} replace />;
 }
 
@@ -418,9 +506,7 @@ function LegacyAutomationsLineEditRedirect() {
     factoryKey: string;
     lineId: string;
   }>();
-  if (!organizationId || !factoryKey || !lineId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !factoryKey || !lineId) return <Navigate to="/" replace />;
   return <Navigate to={editFactoryLinePath(organizationId, factoryKey, lineId)} replace />;
 }
 
@@ -428,9 +514,7 @@ function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
   const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
   const location = useLocation();
 
-  if (!organizationId || !canvasId) {
-    return <Navigate to="/" replace />;
-  }
+  if (!organizationId || !canvasId) return <Navigate to="/" replace />;
 
   const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
   return <Navigate to={`${path}${location.search}`} replace />;

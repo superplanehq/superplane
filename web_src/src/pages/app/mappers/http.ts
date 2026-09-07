@@ -498,7 +498,7 @@ function getHTTPEventSections(
 
     if (state === "success" || state === "failed") {
       const metadata = execution.metadata as Record<string, unknown> | undefined;
-      let responseCode: string | null = null;
+      let responseCode: string | null;
 
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
         responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;

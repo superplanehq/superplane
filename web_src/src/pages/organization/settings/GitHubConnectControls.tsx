@@ -13,6 +13,8 @@ interface GitHubConnectControlsProps {
   permissionsLoading: boolean;
   onConnect: () => void;
   onCreatePrivateApp?: () => void;
+  /** Offer the "Create your own GitHub App" path beside hosted Connect. Defaults to `true`. */
+  allowPrivateApp?: boolean;
 }
 
 export function GitHubConnectControls({
@@ -22,11 +24,12 @@ export function GitHubConnectControls({
   permissionsLoading,
   onConnect,
   onCreatePrivateApp,
+  allowPrivateApp = true,
 }: GitHubConnectControlsProps) {
   const navigate = useNavigate();
   const integrationsBasePath = useIntegrationsBasePath(organizationId);
   const canCreate = Boolean(definition) && canCreateIntegrations;
-  const showPrivateApp = offersPrivateGitHubAppSetup(definition) && canCreateIntegrations;
+  const showPrivateApp = allowPrivateApp && offersPrivateGitHubAppSetup(definition) && canCreateIntegrations;
 
   return (
     <div className="flex shrink-0 flex-col items-end gap-2">

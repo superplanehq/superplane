@@ -50,10 +50,11 @@ func CreateIntegrationWithUsage(
 		return nil, grpcerrors.InvalidArgument(nil, fmt.Sprintf("integration %s not found", integrationName))
 	}
 
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization")
+		return nil, err
 	}
+	orgID = org.String()
 
 	//
 	// Check if an integration with this name already exists in the organization
@@ -520,6 +521,15 @@ func CapabilityStateToProto(t core.IntegrationCapabilityState) pb.Integration_Ca
 	return pb.Integration_CapabilityState_STATE_UNAVAILABLE
 }
 
+func isClearedSensitiveValue(value any) bool {
+	if value == nil {
+		return true
+	}
+
+	s, ok := value.(string)
+	return ok && s == ""
+}
+
 func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Registry, integration core.Integration, config map[string]any, installationID uuid.UUID, existingConfig map[string]any) (map[string]any, error) {
 	result := maps.Clone(config)
 
@@ -530,6 +540,12 @@ func encryptConfigurationIfNeeded(ctx context.Context, registry *registry.Regist
 
 		value, exists := config[field.Name]
 		if !exists {
+			continue
+		}
+
+		if isClearedSensitiveValue(value) {
+			delete(result, field.Name)
+			delete(existingConfig, field.Name)
 			continue
 		}
 

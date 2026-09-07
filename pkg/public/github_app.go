@@ -18,11 +18,39 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
+const githubInstallApprovedPath = "/github/approved"
+
 // HandleGitHubAppSetup finishes a public SuperPlane GitHub App install.
 // GitHub sends every install to this one Setup URL. The CSRF state finds
 // the pending SuperPlane connection.
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
-	s.dispatchGitHubAppByState(w, r)
+	if isGitHubOwnerApprovedSetup(r) {
+		http.Redirect(w, r, githubInstallApprovedPath, http.StatusFound)
+		return
+	}
+
+	// Owner-approve has no SuperPlane session. A request with CSRF state is
+	// the member who started Connect, so load that account before bind.
+	if s.jwt == nil {
+		s.dispatchGitHubAppByState(w, r)
+		return
+	}
+	middleware.AccountAuthMiddleware(s.jwt)(http.HandlerFunc(s.dispatchGitHubAppByState)).ServeHTTP(w, r)
+}
+
+// isGitHubOwnerApprovedSetup is the GitHub admin-approve callback. GitHub
+// sends installation_id and setup_action=install and omits the original
+// CSRF state, so this request cannot find the pending SuperPlane connection.
+func isGitHubOwnerApprovedSetup(r *http.Request) bool {
+	query := r.URL.Query()
+	if query.Get("state") != "" {
+		return false
+	}
+	if query.Get("setup_action") != "install" {
+		return false
+	}
+
+	return strings.TrimSpace(query.Get("installation_id")) != ""
 }
 
 func (s *Server) HandleGitHubAppOAuthCallback(w http.ResponseWriter, r *http.Request) {

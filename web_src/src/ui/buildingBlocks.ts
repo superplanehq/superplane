@@ -227,6 +227,7 @@ const FACTORY_BLOCK_NAMES = new Set([
   "updatePullRequest",
   "findPullRequest",
   "addPullRequestActivity",
+  "updatePullRequestActivity",
   "reportWorkOrderCheck",
 ]);
 

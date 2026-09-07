@@ -23,9 +23,9 @@ func DescribeOrganizationWorkspaceUsage(
 	orgID string,
 	req *pb.DescribeOrganizationWorkspaceUsageRequest,
 ) (*pb.DescribeOrganizationWorkspaceUsageResponse, error) {
-	organizationID, err := uuid.Parse(orgID)
+	organizationID, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(err, "invalid organization id")
+		return nil, err
 	}
 
 	period := clampWorkspaceUsagePeriodDays(int(req.GetPeriodDays()))

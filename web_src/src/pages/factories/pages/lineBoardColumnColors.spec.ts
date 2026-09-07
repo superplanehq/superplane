@@ -4,6 +4,8 @@ import {
   LINE_BOARD_COLUMN_COLORS,
   lineBoardColumnColorById,
   lineBoardColumnLaneClassName,
+  normalizeColumnColors,
+  serializeColumnColors,
 } from "./lineBoardColumnColors";
 
 describe("lineBoardColumnColors", () => {
@@ -18,5 +20,16 @@ describe("lineBoardColumnColors", () => {
     expect(lineBoardColumnLaneClassName("lime")).toBe(lineBoardColumnColorById("lime")?.className);
     expect(lineBoardColumnLaneClassName("lime")).toContain("lime");
     expect(lineBoardColumnLaneClassName(null)).toBeUndefined();
+  });
+
+  it("normalizes known ids and drops unknown ones", () => {
+    expect(normalizeColumnColors({ backlog: "lime", weird: "not-a-color" })).toEqual({ backlog: "lime" });
+  });
+
+  it("serializes only columns with an explicit color", () => {
+    expect(serializeColumnColors({ backlog: "lime", verify: null, done: "teal" })).toEqual({
+      backlog: "lime",
+      done: "teal",
+    });
   });
 });

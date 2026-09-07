@@ -326,6 +326,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/line-runner-models"}: {
+			Resource:                     "factories",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
 		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/checks"}: {
 			Resource:                     "work_orders",
 			Action:                       "read",
@@ -383,6 +389,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/workspace-usage"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/spending-report"}: {
 			Resource:   "org",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
@@ -661,6 +672,48 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/orders"}: {
 			Resource:                     "work_orders",
 			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions"}: {
+			Resource:                     "work_orders",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "GET", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"}: {
+			Resource:                     "work_orders",
+			Action:                       "read",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/end"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/messages"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "PATCH", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/draft"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/create"}: {
+			Resource:                     "work_orders",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"}: {
+			Resource:                     "work_orders",
+			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories},
 		},

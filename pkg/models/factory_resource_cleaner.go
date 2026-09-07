@@ -110,9 +110,29 @@ func (c *FactoryResourceCleaner) Run() (deleted int64, complete bool, err error)
 		return deleted, false, nil
 	}
 
+	count, err = clearFactoryPullRequestCurrentRevisionsLimited(c.tx, c.factory.ID, remaining)
+	if err != nil {
+		return deleted, false, fmt.Errorf("clear factory pull request current revisions: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
 	count, err = deleteFactoryPullRequestRunsLimited(c.tx, c.factory.ID, remaining)
 	if err != nil {
 		return deleted, false, fmt.Errorf("delete factory pull request runs: %w", err)
+	}
+	deleted += count
+	remaining -= int(count)
+	if remaining <= 0 {
+		return deleted, false, nil
+	}
+
+	count, err = deleteFactoryPullRequestRevisionsLimited(c.tx, c.factory.ID, remaining)
+	if err != nil {
+		return deleted, false, fmt.Errorf("delete factory pull request revisions: %w", err)
 	}
 	deleted += count
 	remaining -= int(count)
@@ -233,6 +253,41 @@ func deleteFactoryAssigneesLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) 
 		return 0, result.Error
 	}
 
+	return result.RowsAffected, nil
+}
+
+func clearFactoryPullRequestCurrentRevisionsLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) (int64, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	subQuery := tx.Model(&FactoryPullRequest{}).
+		Select("id").
+		Where("factory_id = ? AND current_revision_id IS NOT NULL", factoryID).
+		Limit(limit)
+	result := tx.Model(&FactoryPullRequest{}).
+		Where("id IN (?)", subQuery).
+		Update("current_revision_id", nil)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
+func deleteFactoryPullRequestRevisionsLimited(tx *gorm.DB, factoryID uuid.UUID, limit int) (int64, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+
+	subQuery := tx.Model(&FactoryPullRequestRevision{}).
+		Select("factory_pull_request_revisions.id").
+		Joins("JOIN factory_pull_requests ON factory_pull_requests.id = factory_pull_request_revisions.pull_request_id").
+		Where("factory_pull_requests.factory_id = ?", factoryID).
+		Limit(limit)
+	result := tx.Where("id IN (?)", subQuery).Delete(&FactoryPullRequestRevision{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
 	return result.RowsAffected, nil
 }
 

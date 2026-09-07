@@ -3,12 +3,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { handleStopMock, handleRejectMock, handleBackToDraftMock } = vi.hoisted(() => ({
+const { handleStopMock, handleRejectMock, handleBackToDraftMock, enabledExperimentalFeatures } = vi.hoisted(() => ({
   handleStopMock: vi.fn(),
   handleRejectMock: vi.fn(),
   handleBackToDraftMock: vi.fn(),
+  enabledExperimentalFeatures: new Set<string>(),
 }));
 
 vi.mock("./useSplitRunFooterActions", () => ({
@@ -21,7 +22,30 @@ vi.mock("./useSplitRunFooterActions", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: (featureId: string) => enabledExperimentalFeatures.has(featureId),
+    enabledExperimentalFeatures: [...enabledExperimentalFeatures],
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
+  useFactoryLineRunnerModels: () => ({
+    data: [{ id: "claude-opus-4-6", name: "claude-opus-4-6" }],
+    isLoading: false,
+  }),
+}));
+
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, FAILED_WORK_ORDER, OPEN_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
@@ -45,6 +69,7 @@ function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fix
 
 describe("WorkOrderSplitRunPopup decision footer", () => {
   beforeEach(() => {
+    enabledExperimentalFeatures.clear();
     handleStopMock.mockReset();
     handleRejectMock.mockReset();
     handleBackToDraftMock.mockReset().mockResolvedValue(true);
@@ -74,7 +99,33 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     );
   });
 
+  it("hides the draft model select when the feature is off", async () => {
+    const user = userEvent.setup();
+    const onDispatch = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <WorkOrderSplitRunPopup
+                fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
+                onDispatch={onDispatch}
+                canDispatch
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+    await user.click(within(note).getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledWith(undefined);
+  });
+
   it("starts and rejects a draft from the note", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
     const user = userEvent.setup();
     const onDispatch = vi.fn();
     render(
@@ -95,11 +146,40 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
 
     const note = screen.getByTestId("split-run-attention-note");
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
+    expect(within(note).getByTestId("split-run-draft-model")).toHaveTextContent("Auto");
     await user.click(within(note).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
+    expect(onDispatch).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole("tab", { name: "Automations" })).toHaveAttribute("data-state", "active");
     await user.click(within(note).getByRole("button", { name: "Reject" }));
     expect(handleRejectMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts a draft with the listed model", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_DRAFT_START_MODEL);
+    const user = userEvent.setup();
+    const onDispatch = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <WorkOrderSplitRunPopup
+                fixture={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER)}
+                onDispatch={onDispatch}
+                canDispatch
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const note = screen.getByTestId("split-run-attention-note");
+    await user.click(within(note).getByRole("combobox", { name: "Model" }));
+    await user.click(await screen.findByRole("option", { name: "claude-opus-4-6" }));
+    await user.click(within(note).getByRole("button", { name: "Start" }));
+    expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6");
   });
 
   it("opens Description after To Backlog", async () => {

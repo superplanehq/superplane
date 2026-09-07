@@ -93,6 +93,14 @@ func (s *OrganizationService) DescribeOrganizationWorkspaceUsage(
 	return organizations.DescribeOrganizationWorkspaceUsage(ctx, orgID, req)
 }
 
+func (s *OrganizationService) DescribeOrganizationSpendingReport(
+	ctx context.Context,
+	req *pb.DescribeOrganizationSpendingReportRequest,
+) (*pb.DescribeOrganizationSpendingReportResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
+}
+
 func (s *OrganizationService) ListHostedLLMModels(
 	ctx context.Context,
 	req *pb.ListHostedLLMModelsRequest,

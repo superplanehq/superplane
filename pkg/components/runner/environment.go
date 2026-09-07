@@ -139,52 +139,77 @@ func ValidateEnvironmentFrom(environmentFrom []EnvironmentFromEntry) error {
 	return nil
 }
 
+type IntegrationSetup struct {
+	Name   string
+	Script string
+}
+
+type ResolvedEnvironment struct {
+	Variables []BrokerEnvironmentVariable
+	Usage     string
+	Setups    []IntegrationSetup
+}
+
 func ResolveEnvironment(
 	secrets core.SecretsContext,
 	environmentFrom []EnvironmentFromEntry,
 	environment []EnvironmentVariable,
-) ([]BrokerEnvironmentVariable, error) {
+) (ResolvedEnvironment, error) {
 	resolved := make([]BrokerEnvironmentVariable, 0)
 	seen := make(map[string]struct{})
+	usages := make([]string, 0)
+	setups := make([]IntegrationSetup, 0)
 
 	for _, entry := range environmentFrom {
 		switch strings.TrimSpace(entry.Source) {
 		case EnvironmentFromSourceIntegration:
 			if secrets == nil {
-				return nil, fmt.Errorf("failed to resolve environmentFrom integration secrets: secrets context is unavailable")
+				return ResolvedEnvironment{}, fmt.Errorf("failed to resolve environmentFrom integration secrets: secrets context is unavailable")
 			}
 
-			keys, err := secrets.GetIntegrationKeys(strings.TrimSpace(entry.Integration.Name))
+			name := strings.TrimSpace(entry.Integration.Name)
+			imported, err := secrets.GetIntegrationSecrets(name)
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve environmentFrom integration secrets: %w", err)
+				return ResolvedEnvironment{}, fmt.Errorf("failed to resolve environmentFrom integration secrets: %w", err)
 			}
 
-			if err := appendImportedEnvironmentVariables(&resolved, seen, keys); err != nil {
-				return nil, err
+			if err := appendImportedEnvironmentVariables(&resolved, seen, imported.Values); err != nil {
+				return ResolvedEnvironment{}, err
+			}
+
+			if usage := strings.TrimSpace(imported.Usage); usage != "" {
+				usages = append(usages, usage)
+			}
+			if setup := strings.TrimSpace(imported.Setup); setup != "" {
+				setupName := strings.TrimSpace(imported.SetupName)
+				if setupName == "" {
+					setupName = "Set up " + name
+				}
+				setups = append(setups, IntegrationSetup{Name: setupName, Script: setup})
 			}
 
 		case EnvironmentFromSourceSecret:
 			if secrets == nil {
-				return nil, fmt.Errorf("failed to resolve environmentFrom secret keys: secrets context is unavailable")
+				return ResolvedEnvironment{}, fmt.Errorf("failed to resolve environmentFrom secret keys: secrets context is unavailable")
 			}
 
 			keys, err := secrets.GetSecretKeys(entry.Secret.Secret)
 			if err != nil {
-				return nil, fmt.Errorf("failed to resolve environmentFrom secret keys: %w", err)
+				return ResolvedEnvironment{}, fmt.Errorf("failed to resolve environmentFrom secret keys: %w", err)
 			}
 
 			if err := appendImportedEnvironmentVariables(&resolved, seen, keys); err != nil {
-				return nil, err
+				return ResolvedEnvironment{}, err
 			}
 
 		default:
-			return nil, fmt.Errorf("invalid environmentFrom source: %s", entry.Source)
+			return ResolvedEnvironment{}, fmt.Errorf("invalid environmentFrom source: %s", entry.Source)
 		}
 	}
 
 	explicit, err := resolveExplicitEnvironment(secrets, environment)
 	if err != nil {
-		return nil, err
+		return ResolvedEnvironment{}, err
 	}
 
 	for _, variable := range explicit {
@@ -202,7 +227,11 @@ func ResolveEnvironment(
 		resolved = append(resolved, variable)
 	}
 
-	return prependPagerDefaults(resolved), nil
+	return ResolvedEnvironment{
+		Variables: prependPagerDefaults(resolved),
+		Usage:     strings.Join(usages, "\n\n"),
+		Setups:    setups,
+	}, nil
 }
 
 // prependPagerDefaults keeps the configured environment authoritative: a

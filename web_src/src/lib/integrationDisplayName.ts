@@ -32,7 +32,19 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dockerhub: "DockerHub",
   harness: "Harness",
   launchdarkly: "LaunchDarkly",
+  perplexity: "Perplexity",
+  sentry: "Sentry",
+  coolify: "Coolify",
+  telegram: "Telegram",
+  teams: "Teams",
+  hetzner: "Hetzner",
+  servicenow: "ServiceNow",
 };
+
+/** Provider ids and labels for settings search (Find settings → Integrations). */
+export function knownIntegrationTypeEntries(): Array<{ name: string; label: string }> {
+  return Object.entries(INTEGRATION_TYPE_DISPLAY_NAMES).map(([name, label]) => ({ name, label }));
+}
 
 /**
  * Returns the display name for an integration type.

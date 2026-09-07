@@ -16,7 +16,7 @@ const OwnerSetup: React.FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [step, setStep] = useState<"owner" | "survey">("owner");
-  const [pendingOrganizationId, setPendingOrganizationId] = useState<string | null>(null);
+  const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,15 +103,15 @@ const OwnerSetup: React.FC = () => {
         return;
       }
 
-      const data: { organization_id: string } = await response.json();
-      const orgId = data.organization_id;
+      const data: { organization_id: string; organization_slug: string } = await response.json();
+      const orgSlug = data.organization_slug;
 
       if (!isPostHogEnabled) {
-        window.location.href = newOrganizationLandingPath(orgId);
+        window.location.href = newOrganizationLandingPath(orgSlug);
         return;
       }
 
-      setPendingOrganizationId(orgId);
+      setPendingOrganizationSlug(orgSlug);
       posthog.getActiveMatchingSurveys((surveys) => {
         const usableSurveys = (surveys as PostHogSurvey[]).filter(
           (survey) => Array.isArray(survey.questions) && survey.questions.length > 0,
@@ -121,7 +121,7 @@ const OwnerSetup: React.FC = () => {
           usableSurveys.find((survey) => survey.name === OWNER_SETUP_SURVEY_NAME) ?? usableSurveys[0];
 
         if (!selectedSurvey) {
-          window.location.href = newOrganizationLandingPath(orgId);
+          window.location.href = newOrganizationLandingPath(orgSlug);
           return;
         }
 
@@ -174,8 +174,8 @@ const OwnerSetup: React.FC = () => {
           />
         )}
 
-        {step === "survey" && activeSurvey && pendingOrganizationId && (
-          <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationId)} />
+        {step === "survey" && activeSurvey && pendingOrganizationSlug && (
+          <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
         )}
       </div>
     </div>

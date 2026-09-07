@@ -52,8 +52,22 @@ type FactoryLine struct {
 	FactoryID      uuid.UUID
 	Name           string
 	Steps          datatypes.JSONSlice[FactoryLineStep]
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// ColumnColors holds the board's column colors, keyed by column key
+	// ("backlog", "phase-<step index>", "verify", "done"). A missing key
+	// means the column uses the default color.
+	ColumnColors datatypes.JSONType[map[string]string]
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// ColumnColorsValue returns the stored column colors, defaulting to an
+// empty map when none have been saved yet.
+func (l *FactoryLine) ColumnColorsValue() map[string]string {
+	colors := l.ColumnColors.Data()
+	if colors == nil {
+		return map[string]string{}
+	}
+	return colors
 }
 
 func (FactoryLine) TableName() string {
@@ -81,6 +95,7 @@ func (f *Factory) CreateLine(tx *gorm.DB, name string, steps []FactoryLineStep) 
 		FactoryID:      f.ID,
 		Name:           name,
 		Steps:          datatypes.JSONSlice[FactoryLineStep](steps),
+		ColumnColors:   datatypes.NewJSONType(map[string]string{}),
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
@@ -171,7 +186,11 @@ func ListFactoryLinesByFactoryIDs(tx *gorm.DB, organizationID uuid.UUID, factory
 	return lines, nil
 }
 
-func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep) error {
+// Update persists the given fields. A nil name, steps, or columnColors
+// means "do not change" that field; an empty (non-nil) steps slice is not
+// valid (callers must not pass one), while an empty (non-nil) columnColors
+// map is a valid "clear all colors" request.
+func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep, columnColors map[string]string) error {
 	updates := map[string]any{
 		"updated_at": time.Now(),
 	}
@@ -180,6 +199,9 @@ func (l *FactoryLine) Update(tx *gorm.DB, name *string, steps []FactoryLineStep)
 	}
 	if steps != nil {
 		updates["steps"] = datatypes.JSONSlice[FactoryLineStep](steps)
+	}
+	if columnColors != nil {
+		updates["column_colors"] = datatypes.NewJSONType(columnColors)
 	}
 
 	err := tx.Model(l).Updates(updates).Error

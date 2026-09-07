@@ -61,6 +61,5 @@ describe("legacy factory organization settings routes", () => {
     expect(
       await screen.findByText("Review factory token usage, VM time, and estimated spend for this organization."),
     ).toBeInTheDocument();
-    expect(await screen.findByText("Refreshing hosted credit totals.")).toBeInTheDocument();
   }, 10000);
 });

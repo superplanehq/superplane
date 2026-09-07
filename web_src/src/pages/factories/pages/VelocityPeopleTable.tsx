@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 
 import { Avatar } from "@/components/Avatar/avatar";
+import { Button } from "@/components/ui/button";
 import { getUserInitials } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 
 import { formatDurationHours } from "../lib/factoryVelocityFlow";
 import type { VelocityPerson } from "../lib/factoryVelocityReport";
+import type { PeopleSortDirection, PeopleSortKey } from "../lib/velocityPeopleSort";
+import { VelocitySortableHeader } from "./VelocitySortableHeader";
 
-type SortKey = "total" | "authoredMerged" | "factoryMerged" | "factoryWaste" | "medianCycleHours" | "costUsd";
+type SortKey = PeopleSortKey;
 
 /** Members without a connected account photo still need a stable, legible avatar. */
 const AVATAR_COLORS = [
@@ -37,22 +39,16 @@ interface Column {
 
 const COLUMNS: Column[] = [
   {
-    key: "authoredMerged",
-    label: "Authored",
-    hint: "Pull requests the person merged themselves",
-    format: (person) => String(person.authoredMerged),
-  },
-  {
     key: "factoryMerged",
-    label: "SuperPlane merged",
-    hint: "Merged pull requests from tasks this person opened",
+    label: "Via SuperPlane",
+    hint: "Merged pull requests from SuperPlane tasks this person opened",
     format: (person) => String(person.factoryMerged),
   },
   {
-    key: "factoryWaste",
-    label: "SuperPlane waste",
-    hint: "Tasks this person opened that closed without a merge",
-    format: (person) => String(person.factoryWaste),
+    key: "authoredMerged",
+    label: "Manual work",
+    hint: "Pull requests this person created without SuperPlane",
+    format: (person) => String(person.authoredMerged),
   },
   {
     key: "medianCycleHours",
@@ -62,14 +58,14 @@ const COLUMNS: Column[] = [
   },
   {
     key: "costUsd",
-    label: "Tracked cost",
-    hint: "Tracked model spend of their tasks",
+    label: "Costs",
+    hint: "Tracked model spend of their SuperPlane tasks",
     format: (person) => `$${person.costUsd.toFixed(0)}`,
   },
   {
     key: "total",
     label: "Merged PRs",
-    hint: "Authored plus SuperPlane merged",
+    hint: "Via SuperPlane plus manual work",
     format: (person) => String(totalMerged(person)),
   },
 ];
@@ -78,28 +74,33 @@ function totalMerged(person: VelocityPerson): number {
   return person.authoredMerged + person.factoryMerged;
 }
 
-function sortValue(person: VelocityPerson, key: SortKey): number {
-  if (key === "total") return totalMerged(person);
-  return person[key];
-}
-
 export function VelocityPeopleTable({
   people,
+  total,
   periodLabel,
   emptyAuthorship,
+  sortKey,
+  sortDirection,
+  onSort,
+  canLoadMore,
+  isLoadingMore,
+  onLoadMore,
 }: {
+  /** Rows fetched so far, already sorted and paged by the backend. */
   people: VelocityPerson[];
+  /** Total people with activity in the period, across every page. */
+  total: number;
   periodLabel: string;
-  /** Names why the Authored column is empty, when the cohort is unavailable. */
+  /** Names why the Manual work column is empty, when the cohort is unavailable. */
   emptyAuthorship?: string;
+  sortKey: SortKey;
+  sortDirection: PeopleSortDirection;
+  /** Sorts by `key`. The caller toggles direction when `key` is already active. */
+  onSort: (key: SortKey) => void;
+  canLoadMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("total");
-
-  const sorted = useMemo(
-    () => [...people].sort((a, b) => sortValue(b, sortKey) - sortValue(a, sortKey)),
-    [people, sortKey],
-  );
-
   return (
     <section
       className="rounded-xl border border-border bg-card px-4 py-4 sm:px-5 sm:py-5"
@@ -109,7 +110,7 @@ export function VelocityPeopleTable({
         <div>
           <h2 className="text-[14px] font-medium tracking-[-0.01em] text-foreground">People</h2>
           <p className="mt-0.5 text-[12px] text-muted-foreground">
-            What each member merged directly and through SuperPlane. Select a column to sort.
+            {total} {total === 1 ? "person" : "people"} with activity in this period
           </p>
         </div>
         <p className="text-[12px] text-muted-foreground">{periodLabel}</p>
@@ -126,17 +127,19 @@ export function VelocityPeopleTable({
                 Member
               </th>
               {COLUMNS.map((column) => (
-                <SortableHeader
+                <VelocitySortableHeader
                   key={column.key}
-                  column={column}
+                  label={column.label}
+                  hint={column.hint}
                   isActive={sortKey === column.key}
-                  onSort={() => setSortKey(column.key)}
+                  direction={sortDirection}
+                  onSort={() => onSort(column.key)}
                 />
               ))}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((person, index) => (
+            {people.map((person, index) => (
               <tr key={person.id} className="border-b border-border/60 last:border-b-0">
                 <td className="py-3 text-[12px] tabular-nums text-muted-foreground">{index + 1}</td>
                 <td className="py-3 pr-6">
@@ -170,30 +173,30 @@ export function VelocityPeopleTable({
         </table>
       </div>
 
-      <p className="mt-4 text-[12px] text-muted-foreground">
-        {people.length} {people.length === 1 ? "person" : "people"} with activity in this period
-      </p>
-      {emptyAuthorship ? <p className="mt-1 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
-    </section>
-  );
-}
+      {canLoadMore ? (
+        <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
+          <p className="text-[12px] text-muted-foreground">
+            Showing {people.length} of {total}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="h-auto px-2 py-1 text-[12px] font-normal text-muted-foreground hover:text-foreground"
+          >
+            {isLoadingMore ? (
+              <Loader2 className="size-3 animate-spin" aria-hidden />
+            ) : (
+              <ChevronDown className="size-3" aria-hidden />
+            )}
+            Show more
+          </Button>
+        </div>
+      ) : null}
 
-function SortableHeader({ column, isActive, onSort }: { column: Column; isActive: boolean; onSort: () => void }) {
-  return (
-    <th scope="col" className="pb-2 pl-6 text-right text-[12px] font-normal">
-      <button
-        type="button"
-        onClick={onSort}
-        title={column.hint}
-        aria-sort={isActive ? "descending" : "none"}
-        className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          isActive ? "text-foreground" : "text-muted-foreground",
-        )}
-      >
-        {isActive ? <ArrowDown className="size-3" aria-hidden /> : <ArrowUp className="size-3 opacity-0" aria-hidden />}
-        {column.label}
-      </button>
-    </th>
+      {emptyAuthorship ? <p className="mt-4 text-[12px] text-muted-foreground">{emptyAuthorship}</p> : null}
+    </section>
   );
 }

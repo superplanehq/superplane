@@ -149,7 +149,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
         {kind === "running"
           ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
-            ? "A Set Work Order Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
+            ? "A Set Task Status Note supplies the headline, body, and Review PR link. To Backlog, Reject, and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}
       </div>
       {model ? <DecisionNote copy={model} /> : null}

@@ -2,6 +2,7 @@ import type { FactoriesFactoryLine } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import type { ReactNode } from "react";
 import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
 import type { WorkOrderListState } from "../../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../../lib/useWorkOrdersHeaderShortcuts";
@@ -22,6 +23,8 @@ interface WorkOrdersHeaderProps {
   onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
+  hostedCreditEmptyBanner?: ReactNode;
+  brokenIntegrationsBanner?: ReactNode;
 }
 
 /**
@@ -38,6 +41,8 @@ export function WorkOrdersHeader({
   onCreateWorkOrder,
   canCreate,
   permissionsLoading,
+  hostedCreditEmptyBanner,
+  brokenIntegrationsBanner,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const lineOptions = buildLineFilterOptions(factoryLines);
@@ -88,8 +93,14 @@ export function WorkOrdersHeader({
         </>
       }
       belowRow={
-        state.filterCount > 0 ? (
-          <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+        hostedCreditEmptyBanner || brokenIntegrationsBanner || state.filterCount > 0 ? (
+          <>
+            {hostedCreditEmptyBanner}
+            {brokenIntegrationsBanner}
+            {state.filterCount > 0 ? (
+              <FilterChips state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
+            ) : null}
+          </>
         ) : undefined
       }
     />

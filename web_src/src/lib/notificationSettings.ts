@@ -20,6 +20,15 @@ export type NotificationTypeToggles = Record<ConfigurableNotificationType, boole
 
 export type WorkspaceScopeForm = "all" | "filtered" | "none";
 
+export type AccountNotificationWorkspaceScope = "all" | "selected";
+
+export interface AccountNotificationForm {
+  emailEnabled: boolean;
+  workspaceScope: AccountNotificationWorkspaceScope;
+  workspaceIds: string[];
+  events: NotificationTypeToggles;
+}
+
 export interface NotificationTypeOption {
   key: ConfigurableNotificationType;
   label: string;
@@ -121,4 +130,45 @@ export function isConfigurableNotificationType(
   type: MeNotificationSettingsType | undefined,
 ): type is ConfigurableNotificationType {
   return NOTIFICATION_SETTINGS_TYPES.some((known) => known === type);
+}
+
+export function accountNotificationsFromSettings(
+  settings: MeNotificationSettings | undefined,
+): AccountNotificationForm {
+  const scope = workspaceScopeFromSettings(settings);
+  const filters = filtersFromSettings(settings);
+  return {
+    emailEnabled: scope !== "none",
+    workspaceScope: scope === "filtered" ? "selected" : "all",
+    workspaceIds: filters.flatMap((filter) => (filter.workspaceId ? [filter.workspaceId] : [])),
+    events:
+      scope === "filtered"
+        ? togglesFromEventTypes(filters[0]?.eventTypes)
+        : togglesFromAllScopeEventTypes(settings?.workspaces?.eventTypes),
+  };
+}
+
+export function settingsFromAccountNotifications(form: AccountNotificationForm): MeNotificationSettings {
+  if (!form.emailEnabled) {
+    return { workspaces: { scope: "WORKSPACE_SCOPE_NONE", eventTypes: [], filters: [] } };
+  }
+  if (form.workspaceScope === "selected") {
+    return {
+      workspaces: {
+        scope: "WORKSPACE_SCOPE_FILTERED",
+        eventTypes: [],
+        filters: form.workspaceIds.map((workspaceId) => ({
+          workspaceId,
+          eventTypes: eventTypesFromToggles(form.events),
+        })),
+      },
+    };
+  }
+  return {
+    workspaces: {
+      scope: "WORKSPACE_SCOPE_ALL",
+      eventTypes: eventTypesFromToggles(form.events),
+      filters: [],
+    },
+  };
 }

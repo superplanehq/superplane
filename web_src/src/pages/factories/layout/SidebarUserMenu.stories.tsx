@@ -14,8 +14,8 @@ import { SidebarUserMenu } from "./SidebarUserMenu";
 const withAccountOrganizations: Decorator = (Story) => {
   const queryClient = useQueryClient();
   queryClient.setQueryData(accountOrganizationsQueryKey, [
-    { id: FACTORIES_ORGANIZATION_ID, name: "SuperPlane" },
-    { id: "org-storybook-acme", name: "Acme" },
+    { id: FACTORIES_ORGANIZATION_ID, slug: "superplane", name: "SuperPlane" },
+    { id: "org-storybook-acme", slug: "acme", name: "Acme" },
   ]);
   return <Story />;
 };

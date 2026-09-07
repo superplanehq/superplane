@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { analytics } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/ui/checkbox";
@@ -27,11 +27,14 @@ interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
   redirectTo: string;
   onComplete?: () => void;
+  initialQuestionIndex?: number;
 }
 
 type SurveyAnswer = string | string[];
 type SurveyResponses = Record<number, SurveyAnswer>;
 type SurveyQuestionType = "single_choice" | "multiple_choice" | "text";
+
+const TEXT_QUESTION_PLACEHOLDER = "Describe the task";
 
 const parseChoiceLabel = (choice: string): { title: string; subtitle: string | null } => {
   const match = choice.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
@@ -58,33 +61,41 @@ const getQuestionType = (question: SurveyQuestion, hasChoices: boolean): SurveyQ
   return "single_choice";
 };
 
+/** Small "A", "B", "C" badge that marks each poll option, matching the AI agent's SurveyWidget. */
+const SurveyOptionLetter: React.FC<{ index: number }> = ({ index }) => (
+  <span className="mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold text-muted-foreground">
+    {String.fromCharCode(65 + index)}
+  </span>
+);
+
+const SurveyOptionLabel: React.FC<{ title: string; subtitle: string | null }> = ({ title, subtitle }) => (
+  <span className="min-w-0 flex-1 text-sm text-foreground">
+    <span className="block font-medium leading-5">{title}</span>
+    {subtitle && <span className="mt-1 block font-normal leading-5 text-muted-foreground">{subtitle}</span>}
+  </span>
+);
+
 interface SurveyChoiceButtonsProps {
   choices: string[];
   onSelect: (choice: string) => void;
 }
 
 const SurveyChoiceButtons: React.FC<SurveyChoiceButtonsProps> = ({ choices, onSelect }) => (
-  <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
-    {choices.map((choice) => {
+  <div className="flex flex-col gap-1.5">
+    {choices.map((choice, index) => {
       const { title, subtitle } = parseChoiceLabel(choice);
 
       return (
-        <button
+        <Button
           key={choice}
           type="button"
-          className="group flex w-full items-start justify-between gap-4 px-2 py-4 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 dark:hover:bg-gray-800"
+          variant="ghost"
+          className="h-auto w-full justify-start gap-3 whitespace-normal rounded-md px-3 py-3 text-left hover:bg-muted"
           onClick={() => onSelect(choice)}
         >
-          <span className="min-w-0">
-            <span className="block text-sm font-medium leading-5 text-gray-900 dark:text-white">{title}</span>
-            {subtitle && (
-              <span className="mt-1 block text-sm font-normal leading-5 text-gray-500 dark:text-gray-400">
-                {subtitle}
-              </span>
-            )}
-          </span>
-          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 transition-colors group-hover:text-gray-900 dark:group-hover:text-white" />
-        </button>
+          <SurveyOptionLetter index={index} />
+          <SurveyOptionLabel title={title} subtitle={subtitle} />
+        </Button>
       );
     })}
   </div>
@@ -99,26 +110,30 @@ interface SurveyMultiChoiceProps {
 
 const SurveyMultiChoice: React.FC<SurveyMultiChoiceProps> = ({ choices, selectedChoices, onToggle, onSubmit }) => (
   <div className="space-y-4">
-    <div className="-mx-2 divide-y divide-gray-200 border-y border-gray-200">
-      {choices.map((choice) => {
+    <div className="flex flex-col gap-1.5">
+      {choices.map((choice, index) => {
         const isChecked = selectedChoices.includes(choice);
         const { title, subtitle } = parseChoiceLabel(choice);
 
         return (
           <label
             key={choice}
-            className="flex cursor-pointer items-start gap-3 px-2 py-4 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-md px-3 py-3 text-left transition-colors",
+              isChecked ? "bg-accent ring-1 ring-ring" : "hover:bg-muted",
+            )}
           >
             <Checkbox
               checked={isChecked}
               onCheckedChange={(checked) => onToggle(choice, checked === true)}
-              className="mt-0.5 shrink-0"
+              className="mt-1 shrink-0"
             />
-            <span className="min-w-0 text-sm text-gray-800 dark:text-gray-200">
+            <SurveyOptionLetter index={index} />
+            {/* Inline (rather than <SurveyOptionLabel />) so the label keeps a direct text
+                child; a11y tooling associates the nested Checkbox with this text. */}
+            <span className="min-w-0 flex-1 text-sm text-foreground">
               <span className="block font-medium leading-5">{title}</span>
-              {subtitle && (
-                <span className="mt-1 block font-normal leading-5 text-gray-500 dark:text-gray-400">{subtitle}</span>
-              )}
+              {subtitle && <span className="mt-1 block font-normal leading-5 text-muted-foreground">{subtitle}</span>}
             </span>
           </label>
         );
@@ -140,7 +155,7 @@ interface SurveyTextQuestionProps {
 const SurveyTextQuestion: React.FC<SurveyTextQuestionProps> = ({ placeholder, textAnswer, onTextChange, onSubmit }) => (
   <div className="space-y-4">
     <Textarea
-      placeholder={placeholder ?? "Type your answer"}
+      placeholder={placeholder ?? TEXT_QUESTION_PLACEHOLDER}
       value={textAnswer}
       onChange={(event) => onTextChange(event.target.value)}
       className="min-h-32 resize-none rounded-md"
@@ -163,15 +178,16 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
       {Array.from({ length: questionCount }).map((_, i) => (
         <div
           key={i}
-          className={`h-1 transition-all duration-300 ${
-            i === currentQuestionIndex ? "w-8 bg-gray-900 dark:bg-white" : "w-4 bg-gray-300 dark:bg-gray-600"
-          }`}
+          className={cn(
+            "h-1 rounded-full transition-all duration-300",
+            i === currentQuestionIndex ? "w-8 bg-primary" : "w-4 bg-muted",
+          )}
         />
       ))}
     </div>
     <button
       type="button"
-      className="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
       onClick={onSkip}
     >
       Skip
@@ -204,18 +220,19 @@ const SurveyQuestionHeader: React.FC<{ question: string | undefined }> = ({ ques
   <div className="space-y-5">
     <img src={superplaneLogo} alt="SuperPlane logo" className="h-8 w-8" />
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        Welcome to SuperPlane
-      </p>
-      <h4 className="text-balance text-2xl font-semibold leading-8 text-gray-950 dark:text-white">
-        {question ?? "Question"}
-      </h4>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Welcome to SuperPlane</p>
+      <h4 className="text-balance text-2xl font-semibold leading-8 text-foreground">{question ?? "Question"}</h4>
     </div>
   </div>
 );
 
-const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({
+  survey,
+  redirectTo,
+  onComplete,
+  initialQuestionIndex = 0,
+}) => {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
   const [multiAnswer, setMultiAnswer] = useState<string[]>([]);

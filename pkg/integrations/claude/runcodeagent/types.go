@@ -70,6 +70,12 @@ type Spec struct {
 	// OutputSchema is a JSON Schema the agent is asked (via a prompt suffix, not
 	// a server-enforced constraint) to match in its final message.
 	OutputSchema string `json:"outputSchema" mapstructure:"outputSchema"`
+	// ResolvesIssue is the GitHub issue the work order driving this run was
+	// imported from, if any. It is resolved from order().origin at execution
+	// time (see resolveResolvesIssue), never from user configuration, and is
+	// used to ask the agent to add a "This resolves #N" backlink to the pull
+	// request it opens.
+	ResolvesIssue *IssueRef `json:"-" mapstructure:"-"`
 }
 
 // SecretRef references a SuperPlane secret by name and key.

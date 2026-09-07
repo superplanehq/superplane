@@ -132,6 +132,10 @@ func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
 }
 
+func (c *IntegrationContext) Persist() error {
+	return nil
+}
+
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	if c.Configuration == nil {
 		return nil, fmt.Errorf("config not found: %s", name)
@@ -431,9 +435,12 @@ func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
 }
 
 type SecretsContext struct {
-	Values          map[string][]byte
-	SecretKeys      map[string]map[string][]byte
-	IntegrationKeys map[string]map[string][]byte
+	Values               map[string][]byte
+	SecretKeys           map[string]map[string][]byte
+	IntegrationKeys      map[string]map[string][]byte
+	IntegrationUsage     map[string]string
+	IntegrationSetup     map[string]string
+	IntegrationSetupName map[string]string
 }
 
 func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
@@ -458,18 +465,23 @@ func (c *SecretsContext) GetSecretKeys(secretName string) (map[string][]byte, er
 	return keys, nil
 }
 
-func (c *SecretsContext) GetIntegrationKeys(installationName string) (map[string][]byte, error) {
+func (c *SecretsContext) GetIntegrationSecrets(installationName string) (core.IntegrationSecrets, error) {
 	if c.IntegrationKeys == nil {
-		return nil, fmt.Errorf("integration secrets not configured")
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not configured")
 	}
 
 	name := strings.TrimSpace(installationName)
 	keys, ok := c.IntegrationKeys[name]
 	if !ok {
-		return nil, fmt.Errorf("integration secrets not found for ref %q", name)
+		return core.IntegrationSecrets{}, fmt.Errorf("integration secrets not found for ref %q", name)
 	}
 
-	return keys, nil
+	return core.IntegrationSecrets{
+		Values:    keys,
+		Usage:     c.IntegrationUsage[name],
+		Setup:     c.IntegrationSetup[name],
+		SetupName: c.IntegrationSetupName[name],
+	}, nil
 }
 
 type HostedLLMContext struct {
