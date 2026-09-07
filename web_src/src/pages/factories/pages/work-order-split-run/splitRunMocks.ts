@@ -191,7 +191,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
       initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
     };
   }
-  return workOrderOwnerDisplay(order, UNKNOWN_OWNER);
+  return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);
 }
 
 function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
@@ -368,7 +368,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
     openPhaseId: activeAutomationId,
     phases,
-    source: splitRunSourceForOrder(order),
+    source: splitRunSourceForOrder(order, options?.resolveUser),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
