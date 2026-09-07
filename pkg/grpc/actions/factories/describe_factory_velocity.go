@@ -69,7 +69,7 @@ func DescribeFactoryVelocity(
 	currentOrders := collectVelocityOrders(rows, current)
 	previousOrders := collectVelocityOrders(rows, previous)
 
-	usage, err := models.SumUsageForWorkOrders(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
+	usage, err := models.SumUsageForWorkOrdersByKind(db, append(velocityOrderIDs(currentOrders), velocityOrderIDs(previousOrders)...))
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe factory velocity")
 	}
@@ -118,15 +118,19 @@ func DescribeFactoryVelocity(
 	for i := range buckets {
 		b := &buckets[i]
 		points = append(points, &pb.DescribeFactoryVelocityDay{
-			Day:              dayLabel(b.start),
-			Date:             timestamppb.New(b.start),
-			SuperplaneMerged: int32(b.superplaneMerged),
-			PeopleMerged:     int32(b.peopleMerged),
-			Waste:            int32(b.waste),
-			Intake:           serializeVelocityIntakeCounts(b.intake),
-			CostCents:        b.costCents,
-			Tokens:           b.tokens,
-			WasteCostCents:   b.wasteCostCents,
+			Day:                        dayLabel(b.start),
+			Date:                       timestamppb.New(b.start),
+			SuperplaneMerged:           int32(b.superplaneMerged),
+			PeopleMerged:               int32(b.peopleMerged),
+			Waste:                      int32(b.waste),
+			Intake:                     serializeVelocityIntakeCounts(b.intake),
+			CostCents:                  b.costCents,
+			ModelCostCents:             b.modelCostCents,
+			ComputeCostCents:           b.computeCostCents,
+			Tokens:                     b.tokens,
+			WasteCostCents:             b.wasteCostCents,
+			MedianTaskModelCostCents:   medianCents(b.taskModelCostCents),
+			MedianTaskComputeCostCents: medianCents(b.taskComputeCostCents),
 		})
 	}
 
@@ -408,14 +412,20 @@ type dayBucket struct {
 	peopleMerged     int
 	waste            int
 	// Merged SuperPlane pull requests of the day, keyed by intake source.
-	intake         map[string]int
-	costCents      int64
-	tokens         int64
-	wasteCostCents int64
+	intake           map[string]int
+	costCents        int64
+	modelCostCents   int64
+	computeCostCents int64
+	tokens           int64
+	wasteCostCents   int64
 	// Work orders reported on the day. A work order counts once here, however
 	// many pull requests it opened.
 	tasksClosed int
 	tasksWaste  int
+	// Spend of every work order reported on the day, one entry per order and
+	// band. The median needs the whole sample, not a running sum.
+	taskModelCostCents   []int64
+	taskComputeCostCents []int64
 }
 
 // dayLabel names the axis tick of a day, as a weekday and a date.
@@ -572,8 +582,12 @@ func fillBuckets(
 			continue
 		}
 		buckets[idx].costCents += order.costCents
+		buckets[idx].modelCostCents += order.modelCostCents
+		buckets[idx].computeCostCents += order.computeCostCents
 		buckets[idx].tokens += order.tokens
 		buckets[idx].tasksClosed++
+		buckets[idx].taskModelCostCents = append(buckets[idx].taskModelCostCents, order.modelCostCents)
+		buckets[idx].taskComputeCostCents = append(buckets[idx].taskComputeCostCents, order.computeCostCents)
 		if !order.merged {
 			buckets[idx].tasksWaste++
 			buckets[idx].wasteCostCents += order.costCents
@@ -602,7 +616,7 @@ func fillBuckets(
 func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVelocityTotals {
 	sp, people, waste := 0, 0, 0
 	tasksClosed, tasksWaste := 0, 0
-	var costCents, tokens, wasteCostCents int64
+	var costCents, modelCostCents, computeCostCents, tokens, wasteCostCents int64
 	for _, b := range buckets {
 		sp += b.superplaneMerged
 		if hasPeople {
@@ -610,6 +624,8 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		}
 		waste += b.waste
 		costCents += b.costCents
+		modelCostCents += b.modelCostCents
+		computeCostCents += b.computeCostCents
 		tokens += b.tokens
 		wasteCostCents += b.wasteCostCents
 		tasksClosed += b.tasksClosed
@@ -621,6 +637,8 @@ func aggregateTotals(buckets []dayBucket, hasPeople bool) *pb.DescribeFactoryVel
 		PeopleMerged:     int32(people),
 		Waste:            int32(waste),
 		CostCents:        costCents,
+		ModelCostCents:   modelCostCents,
+		ComputeCostCents: computeCostCents,
 		Tokens:           tokens,
 		WasteCostCents:   wasteCostCents,
 		TasksClosed:      int32(tasksClosed),

@@ -4,7 +4,7 @@ import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, EMPTY_FACTORY_KEY, PRIMARY_FACTORY_KEY } from "../__fixtures__/factoryPageResponses";
 
 /**
- * Linear-style create dialog. `/work-orders/new` opens it over the list.
+ * Linear-style create dialog. `/tasks/new` opens it over the list.
  * Click New Task on Tasks stories to open the same dialog.
  */
 const meta = {
@@ -16,7 +16,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const createPath = (factoryKey: string) => `workspaces/${factoryKey}/work-orders/new`;
+const createPath = (factoryKey: string) => `workspaces/${factoryKey}/tasks/new`;
 
 export const Empty: Story = {
   render: () => (

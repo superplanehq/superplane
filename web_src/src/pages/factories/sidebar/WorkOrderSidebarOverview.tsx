@@ -1,6 +1,6 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder } from "@/api-client";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
-import { appPath } from "@/lib/appPaths";
+import { factoryAppPath } from "../lib/factoryPagePaths";
 import { cn } from "@/lib/utils";
 import { Calendar, CircleDollarSign, CircleDot, ExternalLink, Loader2, User, UserPlus } from "lucide-react";
 import type { ReactNode } from "react";
@@ -21,6 +21,7 @@ import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
 interface WorkOrderSidebarOverviewProps {
   organizationId: string;
+  factoryKey: string;
   order: FactoriesWorkOrder;
   displayStatus: WorkOrderDisplayStatus;
   statusMeta: { label: string; className: string };
@@ -33,6 +34,7 @@ interface WorkOrderSidebarOverviewProps {
 
 export function WorkOrderSidebarOverview({
   organizationId,
+  factoryKey,
   order,
   displayStatus,
   statusMeta,
@@ -55,7 +57,7 @@ export function WorkOrderSidebarOverview({
         </OverviewRow>
 
         <OverviewRow icon={<UserPlus className="size-3.5" aria-hidden />} srLabel="Author">
-          <CreatorValue organizationId={organizationId} order={order} />
+          <CreatorValue organizationId={organizationId} factoryKey={factoryKey} order={order} />
         </OverviewRow>
 
         <AssigneeOverviewRow organizationId={organizationId} assigneeIds={assigneeIds} assigneeNames={assigneeNames} />
@@ -115,11 +117,19 @@ function StatusValue({ displayStatus, label }: { displayStatus: WorkOrderDisplay
   );
 }
 
-function CreatorValue({ organizationId, order }: { organizationId: string; order: FactoriesWorkOrder }) {
+function CreatorValue({
+  organizationId,
+  factoryKey,
+  order,
+}: {
+  organizationId: string;
+  factoryKey: string;
+  order: FactoriesWorkOrder;
+}) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const automation = order.createdBy?.automation;
   if (isAutomationRefResolved(automation)) {
-    return <AutomationLink organizationId={organizationId} automation={automation} />;
+    return <AutomationLink organizationId={organizationId} factoryKey={factoryKey} automation={automation} />;
   }
   const display = resolveWorkOrderCreatorDisplay(order.createdBy, resolveUser);
   if (display) {
@@ -134,16 +144,18 @@ function isAutomationRefResolved(ref: FactoriesAutomationRef | undefined): ref i
 
 export function AutomationLink({
   organizationId,
+  factoryKey,
   automation,
 }: {
   organizationId: string;
+  factoryKey: string;
   automation: FactoriesAutomationRef;
 }) {
   const label = automation.nodeName || automation.appName || "Automation";
   if (automation.appId) {
     return (
       <Link
-        to={appPath(organizationId, automation.appId)}
+        to={factoryAppPath(organizationId, factoryKey, automation.appId)}
         className="inline-flex min-w-0 max-w-full items-center gap-1 text-foreground underline underline-offset-2 hover:no-underline"
       >
         <span className="truncate">{label}</span>

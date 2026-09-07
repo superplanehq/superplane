@@ -10,8 +10,10 @@ import {
   MACHINE_BREAKDOWN_OPTIONS,
   MODEL_BREAKDOWN_OPTIONS,
   modelKey,
+  quantizeSpendingNow,
   rangeForPreset,
   rangeFromCustomDays,
+  spendingPeriodTriggerLabel,
   type SpendingCatalogs,
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
@@ -91,6 +93,25 @@ describe("rangeForPreset", () => {
     expect(rangeForPreset("week", NOW).start.toISOString()).toBe("2026-08-27T12:00:00.000Z");
     expect(rangeForPreset("month", NOW).start.toISOString()).toBe("2026-08-04T12:00:00.000Z");
     expect(rangeForPreset("year", NOW).start.toISOString()).toBe("2025-09-03T12:00:00.000Z");
+  });
+});
+
+describe("quantizeSpendingNow", () => {
+  it("rounds down to the start of the current minute", () => {
+    expect(quantizeSpendingNow(new Date("2026-09-03T12:00:00.000Z"))).toEqual(new Date("2026-09-03T12:00:00.000Z"));
+    expect(quantizeSpendingNow(new Date("2026-09-03T12:00:59.999Z"))).toEqual(new Date("2026-09-03T12:00:00.000Z"));
+  });
+
+  it("keeps quick remounts within the same minute on the same anchor", () => {
+    const first = quantizeSpendingNow(new Date("2026-09-03T12:00:01.000Z"));
+    const second = quantizeSpendingNow(new Date("2026-09-03T12:00:45.000Z"));
+    expect(second).toEqual(first);
+  });
+
+  it("advances once the minute rolls over", () => {
+    const first = quantizeSpendingNow(new Date("2026-09-03T12:00:59.000Z"));
+    const second = quantizeSpendingNow(new Date("2026-09-03T12:01:00.000Z"));
+    expect(second.getTime()).toBeGreaterThan(first.getTime());
   });
 });
 
@@ -206,6 +227,11 @@ describe("filter helpers", () => {
     expect(formatFilterTriggerLabel("All users")).toBe("All users");
     expect(formatFilterTriggerLabel("All users", "Alex")).toBe("Alex");
     expect(formatSpendingRangeCaption(rangeForPreset("day", NOW))).toBe("Sep 2, 2026 – Sep 3, 2026");
+  });
+
+  it("labels the period trigger with the preset or the custom dates", () => {
+    expect(spendingPeriodTriggerLabel("month", rangeForPreset("month", NOW))).toBe("Last 30 days");
+    expect(spendingPeriodTriggerLabel("custom", rangeForPreset("week", NOW))).toBe("Aug 27, 2026 – Sep 3, 2026");
   });
 
   it("exposes group-by options for each usage section", () => {

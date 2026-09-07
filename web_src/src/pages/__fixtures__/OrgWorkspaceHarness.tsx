@@ -31,6 +31,8 @@ import {
   FactorySettingsRepositoryPage,
   FactorySettingsModelsPage,
   LegacyWorkOrderDetailRedirect,
+  LegacyWorkOrderPermalinkRedirect,
+  LegacyWorkOrdersRedirect,
   LinesPage,
   MissionsPage,
   NewWorkspacePage,
@@ -63,6 +65,7 @@ import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/or
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
+  FactoryOrganizationLLMModelsPage,
   FactoryOrganizationMembersPage,
   FactoryOrganizationSecretDetailPage,
   FactoryOrganizationSecretsPage,
@@ -328,6 +331,15 @@ const factorySettingsStorybookRoutes = [
     }
   />,
   <Route
+    key="factory-settings-organization-models"
+    path="organization/models"
+    element={
+      <RequirePermission resource="org" action="read">
+        <FactoryOrganizationLLMModelsPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
     key="factory-settings-organization-integration-setup"
     path="organization/integrations/:integrationName/setup"
     element={
@@ -417,12 +429,15 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
               <Route path="velocity" element={<VelocityRoutePage />} />
-              <Route path="work-orders">
+              <Route path="tasks">
                 <Route index element={<WorkOrdersRoutePage />} />
                 <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
                 <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
               </Route>
-              <Route path="work-order/:orderNumber" element={<WorkOrderDetailPage />} />
+              <Route path="task/:orderNumber" element={<WorkOrderDetailPage />} />
+              {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
+              <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
+              <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
               <Route path="lines">
                 <Route index element={<FactoryHomeRedirect />} />
                 <Route path="new" element={<FactoryLineEditPage />} />

@@ -1,4 +1,5 @@
 import { useAccount } from "@/contexts/useAccount";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { OnboardingWorkspaceResolution } from "../factories/pages/onboarding/onboardingWorkspaceResolutionContext";
@@ -20,11 +21,31 @@ interface OrganizationOnboardingRedirectProps {
 /** Provisions the internal workspace and renders its existing setup wizard at /onboarding. */
 export function OrganizationOnboardingRedirect({ renderWorkspace }: OrganizationOnboardingRedirectProps) {
   const { account } = useAccount();
+  const queryClient = useQueryClient();
   const hasStartedProvisioning = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<ProvisionedWorkspace | null>(null);
+  const workspaceRef = useRef<ProvisionedWorkspace | null>(null);
   const owner = organizationNameFromAccount(account);
   const onboardingAttempt = useRef(getOnboardingAttempt());
+
+  // A new organization can receive the slug of an earlier onboarding
+  // organization that was later renamed (for example, to the GitHub owner).
+  // Cached queries under that slug still hold the old organization's factory
+  // and connections, which would open the wizard mid-way, so the slug starts
+  // with a clean cache whenever the wizard adopts a different slug.
+  const adoptWorkspace = useCallback(
+    (provisioned: ProvisionedWorkspace) => {
+      if (workspaceRef.current?.organizationSlug !== provisioned.organizationSlug) {
+        queryClient.removeQueries({
+          predicate: (query) => query.queryKey.includes(provisioned.organizationSlug),
+        });
+      }
+      workspaceRef.current = provisioned;
+      setWorkspace(provisioned);
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     if (!account || hasStartedProvisioning.current) return;
@@ -35,11 +56,11 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
 
     hasStartedProvisioning.current = true;
     void provisionWorkspace(owner, onboardingAttempt.current.id)
-      .then(setWorkspace)
+      .then(adoptWorkspace)
       .catch((provisioningError: unknown) => {
         setError(provisioningError instanceof Error ? provisioningError.message : "Could not start workspace setup.");
       });
-  }, [account, owner]);
+  }, [account, owner, adoptWorkspace]);
 
   // Re-runs the retry-safe onboarding endpoint for the same attempt, so a
   // workspace can move to a new organization slug (for example, after the
@@ -47,8 +68,8 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
   const reresolveWorkspace = useCallback(async () => {
     if (!owner) return;
     const result = await provisionWorkspace(owner, onboardingAttempt.current.id);
-    setWorkspace(result);
-  }, [owner]);
+    adoptWorkspace(result);
+  }, [owner, adoptWorkspace]);
 
   if (workspace) {
     return renderWorkspace(workspace, onboardingAttempt.current.entryPath, reresolveWorkspace);

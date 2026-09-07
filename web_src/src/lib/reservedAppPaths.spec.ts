@@ -7,6 +7,7 @@ describe("isReservedAppPathSegment", () => {
     expect(isReservedAppPathSegment("admin")).toBe(true);
     expect(isReservedAppPathSegment("login")).toBe(true);
     expect(isReservedAppPathSegment("onboarding")).toBe(true);
+    expect(isReservedAppPathSegment("github")).toBe(true);
     expect(isReservedAppPathSegment("setup")).toBe(true);
     expect(isReservedAppPathSegment("create")).toBe(true);
   });

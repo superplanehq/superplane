@@ -132,6 +132,10 @@ func (c *IntegrationContext) SetMetadata(metadata any) {
 	c.Metadata = metadata
 }
 
+func (c *IntegrationContext) Persist() error {
+	return nil
+}
+
 func (c *IntegrationContext) GetConfig(name string) ([]byte, error) {
 	if c.Configuration == nil {
 		return nil, fmt.Errorf("config not found: %s", name)
@@ -485,6 +489,8 @@ type HostedLLMContext struct {
 	CreditErr     error
 	ResolveErr    error
 	SelectableErr error
+	Default       core.DefaultHostedLLMModel
+	DefaultErr    error
 }
 
 func (c *HostedLLMContext) Resolve(provider string) (core.HostedLLMAccess, error) {
@@ -500,6 +506,13 @@ func (c *HostedLLMContext) AssertCreditAvailable() error {
 
 func (c *HostedLLMContext) AssertModelSelectable(provider, fundingSource, model string) error {
 	return c.SelectableErr
+}
+
+func (c *HostedLLMContext) DefaultModel() (core.DefaultHostedLLMModel, error) {
+	if c.DefaultErr != nil {
+		return core.DefaultHostedLLMModel{}, c.DefaultErr
+	}
+	return c.Default, nil
 }
 
 type ExpressionContext struct {

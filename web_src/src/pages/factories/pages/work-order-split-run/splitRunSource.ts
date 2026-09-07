@@ -3,7 +3,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
-import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import { getUserInitials, type OrgUserDisplay, type OrgUserDisplayLookup } from "@/lib/orgUserDisplay";
 
 import {
   STORYBOOK_ME_USER_AVATAR_URL,
@@ -67,7 +67,7 @@ export function splitRunIntakeSource(href: string, intakeKind?: SplitRunIntakeKi
   return intakeSourceFromHref(href, intakeKind);
 }
 
-export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSource {
+export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): SplitRunSource {
   const originHref = order.origin?.url?.trim();
   if (originHref) {
     return intakeSourceFromHref(
@@ -89,7 +89,7 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder): SplitRunSourc
 
   return {
     kind: "manual",
-    person: sourcePerson(order),
+    person: sourcePerson(order, resolveUser),
     detail: CREATED_MANUALLY,
   };
 }
@@ -151,10 +151,16 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   return "github-issues";
 }
 
-function sourcePerson(order: FactoriesWorkOrder): OrgUserDisplay {
+function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const user = order.createdBy?.user;
   if (!user?.id && !user?.name) {
     return SOURCE_PERSON_FALLBACK;
+  }
+  // `resolveUser` looks the source up against the org members list, which
+  // carries the avatar image. Without it we can only show initials.
+  const resolved = resolveUser?.(user.id, user.name);
+  if (resolved) {
+    return resolved;
   }
   const name = user.name?.trim() || SOURCE_PERSON_FALLBACK.name;
   return {

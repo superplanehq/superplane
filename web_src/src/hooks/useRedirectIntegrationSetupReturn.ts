@@ -5,6 +5,7 @@ import {
   consumeIntegrationSetupReturn,
   hasIntegrationSetupStay,
   peekIntegrationSetupReturn,
+  withGitHubSetupRequest,
 } from "@/lib/integrationSetupReturn";
 
 function isLegacyIntegrationDetailsPath(organizationId: string, pathname: string): boolean {
@@ -30,16 +31,20 @@ export function useRedirectIntegrationSetupReturn(
 
   useEffect(() => {
     if (!routeOrganizationId || !storageOrganizationId) return;
+    // OrganizationScope rewrites a UID URL to the slug first. Bouncing on the
+    // UID URL consumes the return, then that rewrite wins and the wizard
+    // never comes back.
+    if (routeOrganizationId !== storageOrganizationId) return;
     if (!isLegacyIntegrationDetailsPath(routeOrganizationId, location.pathname)) return;
     if (hasIntegrationSetupStay(location.search)) return;
 
-    const returnTo = peekIntegrationSetupReturn(storageOrganizationId);
-    if (!returnTo) return;
+    const storedReturn = peekIntegrationSetupReturn(storageOrganizationId);
+    if (!storedReturn) return;
 
     // The provider can finish on a later callback after setup has already
     // completed. Consume this one-shot return before navigating so that late
     // callbacks cannot reopen the setup wizard.
     consumeIntegrationSetupReturn(storageOrganizationId);
-    navigate(returnTo, { replace: true });
+    navigate(withGitHubSetupRequest(storedReturn, location.search), { replace: true });
   }, [location.pathname, location.search, navigate, routeOrganizationId, storageOrganizationId]);
 }

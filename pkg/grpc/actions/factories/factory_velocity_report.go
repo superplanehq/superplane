@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -62,7 +63,11 @@ type velocityOrder struct {
 	merged     bool
 	cycleHours *float64
 	costCents  int64
-	tokens     int64
+	// Bands of costCents: what the order spent on model tokens and on runner
+	// compute.
+	modelCostCents   int64
+	computeCostCents int64
+	tokens           int64
 }
 
 // collectVelocityOrders attributes every work order with pull request activity
@@ -140,15 +145,21 @@ func velocityIntakeLabel(key string) string {
 	return key
 }
 
-// applyVelocityOrderUsage fills tracked model spend on each order.
-func applyVelocityOrderUsage(orders map[uuid.UUID]*velocityOrder, usage map[uuid.UUID]models.UsageTotals) {
+// applyVelocityOrderUsage fills tracked spend on each order, in both bands.
+//
+// The total is the sum of the two rounded bands rather than the rounded sum,
+// so a stacked chart of the bands always adds up to the total it is drawn
+// against. The two can differ by a cent.
+func applyVelocityOrderUsage(orders map[uuid.UUID]*velocityOrder, usage map[uuid.UUID]models.UsageSplit) {
 	for id, order := range orders {
-		totals, ok := usage[id]
+		split, ok := usage[id]
 		if !ok {
 			continue
 		}
-		order.costCents = totals.CostCents()
-		order.tokens = totals.TotalTokens
+		order.modelCostCents = split.Model.CostCents()
+		order.computeCostCents = split.Compute.CostCents()
+		order.costCents = order.modelCostCents + order.computeCostCents
+		order.tokens = split.Total().TotalTokens
 	}
 }
 
@@ -399,6 +410,22 @@ func medianFloats(values []float64) float64 {
 	}
 	sorted := append([]float64(nil), values...)
 	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
+}
+
+// medianCents returns the middle value of a cent sample. An even sample
+// averages the two middle values and truncates, because a cent is the smallest
+// amount the report shows.
+func medianCents(values []int64) int64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := slices.Clone(values)
+	slices.Sort(sorted)
 	mid := len(sorted) / 2
 	if len(sorted)%2 == 1 {
 		return sorted[mid]

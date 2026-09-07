@@ -29,8 +29,6 @@ const WRAP_UP_PROMPT =
   "You have no remaining tool turns. Do not call tools. Write a plain-text summary of what you completed and what remains.";
 const TOOL_NUDGE =
   "Use the bash, read, edit, or write tools to do the work. Do not only describe the changes.";
-const PLANNING_TOOL_NUDGE =
-  "Use the bash or read tools to gather context, or call propose_draft/survey. Do not only describe the changes.";
 const TOOLS = [
   {
     type: "function",
@@ -170,7 +168,6 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
   const planning = planningEnabled(process.env);
   const planningHelpers = planning ? loadPlanningHelpers(process.env) : null;
   const tools = planning ? planningToolDefs(planningHelpers) : TOOLS;
-  const toolNudge = planning ? PLANNING_TOOL_NUDGE : TOOL_NUDGE;
   if (planning) {
     process.stdout.write("Planning session tools enabled\n");
     process.stdout.write(`allowed tools: ${tools.map((tool) => tool.function.name).join(", ")}\n`);
@@ -224,10 +221,10 @@ async function runPrompt(promptFile, model, maxTurns = DEFAULT_MAX_TURNS) {
       const toolCalls = extractToolCalls(message);
       pendingToolCalls = toolCalls.length > 0;
       if (!pendingToolCalls) {
-        if (!nudgedForTools) {
+        if (!planning && !nudgedForTools) {
           nudgedForTools = true;
           process.stderr.write("OpenRouter agent returned no tool calls; asking it to use tools\n");
-          messages.push({ role: "user", content: toolNudge });
+          messages.push({ role: "user", content: TOOL_NUDGE });
           continue;
         }
         break;

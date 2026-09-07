@@ -9,7 +9,20 @@ import { TooltipProvider } from "@/ui/tooltip";
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID, STORYBOOK_ME_USER_NAME } from "../../../__fixtures__/factoryPageIds";
 import { SpendingRedesignPage } from "./SpendingRedesignPage";
 import { SPENDING_CATALOGS, SPENDING_CREDIT, SPENDING_LEDGER, SPENDING_REDESIGN_NOW } from "./spendingRedesignMocks";
-import { EMPTY_SPENDING_FILTERS, rangeForPreset } from "./spendingRedesignLib";
+import {
+  EMPTY_SPENDING_FILTERS,
+  formatSpendingRangeCaption,
+  rangeForPreset,
+  type SpendingReport,
+} from "./spendingRedesignLib";
+
+const FAKE_REPORT: SpendingReport = {
+  range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+  totals: { costCents: 100, tokens: 10, durationSeconds: 5, hostedCostCents: 100, byokCostCents: 0 },
+  series: [],
+  seriesKeys: [],
+  breakdown: [],
+};
 
 function renderPage(props?: Partial<ComponentProps<typeof SpendingRedesignPage>>) {
   return render(
@@ -48,7 +61,9 @@ describe("SpendingRedesignPage", () => {
     expect(screen.getByTestId("spending-kpi-tokens")).toHaveTextContent("Tokens");
     expect(screen.getByTestId("spending-kpi-vm")).toHaveTextContent("VM time");
     expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
-    expect(screen.getByRole("tab", { name: "Month", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 30 days");
+    expect(screen.queryByRole("tab", { name: "Custom" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Custom range" })).not.toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
         "Semaphore",
@@ -77,12 +92,26 @@ describe("SpendingRedesignPage", () => {
   it("renders the KPI summary below the range control and above the usage sections", () => {
     renderPage();
 
-    const range = screen.getByRole("tablist", { name: "Spending time range" });
+    const range = screen.getByTestId("spending-period");
     const kpi = screen.getByTestId("spending-kpi-spend");
     const models = screen.getByTestId("spending-model-usage");
 
     expect(range.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(kpi.compareDocumentPosition(models) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("opens presets and a calendar in one period picker", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId("spending-period"));
+
+    expect(screen.getByRole("radio", { name: "Last 30 days", checked: true })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 7 days" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 24 hours" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Last 12 months" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Custom" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("spending-period-picker")).toBeInTheDocument();
   });
 
   it("keeps model filters and VM filters on their own explorers", () => {
@@ -154,13 +183,14 @@ describe("SpendingRedesignPage", () => {
     expect(screen.queryByRole("menuitemradio", { name: "Models" })).not.toBeInTheDocument();
   });
 
-  it("narrows totals when the Week range is selected", async () => {
+  it("narrows totals when the last 7 days are selected", async () => {
     const user = userEvent.setup();
     renderPage();
 
     const monthSpend = screen.getByTestId("spending-kpi-spend").textContent;
-    await user.click(screen.getByRole("tab", { name: "Week" }));
-    expect(screen.getByRole("tab", { name: "Week", selected: true })).toBeInTheDocument();
+    await user.click(screen.getByTestId("spending-period"));
+    await user.click(screen.getByRole("radio", { name: "Last 7 days" }));
+    expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 7 days");
     expect(screen.getByTestId("spending-kpi-spend").textContent).not.toBe(monthSpend);
   });
 
@@ -269,10 +299,59 @@ describe("SpendingRedesignPage", () => {
     });
 
     const models = screen.getByTestId("spending-model-usage");
-    expect(screen.getByRole("tab", { name: "Custom", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-period")).toHaveTextContent(
+      formatSpendingRangeCaption(rangeForPreset("week", SPENDING_REDESIGN_NOW)),
+    );
     expect(within(models).getByTestId("spending-model-group-by")).toHaveTextContent("Group by Users");
     expect(within(models).getByTestId("spending-model-filter-users")).toHaveTextContent(STORYBOOK_ME_USER_NAME);
     expect(within(models).getByTestId("spending-model-filter-workspaces")).toHaveTextContent("Semaphore");
     expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("User")).toBeInTheDocument();
+  });
+
+  describe("loading and refetch indicator", () => {
+    it("shows a centered spinner on the true first load, before any report exists", () => {
+      renderPage({ isLoading: true, modelReport: undefined, machineReport: undefined });
+
+      const page = screen.getByTestId("spending-redesign-page");
+      const loading = screen.getByTestId("spending-page-loading");
+      expect(page.className).toMatch(/items-center/);
+      expect(page.className).toMatch(/justify-center/);
+      expect(loading.querySelector("svg.animate-spin")).not.toBeNull();
+      expect(screen.queryByRole("heading", { name: "Spending" })).not.toBeInTheDocument();
+    });
+
+    it("keeps rendering a previously loaded report instead of the full-page spinner, even if isLoading is still true", () => {
+      renderPage({ isLoading: true, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByTestId("spending-page-loading")).not.toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Spending" })).toBeInTheDocument();
+    });
+
+    it("keeps the full-page spinner while only one report has resolved on the first load", () => {
+      renderPage({ isLoading: true, isFetching: true, modelReport: FAKE_REPORT, machineReport: undefined });
+
+      expect(screen.getByTestId("spending-page-loading")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
+
+    it("shows a quiet top-right indicator while a report refetches over existing data", () => {
+      renderPage({ isLoading: false, isFetching: true, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByTestId("spending-page-loading")).not.toBeInTheDocument();
+      expect(screen.getByTestId("spending-refetch-indicator")).toBeInTheDocument();
+    });
+
+    it("hides the refetch indicator once the background fetch settles", () => {
+      renderPage({ isLoading: false, isFetching: false, modelReport: FAKE_REPORT, machineReport: FAKE_REPORT });
+
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
+
+    it("does not show the quiet indicator underneath the full-page spinner", () => {
+      renderPage({ isLoading: true, isFetching: true, modelReport: undefined, machineReport: undefined });
+
+      expect(screen.getByTestId("spending-page-loading")).toBeInTheDocument();
+      expect(screen.queryByTestId("spending-refetch-indicator")).not.toBeInTheDocument();
+    });
   });
 });

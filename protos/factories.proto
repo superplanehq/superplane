@@ -655,6 +655,18 @@ service Factories {
     };
   }
 
+  rpc ReloadPlanningSessionAgent(ReloadPlanningSessionAgentRequest) returns (ReloadPlanningSessionAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/reload-agent"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reload planning session agent";
+      description: "Keeps the Create with an Agent session and starts a new machine with the selected model";
+      tags: "Factory";
+    };
+  }
+
   rpc SkipPlanningSessionDraft(SkipPlanningSessionDraftRequest) returns (SkipPlanningSessionDraftResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}/skip"
@@ -772,6 +784,7 @@ message FactoryOnboarding {
     AGENT_HARNESS_CLAUDE_CODE = 1;
     AGENT_HARNESS_CURSOR = 2;
     AGENT_HARNESS_CODEX = 3;
+    AGENT_HARNESS_SUPERPLANE = 4;
   }
 
   // Set when workspace setup finished. Null while onboarding is open.
@@ -1844,13 +1857,24 @@ message DescribeFactoryVelocityDay {
   int32 waste = 5;
   // Merged SuperPlane pull requests grouped by intake source.
   repeated DescribeFactoryVelocityIntakeCount intake = 6;
-  // Tracked model spend of the work orders that closed on this day. A work
-  // order counts on the day its pull request merged, or on the day its last
-  // pull request closed when none merged.
+  // Tracked spend of the work orders that closed on this day. A work order
+  // counts on the day its pull request merged, or on the day its last pull
+  // request closed when none merged.
   int64 cost_cents = 7;
   int64 tokens = 8;
   // Part of `cost_cents` spent on work orders that closed without a merge.
   int64 waste_cost_cents = 9;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 10;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 11;
+  // Median model spend of one work order reported on this day. Medians of the
+  // two bands do not add up to the median of the total, so these two describe
+  // one typical work order per band rather than one typical total.
+  int64 median_task_model_cost_cents = 12;
+  // Median runner compute spend of one work order reported on this day.
+  int64 median_task_compute_cost_cents = 13;
 }
 
 // DescribeFactoryVelocityIntakeSource names one intake series and its total.
@@ -1921,7 +1945,7 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
-  // Tracked model spend of the work orders that closed in the window.
+  // Tracked spend of the work orders that closed in the window.
   int64 cost_cents = 6;
   int64 tokens = 7;
   // Part of `cost_cents` spent on work orders that closed without a merge.
@@ -1932,6 +1956,11 @@ message DescribeFactoryVelocityTotals {
   int32 tasks_closed = 9;
   // Part of `tasks_closed` whose pull requests all closed without a merge.
   int32 tasks_waste = 10;
+  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
+  // together with `compute_cost_cents`.
+  int64 model_cost_cents = 11;
+  // Part of `cost_cents` spent on runner compute.
+  int64 compute_cost_cents = 12;
 }
 
 // Trailing 30-day line summary nested on FactoryLine.
@@ -2038,6 +2067,7 @@ message UsageByMachineType {
 message PlanningSessionDraft {
   string title = 1;
   string description = 2;
+  string work_order_id = 3;
 }
 
 message PlanningSessionCreatedOrder {
@@ -2077,11 +2107,13 @@ message PlanningSession {
   string wait_state = 10;
   string execution_id = 11;
   PlanningSessionSurvey survey = 12;
+  string selectable_model_key = 13;
 }
 
 message StartPlanningSessionRequest {
   string factory_id = 1;
   string repository = 2;
+  string work_order_id = 3;
 }
 
 message StartPlanningSessionResponse {
@@ -2142,5 +2174,15 @@ message SkipPlanningSessionDraftRequest {
 }
 
 message SkipPlanningSessionDraftResponse {
+  PlanningSession session = 1;
+}
+
+message ReloadPlanningSessionAgentRequest {
+  string factory_id = 1;
+  string session_id = 2;
+  string selectable_model_key = 3;
+}
+
+message ReloadPlanningSessionAgentResponse {
   PlanningSession session = 1;
 }

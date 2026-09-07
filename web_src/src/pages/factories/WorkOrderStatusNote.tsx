@@ -5,7 +5,7 @@ import { Link } from "react-router";
 import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { appPath } from "@/lib/appPaths";
+import { factoryAppPath } from "./lib/factoryPagePaths";
 import { formatRelative } from "@/lib/datetime";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import {
@@ -22,6 +22,7 @@ import type { WorkOrderStatusNotePresentation } from "./lib/workOrderStatusNote"
 interface WorkOrderStatusNoteProps {
   note: WorkOrderStatusNotePresentation;
   organizationId: string;
+  factoryKey: string;
   canClose: boolean;
   canManage: boolean;
   isBusy: boolean;
@@ -33,6 +34,7 @@ interface WorkOrderStatusNoteProps {
 export function WorkOrderStatusNote({
   note,
   organizationId,
+  factoryKey,
   canClose,
   canManage,
   isBusy,
@@ -53,7 +55,7 @@ export function WorkOrderStatusNote({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <h3 className="text-[13px] font-semibold tracking-[-0.01em] text-foreground">{note.headline}</h3>
-            <NoteAttribution note={note} organizationId={organizationId} />
+            <NoteAttribution note={note} organizationId={organizationId} factoryKey={factoryKey} />
           </div>
 
           <div className="mt-1 text-[13px]">
@@ -89,7 +91,15 @@ export function WorkOrderStatusNote({
 }
 
 /** "PR Closure · 25 minutes ago", with the automation name linked. */
-function NoteAttribution({ note, organizationId }: { note: WorkOrderStatusNotePresentation; organizationId: string }) {
+function NoteAttribution({
+  note,
+  organizationId,
+  factoryKey,
+}: {
+  note: WorkOrderStatusNotePresentation;
+  organizationId: string;
+  factoryKey: string;
+}) {
   const time = note.updatedAt ? formatRelative(note.updatedAt) : null;
   if (!note.source && !time) {
     return null;
@@ -99,7 +109,7 @@ function NoteAttribution({ note, organizationId }: { note: WorkOrderStatusNotePr
     <span className="flex shrink-0 items-baseline gap-1 text-[11px] text-muted-foreground">
       {note.source?.appId ? (
         <Link
-          to={appPath(organizationId, note.source.appId)}
+          to={factoryAppPath(organizationId, factoryKey, note.source.appId)}
           className="text-muted-foreground underline underline-offset-2 hover:text-foreground hover:no-underline"
         >
           {note.source.name}

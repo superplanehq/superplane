@@ -1,8 +1,20 @@
 import type { ReactNode } from "react";
-import { Bug, CheckCircle2, CircleX, ExternalLink, FileText, Hourglass, Loader2, RotateCcw, Undo2 } from "lucide-react";
+import {
+  Bug,
+  CheckCircle2,
+  CircleX,
+  ExternalLink,
+  FileText,
+  Hourglass,
+  Loader2,
+  RotateCcw,
+  Sparkles,
+  Undo2,
+} from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { WorkOrderPersonMention } from "@/pages/app/markdownMentions";
@@ -189,6 +201,9 @@ function ActionIcon({ icon }: { icon?: SplitRunFooterAction["icon"] }) {
   if (icon === "undo-2") {
     return <Undo2 className="size-3.5" aria-hidden />;
   }
+  if (icon === "sparkles") {
+    return <Sparkles className="size-3.5" aria-hidden />;
+  }
   return null;
 }
 
@@ -209,7 +224,7 @@ function NoteAction({
   const busy = action.kind === "start" ? startBusy : actionBusy;
   const disabled = action.kind === "start" ? startDisabled || startBusy : actionBusy;
 
-  return (
+  const button = (
     <Button
       type="button"
       size="sm"
@@ -221,5 +236,14 @@ function NoteAction({
       {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <ActionIcon icon={action.icon} />}
       {action.label}
     </Button>
+  );
+  if (!action.tooltip) {
+    return button;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent>{action.tooltip}</TooltipContent>
+    </Tooltip>
   );
 }

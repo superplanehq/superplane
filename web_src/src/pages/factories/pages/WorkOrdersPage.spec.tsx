@@ -65,3 +65,65 @@ describe("WorkOrdersPage hosted credit banner", () => {
     expect(await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
 });
+
+describe("WorkOrdersPage broken integrations banner", () => {
+  beforeAll(() => {
+    client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  it("hides the banner when every integration is ready", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+        orgIntegrations={[
+          { metadata: { id: "gh-1", name: "github-main", integrationName: "github" }, status: { state: "ready" } },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByTestId("work-orders-header", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("broken-integrations-banner")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("names the integration and the repair step when a connection errors", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+        orgIntegrations={[
+          {
+            metadata: { id: "gh-1", name: "github-main", integrationName: "github" },
+            status: { state: "error", stateDescription: "App was uninstalled" },
+          },
+        ]}
+      />,
+    );
+
+    const banner = await screen.findByTestId("broken-integrations-banner", {}, { timeout: 8000 });
+    expect(banner).toHaveTextContent("1 integration needs attention");
+    expect(banner).toHaveTextContent("App was uninstalled");
+    expect(screen.getByRole("link", { name: "Reinstall app" })).toHaveAttribute(
+      "href",
+      `${factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "integrations")}/gh-1`,
+    );
+  }, 10000);
+
+  it("shows the banner on the production Tasks page when a connection errors", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/work-orders`}
+        factoriesFixture={defaultFactoriesFixture}
+        orgIntegrations={[
+          {
+            metadata: { id: "gh-1", name: "github-main", integrationName: "github" },
+            status: { state: "error", stateDescription: "App was uninstalled" },
+          },
+        ]}
+        pageOverrides={{ workOrders: WorkOrdersPage }}
+      />,
+    );
+
+    expect(await screen.findByTestId("broken-integrations-banner", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+});

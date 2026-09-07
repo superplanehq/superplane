@@ -4,7 +4,7 @@ import { buildBuildingBlockCategories } from "./buildingBlocks";
 const triggers = [
   { name: "onBroadcast", label: "On Broadcast" },
   { name: "onRun", label: "On Run" },
-  { name: "onWorkOrder", label: "On Work Order" },
+  { name: "onWorkOrder", label: "On Task" },
 ];
 
 const components = [
@@ -17,6 +17,7 @@ const components = [
   { name: "runnerJS", label: "Run JavaScript" },
   { name: "runnerBash", label: "Run Bash" },
   { name: "runnerPython", label: "Run Python" },
+  { name: "runnerSuperPlane", label: "Run SuperPlane Agent" },
   { name: "runnerClaudeCode", label: "Run Claude Code" },
   { name: "runnerCodex", label: "Run Codex" },
   { name: "runnerOpenRouter", label: "Run OpenRouter Agent" },
@@ -48,6 +49,7 @@ describe("buildBuildingBlockCategories", () => {
       "runnerBash",
       "runnerJS",
       "runnerPython",
+      "runnerSuperPlane",
       "runnerClaudeCode",
       "runnerCodex",
       "runnerOpenRouter",

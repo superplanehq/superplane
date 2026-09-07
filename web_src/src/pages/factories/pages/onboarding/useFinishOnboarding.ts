@@ -216,7 +216,9 @@ export function useFinishOnboarding(args: {
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, args.selections),
         agentIntegrationId:
-          args.plan.credentialsSource === "integration" ? args.selections[args.plan.integrationName]?.id : undefined,
+          args.plan.credentialsSource === "integration" && args.plan.integrationName
+            ? args.selections[args.plan.integrationName]?.id
+            : undefined,
       });
       markWorkspaceGettingStarted(args.organizationId, args.factoryId);
       navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);

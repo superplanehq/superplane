@@ -8,6 +8,7 @@ const HIDDEN_KINDS = new Set(["setup"]);
 const TOOL_LINE = /^-> \[([^\]]+)\]/;
 
 export const RUNNER_COMPONENTS = new Set([
+  "runnerSuperPlane",
   "runnerClaudeCode",
   "runnerCodex",
   "runnerOpenRouter",

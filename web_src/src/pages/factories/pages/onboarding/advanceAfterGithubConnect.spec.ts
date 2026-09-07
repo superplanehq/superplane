@@ -23,6 +23,30 @@ describe("advanceAfterGithubConnect", () => {
     vi.stubGlobal("location", { ...window.location, replace: locationReplace });
   });
 
+  it("navigates to the repo step before re-resolving a new organization slug", async () => {
+    const order: string[] = [];
+    navigate = vi.fn(() => {
+      order.push("navigate");
+    }) as unknown as NavigateFunction;
+    const reresolveWorkspace = vi.fn().mockImplementation(async () => {
+      order.push("reresolve");
+    });
+
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
+      organizationId: oldSlug,
+      nextSlug,
+      factoryId,
+      factoryKey,
+      navigate,
+      reresolveWorkspace,
+      queryClient,
+    });
+
+    expect(order).toEqual(["navigate", "reresolve"]);
+    expect(locationReplace).not.toHaveBeenCalled();
+  });
+
   it("re-resolves the workspace and navigates client-side during initial onboarding", async () => {
     queryClient.setQueryData(factoryQueryKeys.list(oldSlug), [{ id: factoryId }]);
     queryClient.setQueryData(factoryQueryKeys.detail(oldSlug, factoryId), { id: factoryId, name: "Old" });
@@ -91,7 +115,26 @@ describe("advanceAfterGithubConnect", () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it("falls back to a full reload when re-resolving the workspace fails", async () => {
+  it("skips re-resolution and navigates client-side when the organization slug is unchanged", async () => {
+    const reresolveWorkspace = vi.fn();
+
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
+      organizationId: oldSlug,
+      nextSlug: oldSlug,
+      factoryId,
+      factoryKey,
+      navigate,
+      reresolveWorkspace,
+      queryClient,
+    });
+
+    expect(reresolveWorkspace).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo", { replace: true });
+    expect(locationReplace).not.toHaveBeenCalled();
+  });
+
+  it("navigates client-side when re-resolving the workspace fails", async () => {
     const reresolveWorkspace = vi.fn().mockRejectedValue(new Error("re-resolve failed"));
 
     await advanceAfterGithubConnect({
@@ -106,11 +149,11 @@ describe("advanceAfterGithubConnect", () => {
     });
 
     expect(reresolveWorkspace).toHaveBeenCalledTimes(1);
-    expect(locationReplace).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo");
-    expect(navigate).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo", { replace: true });
+    expect(locationReplace).not.toHaveBeenCalled();
   });
 
-  it("falls back to a full reload when no re-resolution callback is available", async () => {
+  it("navigates client-side when no re-resolution callback is available", async () => {
     await advanceAfterGithubConnect({
       onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",
       organizationId: oldSlug,
@@ -122,7 +165,7 @@ describe("advanceAfterGithubConnect", () => {
       queryClient,
     });
 
-    expect(locationReplace).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo");
-    expect(navigate).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo", { replace: true });
+    expect(locationReplace).not.toHaveBeenCalled();
   });
 });

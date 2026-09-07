@@ -41,6 +41,7 @@ describe("getRouteContext", () => {
       "/setup",
       "/signup",
       "/welcome",
+      "/github/approved",
     ];
     for (const path of publicPaths) {
       expect(getRouteContext(path)).toEqual({ organizationId: null, canvasId: null });

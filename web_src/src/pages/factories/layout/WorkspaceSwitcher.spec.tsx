@@ -10,7 +10,7 @@ import {
   FACTORIES_ORGANIZATION_ID,
   REFUND_FACTORY,
 } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath } from "../lib/factoryPagePaths";
+import { factoryHomePath, factorySettingsWorkspaceGeneralPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 function LocationProbe() {
@@ -68,6 +68,30 @@ describe("WorkspaceSwitcher", () => {
 
     expect(screen.getByTestId("location-path")).toHaveTextContent(
       factoryHomePath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!, ACME_ONBOARDING_LINE_ID),
+    );
+  });
+
+  it("keeps the current settings page in the other workspace", async () => {
+    const user = userEvent.setup();
+    renderSwitcher(factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, REFUND_FACTORY.key!));
+
+    await user.click(screen.getByTestId("factories-workspace-switch"));
+    await user.click(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY.id}`));
+
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      factorySettingsWorkspaceGeneralPath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!),
+    );
+  });
+
+  it("keeps Velocity in the other workspace", async () => {
+    const user = userEvent.setup();
+    renderSwitcher(factoryVelocityPath(FACTORIES_ORGANIZATION_ID, REFUND_FACTORY.key!));
+
+    await user.click(screen.getByTestId("factories-workspace-switch"));
+    await user.click(screen.getByTestId(`factories-workspace-option-${ACME_ONBOARDING_FACTORY.id}`));
+
+    expect(screen.getByTestId("location-path")).toHaveTextContent(
+      factoryVelocityPath(FACTORIES_ORGANIZATION_ID, ACME_ONBOARDING_FACTORY.key!),
     );
   });
 });

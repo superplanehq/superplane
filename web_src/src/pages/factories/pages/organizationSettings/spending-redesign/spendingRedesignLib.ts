@@ -87,12 +87,14 @@ export const EMPTY_SPENDING_FILTERS: SpendingFilters = {
   machineType: "",
 };
 
-export const SPENDING_PERIOD_OPTIONS: Array<{ value: SpendingPeriodPreset; label: string }> = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-  { value: "year", label: "Year" },
-  { value: "custom", label: "Custom" },
+export const SPENDING_PERIOD_PRESETS: Array<{
+  value: Exclude<SpendingPeriodPreset, "custom">;
+  label: string;
+}> = [
+  { value: "day", label: "Last 24 hours" },
+  { value: "week", label: "Last 7 days" },
+  { value: "month", label: "Last 30 days" },
+  { value: "year", label: "Last 12 months" },
 ];
 
 export const SPENDING_BREAKDOWN_OPTIONS: Array<{ value: SpendingBreakdown; label: string }> = [
@@ -125,6 +127,23 @@ export function rangeForPreset(preset: Exclude<SpendingPeriodPreset, "custom">, 
     return { start: new Date(now.getTime() - 30 * DAY_MS), end };
   }
   return { start: new Date(now.getTime() - 365 * DAY_MS), end };
+}
+
+/**
+ * Bucket size used to stabilize the "now" anchor for preset ranges.
+ *
+ * Rounding "now" down to the start of the current minute means quick
+ * remounts (switching settings tabs and back) resolve to the exact same
+ * range, so the spending report query cache is hit instead of starting a
+ * brand-new query on every mount. A stale-but-fresh-enough end time is a
+ * fine trade-off: `useOrganizationSpendingReport`'s `staleTime` still
+ * triggers a background refetch to catch up.
+ */
+const SPENDING_NOW_QUANTIZE_MS = 60 * 1000;
+
+export function quantizeSpendingNow(now: Date): Date {
+  const quantized = Math.floor(now.getTime() / SPENDING_NOW_QUANTIZE_MS) * SPENDING_NOW_QUANTIZE_MS;
+  return new Date(quantized);
 }
 
 export function rangeFromCustomDays(from: Date, to: Date): SpendingDateRange {
@@ -209,6 +228,14 @@ export function formatSpendingRangeCaption(range: SpendingDateRange): string {
     return startLabel;
   }
   return `${startLabel} – ${endLabel}`;
+}
+
+export function spendingPeriodTriggerLabel(period: SpendingPeriodPreset, range: SpendingDateRange): string {
+  const preset = SPENDING_PERIOD_PRESETS.find((option) => option.value === period);
+  if (preset) {
+    return preset.label;
+  }
+  return formatSpendingRangeCaption(range);
 }
 
 export function formatFilterTriggerLabel(allLabel: string, selectedLabel?: string): string {

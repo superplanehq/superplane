@@ -15,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/e2e/queries"
@@ -182,6 +183,12 @@ func (s *TestSession) setupUserAndOrganization() {
 		if err != nil {
 			s.t.Fatalf("create organization: %v", err)
 		}
+	}
+
+	// New orgs enable factories by default. Classic canvas and Apps home
+	// tests must stay on /:org/apps/:id. Factory tests turn the flag on.
+	if err := models.DisableExperimentalFeature(organization.ID, features.FeatureFactories); err != nil {
+		s.t.Fatalf("disable factories: %v", err)
 	}
 
 	user, err := models.FindMaybeDeletedUserByEmail(organization.ID.String(), email)

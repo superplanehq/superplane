@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -107,43 +108,14 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		assert.Contains(t, integration.BrowserAction.URL, "installations/new")
 	})
 
-	t.Run("one install binds the connection", func(t *testing.T) {
-		t.Cleanup(resetBindClientHooks)
-		listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
-			return []common.Repository{{ID: 1, Name: "repo", URL: "https://github.com/acme/repo"}}, nil
-		}
-		newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
-			return gh.NewClient(nil), nil
-		}
-
+	t.Run("one install writes allowlist and stays pending", func(t *testing.T) {
+		// A silent bind of the single installation would lock the connection
+		// to that account (often the user's personal one) with no way to
+		// install the App on an organization. The account picker must open.
 		integration := pendingHostedIntegration("csrf")
 		httpCtx := oauthHTTP(
 			jsonResponse(`{"access_token":"user-token"}`),
 			jsonResponse(`{"installations":[{"id":11,"account":{"login":"acme","type":"Organization"}}]}`),
-		)
-		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
-
-		g.afterHostedAppOAuth(ctx)
-
-		assert.Equal(t, http.StatusSeeOther, rec.Code)
-		assert.Equal(t, "ready", integration.State)
-		metadata := integration.Metadata.(common.Metadata)
-		assert.Equal(t, "11", metadata.InstallationID)
-		assert.Equal(t, "acme", metadata.Owner)
-		assert.Empty(t, metadata.State)
-		assert.Empty(t, metadata.PendingInstallations)
-		assert.Empty(t, integration.CurrentSecrets)
-		assertNoPlaintextSecrets(t, integration)
-	})
-
-	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
-		integration := pendingHostedIntegration("csrf")
-		httpCtx := oauthHTTP(
-			jsonResponse(`{"access_token":"user-token"}`),
-			jsonResponse(`{"installations":[
-				{"id":11,"account":{"login":"acme","type":"Organization"}},
-				{"id":22,"account":{"login":"octo","type":"User"}}
-			]}`),
 		)
 		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
 
@@ -155,13 +127,96 @@ func Test__afterHostedAppOAuth(t *testing.T) {
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Empty(t, metadata.InstallationID)
 		assert.Equal(t, "csrf", metadata.State)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+		assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
+		assert.Empty(t, integration.CurrentSecrets)
+		assertNoPlaintextSecrets(t, integration)
+	})
+
+	t.Run("many installs write allowlist and stay pending", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:           "csrf",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=1&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[
+				{"id":11,"account":{"login":"acme","type":"Organization"}},
+				{"id":22,"account":{"login":"octo","type":"User"}}
+			]}`),
+			jsonResponse(`{"login":"member"}`),
+		)
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(t, "https://app.example/onboarding?attempt=1&step=vcs", rec.Header().Get("Location"))
+		assert.NotEqual(t, "ready", integration.State)
+		assert.Nil(t, integration.BrowserAction)
+		metadata := integration.Metadata.(common.Metadata)
+		assert.Empty(t, metadata.InstallationID)
+		assert.Equal(t, "csrf", metadata.State)
+		assert.Equal(t, "/onboarding?attempt=1&step=vcs", metadata.SetupReturnPath)
+		assert.Equal(t, "member", metadata.StartedByGitHubLogin)
 		require.Len(t, metadata.PendingInstallations, 2)
 		assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
 		assert.Empty(t, integration.CurrentSecrets)
 		assertNoPlaintextSecrets(t, integration)
-		require.Len(t, httpCtx.Requests, 2)
+		require.Len(t, httpCtx.Requests, 3)
 		assert.Equal(t, "/user/installations", httpCtx.Requests[1].URL.Path)
 		assert.NotContains(t, httpCtx.Requests[1].URL.Path, "/app/installations")
+		assert.Equal(t, "/user", httpCtx.Requests[2].URL.Path)
+	})
+
+	t.Run("approved install request clears the waiting state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":11,"account":{"login":"Acme","type":"Organization"}}]}`),
+		)
+		ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		metadata := integration.Metadata.(common.Metadata)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.False(t, metadata.InstallRequested)
+		assert.Empty(t, metadata.InstallRequestedAccount)
+	})
+
+	t.Run("unapproved install request keeps the waiting state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.Metadata = common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		}
+		httpCtx := oauthHTTP(
+			jsonResponse(`{"access_token":"user-token"}`),
+			jsonResponse(`{"installations":[{"id":22,"account":{"login":"octo","type":"User"}}]}`),
+		)
+		ctx, _ := hostedRequestContext(integration, "/api/v1/github/app/oauth/callback?state=csrf&code=abc", httpCtx)
+
+		g.afterHostedAppOAuth(ctx)
+
+		metadata := integration.Metadata.(common.Metadata)
+		require.Len(t, metadata.PendingInstallations, 1)
+		assert.True(t, metadata.InstallRequested)
+		assert.Equal(t, "acme", metadata.InstallRequestedAccount)
 	})
 }
 
@@ -199,9 +254,10 @@ func Test__afterHostedAppBind(t *testing.T) {
 
 		integration := pendingHostedIntegration("csrf")
 		integration.Metadata = common.Metadata{
-			State:     "csrf",
-			HostedApp: true,
-			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			State:            "csrf",
+			HostedApp:        true,
+			InstallRequested: true,
+			GitHubApp:        common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
 			PendingInstallations: []common.PendingInstallation{
 				{ID: "11", AccountLogin: "acme"},
 			},
@@ -215,7 +271,90 @@ func Test__afterHostedAppBind(t *testing.T) {
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Equal(t, "11", metadata.InstallationID)
 		assert.Empty(t, metadata.PendingInstallations)
+		assert.False(t, metadata.InstallRequested)
 		assertNoPlaintextSecrets(t, integration)
+	})
+}
+
+func Test__afterAppInstallationLegacy_installRequest(t *testing.T) {
+	t.Run("accepts request without installation id", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request",
+			rec.Header().Get("Location"),
+		)
+		assert.Equal(t, "pending", integration.State)
+		assert.Empty(t, integration.Metadata.(common.Metadata).InstallationID)
+		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
+	})
+
+	t.Run("persists the requested GitHub organization", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		assert.Equal(
+			t,
+			"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubOrg=acme",
+			rec.Header().Get("Location"),
+		)
+		assert.Equal(t, "acme", integration.Metadata.(common.Metadata).InstallRequestedAccount)
+	})
+
+	t.Run("returns to the stored onboarding path instead of settings", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=csrf&setup_action=request&account=acme",
+			nil,
+		)
+		ctx.Request.AddCookie(&http.Cookie{
+			Name:  integrationSetupReturnCookie,
+			Value: "/org-1/workspaces/APP/setup?step=vcs&pick=newest",
+		})
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		location, err := url.Parse(rec.Header().Get("Location"))
+		require.NoError(t, err)
+		assert.Equal(t, "/org-1/workspaces/APP/setup", location.Path)
+		assert.Equal(t, "vcs", location.Query().Get("step"))
+		assert.Equal(t, "newest", location.Query().Get("pick"))
+		assert.Equal(t, "request", location.Query().Get("githubSetup"))
+		assert.Equal(t, "acme", location.Query().Get("githubOrg"))
+		assert.True(t, integration.Metadata.(common.Metadata).InstallRequested)
+	})
+
+	t.Run("rejects request with a mismatched state", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		ctx, rec := hostedRequestContext(
+			integration,
+			"/api/v1/github/app/setup?state=other&setup_action=request",
+			nil,
+		)
+
+		(&GitHub{}).afterAppInstallationLegacy(ctx)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Equal(t, "pending", integration.State)
+		assert.False(t, integration.Metadata.(common.Metadata).InstallRequested)
 	})
 }
 
@@ -327,6 +466,7 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 			State:           "csrf-keep",
 			HostedApp:       true,
 			StartedByUserID: "starter-user",
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
 			PendingInstallations: []common.PendingInstallation{
 				{ID: "11", AccountLogin: "acme"},
 				{ID: "22", AccountLogin: "octo"},
@@ -339,14 +479,289 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 		OrganizationID: "11111111-1111-1111-1111-111111111111",
 		ActorUserID:    "other-user",
 		BaseURL:        "https://app.example",
+		Configuration:  Configuration{SetupReturnPath: "/onboarding?attempt=new&step=vcs"},
 		Integration:    integrationCtx,
 	}))
 
 	metadata := integrationCtx.Metadata.(common.Metadata)
 	assert.Equal(t, "csrf-keep", metadata.State)
 	assert.Equal(t, "starter-user", metadata.StartedByUserID)
+	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 2)
 	assert.Nil(t, integrationCtx.BrowserAction)
+}
+
+func Test__Sync_hostedAppOffersApprovedInstallInPicker(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (common.PendingInstallation, bool, error) {
+		if account == "acme" {
+			return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
+		}
+		return common.PendingInstallation{}, false, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "22", AccountLogin: "octo", AccountType: "User"},
+			},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	// A silent bind must not happen: the approved installation joins the
+	// picker and the member still picks the account.
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallationID)
+	assert.Equal(t, "csrf", metadata.State)
+	assert.False(t, metadata.InstallRequested)
+	assert.Empty(t, metadata.InstallRequestedAccount)
+	require.Len(t, metadata.PendingInstallations, 2)
+	assert.Equal(t, "11", metadata.PendingInstallations[1].ID)
+	assert.Equal(t, "acme", metadata.PendingInstallations[1].AccountLogin)
+}
+
+func Test__Sync_hostedAppDoesNotDuplicatePickerEntry(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme", AccountType: "Organization"},
+			},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.False(t, metadata.InstallRequested)
+}
+
+func Test__Sync_hostedAppFindsRequestedAccountOnGitHub(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	// GitHub's request callback does not name the requested account, so the
+	// connection stored only the requester's login. Sync finds the open
+	// install request on GitHub and records the account.
+	listAppInstallationRequests = func(_ context.Context, _ *gh.Client, requesterLogin string) (string, error) {
+		if requesterLogin == "member" {
+			return "acme", nil
+		}
+		return "", nil
+	}
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{}, false, nil // The request is still waiting for an approval.
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			InstallRequested:     true,
+			StartedByGitHubLogin: "member",
+			GitHubApp:            common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Equal(t, "acme", metadata.InstallRequestedAccount)
+	assert.True(t, metadata.InstallRequested)
+}
+
+func Test__Sync_hostedAppOffersRequestWithoutStoredAccountInPicker(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallationRequests = func(_ context.Context, _ *gh.Client, requesterLogin string) (string, error) {
+		if requesterLogin == "member" {
+			return "acme", nil
+		}
+		return "", nil
+	}
+	listAppInstallations = func(_ context.Context, _ *gh.Client, account string) (common.PendingInstallation, bool, error) {
+		if account == "acme" {
+			return common.PendingInstallation{ID: "11", AccountLogin: "acme", AccountType: "Organization"}, true, nil
+		}
+		return common.PendingInstallation{}, false, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                "csrf",
+			HostedApp:            true,
+			InstallRequested:     true,
+			StartedByGitHubLogin: "member",
+			GitHubApp:            common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallationID)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Equal(t, "11", metadata.PendingInstallations[0].ID)
+	assert.Equal(t, "acme", metadata.PendingInstallations[0].AccountLogin)
+	assert.False(t, metadata.InstallRequested)
+}
+
+func Test__Sync_hostedAppKeepsWaitingWhenRequestNotApproved(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+	t.Cleanup(resetBindClientHooks)
+
+	listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+		return common.PendingInstallation{}, false, nil
+	}
+	newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+		return gh.NewClient(nil), nil
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		State: "pending",
+		Metadata: common.Metadata{
+			State:                   "csrf",
+			HostedApp:               true,
+			InstallRequested:        true,
+			InstallRequestedAccount: "acme",
+			GitHubApp:               common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Logger:         logrus.NewEntry(logrus.New()),
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.NotEqual(t, "ready", integrationCtx.State)
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Empty(t, metadata.InstallationID)
+	assert.True(t, metadata.InstallRequested)
+	assert.Equal(t, "csrf", metadata.State)
+}
+
+func Test__Sync_hostedAppKeepsSinglePendingInstallation(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:     "csrf-keep",
+			HostedApp: true,
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme"},
+			},
+			GitHubApp: common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	metadata := integrationCtx.Metadata.(common.Metadata)
+	assert.Equal(t, "csrf-keep", metadata.State)
+	require.Len(t, metadata.PendingInstallations, 1)
+	assert.Nil(t, integrationCtx.BrowserAction)
+}
+
+func Test__Sync_hostedAppKeepsSetupReturnPathWhenConfigOmitsIt(t *testing.T) {
+	setHostedAppOAuthEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
+
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: common.Metadata{
+			State:           "csrf-keep",
+			HostedApp:       true,
+			SetupReturnPath: "/onboarding?attempt=old&step=vcs",
+			GitHubApp:       common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+		},
+	}
+
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		BaseURL:        "https://app.example",
+		Integration:    integrationCtx,
+	}))
+
+	assert.Equal(t, "/onboarding?attempt=old&step=vcs", integrationCtx.Metadata.(common.Metadata).SetupReturnPath)
 }
 
 func Test__afterAppInstallationLegacy_afterZeroInstallOAuth(t *testing.T) {
@@ -430,6 +845,8 @@ func resetBindClientHooks() {
 	newInstallationClient = newClientForAppInstallation
 	newAppJWTClient = newClientForApp
 	listInstallationRepos = listInstallationRepositories
+	listAppInstallations = listAppInstallationsFromGitHub
+	listAppInstallationRequests = listAppInstallationRequestsFromGitHub
 }
 
 func assertNoPlaintextSecrets(t *testing.T, integration *contexts.IntegrationContext) {

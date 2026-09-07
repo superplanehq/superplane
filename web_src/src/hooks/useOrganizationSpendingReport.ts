@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { organizationsDescribeOrganizationSpendingReport } from "@/api-client";
 import type { OrganizationsDescribeOrganizationSpendingReportResponse } from "@/api-client";
@@ -59,5 +59,17 @@ export function useOrganizationSpendingReport(query: OrganizationSpendingReportQ
     },
     enabled: enabled && Boolean(organizationId),
     staleTime: 30 * 1000,
+    // Keep the previously loaded report visible while a new range, filter, or
+    // grouping is fetching. Without this, the query key reset reports
+    // isLoading again and the page swaps every panel for a loading message.
+    //
+    // This only helps while the hook stays mounted (changing a filter,
+    // range, or breakdown on an already-rendered page). Remounting the page
+    // (for example, switching settings tabs and back) creates a brand-new
+    // observer with no "previous" data to keep, so callers that build
+    // `range` from the current time should stabilize it (see
+    // `quantizeSpendingNow`) so a remount can still resolve to the exact
+    // same query key and hit the cache instead.
+    placeholderData: keepPreviousData,
   });
 }

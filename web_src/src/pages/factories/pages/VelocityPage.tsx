@@ -18,7 +18,7 @@ import {
 } from "../lib/factoryVelocityReport";
 import { factoryCenteredSectionBodyClassName, factoryCenteredSectionHeaderClassName } from "./factoryPageLayoutStyles";
 import { VelocityAutomationsTable } from "./VelocityAutomationsTable";
-import { CostCard, DeliveryCard, SummaryCard, TaskTimeCard } from "./velocityCards";
+import { CostCard, DeliveryCard, SummaryCard, TaskCostCard, TaskTimeCard } from "./velocityCards";
 import { VelocityPeopleTable } from "./VelocityPeopleTable";
 import { VelocityZeroState } from "./VelocityZeroState";
 import { useVelocityPageModel, type VelocityPageModel } from "./useVelocityPageModel";
@@ -125,10 +125,9 @@ function VelocityReportView({
           periodLabel={model.periodLabel}
         />
       ) : null}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <TaskTimeCard flow={flow} emptyLabel={taskTimeEmptyLabel(model)} />
-        <CostCard totals={report.totals} points={report.points} />
-      </div>
+      <TaskTimeCard flow={flow} emptyLabel={taskTimeEmptyLabel(model)} />
+      <CostCard totals={report.totals} points={report.points} />
+      <TaskCostCard points={report.points} />
     </>
   );
 }

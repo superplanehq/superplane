@@ -1,13 +1,23 @@
 import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
-import { hasIntegrationSetupStay, peekIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import {
+  hasIntegrationSetupStay,
+  peekIntegrationSetupReturn,
+  withGitHubSetupRequest,
+} from "@/lib/integrationSetupReturn";
 
 interface IntegrationSetupReturnProps {
   organizationId: string;
   children: ReactNode;
+}
+
+function isLegacySettingsIntegrationsPath(pathname: string): boolean {
+  return pathname.includes("/settings/integrations/");
 }
 
 /**
@@ -22,12 +32,21 @@ interface IntegrationSetupReturnProps {
  */
 export function IntegrationSetupReturn({ organizationId, children }: IntegrationSetupReturnProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const stayOnPage = hasIntegrationSetupStay(searchParams.toString());
+  const { has, isLoading: featuresLoading } = useExperimentalFeature(organizationId);
   // Peek on each render because provider callbacks use the organization UID.
   // OrganizationScope later replaces that UID with the slug that keys storage.
   // The destination page deletes the marker after navigation.
-  const returnTo = peekIntegrationSetupReturn(organizationId);
+  const storedReturn = peekIntegrationSetupReturn(organizationId);
+  const factoriesOnboardingFallback =
+    !featuresLoading && has(FEATURE_FACTORIES) && !storedReturn && isLegacySettingsIntegrationsPath(location.pathname);
+  const returnTo = storedReturn
+    ? withGitHubSetupRequest(storedReturn, searchParams.toString())
+    : factoriesOnboardingFallback
+      ? withGitHubSetupRequest("/onboarding", searchParams.toString())
+      : null;
 
   useEffect(() => {
     if (!returnTo || stayOnPage) return;

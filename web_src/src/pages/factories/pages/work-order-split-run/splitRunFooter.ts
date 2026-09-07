@@ -2,13 +2,14 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
 export type SplitRunFooterTone = SplitRunFooterKind;
 
-export type SplitRunFooterActionKind = "start" | "reject" | "approve" | "rerun" | "reopen" | "back-to-draft";
+export type SplitRunFooterActionKind = "start" | "reject" | "refine" | "approve" | "rerun" | "reopen" | "back-to-draft";
 
 export type SplitRunStopChoice = "canceled" | "completed" | "rerun-step" | "rerun-start" | "reopen";
 
@@ -120,7 +121,8 @@ export interface SplitRunFooterAction {
   kind: SplitRunFooterActionKind;
   label: string;
   emphasis: "primary" | "quiet";
-  icon?: "undo-2";
+  icon?: "undo-2" | "sparkles";
+  tooltip?: string;
 }
 
 export interface SplitRunFooterNote {
@@ -145,6 +147,14 @@ export interface SplitRunFooter {
 }
 
 const REJECT: SplitRunFooterAction = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const REFINE: SplitRunFooterAction = {
+  id: "refine",
+  kind: "refine",
+  label: CREATE_WITH_AGENT_COPY.refine,
+  emphasis: "quiet",
+  icon: "sparkles",
+  tooltip: CREATE_WITH_AGENT_COPY.refineTooltip,
+};
 const APPROVE: SplitRunFooterAction = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
 const RERUN: SplitRunFooterAction = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
 const START: SplitRunFooterAction = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
@@ -260,8 +270,8 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
- * Draft keeps Reject and Start. Closed failed keeps Reopen. Completed
- * and rejected explain the result only.
+ * Draft keeps Refine, Reject, and Start. Closed failed keeps Reopen.
+ * Completed and rejected explain the result only.
  */
 type FooterInput = {
   kind: SplitRunFooterKind;
@@ -295,7 +305,7 @@ function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Spl
     sentence: "This task is a draft.",
     note,
     attentionCard: true,
-    actions: [REJECT, START],
+    actions: [REFINE, REJECT, START],
   });
 }
 

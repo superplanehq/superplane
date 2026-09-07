@@ -112,6 +112,16 @@ func validateFactoryOnboardingResources(
 		if !offered {
 			return models.ErrFactoryOnboardingHostedAgentUnavailable
 		}
+		defaultModel, modelErr := models.GetInstallationDefaultHostedLLMModel(db)
+		if modelErr != nil {
+			return modelErr
+		}
+		if !defaultModel.IsSet() {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
+		if err := models.AssertDefaultHostedLLMModelAllowed(db, defaultModel); err != nil {
+			return models.ErrFactoryOnboardingHostedAgentUnavailable
+		}
 	}
 
 	if config.ProvisionedAppID != "" {
@@ -224,6 +234,8 @@ func factoryOnboardingAgentHarnessFromProto(harness pb.FactoryOnboarding_AgentHa
 		return models.FactoryOnboardingAgentHarnessCursor, nil
 	case pb.FactoryOnboarding_AGENT_HARNESS_CODEX:
 		return models.FactoryOnboardingAgentHarnessCodex, nil
+	case pb.FactoryOnboarding_AGENT_HARNESS_SUPERPLANE:
+		return models.FactoryOnboardingAgentHarnessSuperPlane, nil
 	default:
 		return "", invalidArgument("invalid agent harness")
 	}

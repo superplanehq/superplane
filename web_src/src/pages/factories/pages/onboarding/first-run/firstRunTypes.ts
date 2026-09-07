@@ -5,9 +5,10 @@ export type FirstRunChrome = {
   displayName?: string;
   onLogOut?: () => void;
   /**
-   * Set when the organization already has another workspace. The shell shows
-   * a close (X) control instead of "Log out", and it cancels setup rather
-   * than signing the user out. Mutually exclusive with `onLogOut`.
+   * Set when the user has somewhere to go on cancel: another workspace in
+   * this organization, or another organization entirely. The shell shows a
+   * close (X) control instead of "Log out", and it cancels setup rather than
+   * signing the user out. Mutually exclusive with `onLogOut`.
    */
   onCancel?: () => void;
   stepIndex: number;

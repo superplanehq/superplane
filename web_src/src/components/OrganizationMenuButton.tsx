@@ -34,6 +34,7 @@ import { posthog } from "@/posthog";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
 
 interface OrganizationMenuButtonProps {
   organizationId?: string;
@@ -91,7 +92,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
 
   const organizationName = organization?.metadata?.name || "Organization";
   const usageEnabled = usageStatus?.enabled === true || !!usageError || isUsagePageForced();
-  const logoHref = organizationId ? `/${organizationId}` : "/";
+  const logoHref = !organizationId ? "/" : factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
 
   const sidebarUserLinks = [
     ...(organizationId

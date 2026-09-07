@@ -180,7 +180,7 @@ export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
   const isProduction = modelReportProp !== undefined && machineReportProp !== undefined;
   const [periodState, setPeriodState] = useState(initialPeriod);
   const [customRangeState, setCustomRangeState] = useState(initialCustomRange);
-  const [customOpenState, setCustomOpenState] = useState(initialPeriod === "custom");
+  const [customOpenState, setCustomOpenState] = useState(false);
   const [modelFiltersState, setModelFiltersState] = useState(initialModelFilters);
   const [machineFiltersState, setMachineFiltersState] = useState(initialMachineFilters);
   const [modelBreakdownState, setModelBreakdownState] = useState(initialModelBreakdown);

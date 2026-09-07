@@ -20,6 +20,7 @@ export function useOnboardingGithubConnections(args: {
   integrationData: IntegrationInstanceSummary[];
   openSection: WizardStepId;
   selectNewest: boolean;
+  selectSingleInitial: boolean;
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
   onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
@@ -30,6 +31,7 @@ export function useOnboardingGithubConnections(args: {
   useSelectNewGithubConnection({
     openSection: args.openSection,
     selectNewest: args.selectNewest,
+    selectSingleInitial: args.selectSingleInitial,
     readyInstances: githubConnections.readyInstances,
     selections: args.selections,
     selectInstance: args.selectInstance,
@@ -52,22 +54,33 @@ function newestReadyInstance(instances: OrganizationsIntegration[]): Organizatio
  * reports the selection so the wizard can continue.
  *
  * The round trip reloads the page, so the in-memory "just connected" hint is
- * gone. Only runs when the return URL asks for it (`pick=newest`), and at most
+ * gone. Runs when the return URL asks for it (`pick=newest`), and at most
  * once, so the user can still choose a different connection afterwards.
+ *
+ * Initial account onboarding also runs it for a single ready connection
+ * without the URL hint (`selectSingleInitial`). An install request approved
+ * later binds the connection outside the wizard round trip, so the return URL
+ * hint is gone when the user comes back. The selection callback saves the
+ * connection and names the organization after the GitHub account, so it must
+ * still run on that visit.
  */
 function useSelectNewGithubConnection(args: {
   openSection: WizardStepId;
   selectNewest: boolean;
+  selectSingleInitial: boolean;
   readyInstances: IntegrationInstanceSummary["readyInstances"];
   selections: IntegrationSelections;
   selectInstance: (integrationName: string, integrationId: string) => void;
   onConnectionSelected: (integration: OrganizationsIntegration) => void | Promise<void>;
 }) {
   const selectedNewConnection = useRef(false);
-  const { openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected } = args;
+  const { openSection, selectNewest, selectSingleInitial, readyInstances, selections, selectInstance } = args;
+  const { onConnectionSelected } = args;
 
   useEffect(() => {
-    if (selectedNewConnection.current || !selectNewest || openSection !== "vcs") return;
+    if (selectedNewConnection.current || openSection !== "vcs") return;
+    const selectSingle = selectSingleInitial && readyInstances.length === 1;
+    if (!selectNewest && !selectSingle) return;
     if (readyInstances.length === 0) return;
 
     const newest = newestReadyInstance(readyInstances);
@@ -77,5 +90,13 @@ function useSelectNewGithubConnection(args: {
     selectedNewConnection.current = true;
     if (selections.github?.id !== id) selectInstance("github", id);
     void onConnectionSelected(newest);
-  }, [openSection, selectNewest, readyInstances, selections, selectInstance, onConnectionSelected]);
+  }, [
+    openSection,
+    selectNewest,
+    selectSingleInitial,
+    readyInstances,
+    selections,
+    selectInstance,
+    onConnectionSelected,
+  ]);
 }

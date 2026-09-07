@@ -308,6 +308,14 @@ type UsageByMachineType struct {
 	CostMicros      int64
 }
 
+// UsageSplit is the ledger of one subject, divided by what the spend paid for.
+type UsageSplit struct {
+	// Model is spend on model tokens.
+	Model UsageTotals
+	// Compute is spend on runner machine time.
+	Compute UsageTotals
+}
+
 func (t UsageTotals) CostCents() int64 {
 	return pricebook.MicrosToCents(t.CostMicros)
 }
@@ -329,8 +337,21 @@ func (r UsageByMachineType) CostCents() int64 {
 	return pricebook.MicrosToCents(r.CostMicros)
 }
 
+// Total is the whole ledger of the subject, both bands together.
+func (s UsageSplit) Total() UsageTotals {
+	return s.Model.Add(s.Compute)
+}
+
 type usageSumRow struct {
 	ID              uuid.UUID
+	TotalTokens     int64
+	DurationSeconds int64
+	CostMicros      int64
+}
+
+type usageKindSumRow struct {
+	ID              uuid.UUID
+	UsageKind       string
 	TotalTokens     int64
 	DurationSeconds int64
 	CostMicros      int64
@@ -367,6 +388,45 @@ func SumUsageForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID
 		return nil, err
 	}
 	return scanUsageSums(rows), nil
+}
+
+// SumUsageForWorkOrdersByKind returns ledger totals keyed by work order, with
+// model spend and compute spend reported apart. Missing IDs are absent from
+// the map (zero value).
+//
+// Anything that is not compute counts as model spend, so the two bands always
+// add up to what the work order cost.
+func SumUsageForWorkOrdersByKind(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]UsageSplit, error) {
+	if len(workOrderIDs) == 0 {
+		return map[uuid.UUID]UsageSplit{}, nil
+	}
+
+	var rows []usageKindSumRow
+	err := tx.Model(&WorkspaceUsageEvent{}).
+		Select("work_order_id AS id, usage_kind, "+usageSumSelect).
+		Where("work_order_id IN ?", workOrderIDs).
+		Group("work_order_id, usage_kind").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[uuid.UUID]UsageSplit, len(rows))
+	for _, row := range rows {
+		totals := UsageTotals{
+			TotalTokens:     row.TotalTokens,
+			DurationSeconds: row.DurationSeconds,
+			CostMicros:      row.CostMicros,
+		}
+		split := result[row.ID]
+		if row.UsageKind == UsageKindCompute {
+			split.Compute = split.Compute.Add(totals)
+		} else {
+			split.Model = split.Model.Add(totals)
+		}
+		result[row.ID] = split
+	}
+	return result, nil
 }
 
 // SumUsageForRunTrees returns ledger totals for each root run, including

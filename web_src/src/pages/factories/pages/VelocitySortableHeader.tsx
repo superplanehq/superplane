@@ -27,12 +27,11 @@ export function VelocitySortableHeader({
   const Icon = isActive && direction === "asc" ? ArrowUp : ArrowDown;
 
   return (
-    <th scope="col" className="pb-2 pl-6 text-right text-[12px] font-normal">
+    <th scope="col" aria-sort={ariaSort} className="pb-2 pl-6 text-right text-[12px] font-normal">
       <button
         type="button"
         onClick={onSort}
         title={hint}
-        aria-sort={ariaSort}
         className={cn(
           "inline-flex items-center gap-1 transition-colors hover:text-foreground",
           isActive ? "text-foreground" : "text-muted-foreground",

@@ -41,6 +41,8 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { factoryListPath } from "@/pages/factories/lib/factoryPagePaths";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
@@ -71,6 +73,8 @@ export function OrganizationSettings() {
     matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
   );
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const factoriesEnabled = hasExperimentalFeature(FEATURE_FACTORIES);
   const canReadOrg = permissionsLoading || canAct("org", "read");
 
   // Use React Query hook for organization data
@@ -152,14 +156,19 @@ export function OrganizationSettings() {
   const usageEnabled =
     usageStatus?.enabled === true || !!usageError || currentSection === "billing" || isUsagePageForced();
 
+  const homeHref = factoriesEnabled ? factoryListPath(organizationId) : `/${organizationId}`;
   const organizationLinks: NavLink[] = [
-    {
-      id: "canvases",
-      label: "Apps",
-      href: `/${organizationId}`,
-      Icon: Home,
-      permission: { resource: "canvases", action: "read" },
-    },
+    ...(factoriesEnabled
+      ? []
+      : [
+          {
+            id: "canvases",
+            label: "Apps",
+            href: `/${organizationId}`,
+            Icon: Home,
+            permission: { resource: "canvases", action: "read" },
+          },
+        ]),
     {
       id: "general",
       label: "Settings",
@@ -306,7 +315,11 @@ export function OrganizationSettings() {
       <Sidebar className={cn("w-60 border-r bg-white", appDarkModeClasses.sidebarEdge, appDarkModeClasses.surface)}>
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
-            <Link to={`/${organizationId}`} className="block h-7 w-7" aria-label="Go to Apps">
+            <Link
+              to={homeHref}
+              className="block h-7 w-7"
+              aria-label={factoriesEnabled ? "Go to Workspaces" : "Go to Apps"}
+            >
               <img
                 src={SuperplaneLogo}
                 alt="SuperPlane"

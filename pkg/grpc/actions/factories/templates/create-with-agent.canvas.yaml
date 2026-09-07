@@ -60,7 +60,13 @@ spec:
               When the user starts a refine, read the current task. Tell them you are ready. Ask what they want to change. Do not call propose_draft until they say what to change.
               Do not call wait_for_user. SuperPlane waits after you stop.
 
-              Greet the user in plain text. Then stop.
+              Refine key: {{ root().data.planning_session.refine_key }}
+              Refine title: {{ root().data.planning_session.refine_title }}
+              Refine description: {{ root().data.planning_session.refine_description }}
+
+              If the refine key is not empty, you already have that draft task. Tell the user you have this task and you are ready to refine it. Ask what they want to change. Do not explore the repository unless you need to understand a requested change. Do not call propose_draft until they say what to change. Then stop.
+
+              If the refine key is empty, greet the user in plain text. Then stop.
       position:
         x: 720
         'y': 880

@@ -15,6 +15,7 @@ export { WorkspaceOverviewPage } from "./onboarding/WorkspaceOverviewPage";
 export { VelocityPage } from "./VelocityPage";
 export { WikiPage } from "./WikiPage";
 export { LegacyWorkOrderDetailRedirect, WorkOrderDetailPage } from "./WorkOrderDetailPage";
+export { LegacyWorkOrderPermalinkRedirect, LegacyWorkOrdersRedirect } from "./LegacyWorkOrderRouteRedirects";
 export { WorkOrdersPage } from "./WorkOrdersPage";
 export { FactorySettingsLayout } from "./settings/FactorySettingsLayout";
 export { FactorySettingsAutomationsPage } from "./settings/FactorySettingsAutomationsPage";

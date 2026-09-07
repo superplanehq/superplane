@@ -327,6 +327,48 @@ func Test__SumUsageForWorkOrders__SumsLedgerByWorkOrder(t *testing.T) {
 	assert.Equal(t, int64(300), sums[order.ID].CostCents())
 }
 
+func Test__SumUsageForWorkOrdersByKind__ReportsModelAndComputeApart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, order := createFactoryOrder(t, r)
+	run := startFactoryCanvasRun(t, r, factory.ID, map[string]any{
+		"type": "workOrder.created",
+		"data": map[string]any{
+			"workOrder": map[string]any{"id": order.ID.String()},
+		},
+	})
+	require.NoError(t, models.RecordUsage(db, sonnetUsage(t, r, run.ID)))
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 900,
+		IdempotencyKey:  "runner:compute:" + run.ID.String(),
+	}))
+
+	sums, err := models.SumUsageForWorkOrdersByKind(db, []uuid.UUID{order.ID})
+	require.NoError(t, err)
+
+	split := sums[order.ID]
+	assert.Equal(t, int64(1_000_000), split.Model.TotalTokens)
+	assert.Equal(t, int64(300), split.Model.CostCents())
+	assert.Zero(t, split.Model.DurationSeconds)
+	assert.Equal(t, int64(900), split.Compute.DurationSeconds)
+	assert.Positive(t, split.Compute.CostMicros, "runner time is charged")
+	assert.Equal(t, split.Model.CostMicros+split.Compute.CostMicros, split.Total().CostMicros)
+}
+
+func Test__SumUsageForWorkOrdersByKind__ReportsNothingForNoOrders(t *testing.T) {
+	support.Setup(t)
+
+	sums, err := models.SumUsageForWorkOrdersByKind(database.DB(t.Context()), nil)
+	require.NoError(t, err)
+	assert.Empty(t, sums)
+}
+
 func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

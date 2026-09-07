@@ -10,8 +10,8 @@ import {
 } from "@/ui/dropdownMenu";
 import { cn } from "@/lib/utils";
 import { Check, Plus, Triangle } from "lucide-react";
-import { useNavigate } from "react-router";
-import { factoryHomePath, firstFactoryLineId } from "../lib/factoryPagePaths";
+import { useLocation, useNavigate } from "react-router";
+import { pathAfterWorkspaceSwitch } from "../lib/factoryPagePaths";
 import { factoriesRailControlClassName, initialsForName } from "./factoriesRail";
 
 interface WorkspaceSwitcherProps {
@@ -32,7 +32,9 @@ export function WorkspaceSwitcher({
   onCreateFactory,
 }: WorkspaceSwitcherProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const workspaceName = factory.name?.trim() || "Workspace";
+  const currentFactoryKey = factory.key;
 
   return (
     <div className="flex flex-col items-center gap-1 px-1.5 pt-3 pb-1" data-testid="factories-workspace-switcher">
@@ -55,14 +57,21 @@ export function WorkspaceSwitcher({
           <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
           {factories.map((entry) => {
             const isCurrent = entry.id === factory.id;
-            const targetHref = entry.key ? factoryHomePath(organizationId, entry.key, firstFactoryLineId(entry)) : "";
             return (
               <DropdownMenuItem
                 key={entry.id}
                 onClick={() => {
-                  if (!isCurrent && targetHref) {
-                    navigate(targetHref);
+                  if (isCurrent || !entry.key || !currentFactoryKey) {
+                    return;
                   }
+                  navigate(
+                    pathAfterWorkspaceSwitch({
+                      pathname,
+                      organizationId,
+                      currentFactoryKey,
+                      nextFactory: entry,
+                    }),
+                  );
                 }}
                 data-testid={`factories-workspace-option-${entry.id}`}
               >

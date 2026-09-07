@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
+import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
 import { SPLIT_RUN_RUNNING } from "./splitRunMocks";
 import {
   fixtureForSplitRunPage,
@@ -71,25 +71,43 @@ describe("fixtureForSplitRunPage", () => {
   });
 
   it("appends PR feedback runs from the live overlay", () => {
-    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
-      {
-        canvasId: "canvas-fb",
-        pullRequestNumber: "12",
-        run: {
-          id: "run-fb",
+    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, {
+      prFeedbackRuns: [
+        {
           canvasId: "canvas-fb",
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          createdAt: "2026-08-26T11:00:00Z",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-fb",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
         },
-      },
-    ]);
+      ],
+    });
 
     expect(fixture?.phases.some((phase) => phase.id === "pr-feedback-run-fb")).toBe(true);
     expect(fixture?.phases.find((phase) => phase.id === "pr-feedback-run-fb")).toMatchObject({
       appId: "canvas-fb",
       runId: "run-fb",
     });
+  });
+
+  it("resolves the source person's avatar through resolveUser", () => {
+    const resolveUser = (userId: string | undefined, name?: string) =>
+      userId
+        ? { id: userId, name: name ?? "Member", initials: "M", avatarUrl: "https://example.com/avatar.jpg" }
+        : null;
+
+    const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, { resolveUser });
+
+    expect(fixture?.source).toEqual(
+      expect.objectContaining({
+        kind: "manual",
+        person: expect.objectContaining({ avatarUrl: "https://example.com/avatar.jpg" }),
+      }),
+    );
   });
 });
 
@@ -103,19 +121,21 @@ describe("phaseForSplitRunCanvas", () => {
   });
 
   it("picks the phase whose run id matches the URL", () => {
-    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, [
-      {
-        canvasId: "canvas-fb",
-        pullRequestNumber: "12",
-        run: {
-          id: "run-fb",
+    const fixture = fixtureForSplitRunPage(RUNNING_WORK_ORDER, [], null, {
+      prFeedbackRuns: [
+        {
           canvasId: "canvas-fb",
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          createdAt: "2026-08-26T11:00:00Z",
+          pullRequestNumber: "12",
+          run: {
+            id: "run-fb",
+            canvasId: "canvas-fb",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-26T11:00:00Z",
+          },
         },
-      },
-    ]);
+      ],
+    });
     expect(phaseForSplitRunCanvas(fixture, "implementation", "run-fb").id).toBe("pr-feedback-run-fb");
   });
 

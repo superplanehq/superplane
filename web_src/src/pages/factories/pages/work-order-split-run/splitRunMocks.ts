@@ -6,7 +6,12 @@ import type {
   FactoriesWorkOrderCheck,
   FactoriesWorkOrderExecution,
 } from "@/api-client";
-import { UNKNOWN_ORG_USER_NAME, getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+import {
+  UNKNOWN_ORG_USER_NAME,
+  getUserInitials,
+  type OrgUserDisplay,
+  type OrgUserDisplayLookup,
+} from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 import { latestDispatchForLine } from "../../lib/workOrderNumberResolution";
 import { clockLabel, providerForName } from "./splitRunFormat";
@@ -170,9 +175,15 @@ const UNKNOWN_OWNER: OrgUserDisplay = {
   initials: getUserInitials(UNKNOWN_ORG_USER_NAME) || "U",
 };
 
-function splitRunOwnerDisplay(order: FactoriesWorkOrder): OrgUserDisplay {
+function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {
   const assignee = order.assignees?.[0];
   if (assignee?.id) {
+    // `resolveUser` looks the owner up against the org members list, which
+    // carries the avatar image. Without it we can only show initials.
+    const resolved = resolveUser?.(assignee.id, assignee.name);
+    if (resolved) {
+      return resolved;
+    }
     const name = assignee.name?.trim() || UNKNOWN_OWNER.name;
     return {
       id: assignee.id,
@@ -180,7 +191,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder): OrgUserDisplay {
       initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
     };
   }
-  return workOrderOwnerDisplay(order, UNKNOWN_OWNER);
+  return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);
 }
 
 function failedFooterNote(current: FactoriesWorkOrderExecution | undefined): WorkOrderStatusNotePresentation {
@@ -318,6 +329,8 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /** Looks up an org member's display (name, initials, avatar) by id. */
+  resolveUser?: OrgUserDisplayLookup;
 };
 
 export function splitRunFixtureForWorkOrder(
@@ -340,7 +353,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
   const fixture: SplitRunFixture = {
     title: order.title ?? "Task",
     descriptionText: order.description ?? "",
-    owner: splitRunOwnerDisplay(order),
+    owner: splitRunOwnerDisplay(order, options?.resolveUser),
     assigneeIds: (order.assignees ?? []).map((assignee) => assignee.id).filter((id): id is string => Boolean(id)),
     elapsed: elapsedForDisplay(displayStatus, order),
     startedLabel: startedLabelForOrder(order),
@@ -355,7 +368,7 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
     currentPhaseId: activeAutomationId ?? (current ? phaseIdForExecution(current, executions) : (phases[0]?.id ?? "")),
     openPhaseId: activeAutomationId,
     phases,
-    source: splitRunSourceForOrder(order),
+    source: splitRunSourceForOrder(order, options?.resolveUser),
     ...reviewSurfaces(order, displayStatus, {
       lineId: options?.lineId,
       phases,
