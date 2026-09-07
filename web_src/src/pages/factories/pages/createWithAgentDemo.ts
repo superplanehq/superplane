@@ -42,6 +42,7 @@ export function emptyCreateWithAgentView(repository = CREATE_WITH_AGENT_DEMO_REP
     right: { kind: "empty" },
     endConfirmOpen: false,
     selectableModelKey: "hosted::anthropic::claude-sonnet-4-6",
+    refining: false,
   };
 }
 

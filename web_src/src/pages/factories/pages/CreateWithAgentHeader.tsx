@@ -21,6 +21,7 @@ export type CreateWithAgentHeaderProps = {
   repository: string;
   machineStatus: CreateWithAgentView["machineStatus"];
   selectableModelKey: string;
+  refining: boolean;
   onEndSession: () => void;
   onSelectModel?: (key: string) => void;
   modelPickerOpen?: boolean;
@@ -60,6 +61,7 @@ function CreateWithAgentHeaderView({
   repository,
   machineStatus,
   selectableModelKey,
+  refining,
   onEndSession,
   onSelectModel,
   modelPickerOpen,
@@ -86,9 +88,13 @@ function CreateWithAgentHeaderView({
         <span className="truncate text-foreground">{workspaceName}</span>
         <span aria-hidden>/</span>
         <DialogTitle className="truncate text-[13px] font-medium text-foreground">
-          {CREATE_WITH_AGENT_COPY.title}
+          {refining ? CREATE_WITH_AGENT_COPY.titleRefine : CREATE_WITH_AGENT_COPY.title}
         </DialogTitle>
-        <DialogDescription className="sr-only">Create tasks with an agent in this workspace.</DialogDescription>
+        <DialogDescription className="sr-only">
+          {refining
+            ? "Refine this task with an agent in this workspace."
+            : "Create tasks with an agent in this workspace."}
+        </DialogDescription>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <CreateWithAgentModelPicker

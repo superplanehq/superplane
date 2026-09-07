@@ -54,4 +54,5 @@ export type CreateWithAgentView = {
   right: CreateWithAgentRightPane;
   endConfirmOpen: boolean;
   selectableModelKey: string;
+  refining: boolean;
 };

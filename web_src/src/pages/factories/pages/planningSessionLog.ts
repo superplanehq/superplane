@@ -217,7 +217,8 @@ function isPlanningSessionSystemPrompt(text: string): boolean {
     name.startsWith("Greet the user") ||
     name.startsWith("The user created the draft task") ||
     name.startsWith("The user skipped that draft") ||
-    name.startsWith("The user started refining")
+    name.startsWith("The user started refining") ||
+    name.startsWith("The user is talking about this draft")
   );
 }
 
@@ -450,7 +451,8 @@ function isPlanningSessionWaitPrompt(text: string): boolean {
     name === "Wait for the next user message" ||
     name.startsWith("The user created the draft task") ||
     name.startsWith("The user skipped that draft") ||
-    name.startsWith("The user started refining")
+    name.startsWith("The user started refining") ||
+    name.startsWith("The user is talking about this draft")
   );
 }
 
@@ -460,7 +462,12 @@ function streamNoteHasText(notes: SplitRunStreamLine[], text: string): boolean {
     return true;
   }
   const prefix = needle.slice(0, 48);
-  return notes.some((note) => `${note.componentName}\n${note.detail ?? ""}`.includes(prefix));
+  return notes.some((note) => {
+    if (isPlanningSessionSystemPrompt(note.componentName)) {
+      return false;
+    }
+    return `${note.componentName}\n${note.detail ?? ""}`.includes(prefix);
+  });
 }
 
 /**

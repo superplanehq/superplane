@@ -32,7 +32,11 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
+import { CreateWithAgentDialog } from "./CreateWithAgentDialog";
 import { LineBoardOrderCard, LineBoardWorkOrderCard } from "./LineBoardOrderCard";
+import { workspacePlanningRepository } from "./planningSessionView";
+import { useCreateWithAgentSession } from "./useCreateWithAgentSession";
+import { usePlanningSessionLiveRun } from "./usePlanningSessionLiveRun";
 import {
   buildLinePhaseBoard,
   collectLineBacklogOrders,
@@ -583,6 +587,8 @@ function LineDetail({
   );
   const peekOrderId = peekOrder?.id ?? null;
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
+  const { factory } = useFactoriesLayout();
+  const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
@@ -602,6 +608,7 @@ function LineDetail({
           canCreateWorkOrder={canCreateWorkOrder}
           canRename={canUpdate}
           onCreateWorkOrder={onCreateWorkOrder}
+          onCreateWithAgent={agentSession.start}
           intakePanel={intakePanel}
           onAddIntake={onAddIntake}
           verifyListeners={verifyListeners}
@@ -626,9 +633,62 @@ function LineDetail({
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
           onClose={onClosePeek}
+          onRefine={() => {
+            const id = peekOrder.id?.trim();
+            const title = peekOrder.title?.trim();
+            if (!id || !title) {
+              return;
+            }
+            agentSession.start({
+              id,
+              title,
+              description: peekOrder.description ?? "",
+            });
+          }}
         />
       ) : null}
+      <LineCreateWithAgentDialog
+        factoryKey={factoryKey}
+        factoryId={factoryId}
+        organizationId={organizationId}
+        session={agentSession}
+      />
     </div>
+  );
+}
+
+function LineCreateWithAgentDialog({
+  factoryKey,
+  factoryId,
+  organizationId,
+  session,
+}: {
+  factoryKey: string;
+  factoryId: string;
+  organizationId: string;
+  session: ReturnType<typeof useCreateWithAgentSession>;
+}) {
+  const view = usePlanningSessionLiveRun(organizationId, session.view);
+  return (
+    <CreateWithAgentDialog
+      open={session.open}
+      workspaceName={factoryKey}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      view={view}
+      onComposerChange={session.onComposerChange}
+      onSend={session.onSend}
+      onSubmitSurvey={session.onSubmitSurvey}
+      onDraftTitleChange={session.onDraftTitleChange}
+      onCreateDraft={session.onCreateDraft}
+      onSkipDraft={session.onSkipDraft}
+      onSelectCreated={session.onSelectCreated}
+      onRefineCreated={session.onRefineCreated}
+      onRequestClose={session.onRequestClose}
+      onCancelEnd={session.onCancelEnd}
+      onConfirmEnd={session.onConfirmEnd}
+      onSelectModel={session.onSelectModel}
+    />
   );
 }
 
@@ -646,6 +706,7 @@ function LineBoardSplitRunPopup({
   onDispatch,
   analysisRuns,
   onClose,
+  onRefine,
 }: {
   organizationId: string;
   factoryId: string;
@@ -660,6 +721,7 @@ function LineBoardSplitRunPopup({
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
   onClose: () => void;
+  onRefine: () => void;
 }) {
   const { data: peekChecks = [] } = useWorkOrderChecks(organizationId, factoryId, peekOrderId);
   const { data: peekPullRequests = [] } = useFactoryPullRequests(organizationId, factoryId, {
@@ -697,6 +759,7 @@ function LineBoardSplitRunPopup({
         resolvedLineName ? (model) => onDispatch(peekOrderId, { lineName: resolvedLineName, model }) : undefined
       }
       onClose={onClose}
+      onRefine={onRefine}
       fixed
     />
   );
@@ -818,6 +881,7 @@ function PhaseBoard({
   canCreateWorkOrder,
   canRename,
   onCreateWorkOrder,
+  onCreateWithAgent,
   intakePanel,
   onAddIntake,
   verifyListeners,
@@ -838,6 +902,7 @@ function PhaseBoard({
   canCreateWorkOrder: boolean;
   canRename: boolean;
   onCreateWorkOrder: () => void;
+  onCreateWithAgent: () => void;
   intakePanel: BacklogIntakePanel;
   onAddIntake?: () => void;
   verifyListeners: LaneListener[];
@@ -961,6 +1026,7 @@ function PhaseBoard({
           canRename={canRename}
           onRename={(title) => setColumnTitle("backlog", title)}
           onCreateWorkOrder={onCreateWorkOrder}
+          onCreateWithAgent={onCreateWithAgent}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}

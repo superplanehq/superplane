@@ -237,6 +237,27 @@ describe("createWithAgentViewFromSession", () => {
     ]);
   });
 
+  it("hides Refine protocol notes from the transcript", () => {
+    const view = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        canvasId: "canvas-1",
+        executionId: "exec-1",
+        draft: { title: "Retry refunds", description: "Stop double charges.", workOrderId: "wo-1" },
+        messages: [
+          { id: "note", role: "user", text: "Refine NEW-11: Retry refunds." },
+          { id: "ready", role: "agent", text: "I have this task. What do you want to change?" },
+        ],
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+    );
+
+    expect(view.refining).toBe(true);
+    expect(view.messages).toEqual([
+      { id: "ready", kind: "text", role: "agent", text: "I have this task. What do you want to change?" },
+    ]);
+  });
+
   it("leaves the order key undefined when the server sends no created_at", () => {
     const view = createWithAgentViewFromSession(
       {

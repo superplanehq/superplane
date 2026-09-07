@@ -54,11 +54,16 @@ func StartPlanningSession(ctx context.Context, organizationID string, req *pb.St
 		if findErr = rejectIfPlanningSessionAtCap(tx, factoryModel, canvas.ID); findErr != nil {
 			return findErr
 		}
+		workOrderID, parseErr := parseOptionalPlanningWorkOrderID(req.GetWorkOrderId())
+		if parseErr != nil {
+			return parseErr
+		}
 		session, findErr = factoryModel.StartPlanningSession(tx, models.StartPlanningSessionParams{
 			CreatedByUserID: userID,
 			Repository:      repository,
 			CanvasID:        canvas.ID,
 			Entrypoint:      entrypoint,
+			WorkOrderID:     workOrderID,
 		})
 		return findErr
 	})
@@ -251,7 +256,11 @@ func ReloadPlanningSessionAgent(ctx context.Context, organizationID string, req 
 		if err != nil {
 			return err
 		}
-		newRun = models.NewPlanningSessionRun(canvas.ID, version.ID, entrypoint, factoryModel.ID.String(), session.Repository, selected.Key)
+		refine, err := session.RefineWorkOrder(tx, factoryModel)
+		if err != nil {
+			return err
+		}
+		newRun = models.NewPlanningSessionRun(canvas.ID, version.ID, entrypoint, factoryModel, session.Repository, selected.Key, refine)
 		if err := tx.Create(newRun).Error; err != nil {
 			return err
 		}
@@ -342,6 +351,18 @@ func parseSessionID(sessionID string) (uuid.UUID, error) {
 	id, err := uuid.Parse(sessionID)
 	if err != nil {
 		return uuid.Nil, invalidArgument("invalid planning session id")
+	}
+	return id, nil
+}
+
+func parseOptionalPlanningWorkOrderID(workOrderID string) (uuid.UUID, error) {
+	raw := strings.TrimSpace(workOrderID)
+	if raw == "" {
+		return uuid.Nil, nil
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, invalidArgument("invalid work order id")
 	}
 	return id, nil
 }
@@ -439,7 +460,11 @@ func serializePlanningSession(tx *gorm.DB, factoryModel *models.Factory, session
 	out.ExecutionId = executionID
 	out.SelectableModelKey = session.SelectableModelKey
 	if draft := session.Draft(); strings.TrimSpace(draft.Title) != "" {
-		out.Draft = &pb.PlanningSessionDraft{Title: draft.Title, Description: draft.Description}
+		out.Draft = &pb.PlanningSessionDraft{
+			Title:       draft.Title,
+			Description: draft.Description,
+			WorkOrderId: draft.WorkOrderID,
+		}
 	}
 	if survey := session.CurrentSurvey(); session.SurveyID != nil && len(survey.Questions) > 0 {
 		out.Survey = &pb.PlanningSessionSurvey{

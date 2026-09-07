@@ -1,6 +1,7 @@
 export const CREATE_WITH_AGENT_COPY = {
   menu: "Create with an Agent",
   title: "New task with an agent",
+  titleRefine: "Refine this task",
   endSession: "End session",
   endSessionAsk: "End this session?",
   endSessionBody: "The machine will stop. Tasks you already created stay in the backlog.",
@@ -16,9 +17,11 @@ export const CREATE_WITH_AGENT_COPY = {
   otherAnswer: "Or write your own answer",
   surveySkipped: "Skipped the survey.",
   composerPlaceholder: "Tell the agent what you want to do",
+  composerPlaceholderRefine: "Tell the agent what you want to change",
   viewingOlder: "You are viewing older messages.",
   jumpToLatest: "Jump to latest",
   machineStarting: "The machine is starting",
+  logStarting: "Starting the planning session.",
   machineRunning: "Machine is running",
   machineWaiting: "Waiting for you",
   machineStopped: "The machine stopped",
@@ -28,7 +31,10 @@ export const CREATE_WITH_AGENT_COPY = {
   draftLabel: "Draft task",
   sessionList: "This session",
   create: "Create",
+  update: "Update",
   skip: "Skip",
+  refine: "Refine",
+  refineTooltip: "Ask an agent to update this task.",
   refineFurther: "Refine further",
   openTask: "Open task",
   greeting: "The repository is ready. What do you want to do?",
@@ -39,6 +45,7 @@ export const CREATE_WITH_AGENT_COPY = {
   failedSurvey: "Failed to send the answers.",
   failedDraft: "Failed to save the draft.",
   failedCreate: "Failed to create the task.",
+  failedUpdate: "Failed to update the task.",
   failedSkip: "Failed to skip the draft.",
   failedReload: "Failed to reload the agent.",
   usingModel: (label: string) => `Using ${label}`,
@@ -48,4 +55,9 @@ export const CREATE_WITH_AGENT_COPY = {
 
 export function planningRefineNote(key: string, title: string) {
   return `Refine ${key}: ${title}.`;
+}
+
+export function isPlanningRefineNote(text: string) {
+  const match = /^Refine (\S+): .+\.$/.exec(text.trim());
+  return Boolean(match?.[1] && /-\d+$/.test(match[1]));
 }

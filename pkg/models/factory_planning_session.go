@@ -74,6 +74,7 @@ type StartPlanningSessionParams struct {
 	Repository      string
 	CanvasID        uuid.UUID
 	Entrypoint      string
+	WorkOrderID     uuid.UUID
 }
 
 type FactoryPlanningSession struct {
@@ -154,13 +155,18 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 		return nil, fmt.Errorf("%w: entrypoint must be onRun", ErrFactoryPlanningSessionInvalid)
 	}
 
+	refine, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
+	if err != nil {
+		return nil, err
+	}
+
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, params.CanvasID)
 	if err != nil {
 		return nil, err
 	}
 
 	now := time.Now()
-	run := NewPlanningSessionRun(params.CanvasID, liveVersion.ID, params.Entrypoint, f.ID.String(), repository, "")
+	run := NewPlanningSessionRun(params.CanvasID, liveVersion.ID, params.Entrypoint, f, repository, "", refine)
 	if err := tx.Create(run).Error; err != nil {
 		return nil, err
 	}
@@ -182,18 +188,22 @@ func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionP
 	if err := tx.Create(session).Error; err != nil {
 		return nil, err
 	}
+	if refine != nil {
+		if err := session.attachRefineDraft(tx, refine); err != nil {
+			return nil, err
+		}
+	}
 	return session, nil
 }
 
-func NewPlanningSessionRun(canvasID, versionID uuid.UUID, entrypoint, factoryID, repository, modelKey string) *CanvasRun {
+func NewPlanningSessionRun(
+	canvasID, versionID uuid.UUID,
+	entrypoint string,
+	factoryModel *Factory,
+	repository, modelKey string,
+	refine *FactoryWorkOrder,
+) *CanvasRun {
 	now := time.Now()
-	planning := map[string]any{
-		"factory_id": factoryID,
-		"repository": repository,
-	}
-	if key := strings.TrimSpace(modelKey); key != "" {
-		planning["selectable_model_key"] = key
-	}
 	return &CanvasRun{
 		ID:         uuid.New(),
 		WorkflowID: canvasID,
@@ -202,7 +212,7 @@ func NewPlanningSessionRun(canvasID, versionID uuid.UUID, entrypoint, factoryID,
 		Callbacks: datatypes.JSONSlice[core.RunCallback]{
 			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
 		},
-		Input:     NewJSONValue(map[string]any{"planning_session": planning}),
+		Input:     NewJSONValue(planningSessionRunInput(factoryModel, repository, modelKey, refine)),
 		State:     CanvasRunStatePending,
 		CreatedAt: &now,
 		UpdatedAt: &now,
@@ -230,6 +240,53 @@ func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, mo
 		"survey":               s.Survey,
 		"updated_at":           s.UpdatedAt,
 	}).Error
+}
+
+func (s *FactoryPlanningSession) RefineWorkOrder(tx *gorm.DB, factoryModel *Factory) (*FactoryWorkOrder, error) {
+	if s.DraftWorkOrderID == nil {
+		return nil, nil
+	}
+	order, err := factoryModel.FindWorkOrder(tx, *s.DraftWorkOrderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return order, nil
+}
+
+func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryWorkOrder, error) {
+	if workOrderID == uuid.Nil {
+		return nil, nil
+	}
+	order, err := f.FindWorkOrder(tx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return nil, fmt.Errorf("%w: work order is not a draft", ErrFactoryPlanningSessionInvalid)
+	}
+	return order, nil
+}
+
+func planningSessionRunInput(factoryModel *Factory, repository, modelKey string, refine *FactoryWorkOrder) map[string]any {
+	planning := map[string]any{
+		"factory_id":         factoryModel.ID.String(),
+		"repository":         repository,
+		"refine_key":         "",
+		"refine_title":       "",
+		"refine_description": "",
+	}
+	if refine != nil {
+		planning["refine_key"] = factoryModel.WorkOrderKey(refine.Number)
+		planning["refine_title"] = refine.Title
+		planning["refine_description"] = refine.Description
+	}
+	if key := strings.TrimSpace(modelKey); key != "" {
+		planning["selectable_model_key"] = key
+	}
+	return map[string]any{"planning_session": planning}
 }
 
 func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {

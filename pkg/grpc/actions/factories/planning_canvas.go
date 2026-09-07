@@ -26,12 +26,25 @@ var (
 	errPlanningProviderRequired = errors.New("provider is not connected")
 )
 
+const (
+	planningCanvasGreetCloser     = "Greet the user in plain text. Then stop."
+	planningCanvasFirstTurnCloser = "" +
+		"Refine key: {{ root().data.planning_session.refine_key }}\n" +
+		"Refine title: {{ root().data.planning_session.refine_title }}\n" +
+		"Refine description: {{ root().data.planning_session.refine_description }}\n\n" +
+		"If the refine key is not empty, you already have that draft task. Tell the user you have this task and you are ready to refine it. Ask what they want to change. Do not explore the repository unless you need to understand a requested change. Do not call propose_draft until they say what to change. Then stop.\n\n" +
+		"If the refine key is empty, greet the user in plain text. Then stop."
+)
+
 func ensurePlanningCanvas(tx *gorm.DB, factoryModel *models.Factory, userID uuid.UUID) (*models.Canvas, string, error) {
 	if err := requirePlanningGitHub(tx, factoryModel); err != nil {
 		return nil, "", err
 	}
 	canvas, err := models.FindPlanningCanvas(tx, factoryModel.OrganizationID, factoryModel.ID)
 	if err == nil {
+		if syncErr := syncPlanningCanvasStockPrompt(tx, canvas.ID); syncErr != nil {
+			return nil, "", syncErr
+		}
 		entrypoint, entryErr := planningCanvasEntrypoint(tx, canvas.ID)
 		return canvas, entrypoint, entryErr
 	}
@@ -224,6 +237,70 @@ func planningTemplateIntegrations(tx *gorm.DB, factoryModel *models.Factory) map
 		}
 	}
 	return out
+}
+
+func syncPlanningCanvasStockPrompt(tx *gorm.DB, canvasID uuid.UUID) error {
+	nodes, err := models.FindCanvasNodesInTransaction(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	changed := false
+	for i := range nodes {
+		if nodes[i].Type != models.NodeTypeComponent {
+			continue
+		}
+		config := nodes[i].Configuration.Data()
+		if !rewritePlanningCanvasPrompt(config) {
+			continue
+		}
+		nodes[i].Configuration = datatypes.NewJSONType(config)
+		if err := tx.Model(&nodes[i]).Select("Configuration").Updates(&nodes[i]).Error; err != nil {
+			return err
+		}
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	live, err := models.FindLiveCanvasVersionInTransaction(tx, canvasID)
+	if err != nil {
+		return err
+	}
+	versionNodes := append([]models.Node(nil), live.Nodes...)
+	for i := range versionNodes {
+		rewritePlanningCanvasPrompt(versionNodes[i].Configuration)
+	}
+	now := time.Now()
+	live.Nodes = datatypes.NewJSONSlice(versionNodes)
+	live.UpdatedAt = &now
+	return tx.Model(live).Select("Nodes", "UpdatedAt").Updates(live).Error
+}
+
+func rewritePlanningCanvasPrompt(config map[string]any) bool {
+	if config == nil {
+		return false
+	}
+	rewritten := false
+	for _, step := range planningCanvasConfigSteps(config["steps"]) {
+		prompt, _ := step["prompt"].(string)
+		next, ok := replacePlanningCanvasGreetCloser(prompt)
+		if !ok {
+			continue
+		}
+		step["prompt"] = next
+		rewritten = true
+	}
+	return rewritten
+}
+
+func replacePlanningCanvasGreetCloser(prompt string) (string, bool) {
+	if !strings.Contains(prompt, planningCanvasGreetCloser) {
+		return prompt, false
+	}
+	if strings.Contains(prompt, "planning_session.refine_key") {
+		return prompt, false
+	}
+	return strings.Replace(prompt, planningCanvasGreetCloser, planningCanvasFirstTurnCloser, 1), true
 }
 
 func planningCanvasPromptFromConfig(config map[string]any) string {
