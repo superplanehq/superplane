@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { suggestWorkspaceKeyFromName } from "../../lib/workspaceKey";
 import { isAgentStepReady } from "./onboardingAgentReadiness";
 import {
   fixtureIssueCount,
@@ -195,6 +196,13 @@ export function useOnboardingSetupState(
     [runIssuesDiscovery],
   );
 
+  // Preview of the slug the workspace would get if it is persisted with the
+  // current name. Selecting a repository suggests a real name (see
+  // `selectRepo` above), so this moves off the placeholder-derived value
+  // (`new`, `neww`, ...) as soon as that happens too — the actual save still
+  // walks to a free variant against the organization's other workspaces.
+  const suggestedWorkspaceKey = useMemo(() => suggestWorkspaceKeyFromName(workspaceName), [workspaceName]);
+
   const backlogRepo = issuesRepo ?? selectedRepo;
   const issueCount =
     options?.simulateDiscovery === false ? undefined : backlogRepo ? fixtureIssueCount(backlogRepo) : 0;
@@ -224,6 +232,7 @@ export function useOnboardingSetupState(
     workspaceName,
     editWorkspaceName,
     suggestWorkspaceName,
+    suggestedWorkspaceKey,
     connected,
     connectIntegration,
     vcsHost,

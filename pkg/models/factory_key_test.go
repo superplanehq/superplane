@@ -12,15 +12,39 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func TestNormalizeFactoryKey(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"uppercase becomes lowercase", "SP", "sp"},
+		{"mixed case becomes lowercase", "SuPeR", "super"},
+		{"trims surrounding whitespace", "  sp  ", "sp"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.want, models.NormalizeFactoryKey(c.in))
+		})
+	}
+}
+
+func TestValidateFactoryKey_ErrorText(t *testing.T) {
+	err := models.ValidateFactoryKey("ABC")
+	require.Error(t, err)
+	assert.Equal(t, "factory key must be 2 to 5 lowercase letters", err.Error())
+}
+
 func TestGenerateFactoryKeyFromName(t *testing.T) {
 	cases := []struct {
 		name string
 		in   string
 		want string
 	}{
-		{"letters only", "SuperPlane", "SUPER"},
-		{"strips numbers and punctuation", "release-2025!", "RELEA"},
-		{"single word short", "Ops", "OPS"},
+		{"letters only", "SuperPlane", "super"},
+		{"strips numbers and punctuation", "release-2025!", "relea"},
+		{"single word short", "Ops", "ops"},
 		{"empty when no letters", "12345", ""},
 	}
 
@@ -38,12 +62,12 @@ func TestValidateFactoryKey(t *testing.T) {
 		err  error
 	}{
 		{"empty is required", "", models.ErrFactoryKeyRequired},
-		{"too short", "A", models.ErrFactoryKeyInvalid},
-		{"too long", "ABCDEF", models.ErrFactoryKeyInvalid},
-		{"lowercase rejected", "ab", models.ErrFactoryKeyInvalid},
-		{"numeric rejected", "AB1", models.ErrFactoryKeyInvalid},
-		{"two letters ok", "SP", nil},
-		{"five letters ok", "SUPER", nil},
+		{"too short", "a", models.ErrFactoryKeyInvalid},
+		{"too long", "abcdef", models.ErrFactoryKeyInvalid},
+		{"uppercase rejected", "AB", models.ErrFactoryKeyInvalid},
+		{"numeric rejected", "ab1", models.ErrFactoryKeyInvalid},
+		{"two letters ok", "sp", nil},
+		{"five letters ok", "super", nil},
 	}
 
 	for _, c := range cases {
@@ -62,26 +86,52 @@ func TestGenerateUniqueFactoryKey_SuffixesOnCollision(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	first, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "AL")
+	first, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "al")
 	require.NoError(t, err)
-	assert.Equal(t, "AL", first.Key)
+	assert.Equal(t, "al", first.Key)
 
 	// Requesting the same seed picks a distinct candidate rather than
 	// tripping the unique constraint.
 	candidate, err := models.GenerateUniqueFactoryKey(db, r.Organization.ID, "Alpha")
 	require.NoError(t, err)
-	assert.NotEqual(t, "AL", candidate)
+	assert.NotEqual(t, "al", candidate)
 	require.NoError(t, models.ValidateFactoryKey(candidate))
+}
+
+func TestGenerateUniqueFactoryKey_WalksLowercaseAlphabetOnCollision(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	// "alpha" is exactly what GenerateFactoryKeyFromName derives from "Alpha"
+	// (5 letters, the max length), so requesting it again collides.
+	_, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "alpha")
+	require.NoError(t, err)
+
+	// The walk keeps the first four letters and cycles the last one through
+	// the lowercase alphabet: "alphb" is the first free candidate (it skips
+	// "alpha" itself).
+	candidate, err := models.GenerateUniqueFactoryKey(db, r.Organization.ID, "Alpha")
+	require.NoError(t, err)
+	assert.Equal(t, "alphb", candidate)
+}
+
+func TestCreateFactory_NormalizesUppercaseKeyToLowercase(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "SUPER")
+	require.NoError(t, err)
+	assert.Equal(t, "super", factory.Key)
 }
 
 func TestCreateFactory_RejectsDuplicateKey(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	_, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "AL")
+	_, err := models.CreateFactory(db, r.Organization.ID, "Alpha", "", "al")
 	require.NoError(t, err)
 
-	_, err = models.CreateFactory(db, r.Organization.ID, "Alpha copy", "", "AL")
+	_, err = models.CreateFactory(db, r.Organization.ID, "Alpha copy", "", "al")
 	assert.ErrorIs(t, err, models.ErrFactoryKeyAlreadyExists)
 }
 
@@ -89,7 +139,7 @@ func TestCreateWorkOrder_AllocatesSequentialNumbers(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, "Numbers", "", "NUM")
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Numbers", "", "num")
 	require.NoError(t, err)
 
 	first, err := factory.CreateWorkOrder(db, "one", "", &r.User, nil, nil)
@@ -100,15 +150,15 @@ func TestCreateWorkOrder_AllocatesSequentialNumbers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), second.Number)
 
-	assert.Equal(t, "NUM-1", factory.WorkOrderKey(first.Number))
-	assert.Equal(t, "NUM-2", factory.WorkOrderKey(second.Number))
+	assert.Equal(t, "num-1", factory.WorkOrderKey(first.Number))
+	assert.Equal(t, "num-2", factory.WorkOrderKey(second.Number))
 }
 
 func TestCreateWorkOrder_ConcurrentAllocationsAreUnique(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, "Concurrent", "", "CON")
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Concurrent", "", "con")
 	require.NoError(t, err)
 
 	const workers = 10
@@ -151,12 +201,12 @@ func TestFactoryUpdate_ChangesKey(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
-	factory, err := models.CreateFactory(db, r.Organization.ID, "Rename", "", "RN")
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Rename", "", "rn")
 	require.NoError(t, err)
 
-	newKey := "RNM"
+	newKey := "rnm"
 	require.NoError(t, factory.Update(db, nil, nil, &newKey))
-	assert.Equal(t, "RNM", factory.Key)
+	assert.Equal(t, "rnm", factory.Key)
 
 	invalid := "A"
 	assert.ErrorIs(t, factory.Update(db, nil, nil, &invalid), models.ErrFactoryKeyInvalid)

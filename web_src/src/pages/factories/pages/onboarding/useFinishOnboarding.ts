@@ -23,9 +23,11 @@ import {
   type UpdateOnboarding,
 } from "./onboardingProvision";
 import { apiIssuesSource } from "./onboardingStatus";
+import { saveWithFreeWorkspaceKey } from "./uniqueFactoryKey";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
+import { isPlaceholderWorkspaceName } from "./workspaceNames";
 
 export function finishOnboardingError(args: {
   appRepository: string | null;
@@ -70,7 +72,7 @@ export async function provisionWorkspace(args: {
   factoryId: string;
   factory: FactoriesFactory | null;
   selections: IntegrationSelections;
-  updateFactory: (input: { name: string }) => Promise<unknown>;
+  updateFactory: (input: { name: string; key?: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
@@ -81,6 +83,7 @@ export async function provisionWorkspace(args: {
   listApps: ListFactoryApps;
   workspaceName: string;
   takenNames: string[];
+  takenKeys: string[];
   appRepository: string;
   backlogRepository: string;
   issuesChoice: IssuesChoiceId | null;
@@ -91,10 +94,23 @@ export async function provisionWorkspace(args: {
   agentIntegrationId?: string;
 }): Promise<{ lineId: string }> {
   if (args.workspaceName !== args.factory?.name) {
+    // The workspace still has its onboarding placeholder name, so its key is
+    // still the placeholder-derived one too (`new`, `neww`, ...). Regenerate
+    // the key from the real name now instead of leaving that placeholder
+    // value in place. A name already customized before this run (for
+    // example through workspace settings) keeps its existing key untouched.
+    const regenerateKey = isPlaceholderWorkspaceName(args.factory?.name ?? "");
     await saveWithFreeWorkspaceName({
       name: args.workspaceName,
       takenNames: args.takenNames,
-      save: (name) => args.updateFactory({ name }),
+      save: (name) =>
+        regenerateKey
+          ? saveWithFreeWorkspaceKey({
+              name,
+              takenKeys: args.takenKeys,
+              save: (key) => args.updateFactory({ name, key }),
+            })
+          : args.updateFactory({ name }),
     });
   }
   await args.updateOnboarding({
@@ -159,7 +175,7 @@ export function useFinishOnboarding(args: {
   setup: OnboardingSetupApi;
   selections: IntegrationSelections;
   setSaving: (saving: boolean) => void;
-  updateFactory: (input: { name: string }) => Promise<unknown>;
+  updateFactory: (input: { name: string; key?: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
@@ -170,6 +186,7 @@ export function useFinishOnboarding(args: {
   listApps: ListFactoryApps;
   resolveDefaultBranch: (repository: string) => Promise<string>;
   takenNames: string[];
+  takenKeys: string[];
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;

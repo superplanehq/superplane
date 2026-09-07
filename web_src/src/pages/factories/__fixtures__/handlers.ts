@@ -31,7 +31,7 @@ import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { storybookHostedLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
-import { isValidWorkspaceKey, suggestWorkspaceKeyFromName, WORKSPACE_KEY_MAX_LENGTH } from "../lib/workspaceKey";
+import { isValidWorkspaceKey, normalizeWorkspaceKey, uniqueWorkspaceKeyFromName } from "../lib/workspaceKey";
 import { metricsForLine } from "../pages/lineListMetricsMockData";
 
 export type { FactoriesFixture };
@@ -108,22 +108,14 @@ function takenFactoryKeys(factories: FactoriesFactory[]): Set<string> {
   return new Set(factories.map((factory) => factory.key).filter((key): key is string => Boolean(key)));
 }
 
-/** Same letter-only keys the live API derives when the client omits `key`. */
+/** Same lowercase, letter-only keys the live API derives when the client omits `key`. */
 function unusedFactoryKey(factories: FactoriesFactory[], name: string, requestedKey: string): string {
   const taken = takenFactoryKeys(factories);
-  const seed = isValidWorkspaceKey(requestedKey) ? requestedKey : suggestWorkspaceKeyFromName(name) || "WS";
-  if (!taken.has(seed)) {
-    return seed;
+  const normalizedRequestedKey = normalizeWorkspaceKey(requestedKey);
+  if (isValidWorkspaceKey(normalizedRequestedKey) && !taken.has(normalizedRequestedKey)) {
+    return normalizedRequestedKey;
   }
-
-  const prefix = seed.slice(0, WORKSPACE_KEY_MAX_LENGTH - 1);
-  for (let code = 65; code <= 90; code += 1) {
-    const candidate = `${prefix}${String.fromCharCode(code)}`;
-    if (!taken.has(candidate)) {
-      return candidate;
-    }
-  }
-  return `${prefix}Z`;
+  return uniqueWorkspaceKeyFromName(name, taken);
 }
 
 function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {

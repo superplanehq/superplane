@@ -27,11 +27,15 @@ var ErrFactoryNameRequired = errors.New("factory name is required")
 var ErrFactoryNotFound = errors.New("factory not found")
 var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
 var ErrFactoryKeyRequired = errors.New("factory key is required")
-var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
+var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 lowercase letters")
 var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
 var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
 
-var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
+// factoryKeyPattern only validates new/edited keys. Existing rows created
+// before this rule was lowercase-only may still hold uppercase keys (see the
+// factories_key_format_check migration history) — they keep working as-is,
+// this pattern just stops new uppercase/mixed-case keys from being written.
+var factoryKeyPattern = regexp.MustCompile(`^[a-z]{2,5}$`)
 
 type Factory struct {
 	ID                     uuid.UUID
@@ -48,10 +52,10 @@ type Factory struct {
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
-// NormalizeFactoryKey uppercases and trims whitespace so callers can accept
+// NormalizeFactoryKey lowercases and trims whitespace so callers can accept
 // user input in any case, then re-check it with ValidateFactoryKey.
 func NormalizeFactoryKey(key string) string {
-	return strings.ToUpper(strings.TrimSpace(key))
+	return strings.ToLower(strings.TrimSpace(key))
 }
 
 // ValidateFactoryKey rejects empty or malformed keys with a stable error
@@ -68,18 +72,18 @@ func ValidateFactoryKey(key string) error {
 }
 
 // GenerateFactoryKeyFromName produces a stable candidate key from a factory
-// name (letters only, uppercased, trimmed to the max length). Callers still
+// name (letters only, lowercased, trimmed to the max length). Callers still
 // need to check organization uniqueness before persisting.
 func GenerateFactoryKeyFromName(name string) string {
 	letters := regexp.MustCompile(`[^A-Za-z]`).ReplaceAllString(name, "")
-	upper := strings.ToUpper(letters)
-	if len(upper) > FactoryKeyMaxLength {
-		upper = upper[:FactoryKeyMaxLength]
+	lower := strings.ToLower(letters)
+	if len(lower) > FactoryKeyMaxLength {
+		lower = lower[:FactoryKeyMaxLength]
 	}
-	if len(upper) < FactoryKeyMinLength {
+	if len(lower) < FactoryKeyMinLength {
 		return ""
 	}
-	return upper
+	return lower
 }
 
 // MapFactoryConstraintError converts Postgres unique-constraint violations
@@ -151,15 +155,15 @@ func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key
 // CLI, where callers may not care about picking a specific key.
 //
 // Keys are letters-only by the schema check constraint, so we cannot fall
-// back to numeric suffixes. Instead we pad with `X` and cycle through the
+// back to numeric suffixes. Instead we pad with `x` and cycle through the
 // last character.
 func GenerateUniqueFactoryKey(tx *gorm.DB, organizationID uuid.UUID, name string) (string, error) {
 	seed := GenerateFactoryKeyFromName(name)
 	if seed == "" {
-		seed = "WS"
+		seed = "ws"
 	}
 	if len(seed) < FactoryKeyMinLength {
-		seed = seed + strings.Repeat("X", FactoryKeyMinLength-len(seed))
+		seed = seed + strings.Repeat("x", FactoryKeyMinLength-len(seed))
 	}
 
 	baseCandidates := []string{seed}
@@ -171,12 +175,12 @@ func GenerateUniqueFactoryKey(tx *gorm.DB, organizationID uuid.UUID, name string
 			baseCandidates = append(baseCandidates, seed[:length])
 			continue
 		}
-		baseCandidates = append(baseCandidates, seed+strings.Repeat("X", length-len(seed)))
+		baseCandidates = append(baseCandidates, seed+strings.Repeat("x", length-len(seed)))
 	}
 
 	tried := map[string]bool{}
 	for _, base := range baseCandidates {
-		for letter := 'A'; letter <= 'Z'; letter++ {
+		for letter := 'a'; letter <= 'z'; letter++ {
 			candidate := base
 			if tried[candidate] {
 				candidate = base[:len(base)-1] + string(letter)
@@ -809,8 +813,8 @@ func (f *Factory) allocateNextWorkOrderNumber(tx *gorm.DB) (int64, error) {
 }
 
 // WorkOrderKey returns the display identifier used for a work order that
-// belongs to this factory. Format matches `<KEY>-<number>` (for example
-// `SP-42`).
+// belongs to this factory. Format matches `<key>-<number>` (for example
+// `sp-42`).
 func (f *Factory) WorkOrderKey(number int64) string {
 	return fmt.Sprintf("%s-%d", f.Key, number)
 }

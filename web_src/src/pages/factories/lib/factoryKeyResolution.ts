@@ -1,5 +1,5 @@
 import type { FactoriesFactory } from "@/api-client";
-import { isValidWorkspaceKey } from "./workspaceKey";
+import { isWorkspaceKeyShaped } from "./workspaceKey";
 
 export type FactoryResolutionStatus = "loading" | "found" | "not-found";
 
@@ -38,7 +38,7 @@ export function resolveFactoryByKey(
   }
 
   const candidateKey = routeKey.toUpperCase();
-  if (isValidWorkspaceKey(candidateKey)) {
+  if (isWorkspaceKeyShaped(candidateKey)) {
     const byKey = factories.find((factory) => Boolean(factory.key) && factory.key!.toUpperCase() === candidateKey);
     if (byKey) {
       return { status: "found", factory: byKey, matchedBy: "key" };

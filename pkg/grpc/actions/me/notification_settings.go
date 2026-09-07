@@ -220,7 +220,7 @@ func mapWorkspaceLookupError(err error) error {
 	case errors.Is(err, models.ErrFactoryKeyRequired):
 		return grpcerrors.InvalidArgument(err, "workspace key is required")
 	case errors.Is(err, models.ErrFactoryKeyInvalid):
-		return grpcerrors.InvalidArgument(err, "workspace key must be 2 to 5 uppercase letters")
+		return grpcerrors.InvalidArgument(err, "workspace key must be 2 to 5 lowercase letters")
 	}
 	if _, _, ok := grpcerrors.HandlerStatus(err); ok {
 		return err

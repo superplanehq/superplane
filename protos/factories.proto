@@ -680,7 +680,7 @@ message ListFactoriesResponse {
 message CreateFactoryRequest {
   string name = 1;
   string description = 2;
-  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Workspace key. 2 to 5 lowercase letters, unique per organization.
   // Used with the sequence number to render identifiers such as `SP-1`.
   string key = 3;
 }
@@ -701,7 +701,7 @@ message UpdateFactoryRequest {
   string id = 1;
   optional string name = 2;
   optional string description = 3;
-  // New workspace key. 2 to 5 uppercase letters, unique per organization.
+  // New workspace key. 2 to 5 lowercase letters, unique per organization.
   // Updating this changes the identifier shown for every work order.
   optional string key = 4;
   // Hosted spend cap in USD cents. Unset leaves the current cap unchanged.
@@ -802,7 +802,7 @@ message Factory {
   string name = 2;
   string description = 3;
   repeated FactoryLine lines = 4;
-  // Workspace key. 2 to 5 uppercase letters, unique per organization.
+  // Workspace key. 2 to 5 lowercase letters, unique per organization.
   string key = 5;
   FactoryOnboarding onboarding = 6;
   // Hosted spend cap in USD cents. Unset means this workspace has no cap.

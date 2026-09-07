@@ -53,6 +53,7 @@ describe("provisionWorkspace", () => {
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],
+      takenKeys: [],
       appRepository: "acme/payments-service",
       backlogRepository: "acme/payments-service",
       issuesChoice: "vcs" as const,
@@ -90,6 +91,53 @@ describe("provisionWorkspace", () => {
     expect(result).toEqual({ lineId: "line-1" });
     const completeCall = updateOnboarding.mock.calls.find(([input]) => input.complete);
     expect(completeCall?.[0]).toMatchObject({ complete: true });
+  });
+
+  // The workspace is created with a placeholder name ("New workspace") and a
+  // key derived from it. Finishing setup is when the real name lands, so the
+  // key must move with it instead of leaving the placeholder-derived value
+  // (`new`, `neww`, ...) in place.
+  it("regenerates the workspace key from the real name while the workspace is still on its placeholder name", async () => {
+    const updateFactory = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        factory: { id: "factory-1", name: "New workspace", key: "neww" },
+        workspaceName: "Payments Service",
+        updateFactory,
+      }),
+    );
+
+    expect(updateFactory).toHaveBeenCalledWith({ name: "Payments Service", key: "payme" });
+  });
+
+  it("walks to a free key when the name-derived candidate is already taken", async () => {
+    const updateFactory = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        factory: { id: "factory-1", name: "New workspace", key: "neww" },
+        workspaceName: "Payments Service",
+        takenKeys: ["payme"],
+        updateFactory,
+      }),
+    );
+
+    expect(updateFactory).toHaveBeenCalledWith({ name: "Payments Service", key: "payma" });
+  });
+
+  it("leaves a previously customized key untouched", async () => {
+    const updateFactory = vi.fn().mockResolvedValue({});
+
+    await provisionWorkspace(
+      provisionArgs({
+        factory: { id: "factory-1", name: "Already renamed", key: "abc" },
+        workspaceName: "Payments Service",
+        updateFactory,
+      }),
+    );
+
+    expect(updateFactory).toHaveBeenCalledWith({ name: "Payments Service" });
   });
 });
 
