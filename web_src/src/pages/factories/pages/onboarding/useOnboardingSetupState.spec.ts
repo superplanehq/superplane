@@ -27,6 +27,27 @@ describe("useOnboardingSetupState", () => {
     expect(result.current.issueCount).toBeUndefined();
   });
 
+  it("regenerates the suggested slug from the repository name instead of the placeholder", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("New workspace", {
+        connected: new Set<IntegrationId>(["github"]),
+        simulateDiscovery: false,
+      }),
+    );
+
+    // Before a repository is picked, the suggestion is still derived from
+    // the onboarding placeholder name.
+    expect(result.current.suggestedWorkspaceKey).not.toBe("");
+
+    act(() => {
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/payments-service");
+    });
+
+    expect(result.current.workspaceName).toBe("Payments Service");
+    expect(result.current.suggestedWorkspaceKey).toBe("payme");
+  });
+
   it("marks the agent step ready when remaining credit is greater than zero", () => {
     const { result } = renderHook(() =>
       useOnboardingSetupState("Payments", {

@@ -162,6 +162,14 @@ function otherWorkspaceNames(factories: FactoriesFactory[], factoryId: string): 
     .filter(Boolean);
 }
 
+/** Keys held by the other workspaces of the organization. */
+function otherWorkspaceKeys(factories: FactoriesFactory[], factoryId: string): string[] {
+  return factories
+    .filter((factory) => factory.id !== factoryId)
+    .map((factory) => factory.key ?? "")
+    .filter(Boolean);
+}
+
 function canConfigureWorkspace(canAct: (resource: string, action: string) => boolean): boolean {
   return (
     canAct("factories", "update") &&
@@ -429,8 +437,14 @@ export function useOnboardingPageModel(args: {
   });
   const github = useOnboardingGithubRepos(args.organizationId, githubIntegrationId);
 
-  const takenNames = useMemo(
-    () => otherWorkspaceNames(args.factories, args.factoryId),
+  // One memo for both: workspace renames during onboarding need the taken
+  // names, and the key regeneration in `useFinishOnboarding` needs the taken
+  // keys, both derived from the same `factories` list.
+  const { takenNames, takenKeys } = useMemo(
+    () => ({
+      takenNames: otherWorkspaceNames(args.factories, args.factoryId),
+      takenKeys: otherWorkspaceKeys(args.factories, args.factoryId),
+    }),
     [args.factories, args.factoryId],
   );
 
@@ -449,6 +463,7 @@ export function useOnboardingPageModel(args: {
     selections: integrations.selections,
     setSaving,
     takenNames,
+    takenKeys,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
     installFactory: installer.installFactory,

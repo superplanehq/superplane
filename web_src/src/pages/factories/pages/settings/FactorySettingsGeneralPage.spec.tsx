@@ -90,4 +90,42 @@ describe("FactorySettingsGeneralPage", () => {
     expect(mutateAsync).toHaveBeenCalledWith({ name: "Refunds" });
     expect(mutateAsync.mock.calls[0][0]).not.toHaveProperty("description");
   });
+
+  it("renames a workspace that still has a legacy uppercase key without touching the key", async () => {
+    // REFUND_FACTORY.key is "RF" — created before keys became lowercase-only.
+    // Saving a name-only change must not trip the new-key validation.
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.clear(screen.getByTestId("factory-settings-name"));
+    await user.type(screen.getByTestId("factory-settings-name"), "Refunds");
+    await user.click(screen.getByTestId("factory-settings-save"));
+
+    expect(mutateAsync).toHaveBeenCalledWith({ name: "Refunds" });
+    expect(screen.queryByText(/lowercase letters/)).not.toBeInTheDocument();
+  });
+
+  it("normalizes typed key input to lowercase and saves it", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.clear(screen.getByTestId("factory-settings-key"));
+    await user.type(screen.getByTestId("factory-settings-key"), "NewKey");
+    expect(screen.getByTestId("factory-settings-key")).toHaveValue("newke");
+
+    await user.click(screen.getByTestId("factory-settings-save"));
+    expect(mutateAsync).toHaveBeenCalledWith({ name: "Semaphore", key: "newke" });
+  });
+
+  it("rejects an edited key that is too short with a lowercase-letters message", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.clear(screen.getByTestId("factory-settings-key"));
+    await user.type(screen.getByTestId("factory-settings-key"), "a");
+    await user.click(screen.getByTestId("factory-settings-save"));
+
+    expect(screen.getByText("Use 2 to 5 lowercase letters.")).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
 });
