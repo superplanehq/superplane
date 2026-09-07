@@ -112,6 +112,7 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
+import { useHostedCreditEmptyBanner } from "../lib/useHostedCreditEmptyBanner";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
@@ -214,6 +215,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const hostedCreditBanner = useHostedCreditEmptyBanner(organizationId, factoryKey, { action: "billing" });
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -406,6 +408,7 @@ export function LinesPage() {
         />
       ) : null}
       <div className={factoryKanbanPageClassName}>
+        {hostedCreditBanner ? <div className="shrink-0 px-3 pt-3">{hostedCreditBanner}</div> : null}
         <div className="shrink-0">
           <LineDetailHeader
             organizationId={organizationId}
