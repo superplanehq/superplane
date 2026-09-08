@@ -1587,7 +1587,7 @@ function PhaseColumn({
               canEditAgent={Boolean(agentEditor.agentNode)}
               onRowAction={(automation, action) => {
                 if (action === "edit-agent") {
-                  agentEditor.openEditor();
+                  agentEditor.openEditor?.();
                   return;
                 }
                 onAutomationRowAction?.(automation, action);
