@@ -1036,7 +1036,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }, [isOpen, suggestions.length, measureCursorPixelPosition]);
 
     useEffect(() => {
-      setInputValue(value);
+      setInputValue(String(value ?? ""));
     }, [value]);
 
     // Adjust textarea height when value or preview mode changes
