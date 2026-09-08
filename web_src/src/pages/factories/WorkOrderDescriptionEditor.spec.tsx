@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -140,6 +140,46 @@ describe("WorkOrderDescriptionEditor", () => {
     expect(screen.getByRole("button", { name: "Link" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Underline" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Strikethrough" })).toBeInTheDocument();
+  });
+
+  it("inserts an uploaded image as an sp-file markdown ref", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onUploadFiles = vi.fn().mockResolvedValue([
+      {
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        filename: "bug.png",
+        contentType: "image/png",
+        ref: "sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        previewUrl: "blob:preview",
+        isImage: true,
+      },
+    ]);
+
+    render(
+      <WorkOrderDescriptionEditor
+        value=""
+        maxLength={5000}
+        disabled={false}
+        onChange={onChange}
+        onUploadFiles={onUploadFiles}
+      />,
+    );
+
+    const input = await screen.findByTestId("work-order-description-input");
+    await user.click(input);
+    const file = new File(["png"], "bug.png", { type: "image/png" });
+    fireEvent.paste(input, {
+      clipboardData: {
+        files: [file],
+        getData: () => "",
+      },
+    });
+
+    expect(onUploadFiles).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onChange.mock.calls.at(-1)?.[0]).toContain("sp-file://aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    });
   });
 
   it("turns selected text into a heading from the heading menu", async () => {
