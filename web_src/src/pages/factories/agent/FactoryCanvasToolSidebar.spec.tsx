@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { FactoryCanvasToolSidebar } from "./FactoryCanvasToolSidebar";
 
@@ -97,8 +96,6 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}): 
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
-    agentMode: "operator" as AgentMode,
-    switchAgentMode: vi.fn(),
     ...overrides,
   };
 }
@@ -129,7 +126,7 @@ describe("FactoryCanvasToolSidebar", () => {
       expect(message).toHaveClass("text-[15px]");
       expect(message).toHaveClass("font-normal");
     }
-    expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
   });
 
   it("does not render while the sidebar is closed", () => {
