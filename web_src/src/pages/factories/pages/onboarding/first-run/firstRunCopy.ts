@@ -8,6 +8,7 @@ export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
     switchOrganization: "Switch organization",
+    switchWorkspace: "Switch workspace",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
     back: "Back",
