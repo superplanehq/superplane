@@ -41,15 +41,10 @@ export type BacklogColumnProps = {
   intakePanel?: BacklogIntakePanel;
   /** Opens the Add intake picker from the overflow menu. Hidden when unset. */
   onAddIntake?: () => void;
-  /** Column automations for the header indicator. Hidden when unset. */
+  /** Column automations for the header icons. Hidden when unset. */
   automations?: ColumnAutomation[];
-  /** Opens the Automations menu. Hidden when unset. */
-  onOpenAutomations?: () => void;
-  automationsOpen?: boolean;
-  onCloseAutomations?: () => void;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -84,12 +79,8 @@ export function BacklogColumn({
   intakePanel,
   onAddIntake,
   automations,
-  onOpenAutomations,
-  automationsOpen,
-  onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -123,12 +114,8 @@ export function BacklogColumn({
             title={title}
             createPopover={createPopover}
             automations={automations}
-            automationsOpen={automationsOpen}
-            onOpenAutomations={onOpenAutomations}
-            onCloseAutomations={onCloseAutomations}
             onAddAutomation={onAddAutomation}
             onAutomationRowAction={onAutomationRowAction}
-            automationsLockOpen={automationsLockOpen}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
             colorId={colorId}
@@ -162,12 +149,8 @@ function BacklogColumnHeaderActions({
   title,
   createPopover,
   automations,
-  automationsOpen,
-  onOpenAutomations,
-  onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
   onOpenSettings,
   onAddIntake,
   colorId,
@@ -176,12 +159,8 @@ function BacklogColumnHeaderActions({
   BacklogColumnProps,
   | "title"
   | "automations"
-  | "automationsOpen"
-  | "onOpenAutomations"
-  | "onCloseAutomations"
   | "onAddAutomation"
   | "onAutomationRowAction"
-  | "automationsLockOpen"
   | "onOpenSettings"
   | "onAddIntake"
   | "colorId"
@@ -194,14 +173,8 @@ function BacklogColumnHeaderActions({
       <BacklogCreatePopover {...createPopover} />
       <ColumnAutomationsHeaderSlot
         title={title}
-        columnKey="backlog"
         automations={automations}
-        open={automationsOpen}
-        onOpen={onOpenAutomations}
-        onClose={onCloseAutomations}
-        onAdd={onAddAutomation}
         onRowAction={onAutomationRowAction}
-        lockOpen={automationsLockOpen}
         testId="lines-backlog-automations"
       />
       <ColumnLaneMenu
@@ -209,6 +182,7 @@ function BacklogColumnHeaderActions({
         testId="lines-backlog-menu"
         onEdit={onOpenSettings}
         onAddIntake={onAddIntake}
+        onAddAutomation={onAddAutomation}
         colorId={colorId}
         onColorChange={onColorChange}
       />

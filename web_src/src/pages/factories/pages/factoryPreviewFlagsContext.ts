@@ -9,7 +9,7 @@ export interface FactoryPreviewFlags {
   /** Show Add intake in the Intake drawer. */
   addIntakeControl: boolean;
   /**
-   * Per-column Automations menu. On by default.
+   * Per-column automation icons in the header. On by default.
    * Set false to keep lane listener banners (legacy Storybook).
    */
   columnAutomations?: boolean;

@@ -463,6 +463,8 @@ export const COLUMN_AUTOMATIONS_COPY = {
   needsRepairLabel: "Needs repair",
   disabledLabel: "Disabled",
   editLabel: "Edit automation",
+  editAgentLabel: "Edit Agent",
+  editAutomationMenuLabel: "Edit Automation",
   tabsLabel: "Automation sections",
   generalTab: "General",
   agentTab: "Agent",

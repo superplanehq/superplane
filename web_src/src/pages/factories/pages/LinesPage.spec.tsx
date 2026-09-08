@@ -411,10 +411,12 @@ describe("LinesPage board", () => {
     expect(within(backlog).queryByTestId(`line-intake-source-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-listener-handler-discussion")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-verify-add-pr-feedback")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-backlog-automations")).toHaveTextContent("3");
-    expect(screen.getByTestId("lines-phase-0-automations")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-verify-automations")).toHaveTextContent("1");
-    expect(screen.getByTestId("lines-done-automations")).toBeInTheDocument();
+    expect(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`column-automation-icon-${SENTRY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`column-automation-icon-${PAGERDUTY_INTAKE_ID}`)).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-icon-handler-discussion")).toBeInTheDocument();
+    expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
   });
 
   it("opens the backlog automations menu from the indicator", async () => {
@@ -423,15 +425,15 @@ describe("LinesPage board", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-backlog-automations"));
+    await user.click(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`,
-    );
-    expect(screen.getByRole("heading", { name: "Backlog automations" })).toBeInTheDocument();
+    expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
     expect(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
       "On GitHub issue → Create a task in Backlog",
     );
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
     expect(screen.getByTestId("column-automation-row-analysis-app-refund-backlog")).toHaveTextContent(
       "On task in Backlog → Score the task",
     );
@@ -440,8 +442,9 @@ describe("LinesPage board", () => {
   it("opens intake settings on the first tab when an automation row is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
+    await user.click(screen.getByTestId(`column-automation-icon-${GITHUB_ISSUES_INTAKE_ID}`));
     await user.click(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
@@ -453,8 +456,9 @@ describe("LinesPage board", () => {
   it("opens an existing phase automation in the board view popup", async () => {
     useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
     await user.click(screen.getByTestId("column-automation-row-step-0-app-refund-implementer"));
 
     const location = screen.getByTestId("lines-test-location");
@@ -483,8 +487,9 @@ describe("LinesPage board", () => {
   it("opens an existing analysis automation in the board view popup", async () => {
     useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
     const user = userEvent.setup();
-    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`);
 
+    await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
     await user.click(screen.getByTestId("column-automation-row-analysis-app-refund-backlog"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
@@ -494,30 +499,48 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
-  it("opens the phase automations menu from the indicator", async () => {
+  it("opens the phase automation summary from the header icon", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-0-automations"));
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`,
-    );
     expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
-    expect(screen.getByTestId("column-automations-add")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-row-step-0-app-refund-implementer")).toHaveTextContent(
+      "On task in Phase 1 → Run the Phase 1 agent",
+    );
+    expect(screen.queryByTestId("column-automations-add")).not.toBeInTheDocument();
   });
 
-  it("opens the verify and done automations menus from the indicators", async () => {
+  it("opens Add automation from the column menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-verify-automations"));
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automations=verify");
-    expect(screen.getByRole("heading", { name: "Verify automations" })).toBeInTheDocument();
+    await user.click(screen.getByTestId("lines-phase-menu-0"));
+    await user.click(screen.getByTestId("lines-phase-menu-0-add-automation"));
 
-    await user.click(screen.getByTestId("lines-done-automations"));
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("automations=done");
-    expect(screen.getByRole("heading", { name: "Done automations" })).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Add automation" })).toBeInTheDocument();
+  });
+
+  it("opens the verify and done automation summaries from the header icons", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-pr-closure", name: "PR Closure" }] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("column-automation-icon-handler-discussion"));
+    expect(screen.getByTestId("column-automation-row-handler-discussion")).toHaveTextContent(
+      "On pull request comment → Address the feedback",
+    );
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByTestId("column-automation-icon-closure-app-pr-closure"));
+    expect(screen.getByTestId("column-automation-row-closure-app-pr-closure")).toHaveTextContent(
+      "On pull request merged or closed → Complete the task",
+    );
   });
 
   it("names each Verify listener from its source", async () => {
@@ -818,10 +841,14 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
-    expect(screen.getByTestId("lines-phase-menu-0-edit-agent")).toHaveTextContent("Edit Agent");
-    await user.click(screen.getByTestId("lines-phase-menu-0-edit"));
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit")).toHaveTextContent(
+      "Edit Automation",
+    );
+    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).toHaveTextContent(
+      "Edit Agent",
+    );
+    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit"));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
@@ -835,8 +862,8 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent"));
 
     expect(screen.getByRole("heading", { level: 2, name: "Implement From Task Description" })).toBeInTheDocument();
     expect(screen.getByTestId("planning-review-nav-steps")).toHaveAttribute("aria-current", "page");
@@ -852,17 +879,19 @@ describe("LinesPage board editing", () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    expect(screen.getByTestId("lines-phase-menu-0-edit")).toHaveTextContent("Edit Automation");
-    expect(screen.queryByTestId("lines-phase-menu-0-edit-agent")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    expect(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit")).toHaveTextContent(
+      "Edit Automation",
+    );
+    expect(screen.queryByTestId("column-automation-step-0-app-refund-implementer-edit-agent")).not.toBeInTheDocument();
   });
 
   it("stages and commits the canvas agent on Save Agent", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-phase-menu-0"));
-    await user.click(screen.getByTestId("lines-phase-menu-0-edit-agent"));
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+    await user.click(screen.getByTestId("column-automation-step-0-app-refund-implementer-edit-agent"));
     await user.click(screen.getByTestId("planning-review-step-toggle-0"));
     const stepName = screen.getByTestId("planning-review-step-name-0");
     await user.clear(stepName);
