@@ -5,14 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 )
 
 type OrganizationCleanupWorker struct {
@@ -164,6 +167,18 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 		return nil, nil, nil
 	}
 
+	if err := deleteOrganizationFileObjects(tx, organization.ID); err != nil {
+		return nil, nil, fmt.Errorf("delete organization files: %w", err)
+	}
+
+	var remainingFiles int64
+	if err := tx.Model(&models.File{}).Where("organization_id = ?", organization.ID).Limit(1).Count(&remainingFiles).Error; err != nil {
+		return nil, nil, fmt.Errorf("count remaining organization files: %w", err)
+	}
+	if remainingFiles > 0 {
+		return nil, nil, nil
+	}
+
 	organizationSessions, err := models.ListAgentSessionsForOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list organization agent sessions: %w", err)
@@ -191,4 +206,19 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 
 	w.logger.Infof("Successfully cleaned up organization %s", organization.ID)
 	return organizationSessions, nil, nil
+}
+
+func deleteOrganizationFileObjects(tx *gorm.DB, organizationID uuid.UUID) error {
+	files, err := models.ListFilesForOrganization(tx, organizationID, 500)
+	if err != nil {
+		return err
+	}
+	provider := blob.Current()
+	ctx := context.Background()
+	for i := range files {
+		if err := storedfiles.DeleteObjectAndRow(ctx, tx, provider, &files[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
