@@ -19,6 +19,7 @@ import {
 } from "@/pages/factories/pages/organizationSettings/organizationSettingsRoutePages";
 import { OrganizationSettingsIntegrationsPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsIntegrationsPage";
 import { OrganizationSettingsWorkspaceUsagePage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsWorkspaceUsagePage";
+import { OrganizationSettingsBillingPage } from "@/pages/factories/pages/organizationSettings/OrganizationSettingsBillingPage";
 import {
   FactoryOrganizationApiKeyDetailPage,
   FactoryOrganizationApiKeysPage,
@@ -193,6 +194,15 @@ export const factorySettingsSectionRoutes = [
     element={
       <RequirePermission resource="secrets" action="read">
         <FactoryOrganizationSecretDetailPage />
+      </RequirePermission>
+    }
+  />,
+  <Route
+    key="factory-settings-organization-billing"
+    path="organization/billing"
+    element={
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsBillingPage />
       </RequirePermission>
     }
   />,
