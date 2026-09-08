@@ -380,6 +380,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
+        onUseDifferentAccount={model.createVcsConnection}
         onContinue={() => flow.goToScreen("choose")}
       />
     );

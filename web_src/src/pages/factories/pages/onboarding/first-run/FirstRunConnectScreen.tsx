@@ -125,6 +125,7 @@ export function FirstRunConnectScreen({
   chrome,
   onConnectGitHub,
   onUseInstallation,
+  onUseDifferentAccount,
   onContinue,
 }: {
   githubConnected: boolean;
@@ -138,6 +139,7 @@ export function FirstRunConnectScreen({
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
+  onUseDifferentAccount?: () => void;
   onContinue: () => void;
 }) {
   const { showAccountPicker, waitingForApproval } = connectScreenState({
@@ -165,6 +167,7 @@ export function FirstRunConnectScreen({
           waitingForApproval={waitingForApproval}
           onConnectGitHub={onConnectGitHub}
           onUseInstallation={onUseInstallation}
+          onUseDifferentAccount={onUseDifferentAccount}
           onContinue={onContinue}
         />
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
@@ -185,6 +188,7 @@ function ConnectScreenBody({
   waitingForApproval,
   onConnectGitHub,
   onUseInstallation,
+  onUseDifferentAccount,
   onContinue,
 }: {
   githubConnected: boolean;
@@ -197,6 +201,7 @@ function ConnectScreenBody({
   waitingForApproval: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
+  onUseDifferentAccount?: () => void;
   onContinue: () => void;
 }) {
   if (showAccountPicker && onUseInstallation) {
@@ -245,6 +250,17 @@ function ConnectScreenBody({
         <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
           {copy.continue}
         </Button>
+        {onUseDifferentAccount ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-[13px] text-primary hover:text-primary"
+            onClick={onUseDifferentAccount}
+            data-testid="first-run-github-use-different"
+          >
+            {copy.useDifferentAccount}
+          </Button>
+        ) : null}
       </>
     );
   }

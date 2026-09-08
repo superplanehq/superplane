@@ -197,6 +197,24 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
+  it("starts a new connect from the connected state to change the GitHub account", async () => {
+    const user = userEvent.setup();
+    const createVcsConnection = vi.fn();
+
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup: { ...setupState(), vcsReady: true },
+        selectedVcsConnectionId: "github-1",
+        createVcsConnection,
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    await user.click(screen.getByTestId("first-run-github-use-different"));
+    expect(createVcsConnection).toHaveBeenCalled();
+  });
+
   function bindablePageModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
     const pendingInstance = {
       metadata: { id: "int-new", integrationName: "github" },
