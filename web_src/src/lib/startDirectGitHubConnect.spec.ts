@@ -89,6 +89,7 @@ describe("pendingGitHubInstallPicker", () => {
               state: "pending",
               metadata: {
                 startedByUserID: "user-1",
+                startedByGitHubLogin: "forestileao",
                 state: "csrf",
                 githubApp: { slug: "superplane" },
                 pendingInstallations: [{ id: "11", accountLogin: "acme" }],
@@ -103,6 +104,7 @@ describe("pendingGitHubInstallPicker", () => {
       state: "csrf",
       appSlug: "superplane",
       authorizeUrl: "",
+      githubLogin: "forestileao",
       installations: [{ id: "11", accountLogin: "acme" }],
     });
   });
@@ -154,6 +156,7 @@ describe("pendingGitHubInstallPicker", () => {
       state: "csrf",
       appSlug: "superplane",
       authorizeUrl: "",
+      githubLogin: "",
       installations: [
         { id: "11", accountLogin: "acme" },
         { id: "22", accountLogin: "octo" },

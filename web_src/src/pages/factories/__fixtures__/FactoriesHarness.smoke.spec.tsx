@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
+import { FIRST_RUN_COPY } from "../pages/onboarding/first-run/firstRunCopy";
 import { factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
@@ -311,12 +312,31 @@ describe("FactoriesHarness workspace setup", () => {
 
     expect(await screen.findByTestId("first-run-github-account-picker", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-use-forestileao")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
     expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
   }, 15000);
 
   // Regression: on a direct repo-step load the selection sync ran before the
   // connection list arrived, dropped the saved connection, and the repository
   // list stayed empty until the user re-picked the account.
+  // Leftover githubSetup=request on step=repo used to reopen Connect and
+  // bounce. The step in the URL must win.
+  it("stays on the repository screen when an install-request flag is leftover on step=repo", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo&githubSetup=request`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.vcs)}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  }, 15000);
+
   it("restores the saved connection's repositories on a direct repo-step load", async () => {
     render(
       <FactoriesHarness

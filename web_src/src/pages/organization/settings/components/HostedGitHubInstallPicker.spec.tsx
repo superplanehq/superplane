@@ -19,7 +19,8 @@ describe("HostedGitHubInstallPicker", () => {
     expect(screen.getByRole("heading", { name: "Select a GitHub account" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use acme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Use octo" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Install on a different account" })).toHaveAttribute(
+    expect(screen.getByText("Do not see your GitHub account or organization?")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Install the GitHub App there." })).toHaveAttribute(
       "href",
       "https://github.com/apps/superplane/installations/new?state=csrf",
     );

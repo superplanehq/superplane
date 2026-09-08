@@ -80,6 +80,20 @@ export function hostedGitHubAuthorizeURL(metadata: unknown): string {
   return typeof url === "string" ? url : "";
 }
 
+/**
+ * GitHub login of the member who authorized this connect. The account
+ * picker uses it so the user can see which GitHub session the listed
+ * installations belong to.
+ */
+export function hostedGitHubStartedByLogin(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const login = (metadata as { startedByGitHubLogin?: unknown }).startedByGitHubLogin;
+  return typeof login === "string" ? login : "";
+}
+
 export function hostedGitHubAppSlug(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";

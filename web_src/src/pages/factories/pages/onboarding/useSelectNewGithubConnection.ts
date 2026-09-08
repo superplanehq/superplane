@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 
 import type { OrganizationsIntegration } from "@/api-client";
-import { pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
+import { hostedGitHubInstallRequested, pendingGitHubInstallations } from "@/lib/hostedGitHubInstall";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 
@@ -30,7 +30,7 @@ export function useOnboardingGithubConnections(args: {
 
   useSelectNewGithubConnection({
     openSection: args.openSection,
-    selectNewest: args.selectNewest && !accountPickerPending(githubConnections.allInstances),
+    selectNewest: args.selectNewest && !githubConnectStillWaiting(githubConnections.allInstances),
     readyInstances: githubConnections.readyInstances,
     selections: args.selections,
     selectInstance: args.selectInstance,
@@ -41,15 +41,17 @@ export function useOnboardingGithubConnections(args: {
 }
 
 /**
- * True when a connect still waits for the user to pick a GitHub account. The
- * OAuth return also carries `pick=newest`, so without this check the wizard
- * would select an older ready connection and skip the account picker.
+ * True when a connect still waits for an account choice or for a GitHub
+ * admin to approve an install request. The return URL also carries
+ * `pick=newest`, so without this check the wizard would select an older
+ * ready connection and skip the waiting screen.
  */
-function accountPickerPending(instances: OrganizationsIntegration[]): boolean {
-  return instances.some(
-    (instance) =>
-      instance.status?.state !== "ready" && pendingGitHubInstallations(instance.status?.metadata).length >= 1,
-  );
+function githubConnectStillWaiting(instances: OrganizationsIntegration[]): boolean {
+  return instances.some((instance) => {
+    if (instance.status?.state === "ready") return false;
+    const metadata = instance.status?.metadata;
+    return pendingGitHubInstallations(metadata).length >= 1 || hostedGitHubInstallRequested(metadata);
+  });
 }
 
 function newestReadyInstance(instances: OrganizationsIntegration[]): OrganizationsIntegration | undefined {
