@@ -26,7 +26,6 @@ import {
 import {
   defaultSplitRunPopupTab,
   type SplitRunPopupTab,
-  splitRunLogTabDotClass,
   splitRunPhaseAutomationHref,
   splitRunPhaseRunHref,
 } from "./splitRunPopupModel";
@@ -37,7 +36,8 @@ import { useSplitRunLiveCanvas } from "./useSplitRunLiveCanvas";
 import { runningSplitRunPhaseId } from "./followLogScroll";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
-import { WorkOrderStatusDot } from "../../workOrders/WorkOrderStatusDot";
+import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
+import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
 
 /**
@@ -454,11 +454,10 @@ function SplitRunPopupTabs({
         <TabsList aria-label="Task views">
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="log">
-            <WorkOrderStatusDot
-              colorClassName={splitRunLogTabDotClass(fixture.lineStatus)}
-              pulsing={fixture.lineStatus === "running"}
+            <WorkOrderStatusIcon
+              status={displayStatusForLineStatus(fixture.lineStatus)}
               title={splitRunStatusLabel(fixture.lineStatus)}
-              className="size-1.5"
+              className="size-3"
               data-testid="split-run-log-tab-dot"
               aria-hidden
             />

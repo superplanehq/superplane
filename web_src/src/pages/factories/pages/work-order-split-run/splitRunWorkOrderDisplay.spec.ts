@@ -2,10 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import { formatDuration, formatMinutesSecondsDuration } from "@/lib/duration";
 
-import { durationForExecution, elapsedForDisplay } from "./splitRunWorkOrderDisplay";
+import { displayStatusForLineStatus, durationForExecution, elapsedForDisplay } from "./splitRunWorkOrderDisplay";
 
 const START = "2026-08-21T12:00:00.000Z";
 const FOUR_MINUTES = 4 * 60 * 1000;
+
+describe("displayStatusForLineStatus", () => {
+  it("maps line status to the card icon status", () => {
+    expect(displayStatusForLineStatus("running")).toBe("running");
+    expect(displayStatusForLineStatus("passed")).toBe("completed");
+    expect(displayStatusForLineStatus("waiting")).toBe("waiting");
+    expect(displayStatusForLineStatus("failed")).toBe("failed");
+    expect(displayStatusForLineStatus("cancelled")).toBe("cancelled");
+    expect(displayStatusForLineStatus("pending")).toBe("draft");
+  });
+});
 
 describe("elapsedForDisplay", () => {
   it("keeps draft and waiting labels", () => {
