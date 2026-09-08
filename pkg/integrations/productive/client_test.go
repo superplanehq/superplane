@@ -1,7 +1,10 @@
 package productive
 
 import (
+	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -191,30 +194,64 @@ func Test__Client__GetTask(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/tasks/91")
 }
 
-func Test__Client__ListChangedTaskDocuments(t *testing.T) {
-	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"data":[
-			{
-				"id":"91",
-				"type":"tasks",
-				"attributes":{"title":"Fix payment retries","created_at":"2026-01-01T09:00:00Z","updated_at":"2026-01-03T09:00:00Z"}
-			}
-		]}`),
-	}}
+func Test__Client__CreateWebhook(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			jsonResponse(`{"data":{"id":"555","type":"webhooks"}}`),
+		}}
 
-	documents, err := testClient(t, httpContext).ListChangedTaskDocuments("42", 2, 50)
+		webhook, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		require.NoError(t, err)
+		assert.Equal(t, &Webhook{ID: "555"}, webhook)
+
+		require.Len(t, httpContext.Requests, 1)
+		req := httpContext.Requests[0]
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.Contains(t, req.URL.String(), "/webhooks")
+		assert.Equal(t, "token-1", req.Header.Get(AuthTokenHeader))
+		assert.Equal(t, "org-1", req.Header.Get(OrganizationIDHeader))
+
+		body, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "https://superplane.example/webhooks/abc")
+		assert.Contains(t, string(body), "s3cr3t")
+		assert.Contains(t, string(body), `"id":"42"`)
+	})
+
+	t.Run("webhooks_limit_exceeded -> ErrWebhooksLimitExceeded", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","code":"webhooks_limit_exceeded","title":"Webhooks are not available on your plan"}]}`)),
+			},
+		}}
+
+		_, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		require.ErrorIs(t, err, ErrWebhooksLimitExceeded)
+	})
+
+	t.Run("other 403 -> generic error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`{"errors":[{"status":"403","code":"not_authorized","title":"Nope"}]}`)),
+			},
+		}}
+
+		_, err := testClient(t, httpContext).CreateWebhook("42", "https://superplane.example/webhooks/abc", "s3cr3t")
+		require.Error(t, err)
+		assert.False(t, errors.Is(err, ErrWebhooksLimitExceeded))
+	})
+}
+
+func Test__Client__DeleteWebhook(t *testing.T) {
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{jsonResponse(`{}`)}}
+
+	err := testClient(t, httpContext).DeleteWebhook("555")
 	require.NoError(t, err)
-	require.Len(t, documents, 1)
-	assert.Equal(t, "91", documents[0]["id"])
 
 	require.Len(t, httpContext.Requests, 1)
-	query := httpContext.Requests[0].URL.Query()
-	assert.Equal(t, "42", query.Get("filter[project_id]"))
-	assert.Equal(t, "-updated_at", query.Get("sort"))
-	assert.Equal(t, "2", query.Get("page[number]"))
-	assert.Equal(t, "50", query.Get("page[size]"))
-
-	// A task closed since the last poll is still a change the trigger can be
-	// configured to report, so the read is not limited to open tasks.
-	assert.Empty(t, query.Get("filter[status]"))
+	req := httpContext.Requests[0]
+	assert.Equal(t, http.MethodDelete, req.Method)
+	assert.Contains(t, req.URL.String(), "/webhooks/555")
 }
