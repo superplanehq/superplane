@@ -403,7 +403,7 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	var billedMicros int64
 	err = tx.Model(&WorkspaceUsageEvent{}).
 		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", orgID, UsageFundingSourceHosted, UsageKindModel).
+		Where("organization_id = ? AND funding_source = ? AND usage_kind IN ?", orgID, UsageFundingSourceHosted, []string{UsageKindModel, UsageKindCompute}).
 		Scan(&billedMicros).Error
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err

@@ -140,6 +140,78 @@ func Test__BYOKRecordUsageIsNotMarkedUp(t *testing.T) {
 	assert.Equal(t, int64(0), summary.BilledMicros)
 }
 
+func Test__DescribeOrganizationLLMCreditSubtractsComputeUsage(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+	modelBilledMicros := models.ApplyMarkupMicros(300*models.MicrosPerCent, models.DefaultMarkupBPS)
+
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 3600,
+	}))
+	var computeCostMicros int64
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Select("COALESCE(SUM(cost_micros), 0)").
+		Where("canvas_run_id = ? AND usage_kind = ?", runID, models.UsageKindCompute).
+		Scan(&computeCostMicros).Error)
+	require.Greater(t, computeCostMicros, int64(0))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, modelBilledMicros+computeCostMicros, summary.BilledMicros)
+	assert.Equal(t, summary.GrantMicros-summary.BilledMicros, summary.RemainingMicros)
+}
+
+func Test__ComputeUsageAloneCanExhaustHostedCredit(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+	runID := requireExecutionRunID(t, execution)
+
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Greater(t, before.RemainingMicros, int64(0))
+
+	// e1-large-amd64 at ~$2/hr; enough seconds to exceed the welcome grant.
+	secondsToExhaust := before.RemainingMicros/556 + 10
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: secondsToExhaust,
+	}))
+
+	err = models.AssertHostedCreditAvailable(db, r.Organization.ID)
+	require.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+
+	err = models.AssertHostedRunAllowed(db, r.Organization.ID, nil)
+	require.ErrorIs(t, err, models.ErrHostedCreditEmpty)
+}
+
 func Test__AssertHostedCreditAvailable(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	r := support.Setup(t)
@@ -290,6 +362,30 @@ func Test__FactoryHostedBudgetHardStopWhenSpent(t *testing.T) {
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
 		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
+	require.ErrorIs(t, err, models.ErrFactoryHostedBudgetEmpty)
+}
+
+func Test__FactoryHostedBudgetHardStopWhenSpentOnCompute(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	workOrderExecution := dispatchWorkOrderExecution(t, r)
+	factory, err := models.FindFactory(db, r.Organization.ID, workOrderExecution.FactoryID)
+	require.NoError(t, err)
+	budget := int64(1)
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, &budget))
+
+	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, workOrderExecution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "runner",
+		MachineType:     "e1-large-amd64",
+		FleetID:         "e1-large-amd64",
+		DurationSeconds: 60,
 	}))
 
 	err = models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID)
