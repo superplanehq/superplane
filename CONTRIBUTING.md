@@ -56,12 +56,13 @@ migrations, then start the development server:
 ```sh
 make dev.up        # Build images and start containers (Postgres, RabbitMQ, app shell, …)
 make dev.setup     # Codegen, Go + JS deps, database create/migrate (run inside the app container)
+make seed          # Optional: owner + GitHub-connected workspace (needs GitHub App env + ANTHROPIC_API_KEY)
 make dev.server    # Start air + Vite (UI at http://localhost:8000)
 ```
 
 After the first setup, run `make dev.up` when the stack is not running, then `make dev.server` to start air and Vite (use `make dev.server.fg` for foreground logs). Re-run `make dev.setup` when you need a fresh `npm install`, codegen, or migrations.
 
-When `make dev.server` reports the app as healthy, open SuperPlane at [http://localhost:8000](http://localhost:8000).
+`make seed` is optional. Put the hosted GitHub App values and `ANTHROPIC_API_KEY` in `.env`. Install the GitHub App on a GitHub account first. Seed creates a local owner, a Demo organization, and a finished factory workspace. It writes only to `superplane_dev`. It does not drop the database. Sign in at [http://localhost:8000](http://localhost:8000) with the printed email and password.
 
 To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`
