@@ -440,20 +440,19 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   // The placeholder workspace under setup is itself in `factories`, so
   // another workspace exists when any factory has a different id.
   const hasOtherWorkspace = factories.some((existing) => existing.id !== factoryId);
-  // The user can also belong to organizations outside the current one. Those
-  // give the user somewhere to go even when this organization has no other
-  // workspace yet.
+  // The organization switch is only for other organizations. Another
+  // workspace in this organization uses the workspace switch.
   const otherOrganizations = (accountOrganizations.data ?? []).filter(
     (organization) => !organizationMatchesRoute(organization, organizationId),
   );
-  const canSwitchOrganization = hasOtherWorkspace || otherOrganizations.length > 0;
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
     return {
       displayName: firstNameOf(account?.name),
       email: account?.email,
       onLogOut: signOut,
-      organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
+      organizationSwitch: otherOrganizations.length > 0 ? { currentOrganizationRouteId: organizationId } : undefined,
+      workspaceSwitch: hasOtherWorkspace ? { organizationId, currentFactoryId: factoryId, factories } : undefined,
       stepIndex: STEP_INDEX_FOR_SCREEN[target],
       stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
       onBack: backActionFor(target, flow),

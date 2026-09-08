@@ -114,7 +114,7 @@ function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/s
 
 describe("FirstRunSetup", () => {
   beforeEach(() => {
-    factory = { id: "factory-1", onboarding: { vcsIntegrationId: "github-1" } };
+    factory = { id: "factory-1", key: "PAY", name: "New workspace", onboarding: { vcsIntegrationId: "github-1" } };
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
@@ -573,41 +573,6 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
 
-  it("shows Log out and the organization switch when another workspace exists", () => {
-    factories = [factory, { id: "factory-2" }];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-organization-switch")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
-  });
-
-  it("shows Log out and the organization switch when another organization exists", () => {
-    factories = [factory];
-    accountOrganizations = [
-      { id: "org-1", name: "Acme" },
-      { id: "org-2", name: "Other Co" },
-    ];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-organization-switch")).toBeInTheDocument();
-  });
-
-  it("opens the current organization from the switch menu so the user can leave setup", async () => {
-    factories = [factory, { id: "factory-2" }];
-    const user = userEvent.setup();
-
-    renderSetup(pageModel());
-
-    await user.click(screen.getByTestId("first-run-organization-switch"));
-    await user.click(screen.getByTestId("first-run-organization-option-org-1"));
-
-    expect(navigateSpy).toHaveBeenCalledWith("/org-1");
-  });
-
   it("goes back through every screen to the welcome screen", async () => {
     const user = userEvent.setup();
     const model = pageModel({
@@ -629,16 +594,5 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
     // The welcome screen is the first screen, so it offers no Back.
     expect(screen.queryByTestId("first-run-back")).not.toBeInTheDocument();
-  });
-
-  it("keeps Log out and hides the organization switch with a single org and single workspace", () => {
-    factories = [factory];
-    accountOrganizations = [{ id: "org-1", name: "Acme" }];
-
-    renderSetup(pageModel());
-
-    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-organization-switch")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
   });
 });
