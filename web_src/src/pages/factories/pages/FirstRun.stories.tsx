@@ -53,7 +53,7 @@ export const ConnectError: Story = {
     <FirstRunConnectScreen
       connectError={FIRST_RUN_COPY.connect.connectError}
       chrome={firstRunStoryChrome(1)}
-      onConnectGitHub={() => undefined}
+      onConnectGitHub={() => console.log("connect GitHub")}
     />
   ),
 };
@@ -65,7 +65,7 @@ export const ConnectInstallRequested: Story = {
       installRequested
       githubOrganization="acme"
       chrome={firstRunStoryChrome(1)}
-      onConnectGitHub={() => undefined}
+      onConnectGitHub={() => console.log("connect GitHub")}
     />
   ),
 };

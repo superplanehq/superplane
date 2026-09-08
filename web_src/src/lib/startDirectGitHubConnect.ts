@@ -10,6 +10,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubAuthorizeURL,
+  hostedGitHubInstallRequested,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
@@ -106,6 +107,29 @@ export function pendingGitHubAccountPicker(
       return false;
     }
     return pendingGitHubInstallations(item.status?.metadata).length >= 1;
+  });
+  return accountPickerFromItem(pending);
+}
+
+/**
+ * First-run picker after GitHub returns a request and no account is ready.
+ * Settings Connect still uses pendingGitHubAccountPicker, so it keeps the
+ * GitHub install action instead of an empty account list.
+ */
+export function pendingGitHubRequestedPicker(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+): PendingGitHubAccountPicker | undefined {
+  if (!currentUserId) {
+    return undefined;
+  }
+
+  const pending = connected.find((item) => {
+    if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
+      return false;
+    }
+    const metadata = item.status?.metadata;
+    return hostedGitHubInstallRequested(metadata) && hostedGitHubState(metadata) !== "";
   });
   return accountPickerFromItem(pending);
 }

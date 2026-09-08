@@ -518,6 +518,35 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
+  it("shows a waiting account row when the pending connection has a request and no ready account", () => {
+    const pendingInstance = {
+      metadata: { id: "int-1", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          startedByGitHubLogin: "ada",
+          installRequested: true,
+          installRequestedAccount: "acme",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+        },
+      },
+    };
+
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: { name: "github", allInstances: [pendingInstance], readyInstances: [] },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
   it("names the GitHub organization from the return query", () => {
     renderSetup(
       pageModel({ openSection: "vcs" }),

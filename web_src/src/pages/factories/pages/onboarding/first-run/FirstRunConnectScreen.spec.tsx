@@ -220,7 +220,13 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).not.toBeInTheDocument();
 
-    await user.hover(screen.getByTestId("first-run-github-install-requested"));
+    const waitingRow = screen.getByTestId("first-run-github-install-requested");
+    expect(waitingRow).toHaveAttribute("tabindex", "0");
+    await user.hover(waitingRow);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
+
+    await user.unhover(waitingRow);
+    waitingRow.focus();
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 

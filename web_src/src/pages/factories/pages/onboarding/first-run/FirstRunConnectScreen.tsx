@@ -110,6 +110,7 @@ function AccountPickerWaitingRow({ login }: { login: string }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <div
+          tabIndex={0}
           className="flex cursor-default items-center gap-3 px-4 py-3"
           data-testid="first-run-github-install-requested"
         >

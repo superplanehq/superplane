@@ -6,6 +6,7 @@ import {
   pendingGitHubAccountPicker,
   pendingGitHubBrowserAction,
   pendingGitHubInstallPicker,
+  pendingGitHubRequestedPicker,
   startDirectGitHubConnect,
 } from "./startDirectGitHubConnect";
 
@@ -195,6 +196,55 @@ describe("pendingGitHubInstallPicker", () => {
           },
         },
       ]),
+    ).toBeUndefined();
+  });
+
+  it("returns a request-only picker when GitHub returned a request and no ready account", () => {
+    expect(
+      pendingGitHubRequestedPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                startedByGitHubLogin: "ada",
+                installRequested: true,
+                installRequestedAccount: "acme",
+                state: "csrf",
+                githubApp: { slug: "superplane" },
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toEqual({
+      id: "int-1",
+      state: "csrf",
+      appSlug: "superplane",
+      authorizeUrl: "",
+      githubLogin: "ada",
+      installations: [],
+    });
+    expect(
+      pendingGitHubAccountPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                installRequested: true,
+                state: "csrf",
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
     ).toBeUndefined();
   });
 

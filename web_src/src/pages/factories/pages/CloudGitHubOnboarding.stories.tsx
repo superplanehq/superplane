@@ -126,9 +126,9 @@ export const ChooseRepository: Story = {
       repositories={FIRST_RUN_REPOSITORIES}
       selectedRepository={null}
       chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onEditConnection={() => undefined}
-      onContinue={() => undefined}
+      onSelectRepository={(repository) => console.log("select repository", repository)}
+      onEditConnection={() => console.log("edit connection")}
+      onContinue={() => console.log("continue")}
     />
   ),
 };
@@ -141,9 +141,9 @@ export const ChooseWhyMissing: Story = {
       selectedRepository="acme/api"
       chrome={firstRunStoryChrome(2)}
       initialWhyMissingOpen
-      onSelectRepository={() => undefined}
-      onEditConnection={() => undefined}
-      onContinue={() => undefined}
+      onSelectRepository={(repository) => console.log("select repository", repository)}
+      onEditConnection={() => console.log("edit connection")}
+      onContinue={() => console.log("continue")}
     />
   ),
 };
@@ -156,9 +156,9 @@ export const ChooseLoading: Story = {
       selectedRepository={null}
       loading
       chrome={firstRunStoryChrome(2)}
-      onSelectRepository={() => undefined}
-      onEditConnection={() => undefined}
-      onContinue={() => undefined}
+      onSelectRepository={(repository) => console.log("select repository", repository)}
+      onEditConnection={() => console.log("edit connection")}
+      onContinue={() => console.log("continue")}
     />
   ),
 };

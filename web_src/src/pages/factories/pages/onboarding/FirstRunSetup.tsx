@@ -14,6 +14,7 @@ import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallR
 import {
   githubAccountPickerFromConnection,
   pendingGitHubAccountPicker,
+  pendingGitHubRequestedPicker,
   type PendingGitHubAccountPicker,
 } from "@/lib/startDirectGitHubConnect";
 import {
@@ -276,7 +277,8 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   );
   const accountPicker =
     pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
-    githubAccountPickerFromConnection(selectedConnection, me?.id);
+    githubAccountPickerFromConnection(selectedConnection, me?.id) ??
+    pendingGitHubRequestedPicker(model.githubConnections.allInstances, me?.id);
 
   // Only a GitHub round trip or a waiting install request lands on the
   // account picker page. A fresh pass opens the Connect GitHub page.
