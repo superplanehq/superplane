@@ -1,15 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { lazy, Suspense } from "react";
 
 import { FIRST_RUN_COPY } from "./onboarding/first-run/firstRunCopy";
 import { firstRunStoryChrome } from "./onboarding/first-run/firstRunMocks";
 import { FirstRunAnalysisScreen } from "./onboarding/first-run/FirstRunAnalysisScreen";
-import { FirstRunBoardExit } from "./onboarding/first-run/FirstRunBoardExit";
 import { FirstRunConnectScreen } from "./onboarding/first-run/FirstRunConnectScreen";
 import { FirstRunFlow } from "./onboarding/first-run/FirstRunFlow";
+import { FirstRunOnboardingMap } from "./onboarding/first-run/firstRunOnboardingMap";
+
+const FirstRunBoardExit = lazy(async () => {
+  const module = await import("./onboarding/first-run/FirstRunBoardExit");
+  return { default: module.FirstRunBoardExit };
+});
 
 /**
  * Isolated first-run screens. Step stories mount the clickable flow so
- * primary buttons advance.
+ * primary buttons advance. The map links GitHub account states, ticket
+ * setup, agent setup, analysis, and the board.
  */
 const meta = {
   title: "Factories/Pages/First run",
@@ -19,6 +26,11 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+export const PathMap: Story = {
+  name: "0 Map",
+  render: () => <FirstRunOnboardingMap />,
+};
 
 export const Journey: Story = {
   name: "0 Clickable journey",
@@ -99,5 +111,9 @@ export const AnalysisFailed: Story = {
 
 export const Board: Story = {
   name: "6 Board",
-  render: () => <FirstRunBoardExit />,
+  render: () => (
+    <Suspense fallback={<div data-testid="first-run-board" />}>
+      <FirstRunBoardExit />
+    </Suspense>
+  ),
 };
