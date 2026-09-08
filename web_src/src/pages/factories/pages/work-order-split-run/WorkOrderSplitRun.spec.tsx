@@ -742,6 +742,32 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
   });
 
+  it("tells a draft is under analysis and hides Reject while it runs", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+        analysisRuns: [
+          {
+            canvasId: "canvas-backlog",
+            workOrderId: DRAFT_WORK_ORDER.id ?? "",
+            run: {
+              id: "run-analysis",
+              canvasId: "canvas-backlog",
+              state: "STATE_STARTED",
+              createdAt: "2026-08-28T12:00:00Z",
+              updatedAt: "2026-08-28T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+  });
+
   it("puts artifacts on the right and check analyses under the description", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0], { checks: OPEN_WORK_ORDER_CHECKS }),
