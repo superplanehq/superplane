@@ -55,7 +55,7 @@ func ApplyOrderPaid(ctx context.Context, tx *gorm.DB, event *OrderWebhookEvent, 
 		return nil
 	}
 
-	orgID, err := parseOrganizationID(event.Data.Customer.ExternalID)
+	orgID, err := parseOrganizationID(event.Data)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 		return permanentApplyError("order event is required")
 	}
 
-	orgID, err := parseOrganizationID(event.Data.Customer.ExternalID)
+	orgID, err := parseOrganizationID(event.Data)
 	if err != nil {
 		return err
 	}
@@ -107,22 +107,37 @@ func ApplyOrderRefunded(ctx context.Context, tx *gorm.DB, event *OrderWebhookEve
 	return models.ReversePolarOrderCredit(tx, orgID, event.Data.ID, reverseMicros, refundID)
 }
 
-func parseOrganizationID(externalID string) (uuid.UUID, error) {
-	orgID, err := uuid.Parse(strings.TrimSpace(externalID))
+func parseOrganizationID(data OrderData) (uuid.UUID, error) {
+	orgID, err := uuid.Parse(data.organizationExternalID())
 	if err != nil {
 		return uuid.Nil, permanentApplyError("order customer external id is not an organization id")
 	}
 	return orgID, nil
 }
 
+func withOrganizationID(data OrderData, orgID uuid.UUID) OrderData {
+	if _, err := parseOrganizationID(data); err == nil {
+		return data
+	}
+	data.Customer.ExternalID = orgID.String()
+	data.ExternalCustomerID = orgID.String()
+	return data
+}
+
 func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLookup) (bool, error) {
 	if data.Product.IsCreditPack() {
 		return true, nil
 	}
-	if lookup == nil || strings.TrimSpace(data.Product.ID) == "" {
+	for _, item := range data.Items {
+		if item.Product.IsCreditPack() {
+			return true, nil
+		}
+	}
+	productID := data.productID()
+	if lookup == nil || productID == "" {
 		return false, nil
 	}
-	pack, err := lookup.GetCreditPack(ctx, data.Product.ID)
+	pack, err := lookup.GetCreditPack(ctx, productID)
 	if err != nil {
 		if errors.Is(err, ErrNotCreditPack) || IsNotFound(err) {
 			return false, nil
