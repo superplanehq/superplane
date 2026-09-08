@@ -4,6 +4,11 @@ export interface AccountOrganization {
   slug?: string;
   lastLocationPath?: string;
   lastLocationUpdatedAt?: string;
+  initialOnboardingPending?: boolean;
+}
+
+export function readyAccountOrganizations(organizations: AccountOrganization[]): AccountOrganization[] {
+  return organizations.filter((organization) => organization.initialOnboardingPending !== true);
 }
 
 export function parseAccountOrganizations(body: unknown): AccountOrganization[] {
@@ -56,5 +61,6 @@ function parseAccountOrganization(entry: unknown): AccountOrganization | null {
     ...(typeof candidate.lastLocationUpdatedAt === "string" && candidate.lastLocationUpdatedAt
       ? { lastLocationUpdatedAt: candidate.lastLocationUpdatedAt }
       : {}),
+    ...(candidate.initialOnboardingPending === true ? { initialOnboardingPending: true } : {}),
   };
 }

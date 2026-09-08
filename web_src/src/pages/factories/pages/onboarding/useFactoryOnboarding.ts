@@ -1,4 +1,5 @@
 import { factoriesUpdateFactoryOnboarding, type FactoriesUpdateFactoryOnboardingBody } from "@/api-client";
+import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,6 +24,9 @@ export function useFactoryOnboarding(organizationId: string, factoryId: string) 
     onSuccess: (factory) => {
       queryClient.setQueryData(factoryQueryKeys.detail(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryQueryKeys.list(organizationId) });
+      if (factory.onboarding?.completedAt) {
+        void queryClient.invalidateQueries({ queryKey: accountOrganizationsQueryKey });
+      }
     },
   });
 }
