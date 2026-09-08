@@ -6,13 +6,14 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
-import { CopyLinkButton } from "../../CopyLinkButton";
-import { workOrderDetailPath } from "../../lib/factoryPagePaths";
+import { useDuplicateWorkOrderAction } from "../../useDuplicateWorkOrderAction";
 import { OwnerTimeCostRow, PopupHeader, PopupShell } from "../work-order-popup-redesign/popupShared";
+import { WorkOrderPopupOverflow } from "./WorkOrderPopupOverflow";
+import { draftStartAction, footerMutationHandlers, returnToBacklogAction } from "./splitRunPopupActions";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { PhaseLogCard } from "./PhaseLogCard";
 import { DraftStartModelSelect } from "./DraftStartModelSelect";
-import { DRAFT_START_MODEL_AUTO, draftStartModelPayload, phaseWithRunnerModel } from "./draftStartModel";
+import { DRAFT_START_MODEL_AUTO, phaseWithRunnerModel } from "./draftStartModel";
 import { SplitRunReview } from "./SplitRunReview";
 import { attachArtifactsToStream, type StreamArtifactIndex } from "./attachStreamArtifacts";
 import { resolveSplitRunVisual } from "./splitRunLiveCanvas";
@@ -39,34 +40,6 @@ import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { WorkOrderStatusIcon } from "../../workOrders/WorkOrderStatusIcon";
 import { displayStatusForLineStatus } from "./splitRunWorkOrderDisplay";
 import { WorkOrderSplitRunOverview } from "./WorkOrderSplitRunOverview";
-
-/**
- * Absolute work-order permalink, so the popup copies the right link even
- * when it is shown without a route change (e.g. straight from a board card).
- * Falls back to the current address when identifiers are missing.
- */
-function popupWorkOrderUrl(organizationId?: string, factoryKey?: string, orderNumber?: string, lineId?: string) {
-  if (!organizationId || !factoryKey || !orderNumber) {
-    return window.location.href;
-  }
-  return window.location.origin + workOrderDetailPath(organizationId, factoryKey, orderNumber, lineId);
-}
-
-function footerMutationHandlers(canUpdate: boolean, footerActions: SplitRunFooterActions, fixture: SplitRunFixture) {
-  if (!canUpdate) {
-    return {};
-  }
-  return {
-    onReject: () => void footerActions.handleReject(),
-    onBackToDraft: () => footerActions.handleBackToDraft(),
-    onStop: (choice: Parameters<typeof footerActions.handleStop>[0]) =>
-      void footerActions.handleStop(choice, {
-        ...fixture.footer,
-        lineName: fixture.lineName,
-        stepIndex: fixture.currentStepIndex,
-      }),
-  };
-}
 
 type WorkOrderSplitRunBodyProps = {
   organizationId?: string;
@@ -263,7 +236,9 @@ export function WorkOrderSplitRunPopup({
   isDispatching = false,
   canDispatch = false,
   canUpdate = true,
+  canCreate = false,
   onRefine,
+  onCreated,
 }: Omit<WorkOrderSplitRunBodyProps, "footerActions"> & {
   onClose?: () => void;
   fixed?: boolean;
@@ -271,10 +246,14 @@ export function WorkOrderSplitRunPopup({
   isDispatching?: boolean;
   canDispatch?: boolean;
   canUpdate?: boolean;
+  canCreate?: boolean;
   onRefine?: () => void;
+  onCreated?: (orderNumber: string) => void;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const duplicate = useDuplicateWorkOrderAction(organizationId, factoryId, onCreated);
+  const liveOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture);
   const popupData = useSplitRunPopupData({ organizationId, factoryId, orderId, fixture });
   const edits = useSplitRunWorkOrderEdits({
@@ -306,11 +285,18 @@ export function WorkOrderSplitRunPopup({
         expanded={fullPage}
         onToggleExpanded={() => setFullPage((current) => !current)}
         actions={
-          <CopyLinkButton
-            url={popupWorkOrderUrl(organizationId, factoryKey, orderNumber, lineId)}
-            className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-slate-950/5 dark:hover:bg-white/10"
-            iconClassName="h-4 w-4"
-            testId="popup-work-order-copy-link-button"
+          <WorkOrderPopupOverflow
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+            lineId={lineId}
+            order={liveOrder.data}
+            fixture={fixture}
+            canCreate={canCreate}
+            canUpdate={canUpdate}
+            isDuplicating={duplicate.isDuplicating}
+            onDuplicate={() => void duplicate.handleDuplicate(orderId)}
+            footerActions={footerActions}
           />
         }
       >
@@ -364,37 +350,6 @@ export function WorkOrderSplitRunPopup({
       />
     </PopupShell>
   );
-}
-
-function draftStartAction(
-  kind: SplitRunFixture["footer"]["kind"],
-  onDispatch: ((model?: string) => Promise<void>) | undefined,
-  openAutomations: () => void,
-  selectedModel: string,
-) {
-  if (kind !== "draft") {
-    return undefined;
-  }
-  return async () => {
-    await onDispatch?.(draftStartModelPayload(selectedModel));
-    openAutomations();
-  };
-}
-
-function returnToBacklogAction(
-  onBackToDraft: (() => void | Promise<boolean | void>) | undefined,
-  openDescription: () => void,
-) {
-  if (!onBackToDraft) {
-    return undefined;
-  }
-  return async () => {
-    const returned = await onBackToDraft();
-    if (returned === false) {
-      return;
-    }
-    openDescription();
-  };
 }
 
 function SplitRunPopupTabs({

@@ -99,6 +99,7 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     canClose: true,
     canAssign: true,
     canManage: true,
+    canCreate: true,
     permissionsLoading: false,
     isDispatching: false,
     isCompleting: false,
@@ -118,6 +119,9 @@ function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedVi
     },
     onStatusChange: async (state: string, result?: string) => {
       console.log("status change", state, result);
+    },
+    onDuplicate: () => {
+      console.log("duplicate");
     },
     onAddComment: async (body: string) => {
       console.log("comment", body);
@@ -244,5 +248,6 @@ export const ReadOnly: Story = {
     canClose: false,
     canAssign: false,
     canManage: false,
+    canCreate: false,
   },
 };

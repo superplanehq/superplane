@@ -493,8 +493,38 @@ function dispatchOrder(fixture: FactoriesFixture, factoryId: string, orderId: st
   return { json: { order } };
 }
 
+function duplicateWorkOrder(fixture: FactoriesFixture, factoryId: string, orderId: string) {
+  const source = findOrder(fixture, factoryId, orderId);
+  if (!source) return { json: {} };
+  const orders = ensureFactoryWorkOrders(fixture, factoryId);
+  const nowIso = new Date().toISOString();
+  const created: FactoriesWorkOrder = {
+    id: `storybook-work-order-${orders.length + 1}`,
+    number: String(200 + orders.length + 1),
+    title: source.title,
+    description: source.description,
+    state: "STATE_DRAFT",
+    result: "RESULT_UNSPECIFIED",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    createdBy: { user: { id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name } },
+    assignees: [{ id: ORGANIZATION_USERS[0].id, name: ORGANIZATION_USERS[0].name }],
+    origin: source.origin,
+    lineDispatches: [],
+  };
+  orders.unshift(created);
+  return { json: { order: created } };
+}
+
 function workOrderRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
+    {
+      pattern: re("/api/v1/factories/([^/]+)/orders/([^/]+):duplicate"),
+      resolve: (match, method) => {
+        if (method !== "POST") return null;
+        return duplicateWorkOrder(fixture, match[1], match[2]);
+      },
+    },
     {
       pattern: re("/api/v1/factories/([^/]+)/orders"),
       resolve: (match, method, body) => {

@@ -139,6 +139,28 @@ describe("matchFactoryPageFixture", () => {
     expect(body.factory?.key).toBe("NEWWA");
   });
 
+  it("duplicates a task into a new draft", async () => {
+    const fixture = structuredClone(defaultFactoriesFixture);
+    const response = await fetchFactoryPageFixture(
+      `/api/v1/factories/${PRIMARY_FACTORY_ID}/orders/${OPEN_WORK_ORDER.id}:duplicate`,
+      { method: "POST", body: "{}" },
+      fixture,
+    );
+    const body = (await response.json()) as {
+      order?: { id?: string; number?: string; title?: string; description?: string; state?: string; origin?: unknown };
+    };
+
+    expect(body.order?.id).not.toBe(OPEN_WORK_ORDER.id);
+    expect(body.order?.title).toBe(OPEN_WORK_ORDER.title);
+    expect(body.order?.description).toBe(OPEN_WORK_ORDER.description);
+    expect(body.order?.state).toBe("STATE_DRAFT");
+    expect(body.order?.origin).toEqual(OPEN_WORK_ORDER.origin);
+
+    const list = await fetchFactoryPageFixture(`/api/v1/factories/${PRIMARY_FACTORY_ID}/orders`, undefined, fixture);
+    const listed = (await list.json()) as { orders: Array<{ id?: string }> };
+    expect(listed.orders[0]?.id).toBe(body.order?.id);
+  });
+
   it("updates a task title and description", async () => {
     const fixture = structuredClone(defaultFactoriesFixture);
     const response = await fetchFactoryPageFixture(

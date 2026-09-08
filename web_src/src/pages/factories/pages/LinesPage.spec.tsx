@@ -102,6 +102,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDuplicateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({

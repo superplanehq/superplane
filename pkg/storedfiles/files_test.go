@@ -557,6 +557,186 @@ func TestDescriptionForDispatchSkipsOtherTaskFiles(t *testing.T) {
 	assert.Equal(t, markdown, rewritten)
 }
 
+func TestCloneDescriptionFilesCopiesReadyFilesAndRewritesMarkdown(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	source, err := factoryModel.CreateWorkOrder(db, "Source", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	copyTo, err := factoryModel.CreateWorkOrder(db, "Copy", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    source.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	markdown := "See ![bug](" + blob.FileRef(file.ID) + ")"
+	cloned, err := CloneDescriptionFiles(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		copyTo.ID,
+		r.User,
+		markdown,
+	)
+	require.NoError(t, err)
+	assert.NotContains(t, cloned.Markdown, blob.FileRef(file.ID))
+	assert.Contains(t, cloned.Markdown, blob.FileRefScheme+"://")
+	require.Len(t, cloned.CopiedKeys, 1)
+
+	sourceFiles, err := models.ListReadyTaskFiles(db, source.ID)
+	require.NoError(t, err)
+	require.Len(t, sourceFiles, 1)
+	assert.Equal(t, file.ID, sourceFiles[0].ID)
+	assert.Equal(t, file.StorageKey, sourceFiles[0].StorageKey)
+
+	copiedFiles, err := models.ListReadyTaskFiles(db, copyTo.ID)
+	require.NoError(t, err)
+	require.Len(t, copiedFiles, 1)
+	assert.NotEqual(t, file.ID, copiedFiles[0].ID)
+	assert.Equal(t, "bug.png", copiedFiles[0].Filename)
+	assert.Equal(t, int64(9), copiedFiles[0].SizeBytes)
+	assert.Contains(t, cloned.Markdown, blob.FileRef(copiedFiles[0].ID))
+	_, err = provider.Head(t.Context(), copiedFiles[0].StorageKey)
+	require.NoError(t, err)
+	_, err = provider.Head(t.Context(), file.StorageKey)
+	require.NoError(t, err)
+}
+
+func TestCloneDescriptionFilesLeavesEmptyMarkdown(t *testing.T) {
+	cloned, err := CloneDescriptionFiles(
+		t.Context(),
+		nil,
+		nil,
+		uuid.Nil,
+		uuid.Nil,
+		uuid.Nil,
+		uuid.Nil,
+		"",
+	)
+	require.NoError(t, err)
+	assert.Empty(t, cloned.Markdown)
+	assert.Empty(t, cloned.CopiedKeys)
+}
+
+func TestCloneDescriptionFilesSkipsForeignAndUnreadFiles(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Copy", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	foreign, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      otherFactory.ID,
+		Filename:       "foreign.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, foreign, bytes.NewReader([]byte("png-bytes"))))
+
+	pending, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "pending.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	markdown := fmt.Sprintf("![foreign](%s) ![pending](%s)", blob.FileRef(foreign.ID), blob.FileRef(pending.ID))
+	cloned, err := CloneDescriptionFiles(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		order.ID,
+		r.User,
+		markdown,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, markdown, cloned.Markdown)
+	assert.Empty(t, cloned.CopiedKeys)
+	copiedFiles, err := models.ListReadyTaskFiles(db, order.ID)
+	require.NoError(t, err)
+	assert.Empty(t, copiedFiles)
+}
+
+func TestCloneDescriptionFilesDeletesCopiedObjectWhenTransactionRollsBack(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	source, err := factoryModel.CreateWorkOrder(db, "Source", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	copyTo, err := factoryModel.CreateWorkOrder(db, "Copy", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    source.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	var cloned CloneResult
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result, cloneErr := CloneDescriptionFiles(
+			t.Context(),
+			tx,
+			provider,
+			r.Organization.ID,
+			factoryModel.ID,
+			copyTo.ID,
+			r.User,
+			"![bug]("+blob.FileRef(file.ID)+")",
+		)
+		if cloneErr != nil {
+			return cloneErr
+		}
+		cloned = result
+		return errors.New("force rollback")
+	})
+	require.Error(t, err)
+	require.Len(t, cloned.CopiedKeys, 1)
+	require.NoError(t, ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, BindResult{CopiedKeys: cloned.CopiedKeys}, err))
+
+	_, headErr := provider.Head(t.Context(), cloned.CopiedKeys[0])
+	assert.ErrorIs(t, headErr, blob.ErrNotFound)
+	copiedFiles, err := models.ListReadyTaskFiles(db, copyTo.ID)
+	require.NoError(t, err)
+	assert.Empty(t, copiedFiles)
+}
+
 func TestDescriptionForDispatchLeavesPlainMarkdown(t *testing.T) {
 	markdown := "No files here"
 	rewritten, files, err := DescriptionForDispatch(

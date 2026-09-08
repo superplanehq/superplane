@@ -35,6 +35,9 @@ const commonHandlers = {
   onStatusChange: async (state: string, result?: string) => {
     console.log("status change", state, result);
   },
+  onDuplicate: () => {
+    console.log("duplicate");
+  },
 };
 
 const commonFlags = {
@@ -42,6 +45,7 @@ const commonFlags = {
   isRejecting: false,
   isClosing: false,
   isUpdatingStatus: false,
+  canCreate: true,
   backHref: "/org-1/workspaces/SP/lines/line-plan-and-implement",
   orderIdentifier: "SP-42",
 };
@@ -56,6 +60,7 @@ export const Open: Story = {
     isClosed: false,
     canClose: true,
     canManage: true,
+    canCreate: true,
     ...commonFlags,
     ...commonHandlers,
   },
@@ -137,6 +142,7 @@ export const ReadOnly: Story = {
     isClosed: false,
     canClose: false,
     canManage: false,
+    canCreate: false,
     ...commonFlags,
     ...commonHandlers,
   },

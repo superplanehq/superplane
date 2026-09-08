@@ -389,6 +389,18 @@ service Factories {
     };
   }
 
+  rpc DuplicateWorkOrder(DuplicateWorkOrderRequest) returns (DuplicateWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}:duplicate"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Duplicate factory work order";
+      description: "Copies a work order into a new draft";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribeWorkOrder(DescribeWorkOrderRequest) returns (DescribeWorkOrderResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/orders/{order_id}"
@@ -1322,6 +1334,15 @@ message CreateWorkOrderRequest {
 }
 
 message CreateWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message DuplicateWorkOrderRequest {
+  string factory_id = 1;
+  string order_id = 2;
+}
+
+message DuplicateWorkOrderResponse {
   WorkOrder order = 1;
 }
 
