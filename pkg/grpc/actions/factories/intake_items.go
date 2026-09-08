@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/notion"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -46,6 +47,7 @@ func registerIntakeItemSource(triggerComponent string, builder intakeItemSourceB
 func init() {
 	registerIntakeItemSource("github.onIssue", newGitHubIntakeItemSource)
 	registerIntakeItemSource("productive.onTask", newProductiveIntakeItemSource)
+	registerIntakeItemSource("notion.onPageAdded", newNotionIntakeItemSource)
 }
 
 type gitHubIntakeItemSource struct {
@@ -57,6 +59,11 @@ type productiveIntakeItemSource struct {
 	productive     *productive.Client
 	projectID      string
 	organizationID string
+}
+
+type notionIntakeItemSource struct {
+	notion     *notion.Client
+	databaseID string
 }
 
 type unsupportedIntakeItemSource struct{}
@@ -124,6 +131,27 @@ func newProductiveIntakeItemSource(
 		projectID:      projectID,
 		organizationID: client.OrganizationID,
 	}, nil
+}
+
+func newNotionIntakeItemSource(
+	_ context.Context,
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	trigger *models.Node,
+	integration *models.Integration,
+) (intakeItemSource, error) {
+	databaseID, _ := trigger.Configuration["database"].(string)
+	databaseID = strings.TrimSpace(databaseID)
+	if databaseID == "" {
+		return nil, errIntakeNotConnected
+	}
+
+	client, err := newIntakeNotionClient(deps, tx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
+	}
+
+	return &notionIntakeItemSource{notion: client, databaseID: databaseID}, nil
 }
 
 func (unsupportedIntakeItemSource) Search(context.Context, string, int) ([]IntakeItem, error) {
@@ -197,6 +225,38 @@ func (s *productiveIntakeItemSource) Get(_ context.Context, id string) (*IntakeI
 
 	item := productiveTaskItem(*task, s.organizationID)
 	return &item, nil
+}
+
+func (s *notionIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
+	pages, err := s.notion.ListPages(s.databaseID, query, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	items := make([]IntakeItem, 0, len(pages))
+	for _, page := range pages {
+		items = append(items, notionPageItem(page))
+	}
+	return items, nil
+}
+
+func (s *notionIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem, error) {
+	page, err := s.notion.GetPage(strings.TrimSpace(id))
+	if err != nil {
+		return nil, err
+	}
+
+	item := notionPageItem(*page)
+	return &item, nil
+}
+
+func notionPageItem(page notion.Page) IntakeItem {
+	return IntakeItem{
+		ID:    page.ID,
+		Title: page.Title,
+		Body:  page.Content,
+		URL:   page.URL,
+	}
 }
 
 func productiveTaskItem(task productive.Task, organizationID string) IntakeItem {

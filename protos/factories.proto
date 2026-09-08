@@ -931,6 +931,7 @@ message FactoryIntake {
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
     SOURCE_PRODUCTIVE_TASKS = 4;
+    SOURCE_NOTION_PAGES = 5;
   }
 
   // Settings that change what the intake does. They are stored in the canvas

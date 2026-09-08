@@ -3,7 +3,10 @@ package factories
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v84/github"
@@ -12,9 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/notion"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/contexts"
 
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
@@ -216,6 +221,102 @@ func issueEventTitle(t *testing.T, event map[string]any) string {
 	payload, ok := event["issue"].(map[string]any)
 	require.True(t, ok)
 	title, ok := payload["title"].(string)
+	require.True(t, ok)
+
+	return title
+}
+
+func Test__NotionPageEvents(t *testing.T) {
+	t.Run("the newest page ends up on top of the intake", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			notionBlocksResponse(""),
+			notionBlocksResponse(""),
+		}}
+		client := notionTestClient(t, httpContext)
+
+		events, err := notionPageEvents(client, notionPagePage([]string{"Newest page", "Older page"}))
+		require.NoError(t, err)
+		require.Len(t, events, 2)
+
+		// Events are emitted oldest first, so the newest page ends up on top
+		// of the intake list.
+		assert.Equal(t, "Older page", notionEventTitle(t, events[0]))
+		assert.Equal(t, "Newest page", notionEventTitle(t, events[1]))
+	})
+
+	t.Run("an event carries what the graph reads", func(t *testing.T) {
+		page := map[string]any{
+			"id": "page-1",
+			"properties": map[string]any{
+				"Name": map[string]any{"type": "title", "title": []any{map[string]any{"plain_text": "Fix payment retries"}}},
+			},
+		}
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			notionBlocksResponse("Retries fail silently after the third attempt."),
+		}}
+		client := notionTestClient(t, httpContext)
+
+		events, err := notionPageEvents(client, []map[string]any{page})
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		// The graph reads root().data.data, and a page added is what the
+		// intake creates a work order from.
+		assert.Equal(t, map[string]any{"event": notion.PageCreatedEvent}, events[0]["meta"])
+		data, ok := events[0]["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "page-1", data["id"])
+		assert.Equal(t, "Fix payment retries", data["title"])
+		assert.Equal(t, "Retries fail silently after the third attempt.", data["content"])
+	})
+}
+
+func notionTestClient(t *testing.T, httpContext *contexts.HTTPContext) *notion.Client {
+	t.Helper()
+
+	client, err := notion.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiToken": "secret_token"},
+	})
+	require.NoError(t, err)
+	return client
+}
+
+func notionJSONResponse(body string) *http.Response {
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+// notionBlocksResponse answers a page's content read with a single paragraph,
+// or none when text is empty.
+func notionBlocksResponse(text string) *http.Response {
+	if text == "" {
+		return notionJSONResponse(`{"results":[]}`)
+	}
+	return notionJSONResponse(fmt.Sprintf(`{"results":[{"type":"paragraph","paragraph":{"rich_text":[{"plain_text":%q}]}}]}`, text))
+}
+
+// notionPagePage builds a page list as Notion's query API returns it, so the
+// titles are given newest first.
+func notionPagePage(titles []string) []map[string]any {
+	pages := make([]map[string]any, 0, len(titles))
+	for i, title := range titles {
+		pages = append(pages, map[string]any{
+			"id":           strconv.Itoa(len(titles) - i),
+			"created_time": "2026-01-01T00:00:00.000Z",
+			"properties": map[string]any{
+				"Name": map[string]any{"type": "title", "title": []any{map[string]any{"plain_text": title}}},
+			},
+		})
+	}
+
+	return pages
+}
+
+func notionEventTitle(t *testing.T, event map[string]any) string {
+	t.Helper()
+
+	page, ok := event["data"].(map[string]any)
+	require.True(t, ok)
+	title, ok := page["title"].(string)
 	require.True(t, ok)
 
 	return title
