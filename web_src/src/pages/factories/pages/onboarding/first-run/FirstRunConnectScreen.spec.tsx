@@ -96,6 +96,10 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
       FIRST_RUN_COPY.connect.signedInAs("forestileao"),
     );
+    expect(screen.getByRole("link", { name: "@forestileao" })).toHaveAttribute(
+      "href",
+      "https://github.com/forestileao",
+    );
   });
 
   it("hides the signed-in line when the picker has no GitHub login", () => {
@@ -123,11 +127,11 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.selectAccountBody)).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.trust)).not.toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.connect.missingAccount)).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-other")).toHaveTextContent(FIRST_RUN_COPY.connect.installThere);
   });
@@ -149,9 +153,8 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.selectAccountBody)).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-other")).toHaveAttribute(
       "href",
@@ -179,7 +182,26 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.queryByTestId("first-run-github-install-requested")).not.toBeInTheDocument();
   });
 
-  it("keeps the waiting chip when the picker lacks the requested organization", () => {
+  it("shows a waiting-only account list when GitHub returned a request and no ready account", () => {
+    render(
+      <FirstRunConnectScreen
+        installRequested
+        githubOrganization="acme"
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
+  it("shows the requested organization as a waiting row in the account list", async () => {
+    const user = userEvent.setup();
+
     render(
       <FirstRunConnectScreen
         installRequested
@@ -192,8 +214,23 @@ describe("FirstRunConnectScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
+    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.installRequested,
+    );
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).not.toBeInTheDocument();
+
+    const waitingRow = screen.getByTestId("first-run-github-install-requested");
+    expect(waitingRow).toHaveAttribute("tabindex", "0");
+    await user.hover(waitingRow);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
+
+    await user.unhover(waitingRow);
+    waitingRow.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
   it("disables the picker while one account is binding", () => {

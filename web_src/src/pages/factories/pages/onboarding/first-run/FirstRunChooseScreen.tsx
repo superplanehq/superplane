@@ -13,6 +13,7 @@ export function FirstRunChooseScreen({
   selectedRepository,
   loading,
   chrome,
+  initialWhyMissingOpen = false,
   onSelectRepository,
   onEditConnection,
   onContinue,
@@ -22,12 +23,13 @@ export function FirstRunChooseScreen({
   /** True while the repository list loads or refreshes; hides stale entries. */
   loading?: boolean;
   chrome?: FirstRunChrome;
+  initialWhyMissingOpen?: boolean;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
   onContinue: () => void;
 }) {
   const copy = FIRST_RUN_COPY.choose;
-  const [whyMissingOpen, setWhyMissingOpen] = useState(false);
+  const [whyMissingOpen, setWhyMissingOpen] = useState(initialWhyMissingOpen);
 
   return (
     <FirstRunShell testId="first-run-choose" chrome={chrome}>
