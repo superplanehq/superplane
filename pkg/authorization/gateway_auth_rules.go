@@ -596,6 +596,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "create",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "PATCH", Pattern: "/api/v1/organizations/{id}/users/{user_id}/owner"}: {
+			Resource:   "members",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "PATCH", Pattern: "/api/v1/secrets/{id_or_name}"}: {
 			Resource:   "secrets",
 			Action:     "update",

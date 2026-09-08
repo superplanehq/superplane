@@ -23,6 +23,7 @@ import {
   organizationsResetInviteLink,
   organizationsDeleteOrganization,
   organizationsDescribeUsage,
+  organizationsSetUserOwner,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { accountOrganizationsQueryKey } from "./useAccountOrganizations";
@@ -267,6 +268,30 @@ export const useAssignRole = (organizationId: string) => {
         return;
       }
       queryClient.invalidateQueries({ queryKey: ["permissions", organizationId] });
+    },
+  });
+};
+
+export const useSetUserOwner = (organizationId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { userId: string; isOwner: boolean }) => {
+      return await organizationsSetUserOwner(
+        withOrganizationHeader({
+          path: {
+            id: organizationId,
+            userId: params.userId,
+          },
+          body: {
+            isOwner: params.isOwner,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) });
+      queryClient.invalidateQueries({ queryKey: ["me", organizationId] });
     },
   });
 };
