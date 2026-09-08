@@ -149,6 +149,7 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
+	environment = runner.AttachExecutionTimeoutEnv(environment, spec.ExecutionTimeoutSeconds)
 
 	task := buildOpenRouterBrokerTask(spec, resolved.Usage, resolved.Setups, byokOpenRouterFallbackModels(ctx, spec.Model))
 	task = applyPlanningFollowUp(task, environment, spec)

@@ -36,7 +36,7 @@ func TestOpencodeRunArgsIncludesJSONAutoPureAndPrefix(t *testing.T) {
 		"session": "",
 	})
 	assert.Equal(t, []string{
-		"run", "--format", "json", "--auto", "--pure",
+		"--pure", "run", "--format", "json", "--auto",
 		"-m", "openrouter/x-ai/grok-4.6",
 		"--dir", "/tmp/repo",
 		"do the work",
@@ -248,7 +248,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"first done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}})
+	}}, nil, nil)
 	assert.Equal(t, 0, first.exitCode)
 	session, err := os.ReadFile(filepath.Join(dir, "opencode_session"))
 	require.NoError(t, err)
@@ -261,7 +261,7 @@ func TestRunPromptContinuesSessionOnLaterPrompt(t *testing.T) {
 			`{"type":"text","sessionID":"ses_keep","part":{"type":"text","text":"second done"}}`,
 			`{"type":"step_finish","sessionID":"ses_keep","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
 		},
-	}})
+	}}, nil, nil)
 	assert.Equal(t, 0, second.exitCode)
 	require.NotEmpty(t, second.spawns)
 	assert.Contains(t, second.spawns[0], "--session")
@@ -290,7 +290,64 @@ func TestRunPromptWritesOpenRouterBaseURLIntoConfig(t *testing.T) {
 	assert.Contains(t, result.spawns[0], "--format")
 	assert.Contains(t, result.spawns[0], "json")
 	assert.Contains(t, result.spawns[0], "--auto")
-	assert.Contains(t, result.spawns[0], "--pure")
+	assert.Equal(t, "--pure", result.spawns[0][0])
+	assert.Equal(t, "run", result.spawns[0][1])
+}
+
+func TestRunPromptDoesNotSwitchWhenSuccessfulSpawnLogs429(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:    "x-ai/grok-4.6",
+		fallback: []string{"x-ai/grok-4.6", "anthropic/claude-sonnet-4-6"},
+		spawns: []spawnScript{{
+			ExitCode: 0,
+			Stderr:   "HTTP 429 Too Many Requests",
+			Stdout: []string{
+				`{"type":"error","sessionID":"ses_ok","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`,
+				`{"type":"text","sessionID":"ses_ok","part":{"type":"text","text":"recovered"}}`,
+				`{"type":"step_finish","sessionID":"ses_ok","part":{"type":"step-finish","tokens":{"input":1,"output":1}}}`,
+			},
+		}},
+	})
+	assert.Equal(t, 0, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.NotContains(t, result.output, "switching to")
+	assert.NotContains(t, result.output, "waiting to continue")
+	payload := resultPayload(t, result.resultFile)
+	assert.Equal(t, "recovered", payload["result"])
+}
+
+func TestRunPromptStopsWaitingWhenExecutionTimeoutExpires(t *testing.T) {
+	result := runOpenRouterPrompt(t, promptHarness{
+		model:     "x-ai/grok-4.6",
+		fallback:  []string{"x-ai/grok-4.6"},
+		nowValues: []int64{0, 2000},
+		env: map[string]string{
+			"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "1",
+		},
+		spawns: []spawnScript{{
+			ExitCode: 1,
+			Stderr:   "Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly.",
+			Stdout:   []string{`{"type":"error","error":{"data":{"message":"Rate limit exceeded: new-account-rpm/x-ai/grok-4.6. Please retry shortly."}}}`},
+		}},
+	})
+	assert.Equal(t, 1, result.exitCode)
+	require.Len(t, result.spawns, 1)
+	assert.Empty(t, result.sleeps)
+	assert.Contains(t, result.output, "Rate limit wait exceeded the execution timeout")
+}
+
+func TestWaitDeadlineMsUsesExecutionTimeoutSeconds(t *testing.T) {
+	deadline := jsWaitDeadline(t, map[string]string{"SUPERPLANE_EXECUTION_TIMEOUT_SECONDS": "30"}, 1000)
+	assert.Equal(t, float64(31000), deadline)
+}
+
+func TestOpenCodeProcessEnvSetsPureAndIsolatesHomes(t *testing.T) {
+	env := jsOpenCodeProcessEnv(t, "/task")
+	assert.Equal(t, "1", env["OPENCODE_PURE"])
+	assert.Equal(t, "1", env["OPENCODE_DISABLE_AUTOUPDATE"])
+	assert.Equal(t, "/task/opencode.json", env["OPENCODE_CONFIG"])
+	assert.Equal(t, "/task/xdg/data", env["XDG_DATA_HOME"])
 }
 
 type spawnScript struct {
@@ -300,10 +357,11 @@ type spawnScript struct {
 }
 
 type promptHarness struct {
-	model    string
-	fallback []string
-	spawns   []spawnScript
-	env      map[string]string
+	model     string
+	fallback  []string
+	spawns    []spawnScript
+	env       map[string]string
+	nowValues []int64
 }
 
 type openRouterPromptResult struct {
@@ -328,15 +386,20 @@ func runOpenRouterPrompt(t *testing.T, harness promptHarness) openRouterPromptRe
 	raw, err := json.Marshal(fallback)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "openrouter_models.json"), raw, 0o644))
-	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env)
+	return runPromptInDir(t, dir, "prompt.txt", harness.model, harness.spawns, harness.env, harness.nowValues)
 }
 
-func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv ...map[string]string) openRouterPromptResult {
+func runPromptInDir(t *testing.T, dir, promptName, model string, spawns []spawnScript, extraEnv map[string]string, nowValues []int64) openRouterPromptResult {
 	t.Helper()
 	resultFile := filepath.Join(dir, "result.json")
 	script, err := filepath.Abs("run.js")
 	require.NoError(t, err)
 	spawnsJSON, err := json.Marshal(spawns)
+	require.NoError(t, err)
+	if nowValues == nil {
+		nowValues = []int64{}
+	}
+	nowJSON, err := json.Marshal(nowValues)
 	require.NoError(t, err)
 	harnessFile := filepath.Join(dir, "harness.js")
 	require.NoError(t, os.WriteFile(harnessFile, []byte(fmt.Sprintf(`
@@ -344,9 +407,11 @@ const fs = require("fs");
 const { PassThrough } = require("stream");
 const { runPrompt } = require(%q);
 const spawns = %s;
+const nowValues = %s;
 const calls = [];
 const sleeps = [];
 let index = 0;
+let nowIndex = 0;
 function mockChild(spec) {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
@@ -385,6 +450,9 @@ runPrompt(%q, %q, {
     sleeps.push(ms);
     return Promise.resolve();
   },
+  now: nowValues.length
+    ? () => nowValues[Math.min(nowIndex++, nowValues.length - 1)]
+    : undefined,
   cwd: %q,
 })
   .then((code) => {
@@ -396,7 +464,7 @@ runPrompt(%q, %q, {
     console.error(err && err.message ? err.message : err);
     process.exit(1);
   });
-`, script, spawnsJSON, filepath.Join(dir, promptName), model, dir)), 0o644))
+`, script, spawnsJSON, nowJSON, filepath.Join(dir, promptName), model, dir)), 0o644))
 
 	spawnsFile := filepath.Join(dir, "spawns.json")
 	cmd := exec.Command("node", harnessFile)
@@ -407,8 +475,8 @@ runPrompt(%q, %q, {
 		"OPENROUTER_API_KEY=test",
 		"SPAWNS_FILE="+spawnsFile,
 	)
-	if len(extraEnv) > 0 {
-		for key, value := range extraEnv[0] {
+	if extraEnv != nil {
+		for key, value := range extraEnv {
 			env = append(env, key+"="+value)
 		}
 	}
@@ -450,6 +518,33 @@ func copyScript(t *testing.T, dir, src, dest string) {
 	body, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, dest), body, 0o644))
+}
+
+func jsWaitDeadline(t *testing.T, env map[string]string, nowMs int64) float64 {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{"env": env, "now": nowMs})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { waitDeadlineMs } = require(process.argv[1]); const input = JSON.parse(process.argv[2]); process.stdout.write(String(waitDeadlineMs(input.env, () => input.now)));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var deadline float64
+	_, err = fmt.Sscan(string(out), &deadline)
+	require.NoError(t, err)
+	return deadline
+}
+
+func jsOpenCodeProcessEnv(t *testing.T, taskDir string) map[string]string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { openCodeProcessEnv } = require(process.argv[1]); process.stdout.write(JSON.stringify(openCodeProcessEnv(process.argv[2], {})));`, script, taskDir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var env map[string]string
+	require.NoError(t, json.Unmarshal(out, &env))
+	return env
 }
 
 func jsString(t *testing.T, fn, arg string) string {

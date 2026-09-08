@@ -142,7 +142,7 @@ function writeSessionID(taskDir, sessionID) {
 }
 
 function opencodeRunArgs({ model, sessionID, prompt, cwd }) {
-  const args = ["run", "--format", "json", "--auto", "--pure"];
+  const args = ["--pure", "run", "--format", "json", "--auto"];
   const prefixed = openRouterModelId(model);
   if (prefixed) {
     args.push("-m", prefixed);
@@ -203,6 +203,7 @@ function openCodeProcessEnv(taskDir, baseEnv = process.env) {
     ...baseEnv,
     OPENCODE_CONFIG: path.join(taskDir, "opencode.json"),
     OPENCODE_DISABLE_AUTOUPDATE: "1",
+    OPENCODE_PURE: "1",
     XDG_DATA_HOME: path.join(xdg, "data"),
     XDG_CONFIG_HOME: path.join(xdg, "config"),
     XDG_CACHE_HOME: path.join(xdg, "cache"),
@@ -299,19 +300,17 @@ async function runPrompt(promptFile, model, helpers = {}) {
       lastCost = spawnResult.cost;
     }
     lastErrorText = spawnResult.errorText || "";
-    const classKind = classifyOpenRouterError(lastErrorText);
-    const retryable = classKind === "rate_limit";
-    const hardFail = classKind === "hard";
     const spawnFailed = spawnResult.exitCode !== 0 || spawnResult.resultFailed;
-    if (!spawnFailed && !retryable) {
+    if (!spawnFailed) {
       failed = false;
       exitCode = spawnResult.exitCode;
       break;
     }
-    if (hardFail || !retryable) {
+    const classKind = classifyOpenRouterError(lastErrorText);
+    if (classKind !== "rate_limit") {
       failed = true;
       exitCode = spawnResult.exitCode !== 0 ? spawnResult.exitCode : 1;
-      if (lastErrorText && classKind !== "rate_limit") {
+      if (lastErrorText) {
         println(truncateText(lastErrorText));
       }
       break;
@@ -401,16 +400,33 @@ async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
     });
   }
 
-  const rl = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
-  rl.on("line", (raw) => formatter.handleLine(raw));
+  const stdout = child.stdout;
+  const rl = stdout ? readline.createInterface({ input: stdout, crlfDelay: Infinity }) : null;
+  if (rl) {
+    rl.on("line", (raw) => formatter.handleLine(raw));
+  }
+  const stdoutDone = rl
+    ? new Promise((resolve) => {
+        rl.on("close", resolve);
+      })
+    : Promise.resolve();
 
-  const exitCode = await Promise.all([
-    new Promise((resolve, reject) => {
-      child.on("error", reject);
+  let exitCode;
+  try {
+    exitCode = await new Promise((resolve, reject) => {
+      child.on("error", (err) => {
+        if (stdout && typeof stdout.destroy === "function") {
+          stdout.destroy();
+        }
+        reject(err);
+      });
       child.on("close", (code) => resolve(code == null ? 1 : code));
-    }),
-    new Promise((resolve) => rl.on("close", resolve)),
-  ]).then(([code]) => code);
+    });
+  } catch (err) {
+    await stdoutDone;
+    throw err;
+  }
+  await stdoutDone;
 
   const snapshot = formatter.snapshot();
   const errorText = [snapshot.errorText, stderrText].filter(Boolean).join("\n");
@@ -873,4 +889,6 @@ module.exports = {
   buildOpenCodeConfig,
   orderedFallbackModels,
   rateLimitWaitMs,
+  waitDeadlineMs,
+  openCodeProcessEnv,
 };

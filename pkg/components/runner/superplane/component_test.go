@@ -62,6 +62,7 @@ func TestRunSuperPlaneExecuteUsesNodeModelOverDefault(t *testing.T) {
 		AllowedModels: []string{"anthropic/claude-sonnet-4-6", "x-ai/grok-4.6"},
 	})
 	assert.Equal(t, "sk-or", requireEnvironmentValue(t, req.Environment, envOpenRouterAPIKey))
+	assert.Equal(t, "3600", requireEnvironmentValue(t, req.Environment, runner.EnvExecutionTimeoutSeconds))
 	modelsFile := requireTaskFile(t, req.Files, "openrouter_models.json")
 	assert.JSONEq(t, `["anthropic/claude-sonnet-4-6","x-ai/grok-4.6"]`, modelsFile.Content)
 	prepare := requireTaskFile(t, req.Files, "prepare.sh").Content
