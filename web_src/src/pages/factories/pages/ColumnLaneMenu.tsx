@@ -1,4 +1,4 @@
-import { Bot, Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
+import { Check, MoreHorizontal, Pencil, Plus, SlidersHorizontal, XIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 
+import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { DEFAULT_LINE_STEP_PARALLELISM, setParallelismLabel } from "../lib/factoryLineFormShared";
 import { LINE_BOARD_COLUMN_COLORS, type LineBoardColumnColorId } from "./lineBoardColumnColors";
 
@@ -23,13 +24,13 @@ interface ColumnLaneMenuProps {
   onEdit?: () => void;
   /** Menu item copy. Defaults to Edit. */
   editLabel?: string;
-  /** Opens the inline agent editor. */
-  onEditAgent?: () => void;
   /** Opens the parallelism modal for canvas-backed phases. */
   onSetParallelism?: () => void;
   parallelism?: number;
   /** Opens the Add intake picker. Leads the menu when set. */
   onAddIntake?: () => void;
+  /** Opens the Add automation picker. */
+  onAddAutomation?: () => void;
   colorId: LineBoardColumnColorId | null;
   onColorChange: (colorId: LineBoardColumnColorId | null) => void;
 }
@@ -43,16 +44,16 @@ export function ColumnLaneMenu({
   editHref,
   onEdit,
   editLabel = "Edit",
-  onEditAgent,
   onSetParallelism,
   parallelism = DEFAULT_LINE_STEP_PARALLELISM,
   onAddIntake,
+  onAddAutomation,
   colorId,
   onColorChange,
 }: ColumnLaneMenuProps) {
   const navigate = useNavigate();
   const canEdit = Boolean(onEdit || editHref);
-  const hasActions = canEdit || Boolean(onEditAgent || onSetParallelism || onAddIntake);
+  const hasActions = canEdit || Boolean(onSetParallelism || onAddIntake || onAddAutomation);
 
   const handleEdit = () => {
     if (onEdit) {
@@ -84,10 +85,10 @@ export function ColumnLaneMenu({
               editLabel={editLabel}
               canEdit={canEdit}
               onEdit={handleEdit}
-              onEditAgent={onEditAgent}
               onSetParallelism={onSetParallelism}
               parallelism={parallelism}
               onAddIntake={onAddIntake}
+              onAddAutomation={onAddAutomation}
             />
             <DropdownMenuSeparator className="my-0" />
           </>
@@ -103,32 +104,32 @@ function ColumnLaneMenuActions({
   editLabel,
   canEdit,
   onEdit,
-  onEditAgent,
   onSetParallelism,
   parallelism,
   onAddIntake,
+  onAddAutomation,
 }: {
   testId: string;
   editLabel: string;
   canEdit: boolean;
   onEdit: () => void;
-  onEditAgent?: () => void;
   onSetParallelism?: () => void;
   parallelism: number;
   onAddIntake?: () => void;
+  onAddAutomation?: () => void;
 }) {
   return (
     <div className="p-1">
+      {onAddAutomation ? (
+        <DropdownMenuItem onSelect={onAddAutomation} data-testid={`${testId}-add-automation`}>
+          <Plus className="h-3.5 w-3.5" aria-hidden />
+          {COLUMN_AUTOMATIONS_COPY.addLabel}
+        </DropdownMenuItem>
+      ) : null}
       {onAddIntake ? (
         <DropdownMenuItem onSelect={onAddIntake} data-testid={`${testId}-add-intake`}>
           <Plus className="h-3.5 w-3.5" aria-hidden />
           Add intake
-        </DropdownMenuItem>
-      ) : null}
-      {onEditAgent ? (
-        <DropdownMenuItem onSelect={onEditAgent} data-testid={`${testId}-edit-agent`}>
-          <Bot className="h-3.5 w-3.5" aria-hidden />
-          Edit Agent
         </DropdownMenuItem>
       ) : null}
       {canEdit ? (

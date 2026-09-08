@@ -2,7 +2,20 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import type { ColumnAutomation } from "../lib/columnAutomations";
-import { ColumnAutomationsPopup } from "./ColumnAutomationsPopup";
+import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
+import { ColumnAutomationsPopup, type ColumnAutomationActivity } from "./ColumnAutomationsPopup";
+
+const HEALTHY_ACTIVITY: ColumnAutomationActivity = {
+  lastRunStatus: "passed",
+  lastRunWhen: "2 minutes ago",
+  runningCount: 2,
+};
+
+const FAILED_ACTIVITY: ColumnAutomationActivity = {
+  lastRunStatus: "failed",
+  lastRunWhen: "18 minutes ago",
+  runningCount: 1,
+};
 
 const INTAKE: ColumnAutomation = {
   id: "intake-github",
@@ -53,22 +66,13 @@ const meta = {
   component: ColumnAutomationsPopup,
   parameters: { layout: "centered" },
   args: {
-    columnTitle: "Backlog",
-    columnKey: "backlog",
-    automations: [INTAKE, ANALYSIS],
-    open: true,
-    onClose: () => undefined,
-    onAdd: () => undefined,
-    onRowAction: () => undefined,
-    trigger: (
-      <button type="button" className="rounded-md border border-border px-2 py-1 text-sm">
-        Automations
-      </button>
-    ),
+    automation: INTAKE,
+    onAction: () => undefined,
+    defaultOpen: true,
   },
   decorators: [
     (Story) => (
-      <ComponentStoryShell className="relative min-h-[520px] bg-gray-50 p-6 dark:bg-gray-950">
+      <ComponentStoryShell className="relative min-h-[320px] bg-gray-50 p-6 dark:bg-gray-950">
         <Story />
       </ComponentStoryShell>
     ),
@@ -79,29 +83,64 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Populated: Story = {
-  name: "Populated",
+export const InfoOpen: Story = {
+  name: "Info open",
 };
 
-export const Empty: Story = {
-  name: "Empty phase",
+export const PhaseEditActions: Story = {
+  name: "Phase edit actions",
   args: {
-    columnTitle: "Review",
-    columnKey: "phase-1",
-    automations: [],
+    automation: ANALYSIS,
+    showEditAgent: true,
+    showEditAutomation: true,
+  },
+};
+
+export const WithActivity: Story = {
+  name: "With last-run activity",
+  args: {
+    automation: ANALYSIS,
+    showEditAgent: true,
+    showEditAutomation: true,
+    activity: HEALTHY_ACTIVITY,
+  },
+};
+
+export const WithFailedActivity: Story = {
+  name: "With failed last run",
+  args: {
+    automation: ANALYSIS,
+    showEditAgent: true,
+    showEditAutomation: true,
+    activity: FAILED_ACTIVITY,
   },
 };
 
 export const NeedsRepair: Story = {
   name: "Needs repair",
   args: {
-    automations: [REPAIR, ANALYSIS],
+    automation: REPAIR,
   },
 };
 
-export const DisabledRow: Story = {
-  name: "Disabled row",
+export const DisabledIcon: Story = {
+  name: "Disabled icon",
   args: {
-    automations: [INTAKE, DISABLED],
+    automation: DISABLED,
   },
+};
+
+export const HeaderIcons: Story = {
+  name: "Header icons",
+  args: {
+    defaultOpen: false,
+  },
+  render: () => (
+    <ColumnAutomationsHeaderSlot
+      title="Backlog"
+      automations={[INTAKE, ANALYSIS, REPAIR]}
+      onRowAction={() => undefined}
+      testId="story-column-automations"
+    />
+  ),
 };
