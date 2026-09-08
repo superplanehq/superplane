@@ -6,14 +6,14 @@ import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
  * Compact amber banner for empty hosted credit. Tasks shows this above the
- * board. The action opens Organization Spending.
+ * board. The action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
   component: HostedCreditEmptyBanner,
   parameters: { layout: "padded" },
   args: {
-    spendingHref: "/org/workspaces/RF/settings/organization/spending",
+    spendingHref: "/org/workspaces/RF/settings/organization/billing",
   },
   decorators: [
     withFactoriesTheme,
@@ -29,13 +29,13 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Polar billing is on. The action adds hosted credit. */
+/** Polar billing is on. The action opens Billing. */
 export const BillingOn: Story = {
   name: "Billing on",
   args: { billingEnabled: true },
 };
 
-/** Polar billing is off. The action opens spending for an installation admin. */
+/** Polar billing is off. The action opens Billing. */
 export const BillingOff: Story = {
   name: "Billing off",
   args: { billingEnabled: false },

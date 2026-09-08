@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   Blocks,
+  CircleDollarSign,
   CircleUser,
   Cpu,
   Grid3x3,
@@ -25,6 +26,7 @@ export type FactorySettingsSection =
   | "automations"
   | "models"
   | "spending"
+  | "billing"
   | "members"
   | "integrations"
   | "api-keys"
@@ -284,6 +286,23 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         keywords: ["create secret", "secret name", "key-value pairs", "credentials", "env"],
       },
       {
+        id: "organization-billing",
+        label: "Billing",
+        Icon: CircleDollarSign,
+        scope: "organization",
+        section: "billing",
+        permission: { resource: "org", action: "read" },
+        keywords: [
+          "billing",
+          "credit",
+          "hosted credit",
+          "invoices",
+          "remaining hosted credit",
+          "superplane grant",
+          "purchased hosted credit",
+        ],
+      },
+      {
         id: "organization-spending",
         label: "Spending",
         Icon: BarChart3,
@@ -291,16 +310,11 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         section: "spending",
         permission: { resource: "org", action: "read" },
         keywords: [
-          "billing",
           "usage",
           "cost",
-          "credit",
           "tokens",
           "vm time",
           "estimated spend",
-          "remaining hosted credit",
-          "superplane grant",
-          "purchased hosted credit",
           "by model",
           "by machine type",
           "model usage",

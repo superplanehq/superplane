@@ -168,6 +168,7 @@ describe("FactorySettingsLayout sidebar", () => {
     ["API keys", "api-keys", "factory-settings-api-keys"],
     ["Secrets", "secrets", "factory-settings-secrets"],
     ["LLM Models", "models", "factory-settings-llm-models"],
+    ["Billing", "billing", "billing-credit-balance"],
   ])("renders the Organization %s page in the factory settings shell", async (_title, path, pageTestId) => {
     render(
       <FactoriesHarness
@@ -181,8 +182,8 @@ describe("FactorySettingsLayout sidebar", () => {
       "aria-current",
       "page",
     );
-    expect(await screen.findByTestId(pageTestId)).toBeInTheDocument();
-  });
+    expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 
   describe("Find settings", () => {
     it("shows section results for Security and hides the grouped nav", async () => {
@@ -202,7 +203,7 @@ describe("FactorySettingsLayout sidebar", () => {
       expect(within(sidebar).queryByTestId("factory-settings-account-nav")).not.toBeInTheDocument();
     }, 10000);
 
-    it("shows Spending results when the query matches billing", async () => {
+    it("shows Billing results when the query matches billing", async () => {
       const user = userEvent.setup();
       render(
         <FactoriesHarness
@@ -214,7 +215,8 @@ describe("FactorySettingsLayout sidebar", () => {
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       await user.type(within(sidebar).getByTestId("factory-settings-find"), "billing");
       const results = within(sidebar).getByTestId("factory-settings-search-results");
-      expect(within(results).getAllByText("Spending")).toHaveLength(1);
+      expect(within(results).getAllByText("Billing")).toHaveLength(1);
+      expect(within(results).queryByText("Spending")).not.toBeInTheDocument();
       expect(within(sidebar).queryByTestId("factory-settings-workspace-nav")).not.toBeInTheDocument();
     }, 10000);
 
