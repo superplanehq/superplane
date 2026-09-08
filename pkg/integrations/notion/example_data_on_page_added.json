@@ -1,0 +1,31 @@
+{
+  "type": "notion.page",
+  "timestamp": "2026-03-26T19:29:35.841Z",
+  "data": {
+    "meta": {
+      "event": "page.created"
+    },
+    "data": {
+      "id": "8a1e6d2f-8b0e-4e9b-9a3a-3a6b2f9c9d10",
+      "object": "page",
+      "created_time": "2026-03-26T19:29:00.000Z",
+      "last_edited_time": "2026-03-26T19:29:00.000Z",
+      "url": "https://www.notion.so/Fix-payment-retries-8a1e6d2f8b0e4e9b9a3a3a6b2f9c9d10",
+      "properties": {
+        "Name": {
+          "id": "title",
+          "type": "title",
+          "title": [
+            {
+              "type": "text",
+              "text": { "content": "Fix payment retries" },
+              "plain_text": "Fix payment retries"
+            }
+          ]
+        }
+      },
+      "title": "Fix payment retries",
+      "content": "Retries fail silently after the third attempt.\n\nCustomers report duplicate charges on the second retry."
+    }
+  }
+}

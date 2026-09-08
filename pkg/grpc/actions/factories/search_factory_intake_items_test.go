@@ -2,6 +2,9 @@ package factories
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -10,10 +13,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/notion"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/contexts"
 	"google.golang.org/grpc/codes"
 	"gorm.io/gorm"
 )
@@ -31,6 +36,60 @@ func Test__ProductiveTaskItem(t *testing.T) {
 	assert.Equal(t, "Fix payment retries", item.Title)
 	assert.Equal(t, "Retries fail silently.", item.Body)
 	assert.Equal(t, "https://app.productive.io/12345/tasks/91", item.URL)
+}
+
+func Test__NotionPageItem(t *testing.T) {
+	item := notionPageItem(notion.Page{
+		ID:      "page-1",
+		Title:   "Fix payment retries",
+		Content: "Retries fail silently.",
+		URL:     "https://www.notion.so/Fix-payment-retries-page-1",
+	})
+
+	assert.Equal(t, "page-1", item.ID)
+	assert.Equal(t, "Fix payment retries", item.Title)
+	assert.Equal(t, "Retries fail silently.", item.Body)
+	assert.Equal(t, "https://www.notion.so/Fix-payment-retries-page-1", item.URL)
+}
+
+// A caller passes the page id to import directly. The integration can read
+// pages in every database shared with it, so a page outside the intake's
+// database must not import even when the id is valid.
+func Test__NotionIntakeItemSource__Get__ScopesToDatabase(t *testing.T) {
+	newSource := func(t *testing.T, responses ...*http.Response) *notionIntakeItemSource {
+		t.Helper()
+		client, err := notion.NewClient(
+			&contexts.HTTPContext{Responses: responses},
+			&contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "secret_token"}},
+		)
+		require.NoError(t, err)
+		return &notionIntakeItemSource{notion: client, databaseID: "db-1"}
+	}
+
+	pageResponse := func(databaseID string) *http.Response {
+		return jsonHTTPResponse(fmt.Sprintf(
+			`{"id":"page-1","url":"https://www.notion.so/page-1","parent":{"type":"database_id","database_id":%q},"properties":{"Name":{"type":"title","title":[{"plain_text":"Task"}]}}}`,
+			databaseID,
+		))
+	}
+	blocksResponse := jsonHTTPResponse(`{"results":[]}`)
+
+	t.Run("imports a page in the intake's database", func(t *testing.T) {
+		source := newSource(t, pageResponse("db-1"), jsonHTTPResponse(`{"results":[]}`))
+		item, err := source.Get(context.Background(), "page-1")
+		require.NoError(t, err)
+		assert.Equal(t, "page-1", item.ID)
+	})
+
+	t.Run("refuses a page in another database", func(t *testing.T) {
+		source := newSource(t, pageResponse("db-2"), blocksResponse)
+		_, err := source.Get(context.Background(), "page-1")
+		require.ErrorIs(t, err, errIntakeItemNotFound)
+	})
+}
+
+func jsonHTTPResponse(body string) *http.Response {
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
 }
 
 type stubIntakeItemSource struct {

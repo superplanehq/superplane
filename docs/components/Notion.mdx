@@ -1,0 +1,94 @@
+---
+title: "Notion"
+---
+
+Create Backlog work orders from new Notion pages
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Page Added" href="#on-page-added" description="Listen for new pages added to a Notion database" />
+</CardGrid>
+
+## Instructions
+
+To configure Notion to work with SuperPlane:
+
+1. **Create an internal integration**: In Notion, open [My integrations](https://www.notion.so/my-integrations) and create a new internal integration for your workspace.
+2. **Copy the token**: Copy the integration's internal integration secret.
+3. **Share a database**: Open the database SuperPlane should watch, choose **Connections** from the page menu, and add your integration.
+4. **Enter the token**: Provide the token in the integration configuration.
+
+<a id="on-page-added"></a>
+
+## On Page Added
+
+**Trigger key:** `notion.onPageAdded`
+
+The On Page Added trigger starts a workflow execution when a page is added to a Notion database.
+
+### Use Cases
+
+- **Backlog intake**: Create a work order when a new task page is added to a database
+- **Notifications**: Alert a channel when a page is added
+
+### Configuration
+
+- **Database** (required): Notion database to monitor. The database must be shared with the integration.
+
+### Outputs
+
+- **Default channel**: Emits an envelope with a `data` object that holds the page's Notion fields
+  (`id`, `url`, `properties`), plus a simplified `title` and `content` (the page body as plain
+  text), and a `meta.event` field that names the change (always `page.created`).
+
+### How pages arrive
+
+The trigger reads the database every minute and emits the pages created since the read before it.
+Pages that already exist when you add the trigger are not reported; only later pages are.
+
+This trigger does not report page edits, status changes, or deletions. It only reports new pages.
+
+Notion has no webhook API for internal integrations, so this trigger polls, at the cost of up to one
+minute of delay.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "data": {
+      "content": "Retries fail silently after the third attempt.\n\nCustomers report duplicate charges on the second retry.",
+      "created_time": "2026-03-26T19:29:00.000Z",
+      "id": "8a1e6d2f-8b0e-4e9b-9a3a-3a6b2f9c9d10",
+      "last_edited_time": "2026-03-26T19:29:00.000Z",
+      "object": "page",
+      "properties": {
+        "Name": {
+          "id": "title",
+          "title": [
+            {
+              "plain_text": "Fix payment retries",
+              "text": {
+                "content": "Fix payment retries"
+              },
+              "type": "text"
+            }
+          ],
+          "type": "title"
+        }
+      },
+      "title": "Fix payment retries",
+      "url": "https://www.notion.so/Fix-payment-retries-8a1e6d2f8b0e4e9b9a3a3a6b2f9c9d10"
+    },
+    "meta": {
+      "event": "page.created"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841Z",
+  "type": "notion.page"
+}
+```
+

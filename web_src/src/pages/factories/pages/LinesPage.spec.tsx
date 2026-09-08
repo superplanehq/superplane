@@ -185,6 +185,10 @@ vi.mock("./ProductiveIntakeSetupDialog", () => ({
     open ? <div data-testid="productive-intake-setup" /> : null,
 }));
 
+vi.mock("./NotionIntakeSetupDialog", () => ({
+  NotionIntakeSetupDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="notion-intake-setup" /> : null),
+}));
+
 async function resetLinesBoardMocks() {
   const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
@@ -680,6 +684,23 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+  });
+
+  it("opens guided Notion setup from the overflow menu when the feature is on", async () => {
+    enabledExperimentalFeatures.add("factory_notion_intake");
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-notion-pages")).toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("add-intake-template-notion-pages"));
+    expect(screen.getByTestId("notion-intake-setup")).toBeInTheDocument();
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("shows only declared intakes", () => {

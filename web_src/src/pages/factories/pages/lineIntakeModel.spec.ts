@@ -14,12 +14,13 @@ import {
 } from "./lineIntakeModel";
 
 describe("lineIntakeModel", () => {
-  it("defines GitHub, Sentry, PagerDuty, and Productive.io as automations that feed Backlog", () => {
+  it("defines GitHub, Sentry, PagerDuty, Productive.io, and Notion as automations that feed Backlog", () => {
     expect(LINE_INTAKE_SOURCES.map((source) => source.id)).toEqual([
       "github-issues",
       "sentry-exceptions",
       "pagerduty-incidents",
       "productive-tasks",
+      "notion-pages",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -268,7 +269,7 @@ describe("lineIntakeModel", () => {
     expect(canvas?.nodes.map((node) => node.component)).toEqual(["github.onIssue", "createWorkOrder"]);
   });
 
-  it("builds Sentry, PagerDuty, and Productive.io canvases from catalogue triggers", () => {
+  it("builds Sentry, PagerDuty, Productive.io, and Notion canvases from catalogue triggers", () => {
     const sentry = intakeAutomationFixture(lineIntakeSourceById("sentry-exceptions")!);
     expect(sentry.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
       "sentry.onIssue",
@@ -286,10 +287,16 @@ describe("lineIntakeModel", () => {
       "productive.onTask",
       "createWorkOrder",
     ]);
+
+    const notion = intakeAutomationFixture(lineIntakeSourceById("notion-pages")!);
+    expect(notion.phases[0]?.canvas?.nodes.map((node) => node.component)).toEqual([
+      "notion.onPageAdded",
+      "createWorkOrder",
+    ]);
   });
 
-  it("lists seven add-intake templates including CI and page performance", () => {
-    expect(ADD_INTAKE_TEMPLATES).toHaveLength(7);
+  it("lists eight add-intake templates including CI and page performance", () => {
+    expect(ADD_INTAKE_TEMPLATES).toHaveLength(8);
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-ci-runtime");
     expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toContain("improve-page-performance");
   });
@@ -303,12 +310,13 @@ describe("lineIntakeModel", () => {
     }
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
+    expect(apiIntakeSource("notion-pages")).toBe("SOURCE_NOTION_PAGES");
   });
 
   it("filters add-intake templates by name or description", () => {
     expect(filterAddIntakeTemplates("production").map((template) => template.id)).toEqual(["sentry-exceptions"]);
     expect(filterAddIntakeTemplates("incident").map((template) => template.id)).toEqual(["pagerduty-incidents"]);
     expect(filterAddIntakeTemplates("runtime").map((template) => template.id)).toEqual(["improve-ci-runtime"]);
-    expect(filterAddIntakeTemplates("")).toHaveLength(7);
+    expect(filterAddIntakeTemplates("")).toHaveLength(8);
   });
 });
