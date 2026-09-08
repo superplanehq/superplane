@@ -8,7 +8,9 @@ import { useNavigate, useParams } from "react-router";
 
 import { factoryListPath, factorySetupPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
+import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
+import { useGithubAppAvailability } from "./useGithubAppAvailability";
 import { useOnboardingStorybook } from "./useOnboardingStorybook";
 import { PLACEHOLDER_WORKSPACE_NAME } from "./workspaceNames";
 
@@ -34,13 +36,16 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
   const factories = useFactories(organizationId);
   const createFactory = useCreateFactory(organizationId);
   const storybookOnboarding = useOnboardingStorybook();
+  const githubApp = useGithubAppAvailability(organizationId);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   // Workspace creation must run once per attempt, not on every render.
   const requested = useRef(false);
 
   useEffect(() => {
-    if (requested.current || factories.isLoading) return;
+    // Setup needs the SuperPlane GitHub App, so the workspace is not created
+    // until the integration catalog confirms the app is available.
+    if (requested.current || factories.isLoading || !githubApp.resolved || !githubApp.available) return;
     requested.current = true;
 
     const create = async () => {
@@ -67,13 +72,27 @@ function NewWorkspacePageContent({ organizationId }: { organizationId: string })
     };
 
     void create();
-  }, [attempt, createFactory, factories.data, factories.isLoading, navigate, organizationId, storybookOnboarding]);
+  }, [
+    attempt,
+    createFactory,
+    factories.data,
+    factories.isLoading,
+    githubApp.available,
+    githubApp.resolved,
+    navigate,
+    organizationId,
+    storybookOnboarding,
+  ]);
 
   const retry = () => {
     setError(null);
     requested.current = false;
     setAttempt((current) => current + 1);
   };
+
+  if (githubApp.resolved && !githubApp.available) {
+    return <GithubAppRequiredNotice />;
+  }
 
   return (
     <div className="min-h-screen w-full bg-background text-foreground" data-testid="new-workspace">
