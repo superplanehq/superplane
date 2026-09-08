@@ -225,7 +225,7 @@ describe("FirstRunConnectScreen", () => {
 
     const waitingRow = screen.getByTestId("first-run-github-install-requested");
     expect(waitingRow.tagName).toBe("BUTTON");
-    await user.click(waitingRow);
+    await user.hover(waitingRow);
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
