@@ -4,7 +4,7 @@ import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
 import { EMPTY_ORG_SPENDING_REPORT } from "../../__fixtures__/spendingReportFixtures";
-import { SPENT_CREDIT_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
+import { SPENT_CREDIT_USAGE_REPORT, STORYBOOK_HOSTED_CREDIT_PRODUCTS } from "../../__fixtures__/usageReportFixtures";
 import { FactorySettingsLayout } from "../settings/FactorySettingsLayout";
 
 const meta = {
@@ -75,7 +75,22 @@ export const Billing: Story = {
       pathSuffix={organizationSettingsPath("billing")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationCreditGrants: MIXED_CREDIT_GRANTS,
+        organizationWorkspaceUsage: {
+          ...defaultFactoriesFixture.organizationWorkspaceUsage!,
+          billingEnabled: true,
+          hasBillingCustomer: true,
+          invoices: [
+            {
+              id: "ord_storybook_1",
+              createdAt: "2026-09-01T12:00:00Z",
+              amountCents: "2500",
+              status: "paid",
+              productName: "Hosted credit 25",
+            },
+          ],
+        },
       }}
     />
   ),
@@ -88,7 +103,13 @@ export const BillingEmptyHistory: Story = {
       pathSuffix={organizationSettingsPath("billing")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationCreditGrants: [],
+        organizationWorkspaceUsage: {
+          ...defaultFactoriesFixture.organizationWorkspaceUsage!,
+          billingEnabled: true,
+          hasBillingCustomer: false,
+        },
       }}
     />
   ),
@@ -101,6 +122,7 @@ export const BillingEmptyCredit: Story = {
       pathSuffix={organizationSettingsPath("billing")}
       factoriesFixture={{
         ...defaultFactoriesFixture,
+        hostedCreditProducts: STORYBOOK_HOSTED_CREDIT_PRODUCTS,
         organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT,
       }}
     />
