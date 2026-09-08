@@ -41,6 +41,13 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     createDescription: "{{ root().data.data.attributes.description }}",
     title: "Productive.io task intake",
   },
+  "notion-pages": {
+    triggerComponent: "notion.onPageAdded",
+    triggerName: "On Page Added",
+    createTitle: "{{ root().data.data.title }}",
+    createDescription: "{{ root().data.data.content }}",
+    title: "Notion page intake",
+  },
 };
 
 export function intakeCanvasForSource(source: LineIntakeSource): SplitRunCanvasModel {

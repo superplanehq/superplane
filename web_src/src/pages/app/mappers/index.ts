@@ -60,6 +60,11 @@ import {
   eventStateRegistry as productiveEventStateRegistry,
 } from "./productive/index";
 import {
+  componentMappers as notionComponentMappers,
+  triggerRenderers as notionTriggerRenderers,
+  eventStateRegistry as notionEventStateRegistry,
+} from "./notion/index";
+import {
   componentMappers as dash0ComponentMappers,
   triggerRenderers as dash0TriggerRenderers,
   eventStateRegistry as dash0EventStateRegistry,
@@ -344,6 +349,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   productive: productiveComponentMappers,
+  notion: notionComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
@@ -395,6 +401,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   linear: linearTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   productive: productiveTriggerRenderers,
+  notion: notionTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
@@ -443,6 +450,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
   productive: productiveEventStateRegistry,
+  notion: notionEventStateRegistry,
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,
