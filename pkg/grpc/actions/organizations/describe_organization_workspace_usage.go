@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"github.com/superplanehq/superplane/pkg/usage/pricebook"
+	"gorm.io/gorm"
 )
 
 const (
@@ -48,12 +50,14 @@ func DescribeOrganizationWorkspaceUsage(
 		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
 	}
 
+	billingEnabled, hasCustomer := billingState(ctx, organizationID)
+	invoices := listHostedCreditInvoices(ctx, db, organizationID, billingEnabled, hasCustomer)
+
 	credit, err := models.DescribeOrganizationLLMCredit(db, organizationID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to describe organization workspace usage")
 	}
 
-	billingEnabled, hasCustomer := billingState(ctx, organizationID)
 	ledger := totals.Add(computeTotals)
 	defaultModel, err := models.GetInstallationDefaultHostedLLMModel(db)
 	if err != nil {
@@ -73,7 +77,7 @@ func DescribeOrganizationWorkspaceUsage(
 		HasBillingCustomer:     hasCustomer,
 		SuperplaneGrantCents:   pricebook.MicrosToCents(credit.SuperPlaneGrantMicros),
 		PurchasedCreditCents:   pricebook.MicrosToCents(credit.PurchasedCreditMicros),
-		Invoices:               listHostedCreditInvoices(ctx, organizationID, billingEnabled, hasCustomer),
+		Invoices:               invoices,
 		TotalDurationSeconds:   ledger.DurationSeconds,
 		ByMachineType:          serializeUsageByMachineType(byMachine),
 		DefaultHostedProvider:  defaultModel.Provider,
@@ -118,6 +122,7 @@ func serializeUsageByMachineType(rows []models.UsageByMachineType) []*pb.UsageBy
 
 func listHostedCreditInvoices(
 	ctx context.Context,
+	db *gorm.DB,
 	organizationID uuid.UUID,
 	billingEnabled bool,
 	hasCustomer bool,
@@ -126,8 +131,9 @@ func listHostedCreditInvoices(
 		return nil
 	}
 
-	orders, err := polar.NewClientFromEnv().ListOrders(ctx, organizationID.String())
+	orders, err := polar.NewClientFromEnv().ListAndReconcileOrders(ctx, db, organizationID)
 	if err != nil {
+		log.WithError(err).WithField("organization_id", organizationID).Warn("failed to list polar hosted credit orders")
 		return nil
 	}
 
