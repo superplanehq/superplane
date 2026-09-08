@@ -503,12 +503,6 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
-  it("stays on the repository screen when an install-request flag is leftover on step=repo", () => {
-    renderSetup(pageModel({ openSection: "repo" }), "/org-1/workspaces/PAY/setup?step=repo&githubSetup=request");
-    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
-  });
-
   it("opens Connect when GitHub returned an install request without a step", () => {
     renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
 

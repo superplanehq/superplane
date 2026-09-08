@@ -153,6 +153,21 @@ describe("advanceAfterGithubConnect", () => {
     expect(locationReplace).not.toHaveBeenCalled();
   });
 
+  it("does not carry an install-request flag onto the repository step", async () => {
+    await advanceAfterGithubConnect({
+      onboardingEntryPath: "/onboarding?attempt=attempt-1&githubSetup=request&githubOrg=acme&step=vcs&pick=newest",
+      organizationId: oldSlug,
+      nextSlug: oldSlug,
+      factoryId,
+      factoryKey,
+      navigate,
+      reresolveWorkspace: vi.fn(),
+      queryClient,
+    });
+
+    expect(navigate).toHaveBeenCalledWith("/onboarding?attempt=attempt-1&step=repo", { replace: true });
+  });
+
   it("navigates client-side when no re-resolution callback is available", async () => {
     await advanceAfterGithubConnect({
       onboardingEntryPath: "/onboarding?attempt=attempt-1&step=vcs&pick=newest",

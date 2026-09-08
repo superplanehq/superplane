@@ -321,6 +321,22 @@ describe("FactoriesHarness workspace setup", () => {
   // Regression: on a direct repo-step load the selection sync ran before the
   // connection list arrived, dropped the saved connection, and the repository
   // list stayed empty until the user re-picked the account.
+  // Leftover githubSetup=request on step=repo used to reopen Connect and
+  // bounce. The step in the URL must win.
+  it("stays on the repository screen when an install-request flag is leftover on step=repo", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=repo&githubSetup=request`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.vcs)}
+        onboardingSeed={{ pending: { workspaceId: PRIMARY_FACTORY_ID, workspaceName: "Refunds Factory" } }}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  }, 15000);
+
   it("restores the saved connection's repositories on a direct repo-step load", async () => {
     render(
       <FactoriesHarness
