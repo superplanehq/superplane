@@ -1,9 +1,13 @@
 import type { FactoriesFactory, FactoriesFactoryLine, FactoryLineStep } from "@/api-client";
+import { accountOrganizationsQueryKey } from "@/hooks/useAccountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
+
+import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganization";
 
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
@@ -63,6 +67,35 @@ function navigateAfterFinish(
   lineId: string,
 ) {
   navigate(afterOnboardingPath({ organizationId, factoryKey, lineId }), { replace: true });
+}
+
+export async function afterWorkspaceProvisioned(args: {
+  factory: FactoriesFactory | null;
+  owner?: string;
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  lineId: string;
+  updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
+  invalidateAccountOrganizations: () => void;
+  navigate: ReturnType<typeof useNavigate>;
+}): Promise<void> {
+  let organizationId = args.organizationId;
+  if (args.updateOrganization) {
+    try {
+      organizationId = await completeInitialOrganizationIdentity({
+        factory: args.factory,
+        owner: args.owner,
+        currentSlug: args.organizationId,
+        update: args.updateOrganization,
+      });
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, "Could not name the organization from the GitHub connection"));
+    }
+  }
+  args.invalidateAccountOrganizations();
+  markWorkspaceGettingStarted(organizationId, args.factoryId);
+  navigateAfterFinish(args.navigate, organizationId, args.factoryKey, args.lineId);
 }
 
 export async function provisionWorkspace(args: {
@@ -173,8 +206,11 @@ export function useFinishOnboarding(args: {
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
+  githubOwner?: string;
+  updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
 }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   // A caller that just changed the issues answer in the same click (the
   // ticket screen's Analyze action) passes it here instead of reading
   // `args.setup.issuesChoice`. That value comes from a render captured before
@@ -220,8 +256,19 @@ export function useFinishOnboarding(args: {
             ? args.selections[args.plan.integrationName]?.id
             : undefined,
       });
-      markWorkspaceGettingStarted(args.organizationId, args.factoryId);
-      navigateAfterFinish(navigate, args.organizationId, args.factoryKey, provisioned.lineId);
+      await afterWorkspaceProvisioned({
+        factory: args.factory,
+        owner: args.githubOwner,
+        organizationId: args.organizationId,
+        factoryId: args.factoryId,
+        factoryKey: args.factoryKey,
+        lineId: provisioned.lineId,
+        updateOrganization: args.updateOrganization,
+        invalidateAccountOrganizations: () => {
+          void queryClient.invalidateQueries({ queryKey: accountOrganizationsQueryKey });
+        },
+        navigate,
+      });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
     } finally {

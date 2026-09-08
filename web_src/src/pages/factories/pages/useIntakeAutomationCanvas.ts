@@ -10,6 +10,7 @@ export interface IntakeAutomationGraph {
 
 interface IntakeAutomationCanvasResult {
   graph: IntakeAutomationGraph;
+  name?: string;
   isLoading: boolean;
   isError: boolean;
   refetch: () => Promise<unknown>;
@@ -33,6 +34,7 @@ export function useIntakeAutomationCanvas(
       edges: prepared.edges,
       factoryId: query.data?.metadata?.factoryId,
     },
+    name: query.data?.metadata?.name,
     isLoading: enabled && (query.isPending || prepared.isLoading),
     isError: query.isError,
     refetch: query.refetch,

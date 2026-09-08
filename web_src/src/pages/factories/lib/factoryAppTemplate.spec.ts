@@ -48,6 +48,14 @@ describe("hasFactoryAppDefaults", () => {
     expect(hasFactoryAppDefaults(canvasWith([{ id: "on-issue-labeled" }, { id: "create-work-order" }]))).toBe(true);
   });
 
+  it("recognizes generated PR feedback discussion canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pr-comment" }, { id: "address-pr-feedback" }]))).toBe(true);
+  });
+
+  it("recognizes generated PR feedback checks canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pull-request" }, { id: "wait-pr-checks" }]))).toBe(true);
+  });
+
   it("rejects custom canvases", () => {
     expect(hasFactoryAppDefaults(canvasWith([{ id: "custom" }]))).toBe(false);
   });

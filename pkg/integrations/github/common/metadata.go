@@ -31,6 +31,10 @@ type Metadata struct {
 	// SetupReturnPath is the in-app path to open after GitHub setup. Callbacks
 	// use it when the browser cookie is missing, for example localhost to ngrok.
 	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath,omitempty"`
+	// AuthorizeURL is the GitHub user OAuth authorize URL for this connect.
+	// The OAuth callback removes the browser action, so the connect screen
+	// uses this URL to ask again which GitHub account to use.
+	AuthorizeURL string `mapstructure:"authorizeURL" json:"authorizeURL,omitempty"`
 }
 
 type PendingInstallation struct {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder, FactoryApp } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
-import { editFactoryLinePath, factoryAppConfigurePath } from "../lib/factoryPagePaths";
+import { editFactoryLinePath, factoryAppConfigurePath, factoryColumnAutomationViewPath } from "../lib/factoryPagePaths";
 import {
   ACME_ONBOARDING_FACTORY,
   ACME_ONBOARDING_FACTORY_KEY,
@@ -18,6 +18,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
@@ -303,6 +304,30 @@ describe("LinesPage board", () => {
     );
   });
 
+  it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const analyzingOrderId = REVIEW_CANDIDATE_WORK_ORDERS[0].id!;
+    // The board optimistically knows this draft is analyzing before its Backlog
+    // run appears in the polled list. The popup must match the board card.
+    markBacklogAnalysisPending(analyzingOrderId);
+    try {
+      const user = userEvent.setup();
+      renderLinesBoard();
+
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+      const dialog = screen.getByTestId("work-order-split-run");
+      expect(
+        within(dialog).getByRole("heading", { name: "SuperPlane is currently analyzing this task" }),
+      ).toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    } finally {
+      clearBacklogAnalysisPending(analyzingOrderId);
+    }
+  });
+
   it("opens the split run from a task permalink", () => {
     useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/842`);
@@ -412,7 +437,7 @@ describe("LinesPage board", () => {
     );
   });
 
-  it("opens intake settings when an automation row is clicked", async () => {
+  it("opens intake settings on the first tab when an automation row is clicked", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
@@ -420,6 +445,53 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`));
 
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
+    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("settings=automation");
+    expect(screen.getByTestId("intake-source-settings")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("opens an existing phase automation in the board view popup", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`);
+
+    await user.click(screen.getByTestId("column-automation-row-step-0-app-refund-implementer"));
+
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-implementer"),
+    );
+    expect(location).not.toHaveTextContent("/apps/");
+    expect(location).not.toHaveTextContent("configure=1");
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("column-automation-view")).getByRole("heading", { name: "Implement" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-view-tab-agent")).toHaveAttribute("data-state", "active");
+    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
+    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+      "href",
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-implementer", {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
+  });
+
+  it("opens an existing analysis automation in the board view popup", async () => {
+    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
+
+    await user.click(screen.getByTestId("column-automation-row-analysis-app-refund-backlog"));
+
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryColumnAutomationViewPath("org-1", PRIMARY_FACTORY_KEY, REFUND_LINE_PLAN_ID, "app-refund-backlog"),
+    );
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
   it("opens the phase automations menu from the indicator", async () => {
@@ -818,29 +890,6 @@ describe("LinesPage board editing", () => {
     expect(screen.queryByTestId("lines-backlog-menu-edit-agent")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-parallelism")).not.toBeInTheDocument();
     expect(screen.queryByTestId("lines-backlog-menu-edit-automation")).not.toBeInTheDocument();
-  });
-
-  it("offers Edit automation on the Backlog menu when a Backlog automation app exists", async () => {
-    useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
-    const user = userEvent.setup();
-    renderLinesBoard();
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    const editAutomation = screen.getByTestId("lines-backlog-menu-edit-automation");
-    const edit = screen.getByTestId("lines-backlog-menu-edit");
-    expect(editAutomation).toHaveTextContent("Edit automation");
-    expect(edit).toHaveTextContent("Edit");
-    // Edit automation, then Edit, then Set color.
-    expect(editAutomation.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(edit.compareDocumentPosition(screen.getByText("Set color")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(editAutomation);
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-refund-backlog", {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
-    );
   });
 
   it("opens Set parallelism and saves a new cap", async () => {

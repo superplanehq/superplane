@@ -7,9 +7,10 @@ import {
 export const FIRST_RUN_COPY = {
   chrome: {
     logOut: "Log out",
-    close: "Cancel setup",
+    switchOrganization: "Switch organization",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
+    back: "Back",
   },
   welcome: {
     greeting: (firstName: string) => `Hi ${firstName}.`,
@@ -20,14 +21,14 @@ export const FIRST_RUN_COPY = {
   connect: {
     headline: "Connect GitHub",
     body: "SuperPlane reads your repositories. It does not start work yet.",
+    signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
     selectAccount: "Select a GitHub account",
     selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
     useAccount: (account: string) => `Use ${account}`,
-    installDifferentAccount: "Install on a different account",
-    connected: "Connected",
-    continue: "Choose a repository",
+    missingAccount: "Do not see your GitHub account or organization?",
+    installThere: "Install the GitHub App there.",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
     installRequestedBody: githubInstallRequestBody,

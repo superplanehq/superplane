@@ -72,6 +72,18 @@ service Organizations {
     };
   }
 
+  rpc SetUserOwner(SetUserOwnerRequest) returns (SetUserOwnerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/users/{user_id}/owner"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set organization owner flag";
+      description: "Sets or clears the owner flag for a member. The organization must keep at least one owner.";
+      tags: "Organization";
+    };
+  }
+
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/invite-link"
@@ -699,6 +711,14 @@ message RemoveUserRequest {
 }
 
 message RemoveUserResponse {}
+
+message SetUserOwnerRequest {
+  string id = 1;
+  string user_id = 2;
+  bool is_owner = 3;
+}
+
+message SetUserOwnerResponse {}
 
 message ListIntegrationsRequest {
   string id = 1;

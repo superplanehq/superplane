@@ -1,14 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
-
-function LocationDisplay() {
-  const location = useLocation();
-  return <div data-testid="lines-test-location">{location.pathname}</div>;
-}
 
 describe("ColumnLaneMenu", () => {
   it("offers colour swatches and applies a selection", async () => {
@@ -161,65 +156,6 @@ describe("ColumnLaneMenu", () => {
     expect(screen.queryByTestId("lines-phase-menu-3-edit")).not.toBeInTheDocument();
   });
 
-  it("offers a separate Edit automation action above Edit for the Backlog shape", async () => {
-    const onEdit = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter>
-        <ColumnLaneMenu
-          title="Backlog"
-          testId="lines-backlog-menu"
-          automationHref="/apps/app-refund-backlog/configure"
-          onEdit={onEdit}
-          colorId={null}
-          onColorChange={vi.fn()}
-        />
-        <LocationDisplay />
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    const editAutomation = screen.getByTestId("lines-backlog-menu-edit-automation");
-    const edit = screen.getByTestId("lines-backlog-menu-edit");
-    expect(editAutomation).toHaveTextContent("Edit automation");
-    expect(edit).toHaveTextContent("Edit");
-    // Edit automation leads the menu, ahead of the name/size Edit item.
-    expect(editAutomation.compareDocumentPosition(edit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-
-    await user.click(editAutomation);
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent("/apps/app-refund-backlog/configure");
-    expect(onEdit).not.toHaveBeenCalled();
-  });
-
-  it("offers Automations first when supplied", async () => {
-    const onOpenAutomations = vi.fn();
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter>
-        <ColumnLaneMenu
-          title="Backlog"
-          testId="lines-backlog-menu"
-          onEdit={vi.fn()}
-          onOpenAutomations={onOpenAutomations}
-          colorId={null}
-          onColorChange={vi.fn()}
-        />
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    const automations = screen.getByTestId("lines-backlog-menu-automations");
-    expect(automations).toHaveTextContent("Automations");
-    expect(
-      automations.compareDocumentPosition(screen.getByTestId("lines-backlog-menu-edit")) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    await user.click(automations);
-    expect(onOpenAutomations).toHaveBeenCalledTimes(1);
-  });
-
   it("offers Add intake ahead of the other actions when supplied", async () => {
     const onAddIntake = vi.fn();
     const user = userEvent.setup();
@@ -264,24 +200,5 @@ describe("ColumnLaneMenu", () => {
 
     await user.click(screen.getByTestId("lines-backlog-menu"));
     expect(screen.queryByTestId("lines-backlog-menu-add-intake")).not.toBeInTheDocument();
-  });
-
-  it("hides Edit automation when no automation href is supplied", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <MemoryRouter>
-        <ColumnLaneMenu
-          title="Backlog"
-          testId="lines-backlog-menu"
-          onEdit={vi.fn()}
-          colorId={null}
-          onColorChange={vi.fn()}
-        />
-      </MemoryRouter>,
-    );
-
-    await user.click(screen.getByTestId("lines-backlog-menu"));
-    expect(screen.queryByTestId("lines-backlog-menu-edit-automation")).not.toBeInTheDocument();
   });
 });

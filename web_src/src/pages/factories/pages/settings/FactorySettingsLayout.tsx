@@ -1,6 +1,7 @@
 import type { FactoriesFactory } from "@/api-client";
 import { Input } from "@/components/ui/input";
 import { useAccount } from "@/contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
 import { useAvailableIntegrations } from "@/hooks/useIntegrations";
@@ -22,7 +23,11 @@ import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
 import { factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
-import { type FactorySettingsNavGroup, type FactorySettingsNavItem } from "./settingsNavItems";
+import {
+  type FactorySettingsNavGroup,
+  type FactorySettingsNavItem,
+  filterFactorySettingsNavGroupsByPermission,
+} from "./settingsNavItems";
 import {
   buildFactorySettingsSearchIndex,
   factorySettingsSearchResultPath,
@@ -117,13 +122,14 @@ function FactorySettingsLayoutContent({
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
   const settingsNavGroups = useFactorySettingsNavGroups();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { data: describedFactory, isLoading, error } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const [navQuery, setNavQuery] = useState("");
   const navGroups = visibleFactorySettingsNavGroups(
-    settingsNavGroups,
+    filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
     hasExperimentalFeature(FEATURE_WORKSPACE_MODELS),
   );
   const searchIndex = useMemo(
