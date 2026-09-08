@@ -538,6 +538,73 @@ func Test__OnPageAdded__Poll__PagesPastAHandledBoundaryLargerThanOnePoll(t *test
 		"the newly emitted boundary page is recorded alongside the handled ones")
 }
 
+// Regression: a page whose content read keeps failing must not block the pages
+// behind it forever. The poll retries the page across maxContentReadAttempts
+// polls; if its content never loads, it is emitted without content so its work
+// order is still created and the cursor moves past it to the newer pages.
+func Test__OnPageAdded__Poll__GivesUpOnAnUnreadablePageSoNewerPagesFlow(t *testing.T) {
+	now := time.Now().UTC()
+	cursor := pageTimestamp(now.Add(-3 * time.Hour))
+	older := pageTimestamp(now.Add(-2 * time.Hour))
+	newest := pageTimestamp(now.Add(-time.Hour))
+
+	trigger := &OnPageAdded{}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
+
+	// A never-readable page sits ahead of a newer page. While the read keeps
+	// failing the poll stops at it and emits nothing, so the newer page stalls.
+	badPage := pageDocument("page-bad", "Unreadable", older)
+	newPage := pageDocument("page-new", "Newer", newest)
+
+	for attempt := 1; attempt < maxContentReadAttempts; attempt++ {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+			pagePage(badPage, newPage),
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"boom"}`))},
+		}}
+		events := &contexts.EventContext{}
+
+		_, err := trigger.HandleHook(pollContext(
+			databaseConfiguration(), metadata, httpContext, events, &contexts.RequestContext{},
+		))
+		require.NoError(t, err)
+
+		assert.Zero(t, events.Count(), "while retrying, the unread page blocks the newer page")
+		stored := nodeMetadata(t, metadata)
+		assert.Equal(t, cursor, stored.PolledUntil, "the cursor stays behind the unread page while it is retried")
+		assert.Equal(t, "page-bad", stored.FailedContentPageID)
+		assert.Equal(t, attempt, stored.FailedContentAttempts)
+	}
+
+	// The final attempt gives up on the unreadable page: it is emitted without
+	// content, then the newer page behind it is emitted too and the cursor moves.
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
+		pagePage(badPage, newPage),
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"boom"}`))},
+		blocksResponse("Body of newer"),
+	}}
+	events := &contexts.EventContext{}
+
+	_, err := trigger.HandleHook(pollContext(
+		databaseConfiguration(), metadata, httpContext, events, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"Unreadable", "Newer"}, emittedTitles(t, events),
+		"the unreadable page is emitted without content so the newer page is no longer blocked")
+
+	// The unreadable page carries an empty content rather than blocking the poll.
+	envelope, ok := events.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	page, ok := envelope["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "", page["content"], "the given-up page is emitted with empty content")
+
+	stored := nodeMetadata(t, metadata)
+	assert.Equal(t, newest, stored.PolledUntil, "the cursor advances past the given-up page")
+	assert.Empty(t, stored.FailedContentPageID, "the content-read failure is cleared once the poll moves on")
+	assert.Zero(t, stored.FailedContentAttempts)
+}
+
 func Test__OnPageAdded__Poll__WithoutACursorReportsNothing(t *testing.T) {
 	httpContext := &contexts.HTTPContext{}
 	metadata := &contexts.MetadataContext{}

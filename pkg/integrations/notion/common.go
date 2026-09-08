@@ -42,6 +42,15 @@ type NodeMetadata struct {
 	// a page sharing an emitted page's minute - an overflow page or one whose
 	// content could not be read yet - is neither skipped nor emitted twice.
 	EmittedAtCursor []string `json:"emittedAtCursor,omitempty" mapstructure:"emittedAtCursor,omitempty"`
+
+	// FailedContentPageID and FailedContentAttempts track the oldest unread
+	// page whose content read keeps failing. A content read is usually
+	// transient, so the page is retried on later polls rather than emitted
+	// without its body; these fields count the consecutive polls that failed on
+	// the same page so a page whose content never loads is eventually emitted
+	// without content instead of stalling every page behind it forever.
+	FailedContentPageID   string `json:"failedContentPageId,omitempty" mapstructure:"failedContentPageId,omitempty"`
+	FailedContentAttempts int    `json:"failedContentAttempts,omitempty" mapstructure:"failedContentAttempts,omitempty"`
 }
 
 // PageEnvelope wraps a page the way every consumer of this trigger reads it:

@@ -24,6 +24,13 @@ const (
 	// above the activity a minute can hold.
 	pollPageSize = 50
 	maxPollPages = 5
+
+	// maxContentReadAttempts is how many consecutive polls may fail to read the
+	// same page's content before the poll gives up and emits the page without
+	// its body. A content read is usually transient, so the page is retried
+	// across a few polls; a page whose content never loads is then emitted
+	// without content rather than blocking every page behind it forever.
+	maxContentReadAttempts = 5
 )
 
 type OnPageAdded struct{}
@@ -246,6 +253,8 @@ func emitChangedPages(
 	//
 	cursor := polledUntil
 	emittedAtCursor := append([]string{}, metadata.EmittedAtCursor...)
+	failedContentPageID := metadata.FailedContentPageID
+	failedContentAttempts := metadata.FailedContentAttempts
 	for _, document := range documents {
 		createdAt, ok := pageTime(document, "created_time")
 		if !ok {
@@ -254,20 +263,49 @@ func emitChangedPages(
 
 		page, err := BuildPageEvent(client, document)
 		if err != nil {
+			id, _ := document["id"].(string)
+			attempts := 1
+			if id != "" && id == failedContentPageID {
+				attempts = failedContentAttempts + 1
+			}
+
 			//
-			// Stop at the first page whose content could not be read and
-			// keep the cursor behind it, so the next poll re-reads from there
-			// instead of skipping it. Its minute is left in the cursor, and its
-			// id is not recorded, so the re-read finds it again.
+			// A content read that fails is usually transient (a rate limit or a
+			// 5xx). Rather than emit the page without its body, stop at the first
+			// page whose content could not be read and keep the cursor behind it,
+			// so the next poll re-reads from there instead of skipping it. Its
+			// minute is left in the cursor, and its id is not recorded, so the
+			// re-read finds it again.
 			//
-			ctx.Logger.Errorf("Error reading the content of Notion page %v: %v", document["id"], err)
-			break
+			if attempts < maxContentReadAttempts {
+				ctx.Logger.Errorf("Error reading the content of Notion page %v (attempt %d of %d): %v", document["id"], attempts, maxContentReadAttempts, err)
+				failedContentPageID = id
+				failedContentAttempts = attempts
+				break
+			}
+
+			//
+			// A page whose content never loads must not block the pages behind
+			// it forever. After maxContentReadAttempts consecutive polls failed
+			// on the same page, emit it without content so its work order is
+			// still created and the cursor can move past it.
+			//
+			ctx.Logger.Errorf("Giving up on the content of Notion page %v after %d attempts; emitting it without content: %v", document["id"], attempts, err)
+			page = pageDocumentEvent(document, "")
 		}
 
 		if err := ctx.Events.Emit(PagePayloadType, PageEnvelope(PageCreatedEvent, page)); err != nil {
 			ctx.Logger.Errorf("Error emitting Notion page %v: %v", document["id"], err)
 			break
 		}
+
+		//
+		// The page was handled - with its content, or without it after repeated
+		// failures - so any recorded content-read failure is cleared and the next
+		// unread page starts its own attempt count.
+		//
+		failedContentPageID = ""
+		failedContentAttempts = 0
 
 		id, _ := document["id"].(string)
 		switch {
@@ -287,11 +325,17 @@ func emitChangedPages(
 	// Persist when the cursor moved to a newer minute, or when it stayed on the
 	// same minute but gained an id - the second case is how an overflow or a
 	// retried page at the boundary minute is recorded without losing the pages
-	// already handled there.
+	// already handled there. The content-read failure count is persisted too, so
+	// a page whose content keeps failing is retried across polls and eventually
+	// given up on rather than retried from scratch every poll.
 	//
-	if cursor.After(polledUntil) || len(emittedAtCursor) != len(metadata.EmittedAtCursor) {
+	failureChanged := failedContentPageID != metadata.FailedContentPageID ||
+		failedContentAttempts != metadata.FailedContentAttempts
+	if cursor.After(polledUntil) || len(emittedAtCursor) != len(metadata.EmittedAtCursor) || failureChanged {
 		metadata.PolledUntil = formatPageTime(cursor)
 		metadata.EmittedAtCursor = emittedAtCursor
+		metadata.FailedContentPageID = failedContentPageID
+		metadata.FailedContentAttempts = failedContentAttempts
 		return ctx.Metadata.Set(metadata)
 	}
 
@@ -309,6 +353,14 @@ func BuildPageEvent(client *Client, document map[string]any) (map[string]any, er
 		return nil, err
 	}
 
+	return pageDocumentEvent(document, content), nil
+}
+
+// pageDocumentEvent maps a page document to the shape a template reads: every
+// field Notion returned, plus a simplified title and the given content. A poll
+// that gives up on an unreadable page passes an empty content here so the page
+// is still emitted rather than blocking the pages behind it forever.
+func pageDocumentEvent(document map[string]any, content string) map[string]any {
 	page := make(map[string]any, len(document)+2)
 	for key, value := range document {
 		page[key] = value
@@ -316,7 +368,7 @@ func BuildPageEvent(client *Client, document map[string]any) (map[string]any, er
 	page["title"] = PageTitle(document)
 	page["content"] = content
 
-	return page, nil
+	return page
 }
 
 // changedPages reads the pages of the database created at or after polledUntil,
