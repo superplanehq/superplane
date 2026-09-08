@@ -12,6 +12,7 @@ import (
 
 const intakeGitHubAppName = "github"
 const intakeProductiveAppName = "productive"
+const intakeNotionAppName = "notion"
 
 // intakeBinding points the generated trigger at a concrete integration and
 // resource. A trigger without one registers no webhook, so the intake would
@@ -60,6 +61,9 @@ func resolveIntakeBinding(
 ) (*intakeBinding, error) {
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return resolveProductiveIntakeBinding(tx, factory, integrationID, resourceID)
+	}
+	if source == models.FactoryIntakeSourceNotionPages {
+		return resolveNotionIntakeBinding(tx, factory, integrationID, resourceID)
 	}
 	if source != models.FactoryIntakeSourceGitHubIssues {
 		return nil, nil
@@ -122,6 +126,47 @@ func resolveProductiveIntakeBinding(
 			Name: integration.InstallationName,
 		},
 		Configuration: map[string]any{"project": projectID},
+		Installation:  integration,
+	}, nil
+}
+
+func resolveNotionIntakeBinding(
+	tx *gorm.DB,
+	factory *models.Factory,
+	integrationID string,
+	databaseID string,
+) (*intakeBinding, error) {
+	integrationID = strings.TrimSpace(integrationID)
+	databaseID = strings.TrimSpace(databaseID)
+	if integrationID == "" && databaseID == "" {
+		return nil, nil
+	}
+	if integrationID == "" || databaseID == "" {
+		return nil, invalidArgument("Notion integration and database are required")
+	}
+
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return nil, invalidArgument("Notion integration is invalid")
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		return nil, invalidArgument("Notion integration was not found")
+	}
+	if integration.AppName != intakeNotionAppName {
+		return nil, invalidArgument("selected integration is not Notion")
+	}
+	if integration.State != models.IntegrationStateReady {
+		return nil, invalidArgument("Notion integration is not ready")
+	}
+
+	return &intakeBinding{
+		Integration: &yaml.IntegrationRef{
+			ID:   integration.ID.String(),
+			Name: integration.InstallationName,
+		},
+		Configuration: map[string]any{"database": databaseID},
 		Installation:  integration,
 	}, nil
 }
