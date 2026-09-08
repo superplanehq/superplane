@@ -109,8 +109,9 @@ func ImportFactoryIntakeItem(
 				&createdByID,
 				body,
 			)
+			bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
 			if ingestErr == nil {
-				body = ingested
+				body = ingested.Markdown
 			}
 			if body != order.Description {
 				if err := order.UpdateContent(tx, nil, &body); err != nil {
@@ -119,7 +120,8 @@ func ImportFactoryIntakeItem(
 			}
 		}
 		result, bindErr := storedfiles.BindDescriptionFiles(ctx, tx, blob.Current(), orgID, factory.ID, order.ID, order.Description)
-		bound = result
+		bound.StaleKeys = append(bound.StaleKeys, result.StaleKeys...)
+		bound.CopiedKeys = append(bound.CopiedKeys, result.CopiedKeys...)
 		return bindErr
 	})
 	if delErr := storedfiles.ApplyBindResult(ctx, blob.Current(), bound, err); delErr != nil {

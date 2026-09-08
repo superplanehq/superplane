@@ -3,6 +3,7 @@ package storedfiles
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -259,7 +260,7 @@ func TestIngestRemoteImagesRewritesGitHubURL(t *testing.T) {
 	failURL := server.URL + "/fail.png"
 	markdown := "![ok](" + okURL + ") ![fail](" + failURL + ")"
 
-	next, err := IngestRemoteImages(
+	ingested, err := IngestRemoteImages(
 		t.Context(),
 		db,
 		provider,
@@ -274,13 +275,64 @@ func TestIngestRemoteImagesRewritesGitHubURL(t *testing.T) {
 		markdown,
 	)
 	require.NoError(t, err)
-	assert.Contains(t, next, blob.FileRefScheme+"://")
-	assert.NotContains(t, next, okURL)
-	assert.Contains(t, next, failURL)
+	assert.Contains(t, ingested.Markdown, blob.FileRefScheme+"://")
+	assert.NotContains(t, ingested.Markdown, okURL)
+	assert.Contains(t, ingested.Markdown, failURL)
+	require.Len(t, ingested.ObjectKeys, 1)
 
 	files, err := models.ListReadyTaskFiles(db, order.ID)
 	require.NoError(t, err)
 	require.Len(t, files, 1)
+}
+
+func TestIngestRemoteImagesDeletesObjectsWhenTransactionRollsBack(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("png-bytes"))
+	}))
+	t.Cleanup(server.Close)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Import", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	okURL := server.URL + "/ok.png"
+	var ingested IngestResult
+	err = db.Transaction(func(tx *gorm.DB) error {
+		result, ingestErr := IngestRemoteImages(
+			t.Context(),
+			tx,
+			provider,
+			func(ctx context.Context, req *http.Request) (*http.Response, error) {
+				return http.DefaultClient.Do(req.WithContext(ctx))
+			},
+			func(string) bool { return true },
+			r.Organization.ID,
+			factoryModel.ID,
+			order.ID,
+			&r.User,
+			"![ok]("+okURL+")",
+		)
+		if ingestErr != nil {
+			return ingestErr
+		}
+		ingested = result
+		return errors.New("force rollback")
+	})
+	require.Error(t, err)
+	require.Len(t, ingested.ObjectKeys, 1)
+	require.NoError(t, ApplyBindResult(t.Context(), provider, BindResult{CopiedKeys: ingested.ObjectKeys}, err))
+
+	_, headErr := provider.Head(t.Context(), ingested.ObjectKeys[0])
+	assert.ErrorIs(t, headErr, blob.ErrNotFound)
+	files, err := models.ListReadyTaskFiles(db, order.ID)
+	require.NoError(t, err)
+	assert.Empty(t, files)
 }
 
 func TestCompleteUploadRejectsOversizedBody(t *testing.T) {

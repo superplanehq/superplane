@@ -168,10 +168,12 @@ func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
 		nil,
 		order.Description,
 	)
-	if err != nil || next == order.Description {
+	if err != nil || next.Markdown == order.Description {
 		return
 	}
-	_ = order.UpdateContent(c.tx, nil, &next)
+	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
+		_ = storedfiles.DeleteObjects(context.Background(), blob.Current(), next.ObjectKeys)
+	}
 }
 
 func (c *FactoryContext) githubClientForCanvas() *githubcommon.Client {

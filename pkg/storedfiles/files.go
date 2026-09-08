@@ -243,11 +243,19 @@ func ContentUploadURL(fileID uuid.UUID) string {
 	return blob.PublicBaseURL() + "/api/v1/files/" + fileID.String() + "/content"
 }
 
+func DeleteObject(ctx context.Context, provider blob.Provider, key string) error {
+	if provider == nil || strings.TrimSpace(key) == "" {
+		return nil
+	}
+	if err := provider.Delete(ctx, key); err != nil && !errors.Is(err, blob.ErrNotFound) {
+		return err
+	}
+	return nil
+}
+
 func DeleteObjectAndRow(ctx context.Context, tx *gorm.DB, provider blob.Provider, file *models.File) error {
-	if provider != nil && strings.TrimSpace(file.StorageKey) != "" {
-		if err := provider.Delete(ctx, file.StorageKey); err != nil && !errors.Is(err, blob.ErrNotFound) {
-			return err
-		}
+	if err := DeleteObject(ctx, provider, file.StorageKey); err != nil {
+		return err
 	}
 	return file.Delete(tx)
 }
@@ -260,6 +268,11 @@ func FetcherFromHTTP(httpCtx core.HTTPContext) FetchFunc {
 	}
 }
 
+type IngestResult struct {
+	Markdown   string
+	ObjectKeys []string
+}
+
 func IngestRemoteImages(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -269,15 +282,16 @@ func IngestRemoteImages(
 	organizationID, factoryID, workOrderID uuid.UUID,
 	createdBy *uuid.UUID,
 	markdown string,
-) (string, error) {
+) (IngestResult, error) {
+	result := IngestResult{Markdown: markdown}
 	if fetch == nil || strings.TrimSpace(markdown) == "" {
-		return markdown, nil
+		return result, nil
 	}
 
 	next := markdown
 	openCount, err := models.CountOpenTaskFiles(tx, workOrderID)
 	if err != nil {
-		return markdown, err
+		return result, err
 	}
 
 	for _, rawURL := range blob.HTTPImageURLs(markdown) {
@@ -301,10 +315,12 @@ func IngestRemoteImages(
 		if err != nil || !ingested {
 			continue
 		}
+		result.ObjectKeys = append(result.ObjectKeys, file.StorageKey)
 		next = blob.ReplaceURL(next, rawURL, blob.FileRef(file.ID))
 		openCount++
 	}
-	return next, nil
+	result.Markdown = next
+	return result, nil
 }
 
 func ingestOneImage(

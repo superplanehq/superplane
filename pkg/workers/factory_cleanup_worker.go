@@ -177,8 +177,11 @@ func deleteFactoryFileObjects(factoryID uuid.UUID, limit int) error {
 	provider := blob.Current()
 	ctx := context.Background()
 	for i := range files {
+		if err := storedfiles.DeleteObject(ctx, provider, files[i].StorageKey); err != nil {
+			return err
+		}
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
-			return storedfiles.DeleteObjectAndRow(ctx, tx, provider, &files[i])
+			return files[i].Delete(tx)
 		})
 		if err != nil {
 			return err
