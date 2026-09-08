@@ -165,7 +165,7 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 
 	environment = runner.AttachPlanningSessionEnv(ctx, environment, spec.ExecutionTimeoutSeconds)
-	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment)
+	commands, files, err := buildSuperPlaneBrokerTask(runModel.Provider, spec, runModel.Model, resolved.Usage, resolved.Setups, environment, access.AllowedModels)
 	if err != nil {
 		return err
 	}
@@ -266,6 +266,7 @@ func buildSuperPlaneBrokerTask(
 	usage string,
 	setups []runner.IntegrationSetup,
 	environment []runner.BrokerEnvironmentVariable,
+	fallbackModels []string,
 ) ([]runner.BrokerCommand, []runner.BrokerTaskFile, error) {
 	switch provider {
 	case models.UsageProviderAnthropic:
@@ -296,8 +297,12 @@ func buildSuperPlaneBrokerTask(
 			WorkingDirectory:        spec.WorkingDirectory,
 			ExecutionTimeoutSeconds: spec.ExecutionTimeoutSeconds,
 		}
-		task := openrouter.ApplyPlanningFollowUp(openrouter.BuildBrokerTask(openRouterSpec, usage, setups), environment, openRouterSpec)
-		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPScriptFile())
+		task := openrouter.ApplyPlanningFollowUp(
+			openrouter.BuildBrokerTask(openRouterSpec, usage, setups, fallbackModels),
+			environment,
+			openRouterSpec,
+		)
+		return withPlanningSessionFiles(task.Commands, task.Files, environment, runner.PlanningSessionMCPFiles()...)
 	default:
 		return nil, nil, fmt.Errorf("unsupported SuperPlane agent provider: %s", provider)
 	}

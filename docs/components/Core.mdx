@@ -1763,9 +1763,10 @@ function main() {
 
 **Component key:** `runnerOpenRouter`
 
-Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can use bash, read, edit, and write tools.
+Runs a SuperPlane OpenRouter agent on a fleet runner. The runner starts OpenCode with the selected OpenRouter model.
 
 ### Prerequisites
+- The `opencode` CLI is installed on the runner machine and available on `PATH`.
 - Node.js on the runner `PATH`.
 - An OpenRouter API key stored as a SuperPlane secret or an OpenRouter integration.
 
@@ -1773,7 +1774,7 @@ Runs a SuperPlane-shipped OpenRouter agent on a fleet runner. Prompt turns can u
 Configure an ordered list of **bash** and **prompt** steps:
 
 - **bash** — shell commands (clone a repo, install deps, run tests, push).
-- **prompt** — one OpenRouter agent loop in the same working directory (up to max turns).
+- **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ### Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
@@ -1782,7 +1783,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **Model**: Required. Select a model from Organization LLM Models.
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).
-- **Max turns per prompt**: Optional limit on model turns for each prompt step (1–256). Defaults to **128**. After this limit, SuperPlane asks for a final reply without tools.
+
+If OpenRouter rate-limits the selected model, SuperPlane continues the session on the next allowed OpenRouter model.
 
 Use **Run SuperPlane Agent** for SuperPlane-hosted credentials.
 

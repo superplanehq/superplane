@@ -197,9 +197,7 @@ async function runLoop(helpers) {
 async function main() {
   const taskDir = readEnv("SUPERPLANE_TASK_DIR");
   const model = String(process.argv[2] || "").trim();
-  // Forward any additional argv (for example OpenRouter's max-turns) straight
-  // through to run.js so every runner's follow-up prompt uses the same
-  // arguments as its original prompt step.
+  // Forward extra argv so follow-up prompts match the original prompt step.
   const extraArgs = process.argv.slice(3);
   const code = await runLoop({
     waitOnce,
