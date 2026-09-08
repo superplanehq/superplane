@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  firstRunGithubOrganization,
   hostedGitHubConnectUserGate,
   isOnboardingSetupReturnPath,
   pendingGitHubAccountPicker,
   pendingGitHubBrowserAction,
   pendingGitHubInstallPicker,
+  pendingGitHubRequestedPicker,
   startDirectGitHubConnect,
 } from "./startDirectGitHubConnect";
 
@@ -105,6 +107,7 @@ describe("pendingGitHubInstallPicker", () => {
       appSlug: "superplane",
       authorizeUrl: "",
       githubLogin: "forestileao",
+      requestedAccount: "",
       installations: [{ id: "11", accountLogin: "acme" }],
     });
   });
@@ -157,6 +160,7 @@ describe("pendingGitHubInstallPicker", () => {
       appSlug: "superplane",
       authorizeUrl: "",
       githubLogin: "",
+      requestedAccount: "",
       installations: [
         { id: "11", accountLogin: "acme" },
         { id: "22", accountLogin: "octo" },
@@ -198,6 +202,95 @@ describe("pendingGitHubInstallPicker", () => {
     ).toBeUndefined();
   });
 
+  it("returns a request-only picker when GitHub returned a request and no ready account", () => {
+    expect(
+      pendingGitHubRequestedPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                startedByGitHubLogin: "ada",
+                installRequested: true,
+                installRequestedAccount: "acme",
+                state: "csrf",
+                githubApp: { slug: "superplane" },
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toEqual({
+      id: "int-1",
+      state: "csrf",
+      appSlug: "superplane",
+      authorizeUrl: "",
+      githubLogin: "ada",
+      requestedAccount: "acme",
+      installations: [],
+    });
+    expect(
+      pendingGitHubRequestedPicker(
+        [
+          {
+            metadata: { id: "int-stale", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                installRequested: true,
+                installRequestedAccount: "acme",
+              },
+            },
+          },
+          {
+            metadata: { id: "int-live", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                installRequested: true,
+                installRequestedAccount: "globex",
+                state: "csrf",
+              },
+            },
+          },
+        ],
+        "user-1",
+        "acme",
+      ),
+    ).toEqual({
+      id: "int-live",
+      state: "csrf",
+      appSlug: "",
+      authorizeUrl: "",
+      githubLogin: "",
+      requestedAccount: "globex",
+      installations: [],
+    });
+    expect(
+      pendingGitHubAccountPicker(
+        [
+          {
+            metadata: { id: "int-1", integrationName: "github" },
+            status: {
+              state: "pending",
+              metadata: {
+                startedByUserID: "user-1",
+                installRequested: true,
+                state: "csrf",
+              },
+            },
+          },
+        ],
+        "user-1",
+      ),
+    ).toBeUndefined();
+  });
+
   it("returns undefined when the picker belongs to a teammate", () => {
     expect(
       pendingGitHubInstallPicker(
@@ -219,6 +312,34 @@ describe("pendingGitHubInstallPicker", () => {
         "user-2",
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("firstRunGithubOrganization", () => {
+  it("uses the picker request when an earlier request has an account and no state", () => {
+    expect(
+      firstRunGithubOrganization(
+        "acme",
+        {
+          id: "int-live",
+          installations: [],
+          state: "csrf",
+          appSlug: "",
+          authorizeUrl: "",
+          githubLogin: "",
+          requestedAccount: "globex",
+        },
+        [
+          {
+            status: { metadata: { installRequestedAccount: "acme" } },
+          },
+        ],
+      ),
+    ).toBe("globex");
+  });
+
+  it("uses the return query when no picker is ready", () => {
+    expect(firstRunGithubOrganization("acme", undefined, [])).toBe("acme");
   });
 });
 

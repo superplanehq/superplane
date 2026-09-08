@@ -7,6 +7,7 @@ import {
   hostedGitHubInstallRequested,
   hostedGitHubInstallRequestedAccount,
   hostedGitHubInstallURL,
+  hostedGitHubProfileURL,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
@@ -76,6 +77,10 @@ describe("hosted GitHub URLs", () => {
     expect(hostedGitHubInstallURL("superplane", "csrf")).toBe(
       "https://github.com/apps/superplane/installations/new?state=csrf",
     );
+  });
+
+  it("builds the GitHub profile URL", () => {
+    expect(hostedGitHubProfileURL("ada")).toBe("https://github.com/ada");
   });
 
   it("reads state and slug", () => {

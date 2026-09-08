@@ -1,19 +1,16 @@
-import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
-import {
-  hostedGitHubInstallRequested,
-  hostedGitHubInstallRequestedAccount,
-  type PendingGitHubInstallation,
-} from "@/lib/hostedGitHubInstall";
+import { hostedGitHubInstallRequested, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import {
+  firstRunGithubOrganization,
   githubAccountPickerFromConnection,
   pendingGitHubAccountPicker,
+  pendingGitHubRequestedPicker,
   type PendingGitHubAccountPicker,
 } from "@/lib/startDirectGitHubConnect";
 import {
@@ -27,17 +24,16 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { AgentStep } from "./AgentStep";
+import { FirstRunAgentScreen } from "./first-run/FirstRunAgentScreen";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
-import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
+import { FIRST_RUN_STEP_COUNT } from "./first-run/FirstRunShell";
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
-import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import type { IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { isWizardStepId } from "./onboardingStatus";
-import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -105,12 +101,6 @@ function screenWithoutAgent(screen: FirstRunScreen, skipAgentScreen: boolean): F
   if (screen === "agent" && skipAgentScreen) return "tickets";
   return screen;
 }
-
-/**
- * The first-run screens have no coding agent screen. This screen keeps the
- * wizard step copy, because provisioning needs a connected agent.
- */
-const AGENT_STEP: { id: "agent"; label: string; purpose: string } = WIZARD_STEPS[3];
 
 /**
  * GitHub Issues is the only source setup can connect, so the tickets screen
@@ -202,47 +192,6 @@ function useRepositoryErrorToast(error: unknown) {
   }, [error]);
 }
 
-function AgentScreen({
-  organizationId,
-  setup,
-  chrome,
-  saving,
-  onRequestConnect,
-  onContinue,
-}: {
-  organizationId: string;
-  setup: OnboardingSetupApi;
-  chrome: FirstRunChrome;
-  saving: boolean;
-  onRequestConnect: (id: IntegrationId) => void;
-  onContinue: () => void;
-}) {
-  return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} width="wide">
-      <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
-        <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
-      </FirstRunHeading>
-
-      <div className="mt-8 space-y-4">
-        <FirstRunPanel>
-          <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={onRequestConnect} />
-        </FirstRunPanel>
-        <LoadingButton
-          type="button"
-          className="w-full"
-          disabled={!setup.agentReady}
-          loading={saving}
-          loadingText={FIRST_RUN_COPY.finish.saving}
-          onClick={onContinue}
-          data-testid="first-run-finish-setup"
-        >
-          {FIRST_RUN_COPY.finish.action}
-        </LoadingButton>
-      </div>
-    </FirstRunShell>
-  );
-}
-
 /**
  * Screen order and answer saving for workspace setup. The first-run screens
  * stay presentational, so this hook holds every step that talks to the API.
@@ -276,7 +225,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   );
   const accountPicker =
     pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
-    githubAccountPickerFromConnection(selectedConnection, me?.id);
+    githubAccountPickerFromConnection(selectedConnection, me?.id) ??
+    pendingGitHubRequestedPicker(
+      model.githubConnections.allInstances,
+      me?.id,
+      searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() || "",
+    );
 
   // Only a GitHub round trip or a waiting install request lands on the
   // account picker page. A fresh pass opens the Connect GitHub page.
@@ -340,12 +294,11 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // opens the connect screen, which shows the waiting state.
   useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
 
-  const githubOrganization =
-    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
-    model.githubConnections.allInstances
-      .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
-      .find((account) => account !== "") ||
-    "";
+  const githubOrganization = firstRunGithubOrganization(
+    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() || "",
+    accountPicker,
+    model.githubConnections.allInstances,
+  );
   // Binding through a page redirect reloads the whole app and walks the user
   // through the connect screen again. Binding in place opens the repository
   // screen directly once the connection is ready.
@@ -513,7 +466,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   }
 
   return (
-    <AgentScreen
+    <FirstRunAgentScreen
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
