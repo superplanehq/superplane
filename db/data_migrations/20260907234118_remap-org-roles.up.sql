@@ -97,10 +97,24 @@ FROM role_metadata
 WHERE role_name = 'org_admin'
 ON CONFLICT (role_name, domain_type, domain_id) DO NOTHING;
 
+-- Custom org_maintainer rows keep the unique key. Overwrite copy so the
+-- default role does not keep a stale display name or description.
+UPDATE role_metadata
+SET display_name = 'Maintainer',
+    description = 'Can create and edit automations, set integrations, and change models.',
+    updated_at = NOW()
+WHERE role_name = 'org_maintainer';
+
 UPDATE role_metadata
 SET display_name = 'Admin',
     description = 'Can manage members, billing, and organization settings.',
     updated_at = NOW()
 WHERE role_name = 'org_admin';
+
+UPDATE role_metadata
+SET display_name = 'Operator',
+    description = 'Can create tasks and interact with them.',
+    updated_at = NOW()
+WHERE role_name = 'org_operator';
 
 COMMIT;
