@@ -154,7 +154,7 @@ function WorkOrderDetailMainColumn({
 
   return (
     <div className="min-w-0">
-      {order.description ? <WorkOrderDescription description={order.description} /> : null}
+      {order.description ? <WorkOrderDescription description={order.description} files={order.files} /> : null}
 
       {showStatusNotes ? (
         <div className={order.description ? "mt-10" : undefined}>

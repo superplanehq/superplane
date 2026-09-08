@@ -213,3 +213,29 @@ func requireBrokerFile(t *testing.T, files []BrokerTaskFile, path string) Broker
 	t.Fatalf("missing task file %q", path)
 	return BrokerTaskFile{}
 }
+
+func TestBuildAgentBrokerTaskFetchesSignedAttachments(t *testing.T) {
+	t.Parallel()
+
+	prompt := "See ![bug](https://app.example/api/v1/public/files/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa?expires=1&sig=abc&sp_file=1)"
+	commands, _ := BuildAgentBrokerTask(AgentBrokerTaskInput{
+		PrepareName:   "Prepare",
+		PrepareScript: NodePrepareScript("", "", ""),
+		RunScriptName: "run.js",
+		RunScript:     "echo run",
+		Steps: []AgentStep{
+			{Name: "Implement", Type: AgentStepPrompt, Prompt: &prompt},
+		},
+		Model: "google/gemini-3.7-flash",
+		PromptCommand: func(promptName, model string) string {
+			return "node run.js " + promptName + " " + model
+		},
+	})
+
+	require.Len(t, commands, 3)
+	assert.Equal(t, "Fetch task attachments", commands[1].Name)
+	assert.Contains(t, commands[1].Command, `mkdir -p "$SUPERPLANE_TASK_DIR/attachments"`)
+	assert.Contains(t, commands[1].Command, `curl -fsSL -o "$SUPERPLANE_TASK_DIR/attachments/`)
+	assert.Contains(t, commands[1].Command, "sp_file=1")
+	assert.Equal(t, "Implement", commands[2].Name)
+}

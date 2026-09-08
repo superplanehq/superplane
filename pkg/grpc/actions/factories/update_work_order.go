@@ -5,11 +5,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 
 	log "github.com/sirupsen/logrus"
@@ -46,6 +48,7 @@ func UpdateWorkOrder(
 	}
 
 	db := database.DB(ctx)
+	var staleKeys []string
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -57,10 +60,29 @@ func UpdateWorkOrder(
 			return err
 		}
 
-		return order.UpdateContent(tx, title, description)
+		if err := order.UpdateContent(tx, title, description); err != nil {
+			return err
+		}
+		if description == nil {
+			return nil
+		}
+		keys, bindErr := storedfiles.BindDescriptionFiles(
+			ctx,
+			tx,
+			blob.Current(),
+			orgID,
+			factory.ID,
+			order.ID,
+			*description,
+		)
+		staleKeys = keys
+		return bindErr
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order")
+	}
+	if err := storedfiles.DeleteObjects(ctx, blob.Current(), staleKeys); err != nil {
+		log.WithError(err).Warnf("Failed to delete old workspace file objects for order %s", orderID)
 	}
 
 	if err := messages.PublishFactoryWorkOrderUpdated(
