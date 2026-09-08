@@ -95,7 +95,10 @@ func Test__ExpiredWelcomeSpendDoesNotReducePurchasedCredit(t *testing.T) {
 	require.Greater(t, before.BilledMicros, int64(0))
 	require.Greater(t, before.RemainingMicros, int64(0))
 
-	expireWelcomeGrant(t, db, r.Organization.ID)
+	expiredAt := expireWelcomeGrant(t, db, r.Organization.ID)
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", r.Organization.ID, models.UsageFundingSourceHosted, models.UsageKindModel).
+		Update("occurred_at", expiredAt.Add(-time.Second)).Error)
 	_, err = models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
 	require.NoError(t, err)
 
@@ -107,12 +110,41 @@ func Test__ExpiredWelcomeSpendDoesNotReducePurchasedCredit(t *testing.T) {
 	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
 }
 
-func expireWelcomeGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+func Test__ExpiredUnusedWelcomeDoesNotShieldLaterPurchasedSpend(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	expireWelcomeGrant(t, db, r.Organization.ID)
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
+	require.NoError(t, err)
+
+	execution := dispatchWorkOrderExecution(t, r)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Greater(t, summary.BilledMicros, int64(0))
+	assert.Equal(t, models.CentsToMicros(10000), summary.PurchasedCreditMicros)
+	assert.Equal(t, models.CentsToMicros(10000)-summary.BilledMicros, summary.RemainingMicros)
+}
+
+func expireWelcomeGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) time.Time {
 	t.Helper()
 	expired := time.Now().Add(-time.Minute)
 	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
 		Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindWelcome).
 		Update("expires_at", expired).Error)
+	return expired
 }
 
 func Test__WelcomeGrantOnlyOncePerAccount(t *testing.T) {

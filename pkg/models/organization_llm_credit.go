@@ -429,16 +429,20 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 		}
 	}
 
-	var billedMicros int64
-	err = tx.Model(&WorkspaceUsageEvent{}).
-		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", orgID, UsageFundingSourceHosted, UsageKindModel).
-		Scan(&billedMicros).Error
+	billedMicros, err := sumHostedModelBilledMicros(tx, orgID, nil)
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err
 	}
 
-	remaining := remainingHostedCreditMicros(grants, billedMicros, now)
+	billedBeforeExpiry := int64(0)
+	if horizon := expiredGrantHorizon(grants, now); horizon != nil {
+		billedBeforeExpiry, err = sumHostedModelBilledMicros(tx, orgID, horizon)
+		if err != nil {
+			return OrganizationLLMCreditSummary{}, err
+		}
+	}
+
+	remaining := remainingHostedCreditMicros(grants, billedMicros, billedBeforeExpiry, now)
 
 	markupBPS, err := ResolveOrganizationMarkupBPS(tx, orgID)
 	if err != nil {
@@ -468,7 +472,37 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	}, nil
 }
 
-func remainingHostedCreditMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, now time.Time) int64 {
+func sumHostedModelBilledMicros(tx *gorm.DB, orgID uuid.UUID, atOrBefore *time.Time) (int64, error) {
+	query := tx.Model(&WorkspaceUsageEvent{}).
+		Select("COALESCE(SUM(cost_micros), 0)").
+		Where("organization_id = ? AND funding_source = ? AND usage_kind = ?", orgID, UsageFundingSourceHosted, UsageKindModel)
+	if atOrBefore != nil {
+		query = query.Where("occurred_at <= ?", *atOrBefore)
+	}
+
+	var billedMicros int64
+	err := query.Scan(&billedMicros).Error
+	if err != nil {
+		return 0, err
+	}
+	return billedMicros, nil
+}
+
+func expiredGrantHorizon(grants []OrganizationLLMCreditGrant, now time.Time) *time.Time {
+	var horizon *time.Time
+	for _, grant := range grants {
+		if !grant.IsExpired(now) || grant.ExpiresAt == nil {
+			continue
+		}
+		if horizon == nil || grant.ExpiresAt.After(*horizon) {
+			expiresAt := *grant.ExpiresAt
+			horizon = &expiresAt
+		}
+	}
+	return horizon
+}
+
+func remainingHostedCreditMicros(grants []OrganizationLLMCreditGrant, billedMicros, billedBeforeExpiryMicros int64, now time.Time) int64 {
 	var expired, usable int64
 	for _, grant := range grants {
 		if grant.IsExpired(now) {
@@ -478,7 +512,15 @@ func remainingHostedCreditMicros(grants []OrganizationLLMCreditGrant, billedMicr
 		usable += grant.AmountMicros
 	}
 
-	spendAgainstUsable := billedMicros - expired
+	forgiven := int64(0)
+	if expired > 0 {
+		forgiven = billedBeforeExpiryMicros
+		if forgiven > expired {
+			forgiven = expired
+		}
+	}
+
+	spendAgainstUsable := billedMicros - forgiven
 	if spendAgainstUsable < 0 {
 		spendAgainstUsable = 0
 	}
