@@ -489,6 +489,55 @@ func Test__OnPageAdded__Setup__RecordsEveryPageAtTheNewestMinuteAcrossPages(t *t
 	assert.Zero(t, events.Count(), "pages that existed before the trigger must not be replayed")
 }
 
+// Regression: Notion reports created_time only to the minute, so a bulk import
+// can leave more pages sharing the cursor's minute than a single poll would
+// otherwise read. Every such page is already handled (recorded at setup), so a
+// poll that stopped after a fixed number of requests would read only handled
+// pages, drop them all, and never advance - the newer pages behind them would be
+// lost. The poll must page past the whole handled boundary minute to reach them.
+func Test__OnPageAdded__Poll__PagesPastAHandledBoundaryLargerThanOnePoll(t *testing.T) {
+	now := time.Now().UTC()
+	cursor := pageTimestamp(now.Add(-time.Hour))
+
+	// The boundary minute holds more handled pages than a poll's request budget
+	// (maxPollPages) would read, each behind its own cursor, and a new page sits
+	// behind all of them.
+	handledIDs := []string{}
+	responses := []*http.Response{}
+	for page := 1; page <= maxPollPages+2; page++ {
+		id := fmt.Sprintf("page-handled-%d", page)
+		handledIDs = append(handledIDs, id)
+		responses = append(responses, pagePageMore(
+			fmt.Sprintf("cursor-%d", page),
+			pageDocument(id, fmt.Sprintf("Handled %d", page), cursor),
+		))
+	}
+	responses = append(responses,
+		pagePage(pageDocument("page-new", "New", cursor)),
+		blocksResponse("Body New"),
+	)
+
+	httpContext := &contexts.HTTPContext{Responses: responses}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{
+		PolledUntil:     cursor,
+		EmittedAtCursor: handledIDs,
+	}}
+	events := &contexts.EventContext{}
+
+	_, err := (&OnPageAdded{}).HandleHook(pollContext(
+		databaseConfiguration(), metadata, httpContext, events, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"New"}, emittedTitles(t, events),
+		"the new page behind the handled boundary minute must not be skipped")
+
+	stored := nodeMetadata(t, metadata)
+	assert.Equal(t, cursor, stored.PolledUntil)
+	assert.Contains(t, stored.EmittedAtCursor, "page-new",
+		"the newly emitted boundary page is recorded alongside the handled ones")
+}
+
 func Test__OnPageAdded__Poll__WithoutACursorReportsNothing(t *testing.T) {
 	httpContext := &contexts.HTTPContext{}
 	metadata := &contexts.MetadataContext{}

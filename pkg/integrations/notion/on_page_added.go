@@ -327,17 +327,26 @@ func BuildPageEvent(client *Client, document map[string]any) (map[string]any, er
 // an emitted page's minute is caught up rather than skipped. When more pages
 // were added than one poll can read, the overflow stays no older than the
 // advanced cursor and is caught up by the next poll instead of skipped.
+//
+// A poll returns at most maxPollDocuments new pages; the budget counts the new
+// pages collected, not the requests made. Pages already handled at the cursor's
+// minute are dropped before the budget sees them, so however many share that
+// minute - even more than a single poll would otherwise read - the walk pages
+// past them to reach the new pages behind them instead of stalling on a boundary
+// minute it can never clear.
 func changedPages(client *Client, databaseID string, polledUntil time.Time, emittedAtCursor []string) ([]map[string]any, error) {
 	handled := make(map[string]bool, len(emittedAtCursor))
 	for _, id := range emittedAtCursor {
 		handled[id] = true
 	}
 
+	maxPollDocuments := pollPageSize * maxPollPages
+
 	changed := []map[string]any{}
 	cursor := ""
 	createdOnOrAfter := formatPageTime(polledUntil)
 
-	for page := 1; page <= maxPollPages; page++ {
+	for {
 		documents, hasMore, nextCursor, err := client.ListChangedPageDocuments(databaseID, cursor, createdOnOrAfter, pollPageSize)
 		if err != nil {
 			return nil, err
@@ -364,13 +373,18 @@ func changedPages(client *Client, databaseID string, polledUntil time.Time, emit
 			changed = append(changed, document)
 		}
 
-		if !hasMore || nextCursor == "" {
+		//
+		// Stop once a poll's worth of new pages is collected, so a large burst
+		// is emitted over several polls rather than all at once. Because handled
+		// pages do not count toward the budget, a boundary minute holding more
+		// handled pages than this budget no longer traps the walk: it reads on
+		// through them until it finds new pages or Notion runs out of pages.
+		//
+		if !hasMore || nextCursor == "" || len(changed) >= maxPollDocuments {
 			return changed, nil
 		}
 		cursor = nextCursor
 	}
-
-	return changed, nil
 }
 
 // newestPageBoundary reports the creation time of the newest page the database
