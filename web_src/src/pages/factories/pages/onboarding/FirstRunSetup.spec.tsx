@@ -227,6 +227,7 @@ describe("FirstRunSetup", () => {
         metadata: {
           owner: "acme",
           startedByUserID: "user-1",
+          startedByGitHubLogin: "forestileao",
           state: "csrf",
           githubApp: { slug: "superplane" },
           pendingInstallations: [
@@ -254,6 +255,9 @@ describe("FirstRunSetup", () => {
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
 

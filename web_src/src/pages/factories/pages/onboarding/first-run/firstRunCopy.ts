@@ -21,6 +21,7 @@ export const FIRST_RUN_COPY = {
   connect: {
     headline: "Connect GitHub",
     body: "SuperPlane reads your repositories. It does not start work yet.",
+    signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     trust: "SuperPlane does not change code without your approval on a specific ticket.",
     connectGitHub: "Connect GitHub",
     selectAccount: "Select a GitHub account",

@@ -411,6 +411,7 @@ function pickerPropsFor(flow: FirstRunFlow) {
     pendingInstallations: flow.accountPicker?.installations,
     githubState: flow.accountPicker?.state,
     githubAppSlug: flow.accountPicker?.appSlug,
+    githubLogin: flow.accountPicker?.githubLogin,
   };
 }
 

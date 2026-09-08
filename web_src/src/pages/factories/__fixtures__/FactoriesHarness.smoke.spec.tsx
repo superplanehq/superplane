@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
+import { FIRST_RUN_COPY } from "../pages/onboarding/first-run/firstRunCopy";
 import { factorySettingsWorkspaceGeneralPath } from "../lib/factoryPagePaths";
 import { FactoriesHarness } from "./FactoriesHarness";
 import { REFUND_IMPLEMENTER_APP, refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
@@ -311,6 +312,9 @@ describe("FactoriesHarness workspace setup", () => {
 
     expect(await screen.findByTestId("first-run-github-account-picker", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-use-forestileao")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
     expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
   }, 15000);
 

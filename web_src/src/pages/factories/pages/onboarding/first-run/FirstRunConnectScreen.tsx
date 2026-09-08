@@ -12,6 +12,17 @@ import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.connect;
 
+function SignedInAsLine({ login }: { login: string }) {
+  const [before, after] = copy.signedInAs(login).split(login);
+  return (
+    <p className="text-[15px] leading-6 text-muted-foreground" data-testid="first-run-github-signed-in-as">
+      {before}
+      <span className="font-medium text-foreground">{login}</span>
+      {after}
+    </p>
+  );
+}
+
 function FirstRunInstallRequested({ githubOrganization }: { githubOrganization: string }) {
   return (
     <Tooltip>
@@ -120,6 +131,7 @@ export function FirstRunConnectScreen({
   pendingInstallations = [],
   githubState = "",
   githubAppSlug = "",
+  githubLogin = "",
   bindingInstallationId,
   connectError,
   chrome,
@@ -133,6 +145,8 @@ export function FirstRunConnectScreen({
   pendingInstallations?: PendingGitHubInstallation[];
   githubState?: string;
   githubAppSlug?: string;
+  /** GitHub login that authorized this connect. Shown only with the account picker. */
+  githubLogin?: string;
   bindingInstallationId?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
@@ -150,6 +164,7 @@ export function FirstRunConnectScreen({
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
+        {showAccountPicker && githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
       </FirstRunHeading>
 
       <div className="mt-8 space-y-3">

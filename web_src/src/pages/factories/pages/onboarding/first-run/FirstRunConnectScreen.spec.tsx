@@ -81,6 +81,37 @@ describe("FirstRunConnectScreen", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
   });
 
+  it("names the GitHub login that authorized the connect when the picker shows", () => {
+    render(
+      <FirstRunConnectScreen
+        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        githubLogin="forestileao"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
+  });
+
+  it("hides the signed-in line when the picker has no GitHub login", () => {
+    render(
+      <FirstRunConnectScreen
+        pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("first-run-github-signed-in-as")).not.toBeInTheDocument();
+  });
+
   it("asks which GitHub account to use when one install is pending", () => {
     render(
       <FirstRunConnectScreen
