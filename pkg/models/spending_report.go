@@ -27,6 +27,9 @@ const (
 
 	spendingFundingSourceHostedLabel = "SuperPlane-hosted"
 	spendingFundingSourceBYOKLabel   = "Your keys"
+
+	// Blank or unknown funding_source values count as Your keys, matching the KPI split.
+	spendingFundingSourceGroupExpr = "CASE WHEN workspace_usage_events.funding_source = '" + UsageFundingSourceHosted + "' THEN '" + UsageFundingSourceHosted + "' ELSE '" + UsageFundingSourceBYOK + "' END"
 )
 
 const spendingReportMaxSpan = 366 * 24 * time.Hour
@@ -127,7 +130,7 @@ func scanSpendingKPITotals(query *gorm.DB, totals *SpendingKPITotals) error {
 			COALESCE(SUM(total_tokens), 0) AS total_tokens,
 			COALESCE(SUM(duration_seconds), 0) AS duration_seconds,
 			COALESCE(SUM(CASE WHEN funding_source = ? THEN cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
-			COALESCE(SUM(CASE WHEN funding_source != ? THEN cost_micros ELSE 0 END), 0) AS byok_cost_micros`,
+			COALESCE(SUM(CASE WHEN funding_source IS DISTINCT FROM ? THEN cost_micros ELSE 0 END), 0) AS byok_cost_micros`,
 			UsageFundingSourceHosted, UsageFundingSourceHosted).
 		Scan(totals).Error
 }
@@ -498,7 +501,7 @@ func spendingGroupExpressions(groupBy string) (idExpr string, groupExpr string) 
 	case SpendingGroupByMachine:
 		return "workspace_usage_events.machine_type", "workspace_usage_events.machine_type"
 	case SpendingGroupByFundingSource:
-		return "workspace_usage_events.funding_source", "workspace_usage_events.funding_source"
+		return spendingFundingSourceGroupExpr, spendingFundingSourceGroupExpr
 	default:
 		return "COALESCE(workspace_usage_events.factory_id::text, '')", "COALESCE(workspace_usage_events.factory_id::text, '')"
 	}

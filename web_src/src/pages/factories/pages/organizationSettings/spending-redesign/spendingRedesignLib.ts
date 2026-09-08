@@ -117,6 +117,8 @@ export const MODEL_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter((option
 export const MACHINE_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter(
   (option) => option.value !== "model" && option.value !== "funding_source",
 );
+export const DEFAULT_MODEL_BREAKDOWN: SpendingBreakdown = "model";
+export const DEFAULT_MACHINE_BREAKDOWN: SpendingBreakdown = "machine";
 
 export function modelKey(provider: string, model: string): string {
   return `${provider}/${model}`;
@@ -175,6 +177,7 @@ export interface SpendingCatalogs {
 export {
   buildSpendingReport,
   filterSpendingEvents,
+  narrowSpendingReport,
   spendingTimeGrainForRange,
   sumSpendingTotals,
 } from "./spendingRedesignReport";

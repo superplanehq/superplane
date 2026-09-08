@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 
 import {
   buildSpendingReport,
+  DEFAULT_MACHINE_BREAKDOWN,
+  DEFAULT_MODEL_BREAKDOWN,
   EMPTY_SPENDING_FILTERS,
   filterSpendingEvents,
   rangeForPreset,
@@ -154,8 +156,8 @@ export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
     initialPeriod = "month",
     initialModelFilters = EMPTY_SPENDING_FILTERS,
     initialMachineFilters = EMPTY_SPENDING_FILTERS,
-    initialModelBreakdown = "funding_source",
-    initialMachineBreakdown = "workspace",
+    initialModelBreakdown = DEFAULT_MODEL_BREAKDOWN,
+    initialMachineBreakdown = DEFAULT_MACHINE_BREAKDOWN,
     initialCustomRange,
     kpiTotals: kpiTotalsProp,
     modelReport: modelReportProp,

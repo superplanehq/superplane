@@ -354,6 +354,57 @@ func TestSummarizeSpendingExplorerSplitsHostedAndBYOK(t *testing.T) {
 	assert.Equal(t, models.UsageFundingSourceBYOK, byokExplorer.Breakdown[0].ID)
 }
 
+func TestSummarizeSpendingExplorerTreatsBlankFundingSourceAsBYOK(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, runID := dispatchSpendingFactoryRun(t, r, db)
+	byokMicros := int64(2_500_000)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     runID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "blank-source",
+		Provider:        models.UsageProviderOpenAI,
+		Model:           "gpt-4o",
+		FundingSource:   models.UsageFundingSourceBYOK,
+		InputTokens:     400,
+		TotalTokens:     400,
+		CostMicros:      &byokMicros,
+		IdempotencyKey:  "spending-blank-source:" + factory.ID.String(),
+	}))
+	require.NoError(t, db.Model(&models.WorkspaceUsageEvent{}).
+		Where("idempotency_key = ?", "spending-blank-source:"+factory.ID.String()).
+		Updates(map[string]any{"funding_source": ""}).Error)
+
+	since := time.Now().AddDate(0, 0, -7)
+	until := time.Now().Add(time.Hour)
+	filter := models.UsageReportFilter{
+		OrganizationID: r.Organization.ID,
+		Since:          since,
+		Until:          until,
+		UsageKind:      models.UsageKindModel,
+	}
+
+	grouped, err := models.SummarizeSpendingExplorer(db, filter, models.SpendingGroupByFundingSource, models.SpendingTimeGrainDay)
+	require.NoError(t, err)
+	require.Len(t, grouped.Breakdown, 1)
+	assert.Equal(t, models.UsageFundingSourceBYOK, grouped.Breakdown[0].ID)
+	assert.Equal(t, byokMicros, grouped.Totals.BYOKCostMicros)
+
+	filter.FundingSource = models.UsageFundingSourceBYOK
+	byokExplorer, err := models.SummarizeSpendingExplorer(db, filter, models.SpendingGroupByFundingSource, models.SpendingTimeGrainDay)
+	require.NoError(t, err)
+	assert.Equal(t, int64(400), byokExplorer.Totals.TotalTokens)
+	require.Len(t, byokExplorer.Breakdown, 1)
+
+	filter.FundingSource = models.UsageFundingSourceHosted
+	hostedExplorer, err := models.SummarizeSpendingExplorer(db, filter, models.SpendingGroupByFundingSource, models.SpendingTimeGrainDay)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), hostedExplorer.Totals.TotalTokens)
+	assert.Empty(t, hostedExplorer.Breakdown)
+}
+
 func dispatchSpendingFactoryRun(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) (*models.Factory, uuid.UUID) {
 	t.Helper()
 

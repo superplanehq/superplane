@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -66,17 +66,17 @@ describe("SpendingRedesignPage", () => {
     expect(screen.queryByRole("button", { name: "Custom range" })).not.toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
-        "SuperPlane-hosted",
+        "claude-sonnet-4-6",
       ),
     ).toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-model-usage")).getByTestId("spending-model-breakdown")).getByText(
-        "Your keys",
+        "claude-opus-4-6",
       ),
     ).toBeInTheDocument();
     expect(
       within(within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-breakdown")).getByText(
-        "Semaphore",
+        "e1-large-amd64",
       ),
     ).toBeInTheDocument();
   });
@@ -143,8 +143,8 @@ describe("SpendingRedesignPage", () => {
 
     expect(within(models).getByTestId("spending-model-filter-bar")).toContainElement(modelGroupBy);
     expect(within(machines).getByTestId("spending-vm-filter-bar")).toContainElement(vmGroupBy);
-    expect(modelGroupBy).toHaveTextContent("Group by Source");
-    expect(vmGroupBy).toHaveTextContent("Group by Workspaces");
+    expect(modelGroupBy).toHaveTextContent("Group by Models");
+    expect(vmGroupBy).toHaveTextContent("Group by Machine types");
   });
 
   it("changes only the model table when a model group-by option is selected", async () => {
@@ -153,22 +153,19 @@ describe("SpendingRedesignPage", () => {
 
     const models = screen.getByTestId("spending-model-usage");
     await user.click(within(models).getByTestId("spending-model-group-by"));
-    await user.click(screen.getByRole("menuitemradio", { name: "Models" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Source" }));
 
-    expect(within(models).getByTestId("spending-model-group-by")).toHaveTextContent("Group by Models");
-    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Model")).toBeInTheDocument();
+    expect(within(models).getByTestId("spending-model-group-by")).toHaveTextContent("Group by Source");
+    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Source")).toBeInTheDocument();
     expect(
-      within(within(models).getByTestId("spending-model-breakdown")).getByText("claude-sonnet-4-6"),
+      within(within(models).getByTestId("spending-model-breakdown")).getByText("SuperPlane-hosted"),
     ).toBeInTheDocument();
+    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Your keys")).toBeInTheDocument();
     expect(
-      within(within(models).getByTestId("spending-model-breakdown")).getByText("claude-opus-4-6"),
-    ).toBeInTheDocument();
-    expect(
-      within(within(models).getByTestId("spending-model-breakdown")).queryByText("sonnet"),
+      within(within(models).getByTestId("spending-model-breakdown")).queryByText("claude-sonnet-4-6"),
     ).not.toBeInTheDocument();
-    expect(within(within(models).getByTestId("spending-model-breakdown")).queryByText("opus")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-group-by")).toHaveTextContent(
-      "Group by Workspaces",
+      "Group by Machine types",
     );
   });
 
@@ -191,10 +188,106 @@ describe("SpendingRedesignPage", () => {
     await user.click(screen.getByRole("menuitemradio", { name: "Your keys" }));
 
     expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Your keys");
-    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Your keys")).toBeInTheDocument();
+    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("gpt-4o")).toBeInTheDocument();
     expect(
-      within(within(models).getByTestId("spending-model-breakdown")).queryByText("SuperPlane-hosted"),
+      within(within(models).getByTestId("spending-model-breakdown")).queryByText("claude-opus-4-6"),
     ).not.toBeInTheDocument();
+  });
+
+  it("clears the model chart when SuperPlane-hosted is selected and spend is only Your keys", async () => {
+    const user = userEvent.setup();
+    const byokReport: SpendingReport = {
+      range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+      totals: { costCents: 500, tokens: 2000, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 500 },
+      series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { byok: 500 } }],
+      seriesKeys: [{ id: "byok", label: "Your keys" }],
+      breakdown: [{ id: "byok", label: "Your keys", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+    };
+
+    function StaleProductionPage() {
+      const [modelFilters, setModelFilters] = useState(EMPTY_SPENDING_FILTERS);
+      return (
+        <SpendingRedesignPage
+          catalogs={SPENDING_CATALOGS}
+          credit={SPENDING_CREDIT}
+          initialModelBreakdown="funding_source"
+          machineReport={FAKE_REPORT}
+          modelFilters={modelFilters}
+          modelReport={byokReport}
+          onModelFiltersChange={setModelFilters}
+        />
+      );
+    }
+
+    render(
+      <ThemeProvider>
+        <TooltipProvider>
+          <StaleProductionPage />
+        </TooltipProvider>
+      </ThemeProvider>,
+    );
+
+    const models = screen.getByTestId("spending-model-usage");
+    expect(within(models).getByTestId("spending-model-chart")).not.toHaveTextContent(
+      "No model usage is recorded for this period.",
+    );
+
+    await user.click(within(models).getByTestId("spending-model-filter-sources"));
+    await user.click(screen.getByRole("menuitemradio", { name: "SuperPlane-hosted" }));
+
+    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("SuperPlane-hosted");
+    expect(within(models).getByTestId("spending-model-chart")).toHaveTextContent(
+      "No model usage is recorded for this period.",
+    );
+    expect(within(models).getByTestId("spending-model-breakdown")).toHaveTextContent(
+      "No model usage is recorded for this period.",
+    );
+    expect(within(models).getByTestId("spending-model-breakdown").textContent).not.toContain("Your keys");
+  });
+
+  it("keeps model spend visible when Your keys is selected and the report is grouped by workspace", async () => {
+    const user = userEvent.setup();
+    const workspaceReport: SpendingReport = {
+      range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
+      totals: { costCents: 2840, tokens: 2000, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 2840 },
+      series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 2840, values: { [PRIMARY_FACTORY_ID]: 2840 } }],
+      seriesKeys: [{ id: PRIMARY_FACTORY_ID, label: "Semaphore" }],
+      breakdown: [
+        { id: PRIMARY_FACTORY_ID, label: "Semaphore", tokens: 2000, durationSeconds: 0, costCents: 2840, share: 1 },
+      ],
+    };
+
+    function StaleProductionPage() {
+      const [modelFilters, setModelFilters] = useState(EMPTY_SPENDING_FILTERS);
+      return (
+        <SpendingRedesignPage
+          catalogs={SPENDING_CATALOGS}
+          credit={SPENDING_CREDIT}
+          machineReport={FAKE_REPORT}
+          modelFilters={modelFilters}
+          modelReport={workspaceReport}
+          onModelFiltersChange={setModelFilters}
+        />
+      );
+    }
+
+    render(
+      <ThemeProvider>
+        <TooltipProvider>
+          <StaleProductionPage />
+        </TooltipProvider>
+      </ThemeProvider>,
+    );
+
+    const models = screen.getByTestId("spending-model-usage");
+    await user.click(within(models).getByTestId("spending-model-filter-sources"));
+    await user.click(screen.getByRole("menuitemradio", { name: "Your keys" }));
+
+    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Your keys");
+    expect(within(models).getByTestId("spending-model-chart")).not.toHaveTextContent(
+      "No model usage is recorded for this period.",
+    );
+    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Semaphore")).toBeInTheDocument();
   });
 
   it("offers machine-type grouping only on VM usage", async () => {

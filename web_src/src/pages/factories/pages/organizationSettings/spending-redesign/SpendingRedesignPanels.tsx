@@ -29,6 +29,7 @@ import {
   formatFilterTriggerLabel,
   formatShare,
   hasActiveSpendingFilters,
+  narrowSpendingReport,
   SPENDING_FUNDING_SOURCE_OPTIONS,
   spendingBreakdownColumnLabel,
   spendingBreakdownLabel,
@@ -63,7 +64,8 @@ export function SpendingUsageSection({
 }) {
   const copy = spendingUsageCopy(kind);
   const prefix = copy.testIdPrefix;
-  const empty = report.totals.costCents === 0;
+  const visibleReport = narrowSpendingReport(report, filters, breakdown);
+  const empty = visibleReport.totals.costCents === 0;
 
   return (
     <section className="flex flex-col gap-5" data-testid={`${prefix}-usage`}>
@@ -88,14 +90,14 @@ export function SpendingUsageSection({
         breakdownOptions={copy.breakdownOptions}
         empty={empty}
         emptyMessage={copy.emptyMessage}
-        report={report}
+        report={visibleReport}
         testId={`${prefix}-chart`}
       />
       <SpendingBreakdownCard
         breakdown={breakdown}
         empty={empty}
         emptyMessage={copy.emptyMessage}
-        report={report}
+        report={visibleReport}
         showTokens={kind === "model"}
         testId={`${prefix}-breakdown`}
       />
@@ -426,7 +428,11 @@ function SpendingBarChart({ report }: { report: SpendingReport }) {
         className="aspect-auto h-[240px] w-full"
         initialDimension={{ width: 760, height: 240 }}
       >
-        <BarChart data={rows} margin={{ top: 8, right: 4, left: 8, bottom: 0 }}>
+        <BarChart
+          key={report.seriesKeys.map((item) => item.id).join("-")}
+          data={rows}
+          margin={{ top: 8, right: 4, left: 8, bottom: 0 }}
+        >
           <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-border" />
           <XAxis
             dataKey="label"

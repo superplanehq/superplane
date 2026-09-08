@@ -4,6 +4,8 @@ import { useParams } from "react-router";
 import { useOrganizationSpendingReport } from "@/hooks/useOrganizationSpendingReport";
 import { SpendingRedesignPage } from "./spending-redesign/SpendingRedesignPage";
 import {
+  DEFAULT_MACHINE_BREAKDOWN,
+  DEFAULT_MODEL_BREAKDOWN,
   EMPTY_SPENDING_FILTERS,
   quantizeSpendingNow,
   rangeForPreset,
@@ -26,8 +28,8 @@ export function OrganizationSettingsWorkspaceUsagePage() {
   const [customOpen, setCustomOpen] = useState(false);
   const [modelFilters, setModelFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
   const [machineFilters, setMachineFilters] = useState<SpendingFilters>(EMPTY_SPENDING_FILTERS);
-  const [modelBreakdown, setModelBreakdown] = useState<SpendingBreakdown>("funding_source");
-  const [machineBreakdown, setMachineBreakdown] = useState<SpendingBreakdown>("workspace");
+  const [modelBreakdown, setModelBreakdown] = useState<SpendingBreakdown>(DEFAULT_MODEL_BREAKDOWN);
+  const [machineBreakdown, setMachineBreakdown] = useState<SpendingBreakdown>(DEFAULT_MACHINE_BREAKDOWN);
 
   const range = useMemo(() => {
     // Quantize "now" so remounting this page (for example, switching to

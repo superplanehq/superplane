@@ -69,6 +69,78 @@ export function buildSpendingReport({
   };
 }
 
+/**
+ * Drop series that do not match the selected group-by filter.
+ *
+ * Production keeps the previous API report on screen while a new filter
+ * fetches. Narrow only when the report already has that dimension, so a
+ * source filter does not wipe a workspace-grouped chart.
+ */
+export function narrowSpendingReport(
+  report: SpendingReport,
+  filters: SpendingFilters,
+  breakdown: SpendingBreakdown,
+): SpendingReport {
+  const selected = selectedBreakdownFilter(filters, breakdown);
+  if (!selected) {
+    return report;
+  }
+  if (breakdown === "funding_source" && !reportHasFundingSourceIds(report)) {
+    return report;
+  }
+
+  const seriesKeys = report.seriesKeys.filter((item) => item.id === selected);
+  const breakdownRows = report.breakdown.filter((row) => row.id === selected);
+  const series = report.series.map((point) => {
+    const value = point.values[selected] ?? 0;
+    return {
+      ...point,
+      totalCents: value,
+      values: seriesKeys.length > 0 ? { [selected]: value } : {},
+    };
+  });
+  const costCents = breakdownRows.reduce((sum, row) => sum + row.costCents, 0);
+  const tokens = breakdownRows.reduce((sum, row) => sum + row.tokens, 0);
+  const durationSeconds = breakdownRows.reduce((sum, row) => sum + row.durationSeconds, 0);
+
+  return {
+    ...report,
+    series,
+    seriesKeys,
+    breakdown: breakdownRows.map((row) => ({ ...row, share: costCents > 0 ? row.costCents / costCents : 0 })),
+    totals: {
+      costCents,
+      tokens,
+      durationSeconds,
+      hostedCostCents: breakdown === "funding_source" && selected === "hosted" ? costCents : 0,
+      byokCostCents: breakdown === "funding_source" && selected === "byok" ? costCents : 0,
+    },
+  };
+}
+
+function reportHasFundingSourceIds(report: SpendingReport): boolean {
+  return (
+    report.seriesKeys.some((item) => item.id === "hosted" || item.id === "byok") ||
+    report.breakdown.some((row) => row.id === "hosted" || row.id === "byok")
+  );
+}
+
+function selectedBreakdownFilter(filters: SpendingFilters, breakdown: SpendingBreakdown): string {
+  if (breakdown === "workspace") {
+    return filters.workspaceId;
+  }
+  if (breakdown === "user") {
+    return filters.userId;
+  }
+  if (breakdown === "model") {
+    return filters.model;
+  }
+  if (breakdown === "machine") {
+    return filters.machineType;
+  }
+  return filters.fundingSource;
+}
+
 export function sumSpendingTotals(events: SpendingUsageEvent[]): SpendingTotals {
   return events.reduce<SpendingTotals>(
     (totals, event) => {

@@ -540,7 +540,11 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 		query = query.Where("workspace_usage_events.machine_type = ?", filter.MachineType)
 	}
 	if filter.FundingSource != "" {
-		query = query.Where("workspace_usage_events.funding_source = ?", filter.FundingSource)
+		if filter.FundingSource == UsageFundingSourceHosted {
+			query = query.Where("workspace_usage_events.funding_source = ?", UsageFundingSourceHosted)
+		} else {
+			query = query.Where("workspace_usage_events.funding_source IS DISTINCT FROM ?", UsageFundingSourceHosted)
+		}
 	}
 	if !filter.Since.IsZero() {
 		query = query.Where("workspace_usage_events.occurred_at >= ?", filter.Since)

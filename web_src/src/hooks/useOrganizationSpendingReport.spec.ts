@@ -66,6 +66,23 @@ describe("useOrganizationSpendingReport", () => {
       }),
     );
   });
+
+  it("sends the funding source filter to the spending report API", async () => {
+    organizationsDescribeOrganizationSpendingReport.mockResolvedValue(reportResponse({ costCents: "0" }));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(
+      () =>
+        useOrganizationSpendingReport(baseQuery({ filters: { ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" } })),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(organizationsDescribeOrganizationSpendingReport).toHaveBeenCalled());
+    expect(organizationsDescribeOrganizationSpendingReport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ fundingSource: "hosted" }),
+      }),
+    );
+  });
 });
 
 async function expectPreviousReportWhileNextLoads(
