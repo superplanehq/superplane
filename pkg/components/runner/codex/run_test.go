@@ -60,10 +60,13 @@ func TestFormatCodexJsonLinesEmitsToolRecords(t *testing.T) {
 	assert.Equal(t, "tool_start", records[0]["type"])
 	assert.Equal(t, "bash", records[0]["kind"])
 	assert.Equal(t, "git status", records[0]["text"])
+	assert.Equal(t, float64(1), records[0]["turn"])
 	assert.Equal(t, "tool_end", records[1]["type"])
 	assert.Equal(t, "passed", records[1]["status"])
 	assert.Equal(t, "edit", records[2]["kind"])
 	assert.Equal(t, "pkg/foo.go", records[2]["text"])
+	assert.Equal(t, float64(2), records[2]["turn"])
+	assert.Contains(t, output, `"type":"turn"`)
 }
 
 func TestFormatCodexJsonLinesPairsAnonymousItemIDs(t *testing.T) {

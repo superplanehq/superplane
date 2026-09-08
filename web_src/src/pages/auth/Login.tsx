@@ -20,6 +20,7 @@ import {
   savePendingSignupAnalyticsPreference,
 } from "@/lib/signupAnalytics";
 import { hasSignupWaitlistConfig } from "@/lib/signupWaitlistConfig";
+import { getSafeRedirectPath } from "@/lib/safeRedirectPath";
 import { buildMagicLinkVerifyRequest } from "./magicLinkVerifyRequest";
 import { getAuthRedirectURL, getWelcomeRedirectPath } from "./authRedirect";
 import { SignupWaitlist } from "./SignupWaitlist";
@@ -28,7 +29,9 @@ import {
   getLogoutHref,
   getSignupRequiredAccountBody,
   getSignupRequiredCreateHref,
+  isEmailAuthProvider,
   isKnownAuthProvider,
+  isSignupRequiredErrorBody,
   shouldShowSignupRequiredPrompt,
 } from "./signupRequiredPrompt";
 import { getSignupUnavailableReason } from "./signupUnavailableReason";
@@ -39,31 +42,6 @@ type AuthConfig = {
   signupEnabled: boolean;
   signupsBlockedByEnvironment: boolean;
   magicCodeEnabled: boolean;
-};
-
-const isValidRedirectPath = (path: string | null): path is string => {
-  if (!path || path[0] !== "/") {
-    return false;
-  }
-
-  if (path.length > 1 && path[1] === "/") {
-    return false;
-  }
-
-  return true;
-};
-
-const getSafeRedirectPath = (rawRedirect: string | null): string | null => {
-  if (!rawRedirect) {
-    return null;
-  }
-
-  try {
-    const decoded = decodeURIComponent(rawRedirect);
-    return isValidRedirectPath(decoded) ? decoded : null;
-  } catch {
-    return null;
-  }
 };
 
 const getProviderLabel = (provider: string) => {
@@ -197,6 +175,9 @@ const getMagicCodeVerifyError = async (response: Response) => {
     if (errorText === ACCOUNT_BLOCKED_MESSAGE) {
       return ACCOUNT_BLOCKED_MESSAGE;
     }
+    if (isSignupRequiredErrorBody(errorText)) {
+      return "Create an account to continue.";
+    }
     return errorText || "Sign-up is not allowed.";
   }
 
@@ -273,6 +254,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
   const [magicCode, setMagicCode] = useState("");
+  const [emailSignupRequired, setEmailSignupRequired] = useState(false);
   const [showPasswordLogin, setShowPasswordLogin] = useState(false);
 
   const [lastUsedMethod, setLastUsedMethod] = useState<LastUsedLoginMethod | null>(null);
@@ -311,29 +293,9 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
         return;
       }
 
-      try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = (await orgsResponse.json()) as Array<{ id?: string; slug?: string }>;
-          if (organizations.length === 1) {
-            // Prefer the slug so the address bar never shows the org UID.
-            // The UID fallback only fires for an organization without a
-            // slug yet; OrganizationScope corrects that case on arrival.
-            const orgRef = organizations[0].slug || organizations[0].id;
-            if (orgRef) {
-              window.location.href = `/${orgRef}`;
-              return;
-            }
-          }
-        }
-      } catch {
-        // fall through to default redirect
-      }
-
-      window.location.href = finalURL;
+      // RootOrganizationRedirect picks the last organization and screen.
+      // Do not pick organizations[0] here — that sent people to abandoned orgs.
+      window.location.href = "/";
     },
     [redirectTarget],
   );
@@ -353,6 +315,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setFormError(null);
     setMagicCodeStep("email");
     setMagicCode("");
+    setEmailSignupRequired(false);
     setShowPasswordLogin(false);
   }, [mode]);
 
@@ -454,7 +417,8 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const canUseMagicCode = authConfig.magicCodeEnabled && (!isSignupMode || canSignup);
   const useMagicCodePrimary = canUseMagicCode && !showPasswordLogin;
-  const isSignupRequiredReturn = authError === SIGNUP_REQUIRED_AUTH_ERROR;
+  const signupRequiredProvider = emailSignupRequired ? "email" : authProvider;
+  const isSignupRequiredReturn = authError === SIGNUP_REQUIRED_AUTH_ERROR || emailSignupRequired;
   const showSignupUnavailable = !configLoading && !canSignup && (isSignupMode || isSignupRequiredReturn);
   const hasConfiguredSignupWaitlist = hasSignupWaitlistConfig();
   const signupUnavailableReason = getSignupUnavailableReason(
@@ -470,10 +434,41 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
   const showStandaloneProductUpdatesOptIn =
     isSignupMode && canSignup && magicCodeStep === "email" && !canSignupWithPassword && !useMagicCodePrimary;
   const visibleFormError = formError ?? authErrorMessage;
-  const showSignupRequiredPrompt = !configLoading && shouldShowSignupRequiredPrompt(authError, canSignup);
+  const showSignupRequiredPrompt =
+    !configLoading && (shouldShowSignupRequiredPrompt(authError, canSignup) || (emailSignupRequired && canSignup));
   const showAuthMethods = !configLoading && !isSignupRequiredReturn;
-  const signupRequiredCreateHref = getSignupRequiredCreateHref(authProvider, redirectQuery);
+  const signupRequiredCreateHref = getSignupRequiredCreateHref(signupRequiredProvider, redirectQuery);
   const logoutHref = getLogoutHref(redirectQuery);
+
+  const requestMagicCode = async (signup: boolean) => {
+    const response = await fetch("/auth/magic-code/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: buildMagicCodeRequestBody(magicCodeEmail, signup, redirectTarget),
+    });
+
+    if (response.ok) {
+      setEmailSignupRequired(false);
+      if (signup) {
+        setIsSignupMode(true);
+      }
+      setMagicCodeStep("code");
+      setSubmitLoading(false);
+      return;
+    }
+
+    const errorBody = (await response.text()).trim();
+    if (response.status === 403 && isSignupRequiredErrorBody(errorBody)) {
+      setEmailSignupRequired(true);
+      setFormError(null);
+      setSubmitLoading(false);
+      return;
+    }
+
+    clearSignupPreference(signup);
+    setFormError(errorBody || "Failed to send code. Please try again.");
+    setSubmitLoading(false);
+  };
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -489,26 +484,47 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
     setSubmitLoading(true);
 
     try {
-      const response = await fetch("/auth/magic-code/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: buildMagicCodeRequestBody(magicCodeEmail, isSignupMode, redirectTarget),
-      });
-
-      if (!response.ok) {
-        clearSignupPreference(isSignupMode);
-        setFormError("Failed to send code. Please try again.");
-        setSubmitLoading(false);
-        return;
-      }
-
-      setMagicCodeStep("code");
-      setSubmitLoading(false);
+      await requestMagicCode(isSignupMode);
     } catch {
       clearSignupPreference(isSignupMode);
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
+  };
+
+  const handleEmailCreateAccount = async () => {
+    setFormError(null);
+    saveSignupPreference(true, signupProductUpdatesOptIn, magicCodeEmail);
+    setSubmitLoading(true);
+
+    try {
+      await requestMagicCode(true);
+    } catch {
+      clearSignupPreference(true);
+      setFormError("Network error occurred");
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleClearEmailSignupRequired = () => {
+    setEmailSignupRequired(false);
+    setMagicCodeStep("email");
+    setMagicCode("");
+    setFormError(null);
+  };
+
+  const applyMagicCodeVerifyFailure = async (response: Response) => {
+    const errorBody = await response.clone().text();
+    if (response.status === 403 && isSignupRequiredErrorBody(errorBody)) {
+      setEmailSignupRequired(true);
+      setFormError(null);
+      setSubmitLoading(false);
+      return;
+    }
+
+    clearSignupPreference(isSignupMode);
+    setFormError(await getMagicCodeVerifyError(response));
+    setSubmitLoading(false);
   };
 
   const handleMagicCodeVerify = async (e: React.FormEvent) => {
@@ -538,9 +554,7 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
       });
 
       if (!response.ok) {
-        clearSignupPreference(isSignupMode);
-        setFormError(await getMagicCodeVerifyError(response));
-        setSubmitLoading(false);
+        await applyMagicCodeVerifyFailure(response);
         return;
       }
 
@@ -726,25 +740,46 @@ export const Login: React.FC<LoginProps> = ({ mode = "login" }) => {
           {!configLoading && showSignupRequiredPrompt && (
             <div className="space-y-4">
               <p className="text-left text-sm leading-6 text-gray-600 dark:text-gray-400">
-                {getSignupRequiredAccountBody(authProvider)}
+                {getSignupRequiredAccountBody(signupRequiredProvider)}
               </p>
               <ProductUpdatesOptIn checked={signupProductUpdatesOptIn} onCheckedChange={setSignupProductUpdatesOptIn} />
-              <Button className="w-full" asChild>
-                <a
-                  href={signupRequiredCreateHref}
-                  onClick={() => {
-                    saveSignupPreference(true, signupProductUpdatesOptIn);
-                    if (isKnownAuthProvider(authProvider)) {
-                      recordLastUsedLoginMethod(authProvider);
-                    }
-                  }}
-                >
-                  Create account
-                </a>
-              </Button>
-              <Button variant="outline" className="w-full" asChild>
-                <a href={logoutHref}>Use a different account</a>
-              </Button>
+              {isEmailAuthProvider(signupRequiredProvider) ? (
+                <>
+                  <LoadingButton
+                    type="button"
+                    className="w-full"
+                    loading={submitLoading}
+                    loadingText="Sending code..."
+                    onClick={() => {
+                      void handleEmailCreateAccount();
+                    }}
+                  >
+                    Create account
+                  </LoadingButton>
+                  <Button variant="outline" className="w-full" type="button" onClick={handleClearEmailSignupRequired}>
+                    Use a different account
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button className="w-full" asChild>
+                    <a
+                      href={signupRequiredCreateHref}
+                      onClick={() => {
+                        saveSignupPreference(true, signupProductUpdatesOptIn);
+                        if (isKnownAuthProvider(authProvider)) {
+                          recordLastUsedLoginMethod(authProvider);
+                        }
+                      }}
+                    >
+                      Create account
+                    </a>
+                  </Button>
+                  <Button variant="outline" className="w-full" asChild>
+                    <a href={logoutHref}>Use a different account</a>
+                  </Button>
+                </>
+              )}
             </div>
           )}
 

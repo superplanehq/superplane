@@ -256,7 +256,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		Edges: current.Edges(),
 	}
 
-	result, err := materializeBacklogDefaults(canvas, version)
+	result, err := materializeBacklogDefaults(nil, nil, canvas, version)
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", result.templateID)
 

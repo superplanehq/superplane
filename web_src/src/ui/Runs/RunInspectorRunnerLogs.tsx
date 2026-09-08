@@ -6,6 +6,7 @@ import {
   terminalTimeMsForExecution,
   useLiveLogStream,
 } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
+import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 import { EmptySectionText, TimelineAccordionCard } from "./RunInspectorTimelineCard";
 import type { StatusPill } from "./RunInspectorTimelineTypes";
 import type { RunInspectorNodeSection } from "./types";
@@ -74,8 +75,10 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
 
 function runnerLogLines(orphanLines: string[], sections: Array<{ text: string; lines: string[] }>): string[] {
   return [
-    ...orphanLines.filter((line) => line.trim() !== ""),
-    ...sections.flatMap((section) => [`$ ${section.text}`, ...section.lines].filter((line) => line.trim() !== "")),
+    ...orphanLines.filter((line) => line.trim() !== "" && !isRawAgentTurnLiveLogText(line)),
+    ...sections.flatMap((section) =>
+      [`$ ${section.text}`, ...section.lines].filter((line) => line.trim() !== "" && !isRawAgentTurnLiveLogText(line)),
+    ),
   ];
 }
 

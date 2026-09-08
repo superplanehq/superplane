@@ -13,6 +13,8 @@ import {
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
   hasAvailablePRFeedbackSource,
+  isPRFeedbackSettingsTab,
+  prFeedbackSettingsTabs,
   takenPRFeedbackSourceIds,
   normalizePRFeedbackDraft,
   oldestActivePRFeedbackRun,
@@ -42,6 +44,17 @@ function discussionDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFe
     ...overrides,
   };
 }
+
+describe("PR feedback settings tabs", () => {
+  it("accepts General, Agent, and Automation", () => {
+    expect(isPRFeedbackSettingsTab("general")).toBe(true);
+    expect(isPRFeedbackSettingsTab("agent")).toBe(true);
+    expect(isPRFeedbackSettingsTab("automation")).toBe(true);
+    expect(isPRFeedbackSettingsTab("runs")).toBe(false);
+    expect(prFeedbackSettingsTabs(false)).toEqual(["general", "automation"]);
+    expect(prFeedbackSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
+  });
+});
 
 describe("oldestActivePRFeedbackRun", () => {
   it("returns the oldest pending or started run", () => {

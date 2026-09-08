@@ -131,6 +131,7 @@ func TestRenderRunnerLogsTextPrintsAllOutputsAfterTruncatedOutput(t *testing.T) 
 
 func TestRenderRunnerLogRecordFormatsKindPreviewAndTools(t *testing.T) {
 	duration := int64(12)
+	turn := 3
 	tests := []struct {
 		name   string
 		record runneraction.LiveLogRecord
@@ -170,6 +171,11 @@ func TestRenderRunnerLogRecordFormatsKindPreviewAndTools(t *testing.T) {
 			name:   "tool end",
 			record: runneraction.LiveLogRecord{Type: "tool_end", Status: "passed", DurationMS: &duration},
 			want:   "  # tool passed (12ms)\n",
+		},
+		{
+			name:   "turn",
+			record: runneraction.LiveLogRecord{Type: "turn", Turn: &turn},
+			want:   "# turn 3\n",
 		},
 	}
 
