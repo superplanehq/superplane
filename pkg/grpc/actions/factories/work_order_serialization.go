@@ -4,9 +4,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -31,13 +35,20 @@ func loadAndSerializeWorkOrder(ctx context.Context, factory *models.Factory, ord
 		return nil, err
 	}
 
-	return serializeWorkOrder(
+	serialized, err := serializeWorkOrder(
 		factory,
 		order,
 		dispatchesByOrderID[order.ID],
 		creatorAutomations[order.ID],
 		usageByOrder[order.ID],
 	)
+	if err != nil {
+		return nil, err
+	}
+	if err := attachWorkOrderFiles(ctx, db, serialized, order.ID); err != nil {
+		return nil, err
+	}
+	return serialized, nil
 }
 
 func loadAndSerializeWorkOrders(ctx context.Context, factory *models.Factory, orders []models.FactoryWorkOrder) ([]*pb.WorkOrder, error) {
@@ -119,5 +130,40 @@ func loadWorkOrderAssigneeUsers(db *gorm.DB, orders ...*models.FactoryWorkOrder)
 		}
 		order.Assignees = append(order.Assignees, assignees[i])
 	}
+	return nil
+}
+
+func attachWorkOrderFiles(ctx context.Context, db *gorm.DB, order *pb.WorkOrder, workOrderID uuid.UUID) error {
+	records, err := models.ListReadyTaskFiles(db, workOrderID)
+	if err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return nil
+	}
+
+	provider := blob.Current()
+	files := make([]*pbFiles.File, 0, len(records))
+	for i := range records {
+		downloadURL, err := storedfiles.DownloadURL(ctx, provider, &records[i], blob.UIDownloadTTL)
+		if err != nil {
+			return err
+		}
+		item := &pbFiles.File{
+			Id:          records[i].ID.String(),
+			Filename:    records[i].Filename,
+			ContentType: records[i].ContentType,
+			SizeBytes:   records[i].SizeBytes,
+			Scope:       records[i].Scope,
+			State:       records[i].State,
+			DownloadUrl: downloadURL,
+			CreatedAt:   timestamppb.New(records[i].CreatedAt),
+		}
+		if records[i].Checksum != nil {
+			item.Checksum = *records[i].Checksum
+		}
+		files = append(files, item)
+	}
+	order.Files = files
 	return nil
 }

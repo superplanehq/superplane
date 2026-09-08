@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useWorkOrder } from "@/hooks/useFactoryData";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
 import { CopyLinkButton } from "../../CopyLinkButton";
@@ -433,6 +434,7 @@ function SplitRunPopupTabs({
   canUpdate: boolean;
   footerActions: SplitRunFooterActions;
 }) {
+  const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const [streamTick, setStreamTick] = useState("");
   const follow = useFollowLogScroll<HTMLOListElement>(runningSplitRunPhaseId(fixture.phases), streamTick, {
     resumeOnBottom: true,
@@ -474,8 +476,11 @@ function SplitRunPopupTabs({
           pullRequestsLoading={pullRequestsLoading}
           pullRequestsError={pullRequestsError}
           organizationId={organizationId}
+          factoryId={factoryId}
           factoryKey={factoryKey}
+          orderId={orderId}
           orderNumber={orderNumber}
+          files={liveWorkOrder.data?.files}
           expandFirstCheck={fixture.footer.kind === "draft"}
           canEditDescription={edits.canEditDescription}
           descriptionBusy={edits.descriptionBusy}
