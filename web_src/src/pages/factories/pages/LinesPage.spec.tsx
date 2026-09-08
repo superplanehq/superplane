@@ -419,6 +419,19 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("lines-done-automations")).not.toBeInTheDocument();
   });
 
+  it("puts backlog automations before the create plus and column menu", () => {
+    useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
+    renderLinesBoard();
+
+    const backlog = screen.getByTestId("lines-backlog-column");
+    const automations = within(backlog).getByTestId("lines-backlog-automations");
+    const create = within(backlog).getByTestId("lines-backlog-create");
+    const menu = within(backlog).getByTestId("lines-backlog-menu");
+
+    expect(automations.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(create.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("opens the backlog automations menu from the indicator", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     useFactoryApps.mockReturnValue({ data: [{ id: "app-refund-backlog", name: "Ingest" }] });
@@ -594,8 +607,9 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("lines-verify-listener-pr-feedback")).not.toBeInTheDocument();
     const verify = screen.getByTestId("lines-verify-column");
     const add = within(verify).getByTestId("lines-verify-add-pr-feedback");
+    const menu = within(verify).getByTestId("lines-verify-menu");
     expect(add.closest("[data-testid='lines-verify-listeners']")).toBeNull();
-    expect(within(add.parentElement as HTMLElement).getByTestId("lines-verify-menu")).toBeInTheDocument();
+    expect(add.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await user.click(add);
     expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");

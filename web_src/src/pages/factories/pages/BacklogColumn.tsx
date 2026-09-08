@@ -170,13 +170,13 @@ function BacklogColumnHeaderActions({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      <BacklogCreatePopover {...createPopover} />
       <ColumnAutomationsHeaderSlot
         title={title}
         automations={automations}
         onRowAction={onAutomationRowAction}
         testId="lines-backlog-automations"
       />
+      <BacklogCreatePopover {...createPopover} />
       <ColumnLaneMenu
         title={title}
         testId="lines-backlog-menu"

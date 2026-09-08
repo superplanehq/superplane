@@ -1347,6 +1347,12 @@ function VerifyColumn({
       className={surfaceClassName ? undefined : "bg-muted"}
       actions={
         <div className="flex shrink-0 items-center gap-0.5">
+          <ColumnAutomationsHeaderSlot
+            title={title}
+            automations={automations}
+            onRowAction={onAutomationRowAction}
+            testId="lines-verify-automations"
+          />
           {onAdd ? (
             <button
               type="button"
@@ -1359,12 +1365,6 @@ function VerifyColumn({
               <Plus className="size-3.5" aria-hidden />
             </button>
           ) : null}
-          <ColumnAutomationsHeaderSlot
-            title={title}
-            automations={automations}
-            onRowAction={onAutomationRowAction}
-            testId="lines-verify-automations"
-          />
           <ColumnLaneMenu
             title={title}
             testId="lines-verify-menu"
