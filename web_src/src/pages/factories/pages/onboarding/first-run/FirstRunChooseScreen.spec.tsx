@@ -38,6 +38,22 @@ describe("FirstRunChooseScreen", () => {
     expect(onEditConnection).toHaveBeenCalled();
   });
 
+  it("can open the missing-repository reasons from the start", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository={null}
+        initialWhyMissingOpen
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-choose-why-missing")).toHaveAttribute("open");
+    expect(screen.getByText(FIRST_RUN_COPY.choose.missingReasons[0])).toBeVisible();
+  });
+
   it("reveals why a repository might not show up when expanded", async () => {
     const user = userEvent.setup();
 

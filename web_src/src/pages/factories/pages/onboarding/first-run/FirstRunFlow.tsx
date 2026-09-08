@@ -1,13 +1,26 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
-import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
-import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
+import {
+  CLOUD_GITHUB_ACME,
+  CLOUD_GITHUB_APP_SLUG,
+  CLOUD_GITHUB_GLOBEX,
+  CLOUD_GITHUB_LOGIN,
+  CLOUD_GITHUB_OCTO,
+  CLOUD_GITHUB_STATE,
+  FIRST_RUN_REPOSITORIES,
+  FIRST_RUN_STORY_EMAIL,
+} from "./firstRunMocks";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 import type { FirstRunAnalysisStatus, FirstRunChrome, FirstRunScreenId, FirstRunTicketSource } from "./firstRunTypes";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
+
+const FirstRunBoardExit = lazy(async () => {
+  const module = await import("./FirstRunBoardExit");
+  return { default: module.FirstRunBoardExit };
+});
 
 const STAGE_MS = 900;
 const COMPLETE_AFTER_MS = STAGE_MS * 3;
@@ -34,9 +47,15 @@ export function FirstRunFlow({
   onLogOut?: () => void;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
+  const [pickerShowing, setPickerShowing] = useState(false);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [stageIndex, setStageIndex] = useState(0);
+
+  const openAccountPicker = () => {
+    setPickerShowing(true);
+    setScreen("connect");
+  };
 
   const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
@@ -68,7 +87,19 @@ export function FirstRunFlow({
   }
 
   if (screen === "connect") {
-    return <FirstRunConnectScreen chrome={chromeFor(1)} onConnectGitHub={() => setScreen("choose")} />;
+    return (
+      <FirstRunConnectScreen
+        chrome={chromeFor(1, pickerShowing ? () => setPickerShowing(false) : () => setScreen("welcome"))}
+        githubAppSlug={CLOUD_GITHUB_APP_SLUG}
+        githubState={CLOUD_GITHUB_STATE}
+        githubLogin={pickerShowing ? CLOUD_GITHUB_LOGIN : ""}
+        installRequested={pickerShowing}
+        githubOrganization={pickerShowing ? CLOUD_GITHUB_GLOBEX : ""}
+        pendingInstallations={pickerShowing ? [CLOUD_GITHUB_ACME, CLOUD_GITHUB_OCTO] : []}
+        onConnectGitHub={() => setPickerShowing(true)}
+        onUseInstallation={() => setScreen("choose")}
+      />
+    );
   }
 
   if (screen === "choose") {
@@ -76,9 +107,9 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        chrome={chromeFor(2, () => setScreen("connect"))}
+        chrome={chromeFor(2, openAccountPicker)}
         onSelectRepository={setSelectedRepository}
-        onEditConnection={() => setScreen("connect")}
+        onEditConnection={openAccountPicker}
         onContinue={() => {
           if (selectedRepository) setScreen("tickets");
         }}
@@ -115,5 +146,13 @@ export function FirstRunFlow({
     );
   }
 
-  return board ?? <FirstRunBoardExit />;
+  if (board) {
+    return board;
+  }
+
+  return (
+    <Suspense fallback={<div data-testid="first-run-board" />}>
+      <FirstRunBoardExit />
+    </Suspense>
+  );
 }
