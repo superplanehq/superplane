@@ -260,6 +260,14 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
+	// The OAuth callback removes the browser action once installations load,
+	// so the connect screen keeps the authorize URL from metadata to ask
+	// again which GitHub account to use.
+	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
+	if oauthEnabled {
+		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	}
+
 	if len(metadata.PendingInstallations) >= 1 {
 		ctx.Integration.SetMetadata(metadata)
 		return
@@ -267,8 +275,8 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if app.UserOAuthEnabled() && ctx.BaseURL != "" && len(metadata.PendingInstallations) == 0 {
-		actionURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	if oauthEnabled {
+		actionURL = metadata.AuthorizeURL
 		description = hostedOAuthDescription
 	}
 
@@ -908,11 +916,17 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+	setupAction := ctx.Request.URL.Query().Get("setup_action")
+	state := ctx.Request.URL.Query().Get("state")
+
 	//
-	// App installation has already been set up.
-	// Just redirect to the SuperPlane app installation page.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
 		http.Redirect(
 			ctx.Response,
@@ -924,10 +938,6 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		)
 		return
 	}
-
-	installationID := ctx.Request.URL.Query().Get("installation_id")
-	setupAction := ctx.Request.URL.Query().Get("setup_action")
-	state := ctx.Request.URL.Query().Get("state")
 	if isInstallationRequestSetupAction(setupAction) {
 		if state != metadata.State {
 			ctx.Logger.Errorf("invalid installation ID or state")

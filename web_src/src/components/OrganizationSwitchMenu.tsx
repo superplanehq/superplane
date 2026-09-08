@@ -1,7 +1,8 @@
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import type { AccountOrganization } from "@/lib/accountOrganizations";
-import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
+import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
 import { Building2, Check, Plus } from "lucide-react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/ui/dropdownMenu";
@@ -26,7 +27,16 @@ export function OrganizationSwitchMenu({
 }: OrganizationSwitchMenuProps) {
   const navigate = useNavigate();
   const organizationsQuery = useAccountOrganizations();
-  const organizations = organizationsQuery.data ?? [];
+  const listedOrganizations = organizationsQuery.data ?? [];
+  const organizations = readyAccountOrganizations(listedOrganizations);
+
+  // The menu mounts when it opens, and the cached list can miss an
+  // organization created or finished since the last fetch. Refetch on open;
+  // the cached list still shows while the fresh one loads.
+  const refetchOrganizations = organizationsQuery.refetch;
+  useEffect(() => {
+    void refetchOrganizations();
+  }, [refetchOrganizations]);
 
   const goToOrganization = (organization: AccountOrganization) => {
     const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);
@@ -46,7 +56,7 @@ export function OrganizationSwitchMenu({
         {organizationsQuery.isError ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">Could not load organizations.</p>
         ) : null}
-        {!organizationsQuery.isLoading && !organizationsQuery.isError && organizations.length === 0 ? (
+        {!organizationsQuery.isLoading && !organizationsQuery.isError && listedOrganizations.length === 0 ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">No organizations available.</p>
         ) : null}
         {organizations.map((organization) => {
