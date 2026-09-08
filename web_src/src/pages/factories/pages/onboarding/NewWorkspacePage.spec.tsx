@@ -6,7 +6,7 @@ import { NewWorkspacePage } from "./NewWorkspacePage";
 
 const createFactory = vi.fn();
 const listedFactories: Array<{ name: string }> = [];
-const githubAppAvailability = { resolved: true, available: true };
+const githubAppAvailability = { resolved: true, available: true, failed: false, retry: vi.fn() };
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateFactory: () => ({ mutateAsync: createFactory, isPending: false }),
@@ -39,6 +39,8 @@ describe("NewWorkspacePage", () => {
     listedFactories.length = 0;
     githubAppAvailability.resolved = true;
     githubAppAvailability.available = true;
+    githubAppAvailability.failed = false;
+    githubAppAvailability.retry.mockReset();
   });
 
   it("creates the workspace with a placeholder name and opens the setup wizard", async () => {
@@ -78,5 +80,14 @@ describe("NewWorkspacePage", () => {
 
     expect(createFactory).not.toHaveBeenCalled();
     expect(screen.queryByTestId("github-app-required")).not.toBeInTheDocument();
+  });
+
+  it("does not create a workspace when the catalog request fails", () => {
+    githubAppAvailability.failed = true;
+    githubAppAvailability.available = false;
+    renderPage();
+
+    expect(screen.getByText("SuperPlane could not check the GitHub App.")).toBeInTheDocument();
+    expect(createFactory).not.toHaveBeenCalled();
   });
 });

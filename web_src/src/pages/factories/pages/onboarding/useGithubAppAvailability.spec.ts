@@ -7,6 +7,7 @@ describe("githubAppAvailabilityFromCatalog", () => {
     expect(githubAppAvailabilityFromCatalog({ isSuccess: false, isError: false })).toEqual({
       resolved: false,
       available: false,
+      failed: false,
     });
   });
 
@@ -17,7 +18,7 @@ describe("githubAppAvailabilityFromCatalog", () => {
         isError: false,
         githubDefinition: { name: "github", hostedAppInstall: false },
       }),
-    ).toEqual({ resolved: true, available: false });
+    ).toEqual({ resolved: true, available: false, failed: false });
   });
 
   it("allows setup when GitHub has a hosted app", () => {
@@ -27,13 +28,14 @@ describe("githubAppAvailabilityFromCatalog", () => {
         isError: false,
         githubDefinition: { name: "github", hostedAppInstall: true },
       }),
-    ).toEqual({ resolved: true, available: true });
+    ).toEqual({ resolved: true, available: true, failed: false });
   });
 
-  it("does not block when the catalog request fails", () => {
+  it("settles as failed when the catalog request fails", () => {
     expect(githubAppAvailabilityFromCatalog({ isSuccess: false, isError: true })).toEqual({
       resolved: true,
-      available: true,
+      available: false,
+      failed: true,
     });
   });
 });

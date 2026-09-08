@@ -16,7 +16,7 @@ export function OnboardingPage() {
   const githubApp = useGithubAppAvailability(layout.organizationId);
   const model = useOnboardingPageModel({ ...layout, onboardingEntryPath, reresolveWorkspace });
 
-  if (githubApp.resolved && !githubApp.available) {
+  if (githubApp.resolved && !githubApp.failed && !githubApp.available) {
     return <GithubAppRequiredNotice />;
   }
 
