@@ -18,12 +18,18 @@ export function FirstRunWorkspaceSwitch({
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> | undefined;
 }) {
+  if (!switcher) return null;
+  return <FirstRunWorkspaceSwitchMenu switcher={switcher} />;
+}
+
+function FirstRunWorkspaceSwitchMenu({
+  switcher,
+}: {
+  switcher: NonNullable<FirstRunChrome["workspaceSwitch"]>;
+}) {
   const navigate = useNavigate();
   const copy = FIRST_RUN_COPY.chrome;
   const [open, setOpen] = useState(false);
-
-  if (!switcher) return null;
-
   const current = switcher.factories.find((factory) => factory.id === switcher.currentFactoryId);
   const currentName = current ? workspaceLabel(current) : "Workspace";
 
