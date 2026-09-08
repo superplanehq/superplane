@@ -148,3 +148,9 @@ func CentsToMicros(cents int64) int64 {
 	}
 	return cents * MicrosPerCent
 }
+
+// SignedMicrosToCents converts millionths of a dollar to whole cents and
+// keeps the sign. Refunds store negative amounts.
+func SignedMicrosToCents(micros int64) int64 {
+	return micros / MicrosPerCent
+}
