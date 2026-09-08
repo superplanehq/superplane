@@ -135,7 +135,14 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
     "invoices",
     "remaining hosted credit",
   ]),
-  entry("organization", "spending", "Spending", undefined, ["usage", "cost", "tokens", "vm time", "estimated spend"]),
+  entry("organization", "spending", "Spending", undefined, [
+    "billing",
+    "usage",
+    "credit",
+    "hosted credit",
+    "your keys",
+    "superplane-hosted",
+  ]),
 ];
 
 function entry(
