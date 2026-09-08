@@ -28,6 +28,12 @@ func pagePage(pages ...string) *http.Response {
 	return jsonResponse(fmt.Sprintf(`{"results":[%s],"has_more":false}`, strings.Join(pages, ",")))
 }
 
+// pagePageMore answers a query with one page of database pages and reports that
+// more remain behind nextCursor, so tests can exercise pagination.
+func pagePageMore(nextCursor string, pages ...string) *http.Response {
+	return jsonResponse(fmt.Sprintf(`{"results":[%s],"has_more":true,"next_cursor":%q}`, strings.Join(pages, ","), nextCursor))
+}
+
 // pageTimestamp formats a time the way Notion reports a page's created_time,
 // so tests can derive their fixtures from time.Now() rather than hardcoding
 // absolute dates.
@@ -411,6 +417,66 @@ func Test__OnPageAdded__Setup__RecordsTheNewestMinuteSoTheFirstPollDoesNotReplay
 		pagePage(
 			pageDocument("page-1", "Newest one", newest),
 			pageDocument("page-2", "Newest two", newest),
+		),
+	}}
+	events := &contexts.EventContext{}
+
+	_, err = trigger.HandleHook(pollContext(
+		databaseConfiguration(), metadata, poll, events, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Zero(t, events.Count(), "pages that existed before the trigger must not be replayed")
+}
+
+// Regression: Notion reports created_time only to the minute, so more pages than
+// a single request returns can share the newest minute. Setup must page through
+// the whole newest minute and record every id, or the first poll re-reads that
+// minute and emits the pages it never recorded as newly created.
+func Test__OnPageAdded__Setup__RecordsEveryPageAtTheNewestMinuteAcrossPages(t *testing.T) {
+	now := time.Now().UTC()
+	newest := pageTimestamp(now.Add(-90 * time.Minute))
+	older := pageTimestamp(now.Add(-2 * time.Hour))
+
+	trigger := &OnPageAdded{}
+	metadata := &contexts.MetadataContext{}
+
+	// The newest minute holds more pages than a single request returns. The first
+	// request fills with pages at the newest minute and reports more; the second
+	// returns the rest of that minute and then an older page that ends it.
+	setup := &contexts.HTTPContext{Responses: []*http.Response{
+		databaseResponse(),
+		pagePageMore("cursor-1",
+			pageDocument("page-1", "Newest one", newest),
+			pageDocument("page-2", "Newest two", newest),
+		),
+		pagePage(
+			pageDocument("page-3", "Newest three", newest),
+			pageDocument("page-4", "Older", older),
+		),
+	}}
+
+	err := trigger.Setup(core.TriggerContext{
+		Integration:   integrationWithDatabase(),
+		HTTP:          setup,
+		Metadata:      metadata,
+		Requests:      &contexts.RequestContext{},
+		Configuration: databaseConfiguration(),
+	})
+	require.NoError(t, err)
+
+	stored := nodeMetadata(t, metadata)
+	assert.Equal(t, newest, stored.PolledUntil)
+	assert.ElementsMatch(t, []string{"page-1", "page-2", "page-3"}, stored.EmittedAtCursor,
+		"every page sharing the newest minute is recorded across pages")
+
+	// The first poll re-reads the newest minute and finds those three pages; all
+	// are already recorded, so none is replayed as new.
+	poll := &contexts.HTTPContext{Responses: []*http.Response{
+		pagePage(
+			pageDocument("page-1", "Newest one", newest),
+			pageDocument("page-2", "Newest two", newest),
+			pageDocument("page-3", "Newest three", newest),
 		),
 	}}
 	events := &contexts.EventContext{}

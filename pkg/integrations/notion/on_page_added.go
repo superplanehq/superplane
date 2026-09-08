@@ -378,35 +378,69 @@ func changedPages(client *Client, databaseID string, polledUntil time.Time, emit
 // minute, or the current time and no ids when it has no pages to read. Setup
 // records these so the first poll re-reads the boundary minute (on_or_after)
 // without re-emitting pages that already existed when the trigger was added.
+//
+// Notion reports created_time only to the minute, so more pages than a single
+// request returns can share the newest minute. The boundary therefore keeps
+// reading, newest first, until it reaches an older minute or the database ends,
+// so every id at the newest minute is recorded and none is replayed as new.
 func newestPageBoundary(client *Client, databaseID string) (string, []string, error) {
-	documents, err := client.ListNewestPages(databaseID, pollPageSize)
-	if err != nil {
-		return "", nil, fmt.Errorf("error reading the pages of database %s: %v", databaseID, err)
-	}
-
-	if len(documents) == 0 {
-		return formatPageTime(time.Now()), nil, nil
-	}
-
-	newest, ok := pageTime(documents[0], "created_time")
-	if !ok {
-		return formatPageTime(time.Now()), nil, nil
-	}
-
-	//
-	// The pages arrive newest first, so every page sharing the newest minute is
-	// at the front of the list. Recording their ids keeps the first poll from
-	// reporting a page that already existed as if it had just been added.
-	//
+	var newest time.Time
+	haveNewest := false
 	ids := []string{}
-	for _, document := range documents {
-		createdAt, ok := pageTime(document, "created_time")
-		if !ok || !createdAt.Equal(newest) {
+	cursor := ""
+
+	for {
+		documents, hasMore, nextCursor, err := client.ListNewestPageDocuments(databaseID, cursor, pollPageSize)
+		if err != nil {
+			return "", nil, fmt.Errorf("error reading the pages of database %s: %v", databaseID, err)
+		}
+
+		//
+		// The pages arrive newest first, so the very first page fixes the newest
+		// minute and every page sharing it is at the front of the walk. Recording
+		// their ids keeps the first poll from reporting a page that already
+		// existed as if it had just been added.
+		//
+		for _, document := range documents {
+			createdAt, ok := pageTime(document, "created_time")
+			if !ok {
+				//
+				// The newest page's timestamp is what anchors the boundary. Without
+				// it there is nothing to record, so start the trigger at the current
+				// time as an empty database would.
+				//
+				if !haveNewest {
+					return formatPageTime(time.Now()), nil, nil
+				}
+				continue
+			}
+
+			if !haveNewest {
+				newest = createdAt
+				haveNewest = true
+			}
+
+			if !createdAt.Equal(newest) {
+				//
+				// An older minute ends the boundary: every page sharing the newest
+				// minute has already been seen.
+				//
+				return formatPageTime(newest), ids, nil
+			}
+
+			if id, _ := document["id"].(string); id != "" {
+				ids = append(ids, id)
+			}
+		}
+
+		if !hasMore || nextCursor == "" {
 			break
 		}
-		if id, _ := document["id"].(string); id != "" {
-			ids = append(ids, id)
-		}
+		cursor = nextCursor
+	}
+
+	if !haveNewest {
+		return formatPageTime(time.Now()), nil, nil
 	}
 
 	return formatPageTime(newest), ids, nil

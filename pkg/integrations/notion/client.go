@@ -301,6 +301,17 @@ func (c *Client) ListNewestPages(databaseID string, limit int) ([]map[string]any
 	return results, err
 }
 
+// ListNewestPageDocuments returns one page of the database's pages, most
+// recently created first, starting at cursor. Setup walks these newest first so
+// it can record every page sharing the newest minute, however many there are,
+// instead of only the first page's worth.
+func (c *Client) ListNewestPageDocuments(databaseID, cursor string, pageSize int) ([]map[string]any, bool, string, error) {
+	return c.queryDatabase(databaseID, queryOptions{
+		startCursor: cursor,
+		pageSize:    pageSize,
+	})
+}
+
 // ListChangedPageDocuments returns one page of the database's pages created at
 // or after createdOnOrAfter, oldest created first, starting at cursor. The
 // onPageAdded trigger walks these oldest first so a burst larger than one poll
