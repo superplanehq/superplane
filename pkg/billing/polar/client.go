@@ -312,32 +312,6 @@ func (c *Client) GetOwnerMember(ctx context.Context, externalCustomerID, custome
 }
 
 func (c *Client) ListOrders(ctx context.Context, externalCustomerID string) ([]Order, error) {
-	items, err := c.listOrderPayloads(ctx, externalCustomerID)
-	if err != nil {
-		return nil, err
-	}
-
-	orders := make([]Order, 0, len(items))
-	for _, item := range items {
-		orders = append(orders, item.toOrder())
-	}
-	return orders, nil
-}
-
-func (c *Client) GetOrder(ctx context.Context, orderID string) (OrderData, error) {
-	id := strings.TrimSpace(orderID)
-	if id == "" {
-		return OrderData{}, fmt.Errorf("order id is required")
-	}
-
-	var payload orderJSON
-	if err := c.get(ctx, "/orders/"+url.PathEscape(id), &payload); err != nil {
-		return OrderData{}, err
-	}
-	return payload.toOrderData(), nil
-}
-
-func (c *Client) listOrderPayloads(ctx context.Context, externalCustomerID string) ([]orderJSON, error) {
 	externalID := strings.TrimSpace(externalCustomerID)
 	if externalID == "" {
 		return nil, fmt.Errorf("external customer id is required")
@@ -363,7 +337,12 @@ func (c *Client) listOrderPayloads(ctx context.Context, externalCustomerID strin
 		}
 		page++
 	}
-	return items, nil
+
+	orders := make([]Order, 0, len(items))
+	for _, item := range items {
+		orders = append(orders, item.toOrder())
+	}
+	return orders, nil
 }
 
 func (c *Client) get(ctx context.Context, path string, dest any) error {
@@ -552,26 +531,22 @@ type memberJSON struct {
 }
 
 type orderJSON struct {
-	ID                 string          `json:"id"`
-	CreatedAt          string          `json:"created_at"`
-	Status             string          `json:"status"`
-	BillingReason      string          `json:"billing_reason"`
-	TotalAmount        int64           `json:"total_amount"`
-	NetAmount          int64           `json:"net_amount"`
-	RefundedAmount     int64           `json:"refunded_amount"`
-	Description        string          `json:"description"`
-	ProductID          string          `json:"product_id"`
-	ExternalCustomerID string          `json:"external_customer_id"`
-	Customer           OrderCustomer   `json:"customer"`
-	Product            OrderProduct    `json:"product"`
-	ProductPrice       priceJSON       `json:"product_price"`
-	Items              []orderItemJSON `json:"items"`
+	ID          string `json:"id"`
+	CreatedAt   string `json:"created_at"`
+	Status      string `json:"status"`
+	TotalAmount int64  `json:"total_amount"`
+	Description string `json:"description"`
+	Product     *struct {
+		Name string `json:"name"`
+	} `json:"product"`
 }
 
 func (o orderJSON) toOrder() Order {
 	name := strings.TrimSpace(o.Description)
-	if productName := strings.TrimSpace(o.Product.Name); productName != "" {
-		name = productName
+	if o.Product != nil {
+		if productName := strings.TrimSpace(o.Product.Name); productName != "" {
+			name = productName
+		}
 	}
 	return Order{
 		ID:          o.ID,
@@ -580,35 +555,6 @@ func (o orderJSON) toOrder() Order {
 		Status:      o.Status,
 		ProductName: name,
 	}
-}
-
-func (o orderJSON) toOrderData() OrderData {
-	return OrderData{
-		ID:                 o.ID,
-		Status:             o.Status,
-		BillingReason:      o.BillingReason,
-		RefundedAmount:     o.RefundedAmount,
-		NetAmount:          o.NetAmount,
-		ProductID:          o.ProductID,
-		ExternalCustomerID: o.ExternalCustomerID,
-		Customer:           o.Customer,
-		Product:            o.Product,
-		ProductPrice:       o.ProductPrice,
-		Items:              o.Items,
-	}
-}
-
-func (o orderJSON) needsHydration() bool {
-	data := o.toOrderData()
-	if data.Product.IsCreditPack() {
-		return false
-	}
-	for _, item := range data.Items {
-		if item.Product.IsCreditPack() {
-			return false
-		}
-	}
-	return data.productID() == ""
 }
 
 func isCreditPack(metadata map[string]any) bool {

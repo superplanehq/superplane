@@ -101,8 +101,7 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_1"))
-	orderID := uuid.NewString()
-	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), orderID)
+	_, err := models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
 	require.NoError(t, err)
 
 	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
@@ -111,7 +110,7 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
 			"items": []map[string]any{
 				{
-					"id":           orderID,
+					"id":           "ord_100",
 					"created_at":   "2026-08-27T12:00:00Z",
 					"status":       "paid",
 					"total_amount": 10000,
@@ -132,62 +131,8 @@ func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
 	assert.Equal(t, int64(10000), resp.PurchasedCreditCents)
 	require.Len(t, resp.Invoices, 1)
-	assert.Equal(t, orderID, resp.Invoices[0].Id)
+	assert.Equal(t, "ord_100", resp.Invoices[0].Id)
 	assert.Equal(t, int64(10000), resp.Invoices[0].AmountCents)
 	assert.Equal(t, "paid", resp.Invoices[0].Status)
 	assert.Equal(t, "$100 pack", resp.Invoices[0].ProductName)
-}
-
-func Test__DescribeOrganizationWorkspaceUsageReconcilesPaidPolarInvoice(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	require.NoError(t, models.SetOrganizationPolarCustomerID(db, r.Organization.ID, "cust_1"))
-	orderID := uuid.NewString()
-
-	server := polarAPIServer(t, func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "/orders/", req.URL.Path)
-		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
-			"items": []map[string]any{
-				{
-					"id":             orderID,
-					"created_at":     "2026-09-08T12:00:00Z",
-					"status":         "paid",
-					"billing_reason": "purchase",
-					"total_amount":   10000,
-					"product_price":  map[string]any{"amount_type": "fixed", "price_amount": 10000},
-					"customer": map[string]any{
-						"id":          "cust_1",
-						"external_id": r.Organization.ID.String(),
-					},
-					"product": map[string]any{
-						"id":   "prod_100",
-						"name": "$100 pack",
-						"metadata": map[string]any{
-							"superplane_credit_pack": true,
-						},
-						"prices": []map[string]any{
-							{"amount_type": "fixed", "price_amount": 10000},
-						},
-					},
-				},
-			},
-			"pagination": map[string]any{"max_page": 1},
-		}))
-	})
-	usePolarTestServer(t, server)
-
-	resp, err := DescribeOrganizationWorkspaceUsage(
-		context.Background(),
-		r.Organization.ID.String(),
-		&pb.DescribeOrganizationWorkspaceUsageRequest{},
-	)
-	require.NoError(t, err)
-	assert.Equal(t, int64(10000), resp.PurchasedCreditCents)
-	assert.Equal(t, models.DefaultWelcomeGrantCents+10000, resp.RemainingCreditCents)
-	require.Len(t, resp.Invoices, 1)
-	assert.Equal(t, orderID, resp.Invoices[0].Id)
-
-	grant, err := models.FindLLMCreditGrantByPolarOrderID(db, orderID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CentsToMicros(10000), grant.AmountMicros)
 }

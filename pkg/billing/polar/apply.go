@@ -115,15 +115,6 @@ func parseOrganizationID(data OrderData) (uuid.UUID, error) {
 	return orgID, nil
 }
 
-func withOrganizationID(data OrderData, orgID uuid.UUID) OrderData {
-	if _, err := parseOrganizationID(data); err == nil {
-		return data
-	}
-	data.Customer.ExternalID = orgID.String()
-	data.ExternalCustomerID = orgID.String()
-	return data
-}
-
 func orderIsCreditPack(ctx context.Context, data OrderData, lookup CreditPackLookup) (bool, error) {
 	if data.Product.IsCreditPack() {
 		return true, nil
