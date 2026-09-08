@@ -3,6 +3,11 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
 import { PR_FEEDBACK_SOURCES, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
+import {
+  buildColumnAutomationActivity,
+  emptyColumnAutomationActivity,
+  type ColumnAutomationActivity,
+} from "./columnAutomationActivity";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
@@ -32,6 +37,7 @@ export type ColumnAutomation = {
   runningCount: number;
   catalogId: string;
   canvasId?: string;
+  activity?: ColumnAutomationActivity;
 };
 
 export type ColumnAutomationCatalogEntry = {
@@ -201,19 +207,37 @@ export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): bo
 }
 
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
+  const workOrders = input.workOrders ?? [];
+  const automations = automationsForColumn(key, input, workOrders);
+  return automations.map((automation) => attachAutomationActivity(automation, workOrders));
+}
+
+function automationsForColumn(
+  key: ColumnKey,
+  input: ColumnAutomationsInput,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
   if (key === "backlog") {
-    return [
-      ...intakeAutomations(input.intakes ?? [], input.workOrders ?? []),
-      ...analysisAutomation(input.apps ?? [], input.workOrders ?? []),
-    ];
+    return [...intakeAutomations(input.intakes ?? [], workOrders), ...analysisAutomation(input.apps ?? [], workOrders)];
   }
   if (key === "verify") {
-    return prFeedbackAutomations(input.prFeedbackHandlers ?? [], input.workOrders ?? []);
+    return prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders);
   }
   if (key === "done") {
-    return closureAutomation(input.apps ?? [], input.workOrders ?? []);
+    return closureAutomation(input.apps ?? [], workOrders);
   }
-  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], input.workOrders ?? []);
+  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], workOrders);
+}
+
+function attachAutomationActivity(automation: ColumnAutomation, workOrders: FactoriesWorkOrder[]): ColumnAutomation {
+  return {
+    ...automation,
+    activity: buildColumnAutomationActivity({
+      canvasId: automation.canvasId,
+      workOrders,
+      runningCount: automation.runningCount,
+    }),
+  };
 }
 
 function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: FactoriesWorkOrder[]): ColumnAutomation[] {
@@ -427,6 +451,10 @@ export function applyColumnAutomationsOverlay(
     .map((automation) => (disabled.has(automation.id) ? { ...automation, health: "disabled" } : automation));
 }
 
+export function automationOffersAgentEdit(automation: Pick<ColumnAutomation, "kind">): boolean {
+  return automation.kind === "agent-step" || automation.kind === "analysis";
+}
+
 export function catalogEntryToAutomation(
   entry: ColumnAutomationCatalogEntry,
   columnTitle: string,
@@ -450,6 +478,7 @@ export function catalogEntryToAutomation(
     health: "healthy",
     runningCount: 0,
     catalogId: entry.id,
+    activity: emptyColumnAutomationActivity(0),
   };
 }
 
@@ -463,6 +492,8 @@ export const COLUMN_AUTOMATIONS_COPY = {
   needsRepairLabel: "Needs repair",
   disabledLabel: "Disabled",
   editLabel: "Edit automation",
+  editAgentLabel: "Edit Agent",
+  editAutomationMenuLabel: "Edit Automation",
   tabsLabel: "Automation sections",
   generalTab: "General",
   agentTab: "Agent",
@@ -471,4 +502,7 @@ export const COLUMN_AUTOMATIONS_COPY = {
   viewEmpty: "This automation has no canvas yet.",
   viewError: "SuperPlane could not load the automation.",
   viewRetry: "Try again",
+  lastRunPassed: "Passed",
+  lastRunFailed: "Failed",
+  activityRunning: "running",
 } as const;
