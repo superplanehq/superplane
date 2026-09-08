@@ -135,6 +135,13 @@ after a disk-full or interrupted download), run `make dev.clean.go.cache` then
   empty. After adding a migration, run `make db.migrate DB_NAME=<DB_NAME>` where
   `DB_NAME` is `superplane_dev` or `superplane_test` (requires a running app
   container).
+- **NEVER DROP LOCAL DATABASES WITHOUT ASKING.** Do not run `make db.delete`,
+  `make db.recreate.all.dangerous`, `make dev.setup.no.cache`,
+  `make dev.pr.clean.checkout`, `dropdb`, or `DROP DATABASE` unless the user
+  explicitly asked. `make db.migrate.all` applies pending migrations and
+  rewrites `db/structure.sql`. It does not drop data. Do not pair it with
+  `db.delete`. If migrate fails (for example `no migration found for version`),
+  stop and ask. Do not recreate `superplane_dev` as a workaround.
 
 Cross-cutting rules when extending the backend:
 

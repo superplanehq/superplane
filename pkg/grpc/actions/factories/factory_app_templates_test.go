@@ -146,6 +146,51 @@ func TestMaterializeCreateWithAgentUsesPlanningModel(t *testing.T) {
 	assert.Equal(t, 10, *agent.Concurrency.Max)
 }
 
+func TestDeriveFactoryInstallParamsSkipsRuntimeExpressions(t *testing.T) {
+	params := deriveFactoryInstallParams([]models.Node{
+		{
+			ID: "find-pull-request",
+			Configuration: map[string]any{
+				"repository": "{{ root().data.repository.full_name }}",
+				"base":       "{{ root().data.pull_request.base.ref }}",
+			},
+		},
+		{
+			ID: "runner",
+			Configuration: map[string]any{
+				"environment": []any{
+					map[string]any{"name": "REPO", "value": "{{ install_params.appRepository }}"},
+					map[string]any{"name": "BASE", "value": "{{ install_params.defaultBranch }}"},
+				},
+			},
+		},
+		{
+			ID: "on-pr-closed",
+			Configuration: map[string]any{
+				"repository": "acme/widgets",
+				"base":       "release",
+			},
+		},
+	})
+
+	assert.Equal(t, "acme/widgets", params["appRepository"])
+	assert.Equal(t, "acme/widgets", params["backlogRepository"])
+	assert.Equal(t, "release", params["defaultBranch"])
+}
+
+func TestDeriveFactoryInstallParamsWithOnlyExpressionsDerivesNothing(t *testing.T) {
+	params := deriveFactoryInstallParams([]models.Node{
+		{
+			ID: "find-pull-request",
+			Configuration: map[string]any{
+				"repository": "{{ root().data.repository.full_name }}",
+			},
+		},
+	})
+
+	assert.Empty(t, params)
+}
+
 func TestMaterializeIntakeDefaults(t *testing.T) {
 	source := models.FactoryIntakeSourceGitHubIssues
 	current, err := buildIntakeCanvas(intakeCanvasRequest{Source: source})
@@ -211,7 +256,7 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		Edges: current.Edges(),
 	}
 
-	result, err := materializeBacklogDefaults(canvas, version)
+	result, err := materializeBacklogDefaults(nil, nil, canvas, version)
 	require.NoError(t, err)
 	assert.Equal(t, "backlog", result.templateID)
 

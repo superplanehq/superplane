@@ -1,3 +1,4 @@
+import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
 
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
@@ -47,12 +48,15 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
       componentType: section.kind,
       componentName: section.preview?.trim() || section.text,
       status: streamStatus(section.status),
-      detail: section.kind === "prompt" ? undefined : section.lines.filter((line) => line.trim()).join("\n"),
+      detail:
+        section.kind === "prompt"
+          ? undefined
+          : section.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n"),
       ...orderKeyProps(orderKey),
     });
     for (const [eventIndex, event] of section.events.entries()) {
       if (event.kind === "note") {
-        if (!event.text.trim()) {
+        if (!event.text.trim() || isRawAgentTurnLiveLogText(event.text)) {
           continue;
         }
         notes.push({
@@ -80,7 +84,7 @@ export function notesFromLiveLogSections(nodeId: string, sections: CommandSectio
           componentType: tool.kind,
           componentName: tool.text,
           status: streamStatus(tool.status),
-          detail: tool.lines.filter((line) => line.trim()).join("\n") || undefined,
+          detail: tool.lines.filter((line) => line.trim() && !isRawAgentTurnLiveLogText(line)).join("\n") || undefined,
           ...orderKeyProps(orderKey),
         });
       }
@@ -202,7 +206,7 @@ export function notesForLiveStream(input: {
 function notesFromOrphanLiveLogLines(nodeId: string, lines: string[]): SplitRunStreamLine[] {
   return lines.flatMap((line, index) => {
     const text = line.trim();
-    if (!text) {
+    if (!text || isRawAgentTurnLiveLogText(text)) {
       return [];
     }
     return [

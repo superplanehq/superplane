@@ -65,6 +65,22 @@ describe("buildSplitRunFooter", () => {
     });
   });
 
+  it("tells a draft is under analysis and drops Reject", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, isAnalyzing: true });
+
+    expect(footer).toEqual({
+      kind: "draft",
+      sentence: "SuperPlane is analyzing this task.",
+      note: {
+        headline: "SuperPlane is currently analyzing this task",
+        text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
+      },
+      attentionCard: true,
+      actions: [REFINE, START],
+    });
+    expect(footer.actions).not.toContainEqual(expect.objectContaining({ kind: "reject" }));
+  });
+
   it("keeps no close actions on a running order", () => {
     const footer = buildSplitRunFooter({
       kind: "running",

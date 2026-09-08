@@ -20,7 +20,6 @@ export function FirstRunFlow({
   firstName,
   email = FIRST_RUN_STORY_EMAIL,
   initialScreen = "welcome",
-  githubStartsConnected = false,
   analysisStatus = "running",
   completeAfterMs = COMPLETE_AFTER_MS,
   board,
@@ -29,23 +28,22 @@ export function FirstRunFlow({
   firstName?: string;
   email?: string;
   initialScreen?: FirstRunScreenId;
-  githubStartsConnected?: boolean;
   analysisStatus?: FirstRunAnalysisStatus;
   completeAfterMs?: number;
   board?: ReactNode;
   onLogOut?: () => void;
 }) {
   const [screen, setScreen] = useState<FirstRunScreenId>(initialScreen);
-  const [githubConnected, setGithubConnected] = useState(githubStartsConnected);
   const [ticketSource, setTicketSource] = useState<FirstRunTicketSource | null>(null);
   const [selectedRepository, setSelectedRepository] = useState<string | null>(null);
   const [stageIndex, setStageIndex] = useState(0);
 
-  const chromeFor = (stepIndex: number): FirstRunChrome => ({
+  const chromeFor = (stepIndex: number, onBack?: () => void): FirstRunChrome => ({
     displayName: firstName,
     email,
     onLogOut,
     stepIndex,
+    onBack,
   });
 
   useEffect(() => {
@@ -70,17 +68,7 @@ export function FirstRunFlow({
   }
 
   if (screen === "connect") {
-    return (
-      <FirstRunConnectScreen
-        githubConnected={githubConnected}
-        chrome={chromeFor(1)}
-        onConnectGitHub={() => {
-          setGithubConnected(true);
-          setScreen("choose");
-        }}
-        onContinue={() => setScreen("choose")}
-      />
-    );
+    return <FirstRunConnectScreen chrome={chromeFor(1)} onConnectGitHub={() => setScreen("choose")} />;
   }
 
   if (screen === "choose") {
@@ -88,7 +76,7 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        chrome={chromeFor(2)}
+        chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
         onEditConnection={() => setScreen("connect")}
         onContinue={() => {
@@ -102,7 +90,7 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
-        chrome={chromeFor(3)}
+        chrome={chromeFor(3, () => setScreen("choose"))}
         onSelectTicketSource={setTicketSource}
         onAnalyzeTickets={() => {
           if (!ticketSource) return;

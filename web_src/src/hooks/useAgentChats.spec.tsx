@@ -45,7 +45,6 @@ describe("useSendAgentChatMessage", () => {
     const sendPromise = result.current.mutateAsync({
       chatId: "chat-1",
       content: "Build this",
-      mode: "builder",
       autoLayoutOnUpdateEnabled: false,
     });
 
@@ -53,6 +52,7 @@ describe("useSendAgentChatMessage", () => {
       expect(agentsSendAgentChatMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.objectContaining({
+            mode: "MODE_BUILDER",
             autoLayoutOnUpdateEnabled: false,
           }),
         }),

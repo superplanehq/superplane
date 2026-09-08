@@ -43,6 +43,10 @@ export function OnboardingGate() {
     return <Outlet />;
   }
 
+  if (!onboarding && factory?.onboarding?.initial === true) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   if (isSetupRoute) {
     return <Outlet />;
   }

@@ -55,6 +55,11 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import {
+  componentMappers as productiveComponentMappers,
+  triggerRenderers as productiveTriggerRenderers,
+  eventStateRegistry as productiveEventStateRegistry,
+} from "./productive/index";
+import {
   componentMappers as dash0ComponentMappers,
   triggerRenderers as dash0TriggerRenderers,
   eventStateRegistry as dash0EventStateRegistry,
@@ -338,6 +343,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   linear: linearComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  productive: productiveComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
@@ -388,6 +394,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jira: jiraTriggerRenderers,
   linear: linearTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  productive: productiveTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
@@ -435,6 +442,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   semaphore: semaphoreEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  productive: productiveEventStateRegistry,
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,

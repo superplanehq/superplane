@@ -57,6 +57,11 @@ func (s *OrganizationService) RemoveUser(ctx context.Context, req *pb.RemoveUser
 	return organizations.RemoveUser(ctx, s.authorizationService, orgID, req.UserId)
 }
 
+func (s *OrganizationService) SetUserOwner(ctx context.Context, req *pb.SetUserOwnerRequest) (*pb.SetUserOwnerResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.SetUserOwner(ctx, orgID, req.UserId, req.IsOwner)
+}
+
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)

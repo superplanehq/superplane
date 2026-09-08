@@ -334,13 +334,19 @@ func resolveFactoryTemplate(nodes []models.Node) (factoryAppTemplate, bool) {
 	return factoryAppTemplate{}, false
 }
 
-func deriveFactoryTemplateInput(tx *gorm.DB, canvas *models.Canvas, version *models.CanvasVersion, template factoryAppTemplate) factoryTemplateInput {
+func deriveFactoryTemplateInput(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	template factoryAppTemplate,
+) factoryTemplateInput {
 	input := factoryTemplateInput{
 		appID:         canvas.ID.String(),
 		appName:       canvas.Name,
 		installParams: deriveFactoryInstallParams(version.Nodes),
 		integrations:  map[string]factoryTemplateIntegration{},
-		agent:         deriveFactoryAgent(version.Nodes),
+		agent:         resetFactoryTemplateAgent(tx, factory, version.Nodes),
 	}
 	for _, node := range version.Nodes {
 		integrationType := template.componentIntegrations[node.ComponentName()]
@@ -396,14 +402,19 @@ func factoryIntegrationNames(value any) []string {
 	return names
 }
 
+// deriveFactoryInstallParams infers install parameters from the current
+// canvas nodes. Only static values qualify: template expressions such as
+// "{{ root().data.repository.full_name }}" resolve during a run, so
+// substituting them into trigger configurations produces webhooks that can
+// never provision.
 func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 	params := map[string]string{}
 	for _, node := range nodes {
-		if value := configString(node.Configuration, "repository"); value != "" && params["appRepository"] == "" {
+		if value := staticConfigString(node.Configuration, "repository"); value != "" && params["appRepository"] == "" {
 			params["appRepository"] = value
 			params["backlogRepository"] = value
 		}
-		if value := configString(node.Configuration, "base"); value != "" && params["defaultBranch"] == "" {
+		if value := staticConfigString(node.Configuration, "base"); value != "" && params["defaultBranch"] == "" {
 			params["defaultBranch"] = value
 		}
 		environment, _ := node.Configuration["environment"].([]any)
@@ -411,6 +422,9 @@ func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 			entry, _ := item.(map[string]any)
 			name, _ := entry["name"].(string)
 			value, _ := entry["value"].(string)
+			if containsTemplateExpression(value) {
+				continue
+			}
 			if name == "REPO" && value != "" && params["appRepository"] == "" {
 				params["appRepository"] = value
 			}
@@ -420,6 +434,30 @@ func deriveFactoryInstallParams(nodes []models.Node) map[string]string {
 		}
 	}
 	return params
+}
+
+func resetFactoryTemplateAgent(tx *gorm.DB, factory *models.Factory, nodes []models.Node) *factoryTemplateAgent {
+	if agent := hostedResetIntakeAgent(tx, factory); agent != nil {
+		return &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		}
+	}
+	return deriveFactoryAgent(nodes)
+}
+
+func hostedResetIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
+	if tx == nil || factory == nil {
+		return nil
+	}
+	return intakeAgentFromHostedProvider(tx, factory)
+}
+
+func resetFactoryIntakeAgent(tx *gorm.DB, factory *models.Factory, nodes []models.Node) *intakeAgent {
+	if agent := hostedResetIntakeAgent(tx, factory); agent != nil {
+		return agent
+	}
+	return intakeAgentFromCanvasNodes(nodes)
 }
 
 func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
@@ -455,6 +493,20 @@ func deriveFactoryAgent(nodes []models.Node) *factoryTemplateAgent {
 func configString(configuration map[string]any, key string) string {
 	value, _ := configuration[key].(string)
 	return value
+}
+
+// staticConfigString returns the configuration value for key, or an empty
+// string when the value contains a template expression.
+func staticConfigString(configuration map[string]any, key string) string {
+	value := configString(configuration, key)
+	if containsTemplateExpression(value) {
+		return ""
+	}
+	return value
+}
+
+func containsTemplateExpression(value string) bool {
+	return strings.Contains(value, "{{")
 }
 
 func materializeIntakeDefaults(
@@ -523,10 +575,15 @@ func materializeIntakeDefaults(
 	}, nil
 }
 
-func materializeBacklogDefaults(canvas *models.Canvas, version *models.CanvasVersion) (*materializedFactoryTemplate, error) {
+func materializeBacklogDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*materializedFactoryTemplate, error) {
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
 		Name:  canvas.Name,
-		Agent: intakeAgentFromCanvasNodes(version.Nodes),
+		Agent: resetFactoryIntakeAgent(tx, factory, version.Nodes),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {
@@ -569,6 +626,78 @@ func intakeAgentFromCanvasNodes(nodes []models.Node) *intakeAgent {
 	return nil
 }
 
+func materializePRFeedbackDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	handler *models.FactoryPRFeedbackHandler,
+) (*materializedFactoryTemplate, error) {
+	spec := models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}
+	graph := resolvePRFeedbackGraph(spec)
+	settings := prFeedbackSettingsFromGraph(graph, spec)
+	request := prFeedbackBuildRequest{
+		Name:                   canvas.Name,
+		Repository:             settings.Repository,
+		Mention:                settings.Mention,
+		IgnoreBots:             settings.IgnoreBots,
+		AllowedBots:            settings.AllowedBots,
+		CheckNames:             settings.CheckNames,
+		MaximumAttempts:        prFeedbackResetMaximumAttempts(handler),
+		RunnerIntegrationNames: settings.RunnerIntegrationNames,
+		Binding:                resolvePRFeedbackBinding(tx, factory, settings.Repository),
+		Agent:                  resetFactoryIntakeAgent(tx, factory, version.Nodes),
+	}
+
+	templateID := prFeedbackDiscussionTemplateID
+	triggerID := prFeedbackCommentTriggerNodeID
+	defaults := buildDiscussionPRFeedbackCanvas(request)
+	if handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
+		templateID = prFeedbackChecksTemplateID
+		triggerID = prFeedbackPullRequestTriggerNodeID
+		defaults = buildChecksPRFeedbackCanvas(request)
+	}
+
+	defaults.Metadata.ID = canvas.ID.String()
+	stampFactoryTemplateMetadata(defaults, triggerID, templateID)
+	encoded, err := goyaml.Marshal(defaults)
+	if err != nil {
+		return nil, fmt.Errorf("encode PR feedback defaults: %w", err)
+	}
+	return &materializedFactoryTemplate{
+		templateID: templateID,
+		canvasYAML: string(encoded),
+	}, nil
+}
+
+func prFeedbackResetMaximumAttempts(handler *models.FactoryPRFeedbackHandler) int {
+	if handler != nil && handler.MaximumAttempts != nil && *handler.MaximumAttempts > 0 {
+		return *handler.MaximumAttempts
+	}
+	return prFeedbackDefaultMaximumAttempts
+}
+
+func stampFactoryTemplateMetadata(canvas *yaml.Canvas, nodeID, templateID string) {
+	if canvas == nil || canvas.Spec == nil {
+		return
+	}
+	for i := range canvas.Spec.Nodes {
+		node := &canvas.Spec.Nodes[i]
+		if node.ID != nodeID {
+			continue
+		}
+		node.Metadata = maps.Clone(node.Metadata)
+		if node.Metadata == nil {
+			node.Metadata = map[string]any{}
+		}
+		node.Metadata[factoryTemplateMetadataKey] = map[string]any{
+			"id":      templateID,
+			"version": factoryTemplateVersion,
+		}
+		return
+	}
+}
+
 func findFactoryAppForDefaults(tx *gorm.DB, organizationID, factoryID, appID uuid.UUID) (*models.Canvas, *models.CanvasVersion, error) {
 	canvas, err := models.FindCanvasInTransaction(tx, organizationID, appID)
 	if err != nil {
@@ -582,4 +711,30 @@ func findFactoryAppForDefaults(tx *gorm.DB, organizationID, factoryID, appID uui
 		return nil, nil, err
 	}
 	return canvas, version, nil
+}
+
+func materializeNonIntakeFactoryAppDefaults(
+	tx *gorm.DB,
+	factory *models.Factory,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+) (*materializedFactoryTemplate, error) {
+	handler, err := models.FindPRFeedbackHandlerByCanvasID(tx, canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+	if handler != nil && handler.FactoryID == factory.ID {
+		return materializePRFeedbackDefaults(tx, factory, canvas, version, handler)
+	}
+	if onWorkOrderNodeIDFromSpec(models.LiveCanvasSpec{Nodes: version.Nodes, Edges: version.Edges}) != "" {
+		return materializeBacklogDefaults(tx, factory, canvas, version)
+	}
+	template, ok := resolveFactoryTemplate(version.Nodes)
+	if !ok {
+		return nil, invalidArgument("factory app has no bundled defaults")
+	}
+	return materializeFactoryTemplate(
+		template.id,
+		deriveFactoryTemplateInput(tx, factory, canvas, version, template),
+	)
 }

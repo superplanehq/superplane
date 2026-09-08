@@ -1246,16 +1246,29 @@ func findInitialWorkspace(tx *gorm.DB, accountID, attemptID uuid.UUID) (*models.
 		return nil, nil, false, err
 	}
 
-	for _, organization := range organizations {
+	var pendingOrganization *models.Organization
+	var pendingWorkspace *models.Factory
+
+	for i := range organizations {
+		organization := &organizations[i]
 		factories, err := models.ListFactories(tx, organization.ID)
 		if err != nil {
 			return nil, nil, false, err
 		}
-		for _, factory := range factories {
+		for j := range factories {
+			factory := &factories[j]
 			if factory.HasInitialOnboardingAttempt(attemptID) {
-				return &organization, &factory, true, nil
+				return organization, factory, true, nil
+			}
+			if pendingWorkspace == nil && factory.IsPendingInitialOnboarding() {
+				pendingOrganization = organization
+				pendingWorkspace = factory
 			}
 		}
+	}
+
+	if pendingWorkspace != nil {
+		return pendingOrganization, pendingWorkspace, true, nil
 	}
 
 	return nil, nil, false, nil
@@ -1486,12 +1499,15 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	}
 
 	type Organization struct {
-		ID          string `json:"id"`
-		Slug        string `json:"slug"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CanvasCount int64  `json:"canvasCount"`
-		MemberCount int64  `json:"memberCount"`
+		ID                       string `json:"id"`
+		Slug                     string `json:"slug"`
+		Name                     string `json:"name"`
+		Description              string `json:"description"`
+		CanvasCount              int64  `json:"canvasCount"`
+		MemberCount              int64  `json:"memberCount"`
+		LastLocationPath         string `json:"lastLocationPath,omitempty"`
+		LastLocationUpdatedAt    string `json:"lastLocationUpdatedAt,omitempty"`
+		InitialOnboardingPending bool   `json:"initialOnboardingPending,omitempty"`
 	}
 
 	organizations, err := models.FindOrganizationsForAccount(account.Email)
@@ -1517,17 +1533,45 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	lastLocations, err := models.ListUserLastLocationsForAccount(database.DB(r.Context()), account.ID)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	lastLocationByOrg := make(map[string]models.UserLastLocation, len(lastLocations))
+	for _, location := range lastLocations {
+		lastLocationByOrg[location.OrganizationID.String()] = location
+	}
+
+	orgUUIDs := make([]uuid.UUID, 0, len(organizations))
+	for _, organization := range organizations {
+		orgUUIDs = append(orgUUIDs, organization.ID)
+	}
+	pendingInitialOnly, err := models.OrganizationIDsPendingInitialOnboardingOnly(database.DB(r.Context()), orgUUIDs)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	response := []Organization{}
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
-		response = append(response, Organization{
+		item := Organization{
 			ID:          organization.ID.String(),
 			Slug:        organization.Slug,
 			Name:        organization.Name,
 			Description: organization.Description,
 			CanvasCount: canvasCounts[orgID],
 			MemberCount: memberCounts[orgID],
-		})
+		}
+		if _, pending := pendingInitialOnly[organization.ID]; pending {
+			item.InitialOnboardingPending = true
+		}
+		if location, ok := lastLocationByOrg[orgID]; ok {
+			item.LastLocationPath = location.Path
+			item.LastLocationUpdatedAt = location.UpdatedAt.UTC().Format(time.RFC3339Nano)
+		}
+		response = append(response, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

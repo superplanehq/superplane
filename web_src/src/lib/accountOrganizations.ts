@@ -2,6 +2,13 @@ export interface AccountOrganization {
   id: string;
   name: string;
   slug?: string;
+  lastLocationPath?: string;
+  lastLocationUpdatedAt?: string;
+  initialOnboardingPending?: boolean;
+}
+
+export function readyAccountOrganizations(organizations: AccountOrganization[]): AccountOrganization[] {
+  return organizations.filter((organization) => organization.initialOnboardingPending !== true);
 }
 
 export function parseAccountOrganizations(body: unknown): AccountOrganization[] {
@@ -48,5 +55,12 @@ function parseAccountOrganization(entry: unknown): AccountOrganization | null {
     id: candidate.id,
     name: candidate.name,
     ...(typeof candidate.slug === "string" && candidate.slug ? { slug: candidate.slug } : {}),
+    ...(typeof candidate.lastLocationPath === "string" && candidate.lastLocationPath
+      ? { lastLocationPath: candidate.lastLocationPath }
+      : {}),
+    ...(typeof candidate.lastLocationUpdatedAt === "string" && candidate.lastLocationUpdatedAt
+      ? { lastLocationUpdatedAt: candidate.lastLocationUpdatedAt }
+      : {}),
+    ...(candidate.initialOnboardingPending === true ? { initialOnboardingPending: true } : {}),
   };
 }

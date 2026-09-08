@@ -20,7 +20,7 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
-  useAccountOrganizations: () => ({ data: [] }),
+  useAccountOrganizations: () => ({ data: [], refetch: vi.fn() }),
 }));
 
 const experimentalFeatureMocks = vi.hoisted(() => ({
