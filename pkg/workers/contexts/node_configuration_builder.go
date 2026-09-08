@@ -1211,29 +1211,25 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 }
 
 func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
-	files, err := models.ListReadyTaskFiles(tx, order.ID)
+	markdown, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
 	if err != nil {
-		return fmt.Errorf("order() could not load files: %w", err)
+		return fmt.Errorf("order() could not mint a file URL: %w", err)
 	}
 
-	ttl := blob.DispatchDownloadTTL(0)
-	urls := map[uuid.UUID]string{}
 	filePayloads := make([]any, 0, len(files))
-	for i := range files {
-		downloadURL, err := storedfiles.DownloadURL(context.Background(), blob.Current(), &files[i], ttl)
-		if err != nil {
-			return fmt.Errorf("order() could not mint a file URL: %w", err)
-		}
-		urls[files[i].ID] = downloadURL
-		filePayloads = append(filePayloads, map[string]any{
-			"id":           files[i].ID.String(),
-			"filename":     files[i].Filename,
-			"content_type": files[i].ContentType,
-			"size_bytes":   files[i].SizeBytes,
-			"url":          downloadURL,
-		})
+	for _, file := range files {
+		filePayloads = append(filePayloads, file.Map())
 	}
-	payload["description"] = blob.RewriteFileRefs(order.Description, urls)
+	payload["description"] = markdown
 	payload["files"] = filePayloads
 	return nil
 }

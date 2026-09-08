@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -443,4 +444,132 @@ func TestCompleteUploadDeletesObjectWhenReadyQuotaExceeded(t *testing.T) {
 
 	_, err = provider.Head(t.Context(), pending.StorageKey)
 	assert.ErrorIs(t, err, blob.ErrNotFound)
+}
+
+func TestDescriptionForDispatchRewritesReadyFileRefs(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Dispatch", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	ready, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "ready.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, ready, bytes.NewReader([]byte("png-bytes"))))
+
+	pending, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "pending.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	foreign, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      otherFactory.ID,
+		Filename:       "foreign.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, foreign, bytes.NewReader([]byte("png-bytes"))))
+
+	markdown := fmt.Sprintf(
+		"See ![ready](%s) ![pending](%s) ![foreign](%s)",
+		blob.FileRef(ready.ID),
+		blob.FileRef(pending.ID),
+		blob.FileRef(foreign.ID),
+	)
+	rewritten, files, err := DescriptionForDispatch(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		order.ID,
+		markdown,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	assert.Equal(t, ready.ID, files[0].ID)
+	assert.Equal(t, "ready.png", files[0].Filename)
+	assert.Contains(t, files[0].URL, "/api/v1/public/files/"+ready.ID.String())
+	assert.Contains(t, rewritten, files[0].URL)
+	assert.NotContains(t, rewritten, blob.FileRef(ready.ID))
+	assert.Contains(t, rewritten, blob.FileRef(pending.ID))
+	assert.Contains(t, rewritten, blob.FileRef(foreign.ID))
+}
+
+func TestDescriptionForDispatchSkipsOtherTaskFiles(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	first, err := factoryModel.CreateWorkOrder(db, "First", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	second, err := factoryModel.CreateWorkOrder(db, "Second", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		WorkOrderID:    first.ID,
+		Filename:       "other.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	markdown := "![other](" + blob.FileRef(file.ID) + ")"
+	rewritten, files, err := DescriptionForDispatch(
+		t.Context(),
+		db,
+		provider,
+		r.Organization.ID,
+		factoryModel.ID,
+		second.ID,
+		markdown,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	assert.Empty(t, files)
+	assert.Equal(t, markdown, rewritten)
+}
+
+func TestDescriptionForDispatchLeavesPlainMarkdown(t *testing.T) {
+	markdown := "No files here"
+	rewritten, files, err := DescriptionForDispatch(
+		t.Context(),
+		nil,
+		nil,
+		uuid.Nil,
+		uuid.Nil,
+		uuid.Nil,
+		markdown,
+		time.Hour,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, markdown, rewritten)
+	assert.Empty(t, files)
 }

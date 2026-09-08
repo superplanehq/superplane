@@ -289,6 +289,98 @@ func DownloadURL(ctx context.Context, provider blob.Provider, file *models.File,
 	return blob.ResolveDownloadURL(ctx, provider, file.StorageKey, file.ID, ttl)
 }
 
+type DispatchFile struct {
+	ID          uuid.UUID
+	Filename    string
+	ContentType string
+	SizeBytes   int64
+	URL         string
+}
+
+func (f DispatchFile) Map() map[string]any {
+	return map[string]any{
+		"id":           f.ID.String(),
+		"filename":     f.Filename,
+		"content_type": f.ContentType,
+		"size_bytes":   f.SizeBytes,
+		"url":          f.URL,
+	}
+}
+
+func DescriptionForDispatch(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID uuid.UUID,
+	markdown string,
+	ttl time.Duration,
+) (string, []DispatchFile, error) {
+	ids := blob.FileIDsInMarkdown(markdown)
+	if len(ids) == 0 {
+		return markdown, nil, nil
+	}
+	if provider == nil {
+		return markdown, nil, blob.ErrProviderNotConfigured
+	}
+
+	files, err := models.ListFilesByIDs(tx, ids)
+	if err != nil {
+		return markdown, nil, err
+	}
+	byID := map[uuid.UUID]models.File{}
+	for _, file := range files {
+		byID[file.ID] = file
+	}
+
+	urls := map[uuid.UUID]string{}
+	dispatched := make([]DispatchFile, 0, len(ids))
+	for _, id := range ids {
+		file, ok := byID[id]
+		if !ok || !dispatchableFile(file, organizationID, factoryID, workOrderID) {
+			continue
+		}
+		downloadURL, err := DownloadURL(ctx, provider, &file, ttl)
+		if err != nil {
+			return markdown, nil, err
+		}
+		urls[id] = downloadURL
+		dispatched = append(dispatched, DispatchFile{
+			ID:          file.ID,
+			Filename:    file.Filename,
+			ContentType: file.ContentType,
+			SizeBytes:   file.SizeBytes,
+			URL:         downloadURL,
+		})
+	}
+	return blob.RewriteFileRefs(markdown, urls), dispatched, nil
+}
+
+func dispatchableFile(file models.File, organizationID, factoryID, workOrderID uuid.UUID) bool {
+	if file.State != models.FileStateReady {
+		return false
+	}
+	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
+		return false
+	}
+	if file.FactoryID == nil || *file.FactoryID != factoryID {
+		return false
+	}
+	switch file.Scope {
+	case blob.ScopeWorkspace:
+		return true
+	case blob.ScopeTask:
+		if file.WorkOrderID == nil {
+			return false
+		}
+		if workOrderID == uuid.Nil {
+			return true
+		}
+		return *file.WorkOrderID == workOrderID
+	default:
+		return false
+	}
+}
+
 func ContentUploadURL(fileID uuid.UUID) string {
 	return blob.PublicBaseURL() + "/api/v1/files/" + fileID.String() + "/content"
 }
