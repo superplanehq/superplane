@@ -169,21 +169,25 @@ describe("FactorySettingsLayout sidebar", () => {
     ["Secrets", "secrets", "factory-settings-secrets"],
     ["LLM Models", "models", "factory-settings-llm-models"],
     ["Billing", "billing", "billing-credit-balance"],
-  ])("renders the Organization %s page in the factory settings shell", async (_title, path, pageTestId) => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${path}`}
-        factoriesFixture={defaultFactoriesFixture}
-      />,
-    );
+  ])(
+    "renders the Organization %s page in the factory settings shell",
+    async (_title, path, pageTestId) => {
+      render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/${path}`}
+          factoriesFixture={defaultFactoriesFixture}
+        />,
+      );
 
-    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId(`factory-settings-nav-organization-${path}`)).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
-  }, 10000);
+      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(within(sidebar).getByTestId(`factory-settings-nav-organization-${path}`)).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
+    },
+    10000,
+  );
 
   describe("Find settings", () => {
     it("shows section results for Security and hides the grouped nav", async () => {
