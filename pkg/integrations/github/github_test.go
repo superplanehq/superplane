@@ -204,7 +204,7 @@ func Test__afterAppInstallation_installRequest(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
 	assert.Equal(
 		t,
-		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request",
+		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubIntegrationId=11111111-1111-1111-1111-111111111111",
 		rec.Header().Get("Location"),
 	)
 	require.NotNil(t, integration.Metadata)
@@ -231,7 +231,7 @@ func Test__afterAppInstallation_installRequest_persistsAccount(t *testing.T) {
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
 	assert.Equal(
 		t,
-		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubOrg=acme",
+		"https://app.example/org-1/settings/integrations/11111111-1111-1111-1111-111111111111?githubSetup=request&githubIntegrationId=11111111-1111-1111-1111-111111111111&githubOrg=acme",
 		rec.Header().Get("Location"),
 	)
 	require.NotNil(t, integration.Metadata)

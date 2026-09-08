@@ -1,5 +1,6 @@
 import { useAccount } from "@/contexts/useAccount";
-import { useQueryClient } from "@tanstack/react-query";
+import { meKeys } from "@/hooks/useMe";
+import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { OnboardingWorkspaceResolution } from "../factories/pages/onboarding/onboardingWorkspaceResolutionContext";
@@ -9,6 +10,23 @@ export type ProvisionedWorkspace = {
   organizationSlug: string;
   workspaceKey: string;
 };
+
+function isWorkspaceResolutionQuery(queryKey: readonly unknown[], organizationSlug: string): boolean {
+  return queryKey[0] === "factories" && queryKey[1] === organizationSlug && queryKey.length <= 3;
+}
+
+function workspaceResolutionQueries(
+  queryClient: QueryClient,
+  currentSlug: string,
+  nextSlug: string,
+): [QueryKey, unknown][] {
+  const queries = queryClient.getQueriesData({
+    predicate: (query) => isWorkspaceResolutionQuery(query.queryKey, nextSlug),
+  });
+  const currentUser = queryClient.getQueryData(meKeys.me(currentSlug));
+  if (currentUser !== undefined) queries.push([meKeys.me(nextSlug), currentUser]);
+  return queries;
+}
 
 interface OrganizationOnboardingRedirectProps {
   renderWorkspace: (
@@ -30,16 +48,22 @@ export function OrganizationOnboardingRedirect({ renderWorkspace }: Organization
   const onboardingAttempt = useRef(getOnboardingAttempt());
 
   // A new organization can receive the slug of an earlier onboarding
-  // organization that was later renamed (for example, to the GitHub owner).
-  // Cached queries under that slug still hold the old organization's factory
-  // and connections, which would open the wizard mid-way, so the slug starts
-  // with a clean cache whenever the wizard adopts a different slug.
+  // organization that was later renamed. Clear that organization's cached
+  // data, but retain the seeded factory data and current permissions. These
+  // queries keep the repository step mounted while the new slug resolves;
+  // all other organization data must load again.
   const adoptWorkspace = useCallback(
     (provisioned: ProvisionedWorkspace) => {
       if (workspaceRef.current?.organizationSlug !== provisioned.organizationSlug) {
+        const resolutionQueries = workspaceRef.current
+          ? workspaceResolutionQueries(queryClient, workspaceRef.current.organizationSlug, provisioned.organizationSlug)
+          : [];
         queryClient.removeQueries({
           predicate: (query) => query.queryKey.includes(provisioned.organizationSlug),
         });
+        for (const [queryKey, data] of resolutionQueries) {
+          if (data !== undefined) queryClient.setQueryData(queryKey, data);
+        }
       }
       workspaceRef.current = provisioned;
       setWorkspace(provisioned);
