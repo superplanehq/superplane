@@ -310,8 +310,8 @@ func (p *CanvasPublisher) restoreDeletedNode(
 	existing.Name = replacement.Name
 	existing.Type = replacement.Type
 	existing.Ref = replacement.Ref
-	existing.Configuration = replacement.Configuration
-	existing.Metadata = replacement.Metadata
+	existing.Configuration = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Configuration.Data()))
+	existing.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Metadata.Data()))
 	existing.Position = replacement.Position
 	existing.IsCollapsed = replacement.IsCollapsed
 	existing.AppInstallationID = appInstallationID
@@ -322,6 +322,8 @@ func (p *CanvasPublisher) restoreDeletedNode(
 	existing.ConcurrencyMax = replacement.ConcurrencyMax
 	existing.DeletedAt = gorm.DeletedAt{}
 	existing.UpdatedAt = &now
+	node.Configuration = withoutAppSubscriptionID(node.Configuration)
+	node.Metadata = withoutAppSubscriptionID(node.Metadata)
 
 	if err := p.tx.Unscoped().Save(&existing).Error; err != nil {
 		return err
@@ -663,4 +665,21 @@ func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 	node.ID = newNodeID
 	p.finalNodes[newNodeID] = node
 	return newNodeID
+}
+
+const appSubscriptionIDKey = "appSubscriptionID"
+
+func withoutAppSubscriptionID(values map[string]any) map[string]any {
+	if values == nil {
+		return nil
+	}
+
+	cleaned := make(map[string]any, len(values))
+	for key, value := range values {
+		if key == appSubscriptionIDKey {
+			continue
+		}
+		cleaned[key] = value
+	}
+	return cleaned
 }

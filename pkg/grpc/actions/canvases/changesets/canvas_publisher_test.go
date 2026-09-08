@@ -749,6 +749,62 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.True(t, staleWebhook.DeletedAt.Valid)
 	})
 
+	t.Run("publish restore strips stale app subscription id from node metadata", func(t *testing.T) {
+		r := support.Setup(t)
+
+		staleSubscriptionID := uuid.New().String()
+		existingNode := componentCanvasNode("node-a", "Node A", "runnerBash", runnerConfiguration())
+		existingNode.Metadata = datatypes.NewJSONType(map[string]any{
+			"appSubscriptionID": staleSubscriptionID,
+			"keepMe":            "yes",
+		})
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{existingNode},
+			nil,
+		)
+
+		draftNode := componentNode("node-a", "Node A", "runnerPython", runnerConfiguration())
+		draftNode.Metadata = map[string]any{
+			"appSubscriptionID": staleSubscriptionID,
+			"keepMe":            "yes",
+		}
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{draftNode},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.Equal(t, "runnerPython", activeNode.Ref.Data().Component.Name)
+		require.NotContains(t, activeNode.Metadata.Data(), "appSubscriptionID")
+		require.Equal(t, "yes", activeNode.Metadata.Data()["keepMe"])
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		updatedVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-a")
+		require.NotContains(t, updatedVersionNode.Metadata, "appSubscriptionID")
+		require.Equal(t, "yes", updatedVersionNode.Metadata["keepMe"])
+	})
+
 	t.Run("update node allows assigning the first implementation to a placeholder component", func(t *testing.T) {
 		r := support.Setup(t)
 
