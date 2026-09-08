@@ -92,6 +92,19 @@ export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   hasBillingCustomer: true,
 };
 
+/** Remaining hosted credit is above zero but at or below the $20 low-credit threshold. */
+export const LOW_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "1500",
+  grantTotalCents: "5000",
+  superplaneGrantCents: "5000",
+  purchasedCreditCents: "0",
+  hostedBilledCents: "3500",
+  remainingCreditWarning: true,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};
+
 /** Polar packs for empty-credit Storybook recovery screens. */
 export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
   { id: "prod-500", name: "Hosted credit 500", amountCents: "50000" },
