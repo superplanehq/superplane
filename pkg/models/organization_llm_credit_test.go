@@ -2,6 +2,7 @@ package models_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func Test__ApplyMarkupMicros(t *testing.T) {
@@ -33,6 +35,80 @@ func Test__WelcomeGrantOnOrgCreate(t *testing.T) {
 	again, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, summary.GrantMicros, again.GrantMicros)
+}
+
+func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+
+	var grant models.OrganizationLLMCreditGrant
+	require.NoError(t, db.Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+		First(&grant).Error)
+	require.NotNil(t, grant.ExpiresAt)
+	assert.WithinDuration(t, grant.CreatedAt.Add(models.DefaultWelcomeGrantTTL), *grant.ExpiresAt, time.Second)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.NotNil(t, summary.WelcomeCreditExpiresAt)
+	assert.WithinDuration(t, *grant.ExpiresAt, *summary.WelcomeCreditExpiresAt, time.Second)
+}
+
+func Test__ExpiredWelcomeCreditIsNotUsable(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+	expireWelcomeGrant(t, db, r.Organization.ID)
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.GrantMicros)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.SuperPlaneGrantMicros)
+	assert.Equal(t, int64(0), summary.RemainingMicros)
+	require.ErrorIs(t, models.AssertHostedCreditAvailable(db, r.Organization.ID), models.ErrHostedCreditEmpty)
+}
+
+func Test__ExpiredWelcomeSpendDoesNotReducePurchasedCredit(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	execution := dispatchWorkOrderExecution(t, r)
+
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     requireExecutionRunID(t, execution),
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	before, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	require.Greater(t, before.BilledMicros, int64(0))
+	require.Greater(t, before.RemainingMicros, int64(0))
+
+	expireWelcomeGrant(t, db, r.Organization.ID)
+	_, err = models.AddPolarLLMCreditGrant(db, r.Organization.ID, models.CentsToMicros(10000), uuid.NewString())
+	require.NoError(t, err)
+
+	after, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(10000), after.PurchasedCreditMicros)
+	assert.Equal(t, models.CentsToMicros(10000), after.RemainingMicros)
+	assert.Equal(t, before.BilledMicros, after.BilledMicros)
+	require.NoError(t, models.AssertHostedCreditAvailable(db, r.Organization.ID))
+}
+
+func expireWelcomeGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
+	t.Helper()
+	expired := time.Now().Add(-time.Minute)
+	require.NoError(t, db.Model(&models.OrganizationLLMCreditGrant{}).
+		Where("organization_id = ? AND kind = ?", orgID, models.LLMCreditGrantKindWelcome).
+		Update("expires_at", expired).Error)
 }
 
 func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {

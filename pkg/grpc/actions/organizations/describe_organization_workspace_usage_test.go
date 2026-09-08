@@ -95,6 +95,7 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	assert.Equal(t, int64(0), resp.HostedBilledCents)
 	assert.False(t, resp.RemainingCreditWarning)
 	assert.Empty(t, resp.Invoices)
+	require.NotNil(t, resp.WelcomeCreditExpiresAt)
 }
 
 func Test__DescribeOrganizationWorkspaceUsageListsPolarInvoices(t *testing.T) {

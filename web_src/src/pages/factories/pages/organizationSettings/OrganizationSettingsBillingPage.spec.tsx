@@ -3,11 +3,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { client } from "@/api-client/client.gen";
 
-import { MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
+import { DEFAULT_CREDIT_GRANTS, MIXED_CREDIT_GRANTS } from "../../__fixtures__/creditGrantFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { FACTORIES_ORGANIZATION_ID } from "../../__fixtures__/factoryPageIds";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { SPENT_CREDIT_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
+import { EXPIRED_WELCOME_USAGE_REPORT, SPENT_CREDIT_USAGE_REPORT } from "../../__fixtures__/usageReportFixtures";
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 
 describe("OrganizationSettingsBillingPage", () => {
@@ -47,6 +47,7 @@ describe("OrganizationSettingsBillingPage", () => {
     expect(within(history).getByText("+$25.00")).toBeInTheDocument();
     expect(within(history).getByText("-$5.00")).toBeInTheDocument();
     expect(within(history).getByText("Support grant · Granted by Ada")).toBeInTheDocument();
+    expect(within(history).getByText(/Expires on|Expired on/)).toBeInTheDocument();
   }, 10000);
 
   it("shows an empty history when the organization has no grants", async () => {
@@ -76,5 +77,28 @@ describe("OrganizationSettingsBillingPage", () => {
 
     expect(await screen.findByText("Hosted credit is empty. SuperPlane-hosted runs cannot start.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add hosted credit" })).toBeDisabled();
+  }, 10000);
+
+  it("explains unused welcome credit after it expires", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          organizationWorkspaceUsage: EXPIRED_WELCOME_USAGE_REPORT,
+          organizationCreditGrants: [
+            {
+              ...DEFAULT_CREDIT_GRANTS[0],
+              expiresAt: "2026-08-15T12:00:00.000Z",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("Welcome credit expired. SuperPlane-hosted runs cannot start.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Welcome credit expired. Unused free credit no longer pays for SuperPlane-hosted runs."),
+    ).toBeInTheDocument();
   }, 10000);
 });

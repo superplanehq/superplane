@@ -29,12 +29,13 @@ import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
+import { useHostedCreditEmptyBanner } from "../lib/useHostedCreditEmptyBanner";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
@@ -253,6 +254,7 @@ export function LinesPage() {
     fixesPausedOrderIds,
   } = usePRFeedbackWorkOrderAttention(pullRequests);
 
+  const hostedCreditEmptyBanner = useHostedCreditEmptyBanner(organizationId, factoryKey);
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
@@ -480,6 +482,7 @@ export function LinesPage() {
             factory={factory}
             state={listState}
             canUpdate={canUpdate}
+            hostedCreditEmptyBanner={hostedCreditEmptyBanner}
           />
         </div>
         <div className={factoryWorkOrdersBodyClassName}>
@@ -556,6 +559,7 @@ function LineDetailHeader({
   factory,
   state,
   canUpdate,
+  hostedCreditEmptyBanner,
 }: {
   organizationId: string;
   factoryId: string;
@@ -565,6 +569,7 @@ function LineDetailHeader({
   factory: FactoriesFactory | null;
   state: WorkOrderListState;
   canUpdate: boolean;
+  hostedCreditEmptyBanner?: ReactNode;
 }) {
   const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
@@ -623,7 +628,14 @@ function LineDetailHeader({
           {canUpdate && line.id ? <ColumnConfigureMenu title={title} href={editHref} testId="lines-edit-menu" /> : null}
         </>
       }
-      belowRow={<FilterChips state={state} assigneeOptions={assigneeOptions} />}
+      belowRow={
+        hostedCreditEmptyBanner || state.filterCount > 0 ? (
+          <>
+            {hostedCreditEmptyBanner}
+            {state.filterCount > 0 ? <FilterChips state={state} assigneeOptions={assigneeOptions} /> : null}
+          </>
+        ) : undefined
+      }
     />
   );
 }

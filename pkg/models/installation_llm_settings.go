@@ -12,6 +12,7 @@ const (
 	installationLLMSettingsID = 1
 
 	DefaultWelcomeGrantCents   int64 = 5000
+	DefaultWelcomeGrantTTL           = 14 * 24 * time.Hour
 	DefaultMarkupBPS                 = 2000
 	DefaultWarningThresholdBPS       = 2000
 	MarkupBaseBPS                    = 10000

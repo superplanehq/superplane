@@ -17,7 +17,9 @@ import {
   creditGrantSourceLabel,
   formatCreditGrantAmount,
   hostedCreditBalanceWarning,
+  welcomeCreditUnusedExpiryNote,
 } from "../../lib/hostedCreditGrants";
+import { parseWelcomeCreditExpiresAt } from "../../lib/hostedCreditEmpty";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 
@@ -55,6 +57,7 @@ export function OrganizationSettingsBillingPage() {
         remaining={parseWorkOrderMetric(spend.data?.remainingCreditCents)}
         remainingCreditWarning={spend.data?.remainingCreditWarning === true}
         superplaneGrant={parseWorkOrderMetric(spend.data?.superplaneGrantCents)}
+        welcomeCreditExpiresAt={spend.data?.welcomeCreditExpiresAt}
       />
     </FactorySettingsPageFrame>
   );
@@ -71,6 +74,7 @@ function BillingPageBody({
   remaining,
   remainingCreditWarning,
   superplaneGrant,
+  welcomeCreditExpiresAt,
 }: {
   billed: number;
   error: unknown;
@@ -82,6 +86,7 @@ function BillingPageBody({
   remaining: number;
   remainingCreditWarning: boolean;
   superplaneGrant: number;
+  welcomeCreditExpiresAt?: string;
 }) {
   if (isLoading) {
     return (
@@ -99,7 +104,14 @@ function BillingPageBody({
     );
   }
 
-  const warning = hostedCreditBalanceWarning(remaining, remainingCreditWarning);
+  const welcomeExpiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
+  const welcomeExpired = welcomeExpiresAt != null && welcomeExpiresAt.getTime() <= Date.now();
+  const warning = hostedCreditBalanceWarning(remaining, remainingCreditWarning, welcomeExpired && purchased === 0);
+  const expiryNote = welcomeCreditUnusedExpiryNote({
+    remainingCents: remaining,
+    purchasedCents: purchased,
+    welcomeCreditExpiresAt,
+  });
   const spendingHref = factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending");
 
   return (
@@ -112,6 +124,7 @@ function BillingPageBody({
           <CreditMetric label="Hosted billed spend" value={billed} />
         </div>
         {warning ? <p className="mt-3 text-sm text-amber-700 dark:text-amber-400">{warning}</p> : null}
+        {expiryNote ? <p className="mt-3 text-sm text-muted-foreground">{expiryNote}</p> : null}
         <p className="mt-3 text-sm text-muted-foreground">
           <Link className="underline underline-offset-2" to={spendingHref}>
             View spending
