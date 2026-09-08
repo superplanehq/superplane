@@ -193,8 +193,10 @@ func RecordUsage(tx *gorm.DB, in WorkspaceUsageEventInput) error {
 }
 
 // RecordComputeUsage inserts one factory-linked runner-fleet row. Cost comes
-// from the compute price book (zero until rates are published). Hosted
-// markup and wallet debit do not apply. Org canvases are skipped.
+// from the compute price book (zero until rates are published) at the raw
+// provider rate; hosted markup does not apply. The stored cost_micros still
+// draws down org hosted credit and factory hosted budgets, same as model
+// usage. Org canvases are skipped.
 func RecordComputeUsage(tx *gorm.DB, in ComputeUsageEventInput) error {
 	machineType := strings.TrimSpace(in.MachineType)
 	if machineType == "" || in.NodeExecutionID == uuid.Nil || in.CanvasRunID == uuid.Nil {
