@@ -94,6 +94,37 @@ describe("useOnboardingGithubConnections", () => {
     expect(selectInstance).not.toHaveBeenCalled();
   });
 
+  // The GitHub request-approval return also carries `pick=newest`. The new
+  // connect is still waiting, so the wizard must not jump ahead with an
+  // older ready connection and show that account's repositories.
+  it("does not auto-select a ready connection while an install request is waiting", () => {
+    const selectInstance = vi.fn();
+    const onConnectionSelected = vi.fn();
+    const waitingConnection: OrganizationsIntegration = {
+      metadata: { id: "github-waiting", name: "GitHub 2", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: { installRequested: true, installRequestedAccount: "acme" },
+      },
+    };
+
+    renderHook(() =>
+      useOnboardingGithubConnections({
+        integrationData: [
+          { name: "github", allInstances: [githubConnection, waitingConnection], readyInstances: [githubConnection] },
+        ],
+        openSection: "vcs",
+        selectNewest: true,
+        selections: {},
+        selectInstance,
+        onConnectionSelected,
+      }),
+    );
+
+    expect(onConnectionSelected).not.toHaveBeenCalled();
+    expect(selectInstance).not.toHaveBeenCalled();
+  });
+
   it("advances from vcs to repo on the same slug without re-resolving the workspace", async () => {
     const selectInstance = vi.fn();
     const navigate = vi.fn() as unknown as NavigateFunction;

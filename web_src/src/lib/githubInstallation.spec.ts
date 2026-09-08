@@ -3,6 +3,20 @@ import { describe, expect, it } from "vitest";
 import { githubInstallationUrl } from "./githubInstallation";
 
 describe("githubInstallationUrl", () => {
+  // The app installation page works for both personal and organization
+  // installs. The settings/installations page belongs to one GitHub login
+  // and 404s when the user is signed in to a different account.
+  it("opens the GitHub App installation page when the slug and id are known", () => {
+    expect(
+      githubInstallationUrl({
+        status: {
+          metadata: { installationId: "159959156", githubApp: { slug: "superplane-devkhjkhjk" } },
+          properties: [{ name: "appInstallationURL", value: "https://github.com/settings/installations/159959156" }],
+        },
+      }),
+    ).toBe("https://github.com/apps/superplane-devkhjkhjk/installations/159959156");
+  });
+
   it("uses the URL the GitHub App setup stored", () => {
     expect(
       githubInstallationUrl({

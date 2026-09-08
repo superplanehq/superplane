@@ -227,6 +227,7 @@ describe("FirstRunSetup", () => {
         metadata: {
           owner: "acme",
           startedByUserID: "user-1",
+          startedByGitHubLogin: "forestileao",
           state: "csrf",
           githubApp: { slug: "superplane" },
           pendingInstallations: [
@@ -254,6 +255,9 @@ describe("FirstRunSetup", () => {
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
+      FIRST_RUN_COPY.connect.signedInAs("forestileao"),
+    );
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
 
@@ -557,14 +561,14 @@ describe("FirstRunSetup", () => {
   // returns to the screen that carries the action, not to a screen with no
   // question left to answer.
   it("resumes on the ticket screen when hosted credentials cover the agent", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
   it("resumes on the agent screen when the agent still needs a connected provider", () => {
-    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });
