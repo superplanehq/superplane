@@ -20,11 +20,13 @@ interface UseCanvasStagingResyncOptions {
   setStagingResetNonce: Dispatch<SetStateAction<number>>;
 }
 
-type ResyncStagedOptions = {
+export type ResyncStagedOptions = {
   /** Bumps stagingResetNonce so file/console baselines reset. Avoid when entering edit from agent staging — it remounts CanvasPage and can loop auto-open. */
   bumpResetNonce?: boolean;
   /** When true, reuse a warm stagedCanvasSpec cache instead of forcing a refetch. */
   preferCachedStagedSpec?: boolean;
+  /** When aborted, skip applying the fetched spec to editor state and query cache. */
+  signal?: AbortSignal;
 };
 
 // Re-applies the staged (uncommitted) spec into React editor state after a remote
@@ -86,10 +88,19 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
         return;
       }
 
-      const inFlight = resyncStagedInFlightRef.current.get(versionId);
-      if (inFlight) {
-        await inFlight;
-        return;
+      const signal = options?.signal;
+      const shouldApply = () => signal == null || !signal.aborted;
+      // Signaled callers (Configure enter timeout) must not occupy the
+      // in-flight slot: abort skips apply, and a coalesced waiter would
+      // otherwise return without applying its own result.
+      const coalesceInFlight = signal == null;
+
+      if (coalesceInFlight) {
+        const inFlight = resyncStagedInFlightRef.current.get(versionId);
+        if (inFlight) {
+          await inFlight;
+          return;
+        }
       }
 
       const bumpResetNonce = options?.bumpResetNonce ?? true;
@@ -121,6 +132,9 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
           cachedStaged.metadata?.id === versionId &&
           cachedStagedQueryState?.isInvalidated !== true
         ) {
+          if (!shouldApply()) {
+            return;
+          }
           applyStagedSpec(versionId, cachedStaged.spec);
           return;
         }
@@ -134,6 +148,10 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
         const stagedVersion = await fetchStagedCanvasVersionWithSpec(canvasId, versionShell);
         const stagedSpec = stagedVersion?.spec ?? null;
 
+        if (!shouldApply()) {
+          return;
+        }
+
         // Apply editor state before updating the staged query cache so draft sync
         // effects cannot briefly overwrite resynced content with a stale snapshot.
         applyStagedSpec(versionId, stagedSpec);
@@ -145,11 +163,15 @@ export function useCanvasStagingResync(options: UseCanvasStagingResyncOptions) {
         }
       })();
 
-      resyncStagedInFlightRef.current.set(versionId, resyncPromise);
+      if (coalesceInFlight) {
+        resyncStagedInFlightRef.current.set(versionId, resyncPromise);
+      }
       try {
         await resyncPromise;
       } finally {
-        resyncStagedInFlightRef.current.delete(versionId);
+        if (coalesceInFlight) {
+          resyncStagedInFlightRef.current.delete(versionId);
+        }
       }
     },
     [
