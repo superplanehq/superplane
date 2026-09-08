@@ -116,7 +116,7 @@ describe("resolveOnboardingAgent", () => {
     ).toBeUndefined();
   });
 
-  it("prefers a connected provider over hosted credit", () => {
+  it("uses a connected provider when hosted credit has no default model", () => {
     expect(
       resolveOnboardingAgent({
         connected: connected("openai"),
@@ -124,6 +124,24 @@ describe("resolveOnboardingAgent", () => {
         hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
       })?.providerId,
     ).toBe("openai");
+  });
+
+  it("prefers hosted SuperPlane over a connected org provider when a default model is set", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        remainingCreditCents: 5000,
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      credentialsSource: "hosted",
+      harness: "AGENT_HARNESS_SUPERPLANE",
+      model: "",
+      planningModel: "",
+    });
   });
 });
 

@@ -106,7 +106,9 @@ func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*Change, error) {
 
 	//
 	// If a node exists in both the current and the proposed,
-	// but it's not the exactly same node, we need an UPDATE_NODE operation for it.
+	// but it's not the exactly same node, we need an UPDATE_NODE operation
+	// for it. An implementation change cannot UPDATE in place: the publisher
+	// tears the old block down, so we emit DELETE_NODE then ADD_NODE.
 	//
 	for _, node := range b.proposedNodes {
 		currentNode, ok := b.currentNodes[node.ID]
@@ -115,6 +117,22 @@ func (b *ChangesetBuilder) computeUpdateNodeChanges() ([]*Change, error) {
 		}
 
 		if reflect.DeepEqual(currentNode, node) {
+			continue
+		}
+
+		if nodeImplementationChanged(currentNode, node) {
+			added, err := changeNodeRefForAdd(node)
+			if err != nil {
+				return nil, err
+			}
+
+			changes = append(changes, &Change{
+				Type: ChangeTypeDeleteNode,
+				Node: &ChangeNode{ID: node.ID},
+			}, &Change{
+				Type: ChangeTypeAddNode,
+				Node: added,
+			})
 			continue
 		}
 
