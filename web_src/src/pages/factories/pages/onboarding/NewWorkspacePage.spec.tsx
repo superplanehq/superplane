@@ -37,7 +37,7 @@ describe("NewWorkspacePage", () => {
   it("creates the workspace with a placeholder name and opens the setup wizard", async () => {
     renderPage();
 
-    expect(await screen.findByText("/org-1/workspaces/NEW/setup")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/new/setup")).toBeInTheDocument();
     expect(createFactory).toHaveBeenCalledWith({ name: "New workspace", description: "", key: "" });
   });
 
@@ -45,7 +45,7 @@ describe("NewWorkspacePage", () => {
     listedFactories.push({ name: "New workspace" });
     renderPage();
 
-    expect(await screen.findByText("/org-1/workspaces/NEW/setup")).toBeInTheDocument();
+    expect(await screen.findByText("/org-1/workspaces/new/setup")).toBeInTheDocument();
     expect(createFactory).toHaveBeenCalledWith({ name: "New workspace 2", description: "", key: "" });
   });
 

@@ -198,7 +198,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
     renderGate({ initialEntry: "/org-1/apps/canvas-1" });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
     expect(getLocation().search).toBe("?configure=1&agent=1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
@@ -209,7 +209,7 @@ describe("AppDefaultTabGate — factory apps", () => {
     mockCanvasQuery = { data: { metadata: { factoryId: "factory-1" } }, isLoading: false };
     renderGate({ initialEntry: "/org-1/apps/canvas-1?run=run-9" });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
     expect(getLocation().search).toBe("?run=run-9");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
@@ -222,7 +222,7 @@ describe("AppDefaultTabGate — factory apps", () => {
       initialEntry: "/org-1/apps/canvas-1?edit=1&sidebar=1&node=create-pr&version=v1&file=app.yaml",
     });
 
-    expect(getLocation().pathname).toBe("/org-1/workspaces/RF/apps/canvas-1");
+    expect(getLocation().pathname).toBe("/org-1/workspaces/rf/apps/canvas-1");
     expect(getLocation().search).toBe("?configure=1&agent=1&sidebar=1&node=create-pr&version=v1");
     expect(screen.getByTestId("factory-app")).toBeInTheDocument();
   });
