@@ -43,6 +43,7 @@ export const FIRST_RUN_COPY = {
     editConnection: "Edit the GitHub connection.",
     accessHint: "You need admin access to the GitHub App or organization to change the repositories.",
     continue: "Choose a repository to continue",
+    continueReady: "Continue",
     moreLater: "You can add more repositories later.",
     missingTitle: "Why is my repository not shown?",
     missingReasons: [
