@@ -10,6 +10,7 @@ export const FIRST_RUN_COPY = {
     switchOrganization: "Switch organization",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
+    back: "Back",
   },
   welcome: {
     greeting: (firstName: string) => `Hi ${firstName}.`,

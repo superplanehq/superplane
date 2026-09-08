@@ -1,6 +1,6 @@
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import type { AccountOrganization } from "@/lib/accountOrganizations";
-import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
+import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
 import { Building2, Check, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 
@@ -26,7 +26,8 @@ export function OrganizationSwitchMenu({
 }: OrganizationSwitchMenuProps) {
   const navigate = useNavigate();
   const organizationsQuery = useAccountOrganizations();
-  const organizations = organizationsQuery.data ?? [];
+  const listedOrganizations = organizationsQuery.data ?? [];
+  const organizations = readyAccountOrganizations(listedOrganizations);
 
   const goToOrganization = (organization: AccountOrganization) => {
     const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);
@@ -46,7 +47,7 @@ export function OrganizationSwitchMenu({
         {organizationsQuery.isError ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">Could not load organizations.</p>
         ) : null}
-        {!organizationsQuery.isLoading && !organizationsQuery.isError && organizations.length === 0 ? (
+        {!organizationsQuery.isLoading && !organizationsQuery.isError && listedOrganizations.length === 0 ? (
           <p className="px-2 py-1 text-sm text-muted-foreground">No organizations available.</p>
         ) : null}
         {organizations.map((organization) => {
