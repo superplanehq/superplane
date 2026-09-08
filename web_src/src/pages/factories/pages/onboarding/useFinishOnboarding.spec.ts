@@ -51,8 +51,6 @@ describe("provisionWorkspace", () => {
       createLine: vi.fn().mockResolvedValue({ id: "line-1" }),
       listIntakes: vi.fn().mockResolvedValue([]),
       createIntake: vi.fn().mockResolvedValue({ id: "intake-1" }),
-      listPRFeedbackHandlers: vi.fn().mockResolvedValue([]),
-      createPRFeedbackHandler: vi.fn().mockResolvedValue({ id: "handler-1" }),
       listApps: vi.fn().mockResolvedValue([]),
       workspaceName: "Payments Service",
       takenNames: [],

@@ -6,7 +6,6 @@ import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  appendUniqueTrimmedString,
   normalizePRFeedbackDraft,
   prFeedbackDraftIsValid,
   type PRFeedbackDraftSettings,
@@ -14,7 +13,6 @@ import {
 
 export function PRFeedbackSettingsFooter({
   draft,
-  pendingCheckName,
   confirmDelete,
   savePending,
   deletePending,
@@ -25,7 +23,6 @@ export function PRFeedbackSettingsFooter({
   onClose,
 }: {
   draft: PRFeedbackDraftSettings;
-  pendingCheckName: string;
   confirmDelete: boolean;
   savePending?: boolean;
   deletePending?: boolean;
@@ -84,12 +81,7 @@ export function PRFeedbackSettingsFooter({
         disabled={savePending || !prFeedbackDraftIsValid(draft)}
         onClick={async () => {
           try {
-            await onSave(
-              normalizePRFeedbackDraft({
-                ...draft,
-                checkNames: appendUniqueTrimmedString(draft.checkNames, pendingCheckName),
-              }),
-            );
+            await onSave(normalizePRFeedbackDraft(draft));
             onClose();
           } catch {
             // The parent supplies the actionable error message.

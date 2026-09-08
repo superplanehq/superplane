@@ -147,6 +147,11 @@ func (s *FactoryService) DeleteFactoryPRFeedbackHandler(ctx context.Context, req
 	return actions.DeleteFactoryPRFeedbackHandler(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryRepositoryStatusChecks(ctx context.Context, req *pb.ListFactoryRepositoryStatusChecksRequest) (*pb.ListFactoryRepositoryStatusChecksResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryRepositoryStatusChecks(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryPullRequests(ctx context.Context, req *pb.ListFactoryPullRequestsRequest) (*pb.ListFactoryPullRequestsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryPullRequests(ctx, organizationID, req)

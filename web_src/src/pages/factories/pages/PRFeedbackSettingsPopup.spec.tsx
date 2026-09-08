@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
 import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
@@ -16,6 +17,8 @@ import type { PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 
+Element.prototype.scrollIntoView ??= () => undefined;
+
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
     <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />
@@ -24,6 +27,16 @@ vi.mock("@monaco-editor/react", () => ({
 
 vi.mock("@/hooks/useIntegrations", () => ({
   useConnectedIntegrations: vi.fn(() => ({ data: [] })),
+}));
+
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryRepositoryStatusChecks: vi.fn(() => ({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  })),
 }));
 
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
@@ -72,18 +85,27 @@ function checksDraft(overrides: Partial<PRFeedbackDraftSettings> = {}): PRFeedba
 
 beforeEach(() => {
   vi.mocked(useConnectedIntegrations).mockReturnValue(mockConnectedIntegrations());
+  vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
+    data: [],
+    isLoading: false,
+    isPending: false,
+    isFetching: false,
+    isError: false,
+  } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
 });
 
 function renderChecksPopup(
   onSave = vi.fn(),
   settings: PRFeedbackDraftSettings = checksDraft(),
   organizationId?: string,
+  factoryId?: string,
 ) {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <PRFeedbackSettingsPopup
           organizationId={organizationId}
+          factoryId={factoryId}
           settings={settings}
           healthy
           onSave={onSave}
@@ -164,59 +186,70 @@ function renderAutomationPopup() {
 }
 
 describe("PRFeedbackSettingsPopup check names", () => {
-  it("adds a check name that contains a comma as one value", async () => {
+  it("selects a check from the repository catalog", async () => {
+    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
+      data: [
+        { name: "lint", required: true },
+        { name: "e2e", required: false },
+      ],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
     const user = userEvent.setup();
-    renderChecksPopup();
+    renderChecksPopup(vi.fn(), checksDraft(), "org-1", "factory-1");
 
-    const input = screen.getByTestId("pr-feedback-check-names");
-    await user.type(input, "lint, typecheck");
-    await user.keyboard("{Enter}");
+    const e2e = screen.getByTestId("pr-feedback-check-option-e2e");
+    expect(e2e).toHaveAttribute("aria-selected", "false");
+    await user.click(e2e);
 
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(1);
-    expect(names).toHaveTextContent("lint, typecheck");
-    expect(input).toHaveValue("");
+    expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
   });
 
-  it("adds a second name with Add and keeps the first comma-containing name", async () => {
+  it("deselects a selected check from the catalog list", async () => {
+    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
+      data: [
+        { name: "lint", required: true },
+        { name: "unit", required: false },
+      ],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
     const user = userEvent.setup();
-    renderChecksPopup();
+    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint", "unit"] }), "org-1", "factory-1");
 
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "lint, typecheck");
-    await user.keyboard("{Enter}");
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "unit");
-    await user.click(screen.getByTestId("pr-feedback-check-names-add"));
+    await user.click(screen.getByTestId("pr-feedback-check-option-lint"));
 
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(2);
-    expect(names).toHaveTextContent("lint, typecheck");
-    expect(names).toHaveTextContent("unit");
+    expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("pr-feedback-check-option-unit")).toHaveAttribute("aria-selected", "true");
   });
 
-  it("includes a pending name that contains a comma when the user saves", async () => {
+  it("saves only the selected catalog checks", async () => {
+    vi.mocked(useFactoryRepositoryStatusChecks).mockReturnValue({
+      data: [
+        { name: "lint", required: true },
+        { name: "e2e", required: false },
+      ],
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    } as ReturnType<typeof useFactoryRepositoryStatusChecks>);
     const user = userEvent.setup();
-    const { onSave } = renderChecksPopup();
+    const { onSave } = renderChecksPopup(vi.fn(), checksDraft(), "org-1", "factory-1");
 
-    await user.type(screen.getByTestId("pr-feedback-check-names"), "lint, typecheck");
+    await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
     await user.click(screen.getByTestId("pr-feedback-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        checkNames: ["lint, typecheck"],
+        checkNames: ["e2e"],
       }),
     );
-  });
-
-  it("removes a selected check name", async () => {
-    const user = userEvent.setup();
-    renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint, typecheck", "unit"] }));
-
-    await user.click(screen.getByRole("button", { name: "Remove check lint, typecheck" }));
-
-    const names = screen.getByTestId("pr-feedback-check-names-list");
-    expect(within(names).getAllByRole("listitem")).toHaveLength(1);
-    expect(names).toHaveTextContent("unit");
-    expect(names).not.toHaveTextContent("lint, typecheck");
   });
 });
 

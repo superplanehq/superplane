@@ -1,6 +1,5 @@
 import { Link } from "@/components/Link/link";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +7,12 @@ import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { PR_FEEDBACK_SETTINGS_COPY, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import { useFactoryRepositoryStatusChecks } from "@/hooks/useFactoryPRFeedbackData";
+
+import { PR_FEEDBACK_SETTINGS_COPY, toggleUniqueString, type PRFeedbackDraftSettings } from "./prFeedbackSettingsModel";
+import { StatusCheckPicker } from "./StatusCheckPicker";
 
 export function PRFeedbackHealthSection({ healthy, checks }: { healthy: boolean; checks: boolean }) {
   const helper = healthy
@@ -72,33 +73,27 @@ export function PRFeedbackTextField({
 
 export function PRFeedbackChecksFields({
   organizationId,
+  factoryId,
   draft,
-  checkNameInput,
   onUpdate,
-  onInputChange,
-  onAdd,
 }: {
   organizationId?: string;
+  factoryId?: string;
   draft: PRFeedbackDraftSettings;
-  checkNameInput: string;
   onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
-  onInputChange: (value: string) => void;
-  onAdd: () => void;
 }) {
+  const catalogEnabled = Boolean(organizationId && factoryId);
+  const catalogQuery = useFactoryRepositoryStatusChecks(organizationId ?? "", factoryId ?? "", draft.repository, {
+    enabled: catalogEnabled,
+  });
   return (
     <>
-      <PRFeedbackCheckNamesField
-        id="pr-feedback-check-names"
+      <StatusCheckPicker
         names={draft.checkNames}
-        inputValue={checkNameInput}
-        onInputChange={onInputChange}
-        onAdd={onAdd}
-        onRemove={(name) =>
-          onUpdate(
-            "checkNames",
-            draft.checkNames.filter((item) => item !== name),
-          )
-        }
+        catalog={catalogQuery.data ?? []}
+        loading={catalogEnabled && (catalogQuery.isPending || catalogQuery.isFetching)}
+        loadError={catalogQuery.isError}
+        onToggle={(name) => onUpdate("checkNames", toggleUniqueString(draft.checkNames, name))}
       />
       <PRFeedbackTextField
         id="pr-feedback-maximum-attempts"
@@ -163,69 +158,6 @@ export function PRFeedbackDiscussionFields({
         onChange={(value) => onUpdate("allowedBots", value)}
       />
     </>
-  );
-}
-
-function PRFeedbackCheckNamesField({
-  id,
-  names,
-  inputValue,
-  onInputChange,
-  onAdd,
-  onRemove,
-}: {
-  id: string;
-  names: string[];
-  inputValue: string;
-  onInputChange: (value: string) => void;
-  onAdd: () => void;
-  onRemove: (name: string) => void;
-}) {
-  return (
-    <section>
-      <Label htmlFor={id}>{PR_FEEDBACK_SETTINGS_COPY.checkNamesLabel}</Label>
-      <p className="workspace-body-text mt-1 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.checkNamesHelper}</p>
-      {names.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap items-center gap-1.5" data-testid={`${id}-list`}>
-          {names.map((name) => (
-            <li
-              key={name}
-              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-            >
-              <span className="min-w-0 truncate">{name}</span>
-              <button
-                type="button"
-                onClick={() => onRemove(name)}
-                aria-label={`Remove check ${name}`}
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-                data-testid={`${id}-remove`}
-              >
-                <X className="size-3" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="mt-2 flex items-center gap-2">
-        <Input
-          id={id}
-          placeholder={PR_FEEDBACK_SETTINGS_COPY.checkNamesPlaceholder}
-          value={inputValue}
-          onChange={(event) => onInputChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") {
-              return;
-            }
-            event.preventDefault();
-            onAdd();
-          }}
-          data-testid={id}
-        />
-        <Button type="button" variant="outline" size="sm" onClick={onAdd} data-testid={`${id}-add`}>
-          {PR_FEEDBACK_SETTINGS_COPY.checkNamesAdd}
-        </Button>
-      </div>
-    </section>
   );
 }
 

@@ -121,6 +121,17 @@ func Test__PRFeedbackSettings__Checks(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("rejects an empty check name list", func(t *testing.T) {
+		err := validatePRFeedbackSettingsForSource(
+			nil,
+			uuid.Nil,
+			models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			defaultPRFeedbackSettings(),
+			nil,
+		)
+		require.Error(t, err)
+	})
+
 	t.Run("reads check names from a generated graph", func(t *testing.T) {
 		spec := prFeedbackChecksSpecFromTemplate(t, "acme/app")
 		graph := resolvePRFeedbackGraph(spec)

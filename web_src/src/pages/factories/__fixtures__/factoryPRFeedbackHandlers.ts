@@ -33,6 +33,27 @@ export function factoryPRFeedbackRoutes(fixture: FactoriesFixture): FactoryPRFee
       pattern: route("/api/v1/factories/([^/]+)/pr-feedback-handlers"),
       resolve: (match, method, body) => listOrCreatePRFeedbackHandlers(fixture, match[1], method, body),
     },
+    {
+      pattern: route("/api/v1/factories/([^/]+)/repository-status-checks"),
+      resolve: (_match, method) =>
+        method === "GET"
+          ? {
+              json: {
+                repository: "acme/api",
+                checks: [
+                  { name: "lint", required: true },
+                  { name: "unit", required: true },
+                  {
+                    name: "e2e",
+                    required: false,
+                    detailsUrl: "https://app.circleci.com/pipelines/github/acme/api/1",
+                    suggestedIntegration: "circleci",
+                  },
+                ],
+              },
+            }
+          : null,
+    },
   ];
 }
 

@@ -104,9 +104,25 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   allowedBotsHelper: "React to comments from these bots even without the mention. Use the bot login.",
   checkNamesLabel: "Status checks",
   checkNamesHelper:
-    "SuperPlane waits for each selected check and fixes selected failures. Leave empty to monitor all checks.",
-  checkNamesAdd: "Add",
-  checkNamesPlaceholder: "lint",
+    "Select the status checks SuperPlane must wait for. SuperPlane starts a fix when a selected check fails.",
+  checkNamesNone: "Select at least one status check.",
+  checkNamesCatalogEmpty: "No status checks found.",
+  checkNamesLoading: "Loading status checks...",
+  checkNamesRequired: "Required",
+  checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
+  wizardTitle: "Fix pull request checks",
+  wizardChecksDescription: "Keep the status checks SuperPlane must wait for and fix.",
+  wizardToolsDescription: "Connect the CI systems that publish these checks so the agent can read their logs.",
+  wizardToolsUnknown:
+    "SuperPlane could not tell which tools publish these checks. Connect the systems the agent needs.",
+  wizardContinue: "Continue",
+  wizardFinish: "Create handler",
+  wizardFinishing: "Creating handler...",
+  wizardStepChecks: "Step 1 of 2",
+  wizardStepTools: "Step 2 of 2",
+  wizardConnect: "Connect",
+  wizardSuggested: "Suggested from the selected checks",
+  wizardOtherTools: "Other tools",
   maximumAttemptsLabel: "Maximum automatic fix attempts",
   maximumAttemptsHelper:
     "SuperPlane pauses automatic fixes after this many consecutive attempts. Passing checks reset the count.",
@@ -213,6 +229,14 @@ export function appendUniqueTrimmedString(items: string[], raw: string): string[
   return [...items, name];
 }
 
+/** Select or deselect one name. Compare names without case. */
+export function toggleUniqueString(items: string[], name: string): string[] {
+  if (items.some((item) => item.toLowerCase() === name.toLowerCase())) {
+    return items.filter((item) => item.toLowerCase() !== name.toLowerCase());
+  }
+  return [...items, name];
+}
+
 function normalizeAllowedBots(bots: string[]): string[] {
   const seen = new Set<string>();
   const normalized: string[] = [];
@@ -255,7 +279,7 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
     return false;
   }
   if (next.source === "checks") {
-    return next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
+    return next.checkNames.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
   }
   return next.mention.startsWith("@");
 }

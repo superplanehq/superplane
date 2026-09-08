@@ -3,6 +3,7 @@ import {
   useCreateFactoryPRFeedbackHandler,
   useDeleteFactoryPRFeedbackHandler,
   useFactoryPRFeedbackHandlers,
+  useFactoryRepositoryStatusChecks,
   useUpdateFactoryPRFeedbackHandler,
 } from "@/hooks/useFactoryPRFeedbackData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -11,6 +12,7 @@ import { useState } from "react";
 
 import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
@@ -52,6 +54,10 @@ export function PRFeedbackSettingsHost({
   const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [checksSource, setChecksSource] = useState<PRFeedbackSource | null>(null);
+  useFactoryRepositoryStatusChecks(organizationId, factoryId, "", {
+    enabled: pickerOpen || Boolean(checksSource),
+  });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
   const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
@@ -61,6 +67,10 @@ export function PRFeedbackSettingsHost({
       return;
     }
     setPickerOpen(false);
+    if (source.id === "checks") {
+      setChecksSource(source);
+      return;
+    }
     createHandler
       .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
       .then((created) => {
@@ -121,6 +131,20 @@ export function PRFeedbackSettingsHost({
           onSelect={createFromSource}
           takenSourceIds={takenSourceIds}
         />
+        {checksSource ? (
+          <ChecksPRFeedbackSetupDialog
+            open
+            organizationId={organizationId}
+            factoryId={factoryId}
+            repository=""
+            source={checksSource}
+            onClose={() => setChecksSource(null)}
+            onCreated={(id) => {
+              setChecksSource(null);
+              onCreated?.(id);
+            }}
+          />
+        ) : null}
       </>
     );
   }
@@ -179,6 +203,7 @@ function PRFeedbackSettingsLoaded({
   return (
     <PRFeedbackSettingsPopup
       organizationId={organizationId}
+      factoryId={factoryId}
       settings={settings}
       healthy={healthy}
       automationGraph={automation.graph}

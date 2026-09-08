@@ -127,6 +127,12 @@ vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
   useCreateFactoryPRFeedbackHandler: () => ({ mutateAsync: createFactoryPRFeedbackHandler, isPending: false }),
   useUpdateFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteFactoryPRFeedbackHandler: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useFactoryRepositoryStatusChecks: () => ({ data: [], isLoading: false, isError: false }),
+}));
+
+vi.mock("./ChecksPRFeedbackSetupDialog", () => ({
+  ChecksPRFeedbackSetupDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="checks-pr-feedback-setup">Checks setup</div> : null,
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -614,6 +620,87 @@ describe("LinesPage board", () => {
     await user.click(add);
     expect(screen.getByTestId("add-pr-feedback-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-pr-feedback-template-checks")).toHaveTextContent("Pull request checks");
+  });
+
+  it("opens the checks setup wizard instead of creating the handler immediately", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("lines-verify-add-pr-feedback"));
+    await user.click(screen.getByTestId("add-pr-feedback-template-checks"));
+
+    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("shows next steps for missing PR feedback handlers after onboarding", () => {
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("You finished workspace setup");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "The factory can implement tasks and will open pull requests for them.",
+    );
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("0 of 2 complete");
+    expect(screen.getByTestId("workspace-next-step-pr-comments-handler")).toHaveAttribute("data-state", "open");
+    expect(screen.getByTestId("workspace-next-step-pr-checks-handler")).toHaveAttribute("data-state", "open");
+  });
+
+  it("keeps a configured next step visible as done", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("1 of 2 complete");
+    expect(screen.getByTestId("workspace-next-step-pr-comments-handler")).toHaveAttribute("data-state", "done");
+    expect(screen.getByTestId("workspace-next-step-pr-checks-handler")).toHaveAttribute("data-state", "open");
+  });
+
+  it("hides next steps when every PR feedback handler is configured", () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [
+        { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
+        { id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true },
+      ],
+    });
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
+  });
+
+  it("does not start setup from a done next step", async () => {
+    useFactoryPRFeedbackHandlers.mockReturnValue({
+      data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
+    });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-pr-comments-handler"));
+
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("starts comments handler setup from the next step", async () => {
+    createFactoryPRFeedbackHandler.mockResolvedValueOnce({ id: "handler-new" });
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-pr-comments-handler"));
+
+    expect(createFactoryPRFeedbackHandler).toHaveBeenCalledWith({
+      source: "SOURCE_PULL_REQUEST_DISCUSSION",
+      name: "Address PR feedback",
+    });
+  });
+
+  it("opens the checks wizard from the next step", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-pr-checks-handler"));
+
+    expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("hides add when every feedback source already has a handler", () => {

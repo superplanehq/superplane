@@ -12,6 +12,7 @@ import {
   fixesPausedWorkOrderIds,
   waitingOnChecksWorkOrderIds,
   appendUniqueTrimmedString,
+  toggleUniqueString,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
   prFeedbackSettingsTabs,
@@ -313,10 +314,22 @@ describe("prFeedbackDraftIsValid", () => {
           source: "checks",
           name: "Fix pull request checks",
           mention: "",
+          checkNames: ["lint"],
           maximumAttempts: 3,
         }),
       ),
     ).toBe(true);
+    expect(
+      prFeedbackDraftIsValid(
+        discussionDraft({
+          source: "checks",
+          name: "Fix pull request checks",
+          mention: "",
+          checkNames: [],
+          maximumAttempts: 3,
+        }),
+      ),
+    ).toBe(false);
     expect(
       prFeedbackDraftIsValid(
         discussionDraft({
@@ -377,6 +390,13 @@ describe("appendUniqueTrimmedString", () => {
     expect(appendUniqueTrimmedString(["lint"], " lint, typecheck ")).toEqual(["lint", "lint, typecheck"]);
     expect(appendUniqueTrimmedString(["lint"], "lint")).toEqual(["lint"]);
     expect(appendUniqueTrimmedString(["lint"], "   ")).toEqual(["lint"]);
+  });
+});
+
+describe("toggleUniqueString", () => {
+  it("adds a missing name and removes a matching name without case", () => {
+    expect(toggleUniqueString(["lint"], "e2e")).toEqual(["lint", "e2e"]);
+    expect(toggleUniqueString(["lint", "e2e"], "LINT")).toEqual(["e2e"]);
   });
 });
 

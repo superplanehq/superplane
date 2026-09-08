@@ -195,6 +195,9 @@ func validatePRFeedbackSettingsForSource(
 	if settings.MaximumAttempts < prFeedbackMaximumAttemptsMin || settings.MaximumAttempts > prFeedbackMaximumAttemptsMax {
 		return invalidArgument("maximum attempts must be between 1 and 10")
 	}
+	if len(settings.CheckNames) == 0 {
+		return invalidArgument("at least one check name is required")
+	}
 	for _, name := range settings.CheckNames {
 		if strings.TrimSpace(name) == "" {
 			return invalidArgument("check names must be non-empty")

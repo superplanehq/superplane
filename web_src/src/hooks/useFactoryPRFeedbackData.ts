@@ -2,12 +2,14 @@ import {
   factoriesCreateFactoryPrFeedbackHandler,
   factoriesDeleteFactoryPrFeedbackHandler,
   factoriesListFactoryPrFeedbackHandlers,
+  factoriesListFactoryRepositoryStatusChecks,
   factoriesUpdateFactoryPrFeedbackHandler,
 } from "@/api-client";
 import type {
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPrFeedbackHandlerSettings,
   FactoriesFactoryPrFeedbackHandlerSource,
+  FactoriesFactoryRepositoryStatusCheck,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -17,6 +19,8 @@ import { factoryAppsKey, factoryQueryKeys } from "./useFactoryData";
 const factoryPRFeedbackQueryKeys = {
   list: (organizationId: string, factoryId: string) =>
     ["factories", organizationId, factoryId, "pr-feedback-handlers"] as const,
+  statusChecks: (organizationId: string, factoryId: string, repository: string) =>
+    ["factories", organizationId, factoryId, "repository-status-checks", repository] as const,
 };
 
 export function factoryPRFeedbackHandlersKey(organizationId: string, factoryId: string) {
@@ -58,6 +62,7 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
       name?: string;
       repository?: string;
       source?: FactoriesFactoryPrFeedbackHandlerSource;
+      settings?: FactoriesFactoryPrFeedbackHandlerSettings;
     }) => {
       const response = await factoriesCreateFactoryPrFeedbackHandler(
         withOrganizationHeader({
@@ -66,7 +71,7 @@ export function useCreateFactoryPRFeedbackHandler(organizationId: string, factor
           body: {
             name: input.name,
             source: input.source,
-            settings: input.repository ? { subject: { repository: input.repository } } : undefined,
+            settings: input.settings ?? (input.repository ? { subject: { repository: input.repository } } : undefined),
           },
         }),
       );
@@ -108,6 +113,30 @@ export function useUpdateFactoryPRFeedbackHandler(organizationId: string, factor
     onSuccess: () => {
       invalidatePRFeedbackQueries(queryClient, organizationId, factoryId);
     },
+  });
+}
+
+export function useFactoryRepositoryStatusChecks(
+  organizationId: string,
+  factoryId: string,
+  repository: string,
+  options?: { enabled?: boolean },
+) {
+  const trimmedRepository = repository.trim();
+  return useQuery({
+    queryKey: factoryPRFeedbackQueryKeys.statusChecks(organizationId, factoryId, trimmedRepository),
+    queryFn: async (): Promise<FactoriesFactoryRepositoryStatusCheck[]> => {
+      const response = await factoriesListFactoryRepositoryStatusChecks(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          query: trimmedRepository ? { repository: trimmedRepository } : undefined,
+        }),
+      );
+      return response.data?.checks ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && (options?.enabled ?? true)),
+    staleTime: 60_000,
   });
 }
 

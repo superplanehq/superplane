@@ -13,7 +13,11 @@ import {
   useFactoryWorkOrders,
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
-import { useCreateFactoryPRFeedbackHandler, useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import {
+  useCreateFactoryPRFeedbackHandler,
+  useFactoryPRFeedbackHandlers,
+  useFactoryRepositoryStatusChecks,
+} from "@/hooks/useFactoryPRFeedbackData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
@@ -38,6 +42,9 @@ import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
+import { NextStepsPanel } from "./NextStepsPanel";
+import { runWorkspaceNextStepAction, workspaceNextSteps } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
 import type { ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
@@ -157,9 +164,11 @@ import {
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
+  prFeedbackSourceById,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
 } from "./prFeedbackSettingsModel";
+import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
@@ -238,6 +247,10 @@ export function LinesPage() {
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
+  const [checksPRFeedbackSource, setChecksPRFeedbackSource] = useState<PRFeedbackSource | null>(null);
+  useFactoryRepositoryStatusChecks(organizationId, factoryId, factory?.onboarding?.appRepository?.trim() ?? "", {
+    enabled: addPRFeedbackOpen || Boolean(checksPRFeedbackSource),
+  });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const {
@@ -310,6 +323,11 @@ export function LinesPage() {
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
+  const nextSteps = workspaceNextSteps({
+    onboardingComplete: isFactoryOnboardingComplete(factory),
+    canConfigure: canUpdate,
+    takenPRFeedbackSources,
+  });
 
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
@@ -336,6 +354,10 @@ export function LinesPage() {
       return;
     }
     setAddPRFeedbackOpen(false);
+    if (source.id === "checks") {
+      setChecksPRFeedbackSource(source);
+      return;
+    }
     createPRFeedbackHandler
       .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
       .then((handler) => {
@@ -437,6 +459,19 @@ export function LinesPage() {
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
       />
+      {checksPRFeedbackSource ? (
+        <ChecksPRFeedbackSetupDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          repository={factory.onboarding?.appRepository?.trim() ?? ""}
+          source={checksPRFeedbackSource}
+          onClose={() => setChecksPRFeedbackSource(null)}
+          onCreated={(handlerId) =>
+            navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handlerId))
+          }
+        />
+      ) : null}
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
           organizationId={organizationId}
@@ -475,6 +510,19 @@ export function LinesPage() {
             factory={factory}
             state={listState}
             canUpdate={canUpdate}
+          />
+          <NextStepsPanel
+            steps={nextSteps}
+            onSelect={(step) =>
+              runWorkspaceNextStepAction(step.action, {
+                configurePRFeedback: (sourceId) => {
+                  const source = prFeedbackSourceById(sourceId);
+                  if (source) {
+                    createPRFeedbackFromSource(source);
+                  }
+                },
+              })
+            }
           />
         </div>
         <div className={factoryWorkOrdersBodyClassName}>

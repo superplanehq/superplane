@@ -13,7 +13,6 @@ import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningRe
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  appendUniqueTrimmedString,
   prFeedbackSettingsTabs,
   type PRFeedbackDraftSettings,
   type PRFeedbackSettingsTab,
@@ -22,6 +21,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 interface PRFeedbackSettingsPopupProps {
   organizationId?: string;
+  factoryId?: string;
   settings: PRFeedbackDraftSettings;
   healthy: boolean;
   automationGraph?: IntakeAutomationGraph;
@@ -42,6 +42,7 @@ interface PRFeedbackSettingsPopupProps {
 
 export function PRFeedbackSettingsPopup({
   organizationId,
+  factoryId,
   settings,
   healthy,
   automationGraph,
@@ -124,6 +125,7 @@ export function PRFeedbackSettingsPopup({
       ) : (
         <PRFeedbackGeneralTab
           organizationId={organizationId}
+          factoryId={factoryId}
           draft={draft}
           healthy={healthy}
           confirmDelete={confirmDelete}
@@ -143,6 +145,7 @@ export function PRFeedbackSettingsPopup({
 
 function PRFeedbackGeneralTab({
   organizationId,
+  factoryId,
   draft,
   healthy,
   confirmDelete,
@@ -156,6 +159,7 @@ function PRFeedbackGeneralTab({
   onClose,
 }: {
   organizationId?: string;
+  factoryId?: string;
   draft: PRFeedbackDraftSettings;
   healthy: boolean;
   confirmDelete: boolean;
@@ -169,11 +173,6 @@ function PRFeedbackGeneralTab({
   onClose: () => void;
 }) {
   const checks = draft.source === "checks";
-  const [checkNameInput, setCheckNameInput] = useState("");
-  const addCheckName = () => {
-    onUpdate("checkNames", appendUniqueTrimmedString(draft.checkNames, checkNameInput));
-    setCheckNameInput("");
-  };
 
   return (
     <>
@@ -199,11 +198,9 @@ function PRFeedbackGeneralTab({
           {checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}
+              factoryId={factoryId}
               draft={draft}
-              checkNameInput={checkNameInput}
               onUpdate={onUpdate}
-              onInputChange={setCheckNameInput}
-              onAdd={addCheckName}
             />
           ) : (
             <PRFeedbackDiscussionFields draft={draft} onUpdate={onUpdate} />
@@ -212,7 +209,6 @@ function PRFeedbackGeneralTab({
       </div>
       <PRFeedbackSettingsFooter
         draft={draft}
-        pendingCheckName={checkNameInput}
         confirmDelete={confirmDelete}
         savePending={savePending}
         deletePending={deletePending}
