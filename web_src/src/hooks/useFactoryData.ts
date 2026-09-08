@@ -4,6 +4,7 @@ import {
   factoriesCreateFactory,
   factoriesCreateFactoryLine,
   factoriesCreateWorkOrder,
+  factoriesDuplicateWorkOrder,
   factoriesDeleteFactory,
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
@@ -367,6 +368,29 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
           queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
         });
       }
+    },
+  });
+}
+
+export function useDuplicateWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await factoriesDuplicateWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId },
+          body: {},
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to duplicate task");
+      }
+      return response.data.order;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: workOrdersKey(organizationId, factoryId) });
     },
   });
 }

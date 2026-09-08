@@ -11,9 +11,10 @@ import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import type { FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
 import { useMemo } from "react";
-import { Navigate, useLocation, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, firstFactoryLineId, workOrderDetailPath } from "../lib/factoryPagePaths";
+import { useDuplicateWorkOrderAction } from "../useDuplicateWorkOrderAction";
 import { flattenWorkOrderEventsPages } from "../lib/workOrderEventsPagination";
 import { canonicalWorkOrderNumber, resolveWorkOrderByNumber } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDetailDerived } from "../lib/workOrderProgress";
@@ -114,7 +115,9 @@ export function WorkOrderDetailPanel({
       checks={checks}
       isChecksLoading={checksQuery.isLoading}
       checksError={checksQuery.error ?? null}
+      factoryId={factoryId}
       canManageWorkOrders={canAct("work_orders", "update")}
+      canCreateWorkOrders={canAct("work_orders", "create")}
       permissionsLoading={permissionsLoading}
       actions={actions}
     />
@@ -170,6 +173,7 @@ interface LoadedWorkOrderDetailProps {
   derived: ReturnType<typeof getWorkOrderDetailDerived>;
   factoryLines: FactoriesFactoryLine[];
   organizationId: string;
+  factoryId: string;
   factoryKey: string;
   chrome?: "page" | "dialog";
   events: ReturnType<typeof flattenWorkOrderEventsPages>;
@@ -180,6 +184,7 @@ interface LoadedWorkOrderDetailProps {
   isChecksLoading: boolean;
   checksError: Error | null;
   canManageWorkOrders: boolean;
+  canCreateWorkOrders: boolean;
   permissionsLoading: boolean;
   actions: ReturnType<typeof useWorkOrderDetailActions>;
 }
@@ -189,6 +194,7 @@ function LoadedWorkOrderDetail({
   derived,
   factoryLines,
   organizationId,
+  factoryId,
   factoryKey,
   chrome = "page",
   events,
@@ -199,9 +205,19 @@ function LoadedWorkOrderDetail({
   isChecksLoading,
   checksError,
   canManageWorkOrders,
+  canCreateWorkOrders,
   permissionsLoading,
   actions,
 }: LoadedWorkOrderDetailProps) {
+  const navigate = useNavigate();
+  const duplicate = useDuplicateWorkOrderAction(organizationId, factoryId, (copied) => {
+    if (copied.number) {
+      navigate(workOrderDetailPath(organizationId, factoryKey, copied.number), {
+        state: { peekOrder: copied },
+      });
+    }
+  });
+
   return (
     <WorkOrderDetailLoadedView
       statusNotes={presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined)}
@@ -241,6 +257,7 @@ function LoadedWorkOrderDetail({
       canClose={canManageWorkOrders}
       canAssign={canManageWorkOrders}
       canManage={canManageWorkOrders}
+      canCreate={canCreateWorkOrders}
       permissionsLoading={permissionsLoading}
       isDispatching={actions.isDispatching}
       isCompleting={actions.isCompleting}
@@ -248,11 +265,13 @@ function LoadedWorkOrderDetail({
       isClosing={actions.isClosing}
       isAssigneesSaving={actions.isAssigneesSaving}
       isUpdatingStatus={actions.isUpdatingStatus}
+      isDuplicating={duplicate.isDuplicating}
       isAddingComment={actions.isAddingComment}
       onDispatch={actions.handleDispatch}
       onClose={actions.handleClose}
       onAssigneesSave={actions.handleAssigneesSave}
       onStatusChange={actions.handleStatusChange}
+      onDuplicate={() => void duplicate.handleDuplicate(order.id)}
       onAddComment={actions.handleAddComment}
     />
   );

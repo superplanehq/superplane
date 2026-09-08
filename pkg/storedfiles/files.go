@@ -82,6 +82,119 @@ func BindDescriptionFiles(
 	return result, nil
 }
 
+type CloneResult struct {
+	Markdown   string
+	CopiedKeys []string
+}
+
+func CloneDescriptionFiles(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID, createdBy uuid.UUID,
+	markdown string,
+) (result CloneResult, err error) {
+	result.Markdown = markdown
+	ids := blob.FileIDsInMarkdown(markdown)
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	files, listErr := models.ListFilesByIDs(tx, ids)
+	if listErr != nil {
+		return result, listErr
+	}
+	byID := map[uuid.UUID]models.File{}
+	for _, file := range files {
+		byID[file.ID] = file
+	}
+
+	defer func() {
+		if err != nil {
+			_ = DeleteObjects(ctx, provider, result.CopiedKeys)
+		}
+	}()
+
+	replacements := map[uuid.UUID]string{}
+	for _, id := range ids {
+		file, ok := byID[id]
+		if !ok || !cloneableDescriptionFile(file, organizationID, factoryID) {
+			continue
+		}
+		cloned, copiedKey, cloneErr := cloneFileToWorkOrder(ctx, tx, provider, organizationID, factoryID, workOrderID, createdBy, &file)
+		if cloneErr != nil {
+			err = cloneErr
+			return result, err
+		}
+		if copiedKey != "" {
+			result.CopiedKeys = append(result.CopiedKeys, copiedKey)
+		}
+		replacements[id] = blob.FileRef(cloned.ID)
+	}
+	result.Markdown = blob.RewriteFileRefs(markdown, replacements)
+	return result, nil
+}
+
+func cloneableDescriptionFile(file models.File, organizationID, factoryID uuid.UUID) bool {
+	if file.State != models.FileStateReady {
+		return false
+	}
+	if file.OrganizationID == nil || *file.OrganizationID != organizationID {
+		return false
+	}
+	if file.FactoryID == nil || *file.FactoryID != factoryID {
+		return false
+	}
+	return true
+}
+
+func cloneFileToWorkOrder(
+	ctx context.Context,
+	tx *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID, workOrderID, createdBy uuid.UUID,
+	source *models.File,
+) (*models.File, string, error) {
+	if provider == nil {
+		return nil, "", blob.ErrProviderNotConfigured
+	}
+
+	cloned, err := models.CreatePendingFile(tx, models.CreateFileParams{
+		Scope:          blob.ScopeTask,
+		OrganizationID: organizationID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		Filename:       source.Filename,
+		ContentType:    source.ContentType,
+		CreatedByID:    createdBy,
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	reader, err := provider.Get(ctx, source.StorageKey)
+	if err != nil {
+		_ = DeleteObjectAndRow(ctx, tx, provider, cloned)
+		return nil, "", err
+	}
+	putErr := provider.Put(ctx, cloned.StorageKey, reader, blob.PutOptions{ContentType: source.ContentType})
+	_ = reader.Close()
+	if putErr != nil {
+		_ = DeleteObjectAndRow(ctx, tx, provider, cloned)
+		return nil, "", putErr
+	}
+
+	checksum := ""
+	if source.Checksum != nil {
+		checksum = *source.Checksum
+	}
+	if err := cloned.MarkReady(tx, source.SizeBytes, checksum); err != nil {
+		_ = DeleteObjectAndRow(ctx, tx, provider, cloned)
+		return nil, "", err
+	}
+	return cloned, cloned.StorageKey, nil
+}
+
 func ApplyBindResult(
 	ctx context.Context,
 	db *gorm.DB,
