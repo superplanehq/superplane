@@ -19,7 +19,7 @@ import {
   hostedCreditBalanceWarning,
   welcomeCreditUnusedExpiryNote,
 } from "../../lib/hostedCreditGrants";
-import { parseWelcomeCreditExpiresAt } from "../../lib/hostedCreditEmpty";
+import { isWelcomeCreditExpired } from "../../lib/hostedCreditEmpty";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 
@@ -29,6 +29,7 @@ export function OrganizationSettingsBillingPage() {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const grantsQuery = useOrganizationCreditGrants(organizationId);
   const organizationName = organization?.metadata?.name || "Organization";
+  const credit = billingCreditFromUsage(spend.data);
 
   usePageTitle(["Billing", organizationName]);
 
@@ -47,20 +48,37 @@ export function OrganizationSettingsBillingPage() {
       }
     >
       <BillingPageBody
-        billed={parseWorkOrderMetric(spend.data?.hostedBilledCents)}
+        {...credit}
         error={error}
         factoryKey={factoryKey}
         grants={grantsQuery.data?.grants ?? []}
         isLoading={isLoading}
         organizationId={organizationId}
-        purchased={parseWorkOrderMetric(spend.data?.purchasedCreditCents)}
-        remaining={parseWorkOrderMetric(spend.data?.remainingCreditCents)}
-        remainingCreditWarning={spend.data?.remainingCreditWarning === true}
-        superplaneGrant={parseWorkOrderMetric(spend.data?.superplaneGrantCents)}
-        welcomeCreditExpiresAt={spend.data?.welcomeCreditExpiresAt}
       />
     </FactorySettingsPageFrame>
   );
+}
+
+function billingCreditFromUsage(
+  data:
+    | {
+        hostedBilledCents?: string | number;
+        purchasedCreditCents?: string | number;
+        remainingCreditCents?: string | number;
+        remainingCreditWarning?: boolean;
+        superplaneGrantCents?: string | number;
+        welcomeCreditExpiresAt?: string;
+      }
+    | undefined,
+) {
+  return {
+    billed: parseWorkOrderMetric(data?.hostedBilledCents),
+    purchased: parseWorkOrderMetric(data?.purchasedCreditCents),
+    remaining: parseWorkOrderMetric(data?.remainingCreditCents),
+    remainingCreditWarning: data?.remainingCreditWarning === true,
+    superplaneGrant: parseWorkOrderMetric(data?.superplaneGrantCents),
+    welcomeCreditExpiresAt: data?.welcomeCreditExpiresAt,
+  };
 }
 
 function BillingPageBody({
@@ -104,9 +122,11 @@ function BillingPageBody({
     );
   }
 
-  const welcomeExpiresAt = parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt);
-  const welcomeExpired = welcomeExpiresAt != null && welcomeExpiresAt.getTime() <= Date.now();
-  const warning = hostedCreditBalanceWarning(remaining, remainingCreditWarning, welcomeExpired && purchased === 0);
+  const warning = hostedCreditBalanceWarning(
+    remaining,
+    remainingCreditWarning,
+    isWelcomeCreditExpired(welcomeCreditExpiresAt) && purchased === 0,
+  );
   const expiryNote = welcomeCreditUnusedExpiryNote({
     remainingCents: remaining,
     purchasedCents: purchased,

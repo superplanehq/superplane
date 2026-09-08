@@ -23,6 +23,11 @@ export function parseWelcomeCreditExpiresAt(value: string | undefined): Date | n
   return parsed;
 }
 
+export function isWelcomeCreditExpired(value: string | undefined, now: Date = new Date()): boolean {
+  const parsed = parseWelcomeCreditExpiresAt(value);
+  return parsed != null && parsed.getTime() <= now.getTime();
+}
+
 export function hostedCreditBannerKind(args: HostedCreditBannerInput): HostedCreditBannerKind | null {
   const remaining = parseWorkOrderMetric(args.remainingCreditCents);
   const purchased = parseWorkOrderMetric(args.purchasedCreditCents);
