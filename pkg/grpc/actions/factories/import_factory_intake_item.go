@@ -2,18 +2,22 @@ package factories
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	workersctx "github.com/superplanehq/superplane/pkg/workers/contexts"
+	"gorm.io/gorm"
 )
 
 func ImportFactoryIntakeItem(
@@ -73,15 +77,54 @@ func ImportFactoryIntakeItem(
 	}
 
 	origin := models.WorkOrderOrigin{URL: item.URL, Label: models.OriginLabelFromURL(item.URL)}
-	order, err := factory.CreateWorkOrderWithOrigin(
-		db,
-		item.Title,
-		item.Body,
-		&createdByID,
-		[]uuid.UUID{createdByID},
-		nil,
-		origin,
-	)
+	var order *models.FactoryWorkOrder
+	var bound storedfiles.BindResult
+	err = db.Transaction(func(tx *gorm.DB) error {
+		created, err := factory.CreateWorkOrderWithOrigin(
+			tx,
+			item.Title,
+			item.Body,
+			&createdByID,
+			[]uuid.UUID{createdByID},
+			nil,
+			origin,
+		)
+		if err != nil {
+			return err
+		}
+		order = created
+		body := item.Body
+		if fetcher, ok := source.(interface {
+			RemoteFetch(context.Context, *http.Request) (*http.Response, error)
+		}); ok {
+			ingested, ingestErr := storedfiles.IngestRemoteImages(
+				ctx,
+				tx,
+				blob.Current(),
+				fetcher.RemoteFetch,
+				blob.IsGitHubImageURL,
+				orgID,
+				factory.ID,
+				order.ID,
+				&createdByID,
+				body,
+			)
+			if ingestErr == nil {
+				body = ingested
+			}
+			if body != order.Description {
+				if err := order.UpdateContent(tx, nil, &body); err != nil {
+					return err
+				}
+			}
+		}
+		result, bindErr := storedfiles.BindDescriptionFiles(ctx, tx, blob.Current(), orgID, factory.ID, order.ID, order.Description)
+		bound = result
+		return bindErr
+	})
+	if delErr := storedfiles.ApplyBindResult(ctx, blob.Current(), bound, err); delErr != nil {
+		log.WithError(delErr).Warn("Failed to delete file objects after bind")
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to import factory intake item")
 	}

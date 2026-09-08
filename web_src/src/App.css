@@ -741,6 +741,15 @@
     text-decoration-color: var(--foreground);
   }
 
+  .workspace-markdown img,
+  .workspace-markdown .work-order-file-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-block: 0.75rem;
+    border-radius: 0.5rem;
+  }
+
   .workspace-markdown h1,
   .workspace-markdown h2,
   .workspace-markdown h3,
