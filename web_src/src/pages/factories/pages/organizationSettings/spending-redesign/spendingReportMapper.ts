@@ -75,8 +75,8 @@ export function mapSpendingExplorerReport(
       costCents: metric(totals?.costCents),
       tokens: metric(totals?.totalTokens),
       durationSeconds: metric(totals?.durationSeconds),
-      hostedCostCents: 0,
-      byokCostCents: 0,
+      hostedCostCents: metric(totals?.hostedCostCents),
+      byokCostCents: metric(totals?.byokCostCents),
     },
     series: (response.series ?? []).map((point) => ({
       key: point.key ?? "",
