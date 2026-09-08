@@ -183,7 +183,9 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
 
-  it("shows GitHub as connected when the workspace already saved this connection", () => {
+  // A connection bound before picker data was kept has nothing to pick from,
+  // so the screen falls back to the connected state.
+  it("shows GitHub as connected when the saved connection kept no picker data", () => {
     renderSetup(
       pageModel({
         openSection: "vcs",
@@ -197,22 +199,62 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
-  it("starts a new connect from the connected state to change the GitHub account", async () => {
+  /** The workspace's bound connection, with the picker data a bind keeps. */
+  function boundConnectionModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
+    const boundInstance = {
+      metadata: { id: "github-1", name: "github-acme", integrationName: "github" },
+      status: {
+        state: "ready",
+        metadata: {
+          owner: "acme",
+          startedByUserID: "user-1",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [
+            { id: "11", accountLogin: "acme" },
+            { id: "22", accountLogin: "octo" },
+          ],
+        },
+      },
+    };
+    return pageModel({
+      openSection: "vcs",
+      setup: { ...setupState(), vcsReady: true },
+      selectedVcsConnectionId: "github-1",
+      selectVcsConnection,
+      githubConnections: {
+        name: "github",
+        readyInstances: [boundInstance],
+        allInstances: [boundInstance],
+      },
+    });
+  }
+
+  it("reopens the account picker for the workspace's bound connection", () => {
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
+
+  it("moves the bound connection to another account through the picker", async () => {
     const user = userEvent.setup();
-    const createVcsConnection = vi.fn();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
 
-    renderSetup(
-      pageModel({
-        openSection: "vcs",
-        setup: { ...setupState(), vcsReady: true },
-        selectedVcsConnectionId: "github-1",
-        createVcsConnection,
-      }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
+    renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+
+    expect(bindMutate).toHaveBeenCalledWith(
+      { state: "csrf", installationId: "22" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
-
-    await user.click(screen.getByTestId("first-run-github-use-different"));
-    expect(createVcsConnection).toHaveBeenCalled();
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("github-1"));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
   });
 
   function bindablePageModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {

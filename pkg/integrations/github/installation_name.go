@@ -9,6 +9,11 @@ import (
 
 var generatedGitHubInstallationName = regexp.MustCompile(`^github(-[0-9]+)?$`)
 
+// ownerGitHubInstallationName matches names this package generated from a
+// GitHub owner (github-acme, github-acme (2), ...). A rebind to another
+// account regenerates such a name from the new owner.
+var ownerGitHubInstallationName = regexp.MustCompile(`^github-[a-z0-9][a-z0-9-]*( \([0-9]+\))?$`)
+
 // IsGeneratedInstallationName reports whether the name is the placeholder
 // created before GitHub bind (github, github-2, ...).
 func IsGeneratedInstallationName(name string) bool {
@@ -21,12 +26,14 @@ func OwnerInstallationName(owner string) string {
 }
 
 // GeneratedOwnerInstallationName returns the preferred github-<owner> name
-// when the connection still uses the generated placeholder.
+// when the connection uses the generated placeholder or a name generated
+// from a previous owner.
 func GeneratedOwnerInstallationName(integration *models.Integration) (string, bool) {
 	if integration == nil || integration.AppName != "github" {
 		return "", false
 	}
-	if !IsGeneratedInstallationName(integration.InstallationName) {
+	name := strings.TrimSpace(integration.InstallationName)
+	if !IsGeneratedInstallationName(name) && !ownerGitHubInstallationName.MatchString(name) {
 		return "", false
 	}
 
@@ -35,7 +42,14 @@ func GeneratedOwnerInstallationName(integration *models.Integration) (string, bo
 		return "", false
 	}
 
-	return OwnerInstallationName(owner), true
+	target := OwnerInstallationName(owner)
+	// The name already comes from this owner (with or without a uniqueness
+	// suffix), so a new assignment would only take the lock for nothing.
+	if name == target || strings.HasPrefix(name, target+" (") {
+		return "", false
+	}
+
+	return target, true
 }
 
 func githubOwnerFromMetadata(metadata map[string]any) string {

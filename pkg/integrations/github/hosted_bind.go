@@ -30,6 +30,11 @@ func (g *GitHub) bindHostedInstallationWith(
 	metadata common.Metadata,
 	installationID string,
 ) error {
+	// A rebind moves the connection to another account, so the owner below
+	// comes from the new installation.
+	if metadata.InstallationID != "" && metadata.InstallationID != installationID {
+		metadata.Owner = ""
+	}
 	metadata.InstallationID = installationID
 	client, err := newInstallationClient(integration, metadata.GitHubApp.ID, installationID)
 	if err != nil {
@@ -62,9 +67,10 @@ func (g *GitHub) bindHostedInstallationWith(
 		return fmt.Errorf("installation owner is empty for installation %s", installationID)
 	}
 
+	// State and PendingInstallations stay after bind. Onboarding reopens the
+	// account picker with them, so the member can move the connection to
+	// another GitHub account.
 	metadata.Repositories = repos
-	metadata.State = ""
-	metadata.PendingInstallations = nil
 	metadata.InstallRequested = false
 	metadata.InstallRequestedAccount = ""
 

@@ -40,6 +40,13 @@ type githubUserInstallation struct {
 	} `json:"account"`
 }
 
+// allowsRebind reports whether a bound hosted connection can move to another
+// installation: the CSRF state survived the first bind and the request
+// carries it.
+func allowsRebind(metadata common.Metadata, state string) bool {
+	return metadata.HostedApp && metadata.State != "" && state == metadata.State
+}
+
 func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 	metadata, ok := decodeHostedMetadata(ctx)
 	if !ok {
@@ -47,12 +54,15 @@ func (g *GitHub) afterHostedAppOAuth(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+
+	// A bound connection refreshes its account picker through OAuth when the
+	// state is valid, so the member can install the App on another account.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
 	if state == "" || state != metadata.State {
 		http.Error(ctx.Response, "invalid state", http.StatusBadRequest)
 		return
@@ -144,13 +154,17 @@ func (g *GitHub) afterHostedAppBind(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	if metadata.InstallationID != "" {
+	state := ctx.Request.URL.Query().Get("state")
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+
+	// A bound connection accepts a rebind with a valid state, so the
+	// onboarding account picker can move it to another account. A request
+	// without that state is a stale callback and goes back to settings.
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	state := ctx.Request.URL.Query().Get("state")
-	installationID := ctx.Request.URL.Query().Get("installation_id")
 	if state == "" || state != metadata.State || installationID == "" {
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
 		return

@@ -231,26 +231,8 @@ describe("FirstRunConnectScreen", () => {
 
     expect(screen.getByTestId("first-run-github-connected")).toHaveTextContent(FIRST_RUN_COPY.connect.connected);
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-github-use-different")).not.toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-github-continue"));
     expect(onContinue).toHaveBeenCalled();
-  });
-
-  it("offers a different GitHub account next to the connected state", async () => {
-    const user = userEvent.setup();
-    const onUseDifferentAccount = vi.fn();
-
-    render(
-      <FirstRunConnectScreen
-        githubConnected
-        onConnectGitHub={vi.fn()}
-        onUseDifferentAccount={onUseDifferentAccount}
-        onContinue={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByTestId("first-run-github-use-different"));
-    expect(onUseDifferentAccount).toHaveBeenCalled();
   });
 
   it("shows the account picker instead of the connected state while a new install is pending", () => {

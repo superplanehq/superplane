@@ -11,7 +11,7 @@ import {
 } from "@/lib/hostedGitHubInstall";
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
-import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
+import { githubAccountPickerFromConnection, pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -284,7 +284,14 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     "";
   // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
   // user. The /account id is the account, so a match would hide the picker.
-  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
+  // A bound connection keeps its picker data, so Back from the repository
+  // screen offers the accounts again instead of a dead connected state.
+  const selectedConnection = model.githubConnections.readyInstances.find(
+    (instance) => instance.metadata?.id === model.selectedVcsConnectionId,
+  );
+  const accountPicker =
+    pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
+    githubAccountPickerFromConnection(selectedConnection, me?.id);
 
   // Binding through a page redirect reloads the whole app and walks the user
   // through the connect screen again. Binding in place opens the repository
@@ -393,7 +400,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
-        onUseDifferentAccount={model.createVcsConnection}
         onContinue={() => flow.goToScreen("choose")}
       />
     );

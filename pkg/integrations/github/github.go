@@ -908,11 +908,17 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+	setupAction := ctx.Request.URL.Query().Get("setup_action")
+	state := ctx.Request.URL.Query().Get("state")
+
 	//
-	// App installation has already been set up.
-	// Just redirect to the SuperPlane app installation page.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
-	if metadata.InstallationID != "" {
+	if metadata.InstallationID != "" && !allowsRebind(metadata, state) {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
 		http.Redirect(
 			ctx.Response,
@@ -924,10 +930,6 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		)
 		return
 	}
-
-	installationID := ctx.Request.URL.Query().Get("installation_id")
-	setupAction := ctx.Request.URL.Query().Get("setup_action")
-	state := ctx.Request.URL.Query().Get("state")
 	if isInstallationRequestSetupAction(setupAction) {
 		if state != metadata.State {
 			ctx.Logger.Errorf("invalid installation ID or state")

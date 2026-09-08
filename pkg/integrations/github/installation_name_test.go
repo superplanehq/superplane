@@ -38,6 +38,31 @@ func Test__GeneratedOwnerInstallationName(t *testing.T) {
 	})
 	assert.False(t, ok)
 
+	// A rebind to another account regenerates a name from the new owner.
+	name, ok = GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "github",
+		InstallationName: "github-acme",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Octo"}),
+	})
+	assert.True(t, ok)
+	assert.Equal(t, "github-octo", name)
+
+	// A uniqueness suffix for the same owner stays untouched.
+	_, ok = GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "github",
+		InstallationName: "github-acme (2)",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Acme"}),
+	})
+	assert.False(t, ok)
+
+	// A name the user typed does not regenerate.
+	_, ok = GeneratedOwnerInstallationName(&models.Integration{
+		AppName:          "github",
+		InstallationName: "My GitHub",
+		Metadata:         datatypes.NewJSONType(map[string]any{"owner": "Octo"}),
+	})
+	assert.False(t, ok)
+
 	_, ok = GeneratedOwnerInstallationName(&models.Integration{
 		AppName:          "slack",
 		InstallationName: "github",
