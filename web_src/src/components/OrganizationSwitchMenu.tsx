@@ -2,6 +2,7 @@ import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import type { AccountOrganization } from "@/lib/accountOrganizations";
 import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
 import { Building2, Check, Plus } from "lucide-react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/ui/dropdownMenu";
@@ -28,6 +29,14 @@ export function OrganizationSwitchMenu({
   const organizationsQuery = useAccountOrganizations();
   const listedOrganizations = organizationsQuery.data ?? [];
   const organizations = readyAccountOrganizations(listedOrganizations);
+
+  // The menu mounts when it opens, and the cached list can miss an
+  // organization created or finished since the last fetch. Refetch on open;
+  // the cached list still shows while the fresh one loads.
+  const refetchOrganizations = organizationsQuery.refetch;
+  useEffect(() => {
+    void refetchOrganizations();
+  }, [refetchOrganizations]);
 
   const goToOrganization = (organization: AccountOrganization) => {
     const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);

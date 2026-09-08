@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 
@@ -114,7 +114,6 @@ function connectScreenState({
 }
 
 export function FirstRunConnectScreen({
-  githubConnected,
   installRequested = false,
   githubOrganization = "",
   pendingInstallations = [],
@@ -125,9 +124,7 @@ export function FirstRunConnectScreen({
   chrome,
   onConnectGitHub,
   onUseInstallation,
-  onContinue,
 }: {
-  githubConnected: boolean;
   installRequested?: boolean;
   githubOrganization?: string;
   pendingInstallations?: PendingGitHubInstallation[];
@@ -138,7 +135,6 @@ export function FirstRunConnectScreen({
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
-  onContinue: () => void;
 }) {
   const { showAccountPicker, waitingForApproval } = connectScreenState({
     installRequested,
@@ -155,7 +151,6 @@ export function FirstRunConnectScreen({
 
       <div className="mt-8 space-y-3">
         <ConnectScreenBody
-          githubConnected={githubConnected}
           githubOrganization={githubOrganization}
           pendingInstallations={pendingInstallations}
           githubState={githubState}
@@ -165,7 +160,6 @@ export function FirstRunConnectScreen({
           waitingForApproval={waitingForApproval}
           onConnectGitHub={onConnectGitHub}
           onUseInstallation={onUseInstallation}
-          onContinue={onContinue}
         />
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
         {connectError && !waitingForApproval ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
@@ -175,7 +169,6 @@ export function FirstRunConnectScreen({
 }
 
 function ConnectScreenBody({
-  githubConnected,
   githubOrganization,
   pendingInstallations,
   githubState,
@@ -185,9 +178,7 @@ function ConnectScreenBody({
   waitingForApproval,
   onConnectGitHub,
   onUseInstallation,
-  onContinue,
 }: {
-  githubConnected: boolean;
   githubOrganization: string;
   pendingInstallations: PendingGitHubInstallation[];
   githubState: string;
@@ -197,7 +188,6 @@ function ConnectScreenBody({
   waitingForApproval: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
-  onContinue: () => void;
 }) {
   if (showAccountPicker && onUseInstallation) {
     return (
@@ -214,44 +204,12 @@ function ConnectScreenBody({
     );
   }
 
-  if (waitingForApproval) {
-    return (
-      <>
-        <FirstRunInstallRequested githubOrganization={githubOrganization} />
-        {githubConnected ? (
-          <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
-            {copy.continue}
-          </Button>
-        ) : (
-          <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
-            {copy.connectGitHub}
-          </Button>
-        )}
-      </>
-    );
-  }
-
-  if (githubConnected) {
-    return (
-      <>
-        <div
-          className="flex items-center gap-3 rounded-md bg-accent/40 px-3 py-2.5 text-left"
-          data-testid="first-run-github-connected"
-        >
-          <IntegrationChoiceIcon name="github" />
-          <span className="text-[13px] font-medium">{copy.connected}</span>
-          <Check className="ml-auto size-3.5" strokeWidth={2.5} aria-hidden />
-        </div>
-        <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
-          {copy.continue}
-        </Button>
-      </>
-    );
-  }
-
   return (
-    <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
-      {copy.connectGitHub}
-    </Button>
+    <>
+      {waitingForApproval ? <FirstRunInstallRequested githubOrganization={githubOrganization} /> : null}
+      <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
+        {copy.connectGitHub}
+      </Button>
+    </>
   );
 }

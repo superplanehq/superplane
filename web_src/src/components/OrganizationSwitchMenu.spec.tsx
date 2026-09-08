@@ -26,6 +26,7 @@ const organizationsState = vi.hoisted(() => ({
   ],
   isLoading: false,
   isError: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({

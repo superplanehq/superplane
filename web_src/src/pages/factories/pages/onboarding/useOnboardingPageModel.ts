@@ -532,6 +532,10 @@ export function useOnboardingPageModel(args: {
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
+    // The account picker reads the connection list from the cache. A bind or
+    // an install finished outside this document leaves that cache stale, so
+    // the connect screen refetches when it opens.
+    refreshGithubConnections: connect.refetchConnections,
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
     createVcsConnection: () => connect.createNew("github"),

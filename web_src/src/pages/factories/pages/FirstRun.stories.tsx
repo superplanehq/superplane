@@ -35,41 +35,25 @@ export const Connect: Story = {
   render: () => <FirstRunFlow firstName="Ada" initialScreen="connect" />,
 };
 
-export const ConnectGitHubConnected: Story = {
-  name: "2b Connect GitHub (connected)",
-  render: () => (
-    <FirstRunConnectScreen
-      githubConnected
-      chrome={firstRunStoryChrome(1)}
-      onConnectGitHub={() => undefined}
-      onContinue={() => undefined}
-    />
-  ),
-};
-
 export const ConnectError: Story = {
-  name: "2c Connect GitHub (error)",
+  name: "2b Connect GitHub (error)",
   render: () => (
     <FirstRunConnectScreen
-      githubConnected={false}
       connectError={FIRST_RUN_COPY.connect.connectError}
       chrome={firstRunStoryChrome(1)}
       onConnectGitHub={() => undefined}
-      onContinue={() => undefined}
     />
   ),
 };
 
 export const ConnectInstallRequested: Story = {
-  name: "2d Connect GitHub (waiting for approval)",
+  name: "2c Connect GitHub (waiting for approval)",
   render: () => (
     <FirstRunConnectScreen
-      githubConnected={false}
       installRequested
       githubOrganization="acme"
       chrome={firstRunStoryChrome(1)}
       onConnectGitHub={() => undefined}
-      onContinue={() => undefined}
     />
   ),
 };

@@ -53,7 +53,7 @@ const navigateSpy = vi.fn();
 let accountOrganizations: Array<{ id: string; name: string; slug?: string }>;
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
-  useAccountOrganizations: () => ({ data: accountOrganizations }),
+  useAccountOrganizations: () => ({ data: accountOrganizations, refetch: vi.fn() }),
 }));
 
 vi.mock("react-router", async () => {
@@ -81,6 +81,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
+    refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
     createVcsConnection: vi.fn(),
@@ -184,8 +185,8 @@ describe("FirstRunSetup", () => {
   });
 
   // A connection bound before picker data was kept has nothing to pick from,
-  // so the screen falls back to the connected state.
-  it("shows GitHub as connected when the saved connection kept no picker data", () => {
+  // so the screen offers a new connect instead of a dead connected state.
+  it("asks to connect GitHub again when the saved connection kept no picker data", () => {
     renderSetup(
       pageModel({
         openSection: "vcs",
@@ -195,8 +196,25 @@ describe("FirstRunSetup", () => {
       "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
-    expect(screen.getByTestId("first-run-github-connected")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
+
+  // A resumed pending organization or workspace opens without a step in the
+  // URL. Setup then always starts on the welcome screen, even when earlier
+  // answers exist.
+  it("starts on the welcome screen when the URL carries no step", () => {
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        setup: { ...setupState(), vcsReady: true },
+        selectedVcsConnectionId: "github-1",
+      }),
+      "/org-1/workspaces/PAY/setup",
+    );
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
   });
 
   /** The workspace's bound connection, with the picker data a bind keeps. */

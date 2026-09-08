@@ -102,15 +102,6 @@ function signOut() {
   window.location.href = "/logout";
 }
 
-/** True when this workspace saved the ready GitHub connection it now uses. */
-function workspaceOwnsGithubConnection(
-  savedIntegrationId: string | undefined,
-  selectedIntegrationId: string | undefined,
-  vcsReady: boolean,
-): boolean {
-  return Boolean(savedIntegrationId && selectedIntegrationId === savedIntegrationId && vcsReady);
-}
-
 /**
  * Saves the connection the account picker bound, once the refreshed
  * connection list reports it ready. The bind callback runs before the list
@@ -136,6 +127,18 @@ function useSelectBoundGithubConnection(
       if (saved) onSelected();
     });
   }, [boundIntegrationId, clearBoundIntegrationId, readyInstances, selectConnection, onSelected]);
+}
+
+/**
+ * The GitHub account picker reads the connection list from the cache. An
+ * install or bind finished outside this document, or a browser Back, can
+ * leave that list stale, so entering the connect screen refetches it.
+ */
+function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refresh: () => Promise<unknown>) {
+  useEffect(() => {
+    if (screen !== "connect") return;
+    void refresh();
+  }, [screen, refresh]);
 }
 
 /** Reports a failed repository list, which the choose screen shows as empty. */
@@ -195,7 +198,7 @@ function AgentScreen({
  * stay presentational, so this hook holds every step that talks to the API.
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory, organizationId } = useFactoriesLayout();
+  const { organizationId } = useFactoriesLayout();
   const { data: me } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
@@ -205,7 +208,10 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
       return "connect";
     }
-    const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
+    // Only a provider round trip carries a step in the URL. A fresh visit,
+    // including a resumed pending organization or workspace, starts on the
+    // welcome screen.
+    const resumed = searchParams.get("step") !== null;
     return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
   });
   const openStep = useRef(model.openSection);
@@ -344,8 +350,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId, factoryId, factory, factories } = useFactoriesLayout();
+  const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
+  useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -386,11 +393,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        githubConnected={workspaceOwnsGithubConnection(
-          factory?.onboarding?.vcsIntegrationId,
-          model.selectedVcsConnectionId,
-          setup.vcsReady,
-        )}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
         pendingInstallations={flow.accountPicker?.installations}
@@ -400,7 +402,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
-        onContinue={() => flow.goToScreen("choose")}
       />
     );
   }
