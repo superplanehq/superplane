@@ -70,7 +70,7 @@ export function FirstRunChooseScreen({
             onClick={onContinue}
             data-testid="first-run-continue-to-tickets"
           >
-            {copy.continue}
+            {selectedRepository ? copy.continueReady : copy.continue}
           </Button>
           <p className="text-[12px] text-muted-foreground">{copy.moreLater}</p>
         </div>

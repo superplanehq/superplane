@@ -112,6 +112,24 @@ describe("FirstRunChooseScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeDisabled();
+    const continueButton = screen.getByTestId("first-run-continue-to-tickets");
+    expect(continueButton).toBeDisabled();
+    expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.choose.continue);
+  });
+
+  it("enables continue and shows the ready label when a repository is selected", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/repo"]}
+        selectedRepository="octo/repo"
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    const continueButton = screen.getByTestId("first-run-continue-to-tickets");
+    expect(continueButton).toBeEnabled();
+    expect(continueButton).toHaveTextContent(FIRST_RUN_COPY.choose.continueReady);
   });
 });
