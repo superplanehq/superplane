@@ -391,7 +391,7 @@ function useSelectOnboardingVcsConnection(args: {
   selectInstance: (integrationName: string, integrationId: string) => void;
 }) {
   const queryClient = useQueryClient();
-  return async (integrationId: string) => {
+  return async (integrationId: string): Promise<boolean> => {
     if (integrationId !== args.currentId) {
       const saved = await persistSelectedGithubConnection({
         setup: args.setup,
@@ -404,9 +404,10 @@ function useSelectOnboardingVcsConnection(args: {
         integrationId,
         previousId: args.currentId || args.factory?.onboarding?.vcsIntegrationId,
       });
-      if (!saved) return;
+      if (!saved) return false;
     }
     args.selectInstance("github", integrationId);
+    return true;
   };
 }
 

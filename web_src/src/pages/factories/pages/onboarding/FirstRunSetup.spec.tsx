@@ -84,7 +84,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
     createVcsConnection: vi.fn(),
-    selectVcsConnection: vi.fn(),
+    selectVcsConnection: vi.fn().mockResolvedValue(true),
     githubConnections: { name: "github", allInstances: [], readyInstances: [] },
     selectedVcsConnectionId: "github-1",
     requestConfigure: vi.fn(),
@@ -247,7 +247,7 @@ describe("FirstRunSetup", () => {
 
   it("saves the bound GitHub connection for a workspace of an existing organization", async () => {
     const user = userEvent.setup();
-    const selectVcsConnection = vi.fn().mockResolvedValue(undefined);
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
     factory = { id: "factory-1", onboarding: {} };
     bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
       options.onSuccess?.();
@@ -263,7 +263,7 @@ describe("FirstRunSetup", () => {
 
   it("saves the bound GitHub connection for the initial organization", async () => {
     const user = userEvent.setup();
-    const selectVcsConnection = vi.fn().mockResolvedValue(undefined);
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
     factory = { id: "factory-1", onboarding: { initial: true } };
     bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
       options.onSuccess?.();
@@ -275,6 +275,26 @@ describe("FirstRunSetup", () => {
 
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+  });
+
+  // Regression: the repository screen opened before the bound connection was
+  // saved, so a fast repository pick stored the repository on the prior
+  // connection. The screen must stay on connect when the save fails.
+  it("keeps the connect screen when the bound connection does not save", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(false);
+    factory = { id: "factory-1", onboarding: {} };
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
+
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
+    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
   });
 
   it("shows the GitHub account picker on the connect screen", () => {

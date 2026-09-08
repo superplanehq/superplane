@@ -114,12 +114,15 @@ function workspaceOwnsGithubConnection(
 /**
  * Saves the connection the account picker bound, once the refreshed
  * connection list reports it ready. The bind callback runs before the list
- * re-renders, so an effect makes the save see the ready connection.
+ * re-renders, so an effect makes the save see the ready connection. The
+ * repository screen opens only after the save, so a fast repository pick
+ * cannot store the prior connection.
  */
 function useSelectBoundGithubConnection(
   boundIntegrationId: string | null,
   clearBoundIntegrationId: () => void,
   model: OnboardingPageModel,
+  onSelected: () => void,
 ) {
   const readyInstances = model.githubConnections.readyInstances;
   const selectConnection = model.selectVcsConnection;
@@ -129,8 +132,10 @@ function useSelectBoundGithubConnection(
     const bound = readyInstances.some((instance) => instance.metadata?.id === boundIntegrationId);
     if (!bound) return;
     clearBoundIntegrationId();
-    void selectConnection(boundIntegrationId);
-  }, [boundIntegrationId, clearBoundIntegrationId, readyInstances, selectConnection]);
+    void selectConnection(boundIntegrationId).then((saved) => {
+      if (saved) onSelected();
+    });
+  }, [boundIntegrationId, clearBoundIntegrationId, readyInstances, selectConnection, onSelected]);
 }
 
 /** Reports a failed repository list, which the choose screen shows as empty. */
@@ -286,7 +291,12 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // screen directly once the connection is ready.
   const bindInstallation = useBindGitHubInstallation(organizationId);
   const [boundIntegrationId, setBoundIntegrationId] = useState<string | null>(null);
-  useSelectBoundGithubConnection(boundIntegrationId, () => setBoundIntegrationId(null), model);
+  useSelectBoundGithubConnection(
+    boundIntegrationId,
+    () => setBoundIntegrationId(null),
+    model,
+    () => goToScreen("choose"),
+  );
   const useInstallation = (installation: PendingGitHubInstallation) => {
     const state = accountPicker?.state;
     const pendingId = accountPicker?.id;
@@ -295,8 +305,11 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       { state, installationId: installation.id },
       {
         onSuccess: () => {
-          setBoundIntegrationId(pendingId ?? null);
-          goToScreen("choose");
+          if (!pendingId) {
+            goToScreen("choose");
+            return;
+          }
+          setBoundIntegrationId(pendingId);
         },
         onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
       },
