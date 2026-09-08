@@ -89,3 +89,15 @@ func serializeFactoryLLMModels(ids []string) []*pb.FactoryLLMModel {
 	}
 	return out
 }
+
+func serializeLineRunnerModels(ids []string) []*pb.FactoryLLMModel {
+	out := make([]*pb.FactoryLLMModel, 0, len(ids))
+	for _, id := range models.CompactModelIDs(ids) {
+		name := id
+		if parsed, err := models.ParseSelectableLLMModelKey(id); err == nil {
+			name = parsed.Label
+		}
+		out = append(out, &pb.FactoryLLMModel{Id: id, Name: name})
+	}
+	return out
+}

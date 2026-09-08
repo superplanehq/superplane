@@ -89,7 +89,7 @@ export const INTAKE_SEARCH_PARAM = "intake";
  * intakes on the same source, so the identifier is the intake, not the source.
  */
 export const INTAKE_ID_SEARCH_PARAM = "intakeId";
-/** Opens intake settings on a tab: general, runs, or automation. */
+/** Opens intake settings on a tab: general, agent, runs, or automation. */
 export const INTAKE_SETTINGS_SEARCH_PARAM = "settings";
 
 export function factoryIntakePath(
@@ -121,7 +121,7 @@ export function intakeSettingsTabFromSearch(search: string): string | null {
 }
 
 export const PR_FEEDBACK_SEARCH_PARAM = "prFeedback";
-/** Opens PR feedback settings on a tab: general or automation. */
+/** Opens PR feedback settings on a tab: general, agent, or automation. */
 export const PR_FEEDBACK_SETTINGS_SEARCH_PARAM = "prFeedbackSettings";
 export const PR_FEEDBACK_HANDLER_SEARCH_PARAM = "prFeedbackHandler";
 
@@ -156,6 +156,44 @@ export function prFeedbackSettingsTabFromSearch(search: string): string | null {
 export function prFeedbackHandlerIdFromSearch(search: string): string | null {
   const query = search.startsWith("?") ? search.slice(1) : search;
   return new URLSearchParams(query).get(PR_FEEDBACK_HANDLER_SEARCH_PARAM);
+}
+
+/** Opens the per-column Automations drawer. Value is a column key. */
+export const COLUMN_AUTOMATIONS_SEARCH_PARAM = "automations";
+
+export function factoryColumnAutomationsPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | null | undefined,
+  columnKey: string,
+) {
+  const params = new URLSearchParams();
+  params.set(COLUMN_AUTOMATIONS_SEARCH_PARAM, columnKey);
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function columnAutomationsKeyFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(COLUMN_AUTOMATIONS_SEARCH_PARAM);
+}
+
+/** Opens the column-automation view popup on the line board. Value is the canvas id. */
+export const COLUMN_AUTOMATION_VIEW_SEARCH_PARAM = "automationView";
+
+export function factoryColumnAutomationViewPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string | null | undefined,
+  canvasId: string,
+) {
+  const params = new URLSearchParams();
+  params.set(COLUMN_AUTOMATION_VIEW_SEARCH_PARAM, canvasId);
+  return `${factoryHomePath(organizationId, factoryKey, lineId)}?${params.toString()}`;
+}
+
+export function columnAutomationViewCanvasIdFromSearch(search: string): string | null {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(COLUMN_AUTOMATION_VIEW_SEARCH_PARAM);
 }
 
 export function factorySetupPath(organizationId: string, factoryKey: string) {

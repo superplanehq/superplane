@@ -13,7 +13,6 @@ import {
   agentsResetCanvasAgentChat,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
-import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import {
   fromApiChat,
   fromApiMessage,
@@ -32,10 +31,10 @@ export const agentChatKeys = {
 };
 
 const PAGE_SIZE = 50;
-const agentModeToApiMode = {
-  builder: "MODE_BUILDER",
-  operator: "MODE_OPERATOR",
-} as const;
+
+// The agent only supports the Build workflow; every message is sent in
+// builder mode so it can act on the canvas.
+const AGENT_CHAT_MODE = "MODE_BUILDER" as const;
 
 export function useCanvasAgentChat(
   canvasId: string | undefined,
@@ -99,13 +98,11 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
     mutationFn: async ({
       chatId,
       content,
-      mode,
       images,
       autoLayoutOnUpdateEnabled,
     }: {
       chatId: string;
       content: string;
-      mode?: AgentMode;
       images?: AgentOutgoingImage[];
       autoLayoutOnUpdateEnabled?: boolean;
     }) => {
@@ -115,7 +112,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
           path: { chatId },
           body: {
             content,
-            mode: mode ? agentModeToApiMode[mode] : undefined,
+            mode: AGENT_CHAT_MODE,
             autoLayoutOnUpdateEnabled,
             images: images && images.length > 0 ? images : undefined,
           },
@@ -123,7 +120,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       );
       return fromApiMessage(response.data?.message, chatId, organizationId);
     },
-    onMutate: ({ chatId, content, mode, images }) => {
+    onMutate: ({ chatId, content, images }) => {
       const submittedAt = Date.now();
       const optimisticMessage: AgentMessage = {
         id: `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -139,8 +136,8 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         createdAt: new Date().toISOString(),
       };
       upsertAgentMessageInCache(queryClient, chatId, optimisticMessage);
-      analytics.agentMessageSendSubmitted(chatId, canvasId, organizationId, mode);
-      return { mode, optimisticMessageId: optimisticMessage.id, submittedAt };
+      analytics.agentMessageSendSubmitted(chatId, canvasId, organizationId);
+      return { optimisticMessageId: optimisticMessage.id, submittedAt };
     },
     onSuccess: (data, variables, context) => {
       if (context?.optimisticMessageId) {
@@ -151,7 +148,6 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
           variables.chatId,
           canvasId,
           organizationId,
-          context.mode,
           Date.now() - context.submittedAt,
         );
       }
@@ -162,13 +158,7 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
         removeAgentMessageFromCache(queryClient, variables.chatId, context.optimisticMessageId);
       }
       if (context?.submittedAt) {
-        analytics.agentMessageSendFailed(
-          variables.chatId,
-          canvasId,
-          organizationId,
-          context.mode,
-          Date.now() - context.submittedAt,
-        );
+        analytics.agentMessageSendFailed(variables.chatId, canvasId, organizationId, Date.now() - context.submittedAt);
       }
     },
   });

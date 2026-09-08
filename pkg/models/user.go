@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type User struct {
@@ -22,6 +24,7 @@ type User struct {
 	TokenHash       string
 	APIKeyExpiresAt *time.Time                  `gorm:"column:api_key_expires_at"`
 	APIKeyCanvasIDs datatypes.JSONSlice[string] `gorm:"column:api_key_canvas_ids"`
+	IsOwner         bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       gorm.DeletedAt
@@ -434,6 +437,8 @@ func FindOrganizationsForAccount(email string) ([]Organization, error) {
 		Joins("JOIN users ON organizations.id = users.organization_id").
 		Where("users.email = ?", utils.NormalizeEmail(email)).
 		Where("users.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL").
+		Order("organizations.created_at DESC").
 		Find(&organizations).
 		Error
 
@@ -542,6 +547,63 @@ func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*
 	}
 
 	return &user, nil
+}
+
+func SetUserIsOwner(tx *gorm.DB, userID uuid.UUID, isOwner bool) error {
+	return tx.Model(&User{}).Where("id = ?", userID).Update("is_owner", isOwner).Error
+}
+
+var ErrLastOrganizationOwner = errors.New("cannot remove the last organization owner")
+
+func ListOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	var users []User
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("is_owner = ?", true).
+		Where("type = ?", UserTypeHuman).
+		Order("id").
+		Find(&users).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func LockOrganizationOwners(tx *gorm.DB, orgID uuid.UUID) ([]User, error) {
+	return ListOrganizationOwners(tx.Clauses(clause.Locking{Strength: "UPDATE"}), orgID)
+}
+
+func RefuseIfLastOrganizationOwner(tx *gorm.DB, orgID, userID uuid.UUID) error {
+	owners, err := LockOrganizationOwners(tx, orgID)
+	if err != nil {
+		return err
+	}
+
+	if len(owners) > 1 {
+		return nil
+	}
+
+	for i := range owners {
+		if owners[i].ID == userID {
+			return ErrLastOrganizationOwner
+		}
+	}
+
+	return nil
+}
+
+func ListOrganizationOwnerIDs(tx *gorm.DB, orgID uuid.UUID) ([]string, error) {
+	owners, err := ListOrganizationOwners(tx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(owners))
+	for i := range owners {
+		ids = append(ids, owners[i].ID.String())
+	}
+	return ids, nil
 }
 
 type UserAccountProvider struct {

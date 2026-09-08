@@ -1090,6 +1090,19 @@ CREATE TABLE public.user_canvas_preferences (
 
 
 --
+-- Name: user_last_locations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.user_last_locations (
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    path text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: user_notification_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1123,7 +1136,8 @@ CREATE TABLE public.users (
     description text,
     created_by uuid,
     api_key_expires_at timestamp without time zone,
-    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL
+    api_key_canvas_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    is_owner boolean DEFAULT false NOT NULL
 );
 
 
@@ -2040,6 +2054,14 @@ ALTER TABLE ONLY public.user_api_tokens
 
 ALTER TABLE ONLY public.user_canvas_preferences
     ADD CONSTRAINT user_canvas_preferences_pkey PRIMARY KEY (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: user_last_locations user_last_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_pkey PRIMARY KEY (organization_id, user_id);
 
 
 --
@@ -3891,6 +3913,22 @@ ALTER TABLE ONLY public.user_canvas_preferences
 
 
 --
+-- Name: user_last_locations user_last_locations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_last_locations user_last_locations_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_last_locations
+    ADD CONSTRAINT user_last_locations_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user_notification_settings user_notification_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4234,7 +4272,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260905194301	f
+20260907234117	f
 \.
 
 
@@ -4270,7 +4308,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260709012138	f
+20260907234118	f
 \.
 
 

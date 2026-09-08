@@ -3,7 +3,7 @@ import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useAccount } from "@/contexts/useAccount";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
-import { organizationMatchesRoute, organizationRouteId } from "@/lib/accountOrganizations";
+import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
@@ -55,7 +55,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isOrganizationSwitchOpen, setIsOrganizationSwitchOpen] = useState(false);
   const accountOrganizationsQuery = useAccountOrganizations();
-  const accountOrganizations = accountOrganizationsQuery.data ?? [];
+  const listedOrganizations = accountOrganizationsQuery.data ?? [];
+  const accountOrganizations = readyAccountOrganizations(listedOrganizations);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleMenuButtonClick = () => {
@@ -303,7 +304,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       ) : null}
                       {!accountOrganizationsQuery.isLoading &&
                       !accountOrganizationsQuery.isError &&
-                      accountOrganizations.length === 0 ? (
+                      listedOrganizations.length === 0 ? (
                         <p className="px-1.5 py-1 text-sm text-gray-500">No organizations available.</p>
                       ) : null}
                       {accountOrganizations.map((accountOrganization) => {

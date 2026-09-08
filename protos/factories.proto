@@ -930,6 +930,7 @@ message FactoryIntake {
     SOURCE_GITHUB_ISSUES = 1;
     SOURCE_SENTRY_EXCEPTIONS = 2;
     SOURCE_PAGERDUTY_INCIDENTS = 3;
+    SOURCE_PRODUCTIVE_TASKS = 4;
   }
 
   // Settings that change what the intake does. They are stored in the canvas
@@ -1018,6 +1019,9 @@ message CreateFactoryIntakeRequest {
   // Defaults to a name derived from the source when empty.
   string name = 3;
   optional int32 confidence_pct = 4;
+  // Optional integration and source resource selected during guided setup.
+  string integration_id = 5;
+  string resource_id = 6;
 }
 
 message CreateFactoryIntakeResponse {

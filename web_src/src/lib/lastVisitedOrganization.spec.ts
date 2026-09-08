@@ -3,6 +3,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import {
   LAST_VISITED_ORGANIZATION_STORAGE_KEY,
   pickAutoRedirectOrganization,
+  pickResumePath,
   readLastVisitedOrganization,
   recordLastVisitedOrganization,
 } from "./lastVisitedOrganization";
@@ -71,9 +72,32 @@ describe("pickAutoRedirectOrganization", () => {
     expect(pickAutoRedirectOrganization([], "org-a")).toBeNull();
   });
 
+  it("picks the organization with the newest saved screen when last visited is gone", () => {
+    expect(
+      pickAutoRedirectOrganization(
+        [
+          { slug: "old-zombie" },
+          { slug: "puppies-inc", lastLocationUpdatedAt: "2026-02-20T10:00:00.000Z" },
+          { slug: "acme", lastLocationUpdatedAt: "2026-09-01T10:00:00.000Z" },
+        ],
+        "old-zombie-gone",
+      ),
+    ).toBe("acme");
+  });
+
   it("never returns a raw UID: the single-organization branch trusts the caller's slug field", () => {
     // Callers must map their data to `{ slug }` before calling this helper;
     // once they do, only slugs ever come out, even for a single organization.
     expect(pickAutoRedirectOrganization([{ slug: "acme" }], null)).toBe("acme");
+  });
+});
+
+describe("pickResumePath", () => {
+  it("prefers the first safe path that belongs to the organization", () => {
+    expect(pickResumePath("acme", "/other/apps", "/acme/apps/deploy?run=1")).toBe("/acme/apps/deploy?run=1");
+  });
+
+  it("returns null when no candidate belongs to the organization", () => {
+    expect(pickResumePath("acme", "/other/apps", "//evil.com")).toBeNull();
   });
 });

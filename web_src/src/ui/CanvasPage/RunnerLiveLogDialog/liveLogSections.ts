@@ -1,3 +1,5 @@
+import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
+
 import type { CommandSection, CommandSectionEvent, CommandTool, LogState } from "./types";
 
 export type CommandStart = {
@@ -65,6 +67,9 @@ export function appendLineToLatestSection(
   text: string,
   replayLineSkip?: Map<number, number>,
 ): LogState {
+  if (isRawAgentTurnLiveLogText(text)) {
+    return state;
+  }
   if (state.sections.length === 0) {
     return {
       ...state,

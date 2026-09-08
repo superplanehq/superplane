@@ -10,6 +10,10 @@ import {
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
   factoryPRFeedbackPath,
+  factoryColumnAutomationsPath,
+  factoryColumnAutomationViewPath,
+  columnAutomationsKeyFromSearch,
+  columnAutomationViewCanvasIdFromSearch,
   intakeSettingsTabFromSearch,
   intakeIdFromSearch,
   isIntakeSearchOpen,
@@ -144,6 +148,36 @@ describe("factoryPRFeedbackPath", () => {
       "/org-1/workspaces/SP/lines/line-plan?prFeedback=1&prFeedbackHandler=handler-1",
     );
     expect(prFeedbackHandlerIdFromSearch("?prFeedback=1&prFeedbackHandler=handler-1")).toBe("handler-1");
+  });
+});
+
+describe("factoryColumnAutomationsPath", () => {
+  it("opens the line board on a column automations drawer", () => {
+    expect(factoryColumnAutomationsPath("org-1", "SP", "line-plan", "backlog")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?automations=backlog",
+    );
+    expect(factoryColumnAutomationsPath("org-1", "SP", "line-plan", "phase-0")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?automations=phase-0",
+    );
+  });
+
+  it("reads the column key from the search string", () => {
+    expect(columnAutomationsKeyFromSearch("?automations=verify")).toBe("verify");
+    expect(columnAutomationsKeyFromSearch("automations=done")).toBe("done");
+    expect(columnAutomationsKeyFromSearch("")).toBeNull();
+  });
+});
+
+describe("factoryColumnAutomationViewPath", () => {
+  it("opens the line board on the automation view popup", () => {
+    expect(factoryColumnAutomationViewPath("org-1", "SP", "line-plan", "app-refund-implementer")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan?automationView=app-refund-implementer",
+    );
+  });
+
+  it("reads the canvas id from the search string", () => {
+    expect(columnAutomationViewCanvasIdFromSearch("?automationView=app-1")).toBe("app-1");
+    expect(columnAutomationViewCanvasIdFromSearch("automations=phase-0")).toBeNull();
   });
 });
 

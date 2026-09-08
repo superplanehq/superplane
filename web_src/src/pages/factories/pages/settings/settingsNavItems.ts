@@ -43,6 +43,11 @@ export interface FactorySettingsNavItem {
    * Find settings matches these in addition to the nav label and group label.
    */
   keywords?: string[];
+  /**
+   * When set, hide this item unless the current user can perform the action.
+   * Account pages stay ungated.
+   */
+  permission?: { resource: string; action: string };
 }
 
 export interface FactorySettingsNavGroup {
@@ -124,6 +129,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Grid3x3,
         scope: "workspace",
         section: "general",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "name",
           "workspace key",
@@ -142,6 +148,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Blocks,
         scope: "workspace",
         section: "repository",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "github repository",
           "repo",
@@ -158,6 +165,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Workflow,
         scope: "workspace",
         section: "automations",
+        permission: { resource: "factories", action: "update" },
         keywords: ["new automation", "triggers", "lines", "canvas", "canvases"],
       },
       {
@@ -166,6 +174,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Cpu,
         scope: "workspace",
         section: "models",
+        permission: { resource: "factories", action: "update" },
         keywords: [
           "llm",
           "ai",
@@ -192,6 +201,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Settings,
         scope: "organization",
         section: "general",
+        permission: { resource: "org", action: "read" },
         keywords: ["name", "organization slug", "slug", "workspace url"],
       },
       {
@@ -200,6 +210,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Users,
         scope: "organization",
         section: "members",
+        permission: { resource: "members", action: "read" },
         keywords: [
           "invite",
           "invite link",
@@ -220,6 +231,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Plug,
         scope: "organization",
         section: "integrations",
+        permission: { resource: "integrations", action: "read" },
         keywords: ["connect", "filter integrations", "github", "slack", "request it"],
       },
       {
@@ -228,6 +240,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Cpu,
         scope: "organization",
         section: "models",
+        permission: { resource: "org", action: "read" },
         keywords: [
           "llm",
           "ai",
@@ -248,6 +261,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: KeyRound,
         scope: "organization",
         section: "api-keys",
+        permission: { resource: "api_keys", action: "read" },
         keywords: [
           "create api key",
           "programmatic access",
@@ -268,6 +282,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: Key,
         scope: "organization",
         section: "secrets",
+        permission: { resource: "secrets", action: "read" },
         keywords: ["create secret", "secret name", "key-value pairs", "credentials", "env"],
       },
       {
@@ -292,6 +307,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: BarChart3,
         scope: "organization",
         section: "spending",
+        permission: { resource: "org", action: "read" },
         keywords: [
           "usage",
           "cost",
@@ -359,4 +375,26 @@ export function factorySettingsRouteFromPathname(pathname: string) {
   const scope = segments[settingsIndex + 1];
   const section = segments[settingsIndex + 2];
   return FACTORY_SETTINGS_NAV_ITEMS.find((item) => item.scope === scope && item.section === section);
+}
+
+export function filterFactorySettingsNavGroupsByPermission(
+  groups: FactorySettingsNavGroup[],
+  canAct: (resource: string, action: string) => boolean,
+  permissionsLoading: boolean,
+): FactorySettingsNavGroup[] {
+  if (permissionsLoading) {
+    return groups;
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (!item.permission) {
+          return true;
+        }
+        return canAct(item.permission.resource, item.permission.action);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 }

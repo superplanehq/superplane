@@ -1,3 +1,4 @@
+import { isRawAgentTurnLiveLogText } from "@/lib/agentRunTelemetry";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
@@ -128,9 +129,11 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
       <div className="border-t border-slate-200 bg-white px-4 py-2 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
         {section.events.map((event, index) =>
           event.kind === "note" ? (
-            <p key={`note-${index}`} className="whitespace-pre-wrap">
-              {event.text}
-            </p>
+            isRawAgentTurnLiveLogText(event.text) ? null : (
+              <p key={`note-${index}`} className="whitespace-pre-wrap">
+                {event.text}
+              </p>
+            )
           ) : (
             <ul key={event.id} className="mt-1 space-y-1">
               {event.tools.map((tool) => (
@@ -155,7 +158,7 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
 
   return (
     <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200 dark:text-gray-200 dark:bg-gray-900 dark:border-gray-800">
-      {section.lines.filter((line) => line.trim() !== "").join("\n")}
+      {section.lines.filter((line) => line.trim() !== "" && !isRawAgentTurnLiveLogText(line)).join("\n")}
     </pre>
   );
 }

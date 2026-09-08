@@ -4,6 +4,7 @@ import {
   organizationMatchesRoute,
   organizationRouteId,
   parseAccountOrganizations,
+  readyAccountOrganizations,
   selectedOrganizationRouteId,
 } from "./accountOrganizations";
 
@@ -11,19 +12,48 @@ describe("parseAccountOrganizations", () => {
   it("keeps organizations that have an id and a name, including slug when present", () => {
     expect(
       parseAccountOrganizations([
-        { id: "org-uuid", slug: "demo", name: "Demo" },
+        {
+          id: "org-uuid",
+          slug: "demo",
+          name: "Demo",
+          lastLocationPath: "/demo/apps/deploy",
+          lastLocationUpdatedAt: "2026-09-07T12:00:00.000Z",
+        },
         { id: "org-1", name: "SuperPlane" },
         { id: 2, name: "skip-me" },
         { name: "missing-id" },
       ]),
     ).toEqual([
-      { id: "org-uuid", slug: "demo", name: "Demo" },
+      {
+        id: "org-uuid",
+        slug: "demo",
+        name: "Demo",
+        lastLocationPath: "/demo/apps/deploy",
+        lastLocationUpdatedAt: "2026-09-07T12:00:00.000Z",
+      },
       { id: "org-1", name: "SuperPlane" },
     ]);
   });
 
   it("returns an empty list when the body is not an array", () => {
     expect(parseAccountOrganizations({ id: "org-1" })).toEqual([]);
+  });
+
+  it("keeps the unfinished initial onboarding flag", () => {
+    expect(parseAccountOrganizations([{ id: "org-pending", name: "Pending", initialOnboardingPending: true }])).toEqual(
+      [{ id: "org-pending", name: "Pending", initialOnboardingPending: true }],
+    );
+  });
+});
+
+describe("readyAccountOrganizations", () => {
+  it("hides organizations that did not finish first-run setup", () => {
+    expect(
+      readyAccountOrganizations([
+        { id: "org-ready", name: "Ready" },
+        { id: "org-pending", name: "Pending", initialOnboardingPending: true },
+      ]),
+    ).toEqual([{ id: "org-ready", name: "Ready" }]);
   });
 });
 
