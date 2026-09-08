@@ -217,7 +217,7 @@ export const runnerMapper: ComponentBaseMapper = {
   },
 };
 
-export const claudeCodeMapper: ComponentBaseMapper = {
+export const agentHarnessMapper: ComponentBaseMapper = {
   ...runnerMapper,
   props(context: ComponentBaseContext): ComponentBaseProps {
     const props = runnerMapper.props(context);
