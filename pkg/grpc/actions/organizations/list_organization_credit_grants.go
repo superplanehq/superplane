@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -50,6 +51,7 @@ func serializeOrganizationCreditGrant(
 		AmountCents: models.SignedMicrosToCents(grant.AmountMicros),
 		Note:        grant.Note,
 		CreatedAt:   timestamppb.New(grant.CreatedAt),
+		ExpiresAt:   protoTimestamp(grant.ExpiresAt),
 	}
 	if grant.ActorAccountID != nil {
 		item.ActorName = actorNames[*grant.ActorAccountID]
@@ -58,4 +60,11 @@ func serializeOrganizationCreditGrant(
 		item.PolarOrderId = *grant.PolarOrderID
 	}
 	return item
+}
+
+func protoTimestamp(value *time.Time) *timestamppb.Timestamp {
+	if value == nil || value.IsZero() {
+		return nil
+	}
+	return timestamppb.New(*value)
 }

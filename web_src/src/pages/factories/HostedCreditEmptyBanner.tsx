@@ -4,7 +4,11 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { hostedCreditEmptyBannerCopy } from "./lib/hostedCreditEmpty";
+import {
+  hostedCreditBannerCopy,
+  parseWelcomeCreditExpiresAt,
+  type HostedCreditBannerKind,
+} from "./lib/hostedCreditEmpty";
 
 interface HostedCreditEmptyBannerProps {
   billingEnabled: boolean;
@@ -12,15 +16,25 @@ interface HostedCreditEmptyBannerProps {
   canManageBilling?: boolean;
   spendingHref: string;
   className?: string;
+  kind?: HostedCreditBannerKind;
+  remainingCreditCents?: number;
+  welcomeCreditExpiresAt?: string;
 }
 
 export function HostedCreditEmptyBanner({
   billingEnabled,
-  canManageBilling = true,
   spendingHref,
   className,
+  kind = "empty",
+  remainingCreditCents = 0,
+  welcomeCreditExpiresAt,
 }: HostedCreditEmptyBannerProps) {
-  const copy = hostedCreditEmptyBannerCopy(billingEnabled, canManageBilling);
+  const copy = hostedCreditBannerCopy({
+    kind,
+    billingEnabled,
+    remainingCreditCents,
+    welcomeCreditExpiresAt: parseWelcomeCreditExpiresAt(welcomeCreditExpiresAt) ?? undefined,
+  });
 
   return (
     <div

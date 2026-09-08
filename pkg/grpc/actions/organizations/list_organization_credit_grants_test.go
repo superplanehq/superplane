@@ -54,6 +54,9 @@ func Test__ListOrganizationCreditGrants(t *testing.T) {
 
 		assert.Equal(t, models.LLMCreditGrantKindWelcome, resp.Grants[3].Kind)
 		assert.Equal(t, int64(models.DefaultWelcomeGrantCents), resp.Grants[3].AmountCents)
-		assert.Empty(t, resp.Grants[3].ActorName)
+		assert.Equal(t, r.Account.Name, resp.Grants[3].ActorName)
+		require.NotNil(t, resp.Grants[3].ExpiresAt)
+		assert.Nil(t, resp.Grants[2].ExpiresAt)
+		assert.Nil(t, resp.Grants[1].ExpiresAt)
 	})
 }
