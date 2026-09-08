@@ -3,14 +3,11 @@ import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useMe } from "@/hooks/useMe";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { getApiErrorMessage } from "@/lib/errors";
-import {
-  hostedGitHubInstallRequested,
-  hostedGitHubInstallRequestedAccount,
-  type PendingGitHubInstallation,
-} from "@/lib/hostedGitHubInstall";
+import { hostedGitHubInstallRequested, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
 import {
+  firstRunGithubOrganization,
   githubAccountPickerFromConnection,
   pendingGitHubAccountPicker,
   pendingGitHubRequestedPicker,
@@ -229,7 +226,11 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const accountPicker =
     pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
     githubAccountPickerFromConnection(selectedConnection, me?.id) ??
-    pendingGitHubRequestedPicker(model.githubConnections.allInstances, me?.id);
+    pendingGitHubRequestedPicker(
+      model.githubConnections.allInstances,
+      me?.id,
+      searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() || "",
+    );
 
   // Only a GitHub round trip or a waiting install request lands on the
   // account picker page. A fresh pass opens the Connect GitHub page.
@@ -293,12 +294,11 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // opens the connect screen, which shows the waiting state.
   useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
 
-  const githubOrganization =
-    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
-    model.githubConnections.allInstances
-      .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
-      .find((account) => account !== "") ||
-    "";
+  const githubOrganization = firstRunGithubOrganization(
+    searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() || "",
+    accountPicker,
+    model.githubConnections.allInstances,
+  );
   // Binding through a page redirect reloads the whole app and walks the user
   // through the connect screen again. Binding in place opens the repository
   // screen directly once the connection is ready.

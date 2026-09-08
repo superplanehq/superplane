@@ -335,6 +335,49 @@ describe("FirstRunSetup GitHub picker", () => {
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
+  it("names the waiting organization from the request that has state", () => {
+    const earlierWithoutState = {
+      metadata: { id: "int-stale", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          installRequested: true,
+          installRequestedAccount: "acme",
+        },
+      },
+    };
+    const laterWithState = {
+      metadata: { id: "int-live", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          startedByGitHubLogin: "ada",
+          installRequested: true,
+          installRequestedAccount: "globex",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+        },
+      },
+    };
+
+    renderSetup(
+      pageModel({
+        openSection: "vcs",
+        githubConnections: {
+          name: "github",
+          allInstances: [earlierWithoutState, laterWithState],
+          readyInstances: [],
+        },
+      }),
+      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("globex");
+  });
+
   it("names the GitHub organization from the return query", () => {
     renderSetup(
       pageModel({ openSection: "vcs" }),
