@@ -72,7 +72,22 @@ type OrganizationLLMCreditSummary struct {
 	WelcomeCreditExpiresAt *time.Time
 }
 
-func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
+func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
+	if accountID == uuid.Nil {
+		return errors.New("account is required for welcome credit")
+	}
+
+	var account Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", accountID).
+		First(&account).Error
+	if err != nil {
+		return err
+	}
+	if account.HasReceivedWelcomeCredit() {
+		return nil
+	}
+
 	settings, err := GetInstallationLLMSettings(tx)
 	if err != nil {
 		return err
@@ -82,33 +97,41 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
 		return nil
 	}
 
+	now := time.Now()
 	var existing OrganizationLLMCreditGrant
 	err = tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
 		First(&existing).Error
 	if err == nil {
-		return nil
+		return stampWelcomeCreditGrantedAt(tx, accountID, existing.CreatedAt)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
-	now := time.Now()
 	expiresAt := now.Add(DefaultWelcomeGrantTTL)
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
 		Kind:           LLMCreditGrantKindWelcome,
 		AmountMicros:   amount,
+		ActorAccountID: &accountID,
 		CreatedAt:      now,
 		ExpiresAt:      &expiresAt,
 	}
 	if err := tx.Create(&grant).Error; err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil
+			return stampWelcomeCreditGrantedAt(tx, accountID, now)
 		}
 		return err
 	}
-	return nil
+
+	return stampWelcomeCreditGrantedAt(tx, accountID, now)
+}
+
+func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt time.Time) error {
+	return tx.Model(&Account{}).
+		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
+		Update("welcome_credit_granted_at", grantedAt).Error
 }
 
 func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, note string, actorAccountID *uuid.UUID) (*OrganizationLLMCreditGrant, error) {

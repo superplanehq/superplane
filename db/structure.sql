@@ -120,7 +120,8 @@ CREATE TABLE public.accounts (
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
     blocked_at timestamp with time zone,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    welcome_credit_granted_at timestamp with time zone
 );
 
 
@@ -4273,7 +4274,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260908154946	f
+20260908161327	f
 \.
 
 

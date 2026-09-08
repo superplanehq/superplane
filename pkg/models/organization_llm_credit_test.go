@@ -31,10 +31,14 @@ func Test__WelcomeGrantOnOrgCreate(t *testing.T) {
 	assert.Equal(t, summary.GrantMicros, summary.RemainingMicros)
 	assert.False(t, summary.Warning)
 
-	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID))
+	require.NoError(t, models.GrantWelcomeCredit(db, r.Organization.ID, r.Account.ID))
 	again, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
 	require.NoError(t, err)
 	assert.Equal(t, summary.GrantMicros, again.GrantMicros)
+
+	account, err := models.FindAccountByID(r.Account.ID.String())
+	require.NoError(t, err)
+	assert.True(t, account.HasReceivedWelcomeCredit())
 }
 
 func Test__WelcomeGrantSetsExpiresAt(t *testing.T) {
@@ -111,6 +115,74 @@ func expireWelcomeGrant(t *testing.T, db *gorm.DB, orgID uuid.UUID) {
 		Update("expires_at", expired).Error)
 }
 
+func Test__WelcomeGrantOnlyOncePerAccount(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	r := support.Setup(t)
+	db := database.Conn()
+
+	second, err := models.CreateOrganization(support.RandomName("org"), "")
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, second.ID, r.Account.ID))
+
+	first, err := models.DescribeOrganizationLLMCredit(db, r.Organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), first.GrantMicros)
+
+	skipped, err := models.DescribeOrganizationLLMCredit(db, second.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), skipped.GrantMicros)
+
+	viaSupport := support.CreateOrganization(t, r, r.User)
+	viaSupportSummary, err := models.DescribeOrganizationLLMCredit(db, viaSupport.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), viaSupportSummary.GrantMicros)
+
+	other, err := models.CreateAccount("Other User", "other-welcome@example.com")
+	require.NoError(t, err)
+	third, err := models.CreateOrganization(support.RandomName("org"), "")
+	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, third.ID, other.ID))
+
+	granted, err := models.DescribeOrganizationLLMCredit(db, third.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), granted.GrantMicros)
+
+	reloaded, err := models.FindAccountByID(other.ID.String())
+	require.NoError(t, err)
+	assert.True(t, reloaded.HasReceivedWelcomeCredit())
+}
+
+func Test__WelcomeGrantStampsAccountWhenOrgAlreadyHasWelcome(t *testing.T) {
+	restoreInstallationLLMSettings(t)
+	db := database.Conn()
+
+	account, err := models.CreateAccount("Legacy Welcome", "legacy-welcome@example.com")
+	require.NoError(t, err)
+	org, err := models.CreateOrganization(support.RandomName("org"), "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	expiresAt := now.Add(models.DefaultWelcomeGrantTTL)
+	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: org.ID,
+		Kind:           models.LLMCreditGrantKindWelcome,
+		AmountMicros:   models.CentsToMicros(models.DefaultWelcomeGrantCents),
+		CreatedAt:      now,
+		ExpiresAt:      &expiresAt,
+	}).Error)
+
+	require.NoError(t, models.GrantWelcomeCredit(db, org.ID, account.ID))
+
+	summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), summary.GrantMicros)
+
+	reloaded, err := models.FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	assert.True(t, reloaded.HasReceivedWelcomeCredit())
+}
+
 func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
 	restoreInstallationLLMSettings(t)
 	_ = support.Setup(t)
@@ -123,12 +195,19 @@ func Test__WelcomeGrantSkippedWhenAmountIsZero(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	account, err := models.CreateAccount("Zero Welcome", "zero-welcome@example.com")
+	require.NoError(t, err)
 	org, err := models.CreateOrganization(support.RandomName("org"), "")
 	require.NoError(t, err)
+	require.NoError(t, models.GrantWelcomeCredit(db, org.ID, account.ID))
 
 	summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), summary.GrantMicros)
+
+	reloaded, err := models.FindAccountByID(account.ID.String())
+	require.NoError(t, err)
+	assert.False(t, reloaded.HasReceivedWelcomeCredit())
 }
 
 func Test__AdminGrantRestoresHostedCredit(t *testing.T) {
