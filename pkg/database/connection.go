@@ -224,7 +224,8 @@ func TruncateTables() error {
 			agent_session_messages,
 			factory_planning_sessions,
 			factory_planning_session_messages,
-			factory_planning_session_work_orders
+			factory_planning_session_work_orders,
+			files
 		restart identity cascade;
 	`).Error
 }
