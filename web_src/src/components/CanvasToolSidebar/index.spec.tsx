@@ -111,8 +111,6 @@ function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
-    agentMode: "operator" as const,
-    switchAgentMode: vi.fn(),
     ...overrides,
   };
 }
@@ -146,7 +144,7 @@ describe("CanvasToolSidebar", () => {
 
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ markAgentAvailable })} />);
 
-    expect(await screen.findByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Describe the change to build...")).toBeInTheDocument();
     await waitFor(() => expect(markAgentAvailable).toHaveBeenCalledTimes(1));
   });
 
@@ -233,7 +231,6 @@ describe("CanvasToolSidebar", () => {
     expect(sendMutation.mutateAsync).toHaveBeenCalledWith({
       chatId: "chat-1",
       content: "retry",
-      mode: "operator",
       images: [],
       autoLayoutOnUpdateEnabled: false,
     });
@@ -242,13 +239,13 @@ describe("CanvasToolSidebar", () => {
   it("does not render when managed agents are disabled", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("does not render while the sidebar is closed", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState({ isToolSidebarOpen: false })} />);
 
-    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Describe the change to build...")).not.toBeInTheDocument();
   });
 
   it("opens the sidebar when the agent tab event is dispatched", () => {
