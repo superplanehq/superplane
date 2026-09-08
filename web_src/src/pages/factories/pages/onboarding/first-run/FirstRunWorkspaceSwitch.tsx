@@ -22,11 +22,7 @@ export function FirstRunWorkspaceSwitch({
   return <FirstRunWorkspaceSwitchMenu switcher={switcher} />;
 }
 
-function FirstRunWorkspaceSwitchMenu({
-  switcher,
-}: {
-  switcher: NonNullable<FirstRunChrome["workspaceSwitch"]>;
-}) {
+function FirstRunWorkspaceSwitchMenu({ switcher }: { switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> }) {
   const navigate = useNavigate();
   const copy = FIRST_RUN_COPY.chrome;
   const [open, setOpen] = useState(false);
