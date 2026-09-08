@@ -284,7 +284,7 @@ func TestDeleteAccount_LeavesOwnedButUncreatedOrg(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, models.SetOrganizationCreatedByAccount(database.Conn(), r.Organization.ID, other.ID))
 
-	ownerIDs, err := r.AuthService.GetOrgUsersForRole(t.Context(), models.RoleOrgOwner, r.Organization.ID.String())
+	ownerIDs, err := models.ListOrganizationOwnerIDs(database.Conn(), r.Organization.ID)
 	require.NoError(t, err)
 	require.Contains(t, ownerIDs, r.User.String())
 
@@ -351,7 +351,7 @@ func TestDeleteAccount_RemovesOrganizationRoles(t *testing.T) {
 	server.Router.ServeHTTP(res, req)
 	require.Equal(t, http.StatusNoContent, res.Code)
 
-	ownerIDs, err := r.AuthService.GetOrgUsersForRole(t.Context(), models.RoleOrgOwner, r.Organization.ID.String())
+	ownerIDs, err := models.ListOrganizationOwnerIDs(database.Conn(), r.Organization.ID)
 	require.NoError(t, err)
 	assert.NotContains(t, ownerIDs, r.User.String())
 }
@@ -369,7 +369,7 @@ func TestDeleteAccount_RefusesLastLivingOwnerAfterDeletedOwner(t *testing.T) {
 
 	otherUser, err := models.CreateUserInTransaction(database.Conn(), r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 	require.NoError(t, err)
-	require.NoError(t, r.AuthService.AssignRole(otherUser.ID.String(), models.RoleOrgOwner, r.Organization.ID.String(), models.DomainTypeOrganization))
+	require.NoError(t, models.SetUserIsOwner(database.Conn(), otherUser.ID, true))
 
 	firstServer, _, firstToken := setupTestServer(r, t)
 	body, err := json.Marshal(map[string]string{"email": r.Account.Email})
