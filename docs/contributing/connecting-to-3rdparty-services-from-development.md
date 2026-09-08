@@ -82,24 +82,18 @@ that points at a stable public tunnel.
 
 ### 1. Start a stable tunnel
 
-Use one HTTPS URL that does not change across restarts. A new URL forces a
-new GitHub App or a full rewrite of the callback and webhook fields.
+The tunnel URL must be stable. A URL that changes on restart forces a new
+GitHub App or a rewrite of the callback and webhook fields.
 
-Prefer Cloudflare when ngrok blocks your account or shows an interstitial:
-
-```bash
-cloudflared tunnel --url http://localhost:8000
-```
-
-Copy the `https://<name>.trycloudflare.com` URL. Set both values in `.env`:
+Set both values in `.env` to the same HTTPS tunnel URL:
 
 ```env
-BASE_URL=https://<name>.trycloudflare.com
-WEBHOOKS_BASE_URL=https://<name>.trycloudflare.com
+BASE_URL=https://<stable-tunnel-url>
+WEBHOOKS_BASE_URL=https://<stable-tunnel-url>
 ```
 
-If you already have a stable ngrok domain, use that URL instead. See the
-ngrok steps above. Restart SuperPlane after you change these values.
+Restart SuperPlane after you change these values. See the tunnel steps
+above if you still need to expose `localhost:8000`.
 
 ### 2. Create a public GitHub App
 
