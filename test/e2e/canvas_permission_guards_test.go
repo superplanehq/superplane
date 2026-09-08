@@ -15,22 +15,31 @@ import (
 )
 
 func TestCanvasPermissionGuards(t *testing.T) {
-	t.Run("viewer can read canvas but cannot enter edit mode", func(t *testing.T) {
+	t.Run("operator can read canvas but cannot enter edit mode", func(t *testing.T) {
 		steps := &canvasPermissionGuardSteps{t: t}
 		steps.start()
-		steps.givenACanvasExists("Viewer Read Only Canvas")
-		steps.loginAsViewer()
+		steps.givenACanvasExists("Operator Read Only Canvas")
+		steps.loginAsOperator()
 		steps.visitCanvas()
 		steps.assertEditDisabled()
 		steps.assertNoStagingActions()
 	})
 
-	t.Run("viewer cannot open agent without agent permissions", func(t *testing.T) {
+	t.Run("operator cannot open canvas configure by URL", func(t *testing.T) {
+		steps := &canvasPermissionGuardSteps{t: t}
+		steps.start()
+		steps.givenACanvasExists("Operator Configure Guard Canvas")
+		steps.loginAsOperator()
+		steps.visitCanvasEditURL()
+		steps.assertPermissionDenied()
+	})
+
+	t.Run("operator cannot open agent without agent permissions", func(t *testing.T) {
 		steps := &canvasPermissionGuardSteps{t: t}
 		steps.start()
 		steps.enableAgentFeature()
-		steps.givenACanvasExists("Viewer Agent Guard Canvas")
-		steps.loginAsViewer()
+		steps.givenACanvasExists("Operator Agent Guard Canvas")
+		steps.loginAsOperator()
 		steps.visitCanvas()
 		steps.assertAgentHidden()
 	})
@@ -69,8 +78,8 @@ func (s *canvasPermissionGuardSteps) enableAgentFeature() {
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureClaudeManagedAgents))
 }
 
-func (s *canvasPermissionGuardSteps) loginAsViewer() {
-	loginAsViewer(s.t, s.session)
+func (s *canvasPermissionGuardSteps) loginAsOperator() {
+	loginAsOperator(s.t, s.session)
 }
 
 func (s *canvasPermissionGuardSteps) loginWithCanvasPermissions(roleLabel string, permissions ...*permissionSpec) {
@@ -79,6 +88,15 @@ func (s *canvasPermissionGuardSteps) loginWithCanvasPermissions(roleLabel string
 
 func (s *canvasPermissionGuardSteps) visitCanvas() {
 	s.canvas.Visit()
+}
+
+func (s *canvasPermissionGuardSteps) visitCanvasEditURL() {
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?edit=1")
+}
+
+func (s *canvasPermissionGuardSteps) assertPermissionDenied() {
+	s.session.AssertVisible(q.TestID("permission-denied-page"))
+	s.session.AssertText("Permission denied")
 }
 
 func (s *canvasPermissionGuardSteps) enterEditMode() {
@@ -127,8 +145,8 @@ func organizationPermission(resource, action string) *permissionSpec {
 	return &permissionSpec{resource: resource, action: action}
 }
 
-func loginAsViewer(t *testing.T, sess *session.TestSession) {
-	account := createAccountForRole(t, sess, "viewer", models.RoleOrgViewer)
+func loginAsOperator(t *testing.T, sess *session.TestSession) {
+	account := createAccountForRole(t, sess, "operator", models.RoleOrgOperator)
 	sess.Account = account
 	sess.Login()
 }
@@ -158,7 +176,7 @@ func loginWithOrganizationPermissions(t *testing.T, sess *session.TestSession, r
 		Description: "E2E permission guard role",
 		Permissions: rolePermissions,
 		InheritsFrom: &authorization.RoleDefinition{
-			Name:       models.RoleOrgViewer,
+			Name:       models.RoleOrgOperator,
 			DomainType: models.DomainTypeOrganization,
 		},
 	})

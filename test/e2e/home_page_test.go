@@ -29,22 +29,22 @@ func TestHomePage(t *testing.T) {
 		steps.AssertCanvasFolderVisible("Deployments", "Foldered Canvas")
 	})
 
-	t.Run("viewer cannot create canvases from empty home", func(t *testing.T) {
+	t.Run("operator cannot create canvases from empty home", func(t *testing.T) {
 		steps := &TestHomePageSteps{t: t}
 		steps.Start()
-		steps.LoginAsViewer()
+		steps.LoginAsOperator()
 		steps.VisitHomePage()
 		steps.AssertEmptyHomeVisible()
 		steps.AssertNewAppDisabled()
 		steps.AssertNotRedirectedToNewApp()
 	})
 
-	t.Run("viewer cannot open new app page directly", func(t *testing.T) {
+	t.Run("operator cannot open new app page directly", func(t *testing.T) {
 		steps := &TestHomePageSteps{t: t}
 		steps.Start()
-		steps.LoginAsViewer()
+		steps.LoginAsOperator()
 		steps.VisitNewAppPage()
-		steps.AssertNewAppPageNotFound()
+		steps.AssertNewAppPagePermissionDenied()
 	})
 
 	t.Run("canvas creator without update cannot create inside a folder", func(t *testing.T) {
@@ -93,8 +93,9 @@ func (steps *TestHomePageSteps) AssertNotRedirectedToNewApp() {
 	assert.NotContains(steps.t, url, "/apps/new")
 }
 
-func (steps *TestHomePageSteps) AssertNewAppPageNotFound() {
-	steps.session.AssertText("404")
+func (steps *TestHomePageSteps) AssertNewAppPagePermissionDenied() {
+	steps.session.AssertVisible(q.TestID("permission-denied-page"))
+	steps.session.AssertText("Permission denied")
 	steps.session.AssertHidden(q.Text("Create a blank app"))
 }
 
@@ -142,8 +143,8 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 	steps.session.AssertText(canvasName)
 }
 
-func (steps *TestHomePageSteps) LoginAsViewer() {
-	loginAsViewer(steps.t, steps.session)
+func (steps *TestHomePageSteps) LoginAsOperator() {
+	loginAsOperator(steps.t, steps.session)
 }
 
 func (steps *TestHomePageSteps) LoginWithCanvasPermissions(roleLabel string, permissions ...*permissionSpec) {
