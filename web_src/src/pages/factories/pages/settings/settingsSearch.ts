@@ -129,7 +129,14 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   // Organization · API keys / Secrets / Spending
   entry("organization", "api-keys", "API keys", undefined, ["create api key", "token", "credentials", "programmatic"]),
   entry("organization", "secrets", "Secrets", undefined, ["create secret", "credentials", "env", "key-value"]),
-  entry("organization", "spending", "Spending", undefined, ["billing", "usage", "credit", "hosted credit", "byok"]),
+  entry("organization", "spending", "Spending", undefined, [
+    "billing",
+    "usage",
+    "credit",
+    "hosted credit",
+    "your keys",
+    "superplane-hosted",
+  ]),
 ];
 
 function entry(

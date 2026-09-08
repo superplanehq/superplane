@@ -20,7 +20,13 @@ import { OrganizationSettingsWorkspaceUsagePage } from "./OrganizationSettingsWo
 function reportResponse(costCents: string) {
   return {
     data: {
-      kpiTotals: { costCents, totalTokens: "100", durationSeconds: "10" },
+      kpiTotals: {
+        costCents,
+        totalTokens: "100",
+        durationSeconds: "10",
+        hostedCostCents: costCents,
+        byokCostCents: "0",
+      },
       explorerTotals: { costCents, totalTokens: "100", durationSeconds: "10" },
       series: [],
       seriesKeys: [],
@@ -108,7 +114,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     const { unmount } = renderPage(queryClient);
 
     await waitFor(() => expect(loadingState()).not.toBeInTheDocument());
-    expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$1.00");
+    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00");
 
     unmount();
 
@@ -126,7 +132,7 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
     // The previously loaded report is visible immediately: no full-page
     // loading swap.
     expect(loadingState()).not.toBeInTheDocument();
-    expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$1.00");
+    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$1.00");
     await waitFor(() => expect(refetchIndicator()).toBeInTheDocument());
 
     await act(async () => {
@@ -135,6 +141,6 @@ describe("OrganizationSettingsWorkspaceUsagePage", () => {
 
     await waitFor(() => expect(refetchIndicator()).not.toBeInTheDocument());
     expect(loadingState()).not.toBeInTheDocument();
-    expect(screen.getByTestId("spending-kpi-spend")).toHaveTextContent("$2.50");
+    expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("$2.50");
   });
 });

@@ -17,6 +17,8 @@ export interface StorybookSpendingReport {
     costCents: string;
     totalTokens: string;
     durationSeconds: string;
+    hostedCostCents?: string;
+    byokCostCents?: string;
   };
   series: Array<{
     key: string;
@@ -63,6 +65,8 @@ export const DEFAULT_ORG_SPENDING_REPORT: StorybookSpendingReport = {
     costCents: "6200",
     totalTokens: "3200000",
     durationSeconds: "0",
+    hostedCostCents: "4524",
+    byokCostCents: "1676",
   },
   series: [
     {
@@ -119,6 +123,8 @@ export const EMPTY_ORG_SPENDING_REPORT: StorybookSpendingReport = {
     costCents: "0",
     totalTokens: "0",
     durationSeconds: "0",
+    hostedCostCents: "0",
+    byokCostCents: "0",
   },
   series: [],
   seriesKeys: [],
