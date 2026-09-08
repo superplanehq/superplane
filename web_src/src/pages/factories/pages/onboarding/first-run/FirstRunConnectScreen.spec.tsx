@@ -234,4 +234,21 @@ describe("FirstRunConnectScreen", () => {
     await user.click(screen.getByTestId("first-run-github-continue"));
     expect(onContinue).toHaveBeenCalled();
   });
+
+  it("shows the account picker instead of the connected state while a new install is pending", () => {
+    render(
+      <FirstRunConnectScreen
+        githubConnected
+        pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
+        githubState="csrf"
+        githubAppSlug="superplane"
+        onConnectGitHub={vi.fn()}
+        onUseInstallation={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
 });

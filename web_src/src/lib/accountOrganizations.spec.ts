@@ -4,6 +4,7 @@ import {
   organizationMatchesRoute,
   organizationRouteId,
   parseAccountOrganizations,
+  readyAccountOrganizations,
   selectedOrganizationRouteId,
 } from "./accountOrganizations";
 
@@ -36,6 +37,23 @@ describe("parseAccountOrganizations", () => {
 
   it("returns an empty list when the body is not an array", () => {
     expect(parseAccountOrganizations({ id: "org-1" })).toEqual([]);
+  });
+
+  it("keeps the unfinished initial onboarding flag", () => {
+    expect(parseAccountOrganizations([{ id: "org-pending", name: "Pending", initialOnboardingPending: true }])).toEqual(
+      [{ id: "org-pending", name: "Pending", initialOnboardingPending: true }],
+    );
+  });
+});
+
+describe("readyAccountOrganizations", () => {
+  it("hides organizations that did not finish first-run setup", () => {
+    expect(
+      readyAccountOrganizations([
+        { id: "org-ready", name: "Ready" },
+        { id: "org-pending", name: "Pending", initialOnboardingPending: true },
+      ]),
+    ).toEqual([{ id: "org-ready", name: "Ready" }]);
   });
 });
 

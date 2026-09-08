@@ -74,7 +74,20 @@ export function FirstRunShell({
       </div>
 
       <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
-        <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>{children}</div>
+        <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>
+          {children}
+          {chrome?.onBack ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-4 text-muted-foreground hover:text-foreground"
+              onClick={chrome.onBack}
+              data-testid="first-run-back"
+            >
+              {copy.back}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {chrome ? (
