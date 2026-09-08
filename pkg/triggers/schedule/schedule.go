@@ -701,8 +701,14 @@ func nextDaysTrigger(interval int, hour int, minute int, now time.Time) (*time.T
 
 	nowInTZ := now
 
-	nextTrigger := nowInTZ.AddDate(0, 0, interval)
-	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), nextTrigger.Day(), hour, minute, 0, 0, nextTrigger.Location())
+	// Occurrence of the specified time today (same pattern as nextHoursTrigger).
+	nextTrigger := time.Date(nowInTZ.Year(), nowInTZ.Month(), nowInTZ.Day(), hour, minute, 0, 0, nowInTZ.Location())
+
+	// If that occurrence is still in the future, fire today.
+	// Otherwise (the time has already passed), advance by the configured interval.
+	if !nextTrigger.After(nowInTZ) {
+		nextTrigger = nextTrigger.AddDate(0, 0, interval)
+	}
 
 	utcResult := nextTrigger.UTC()
 	return &utcResult, nil
@@ -762,9 +768,16 @@ func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now t
 	}
 
 	nowInTZ := now
-	nextTriggerMonths := interval
-	nextTrigger := nowInTZ.AddDate(0, nextTriggerMonths, 0)
-	nextTrigger = time.Date(nextTrigger.Year(), nextTrigger.Month(), dayOfMonth, hour, minute, 0, 0, nextTrigger.Location())
+
+	// Occurrence of the specified day/time this month (same pattern as nextHoursTrigger).
+	nextTrigger := time.Date(nowInTZ.Year(), nowInTZ.Month(), dayOfMonth, hour, minute, 0, 0, nowInTZ.Location())
+
+	// If that occurrence is still in the future, fire this month.
+	// Otherwise (the day/time has already passed), advance by the configured interval.
+	if !nextTrigger.After(nowInTZ) {
+		advanced := nowInTZ.AddDate(0, interval, 0)
+		nextTrigger = time.Date(advanced.Year(), advanced.Month(), dayOfMonth, hour, minute, 0, 0, advanced.Location())
+	}
 
 	utcResult := nextTrigger.UTC()
 	return &utcResult, nil
