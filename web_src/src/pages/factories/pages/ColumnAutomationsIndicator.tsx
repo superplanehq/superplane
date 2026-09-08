@@ -1,10 +1,6 @@
 import { emptyColumnAutomationActivity } from "../lib/columnAutomationActivity";
-import type { ColumnAutomation } from "../lib/columnAutomations";
-import {
-  automationOffersAgentEdit,
-  ColumnAutomationsPopup,
-  type ColumnAutomationRowAction,
-} from "./ColumnAutomationsPopup";
+import { automationOffersAgentEdit, type ColumnAutomation } from "../lib/columnAutomations";
+import { ColumnAutomationsPopup, type ColumnAutomationRowAction } from "./ColumnAutomationsPopup";
 
 /** One header icon for each configured automation. */
 export function ColumnAutomationsHeaderSlot({

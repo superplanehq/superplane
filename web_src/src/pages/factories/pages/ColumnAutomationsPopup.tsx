@@ -207,7 +207,3 @@ function ColumnAutomationActivitySummary({ activity }: { activity: ColumnAutomat
     </span>
   );
 }
-
-export function automationOffersAgentEdit(automation: ColumnAutomation): boolean {
-  return automation.kind === "agent-step" || automation.kind === "analysis";
-}
