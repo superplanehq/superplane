@@ -65,19 +65,65 @@ export function shouldShowHostedCreditEmptyBanner(args: HostedCreditBannerInput)
   return hostedCreditBannerKind(args) != null;
 }
 
+export type HostedCreditBannerTone = "info" | "warning";
+
+export interface HostedCreditBannerCopy {
+  title: string;
+  description: string;
+  actionLabel: string;
+  remainingLabel?: string;
+  expiryLabel?: string;
+  tone: HostedCreditBannerTone;
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 export function welcomeCreditExpirySentence(expiresAt: Date, now: Date = new Date()): string {
   const ms = expiresAt.getTime() - now.getTime();
   if (ms <= 0) {
     return "Free hosted credit expired.";
   }
-  if (ms < 24 * 60 * 60 * 1000) {
+  if (ms < ONE_DAY_MS) {
     return "It expires today.";
   }
-  const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+  const days = Math.ceil(ms / ONE_DAY_MS);
   if (days === 1) {
     return "It expires in 1 day.";
   }
   return `It expires in ${days} days.`;
+}
+
+/** Short expiry label for scannable trial chrome. */
+export function welcomeCreditExpiryLabel(expiresAt: Date, now: Date = new Date()): string {
+  const ms = expiresAt.getTime() - now.getTime();
+  if (ms <= 0) {
+    return "Expired";
+  }
+  if (ms < ONE_DAY_MS) {
+    return "Expires today";
+  }
+  const days = Math.ceil(ms / ONE_DAY_MS);
+  if (days === 1) {
+    return "1 day remaining";
+  }
+  return `${days} days remaining`;
+}
+
+export function hostedCreditBannerTone(
+  kind: HostedCreditBannerKind,
+  welcomeCreditExpiresAt?: Date,
+  now: Date = new Date(),
+): HostedCreditBannerTone {
+  if (kind !== "trial") {
+    return "warning";
+  }
+  if (!welcomeCreditExpiresAt) {
+    return "info";
+  }
+  if (welcomeCreditExpiresAt.getTime() - now.getTime() <= ONE_DAY_MS) {
+    return "warning";
+  }
+  return "info";
 }
 
 export function hostedCreditBannerCopy(args: {
@@ -86,51 +132,60 @@ export function hostedCreditBannerCopy(args: {
   remainingCreditCents?: number;
   welcomeCreditExpiresAt?: Date;
   now?: Date;
-}): {
-  title: string;
-  description: string;
-  actionLabel: string;
-} {
+}): HostedCreditBannerCopy {
+  const now = args.now ?? new Date();
+  const tone = hostedCreditBannerTone(args.kind, args.welcomeCreditExpiresAt, now);
+
   if (args.kind === "trial") {
-    const expiry = args.welcomeCreditExpiresAt
-      ? welcomeCreditExpirySentence(args.welcomeCreditExpiresAt, args.now ?? new Date())
+    const remaining = formatUsdCents(args.remainingCreditCents ?? 0);
+    const expirySentence = args.welcomeCreditExpiresAt
+      ? welcomeCreditExpirySentence(args.welcomeCreditExpiresAt, now)
       : "It expires in 14 days.";
+    const expiryLabel = args.welcomeCreditExpiresAt
+      ? welcomeCreditExpiryLabel(args.welcomeCreditExpiresAt, now)
+      : "14 days remaining";
     return {
       title: "Trial",
-      description: `You have ${formatUsdCents(args.remainingCreditCents ?? 0)} of free hosted credit. ${expiry} Open Billing to buy more credit.`,
-      actionLabel: "Open billing",
+      description: `You have ${remaining} of free hosted credit. ${expirySentence}`,
+      remainingLabel: `${remaining} remaining`,
+      expiryLabel,
+      actionLabel: "Add credits",
+      tone,
     };
   }
 
   if (args.kind === "trial-empty") {
     return {
       title: "Trial credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Open Billing to buy hosted credit.",
-      actionLabel: "Open billing",
+      description: "SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone,
     };
   }
 
   if (args.kind === "trial-expired") {
     return {
       title: "Trial ended",
-      description:
-        "Free hosted credit expired. SuperPlane-hosted runs cannot start. Open Billing to buy hosted credit.",
-      actionLabel: "Open billing",
+      description: "Free hosted credit expired. SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone,
     };
   }
 
   if (args.billingEnabled) {
     return {
       title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
-      actionLabel: "View billing",
+      description: "SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone,
     };
   }
 
   return {
     title: "Hosted credit is empty",
     description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-    actionLabel: "View billing",
+    actionLabel: "Add credits",
+    tone,
   };
 }
 
@@ -140,10 +195,6 @@ export function hostedCreditBannerCopy(args: {
 export function hostedCreditEmptyBannerCopy(
   billingEnabled: boolean,
   _canManageBilling: boolean = true,
-): {
-  title: string;
-  description: string;
-  actionLabel: string;
-} {
+): HostedCreditBannerCopy {
   return hostedCreditBannerCopy({ kind: "empty", billingEnabled });
 }

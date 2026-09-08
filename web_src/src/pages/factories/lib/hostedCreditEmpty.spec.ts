@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   hostedCreditBannerCopy,
   hostedCreditBannerKind,
+  hostedCreditBannerTone,
   hostedCreditEmptyBannerCopy,
   shouldShowHostedCreditEmptyBanner,
+  welcomeCreditExpiryLabel,
   welcomeCreditExpirySentence,
 } from "./hostedCreditEmpty";
 
@@ -130,6 +132,30 @@ describe("welcomeCreditExpirySentence", () => {
   });
 });
 
+describe("welcomeCreditExpiryLabel", () => {
+  it("names today, one day, and many days as short labels", () => {
+    expect(welcomeCreditExpiryLabel(new Date("2026-09-08T18:00:00.000Z"), now)).toBe("Expires today");
+    expect(welcomeCreditExpiryLabel(new Date("2026-09-09T12:00:00.000Z"), now)).toBe("1 day remaining");
+    expect(welcomeCreditExpiryLabel(new Date(inFourteenDays), now)).toBe("14 days remaining");
+  });
+});
+
+describe("hostedCreditBannerTone", () => {
+  it("keeps a healthy trial informational", () => {
+    expect(hostedCreditBannerTone("trial", new Date(inFourteenDays), now)).toBe("info");
+  });
+
+  it("warns when the trial expires today", () => {
+    expect(hostedCreditBannerTone("trial", new Date("2026-09-08T18:00:00.000Z"), now)).toBe("warning");
+  });
+
+  it("warns when hosted runs cannot start", () => {
+    expect(hostedCreditBannerTone("trial-empty")).toBe("warning");
+    expect(hostedCreditBannerTone("trial-expired")).toBe("warning");
+    expect(hostedCreditBannerTone("empty")).toBe("warning");
+  });
+});
+
 describe("hostedCreditBannerCopy", () => {
   it("names remaining trial credit and the expiry window", () => {
     expect(
@@ -142,25 +168,29 @@ describe("hostedCreditBannerCopy", () => {
       }),
     ).toEqual({
       title: "Trial",
-      description: "You have $41.24 of free hosted credit. It expires in 14 days. Open Billing to buy more credit.",
-      actionLabel: "Open billing",
+      description: "You have $41.24 of free hosted credit. It expires in 14 days.",
+      remainingLabel: "$41.24 remaining",
+      expiryLabel: "14 days remaining",
+      actionLabel: "Add credits",
+      tone: "info",
     });
   });
 
   it("tells the user to buy credit when the trial is empty", () => {
     expect(hostedCreditBannerCopy({ kind: "trial-empty", billingEnabled: true })).toEqual({
       title: "Trial credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Open Billing to buy hosted credit.",
-      actionLabel: "Open billing",
+      description: "SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 
   it("tells the user the trial ended", () => {
     expect(hostedCreditBannerCopy({ kind: "trial-expired", billingEnabled: true })).toEqual({
       title: "Trial ended",
-      description:
-        "Free hosted credit expired. SuperPlane-hosted runs cannot start. Open Billing to buy hosted credit.",
-      actionLabel: "Open billing",
+      description: "Free hosted credit expired. SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 });
@@ -169,8 +199,9 @@ describe("hostedCreditEmptyBannerCopy", () => {
   it("tells the user to view billing when billing is on", () => {
     expect(hostedCreditEmptyBannerCopy(true)).toEqual({
       title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
-      actionLabel: "View billing",
+      description: "SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 
@@ -178,15 +209,17 @@ describe("hostedCreditEmptyBannerCopy", () => {
     expect(hostedCreditEmptyBannerCopy(false)).toEqual({
       title: "Hosted credit is empty",
       description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-      actionLabel: "View billing",
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 
   it("points every role to Billing", () => {
     expect(hostedCreditEmptyBannerCopy(true, false)).toEqual({
       title: "Hosted credit is empty",
-      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
-      actionLabel: "View billing",
+      description: "SuperPlane-hosted runs cannot start.",
+      actionLabel: "Add credits",
+      tone: "warning",
     });
   });
 });

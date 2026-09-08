@@ -33,7 +33,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Trial");
     expect(banner).toHaveTextContent("$41.24");
-    expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
@@ -67,8 +67,8 @@ describe("WorkOrdersPage hosted credit banner", () => {
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Trial credit is empty");
-    expect(banner).toHaveTextContent("SuperPlane-hosted runs cannot start. Open Billing to buy hosted credit.");
-    expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute(
+    expect(banner).toHaveTextContent("SuperPlane-hosted runs cannot start.");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );
@@ -102,7 +102,7 @@ describe("WorkOrdersPage hosted credit banner", () => {
 
     const banner = await screen.findByTestId("hosted-credit-empty-banner", {}, { timeout: 8000 });
     expect(banner).toHaveTextContent("Trial ended");
-    expect(screen.getByRole("link", { name: "Open billing" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute(
       "href",
       factorySettingsSectionPath(FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY, "organization", "billing"),
     );

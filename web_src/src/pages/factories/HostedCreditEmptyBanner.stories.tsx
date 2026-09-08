@@ -5,8 +5,9 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
- * Compact amber banner for empty hosted credit. Tasks shows this above the
- * board. The action opens Organization Billing.
+ * Status banner for hosted credit. A healthy trial uses quiet chrome.
+ * Empty or expired credit uses an amber warning. Tasks shows this above
+ * the board. The action opens Organization Billing.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -49,6 +50,17 @@ export const Trial: Story = {
     kind: "trial",
     remainingCreditCents: 4124,
     welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit expires today. The banner uses warning chrome. */
+export const TrialEndsToday: Story = {
+  name: "Trial ends today",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
   },
 };
 
