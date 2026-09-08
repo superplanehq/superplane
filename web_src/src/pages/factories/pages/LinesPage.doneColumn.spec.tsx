@@ -172,6 +172,24 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-verify-column")).toHaveTextContent("No tasks in Verify.");
   });
 
+  it("does not show a draft rejected out of the Backlog in Done — it archives off the board", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-rejected-draft",
+          title: "Retire the legacy refund webhook",
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+          lineDispatches: [],
+        },
+      ] as FactoriesWorkOrder[],
+    });
+    renderBoard();
+
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
+    expect(screen.queryByText("Retire the legacy refund webhook")).not.toBeInTheDocument();
+  });
+
   it("keeps the bookend Done column when the line has its own Done automation", () => {
     const factory: FactoriesFactory = {
       ...REFUND_FACTORY,
