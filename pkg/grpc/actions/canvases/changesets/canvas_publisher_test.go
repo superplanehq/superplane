@@ -672,7 +672,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, existingError, *updatedVersionNode.ErrorMessage)
 	})
 
-	t.Run("update node rejects component changes", func(t *testing.T) {
+	t.Run("publish replaces a runner implementation and keeps the node id", func(t *testing.T) {
 		r := support.Setup(t)
 
 		now := time.Now()
@@ -727,25 +727,82 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
-		require.ErrorContains(t, err, "cannot change node node-a implementation; delete the node and add a new one instead")
+		require.NoError(t, err)
 
 		activeNodes, err := models.FindCanvasNodes(canvas.ID)
 		require.NoError(t, err)
 		activeNode := findCanvasNode(t, activeNodes, "node-a")
 		require.Equal(t, models.NodeTypeComponent, activeNode.Type)
-		require.Equal(t, "runnerBash", activeNode.Ref.Data().Component.Name)
-		require.NotNil(t, activeNode.WebhookID)
-		require.Equal(t, staleWebhookID, *activeNode.WebhookID)
+		require.Equal(t, "runnerPython", activeNode.Ref.Data().Component.Name)
 		require.Equal(t, models.CanvasNodeStateReady, activeNode.State)
+		if activeNode.WebhookID != nil {
+			require.NotEqual(t, staleWebhookID, *activeNode.WebhookID)
+		}
 
 		staleWebhookNodes, err := models.FindWebhookNodesInTransaction(database.Conn(), staleWebhookID)
 		require.NoError(t, err)
-		require.Len(t, staleWebhookNodes, 1)
+		require.Empty(t, staleWebhookNodes)
 
 		var staleWebhook models.Webhook
 		err = database.Conn().Unscoped().First(&staleWebhook, staleWebhookID).Error
 		require.NoError(t, err)
-		require.False(t, staleWebhook.DeletedAt.Valid)
+		require.True(t, staleWebhook.DeletedAt.Valid)
+	})
+
+	t.Run("publish restore strips stale app subscription id from node metadata", func(t *testing.T) {
+		r := support.Setup(t)
+
+		staleSubscriptionID := uuid.New().String()
+		existingNode := componentCanvasNode("node-a", "Node A", "runnerBash", runnerConfiguration())
+		existingNode.Metadata = datatypes.NewJSONType(map[string]any{
+			"appSubscriptionID": staleSubscriptionID,
+			"keepMe":            "yes",
+		})
+
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{existingNode},
+			nil,
+		)
+
+		draftNode := componentNode("node-a", "Node A", "runnerPython", runnerConfiguration())
+		draftNode.Metadata = map[string]any{
+			"appSubscriptionID": staleSubscriptionID,
+			"keepMe":            "yes",
+		}
+
+		draft, err := models.CreateCommitVersionWithSpecInTransaction(
+			database.Conn(),
+			canvas.ID,
+			r.User,
+			"Test commit",
+			[]models.Node{draftNode},
+			nil,
+		)
+		require.NoError(t, err)
+
+		liveVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		require.NoError(t, err)
+		publisher, err := NewCanvasPublisher(database.Conn(), canvas, draft, liveVersion, canvasPublisherOptions(r))
+		require.NoError(t, err)
+
+		err = publisher.Publish(context.Background())
+		require.NoError(t, err)
+
+		activeNodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(t, err)
+		activeNode := findCanvasNode(t, activeNodes, "node-a")
+		require.Equal(t, "runnerPython", activeNode.Ref.Data().Component.Name)
+		require.NotContains(t, activeNode.Metadata.Data(), "appSubscriptionID")
+		require.Equal(t, "yes", activeNode.Metadata.Data()["keepMe"])
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		updatedVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-a")
+		require.NotContains(t, updatedVersionNode.Metadata, "appSubscriptionID")
+		require.Equal(t, "yes", updatedVersionNode.Metadata["keepMe"])
 	})
 
 	t.Run("update node allows assigning the first implementation to a placeholder component", func(t *testing.T) {
@@ -802,7 +859,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Nil(t, activeNode.StateReason)
 	})
 
-	t.Run("update node rejects widget changes", func(t *testing.T) {
+	t.Run("publish replaces a component with a widget and keeps the node id", func(t *testing.T) {
 		r := support.Setup(t)
 
 		canvas, _ := support.CreateCanvas(
@@ -833,13 +890,17 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
-		require.ErrorContains(t, err, "cannot change node node-a implementation; delete the node and add a new one instead")
+		require.NoError(t, err)
 
 		activeNodes, err := models.FindCanvasNodes(canvas.ID)
 		require.NoError(t, err)
-		activeNode := findCanvasNode(t, activeNodes, "node-a")
-		require.Equal(t, models.NodeTypeComponent, activeNode.Type)
-		require.Equal(t, "noop", activeNode.Ref.Data().Component.Name)
+		require.Empty(t, activeNodes)
+
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
+		require.NoError(t, err)
+		updatedVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-a")
+		require.Equal(t, models.NodeTypeWidget, updatedVersionNode.Type)
+		require.Equal(t, "group", updatedVersionNode.Ref.Widget.Name)
 	})
 
 	t.Run("update widget ignores deleted component tombstone", func(t *testing.T) {
@@ -903,7 +964,7 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.Equal(t, "group", updatedVersionNode.Ref.Widget.Name)
 	})
 
-	t.Run("update node rejects widget implementation changes", func(t *testing.T) {
+	t.Run("publish replaces a widget implementation and keeps the node id", func(t *testing.T) {
 		r := support.Setup(t)
 
 		canvas, _ := support.CreateCanvas(
@@ -944,12 +1005,13 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, err)
 
 		err = publisher.Publish(context.Background())
-		require.ErrorContains(t, err, "cannot change node node-a implementation; delete the node and add a new one instead")
+		require.NoError(t, err)
 
-		publishedVersion, err := models.FindLiveCanvasVersionInTransaction(database.Conn(), canvas.ID)
+		publishedVersion, err := models.FindCanvasVersionInTransaction(database.Conn(), canvas.ID, draft.ID)
 		require.NoError(t, err)
 		updatedVersionNode := findVersionNode(t, publishedVersion.Nodes, "node-a")
-		require.Equal(t, "group", updatedVersionNode.Ref.Widget.Name)
+		require.Equal(t, "annotation", updatedVersionNode.Ref.Widget.Name)
+		require.Equal(t, "Widget After", updatedVersionNode.Name)
 	})
 
 	t.Run("add node with conflicting id rewrites id in db and published version", func(t *testing.T) {
