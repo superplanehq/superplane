@@ -331,6 +331,31 @@ func TestListSelectableLLMModelsUsesOrgRead(t *testing.T) {
 	assert.Equal(t, "read", rule.Action)
 }
 
+func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	createWorkspace, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", createWorkspace.Resource)
+	assert.Equal(t, "update", createWorkspace.Action)
+	assert.Equal(t, []string{features.FeatureFactories}, createWorkspace.RequiredExperimentalFeatures)
+
+	listWorkspace, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", listWorkspace.Resource)
+	assert.Equal(t, "read", listWorkspace.Action)
+
+	createTask, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", createTask.Resource)
+	assert.Equal(t, "update", createTask.Action)
+
+	listTask, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/orders/{order_id}/files"}]
+	require.True(t, ok)
+	assert.Equal(t, "work_orders", listTask.Resource)
+	assert.Equal(t, "read", listTask.Action)
+}
+
 func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 
