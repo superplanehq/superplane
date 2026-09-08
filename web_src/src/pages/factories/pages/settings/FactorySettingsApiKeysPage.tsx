@@ -66,7 +66,7 @@ type CreateFormState = {
 const EMPTY_CREATE_FORM: CreateFormState = {
   name: "",
   description: "",
-  role: "org_viewer",
+  role: "org_operator",
   accessMode: "organization",
   canvasIds: [],
   expirationPreset: "never",
@@ -428,7 +428,8 @@ function CreateApiKeyDialog({
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="org_viewer">Viewer</SelectItem>
+                <SelectItem value="org_operator">Operator</SelectItem>
+                <SelectItem value="org_maintainer">Maintainer</SelectItem>
                 <SelectItem value="org_admin">Admin</SelectItem>
               </SelectContent>
             </Select>
