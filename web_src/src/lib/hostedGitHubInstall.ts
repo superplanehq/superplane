@@ -133,3 +133,7 @@ export async function bindHostedGitHubInstallation(state: string, installationId
 export function hostedGitHubInstallURL(slug: string, state: string): string {
   return `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
 }
+
+export function hostedGitHubProfileURL(login: string): string {
+  return `https://github.com/${encodeURIComponent(login)}`;
+}

@@ -10,6 +10,8 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubAuthorizeURL,
+  hostedGitHubInstallRequested,
+  hostedGitHubInstallRequestedAccount,
   hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
@@ -30,6 +32,8 @@ export type PendingGitHubAccountPicker = {
   authorizeUrl: string;
   /** GitHub login that authorized this connect. Empty when the field is absent. */
   githubLogin: string;
+  /** Organization on this same request. Empty when the field is absent. */
+  requestedAccount: string;
 };
 
 function accountPickerFromItem(item: OrganizationsIntegration | undefined): PendingGitHubAccountPicker | undefined {
@@ -44,6 +48,7 @@ function accountPickerFromItem(item: OrganizationsIntegration | undefined): Pend
     appSlug: hostedGitHubAppSlug(item.status?.metadata),
     authorizeUrl: hostedGitHubAuthorizeURL(item.status?.metadata),
     githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
+    requestedAccount: hostedGitHubInstallRequestedAccount(item.status?.metadata),
   };
 }
 
@@ -108,6 +113,57 @@ export function pendingGitHubAccountPicker(
     return pendingGitHubInstallations(item.status?.metadata).length >= 1;
   });
   return accountPickerFromItem(pending);
+}
+
+/**
+ * First-run picker after GitHub returns a request and no account is ready.
+ * Settings Connect still uses pendingGitHubAccountPicker, so it keeps the
+ * GitHub install action instead of an empty account list.
+ */
+export function pendingGitHubRequestedPicker(
+  connected: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredAccount?: string,
+): PendingGitHubAccountPicker | undefined {
+  if (!currentUserId) {
+    return undefined;
+  }
+
+  const pending = connected.filter((item) => {
+    if (!isOwnPendingGitHubItem(item, currentUserId) || !item.metadata?.id) {
+      return false;
+    }
+    const metadata = item.status?.metadata;
+    return hostedGitHubInstallRequested(metadata) && hostedGitHubState(metadata) !== "";
+  });
+  const preferred = preferredAccount?.trim().toLowerCase();
+  const match = preferred
+    ? pending.find((item) => hostedGitHubInstallRequestedAccount(item.status?.metadata).toLowerCase() === preferred)
+    : undefined;
+  return accountPickerFromItem(match ?? pending[0]);
+}
+
+/**
+ * Waiting-row copy must come from the picker request. An earlier request can
+ * name an organization and still have no state, so the URL or a list scan
+ * would show a different organization from the request the picker binds.
+ */
+export function firstRunGithubOrganization(
+  urlOrg: string,
+  picker: PendingGitHubAccountPicker | undefined,
+  connected: OrganizationsIntegration[],
+): string {
+  if (picker?.requestedAccount) {
+    return picker.requestedAccount;
+  }
+  if (urlOrg !== "") {
+    return urlOrg;
+  }
+  return (
+    connected
+      .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
+      .find((account) => account !== "") || ""
+  );
 }
 
 /**
