@@ -125,13 +125,12 @@ import {
   factorySectionHeaderClassName,
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
+import { addColumnAutomation, removeColumnAutomation } from "../lib/columnAutomationBindings";
 import {
-  addColumnAutomation,
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   columnAutomationOpenPath,
   isColumnKey,
-  removeColumnAutomation,
   type ColumnAutomation,
   type ColumnKey,
 } from "../lib/columnAutomations";
@@ -156,7 +155,6 @@ import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  PR_FEEDBACK_SOURCES,
   apiPRFeedbackSource,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,

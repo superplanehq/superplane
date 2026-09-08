@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
+import { addColumnAutomation, removeColumnAutomation } from "./columnAutomationBindings";
 import {
-  addColumnAutomation,
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   catalogForColumn,
@@ -14,7 +14,6 @@ import {
   columnTitleForKey,
   isColumnKey,
   phaseIndexFromColumnKey,
-  removeColumnAutomation,
   takenCatalogIds,
 } from "./columnAutomations";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";

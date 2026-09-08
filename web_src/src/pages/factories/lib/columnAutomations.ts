@@ -3,9 +3,13 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES, lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
 import { PR_FEEDBACK_SOURCES, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
+import { columnAutomationCanvasIds, type LineColumnAutomations } from "./columnAutomationBindings";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
 import { isActiveWorkOrderExecution } from "./workOrderExecutions";
 import { findBacklogAutomationApp, findClosureAutomationApp, type LinePhaseColumn } from "./linePhaseRuns";
+
+export type { LineColumnAutomations } from "./columnAutomationBindings";
+export { COLUMN_AUTOMATIONS_COPY } from "./columnAutomationsCopy";
 
 export type ColumnKey = "backlog" | `phase-${number}` | "verify" | "done";
 
@@ -98,8 +102,6 @@ const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   iconAlt: "",
   unique: false,
 };
-
-export type LineColumnAutomations = Record<string, { canvasIds?: string[] }>;
 
 const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   id: PR_CLOSURE_CATALOG_ID,
@@ -201,44 +203,6 @@ export function takenCatalogIds(automations: ColumnAutomation[], catalog: Column
 
 export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): boolean {
   return automations.some((automation) => automation.health === "needs-repair");
-}
-
-export function columnAutomationCanvasIds(bindings: LineColumnAutomations | undefined, key: ColumnKey): string[] {
-  return (bindings?.[key]?.canvasIds ?? []).map((id) => id.trim()).filter((id): id is string => Boolean(id));
-}
-
-export function addColumnAutomation(
-  current: LineColumnAutomations | undefined,
-  key: ColumnKey,
-  canvasId: string,
-): LineColumnAutomations {
-  const id = canvasId.trim();
-  const existing = columnAutomationCanvasIds(current, key);
-  const next: LineColumnAutomations = { ...current };
-  if (!id || existing.includes(id)) {
-    if (existing.length > 0) {
-      next[key] = { canvasIds: existing };
-    }
-    return next;
-  }
-  next[key] = { canvasIds: [...existing, id] };
-  return next;
-}
-
-export function removeColumnAutomation(
-  current: LineColumnAutomations | undefined,
-  key: ColumnKey,
-  canvasId: string,
-): LineColumnAutomations {
-  const id = canvasId.trim();
-  const remaining = columnAutomationCanvasIds(current, key).filter((entry) => entry !== id);
-  const next: LineColumnAutomations = { ...current };
-  if (remaining.length === 0) {
-    delete next[key];
-    return next;
-  }
-  next[key] = { canvasIds: remaining };
-  return next;
 }
 
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
@@ -523,23 +487,3 @@ export function catalogEntryToAutomation(
     catalogId: entry.id,
   };
 }
-
-export const COLUMN_AUTOMATIONS_COPY = {
-  menuLabel: "Automations",
-  addLabel: "New automation",
-  addHint: "Create a canvas and open the editor.",
-  pickerTitle: "Add automation",
-  pickerDescription: "Choose an automation for this column.",
-  sourceTaken: "This automation is already configured.",
-  needsRepairLabel: "Needs repair",
-  disabledLabel: "Disabled",
-  editLabel: "Edit automation",
-  tabsLabel: "Automation sections",
-  generalTab: "General",
-  agentTab: "Agent",
-  automationTab: "Automation",
-  viewLoading: "The automation is loading.",
-  viewEmpty: "This automation has no canvas yet.",
-  viewError: "SuperPlane could not load the automation.",
-  viewRetry: "Try again",
-} as const;
