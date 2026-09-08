@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/blob"
@@ -16,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func setupFileStore(t *testing.T) blob.Provider {
@@ -57,12 +60,13 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 
 	description := "See ![bug](" + blob.FileRef(file.ID) + ")"
 	sourceKey := loaded.StorageKey
-	staleKeys, err := BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
+	bound, err := BindDescriptionFiles(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
 	require.NoError(t, err)
-	require.Equal(t, []string{sourceKey}, staleKeys)
+	require.Equal(t, []string{sourceKey}, bound.StaleKeys)
+	require.Len(t, bound.CopiedKeys, 1)
 	_, err = provider.Head(t.Context(), sourceKey)
 	require.NoError(t, err)
-	require.NoError(t, DeleteObjects(t.Context(), provider, staleKeys))
+	require.NoError(t, ApplyBindResult(t.Context(), provider, bound, nil))
 	_, err = provider.Head(t.Context(), sourceKey)
 	assert.ErrorIs(t, err, blob.ErrNotFound)
 
@@ -109,6 +113,126 @@ func TestBindDescriptionFilesRejectsForeignWorkOrder(t *testing.T) {
 		"![bug]("+blob.FileRef(file.ID)+")",
 	)
 	assert.ErrorIs(t, err, models.ErrFileForeignReference)
+}
+
+func TestBindDescriptionFilesDeletesCopiedObjectWhenLaterFileFails(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Attach", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	file, err := models.CreatePendingFile(db, models.CreateFileParams{
+		Scope:          blob.ScopeWorkspace,
+		OrganizationID: r.Organization.ID,
+		FactoryID:      factoryModel.ID,
+		Filename:       "bug.png",
+		ContentType:    "image/png",
+		CreatedByID:    r.User,
+	})
+	require.NoError(t, err)
+	require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+
+	sourceKey := file.StorageKey
+	nextKey, err := blob.ObjectKey(file.InstallationID, blob.ScopeTask, r.Organization.ID, factoryModel.ID, order.ID, file.ID)
+	require.NoError(t, err)
+
+	description := "![ok](" + blob.FileRef(file.ID) + ") ![missing](" + blob.FileRef(uuid.New()) + ")"
+	err = db.Transaction(func(tx *gorm.DB) error {
+		_, bindErr := BindDescriptionFiles(t.Context(), tx, provider, r.Organization.ID, factoryModel.ID, order.ID, description)
+		return bindErr
+	})
+	assert.ErrorIs(t, err, models.ErrFileNotFound)
+
+	loaded, err := models.FindFile(db, file.ID)
+	require.NoError(t, err)
+	assert.Equal(t, blob.ScopeWorkspace, loaded.Scope)
+	assert.Equal(t, sourceKey, loaded.StorageKey)
+	_, err = provider.Head(t.Context(), sourceKey)
+	require.NoError(t, err)
+	_, err = provider.Head(t.Context(), nextKey)
+	assert.ErrorIs(t, err, blob.ErrNotFound)
+}
+
+func TestBindDescriptionFilesSerializesConcurrentTaskQuota(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Quota", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	for i := 0; i < models.MaxFilesPerWorkOrder-1; i++ {
+		file, createErr := models.CreatePendingFile(db, models.CreateFileParams{
+			Scope:          blob.ScopeTask,
+			OrganizationID: r.Organization.ID,
+			FactoryID:      factoryModel.ID,
+			WorkOrderID:    order.ID,
+			Filename:       "shot.png",
+			ContentType:    "image/png",
+			CreatedByID:    r.User,
+		})
+		require.NoError(t, createErr)
+		require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+	}
+
+	workspaceFiles := make([]*models.File, 2)
+	for i := range workspaceFiles {
+		file, createErr := models.CreatePendingFile(db, models.CreateFileParams{
+			Scope:          blob.ScopeWorkspace,
+			OrganizationID: r.Organization.ID,
+			FactoryID:      factoryModel.ID,
+			Filename:       "extra.png",
+			ContentType:    "image/png",
+			CreatedByID:    r.User,
+		})
+		require.NoError(t, createErr)
+		require.NoError(t, CompleteUpload(t.Context(), db, provider, file, bytes.NewReader([]byte("png-bytes"))))
+		workspaceFiles[i] = file
+	}
+
+	errCh := make(chan error, 2)
+	var start sync.WaitGroup
+	start.Add(2)
+	for _, file := range workspaceFiles {
+		go func(file *models.File) {
+			start.Done()
+			start.Wait()
+			errCh <- db.Transaction(func(tx *gorm.DB) error {
+				_, bindErr := BindDescriptionFiles(
+					t.Context(),
+					tx,
+					provider,
+					r.Organization.ID,
+					factoryModel.ID,
+					order.ID,
+					"![extra]("+blob.FileRef(file.ID)+")",
+				)
+				return bindErr
+			})
+		}(file)
+	}
+
+	firstErr := <-errCh
+	secondErr := <-errCh
+	quotaFailures := 0
+	for _, bindErr := range []error{firstErr, secondErr} {
+		if bindErr == nil {
+			continue
+		}
+		assert.ErrorIs(t, bindErr, models.ErrFileQuotaExceeded)
+		quotaFailures++
+	}
+	assert.Equal(t, 1, quotaFailures)
+
+	count, err := models.CountOpenTaskFiles(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(models.MaxFilesPerWorkOrder), count)
 }
 
 func TestIngestRemoteImagesRewritesGitHubURL(t *testing.T) {

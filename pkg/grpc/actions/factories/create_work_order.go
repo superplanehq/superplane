@@ -53,14 +53,14 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 
 	assigneeIDs := []uuid.UUID{createdByID}
 	var order *models.FactoryWorkOrder
-	var staleKeys []string
+	var bound storedfiles.BindResult
 	err = db.Transaction(func(tx *gorm.DB) error {
 		created, err := factory.CreateWorkOrder(tx, title, req.GetDescription(), &createdByID, assigneeIDs, nil)
 		if err != nil {
 			return err
 		}
 		order = created
-		keys, bindErr := storedfiles.BindDescriptionFiles(
+		result, bindErr := storedfiles.BindDescriptionFiles(
 			ctx,
 			tx,
 			blob.Current(),
@@ -69,14 +69,14 @@ func CreateWorkOrder(ctx context.Context, organizationID string, req *pb.CreateW
 			order.ID,
 			order.Description,
 		)
-		staleKeys = keys
+		bound = result
 		return bindErr
 	})
+	if delErr := storedfiles.ApplyBindResult(ctx, blob.Current(), bound, err); delErr != nil {
+		log.WithError(delErr).Warn("Failed to delete file objects after bind")
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order")
-	}
-	if err := storedfiles.DeleteObjects(ctx, blob.Current(), staleKeys); err != nil {
-		log.WithError(err).Warnf("Failed to delete old workspace file objects for order %s", order.ID)
 	}
 
 	workersctx.EmitWorkOrderCreated(db, factory, order)

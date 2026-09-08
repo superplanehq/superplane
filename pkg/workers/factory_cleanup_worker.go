@@ -82,7 +82,18 @@ func (w *FactoryCleanupWorker) LockAndProcessFactory(factory models.Factory) err
 }
 
 func (w *FactoryCleanupWorker) commitFactoryFileCleanup(factory models.Factory) (bool, error) {
-	var readyForDomain bool
+	canDeleteFiles, err := w.prepareFactoryFileCleanup(factory)
+	if err != nil || !canDeleteFiles {
+		return false, err
+	}
+	if err := deleteFactoryFileObjects(factory.ID, w.maxResourcesPerTick); err != nil {
+		return false, fmt.Errorf("delete factory file objects: %w", err)
+	}
+	return w.factoryHasNoFiles(factory)
+}
+
+func (w *FactoryCleanupWorker) prepareFactoryFileCleanup(factory models.Factory) (bool, error) {
+	var canDeleteFiles bool
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockDeletedFactory(tx, factory.ID)
 		if err != nil {
@@ -103,8 +114,19 @@ func (w *FactoryCleanupWorker) commitFactoryFileCleanup(factory models.Factory) 
 			return nil
 		}
 
-		if err := deleteFactoryFileObjects(tx, locked.ID, w.maxResourcesPerTick); err != nil {
-			return fmt.Errorf("delete factory file objects: %w", err)
+		canDeleteFiles = true
+		return nil
+	})
+	return canDeleteFiles, err
+}
+
+func (w *FactoryCleanupWorker) factoryHasNoFiles(factory models.Factory) (bool, error) {
+	var readyForDomain bool
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockDeletedFactory(tx, factory.ID)
+		if err != nil {
+			w.logger.Infof("Factory %s already being processed - skipping", factory.ID)
+			return nil
 		}
 
 		var remainingFiles int64
@@ -147,15 +169,18 @@ func (w *FactoryCleanupWorker) commitFactoryDomainCleanup(factory models.Factory
 	})
 }
 
-func deleteFactoryFileObjects(tx *gorm.DB, factoryID uuid.UUID, limit int) error {
-	files, err := models.ListFilesForFactory(tx, factoryID, limit)
+func deleteFactoryFileObjects(factoryID uuid.UUID, limit int) error {
+	files, err := models.ListFilesForFactory(database.Conn(), factoryID, limit)
 	if err != nil {
 		return err
 	}
 	provider := blob.Current()
 	ctx := context.Background()
 	for i := range files {
-		if err := storedfiles.DeleteObjectAndRow(ctx, tx, provider, &files[i]); err != nil {
+		err := database.Conn().Transaction(func(tx *gorm.DB) error {
+			return storedfiles.DeleteObjectAndRow(ctx, tx, provider, &files[i])
+		})
+		if err != nil {
 			return err
 		}
 	}

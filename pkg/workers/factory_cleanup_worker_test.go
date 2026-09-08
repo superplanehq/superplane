@@ -2,6 +2,9 @@ package workers
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -83,6 +86,85 @@ func Test__FactoryCleanupWorker_DeletesFileObjectsBeforeRows(t *testing.T) {
 		_, headErr := store.Head(t.Context(), file.StorageKey)
 		assert.ErrorIs(t, headErr, blob.ErrNotFound)
 	}
+}
+
+type failAfterNDeletes struct {
+	blob.Provider
+	mu      sync.Mutex
+	succeed int
+	count   int
+}
+
+func (p *failAfterNDeletes) Delete(ctx context.Context, key string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.count >= p.succeed {
+		return errors.New("forced delete failure")
+	}
+	if err := p.Provider.Delete(ctx, key); err != nil {
+		return err
+	}
+	p.count++
+	return nil
+}
+
+func Test__FactoryCleanupWorker_KeepsEarlierFileDeletesWhenALaterDeleteFails(t *testing.T) {
+	r := support.Setup(t)
+	store, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	provider := &failAfterNDeletes{Provider: store, succeed: 1}
+	blob.SetCurrent(provider)
+	t.Cleanup(func() { blob.SetCurrent(nil) })
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	var files []*models.File
+	for i := 0; i < 2; i++ {
+		file, createErr := models.CreatePendingFile(database.Conn(), models.CreateFileParams{
+			Scope:          blob.ScopeTask,
+			OrganizationID: r.Organization.ID,
+			FactoryID:      factory.ID,
+			WorkOrderID:    order.ID,
+			Filename:       "shot.png",
+			ContentType:    "image/png",
+			CreatedByID:    r.User,
+		})
+		require.NoError(t, createErr)
+		require.NoError(t, storedfiles.CompleteUpload(
+			t.Context(),
+			database.Conn(),
+			store,
+			file,
+			bytes.NewReader([]byte("png-bytes")),
+		))
+		files = append(files, file)
+	}
+
+	require.NoError(t, factory.SoftDelete(database.Conn()))
+	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Factory{}).
+		Where("id = ?", factory.ID).
+		Update("deleted_at", deletedAtOutsideGracePeriod).
+		Error)
+	factory.DeletedAt.Time = deletedAtOutsideGracePeriod
+	factory.DeletedAt.Valid = true
+
+	worker := NewFactoryCleanupWorker()
+	err = worker.LockAndProcessFactory(*factory)
+	require.Error(t, err)
+
+	var remaining []models.File
+	require.NoError(t, database.Conn().Where("factory_id = ?", factory.ID).Order("created_at ASC, id ASC").Find(&remaining).Error)
+	require.Len(t, remaining, 1)
+	assert.Equal(t, files[1].ID, remaining[0].ID)
+
+	_, headErr := store.Head(t.Context(), files[0].StorageKey)
+	assert.ErrorIs(t, headErr, blob.ErrNotFound)
+	_, headErr = store.Head(t.Context(), files[1].StorageKey)
+	require.NoError(t, headErr)
 }
 
 func Test__FactoryCleanupWorker_GracePeriod(t *testing.T) {

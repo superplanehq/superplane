@@ -259,6 +259,13 @@ func CountOpenTaskFiles(tx *gorm.DB, workOrderID uuid.UUID) (int64, error) {
 	return count, err
 }
 
+func LockAndCountOpenTaskFiles(tx *gorm.DB, organizationID, workOrderID uuid.UUID) (int64, error) {
+	if err := lockFileQuotaRows(tx, organizationID, workOrderID); err != nil {
+		return 0, err
+	}
+	return CountOpenTaskFiles(tx, workOrderID)
+}
+
 func SumReadyOrganizationFileBytes(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
 	var total int64
 	err := tx.Model(&File{}).
