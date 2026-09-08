@@ -97,6 +97,7 @@ var defaultRunTitleExpressions = map[string]string{
 	"linear.onIssueAttachment":            "{{ root().data.data.issue != nil ? root().data.data.issue.identifier + \" - \" + root().data.data.title : root().data.data.title }}",
 	"logfire.onAlertReceived":             "{{ root().data.alertName }}",
 	"newrelic.onIssue":                    "{{ root().data.title }} {{ root().data.state }}",
+	"notion.onPageAdded":                  "{{ root().data.data.title }}",
 	"oci.onComputeInstanceCreated":        "{{ root().data.data.resourceName }}",
 	"oci.onInstanceStateChange":           "{{ root().data.data.resourceName }}",
 	"octopus.onDeploymentEvent":           "{{ root().data.message }}",

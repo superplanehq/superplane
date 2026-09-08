@@ -171,6 +171,8 @@ func serializeFactoryIntakeSource(source string) pb.FactoryIntake_Source {
 		return pb.FactoryIntake_SOURCE_PAGERDUTY_INCIDENTS
 	case models.FactoryIntakeSourceProductiveTasks:
 		return pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS
+	case models.FactoryIntakeSourceNotionPages:
+		return pb.FactoryIntake_SOURCE_NOTION_PAGES
 	default:
 		return pb.FactoryIntake_SOURCE_UNSPECIFIED
 	}
@@ -186,6 +188,8 @@ func parseFactoryIntakeSource(source pb.FactoryIntake_Source) (string, error) {
 		return models.FactoryIntakeSourcePagerDutyIncidents, nil
 	case pb.FactoryIntake_SOURCE_PRODUCTIVE_TASKS:
 		return models.FactoryIntakeSourceProductiveTasks, nil
+	case pb.FactoryIntake_SOURCE_NOTION_PAGES:
+		return models.FactoryIntakeSourceNotionPages, nil
 	default:
 		return "", invalidArgument("intake source is required")
 	}

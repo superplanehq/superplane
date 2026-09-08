@@ -16,6 +16,7 @@ const (
 	FactoryIntakeSourceSentryExceptions   = "sentry-exceptions"
 	FactoryIntakeSourcePagerDutyIncidents = "pagerduty-incidents"
 	FactoryIntakeSourceProductiveTasks    = "productive-tasks"
+	FactoryIntakeSourceNotionPages        = "notion-pages"
 
 	factoryIntakeCanvasUniqueConstraint = "idx_factory_intakes_canvas_id"
 )
@@ -32,6 +33,7 @@ var factoryIntakeSources = []string{
 	FactoryIntakeSourceSentryExceptions,
 	FactoryIntakeSourcePagerDutyIncidents,
 	FactoryIntakeSourceProductiveTasks,
+	FactoryIntakeSourceNotionPages,
 }
 
 // FactoryIntake declares that a factory canvas listens to an external source,
