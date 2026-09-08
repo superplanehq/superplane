@@ -127,6 +127,7 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
     expect(filtered.find((group) => group.id === "organization")?.items.map((item) => item.id)).toEqual([
       "organization-general",
       "organization-models",
+      "organization-billing",
       "organization-spending",
     ]);
   });

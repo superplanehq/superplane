@@ -291,6 +291,7 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
         Icon: CircleDollarSign,
         scope: "organization",
         section: "billing",
+        permission: { resource: "org", action: "read" },
         keywords: [
           "billing",
           "credit",

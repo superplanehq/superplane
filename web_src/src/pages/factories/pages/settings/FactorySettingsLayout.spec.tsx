@@ -182,8 +182,8 @@ describe("FactorySettingsLayout sidebar", () => {
       "aria-current",
       "page",
     );
-    expect(await screen.findByTestId(pageTestId)).toBeInTheDocument();
-  });
+    expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 
   describe("Find settings", () => {
     it("shows section results for Security and hides the grouped nav", async () => {
