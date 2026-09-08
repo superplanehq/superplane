@@ -2,6 +2,8 @@ import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeInt
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
+import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
+import { useGithubAppAvailability } from "./useGithubAppAvailability";
 import { useOnboardingEntryPath } from "./useOnboardingEntryPath";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
@@ -11,7 +13,12 @@ export function OnboardingPage() {
   const onboardingEntryPath = useOnboardingEntryPath();
   const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
+  const githubApp = useGithubAppAvailability(layout.organizationId);
   const model = useOnboardingPageModel({ ...layout, onboardingEntryPath, reresolveWorkspace });
+
+  if (githubApp.resolved && !githubApp.available) {
+    return <GithubAppRequiredNotice />;
+  }
 
   if (!model.canConfigureWorkspace) {
     return (
