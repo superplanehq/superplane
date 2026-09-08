@@ -12,6 +12,7 @@ Read more only when the task needs it:
   [.agents/skills/ui-copy/SKILL.md](.agents/skills/ui-copy/SKILL.md), and
   [.agents/skills/simplified-technical-english/SKILL.md](.agents/skills/simplified-technical-english/SKILL.md)
 - `pkg/models` or new database access: [pkg/models/AGENTS.md](pkg/models/AGENTS.md)
+- Local factory GitHub App: [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md)
 
 ## Read this first
 
@@ -89,6 +90,11 @@ Run these three steps once, in order:
 3. `make dev.server` — starts the API (Go hot-reload via `air`) and the Vite dev
    server. UI at http://localhost:8000; health check at
    http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
+
+Factory workspace onboarding needs a public SuperPlane GitHub App on a
+stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
+onboarding is blocked. See
+[docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 To run Runner nodes locally, start `make dev` in the runner repository.
 Compose defaults already point at that broker. Set `TASK_BROKER_*` in `.env`

@@ -48,6 +48,7 @@ import (
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -367,6 +368,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	err = pbFiles.RegisterFilesHandlerServer(ctx, grpcGatewayMux, services.Files)
+	if err != nil {
+		return err
+	}
+
 	err = pbAPIKeys.RegisterApiKeysHandlerServer(ctx, grpcGatewayMux, services.APIKeys)
 	if err != nil {
 		return err
@@ -409,6 +415,11 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		"/api/v1/agents/chats/{chatId}/messages/{messageId}/images/{index}",
 		orgAuthMiddleware(http.HandlerFunc(s.handleAgentChatMessageImage)),
 	).Methods(http.MethodGet)
+
+	s.Router.Handle(
+		"/api/v1/files/{file_id}/content",
+		orgAuthMiddleware(http.HandlerFunc(s.handleFileContentUpload)),
+	).Methods(http.MethodPut)
 
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
@@ -658,6 +669,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
 	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
 	publicRoute.HandleFunc("/api/v1/polar/webhooks", s.handlePolarWebhook).Methods("POST")
+	publicRoute.HandleFunc("/api/v1/public/files/{file_id}", s.handlePublicFileDownload).Methods("GET")
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
@@ -1140,6 +1152,20 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
+	// App, so onboarding stops here on installations that do not hold the
+	// app credentials (for example, local development without a tunnel).
+	if !config.LoadGitHubHostedAppConfig().Enabled() {
+		http.Error(
+			w,
+			"This installation has no GitHub App configured, so workspace setup is not available. "+
+				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
+				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
+			http.StatusServiceUnavailable,
+		)
 		return
 	}
 

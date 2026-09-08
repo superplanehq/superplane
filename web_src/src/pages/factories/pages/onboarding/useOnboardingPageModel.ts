@@ -48,9 +48,11 @@ import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const ONBOARDING_INTEGRATIONS = ["github", ...AGENT_PROVIDER_IDS];
 
-// Onboarding never adopts an existing organization GitHub connection on its
-// own. The repository list must come from the account the user picked.
-const ONBOARDING_MANUAL_SELECTIONS = ["github"] as const;
+// Onboarding never adopts an existing organization GitHub or agent
+// connection on its own. GitHub repositories must come from the account the
+// user picked. Agent keys stay unselected so a new workspace can use the
+// canonical SuperPlane template when hosted credit is available.
+const ONBOARDING_MANUAL_SELECTIONS = ["github", ...AGENT_PROVIDER_IDS] as const;
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key

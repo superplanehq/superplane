@@ -1,4 +1,4 @@
-import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
@@ -24,13 +24,16 @@ export function WorkOrderSplitRunOverview({
   pullRequestsError = null,
   checks,
   organizationId,
+  factoryId,
   factoryKey,
+  orderId,
   orderNumber,
   expandFirstCheck = false,
   canEditDescription = false,
   descriptionBusy = false,
   onDescriptionSave,
   source,
+  files,
 }: {
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -40,13 +43,16 @@ export function WorkOrderSplitRunOverview({
   pullRequestsError?: Error | null;
   checks: WorkOrderCheckPresentation[];
   organizationId?: string;
+  factoryId?: string;
   factoryKey?: string;
+  orderId?: string;
   orderNumber?: string;
   expandFirstCheck?: boolean;
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
   source?: SplitRunSource;
+  files?: FilesFile[];
 }) {
   return (
     <div className={SPLIT_RUN_PANE_GRID_CLASSNAME} data-testid="split-run-work-order-tab">
@@ -57,6 +63,10 @@ export function WorkOrderSplitRunOverview({
             canEdit={canEditDescription}
             busy={descriptionBusy}
             onSave={onDescriptionSave}
+            files={files}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            orderId={orderId}
           />
 
           {checks.length > 0 ? (
