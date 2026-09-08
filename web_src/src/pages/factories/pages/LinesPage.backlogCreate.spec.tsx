@@ -248,7 +248,7 @@ describe("LinesPage backlog create", () => {
       expect(screen.getByTestId("create-with-agent-dialog")).toBeInTheDocument();
     });
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/task/105`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY.toLowerCase()}/task/105`,
     );
     await waitFor(() => {
       expect(

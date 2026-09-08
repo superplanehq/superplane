@@ -384,7 +384,9 @@ describe("FactorySettingsLayout sidebar", () => {
       );
       expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
         "href",
-        expect.stringContaining(`/workspaces/${ACME_ONBOARDING_FACTORY_KEY}/settings/organization/general`),
+        expect.stringContaining(
+          `/workspaces/${ACME_ONBOARDING_FACTORY_KEY.toLowerCase()}/settings/organization/general`,
+        ),
       );
       expect(screen.queryByTestId("lines-detail-page")).not.toBeInTheDocument();
       expect(screen.queryByText("Loading settings…")).not.toBeInTheDocument();

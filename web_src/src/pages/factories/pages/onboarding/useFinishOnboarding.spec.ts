@@ -115,7 +115,7 @@ describe("afterWorkspaceProvisioned", () => {
 
     expect(updateOrganization).toHaveBeenCalledWith({ name: "Acme Org", slug: "acme-org" });
     expect(invalidateAccountOrganizations).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/SP/lines/line-1", { replace: true });
+    expect(navigate).toHaveBeenCalledWith("/acme-org/workspaces/sp/lines/line-1", { replace: true });
   });
 });
 
@@ -127,6 +127,6 @@ describe("afterOnboardingPath", () => {
         factoryKey: "SP",
         lineId: "line-1",
       }),
-    ).toBe("/org-1/workspaces/SP/lines/line-1");
+    ).toBe("/org-1/workspaces/sp/lines/line-1");
   });
 });
