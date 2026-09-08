@@ -6,10 +6,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
-import { Bot, Pencil, Sparkles, Workflow } from "lucide-react";
+import { Bot, LoaderCircle, Pencil, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { type ColumnAutomationActivity, type ColumnAutomationLastRunStatus } from "../lib/columnAutomationActivity";
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation, type ColumnAutomationKind } from "../lib/columnAutomations";
+
+export type { ColumnAutomationActivity, ColumnAutomationLastRunStatus };
 
 export type ColumnAutomationRowAction = "settings" | "edit" | "edit-agent" | "disable" | "enable" | "remove";
 
@@ -24,6 +27,7 @@ interface ColumnAutomationsPopupProps {
   onAction: (action: ColumnAutomationRowAction) => void;
   showEditAgent?: boolean;
   showEditAutomation?: boolean;
+  activity?: ColumnAutomationActivity;
   /** Open the menu on first render. Used by stories. */
   defaultOpen?: boolean;
 }
@@ -34,6 +38,7 @@ export function ColumnAutomationsPopup({
   onAction,
   showEditAgent = false,
   showEditAutomation = false,
+  activity,
   defaultOpen = false,
 }: ColumnAutomationsPopupProps) {
   const needsRepair = automation.health === "needs-repair";
@@ -63,9 +68,13 @@ export function ColumnAutomationsPopup({
           ) : null}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56 w-80 p-0" data-testid="column-automations-popup">
+      <DropdownMenuContent align="end" className="min-w-56 p-0" data-testid="column-automations-popup">
         <div className="p-1">
-          <ColumnAutomationInfo automation={automation} onOpenSettings={() => onAction("settings")} />
+          <ColumnAutomationInfo
+            automation={automation}
+            activity={activity}
+            onOpenSettings={() => onAction("settings")}
+          />
         </div>
         {hasEditActions ? (
           <>
@@ -123,9 +132,11 @@ export function ColumnAutomationGlyph({
 
 function ColumnAutomationInfo({
   automation,
+  activity,
   onOpenSettings,
 }: {
   automation: ColumnAutomation;
+  activity?: ColumnAutomationActivity;
   onOpenSettings: () => void;
 }) {
   const disabled = automation.health === "disabled";
@@ -138,11 +149,12 @@ function ColumnAutomationInfo({
       className={cn("items-start gap-3 py-2.5", disabled && "opacity-70")}
     >
       <ColumnAutomationGlyph automation={automation} className="mt-0.5 size-4" />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{automation.name}</span>
         <span className="mt-0.5 block text-[13px] text-muted-foreground">
           {automation.trigger} → {automation.action}
         </span>
+        {activity ? <ColumnAutomationActivitySummary activity={activity} /> : null}
         {needsRepair || disabled ? (
           <span className="mt-1 flex flex-wrap items-center gap-1.5">
             {needsRepair ? (
@@ -159,6 +171,40 @@ function ColumnAutomationInfo({
         ) : null}
       </span>
     </DropdownMenuItem>
+  );
+}
+
+function ColumnAutomationActivitySummary({ activity }: { activity: ColumnAutomationActivity }) {
+  const running = activity.runningCount ?? 0;
+  const lastRunLabel =
+    activity.lastRunStatus === "passed"
+      ? COLUMN_AUTOMATIONS_COPY.lastRunPassed
+      : activity.lastRunStatus === "failed"
+        ? COLUMN_AUTOMATIONS_COPY.lastRunFailed
+        : undefined;
+
+  return (
+    <span className="mt-1.5 flex flex-col gap-0.5" data-testid="column-automation-activity">
+      {lastRunLabel && activity.lastRunWhen ? (
+        <span
+          className={cn(
+            "text-[11px] font-medium",
+            activity.lastRunStatus === "passed"
+              ? "text-emerald-700 dark:text-emerald-400"
+              : "text-red-700 dark:text-red-400",
+          )}
+        >
+          {lastRunLabel}
+          <span className="font-normal text-muted-foreground"> · {activity.lastRunWhen}</span>
+        </span>
+      ) : null}
+      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        {running > 0 ? (
+          <LoaderCircle className="size-3 shrink-0 animate-spin text-[color:var(--status-running-dot)]" aria-hidden />
+        ) : null}
+        {running} {COLUMN_AUTOMATIONS_COPY.activityRunning}
+      </span>
+    </span>
   );
 }
 

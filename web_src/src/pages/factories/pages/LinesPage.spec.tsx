@@ -431,6 +431,8 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId(`column-automation-row-${GITHUB_ISSUES_INTAKE_ID}`)).toHaveTextContent(
       "On GitHub issue → Create a task in Backlog",
     );
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
 
     await user.keyboard("{Escape}");
     await user.click(screen.getByTestId("column-automation-icon-analysis-app-refund-backlog"));
@@ -499,6 +501,17 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
   });
 
+  it("shows last-run activity on a phase automation from work-order executions", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: [BOARD_IMPLEMENT_FAILED_ORDER] });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("column-automation-icon-step-0-app-refund-implementer"));
+
+    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("Failed");
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
+  });
+
   it("opens the phase automation summary from the header icon", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
@@ -509,6 +522,8 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("column-automation-row-step-0-app-refund-implementer")).toHaveTextContent(
       "On task in Phase 1 → Run the Phase 1 agent",
     );
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
+    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
     expect(screen.queryByTestId("column-automations-add")).not.toBeInTheDocument();
   });
 
@@ -535,12 +550,16 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("column-automation-row-handler-discussion")).toHaveTextContent(
       "On pull request comment → Address the feedback",
     );
+    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
 
     await user.keyboard("{Escape}");
     await user.click(screen.getByTestId("column-automation-icon-closure-app-pr-closure"));
     expect(screen.getByTestId("column-automation-row-closure-app-pr-closure")).toHaveTextContent(
       "On pull request merged or closed → Complete the task",
     );
+    expect(screen.getByTestId("column-automation-activity")).toHaveTextContent("0 running");
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
   });
 
   it("names each Verify listener from its source", async () => {

@@ -173,6 +173,7 @@ describe("buildColumnAutomations", () => {
         action: "Run the Implement agent",
         runningCount: 1,
         canvasId: "app-refund-implementer",
+        activity: expect.objectContaining({ runningCount: 1 }),
       }),
     ]);
   });

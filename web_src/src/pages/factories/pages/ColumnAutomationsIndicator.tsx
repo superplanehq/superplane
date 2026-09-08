@@ -1,3 +1,4 @@
+import { emptyColumnAutomationActivity } from "../lib/columnAutomationActivity";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import {
   automationOffersAgentEdit,
@@ -29,6 +30,7 @@ export function ColumnAutomationsHeaderSlot({
         <div key={automation.id} role="listitem">
           <ColumnAutomationsPopup
             automation={automation}
+            activity={automation.activity ?? emptyColumnAutomationActivity(automation.runningCount)}
             onAction={(action) => onRowAction(automation, action)}
             showEditAgent={canEditAgent ?? automationOffersAgentEdit(automation)}
             showEditAutomation={Boolean(automation.canvasId)}

@@ -3,7 +3,19 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import type { ColumnAutomation } from "../lib/columnAutomations";
 import { ColumnAutomationsHeaderSlot } from "./ColumnAutomationsIndicator";
-import { ColumnAutomationsPopup } from "./ColumnAutomationsPopup";
+import { ColumnAutomationsPopup, type ColumnAutomationActivity } from "./ColumnAutomationsPopup";
+
+const HEALTHY_ACTIVITY: ColumnAutomationActivity = {
+  lastRunStatus: "passed",
+  lastRunWhen: "2 minutes ago",
+  runningCount: 2,
+};
+
+const FAILED_ACTIVITY: ColumnAutomationActivity = {
+  lastRunStatus: "failed",
+  lastRunWhen: "18 minutes ago",
+  runningCount: 1,
+};
 
 const INTAKE: ColumnAutomation = {
   id: "intake-github",
@@ -81,6 +93,26 @@ export const PhaseEditActions: Story = {
     automation: ANALYSIS,
     showEditAgent: true,
     showEditAutomation: true,
+  },
+};
+
+export const WithActivity: Story = {
+  name: "With last-run activity",
+  args: {
+    automation: ANALYSIS,
+    showEditAgent: true,
+    showEditAutomation: true,
+    activity: HEALTHY_ACTIVITY,
+  },
+};
+
+export const WithFailedActivity: Story = {
+  name: "With failed last run",
+  args: {
+    automation: ANALYSIS,
+    showEditAgent: true,
+    showEditAutomation: true,
+    activity: FAILED_ACTIVITY,
   },
 };
 

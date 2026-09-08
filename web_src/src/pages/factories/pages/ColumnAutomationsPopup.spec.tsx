@@ -89,6 +89,24 @@ describe("ColumnAutomationsPopup", () => {
     expect(screen.getByTestId("column-automation-row-intake-github")).not.toHaveTextContent("running");
   });
 
+  it("shows last-run activity when it is supplied", () => {
+    renderPopup({
+      automation: { ...INTAKE, name: "Task analysis" },
+      activity: {
+        lastRunStatus: "passed",
+        lastRunWhen: "2 minutes ago",
+        runningCount: 2,
+      },
+    });
+
+    const activity = screen.getByTestId("column-automation-activity");
+    expect(activity).toHaveTextContent("Passed");
+    expect(activity).toHaveTextContent("2 minutes ago");
+    expect(activity).toHaveTextContent("2 running");
+    expect(activity.querySelector("svg.animate-spin")).not.toBeNull();
+    expect(screen.queryByTestId("column-automation-hourly-chart")).not.toBeInTheDocument();
+  });
+
   it("reports a click on the summary", async () => {
     const user = userEvent.setup();
     const onAction = vi.fn();
