@@ -5,8 +5,11 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { HostedCreditEmptyBanner } from "./HostedCreditEmptyBanner";
 
 /**
- * Compact amber banner for empty hosted credit. Tasks shows this above the
- * board. The action opens Organization Spending.
+ * Compact banner warning about hosted credit. Tasks and Missions show this
+ * above the board with a link to Organization Spending; the workspace board
+ * shows it with a (not yet wired) go-to-billing button. Red styling ("empty")
+ * is severe — hosted runs cannot start. Amber styling ("low") warns before
+ * that happens.
  */
 const meta = {
   title: "Factories/Components/HostedCreditEmptyBanner",
@@ -29,14 +32,26 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Polar billing is on. The action adds hosted credit. */
+/** Polar billing is on. The action links to spending. */
 export const BillingOn: Story = {
   name: "Billing on",
-  args: { billingEnabled: true },
+  args: { level: "empty", billingEnabled: true },
 };
 
 /** Polar billing is off. The action opens spending for an installation admin. */
 export const BillingOff: Story = {
   name: "Billing off",
-  args: { billingEnabled: false },
+  args: { level: "empty", billingEnabled: false },
+};
+
+/** Remaining hosted credit is at or below $20. Amber, less severe than empty. */
+export const LowCredit: Story = {
+  name: "Low credit",
+  args: { level: "low", billingEnabled: true },
+};
+
+/** The workspace board has no billing page yet, so the action is a no-op button. */
+export const BoardGoToBillingButton: Story = {
+  name: "Board (go to billing button)",
+  args: { level: "empty", billingEnabled: true, spendingHref: undefined, onGoToBilling: () => {} },
 };
