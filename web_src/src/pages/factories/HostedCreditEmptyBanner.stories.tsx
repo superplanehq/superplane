@@ -53,5 +53,10 @@ export const LowCredit: Story = {
 /** The workspace board has no billing page yet, so the action is a no-op button. */
 export const BoardGoToBillingButton: Story = {
   name: "Board (go to billing button)",
-  args: { level: "empty", billingEnabled: true, spendingHref: undefined, onGoToBilling: () => {} },
+  args: {
+    level: "empty",
+    billingEnabled: true,
+    spendingHref: undefined,
+    onGoToBilling: () => console.log("Go to billing"),
+  },
 };
