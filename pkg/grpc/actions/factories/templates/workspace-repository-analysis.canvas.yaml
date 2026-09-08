@@ -40,12 +40,8 @@ spec:
     - id: analyze-repository
       name: Detect Repository Setup
       type: TYPE_ACTION
-      component: runnerClaudeCode
+      component: runnerBash
       configuration:
-        credentials:
-          source: integration
-          integration:
-            name: claude
         environmentFrom:
           - source: integration
             integration:
@@ -57,29 +53,23 @@ spec:
           - name: BASE
             value: '{{ workspace().default_branch }}'
             valueSource: literal
-        executionTimeoutSeconds: 900
-        machineType: e1-large-amd64
-        model: sonnet
-        steps:
-          - name: Clone Repository
-            type: bash
-            command: |-
-              set -euo pipefail
-              git clone --depth 1 --branch "${BASE:-main}" \
-                "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
-          - name: Run Suss
-            type: bash
-            workingDirectory: repo
-            command: |-
-              set -euo pipefail
-              go run github.com/superplanehq/suss/cmd/suss@043a66e4f7e8d2e2919c1e300d827c37b144b206 . --json > /tmp/suss.json
-              jq -e '.schemaVersion == "1" and (.projects | type == "array")' /tmp/suss.json >/dev/null
-              COMMIT_SHA="$(git rev-parse HEAD)"
-              jq -n \
-                --arg commitSha "$COMMIT_SHA" \
-                --rawfile document /tmp/suss.json \
-                '{commitSha: $commitSha, document: ($document | @base64)}' \
-                > "$SUPERPLANE_RESULT_FILE"
+        execution_timeout_seconds: 900
+        machine_type: e1-large-amd64
+        script: |-
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          git clone --depth 1 --branch "${BASE:-main}" \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" repo
+          cd repo
+          go run github.com/superplanehq/suss/cmd/suss@043a66e4f7e8d2e2919c1e300d827c37b144b206 . --json > /tmp/suss.json
+          jq -e '.schemaVersion == "1" and (.projects | type == "array")' /tmp/suss.json >/dev/null
+          COMMIT_SHA="$(git rev-parse HEAD)"
+          jq -n \
+            --arg commitSha "$COMMIT_SHA" \
+            --rawfile document /tmp/suss.json \
+            '{commitSha: $commitSha, document: ($document | @base64)}' \
+            > "$SUPERPLANE_RESULT_FILE"
       position:
         x: 360
         'y': 440

@@ -138,10 +138,14 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Create a branch, implement the plan, and open a pull request.",
     entrypointNodeId: "onrun-implement",
   }),
-  "workspace-repository-analysis": buildLineApp({
+  // Suss is a static scan, so this app runs plain Bash and needs no agent
+  // provider integration.
+  "workspace-repository-analysis": buildOnboardingApp({
     id: "workspace-repository-analysis",
     title: "Repository Analysis",
     description: "Detect repository languages and development commands with Suss.",
+    integrations: ["github"],
+    componentIntegrations: LINE_APP_COMPONENT_INTEGRATIONS,
     entrypointNodeId: "onrun-analyze-repository",
   }),
   "pr-closure": buildEventApp({
