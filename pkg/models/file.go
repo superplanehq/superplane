@@ -342,6 +342,46 @@ func (f *File) Delete(tx *gorm.DB) error {
 	return tx.Delete(f).Error
 }
 
+func RememberAbandonedFileObjects(tx *gorm.DB, organizationID, factoryID uuid.UUID, keys []string) error {
+	if organizationID == uuid.Nil || factoryID == uuid.Nil || len(keys) == 0 {
+		return nil
+	}
+	installationID, err := GetInstallationID(tx)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	staleAt := now.Add(-StalePendingFileAge)
+	orgID := organizationID
+	facID := factoryID
+	for _, key := range keys {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		file := File{
+			ID:             uuid.New(),
+			InstallationID: installationID,
+			Scope:          blob.ScopeWorkspace,
+			OrganizationID: &orgID,
+			FactoryID:      &facID,
+			Filename:       "abandoned-object",
+			ContentType:    "text/plain",
+			StorageKey:     key,
+			State:          FileStateFailed,
+			CreatedAt:      now,
+			UpdatedAt:      staleAt,
+		}
+		err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "storage_key"}},
+			DoNothing: true,
+		}).Create(&file).Error
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ensureFileQuota(tx *gorm.DB, params CreateFileParams) error {
 	if err := lockFileQuotaRows(tx, params.OrganizationID, params.WorkOrderID); err != nil {
 		return err

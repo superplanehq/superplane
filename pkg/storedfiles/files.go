@@ -82,11 +82,19 @@ func BindDescriptionFiles(
 	return result, nil
 }
 
-func ApplyBindResult(ctx context.Context, provider blob.Provider, result BindResult, txErr error) error {
+func ApplyBindResult(
+	ctx context.Context,
+	db *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID uuid.UUID,
+	result BindResult,
+	txErr error,
+) error {
+	keys := result.StaleKeys
 	if txErr != nil {
-		return DeleteObjects(ctx, provider, result.CopiedKeys)
+		keys = result.CopiedKeys
 	}
-	return DeleteObjects(ctx, provider, result.StaleKeys)
+	return SweepObjects(ctx, db, provider, organizationID, factoryID, keys)
 }
 
 func bindFileToWorkOrder(
@@ -175,20 +183,62 @@ func reparentWorkspaceFile(
 	return staleKey, copiedKey, nil
 }
 
+const objectDeleteAttempts = 3
+
 func DeleteObjects(ctx context.Context, provider blob.Provider, keys []string) error {
-	if provider == nil || len(keys) == 0 {
-		return nil
+	_, err := deleteObjects(ctx, provider, keys)
+	return err
+}
+
+func SweepObjects(
+	ctx context.Context,
+	db *gorm.DB,
+	provider blob.Provider,
+	organizationID, factoryID uuid.UUID,
+	keys []string,
+) error {
+	leftover, err := deleteObjects(ctx, provider, keys)
+	if db == nil || organizationID == uuid.Nil || factoryID == uuid.Nil || len(leftover) == 0 {
+		return err
 	}
+	recErr := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return models.RememberAbandonedFileObjects(tx, organizationID, factoryID, leftover)
+	})
+	if err == nil {
+		return recErr
+	}
+	if recErr == nil {
+		return err
+	}
+	return fmt.Errorf("%w; record abandoned objects: %v", err, recErr)
+}
+
+func deleteObjects(ctx context.Context, provider blob.Provider, keys []string) ([]string, error) {
+	if provider == nil || len(keys) == 0 {
+		return nil, nil
+	}
+	var leftover []string
 	var first error
 	for _, key := range keys {
 		if strings.TrimSpace(key) == "" {
 			continue
 		}
-		if err := provider.Delete(ctx, key); err != nil && !errors.Is(err, blob.ErrNotFound) && first == nil {
-			first = err
+		var last error
+		for attempt := 0; attempt < objectDeleteAttempts; attempt++ {
+			last = provider.Delete(ctx, key)
+			if last == nil || errors.Is(last, blob.ErrNotFound) {
+				last = nil
+				break
+			}
+		}
+		if last != nil {
+			leftover = append(leftover, key)
+			if first == nil {
+				first = last
+			}
 		}
 	}
-	return first
+	return leftover, first
 }
 
 func CompleteUpload(ctx context.Context, tx *gorm.DB, provider blob.Provider, file *models.File, body io.Reader) error {

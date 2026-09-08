@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +68,7 @@ func TestCompleteUploadAndBindDescriptionFiles(t *testing.T) {
 	require.Len(t, bound.CopiedKeys, 1)
 	_, err = provider.Head(t.Context(), sourceKey)
 	require.NoError(t, err)
-	require.NoError(t, ApplyBindResult(t.Context(), provider, bound, nil))
+	require.NoError(t, ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, bound, nil))
 	_, err = provider.Head(t.Context(), sourceKey)
 	assert.ErrorIs(t, err, blob.ErrNotFound)
 
@@ -326,13 +327,54 @@ func TestIngestRemoteImagesDeletesObjectsWhenTransactionRollsBack(t *testing.T) 
 	})
 	require.Error(t, err)
 	require.Len(t, ingested.ObjectKeys, 1)
-	require.NoError(t, ApplyBindResult(t.Context(), provider, BindResult{CopiedKeys: ingested.ObjectKeys}, err))
+	require.NoError(t, ApplyBindResult(t.Context(), db, provider, r.Organization.ID, factoryModel.ID, BindResult{CopiedKeys: ingested.ObjectKeys}, err))
 
 	_, headErr := provider.Head(t.Context(), ingested.ObjectKeys[0])
 	assert.ErrorIs(t, headErr, blob.ErrNotFound)
 	files, err := models.ListReadyTaskFiles(db, order.ID)
 	require.NoError(t, err)
 	assert.Empty(t, files)
+}
+
+type failDeleteProvider struct {
+	blob.Provider
+}
+
+func (p failDeleteProvider) Delete(ctx context.Context, key string) error {
+	return errors.New("delete denied")
+}
+
+func TestApplyBindResultRecordsAbandonedObjectsWhenDeleteFails(t *testing.T) {
+	r := support.Setup(t)
+	provider := setupFileStore(t)
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	key := "abandoned/" + uuid.NewString()
+	require.NoError(t, provider.Put(t.Context(), key, strings.NewReader("png-bytes"), blob.PutOptions{ContentType: "image/png"}))
+
+	err = ApplyBindResult(
+		t.Context(),
+		db,
+		failDeleteProvider{Provider: provider},
+		r.Organization.ID,
+		factoryModel.ID,
+		BindResult{CopiedKeys: []string{key}},
+		errors.New("force rollback"),
+	)
+	require.Error(t, err)
+
+	stale, err := models.ListStalePendingFiles(db, time.Now(), 10)
+	require.NoError(t, err)
+	require.Len(t, stale, 1)
+	assert.Equal(t, key, stale[0].StorageKey)
+	assert.Equal(t, models.FileStateFailed, stale[0].State)
+
+	require.NoError(t, DeleteObjectAndRow(t.Context(), db, provider, &stale[0]))
+	_, headErr := provider.Head(t.Context(), key)
+	assert.ErrorIs(t, headErr, blob.ErrNotFound)
 }
 
 func TestCompleteUploadRejectsOversizedBody(t *testing.T) {

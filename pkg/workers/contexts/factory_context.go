@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -172,7 +173,14 @@ func (c *FactoryContext) ingestGitHubImages(order *models.FactoryWorkOrder) {
 		return
 	}
 	if err := order.UpdateContent(c.tx, nil, &next.Markdown); err != nil {
-		_ = storedfiles.DeleteObjects(context.Background(), blob.Current(), next.ObjectKeys)
+		_ = storedfiles.SweepObjects(
+			context.Background(),
+			database.Conn(),
+			blob.Current(),
+			order.OrganizationID,
+			order.FactoryID,
+			next.ObjectKeys,
+		)
 	}
 }
 

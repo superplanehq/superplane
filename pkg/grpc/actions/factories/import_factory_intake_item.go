@@ -124,7 +124,7 @@ func ImportFactoryIntakeItem(
 		bound.CopiedKeys = append(bound.CopiedKeys, result.CopiedKeys...)
 		return bindErr
 	})
-	if delErr := storedfiles.ApplyBindResult(ctx, blob.Current(), bound, err); delErr != nil {
+	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
 	}
 	if err != nil {
