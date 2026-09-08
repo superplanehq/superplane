@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/integrations/notion"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -50,6 +51,8 @@ func seedIntake(
 		return seedGitHubIssues(ctx, deps, tx, canvasID, binding, installation)
 	case models.FactoryIntakeSourceProductiveTasks:
 		return seedProductiveTasks(deps, tx, canvasID, binding, installation)
+	case models.FactoryIntakeSourceNotionPages:
+		return seedNotionPages(deps, tx, canvasID, binding, installation)
 	}
 
 	// The remaining sources cannot be read yet, so they start empty.
@@ -115,6 +118,53 @@ func productiveTaskEvents(documents []map[string]any) []map[string]any {
 	return events
 }
 
+func seedNotionPages(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	binding *intakeBinding,
+	installation *models.Integration,
+) error {
+	client, err := newIntakeNotionClient(deps, tx, installation)
+	if err != nil {
+		return err
+	}
+
+	database, _ := binding.Configuration["database"].(string)
+	pages, err := client.ListNewestPages(database, intakeSeedSize)
+	if err != nil {
+		return fmt.Errorf("failed to list the pages of database %s: %w", database, err)
+	}
+
+	events, err := notionPageEvents(client, pages)
+	if err != nil {
+		return err
+	}
+
+	return emitIntakeEvents(tx, canvasID, notion.PagePayloadType, events)
+}
+
+// notionPageEvents shapes each page of a newest-first read like the event the
+// trigger emits when it polls, so the rest of the graph cannot tell a seeded
+// page from a polled one.
+func notionPageEvents(client *notion.Client, pages []map[string]any) ([]map[string]any, error) {
+	events := make([]map[string]any, 0, len(pages))
+	for _, page := range pages {
+		enriched, err := notion.BuildPageEvent(client, page)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read the content of page %s: %w", page["id"], err)
+		}
+
+		events = append(events, notion.PageEnvelope(notion.PageCreatedEvent, enriched))
+	}
+
+	// The intake lists its runs newest first. Emitting the oldest page first
+	// keeps the newest page at the top of the intake list.
+	slices.Reverse(events)
+
+	return events, nil
+}
+
 func newIntakeGitHubClient(deps IntakeDependencies, tx *gorm.DB, integration *models.Integration) (*common.Client, error) {
 	if deps.Registry == nil {
 		return nil, fmt.Errorf("integration registry is unavailable")
@@ -150,6 +200,28 @@ func newIntakeProductiveClient(
 	client, err := productive.NewClient(deps.Registry.HTTPContext(), integrationContext)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build Productive.io client: %w", err)
+	}
+
+	return client, nil
+}
+
+func newIntakeNotionClient(
+	deps IntakeDependencies,
+	tx *gorm.DB,
+	integration *models.Integration,
+) (*notion.Client, error) {
+	if deps.Registry == nil {
+		return nil, fmt.Errorf("integration registry is unavailable")
+	}
+
+	if integration.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integration.ID)
+	}
+
+	integrationContext := contexts.NewIntegrationContext(tx, nil, integration, deps.Encryptor, deps.Registry, nil)
+	client, err := notion.NewClient(deps.Registry.HTTPContext(), integrationContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build Notion client: %w", err)
 	}
 
 	return client, nil
