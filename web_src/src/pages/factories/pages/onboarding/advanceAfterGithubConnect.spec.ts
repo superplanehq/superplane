@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { factoryQueryKeys } from "@/hooks/useFactoryData";
 
-import { advanceAfterGithubConnect } from "./useOnboardingPageModel";
+import { advanceAfterGithubConnect } from "./advanceAfterGithubConnect";
 
 describe("advanceAfterGithubConnect", () => {
   const factoryId = "factory-1";

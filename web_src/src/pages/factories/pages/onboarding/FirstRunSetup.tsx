@@ -64,7 +64,11 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   agent: 4,
 };
 
+// The reverse path walks the exact screens in reverse order, back to the
+// welcome screen. The connect screen asks for the GitHub account again on
+// the next forward pass.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  connect: "welcome",
   choose: "connect",
   tickets: "choose",
   agent: "tickets",
@@ -273,14 +277,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
 
   // An approved install request binds outside the wizard round trip, so the
   // waiting screen rechecks GitHub through the connection until it is ready.
+  // The welcome screen stays first even while a request waits; Get started
+  // opens the connect screen, which shows the waiting state.
   useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
-
-  useEffect(() => {
-    if (!installRequested || openedScreen !== "welcome") return;
-    openStep.current = "vcs";
-    setOpenSection("vcs");
-    setOpenedScreen("connect");
-  }, [installRequested, openedScreen, setOpenSection]);
 
   const githubOrganization =
     searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||

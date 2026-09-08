@@ -531,7 +531,7 @@ describe("FirstRunSetup", () => {
     expect(navigateSpy).toHaveBeenCalledWith("/org-1");
   });
 
-  it("goes back from the ticket screen to the repository screen", async () => {
+  it("goes back through every screen to the welcome screen", async () => {
     const user = userEvent.setup();
     const model = pageModel({
       setup: (() => {
@@ -548,6 +548,10 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-back"));
     expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    // The welcome screen is the first screen, so it offers no Back.
+    expect(screen.queryByTestId("first-run-back")).not.toBeInTheDocument();
   });
 
   it("keeps Log out and hides the organization switch with a single org and single workspace", () => {
