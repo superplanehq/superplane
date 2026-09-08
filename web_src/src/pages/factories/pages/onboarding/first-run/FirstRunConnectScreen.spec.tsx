@@ -235,12 +235,10 @@ describe("FirstRunConnectScreen", () => {
     expect(onContinue).toHaveBeenCalled();
   });
 
-  it("shows the account picker instead of ready connections while a new install is pending", () => {
+  it("shows the account picker instead of the connected state while a new install is pending", () => {
     render(
       <FirstRunConnectScreen
         githubConnected
-        readyConnections={[{ id: "int-1", name: "github-acme", owner: "acme" }]}
-        selectedConnectionId="int-1"
         pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
         githubState="csrf"
         githubAppSlug="superplane"
@@ -251,34 +249,6 @@ describe("FirstRunConnectScreen", () => {
     );
 
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-github-connections")).not.toBeInTheDocument();
-  });
-
-  it("lists ready GitHub connections and can connect another account", async () => {
-    const user = userEvent.setup();
-    const onSelectConnection = vi.fn();
-    const onConnectAnother = vi.fn();
-
-    render(
-      <FirstRunConnectScreen
-        githubConnected
-        readyConnections={[
-          { id: "int-1", name: "github-acme", owner: "acme" },
-          { id: "int-2", name: "github-octo", owner: "octo" },
-        ]}
-        selectedConnectionId="int-1"
-        onConnectGitHub={vi.fn()}
-        onSelectConnection={onSelectConnection}
-        onConnectAnother={onConnectAnother}
-        onContinue={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("first-run-github-connections")).toHaveTextContent("acme");
-    expect(screen.getByTestId("first-run-github-connections")).toHaveTextContent("octo");
-    await user.click(screen.getByRole("button", { name: /octo/i }));
-    expect(onSelectConnection).toHaveBeenCalledWith("int-2");
-    await user.click(screen.getByTestId("first-run-github-connect-another"));
-    expect(onConnectAnother).toHaveBeenCalled();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
   });
 });

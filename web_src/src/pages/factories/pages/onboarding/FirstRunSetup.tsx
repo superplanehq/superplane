@@ -30,9 +30,7 @@ import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } f
 import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
-import type { FirstRunGithubConnection } from "./first-run/FirstRunConnectScreen";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
-import { githubIntegrationOwner } from "./initialOnboardingOrganization";
 import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -72,20 +70,6 @@ const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   agent: "tickets",
 };
 
-function readyGithubConnections(model: OnboardingPageModel): FirstRunGithubConnection[] {
-  const connections: FirstRunGithubConnection[] = [];
-  for (const instance of model.githubConnections.readyInstances) {
-    const id = instance.metadata?.id ?? "";
-    if (!id) continue;
-    connections.push({
-      id,
-      name: instance.metadata?.name ?? "",
-      owner: githubIntegrationOwner(instance),
-    });
-  }
-  return connections;
-}
-
 /**
  * Hosted credentials leave the agent screen with no question to ask, so the
  * ticket screen becomes the last screen and provisions the workspace.
@@ -118,24 +102,13 @@ function signOut() {
   window.location.href = "/logout";
 }
 
-/**
- * Selects the connection when the organization has exactly one ready GitHub
- * connection. The first-run connect screen shows connection state only, so
- * setup must not wait for a choice the screen cannot offer.
- */
-function useSingleGithubConnection(model: OnboardingPageModel) {
-  const selected = model.selectedVcsConnectionId;
-  const readyInstances = model.githubConnections.readyInstances;
-  const selectConnection = model.selectVcsConnection;
-  const attempted = useRef(false);
-
-  useEffect(() => {
-    if (attempted.current || selected || readyInstances.length !== 1) return;
-    const integrationId = readyInstances[0]?.metadata?.id;
-    if (!integrationId) return;
-    attempted.current = true;
-    selectConnection(integrationId);
-  }, [readyInstances, selectConnection, selected]);
+/** True when this workspace saved the ready GitHub connection it now uses. */
+function workspaceOwnsGithubConnection(
+  savedIntegrationId: string | undefined,
+  selectedIntegrationId: string | undefined,
+  vcsReady: boolean,
+): boolean {
+  return Boolean(savedIntegrationId && selectedIntegrationId === savedIntegrationId && vcsReady);
 }
 
 /** Reports a failed repository list, which the choose screen shows as empty. */
@@ -211,7 +184,6 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const openStep = useRef(model.openSection);
   const skipAgentScreen = model.hostedAgentReady;
 
-  useSingleGithubConnection(model);
   useRepositoryErrorToast(model.repositoriesError);
 
   // Setup selects the connection GitHub returns with, then opens the next step.
@@ -293,11 +265,17 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const bindInstallation = useBindGitHubInstallation(organizationId);
   const useInstallation = (installation: PendingGitHubInstallation) => {
     const state = accountPicker?.state;
+    const pendingId = accountPicker?.id;
     if (!state || bindInstallation.isPending) return;
     bindInstallation.mutate(
       { state, installationId: installation.id },
       {
-        onSuccess: () => goToScreen("choose"),
+        onSuccess: async () => {
+          if (!factory?.onboarding?.initial && pendingId) {
+            await model.selectVcsConnection(pendingId);
+          }
+          goToScreen("choose");
+        },
         onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
       },
     );
@@ -324,7 +302,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
  */
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
-  const { organizationId, factoryId, factories } = useFactoriesLayout();
+  const { organizationId, factoryId, factory, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
@@ -366,20 +344,20 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        githubConnected={setup.vcsReady}
+        githubConnected={workspaceOwnsGithubConnection(
+          factory?.onboarding?.vcsIntegrationId,
+          model.selectedVcsConnectionId,
+          setup.vcsReady,
+        )}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
         pendingInstallations={flow.accountPicker?.installations}
         githubState={flow.accountPicker?.state}
         githubAppSlug={flow.accountPicker?.appSlug}
         bindingInstallationId={flow.bindingInstallationId}
-        readyConnections={readyGithubConnections(model)}
-        selectedConnectionId={model.selectedVcsConnectionId}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
-        onSelectConnection={model.selectVcsConnection}
-        onConnectAnother={model.createVcsConnection}
         onContinue={() => flow.goToScreen("choose")}
       />
     );

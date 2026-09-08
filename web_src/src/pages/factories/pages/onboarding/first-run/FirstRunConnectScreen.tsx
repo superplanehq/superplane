@@ -5,16 +5,10 @@ import { Check, Clock } from "lucide-react";
 
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 
-import { ConnectOptionRow, IntegrationChoiceIcon } from "../onboardingSteps";
+import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunChrome } from "./firstRunTypes";
-
-export type FirstRunGithubConnection = {
-  id: string;
-  name: string;
-  owner?: string;
-};
 
 const copy = FIRST_RUN_COPY.connect;
 
@@ -119,10 +113,6 @@ function connectScreenState({
   };
 }
 
-function connectionLabel(connection: FirstRunGithubConnection): string {
-  return connection.owner || connection.name || copy.connected;
-}
-
 export function FirstRunConnectScreen({
   githubConnected,
   installRequested = false,
@@ -131,14 +121,10 @@ export function FirstRunConnectScreen({
   githubState = "",
   githubAppSlug = "",
   bindingInstallationId,
-  readyConnections = [],
-  selectedConnectionId,
   connectError,
   chrome,
   onConnectGitHub,
   onUseInstallation,
-  onSelectConnection,
-  onConnectAnother,
   onContinue,
 }: {
   githubConnected: boolean;
@@ -148,14 +134,10 @@ export function FirstRunConnectScreen({
   githubState?: string;
   githubAppSlug?: string;
   bindingInstallationId?: string;
-  readyConnections?: FirstRunGithubConnection[];
-  selectedConnectionId?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
-  onSelectConnection?: (id: string) => void;
-  onConnectAnother?: () => void;
   onContinue: () => void;
 }) {
   const { showAccountPicker, waitingForApproval } = connectScreenState({
@@ -179,14 +161,10 @@ export function FirstRunConnectScreen({
           githubState={githubState}
           githubAppSlug={githubAppSlug}
           bindingInstallationId={bindingInstallationId}
-          readyConnections={readyConnections}
-          selectedConnectionId={selectedConnectionId}
           showAccountPicker={showAccountPicker}
           waitingForApproval={waitingForApproval}
           onConnectGitHub={onConnectGitHub}
           onUseInstallation={onUseInstallation}
-          onSelectConnection={onSelectConnection}
-          onConnectAnother={onConnectAnother}
           onContinue={onContinue}
         />
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
@@ -203,14 +181,10 @@ function ConnectScreenBody({
   githubState,
   githubAppSlug,
   bindingInstallationId,
-  readyConnections,
-  selectedConnectionId,
   showAccountPicker,
   waitingForApproval,
   onConnectGitHub,
   onUseInstallation,
-  onSelectConnection,
-  onConnectAnother,
   onContinue,
 }: {
   githubConnected: boolean;
@@ -219,14 +193,10 @@ function ConnectScreenBody({
   githubState: string;
   githubAppSlug: string;
   bindingInstallationId?: string;
-  readyConnections: FirstRunGithubConnection[];
-  selectedConnectionId?: string;
   showAccountPicker: boolean;
   waitingForApproval: boolean;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
-  onSelectConnection?: (id: string) => void;
-  onConnectAnother?: () => void;
   onContinue: () => void;
 }) {
   if (showAccountPicker && onUseInstallation) {
@@ -261,37 +231,6 @@ function ConnectScreenBody({
     );
   }
 
-  if (readyConnections.length > 0) {
-    return (
-      <>
-        <FirstRunPanel>
-          <div className="space-y-3" data-testid="first-run-github-connections">
-            {readyConnections.map((connection) => (
-              <ConnectOptionRow
-                key={connection.id}
-                icon={<IntegrationChoiceIcon name="github" />}
-                title={connectionLabel(connection)}
-                detail={copy.connected}
-                selected={connection.id === selectedConnectionId}
-                onSelect={() => onSelectConnection?.(connection.id)}
-              />
-            ))}
-          </div>
-        </FirstRunPanel>
-        <Button
-          type="button"
-          className="min-w-40"
-          disabled={!selectedConnectionId}
-          onClick={onContinue}
-          data-testid="first-run-github-continue"
-        >
-          {copy.continue}
-        </Button>
-        <ConnectAnotherButton onConnectAnother={onConnectAnother} />
-      </>
-    );
-  }
-
   if (githubConnected) {
     return (
       <>
@@ -306,7 +245,6 @@ function ConnectScreenBody({
         <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
           {copy.continue}
         </Button>
-        <ConnectAnotherButton onConnectAnother={onConnectAnother} />
       </>
     );
   }
@@ -314,24 +252,6 @@ function ConnectScreenBody({
   return (
     <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
       {copy.connectGitHub}
-    </Button>
-  );
-}
-
-function ConnectAnotherButton({ onConnectAnother }: { onConnectAnother?: () => void }) {
-  if (!onConnectAnother) {
-    return null;
-  }
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      className="text-[13px] text-primary hover:text-primary"
-      onClick={onConnectAnother}
-      data-testid="first-run-github-connect-another"
-    >
-      {copy.connectAnother}
     </Button>
   );
 }

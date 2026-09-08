@@ -28,7 +28,6 @@ export const FIRST_RUN_COPY = {
     useAccount: (account: string) => `Use ${account}`,
     installDifferentAccount: "Install on a different account",
     connected: "Connected",
-    connectAnother: "Connect another GitHub account",
     continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
