@@ -7,6 +7,7 @@ import "google/protobuf/struct.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "canvases.proto";
+import "files.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/factories";
 
@@ -1382,6 +1383,9 @@ message WorkOrder {
   // External ticket this work order was created from, when known.
   WorkOrderOrigin origin = 16;
   int64 total_duration_seconds = 17;
+  // Ready files for this task. Present on DescribeWorkOrder only.
+  // The stored description uses sp-file:// refs, not download URLs.
+  repeated Superplane.Files.File files = 18;
 }
 
 message WorkOrderOrigin {

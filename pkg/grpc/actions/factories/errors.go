@@ -130,6 +130,12 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This intake cannot search items yet.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, models.ErrFileNotFound):
+		return grpcerrors.NotFound(err, "file not found")
+	case errors.Is(err, models.ErrFileNotReady), errors.Is(err, models.ErrFileForeignReference), errors.Is(err, models.ErrFileInvalid), errors.Is(err, models.ErrFileContentType):
+		return grpcerrors.InvalidArgument(err, err.Error())
+	case errors.Is(err, models.ErrFileQuotaExceeded):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	case errors.Is(err, errInvalidArgument):
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):

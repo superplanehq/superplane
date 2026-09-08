@@ -92,6 +92,7 @@ vi.mock("@/hooks/useFactoryData", () => ({
       return updateLineIsPending.value;
     },
   }),
+  useWorkOrder: () => ({ data: undefined }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useFactoryPullRequests: () => ({ data: [] }),
