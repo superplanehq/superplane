@@ -18,6 +18,7 @@ import type {
 import type { FactoriesWorkOrderCheck } from "@/api-client";
 import type { BacklogIntakeItemCatalog } from "../pages/backlogIntakeItems";
 import { DEFAULT_ORG_SPENDING_REPORT, type StorybookSpendingReport } from "./spendingReportFixtures";
+import { DEFAULT_CREDIT_GRANTS } from "./creditGrantFixtures";
 import { DEFAULT_FACTORY_USAGE, EMPTY_USAGE_REPORT, type StorybookUsageReport } from "./usageReportFixtures";
 import { DEFAULT_FACTORY_VELOCITY } from "./velocityReportFixtures";
 import {
@@ -297,6 +298,15 @@ export interface FactoriesFixture {
   velocityByFactoryId?: Record<string, Record<number, FactoriesDescribeFactoryVelocityResponse>>;
   organizationWorkspaceUsage?: StorybookUsageReport;
   organizationSpendingReport?: StorybookSpendingReport;
+  organizationCreditGrants?: Array<{
+    id?: string;
+    kind?: string;
+    amountCents?: string;
+    note?: string;
+    actorName?: string;
+    polarOrderId?: string;
+    createdAt?: string;
+  }>;
   hostedCreditProducts?: Array<{ id: string; name: string; amountCents: string }>;
   /**
    * Ready BYOK providers (`anthropic`, `openai`, `openrouter`).
@@ -355,4 +365,5 @@ export const defaultFactoriesFixture: FactoriesFixture = {
   },
   organizationWorkspaceUsage: DEFAULT_FACTORY_USAGE,
   organizationSpendingReport: DEFAULT_ORG_SPENDING_REPORT,
+  organizationCreditGrants: DEFAULT_CREDIT_GRANTS,
 };
