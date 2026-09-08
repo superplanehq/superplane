@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 
@@ -11,6 +11,17 @@ import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.connect;
+
+function SignedInAsLine({ login }: { login: string }) {
+  const [before, after] = copy.signedInAs(login).split(login);
+  return (
+    <p className="text-[15px] leading-6 text-muted-foreground" data-testid="first-run-github-signed-in-as">
+      {before}
+      <span className="font-medium text-foreground">{login}</span>
+      {after}
+    </p>
+  );
+}
 
 function FirstRunInstallRequested({ githubOrganization }: { githubOrganization: string }) {
   return (
@@ -59,7 +70,7 @@ function FirstRunGitHubAccountPicker({
 }) {
   const binding = bindingInstallationId !== undefined;
   return (
-    <div className="space-y-3" data-testid="first-run-github-account-picker">
+    <div className="space-y-3 text-left" data-testid="first-run-github-account-picker">
       <FirstRunPanel>
         <p className="text-[13px] font-medium">{copy.selectAccount}</p>
         <p className="mt-0.5 text-[13px] text-muted-foreground">{copy.selectAccountBody}</p>
@@ -78,32 +89,33 @@ function FirstRunGitHubAccountPicker({
         </LoadingButton>
       ))}
       {githubAppSlug !== "" ? (
-        <a
-          href={hostedGitHubInstallURL(githubAppSlug, githubState)}
-          className="inline-block text-[13px] text-primary hover:underline"
-          data-testid="first-run-github-install-other"
-        >
-          {copy.installDifferentAccount}
-        </a>
+        <p className="text-[13px] text-muted-foreground">
+          {copy.missingAccount}{" "}
+          <a
+            href={hostedGitHubInstallURL(githubAppSlug, githubState)}
+            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
+            data-testid="first-run-github-install-other"
+          >
+            {copy.installThere}
+          </a>
+        </p>
       ) : null}
     </div>
   );
 }
 
 function connectScreenState({
-  githubConnected,
   installRequested,
   githubOrganization,
   pendingInstallations,
   githubState,
 }: {
-  githubConnected: boolean;
   installRequested: boolean;
   githubOrganization: string;
   pendingInstallations: PendingGitHubInstallation[];
   githubState: string;
 }) {
-  const showAccountPicker = !githubConnected && pendingInstallations.length >= 1 && githubState !== "";
+  const showAccountPicker = pendingInstallations.length >= 1 && githubState !== "";
   // A picker that offers the requested organization means the request is
   // approved, so the waiting state must not show next to it.
   const requestApproved = pendingInstallations.some(
@@ -111,39 +123,40 @@ function connectScreenState({
   );
   return {
     showAccountPicker,
-    waitingForApproval: installRequested && !githubConnected && !(showAccountPicker && requestApproved),
+    waitingForApproval: installRequested && !(showAccountPicker && requestApproved),
   };
 }
 
 export function FirstRunConnectScreen({
-  githubConnected,
+  loading = false,
   installRequested = false,
   githubOrganization = "",
   pendingInstallations = [],
   githubState = "",
   githubAppSlug = "",
+  githubLogin = "",
   bindingInstallationId,
   connectError,
   chrome,
   onConnectGitHub,
   onUseInstallation,
-  onContinue,
 }: {
-  githubConnected: boolean;
+  /** True while the picker data still loads after a GitHub round trip. */
+  loading?: boolean;
   installRequested?: boolean;
   githubOrganization?: string;
   pendingInstallations?: PendingGitHubInstallation[];
   githubState?: string;
   githubAppSlug?: string;
+  /** GitHub login that authorized this connect. Shown only with the account picker. */
+  githubLogin?: string;
   bindingInstallationId?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
-  onContinue: () => void;
 }) {
   const { showAccountPicker, waitingForApproval } = connectScreenState({
-    githubConnected,
     installRequested,
     githubOrganization,
     pendingInstallations,
@@ -154,49 +167,87 @@ export function FirstRunConnectScreen({
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
+        {showAccountPicker && githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
       </FirstRunHeading>
 
-      <div className="mt-8 space-y-3">
-        {githubConnected ? (
-          <>
-            <div
-              className="flex items-center gap-3 rounded-md bg-accent/40 px-3 py-2.5 text-left"
-              data-testid="first-run-github-connected"
-            >
-              <IntegrationChoiceIcon name="github" />
-              <span className="text-[13px] font-medium">{copy.connected}</span>
-              <Check className="ml-auto size-3.5" strokeWidth={2.5} aria-hidden />
-            </div>
-            <Button type="button" className="min-w-40" onClick={onContinue} data-testid="first-run-github-continue">
-              {copy.continue}
-            </Button>
-          </>
+      <div className="mt-8 space-y-6">
+        {loading ? (
+          <ConnectScreenLoading />
         ) : (
-          <>
-            {waitingForApproval ? <FirstRunInstallRequested githubOrganization={githubOrganization} /> : null}
-            {showAccountPicker && onUseInstallation ? (
-              <FirstRunGitHubAccountPicker
-                installations={pendingInstallations}
-                githubAppSlug={githubAppSlug}
-                githubState={githubState}
-                bindingInstallationId={bindingInstallationId}
-                onUseInstallation={onUseInstallation}
-              />
-            ) : (
-              <Button
-                type="button"
-                className="min-w-40"
-                onClick={onConnectGitHub}
-                data-testid="first-run-connect-github"
-              >
-                {copy.connectGitHub}
-              </Button>
-            )}
-          </>
+          <ConnectScreenBody
+            githubOrganization={githubOrganization}
+            pendingInstallations={pendingInstallations}
+            githubState={githubState}
+            githubAppSlug={githubAppSlug}
+            bindingInstallationId={bindingInstallationId}
+            showAccountPicker={showAccountPicker}
+            waitingForApproval={waitingForApproval}
+            onConnectGitHub={onConnectGitHub}
+            onUseInstallation={onUseInstallation}
+          />
         )}
-        <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
+        <p className="text-[12px] text-muted-foreground">{copy.trust}</p>
         {connectError && !waitingForApproval ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>
+  );
+}
+
+/**
+ * Placeholder while the picker data loads after a GitHub round trip, so the
+ * screen does not flash the connect button before the picker.
+ */
+function ConnectScreenLoading() {
+  return (
+    <div className="space-y-3" data-testid="first-run-connect-loading" aria-hidden>
+      <div className="h-14 animate-pulse rounded-md bg-accent/40" />
+      <div className="h-9 w-40 animate-pulse rounded-md bg-accent/40" />
+    </div>
+  );
+}
+
+function ConnectScreenBody({
+  githubOrganization,
+  pendingInstallations,
+  githubState,
+  githubAppSlug,
+  bindingInstallationId,
+  showAccountPicker,
+  waitingForApproval,
+  onConnectGitHub,
+  onUseInstallation,
+}: {
+  githubOrganization: string;
+  pendingInstallations: PendingGitHubInstallation[];
+  githubState: string;
+  githubAppSlug: string;
+  bindingInstallationId?: string;
+  showAccountPicker: boolean;
+  waitingForApproval: boolean;
+  onConnectGitHub: () => void;
+  onUseInstallation?: (installation: PendingGitHubInstallation) => void;
+}) {
+  if (showAccountPicker && onUseInstallation) {
+    return (
+      <>
+        {waitingForApproval ? <FirstRunInstallRequested githubOrganization={githubOrganization} /> : null}
+        <FirstRunGitHubAccountPicker
+          installations={pendingInstallations}
+          githubAppSlug={githubAppSlug}
+          githubState={githubState}
+          bindingInstallationId={bindingInstallationId}
+          onUseInstallation={onUseInstallation}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {waitingForApproval ? <FirstRunInstallRequested githubOrganization={githubOrganization} /> : null}
+      <Button type="button" className="min-w-40" onClick={onConnectGitHub} data-testid="first-run-connect-github">
+        {copy.connectGitHub}
+      </Button>
+    </>
   );
 }

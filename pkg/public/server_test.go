@@ -501,6 +501,62 @@ func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {
 	assert.Equal(t, first, retryResult)
 }
 
+func Test__CreateInitialWorkspaceReusesPendingOrganization(t *testing.T) {
+	r := support.Setup(t)
+	account, err := models.CreateAccount("Reuse Pending", "reuse-onboarding@superplane.local")
+	require.NoError(t, err)
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test"),
+		support.NewOIDCProvider(),
+		r.GitProvider,
+		"",
+		"localhost",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	postOnboarding := func(attemptID uuid.UUID) initialWorkspaceResponse {
+		body, marshalErr := json.Marshal(initialWorkspaceRequest{Owner: "Reuse Pending", AttemptID: attemptID.String()})
+		require.NoError(t, marshalErr)
+		request := httptest.NewRequest(http.MethodPost, "/account/onboarding", bytes.NewReader(body))
+		request = request.WithContext(accountContext(account))
+		response := httptest.NewRecorder()
+		server.createInitialWorkspace(response, request)
+		require.Equal(t, http.StatusOK, response.Code)
+		var result initialWorkspaceResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+		return result
+	}
+
+	first := postOnboarding(uuid.New())
+	second := postOnboarding(uuid.New())
+	assert.Equal(t, first, second)
+
+	organizations, err := models.ListOrganizationsCreatedByAccount(database.DB(t.Context()), account.ID)
+	require.NoError(t, err)
+	require.Len(t, organizations, 1)
+
+	workspaces, err := models.ListFactories(database.DB(t.Context()), organizations[0].ID)
+	require.NoError(t, err)
+	require.Len(t, workspaces, 1)
+	require.NoError(t, database.DB(t.Context()).Model(&workspaces[0]).Update("onboarding_completed_at", time.Now()).Error)
+
+	third := postOnboarding(uuid.New())
+	assert.NotEqual(t, first.OrganizationSlug, third.OrganizationSlug)
+
+	organizations, err = models.ListOrganizationsCreatedByAccount(database.DB(t.Context()), account.ID)
+	require.NoError(t, err)
+	assert.Len(t, organizations, 2)
+}
+
 func Test__InitialOrganizationNameUsesEmailWhenAccountNameEmpty(t *testing.T) {
 	account := &models.Account{Name: "  ", Email: "dev@superplane.local"}
 	assert.Equal(t, "dev", initialOrganizationName(account, ""))

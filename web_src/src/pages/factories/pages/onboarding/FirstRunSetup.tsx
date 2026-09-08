@@ -11,7 +11,11 @@ import {
 } from "@/lib/hostedGitHubInstall";
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
-import { pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
+import {
+  githubAccountPickerFromConnection,
+  pendingGitHubAccountPicker,
+  type PendingGitHubAccountPicker,
+} from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -32,6 +36,7 @@ import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunT
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import { isWizardStepId } from "./onboardingStatus";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -49,6 +54,24 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   name: "agent",
 };
 
+function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen {
+  const requestedStep = searchParams.get("step");
+  // A leftover githubSetup=request on a later step must not reopen Connect.
+  if (isWizardStepId(requestedStep)) {
+    return SCREEN_FOR_STEP[requestedStep];
+  }
+  if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
+    return "connect";
+  }
+  return "welcome";
+}
+
+function startConnectOnPicker(searchParams: URLSearchParams): boolean {
+  const step = searchParams.get("step");
+  if (step === "vcs") return true;
+  return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
+}
+
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
   connect: "vcs",
   choose: "repo",
@@ -62,6 +85,16 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   choose: 2,
   tickets: 3,
   agent: 4,
+};
+
+// The reverse path walks the exact screens in reverse order, back to the
+// welcome screen. The connect screen has two pages (the Connect GitHub page
+// and the account picker), so `backActionFor` in FirstRunSetup handles the
+// connect and choose screens itself.
+const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
+  connect: "welcome",
+  tickets: "choose",
+  agent: "tickets",
 };
 
 /**
@@ -97,23 +130,65 @@ function signOut() {
 }
 
 /**
- * Selects the connection when the organization has exactly one ready GitHub
- * connection. The first-run connect screen shows connection state only, so
- * setup must not wait for a choice the screen cannot offer.
+ * Saves the connection the account picker bound, once the refreshed
+ * connection list reports it ready. The bind callback runs before the list
+ * re-renders, so an effect makes the save see the ready connection. The
+ * repository screen opens only after the save, so a fast repository pick
+ * cannot store the prior connection.
  */
-function useSingleGithubConnection(model: OnboardingPageModel) {
-  const selected = model.selectedVcsConnectionId;
+function useSelectBoundGithubConnection(
+  boundIntegrationId: string | null,
+  clearBoundIntegrationId: () => void,
+  model: OnboardingPageModel,
+  onSelected: () => void,
+) {
   const readyInstances = model.githubConnections.readyInstances;
   const selectConnection = model.selectVcsConnection;
-  const attempted = useRef(false);
 
   useEffect(() => {
-    if (attempted.current || selected || readyInstances.length !== 1) return;
-    const integrationId = readyInstances[0]?.metadata?.id;
-    if (!integrationId) return;
-    attempted.current = true;
-    selectConnection(integrationId);
-  }, [readyInstances, selectConnection, selected]);
+    if (!boundIntegrationId) return;
+    const bound = readyInstances.some((instance) => instance.metadata?.id === boundIntegrationId);
+    if (!bound) return;
+    clearBoundIntegrationId();
+    void selectConnection(boundIntegrationId).then((saved) => {
+      if (saved) onSelected();
+    });
+  }, [boundIntegrationId, clearBoundIntegrationId, readyInstances, selectConnection, onSelected]);
+}
+
+/**
+ * The GitHub account picker reads the connection list from the cache. An
+ * install or bind finished outside this document, or a browser Back, can
+ * leave that list stale, so entering the connect screen refetches it.
+ */
+function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refresh: () => Promise<unknown>) {
+  useEffect(() => {
+    if (screen !== "connect") return;
+    void refresh();
+  }, [screen, refresh]);
+}
+
+/**
+ * The connect step is two pages: the Connect GitHub page with the connect
+ * button, and the account picker. Get started always opens the connect
+ * button page; only a GitHub round trip (or Back from the repository screen)
+ * opens the picker. So the user picks the GitHub account on every forward
+ * pass, and Back walks repository, picker, connect, welcome in order.
+ */
+function useConnectStage(
+  startOnPicker: boolean,
+  accountPicker: PendingGitHubAccountPicker | undefined,
+  sourcesLoading: boolean,
+) {
+  const [pickerOpen, setPickerOpen] = useState(startOnPicker);
+  return {
+    pickerShowing: pickerOpen && Boolean(accountPicker),
+    // A GitHub round trip reloads the page, so the picker data arrives after
+    // the first render. The screen shows a placeholder until the connection
+    // list settles, instead of flashing the connect button first.
+    pickerLoading: pickerOpen && !accountPicker && sourcesLoading,
+    setPickerOpen,
+  };
 }
 
 /** Reports a failed repository list, which the choose screen shows as empty. */
@@ -173,23 +248,16 @@ function AgentScreen({
  * stay presentational, so this hook holds every step that talks to the API.
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
-  const { factory, organizationId } = useFactoriesLayout();
-  const { data: me } = useMe(true, organizationId);
+  const { organizationId } = useFactoriesLayout();
+  const { data: me, isPending: meLoading } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
   const setOpenSection = model.setOpenSection;
 
-  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => {
-    if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
-      return "connect";
-    }
-    const resumed = Boolean(factory?.onboarding?.vcsIntegrationId) || searchParams.get("step") !== null;
-    return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
-  });
+  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => initialFirstRunScreen(searchParams));
   const openStep = useRef(model.openSection);
   const skipAgentScreen = model.hostedAgentReady;
 
-  useSingleGithubConnection(model);
   useRepositoryErrorToast(model.repositoriesError);
 
   // Setup selects the connection GitHub returns with, then opens the next step.
@@ -199,7 +267,29 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const goToScreen = (next: FirstRunScreen) => {
+  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
+  // user. The /account id is the account, so a match would hide the picker.
+  // A bound connection keeps its picker data, so Back from the repository
+  // screen offers the accounts again instead of a dead connected state.
+  const selectedConnection = model.githubConnections.readyInstances.find(
+    (instance) => instance.metadata?.id === model.selectedVcsConnectionId,
+  );
+  const accountPicker =
+    pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
+    githubAccountPickerFromConnection(selectedConnection, me?.id);
+
+  // Only a GitHub round trip or a waiting install request lands on the
+  // account picker page. A fresh pass opens the Connect GitHub page.
+  const stage = useConnectStage(
+    startConnectOnPicker(searchParams),
+    accountPicker,
+    meLoading || model.githubConnectionsLoading,
+  );
+
+  const goToScreen = (next: FirstRunScreen, connectStage: "button" | "picker" = "button") => {
+    if (next === "connect") {
+      stage.setPickerOpen(connectStage === "picker");
+    }
     const step = STEP_FOR_SCREEN[next];
     if (step) {
       // Keeps the provider return URL on the step the user is answering.
@@ -246,14 +336,9 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
 
   // An approved install request binds outside the wizard round trip, so the
   // waiting screen rechecks GitHub through the connection until it is ready.
+  // The welcome screen stays first even while a request waits; Get started
+  // opens the connect screen, which shows the waiting state.
   useRecheckGitHubInstallRequest(organizationId, model.githubConnections.allInstances);
-
-  useEffect(() => {
-    if (!installRequested || openedScreen !== "welcome") return;
-    openStep.current = "vcs";
-    setOpenSection("vcs");
-    setOpenedScreen("connect");
-  }, [installRequested, openedScreen, setOpenSection]);
 
   const githubOrganization =
     searchParams.get(GITHUB_SETUP_ORG_PARAM)?.trim() ||
@@ -261,21 +346,31 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
       .find((account) => account !== "") ||
     "";
-  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
-  // user. The /account id is the account, so a match would hide the picker.
-  const accountPicker = pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id);
-
   // Binding through a page redirect reloads the whole app and walks the user
   // through the connect screen again. Binding in place opens the repository
   // screen directly once the connection is ready.
   const bindInstallation = useBindGitHubInstallation(organizationId);
+  const [boundIntegrationId, setBoundIntegrationId] = useState<string | null>(null);
+  useSelectBoundGithubConnection(
+    boundIntegrationId,
+    () => setBoundIntegrationId(null),
+    model,
+    () => goToScreen("choose"),
+  );
   const useInstallation = (installation: PendingGitHubInstallation) => {
     const state = accountPicker?.state;
+    const pendingId = accountPicker?.id;
     if (!state || bindInstallation.isPending) return;
     bindInstallation.mutate(
       { state, installationId: installation.id },
       {
-        onSuccess: () => goToScreen("choose"),
+        onSuccess: () => {
+          if (!pendingId) {
+            goToScreen("choose");
+            return;
+          }
+          setBoundIntegrationId(pendingId);
+        },
         onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
       },
     );
@@ -287,12 +382,46 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     installRequested,
     githubOrganization,
     accountPicker,
+    pickerShowing: stage.pickerShowing,
+    pickerLoading: stage.pickerLoading,
+    closePicker: () => stage.setPickerOpen(false),
     bindingInstallationId: bindInstallation.isPending ? bindInstallation.variables?.installationId : undefined,
     useInstallation,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
     selectTicketSource,
+  };
+}
+
+type FirstRunFlow = ReturnType<typeof useFirstRunSetupFlow>;
+
+/**
+ * Back walks the exact screens in reverse order: repository, account picker,
+ * Connect GitHub, welcome. The picker is a page of the connect screen, so
+ * Back on the picker closes it instead of changing screens.
+ */
+function backActionFor(target: FirstRunScreen, flow: FirstRunFlow): (() => void) | undefined {
+  if (target === "connect" && flow.pickerShowing) {
+    return flow.closePicker;
+  }
+  if (target === "choose") {
+    return () => flow.goToScreen("connect", "picker");
+  }
+  const backScreen = BACK_SCREEN[target];
+  return backScreen ? () => flow.goToScreen(backScreen) : undefined;
+}
+
+/** Picker data for the connect screen. The Connect GitHub page passes none. */
+function pickerPropsFor(flow: FirstRunFlow) {
+  if (!flow.pickerShowing) {
+    return {};
+  }
+  return {
+    pendingInstallations: flow.accountPicker?.installations,
+    githubState: flow.accountPicker?.state,
+    githubAppSlug: flow.accountPicker?.appSlug,
+    githubLogin: flow.accountPicker?.githubLogin,
   };
 }
 
@@ -304,6 +433,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
   const { organizationId, factoryId, factories } = useFactoriesLayout();
   const flow = useFirstRunSetupFlow(model);
+  useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -318,14 +448,17 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   );
   const canSwitchOrganization = hasOtherWorkspace || otherOrganizations.length > 0;
 
-  const chromeFor = (target: FirstRunScreen): FirstRunChrome => ({
-    displayName: firstNameOf(account?.name),
-    email: account?.email,
-    onLogOut: signOut,
-    organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
-    stepIndex: STEP_INDEX_FOR_SCREEN[target],
-    stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
-  });
+  const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
+    return {
+      displayName: firstNameOf(account?.name),
+      email: account?.email,
+      onLogOut: signOut,
+      organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
+      stepIndex: STEP_INDEX_FOR_SCREEN[target],
+      stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
+      onBack: backActionFor(target, flow),
+    };
+  };
 
   if (flow.screen === "welcome") {
     return (
@@ -340,17 +473,14 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
-        githubConnected={setup.vcsReady}
+        loading={flow.pickerLoading}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
-        pendingInstallations={flow.accountPicker?.installations}
-        githubState={flow.accountPicker?.state}
-        githubAppSlug={flow.accountPicker?.appSlug}
+        {...pickerPropsFor(flow)}
         bindingInstallationId={flow.bindingInstallationId}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
         onUseInstallation={flow.useInstallation}
-        onContinue={() => flow.goToScreen("choose")}
       />
     );
   }
@@ -360,6 +490,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunChooseScreen
         repositories={model.repositories}
         selectedRepository={setup.selectedRepo}
+        loading={model.repositoriesLoading}
         chrome={chromeFor("choose")}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}

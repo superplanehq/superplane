@@ -356,6 +356,15 @@ func TestFileRoutesUseFactoryAndWorkOrderPermissions(t *testing.T) {
 	assert.Equal(t, "read", listTask.Action)
 }
 
+func TestListOrganizationCreditGrantsUsesOrgRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/organizations/{id}/credit-grants"}]
+	require.True(t, ok)
+	assert.Equal(t, "org", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
 func TestNotificationSettingsRoutesUseNotificationsPermission(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

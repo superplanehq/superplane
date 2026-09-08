@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSpendingReport,
+  DEFAULT_MACHINE_BREAKDOWN,
+  DEFAULT_MODEL_BREAKDOWN,
   EMPTY_SPENDING_FILTERS,
   filterSpendingEvents,
   formatFilterTriggerLabel,
@@ -10,11 +12,13 @@ import {
   MACHINE_BREAKDOWN_OPTIONS,
   MODEL_BREAKDOWN_OPTIONS,
   modelKey,
+  narrowSpendingReport,
   quantizeSpendingNow,
   rangeForPreset,
   rangeFromCustomDays,
   spendingPeriodTriggerLabel,
   type SpendingCatalogs,
+  type SpendingReport,
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
 
@@ -154,6 +158,16 @@ describe("filterSpendingEvents", () => {
     );
     expect(matched.map((item) => item.id)).toEqual(["week-gpt"]);
   });
+
+  it("keeps Your-keys model rows when the source filter is byok", () => {
+    const matched = filterSpendingEvents(
+      ledger,
+      rangeForPreset("week", NOW),
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "byok" },
+      "model",
+    );
+    expect(matched.map((item) => item.id)).toEqual(["week-gpt"]);
+  });
 });
 
 describe("buildSpendingReport", () => {
@@ -215,12 +229,92 @@ describe("buildSpendingReport", () => {
     expect(report.breakdown[0]).toMatchObject({ id: "anthropic/sonnet", label: "claude-sonnet-4-6" });
     expect(report.seriesKeys[0].label).toBe("claude-sonnet-4-6");
   });
+
+  it("groups model spend by SuperPlane-hosted and Your keys", () => {
+    const report = buildSpendingReport({
+      events: ledger,
+      range: rangeForPreset("week", NOW),
+      filters: EMPTY_SPENDING_FILTERS,
+      breakdown: "funding_source",
+      catalogs,
+      usageKind: "model",
+    });
+    expect(report.breakdown.map((row) => row.id)).toEqual(["hosted", "byok"]);
+    expect(report.breakdown.map((row) => row.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
+    expect(report.seriesKeys.map((item) => item.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
+  });
+});
+
+describe("narrowSpendingReport", () => {
+  const range = rangeForPreset("week", NOW);
+  const byokOnlyReport: SpendingReport = {
+    range,
+    totals: { costCents: 500, tokens: 2000, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 500 },
+    series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { byok: 500 } }],
+    seriesKeys: [{ id: "byok", label: "Your keys" }],
+    breakdown: [{ id: "byok", label: "Your keys", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+  };
+
+  it("clears SuperPlane-hosted when the report only has Your keys", () => {
+    const narrowed = narrowSpendingReport(
+      byokOnlyReport,
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" },
+      "funding_source",
+    );
+    expect(narrowed.totals.costCents).toBe(0);
+    expect(narrowed.seriesKeys).toEqual([]);
+    expect(narrowed.breakdown).toEqual([]);
+    expect(narrowed.series[0]?.values).toEqual({});
+  });
+
+  it("keeps Your keys when that source is selected", () => {
+    const narrowed = narrowSpendingReport(
+      byokOnlyReport,
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "byok" },
+      "funding_source",
+    );
+    expect(narrowed.totals.costCents).toBe(500);
+    expect(narrowed.seriesKeys.map((item) => item.id)).toEqual(["byok"]);
+    expect(narrowed.breakdown.map((row) => row.id)).toEqual(["byok"]);
+  });
+
+  it("does not drop source series when the group-by is workspaces", () => {
+    const workspaceReport: SpendingReport = {
+      ...byokOnlyReport,
+      seriesKeys: [{ id: "ws-refunds", label: "Semaphore" }],
+      series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { "ws-refunds": 500 } }],
+      breakdown: [{ id: "ws-refunds", label: "Semaphore", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+    };
+    const narrowed = narrowSpendingReport(
+      workspaceReport,
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" },
+      "workspace",
+    );
+    expect(narrowed).toBe(workspaceReport);
+  });
+
+  it("keeps workspace rows when Your keys is selected but the report is not grouped by source", () => {
+    const workspaceReport: SpendingReport = {
+      ...byokOnlyReport,
+      seriesKeys: [{ id: "ws-refunds", label: "Semaphore" }],
+      series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { "ws-refunds": 500 } }],
+      breakdown: [{ id: "ws-refunds", label: "Semaphore", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+    };
+    const narrowed = narrowSpendingReport(
+      workspaceReport,
+      { ...EMPTY_SPENDING_FILTERS, fundingSource: "byok" },
+      "funding_source",
+    );
+    expect(narrowed).toBe(workspaceReport);
+    expect(narrowed.totals.costCents).toBe(500);
+  });
 });
 
 describe("filter helpers", () => {
   it("reports an active single-select filter set", () => {
     expect(hasActiveSpendingFilters(EMPTY_SPENDING_FILTERS)).toBe(false);
     expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, model: "openai/gpt-4o" })).toBe(true);
+    expect(hasActiveSpendingFilters({ ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" })).toBe(true);
   });
 
   it("labels filter triggers with the selected name", () => {
@@ -235,7 +329,14 @@ describe("filter helpers", () => {
   });
 
   it("exposes group-by options for each usage section", () => {
-    expect(MODEL_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "model"]);
+    expect(MODEL_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual([
+      "funding_source",
+      "workspace",
+      "user",
+      "model",
+    ]);
     expect(MACHINE_BREAKDOWN_OPTIONS.map((option) => option.value)).toEqual(["workspace", "user", "machine"]);
+    expect(DEFAULT_MODEL_BREAKDOWN).toBe("model");
+    expect(DEFAULT_MACHINE_BREAKDOWN).toBe("machine");
   });
 });

@@ -45,6 +45,18 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, reloaded.HasInitialOnboardingAttempt(attemptID))
 		assert.True(t, reloaded.IsInitialOnboarding())
+		assert.True(t, reloaded.IsPendingInitialOnboarding())
+	})
+
+	t.Run("pending initial onboarding is false after complete", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		require.NoError(t, factory.SetInitialOnboardingAttempt(db, uuid.New()))
+		assert.True(t, factory.IsPendingInitialOnboarding())
+
+		require.NoError(t, factory.CompleteOnboarding(db, readyOnboardingPatch()))
+		assert.False(t, factory.IsPendingInitialOnboarding())
+		assert.True(t, factory.IsInitialOnboarding())
 	})
 
 	t.Run("partial update merges fields", func(t *testing.T) {
@@ -131,6 +143,35 @@ func Test__FactoryOnboarding(t *testing.T) {
 		require.NoError(t, factory.CompleteOnboarding(db, ready))
 		assert.Empty(t, factory.OnboardingConfigValue().AgentIntegrationID)
 	})
+}
+
+func Test__OrganizationIDsPendingInitialOnboardingOnly(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	pendingOrg, err := models.CreateOrganization("pending-"+uuid.NewString(), "Pending Org")
+	require.NoError(t, err)
+	readyOrg, err := models.CreateOrganization("ready-"+uuid.NewString(), "Ready Org")
+	require.NoError(t, err)
+
+	pendingFactory, err := models.CreateFactory(db, pendingOrg.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, pendingFactory.SetInitialOnboardingAttempt(db, uuid.New()))
+
+	readyFactory, err := models.CreateFactory(db, readyOrg.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, readyFactory.SetInitialOnboardingAttempt(db, uuid.New()))
+	require.NoError(t, readyFactory.CompleteOnboarding(db, readyOnboardingPatch()))
+
+	pending, err := models.OrganizationIDsPendingInitialOnboardingOnly(db, []uuid.UUID{pendingOrg.ID, readyOrg.ID, r.Organization.ID})
+	require.NoError(t, err)
+
+	_, pendingListed := pending[pendingOrg.ID]
+	_, readyListed := pending[readyOrg.ID]
+	_, setupListed := pending[r.Organization.ID]
+	assert.True(t, pendingListed)
+	assert.False(t, readyListed)
+	assert.False(t, setupListed)
 }
 
 func readyOnboardingPatch() models.FactoryOnboardingPatch {

@@ -8,6 +8,14 @@ export function githubIntegrationOwner(integration: OrganizationsIntegration): s
   return typeof owner === "string" && owner.trim() ? owner.trim() : undefined;
 }
 
+export function githubOwnerFromConnections(
+  connections: OrganizationsIntegration[],
+  integrationId: string,
+): string | undefined {
+  const integration = connections.find((item) => item.metadata?.id === integrationId);
+  return integration ? githubIntegrationOwner(integration) : undefined;
+}
+
 export function shouldNameOrganizationFromGitHub(factory: FactoriesFactory | null): boolean {
   return factory?.onboarding?.initial === true;
 }
@@ -76,6 +84,24 @@ export async function nameOrganizationFromGitHubOwner(args: {
   }
 
   return undefined;
+}
+
+export async function completeInitialOrganizationIdentity(args: {
+  factory: FactoriesFactory | null;
+  owner: string | undefined;
+  currentSlug: string;
+  update: (identity: { name: string; slug: string }) => Promise<string | undefined>;
+}): Promise<string> {
+  if (!shouldNameOrganizationFromGitHub(args.factory) || !args.owner) {
+    return args.currentSlug;
+  }
+
+  const nextSlug = await nameOrganizationFromGitHubOwner({
+    owner: args.owner,
+    currentSlug: args.currentSlug,
+    update: args.update,
+  });
+  return nextSlug || args.currentSlug;
 }
 
 function slugifyOrganizationOwner(owner: string): string {
