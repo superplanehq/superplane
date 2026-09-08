@@ -7,6 +7,7 @@ import {
   hostedGitHubInstallRequested,
   hostedGitHubInstallRequestedAccount,
   hostedGitHubInstallURL,
+  hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
 } from "./hostedGitHubInstall";
@@ -80,6 +81,12 @@ describe("hosted GitHub URLs", () => {
   it("reads state and slug", () => {
     expect(hostedGitHubState({ state: "csrf" })).toBe("csrf");
     expect(hostedGitHubAppSlug({ githubApp: { slug: "superplane" } })).toBe("superplane");
+  });
+
+  it("reads the GitHub login that authorized the connect", () => {
+    expect(hostedGitHubStartedByLogin({ startedByGitHubLogin: "forestileao" })).toBe("forestileao");
+    expect(hostedGitHubStartedByLogin({})).toBe("");
+    expect(hostedGitHubStartedByLogin(undefined)).toBe("");
   });
 
   it("reads a pending GitHub install request", () => {

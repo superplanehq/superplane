@@ -72,6 +72,18 @@ service Organizations {
     };
   }
 
+  rpc SetUserOwner(SetUserOwnerRequest) returns (SetUserOwnerResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/users/{user_id}/owner"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Set organization owner flag";
+      description: "Sets or clears the owner flag for a member. The organization must keep at least one owner.";
+      tags: "Organization";
+    };
+  }
+
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/invite-link"
@@ -215,6 +227,17 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create billing portal session";
       description: "Creates a customer portal session for invoices and receipts";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListOrganizationCreditGrants(ListOrganizationCreditGrantsRequest) returns (ListOrganizationCreditGrantsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/credit-grants"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization credit grants";
+      description: "Returns hosted-credit grants for an organization, newest first";
       tags: "Organization";
     };
   }
@@ -512,6 +535,7 @@ message DescribeOrganizationSpendingReportRequest {
   string group_by = 8;
   string time_grain = 9;
   string usage_kind = 10;
+  string funding_source = 11;
 }
 
 message SpendingReportTotals {
@@ -679,6 +703,24 @@ message CreateBillingPortalSessionResponse {
   string portal_url = 1;
 }
 
+message ListOrganizationCreditGrantsRequest {
+  string id = 1;
+}
+
+message OrganizationCreditGrant {
+  string id = 1;
+  string kind = 2;
+  int64 amount_cents = 3;
+  string note = 4;
+  string actor_name = 5;
+  string polar_order_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ListOrganizationCreditGrantsResponse {
+  repeated OrganizationCreditGrant grants = 1;
+}
+
 message UsageByModel {
   string provider = 1;
   string model = 2;
@@ -698,6 +740,14 @@ message RemoveUserRequest {
 }
 
 message RemoveUserResponse {}
+
+message SetUserOwnerRequest {
+  string id = 1;
+  string user_id = 2;
+  bool is_owner = 3;
+}
+
+message SetUserOwnerResponse {}
 
 message ListIntegrationsRequest {
   string id = 1;

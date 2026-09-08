@@ -54,8 +54,6 @@ const toolSidebarState = {
   handleToolSidebarToggle: vi.fn(),
   openToolSidebar: vi.fn(),
   closeToolSidebar: vi.fn(),
-  agentMode: "operator" as const,
-  switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
 const runsSidebarState = {

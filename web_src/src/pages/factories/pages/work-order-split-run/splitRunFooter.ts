@@ -191,6 +191,11 @@ export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = {
   text: "Review the details. Change anything you need. Then click Start to send it to the line.",
 };
 
+export const SPLIT_RUN_ANALYZING_NOTE: SplitRunFooterNote = {
+  headline: "SuperPlane is currently analyzing this task",
+  text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
+};
+
 export type SplitRunDecisionTone = "draft" | "waiting" | "failed" | "done" | "rejected";
 
 export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTone {
@@ -270,8 +275,10 @@ export function toFooterNote(note: WorkOrderStatusNotePresentation): SplitRunFoo
 /**
  * Decision strip for the work-order popup. Running has no strip. Open
  * waiting and failed keep To Backlog with Reject, Approve, or Rerun.
- * Draft keeps Refine, Reject, and Start. Closed failed keeps Reopen.
- * Completed and rejected explain the result only.
+ * Draft keeps Refine, Reject, and Start. A draft still under Backlog
+ * analysis drops Reject; rejecting a task before its analysis finishes
+ * makes no sense. Closed failed keeps Reopen. Completed and rejected
+ * explain the result only.
  */
 type FooterInput = {
   kind: SplitRunFooterKind;
@@ -283,6 +290,8 @@ type FooterInput = {
   status?: WorkOrderDisplayStatus;
   actor?: OrgUserDisplay;
   automationName?: string;
+  /** True while the Backlog automation still scores this draft. */
+  isAnalyzing?: boolean;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
@@ -300,6 +309,15 @@ function hiddenDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): Sp
 }
 
 function draftDecisionFooter(input: FooterInput, note?: SplitRunFooterNote): SplitRunFooter {
+  if (input.isAnalyzing) {
+    return withFooterMeta(input, {
+      kind: "draft",
+      sentence: "SuperPlane is analyzing this task.",
+      note: { ...SPLIT_RUN_ANALYZING_NOTE },
+      attentionCard: true,
+      actions: [REFINE, START],
+    });
+  }
   return withFooterMeta(input, {
     kind: "draft",
     sentence: "This task is a draft.",

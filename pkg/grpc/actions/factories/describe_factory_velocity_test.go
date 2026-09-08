@@ -918,7 +918,11 @@ func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) 
 	require.NoError(t, err)
 
 	now := time.Now()
-	mergedAt := now.Add(-3 * time.Hour)
+	// Anchor the merge to midday so it always lands in today's bucket, even
+	// when the suite runs in the first hours after local midnight. Subtracting
+	// a few hours from now would slip into yesterday near midnight and empty
+	// today's point.
+	mergedAt := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
 
 	// Two tasks that closed today. Their spend differs, so the median is not
 	// the mean and a wrong aggregation shows.

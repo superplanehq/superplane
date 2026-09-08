@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunChrome } from "./firstRunTypes";
+import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
 export const FIRST_RUN_STEP_COUNT = 5;
 
@@ -41,29 +42,7 @@ export function FirstRunShell({
           >
             {copy.logOut}
           </Button>
-          {chrome?.organizationSwitch ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-xs"
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label={copy.switchOrganization}
-                  data-testid="first-run-organization-switch"
-                >
-                  <ArrowRightLeft className="size-4" aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-64">
-                <OrganizationSwitchMenu
-                  currentOrganizationRouteId={chrome.organizationSwitch.currentOrganizationRouteId}
-                  navigateToCurrentOrganization
-                  testIdPrefix="first-run"
-                />
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+          <FirstRunOrganizationSwitch organizationSwitch={chrome?.organizationSwitch} />
         </div>
         {identity ? (
           <p className="text-right text-[13px] leading-5 text-muted-foreground" data-testid="first-run-signed-in">
@@ -74,8 +53,23 @@ export function FirstRunShell({
       </div>
 
       <div className="flex h-full items-center justify-center overflow-y-auto px-6 py-24">
-        <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>{children}</div>
+        <div className={cn("w-full text-center", width === "wide" ? "max-w-xl" : "max-w-md")}>
+          {children}
+          {chrome?.onBack ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="mt-4 text-muted-foreground hover:text-foreground"
+              onClick={chrome.onBack}
+              data-testid="first-run-back"
+            >
+              {copy.back}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      <FirstRunWorkspaceSwitch switcher={chrome?.workspaceSwitch} />
 
       {chrome ? (
         <nav
@@ -97,6 +91,38 @@ export function FirstRunShell({
         </nav>
       ) : null}
     </div>
+  );
+}
+
+function FirstRunOrganizationSwitch({
+  organizationSwitch,
+}: {
+  organizationSwitch: FirstRunChrome["organizationSwitch"];
+}) {
+  if (!organizationSwitch) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="text-muted-foreground hover:text-foreground"
+          aria-label={FIRST_RUN_COPY.chrome.switchOrganization}
+          data-testid="first-run-organization-switch"
+        >
+          <ArrowRightLeft className="size-4" aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <OrganizationSwitchMenu
+          currentOrganizationRouteId={organizationSwitch.currentOrganizationRouteId}
+          navigateToCurrentOrganization
+          testIdPrefix="first-run"
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

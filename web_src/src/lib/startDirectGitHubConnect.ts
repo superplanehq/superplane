@@ -9,6 +9,8 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
+  hostedGitHubAuthorizeURL,
+  hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
   type PendingGitHubInstallation,
@@ -24,7 +26,26 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
+  /** GitHub OAuth authorize URL, to ask again which account to use. */
+  authorizeUrl: string;
+  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  githubLogin: string;
 };
+
+function accountPickerFromItem(item: OrganizationsIntegration | undefined): PendingGitHubAccountPicker | undefined {
+  if (!item?.metadata?.id) {
+    return undefined;
+  }
+
+  return {
+    id: item.metadata.id,
+    installations: pendingGitHubInstallations(item.status?.metadata),
+    state: hostedGitHubState(item.status?.metadata),
+    appSlug: hostedGitHubAppSlug(item.status?.metadata),
+    authorizeUrl: hostedGitHubAuthorizeURL(item.status?.metadata),
+    githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
+  };
+}
 
 function startedByUserID(item: OrganizationsIntegration): string {
   const startedBy = item.status?.metadata?.startedByUserID;
@@ -86,16 +107,31 @@ export function pendingGitHubAccountPicker(
     }
     return pendingGitHubInstallations(item.status?.metadata).length >= 1;
   });
-  if (!pending?.metadata?.id) {
+  return accountPickerFromItem(pending);
+}
+
+/**
+ * The account picker for a connection the account picker already bound. A
+ * bound connection keeps its installations and state, so onboarding shows the
+ * picker again and the member can move the connection to another account.
+ */
+export function githubAccountPickerFromConnection(
+  connection: OrganizationsIntegration | undefined,
+  currentUserId?: string,
+): PendingGitHubAccountPicker | undefined {
+  if (!connection?.metadata?.id || !currentUserId) {
+    return undefined;
+  }
+  if (connection.metadata.integrationName !== "github" || !isOwnPendingGitHub(connection, currentUserId)) {
     return undefined;
   }
 
-  return {
-    id: pending.metadata.id,
-    installations: pendingGitHubInstallations(pending.status?.metadata),
-    state: hostedGitHubState(pending.status?.metadata),
-    appSlug: hostedGitHubAppSlug(pending.status?.metadata),
-  };
+  const picker = accountPickerFromItem(connection);
+  if (!picker || picker.installations.length === 0 || picker.state === "") {
+    return undefined;
+  }
+
+  return picker;
 }
 
 export function isOnboardingSetupReturnPath(path: string | undefined): boolean {
@@ -167,7 +203,14 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
-      return true;
+      // Onboarding asks again which GitHub account to use on every Connect
+      // click, so the click goes to GitHub authorization instead of the
+      // stored picker. Without a stored authorize URL the flow falls
+      // through and starts a fresh connect, which also opens authorization.
+      if (picker.authorizeUrl) {
+        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
+      }
+      return false;
     }
 
     const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);

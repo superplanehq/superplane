@@ -322,6 +322,59 @@ func ResolveOrganizationMarkupBPS(tx *gorm.DB, orgID uuid.UUID) (int, error) {
 	return installation.MarkupBPS, nil
 }
 
+func ListOrganizationLLMCreditGrants(tx *gorm.DB, orgID uuid.UUID) ([]OrganizationLLMCreditGrant, error) {
+	var grants []OrganizationLLMCreditGrant
+	err := tx.Where("organization_id = ?", orgID).
+		Order("created_at DESC").
+		Find(&grants).Error
+	if err != nil {
+		return nil, err
+	}
+	return grants, nil
+}
+
+func CreditGrantActorNames(tx *gorm.DB, grants []OrganizationLLMCreditGrant) (map[uuid.UUID]string, error) {
+	ids := uniqueCreditGrantActorIDs(grants)
+	if len(ids) == 0 {
+		return map[uuid.UUID]string{}, nil
+	}
+
+	var accounts []Account
+	err := tx.Select("id", "name", "email").Where("id IN ?", ids).Find(&accounts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	names := make(map[uuid.UUID]string, len(accounts))
+	for _, account := range accounts {
+		names[account.ID] = creditGrantActorDisplayName(account)
+	}
+	return names, nil
+}
+
+func uniqueCreditGrantActorIDs(grants []OrganizationLLMCreditGrant) []uuid.UUID {
+	seen := make(map[uuid.UUID]struct{})
+	ids := make([]uuid.UUID, 0)
+	for _, grant := range grants {
+		if grant.ActorAccountID == nil || *grant.ActorAccountID == uuid.Nil {
+			continue
+		}
+		if _, ok := seen[*grant.ActorAccountID]; ok {
+			continue
+		}
+		seen[*grant.ActorAccountID] = struct{}{}
+		ids = append(ids, *grant.ActorAccountID)
+	}
+	return ids
+}
+
+func creditGrantActorDisplayName(account Account) string {
+	if name := strings.TrimSpace(account.Name); name != "" {
+		return name
+	}
+	return strings.TrimSpace(account.Email)
+}
+
 func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLLMCreditSummary, error) {
 	var kindTotals []struct {
 		Kind  string

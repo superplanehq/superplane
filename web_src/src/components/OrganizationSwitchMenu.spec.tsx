@@ -22,9 +22,11 @@ const organizationsState = vi.hoisted(() => ({
   data: [
     { id: "org-1", name: "Acme", slug: "acme" },
     { id: "org-2", name: "Other Co", slug: "other-co" },
+    { id: "org-pending", name: "Pending Org", slug: "pending-org", initialOnboardingPending: true },
   ],
   isLoading: false,
   isError: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -68,6 +70,15 @@ describe("OrganizationSwitchMenu", () => {
     await user.click(screen.getByTestId("menu-organization-option-org-1"));
 
     expect(navigateSpy).toHaveBeenCalledWith("/acme");
+  });
+
+  it("hides organizations that did not finish first-run setup", () => {
+    renderMenu();
+
+    expect(screen.getByTestId("menu-organization-option-org-1")).toBeInTheDocument();
+    expect(screen.getByTestId("menu-organization-option-org-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("menu-organization-option-org-pending")).not.toBeInTheDocument();
+    expect(screen.getByTestId("menu-organization-create")).toBeInTheDocument();
   });
 
   it("navigates to another organization", async () => {

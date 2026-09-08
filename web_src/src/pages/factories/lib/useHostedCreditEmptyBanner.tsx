@@ -16,7 +16,7 @@ export function useHostedCreditEmptyBanner(organizationId: string, factoryKey: s
     <HostedCreditEmptyBanner
       billingEnabled={spend.data.billingEnabled === true}
       canManageBilling={canAct("org", "update")}
-      spendingHref={factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending")}
+      spendingHref={factorySettingsSectionPath(organizationId, factoryKey, "organization", "billing")}
     />
   );
 }

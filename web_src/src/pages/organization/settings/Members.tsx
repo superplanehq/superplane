@@ -15,6 +15,7 @@ import {
   useOrganizationUsers,
   useRemoveOrganizationSubject,
   useResetOrganizationInviteLink,
+  useSetUserOwner,
   useUpdateOrganizationInviteLink,
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
@@ -23,26 +24,10 @@ import { Switch } from "@/ui/switch";
 import { getApiErrorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import {
-  settingsCardClassName,
-  settingsErrorClassName,
-  settingsRowMenuClassName,
-  settingsTableCardClassName,
-} from "./settingsPageStyles";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { settingsCardClassName, settingsErrorClassName, settingsTableCardClassName } from "./settingsPageStyles";
 import { useMe } from "@/hooks/useMe";
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  roleName: string;
-  initials: string;
-  avatar?: string;
-  type: "member";
-  status: "active";
-}
+import { defaultOrganizationRoleSortIndex } from "@/lib/organizationRoles";
+import { MemberOverflowMenu, MemberRoleSelect, type OrganizationMember } from "./MemberRowControls";
 
 interface MembersProps {
   organizationId: string;
@@ -53,7 +38,7 @@ export function Members({ organizationId }: MembersProps) {
   const { data: me } = useMe();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Member | null;
+    key: keyof OrganizationMember | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
   const [removalError, setRemovalError] = useState<string | null>(null);
@@ -76,6 +61,7 @@ export function Members({ organizationId }: MembersProps) {
 
   // Mutations for role assignment and user removal
   const assignRoleMutation = useAssignRole(organizationId);
+  const setUserOwnerMutation = useSetUserOwner(organizationId);
   const removeUserMutation = useRemoveOrganizationSubject(organizationId);
   const updateInviteLinkMutation = useUpdateOrganizationInviteLink(organizationId);
   const resetInviteLinkMutation = useResetOrganizationInviteLink(organizationId);
@@ -88,12 +74,25 @@ export function Members({ organizationId }: MembersProps) {
 
   const ownerIds = useMemo(() => {
     const ids = users
-      .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))
+      .filter((user) => user.status?.isOwner)
       .map((user) => user.metadata?.id)
       .filter((id): id is string => Boolean(id));
 
     return new Set(ids);
   }, [users]);
+
+  const assignableRoles = useMemo(() => {
+    return [...organizationRoles].sort((a, b) => {
+      const aDefault = defaultOrganizationRoleSortIndex(a.metadata?.name);
+      const bDefault = defaultOrganizationRoleSortIndex(b.metadata?.name);
+      if (aDefault !== bDefault) {
+        return aDefault - bDefault;
+      }
+      const aName = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
+      const bName = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
+      return aName.localeCompare(bName);
+    });
+  }, [organizationRoles]);
 
   const inviteLinkUrl = useMemo(() => {
     if (!inviteLink?.token) {
@@ -111,7 +110,7 @@ export function Members({ organizationId }: MembersProps) {
 
   // Transform users to Member interface format
   const members = useMemo(() => {
-    return users.map((user): Member => {
+    return users.map((user): OrganizationMember => {
       // Generate initials from displayName or userId
       const name = user.spec?.displayName || "Unknown User";
       const initials = name
@@ -135,18 +134,19 @@ export function Members({ organizationId }: MembersProps) {
         avatar: user.status?.accountProviders?.[0]?.avatarUrl,
         type: "member",
         status: "active",
+        isOwner: Boolean(user.status?.isOwner),
       };
     });
   }, [users]);
 
-  const handleSort = (key: keyof Member) => {
+  const handleSort = (key: keyof OrganizationMember) => {
     setSortConfig((prevConfig) => ({
       key,
       direction: prevConfig.key === key && prevConfig.direction === "asc" ? "desc" : "asc",
     }));
   };
 
-  const getSortIcon = (columnKey: keyof Member) => {
+  const getSortIcon = (columnKey: keyof OrganizationMember) => {
     if (sortConfig.key !== columnKey) {
       return "chevrons-up-down";
     }
@@ -186,10 +186,28 @@ export function Members({ organizationId }: MembersProps) {
     }
   };
 
-  const handleMemberRemove = async (member: Member) => {
+  const handleOwnerChange = async (member: OrganizationMember, isOwner: boolean) => {
+    if (!canUpdateMembers) return;
+    if (!isOwner && member.isOwner && ownerIds.size <= 1) {
+      setRemovalError("The organization must keep at least one owner.");
+      return;
+    }
+
+    try {
+      setRemovalError(null);
+      await setUserOwnerMutation.mutateAsync({
+        userId: member.id,
+        isOwner,
+      });
+    } catch (error) {
+      setRemovalError(getApiErrorMessage(error, "Unable to update owner."));
+    }
+  };
+
+  const handleMemberRemove = async (member: OrganizationMember) => {
     if (!canDeleteMembers) return;
     if (member.type === "member" && ownerIds.has(member.id) && ownerIds.size <= 1) {
-      setRemovalError("You must have at least one organization owner.");
+      setRemovalError("The organization must keep at least one owner.");
       return;
     }
 
@@ -390,7 +408,10 @@ export function Members({ organizationId }: MembersProps) {
                       <div className="flex items-center gap-3">
                         <Avatar src={member.avatar} initials={member.initials} className="size-8" />
                         <div>
-                          <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-gray-800 dark:text-white">{member.name}</div>
+                            {member.isOwner && <Badge color="yellow">Owner</Badge>}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
@@ -400,99 +421,31 @@ export function Members({ organizationId }: MembersProps) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {(() => {
-                        const isSelf = me?.id === member.id;
-                        const roleChangeAllowed = canUpdateMembers && !isSelf;
-                        const tooltipAllowed = roleChangeAllowed || (permissionsLoading && !isSelf);
-                        const tooltipMessage = isSelf
-                          ? "You can't change your own role."
-                          : "You don't have permission to update member roles.";
-
-                        return (
-                          <PermissionTooltip allowed={tooltipAllowed} message={tooltipMessage}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}
-                                  disabled={!roleChangeAllowed}
-                                >
-                                  {member.role}
-                                  <Icon name="chevron-down" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                {organizationRoles.map((role) => (
-                                  <DropdownMenuItem
-                                    key={role.metadata?.name}
-                                    onClick={() => handleRoleChange(member.id, role.metadata?.name || "")}
-                                    disabled={loadingRoles || !roleChangeAllowed}
-                                    className="flex flex-col items-start gap-1"
-                                  >
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                                      {role.spec?.displayName || role.metadata?.name}
-                                    </span>
-                                  </DropdownMenuItem>
-                                ))}
-                                {loadingRoles && (
-                                  <DropdownMenuItem disabled>
-                                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading roles...</span>
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </PermissionTooltip>
-                        );
-                      })()}
+                      <MemberRoleSelect
+                        member={member}
+                        currentUserId={me?.id}
+                        canUpdateMembers={canUpdateMembers}
+                        permissionsLoading={permissionsLoading}
+                        loadingRoles={loadingRoles}
+                        assignableRoles={assignableRoles}
+                        onRoleChange={handleRoleChange}
+                      />
                     </TableCell>
                     <TableCell>
                       <Badge color="green">Active</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
-                        {ownerIds.has(member.id) && ownerIds.size <= 1 ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className={cn("flex items-center gap-2 text-sm", settingsRowMenuClassName)}>
-                                <Icon name="ellipsis-vertical" size="sm" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem disabled>
-                                <Icon name="x" size="sm" />
-                                <span className="ml-1">Cannot remove last owner</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          <PermissionTooltip
-                            allowed={canDeleteMembers || permissionsLoading}
-                            message="You don't have permission to remove members."
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className={cn(
-                                    "flex items-center gap-2 text-sm disabled:opacity-50",
-                                    settingsRowMenuClassName,
-                                  )}
-                                  disabled={!canDeleteMembers}
-                                >
-                                  <Icon name="ellipsis-vertical" size="sm" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem
-                                  className="flex items-center gap-1"
-                                  onClick={() => handleMemberRemove(member)}
-                                  disabled={!canDeleteMembers}
-                                >
-                                  <Icon name="x" size="sm" />
-                                  Remove
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </PermissionTooltip>
-                        )}
+                        <MemberOverflowMenu
+                          member={member}
+                          ownerCount={ownerIds.size}
+                          canUpdateMembers={canUpdateMembers}
+                          canDeleteMembers={canDeleteMembers}
+                          permissionsLoading={permissionsLoading}
+                          ownerChangePending={setUserOwnerMutation.isPending}
+                          onOwnerChange={handleOwnerChange}
+                          onRemove={handleMemberRemove}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

@@ -640,6 +640,13 @@ function organizationSpendingReportRoute(fixture: FactoriesFixture): FactoriesRo
   };
 }
 
+function organizationCreditGrantsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/credit-grants"),
+    resolve: () => ({ json: { grants: fixture.organizationCreditGrants ?? [] } }),
+  };
+}
+
 function hostedLlmModelsRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
@@ -786,6 +793,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...workOrderRoutes(fixture),
     organizationWorkspaceUsageRoute(fixture),
     organizationSpendingReportRoute(fixture),
+    organizationCreditGrantsRoute(fixture),
     hostedLlmModelsRoute(),
     selectableLlmModelsRoute(fixture),
     byokModelsRoute(fixture),

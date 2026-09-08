@@ -30,6 +30,11 @@ describe("searchFactorySettings", () => {
     expect(results.some((result) => result.title === "LLM Models" && result.section === "models")).toBe(true);
   });
 
+  it("returns Billing and not Spending for a billing query", () => {
+    const titles = searchFactorySettings(index, "billing").map((result) => result.title);
+    expect(titles).toEqual(["Billing"]);
+  });
+
   it("returns Workspace key under Workspace General", () => {
     const results = searchFactorySettings(index, "workspace key");
     expect(results[0]?.title).toBe("Workspace key");

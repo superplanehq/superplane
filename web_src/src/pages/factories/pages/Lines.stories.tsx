@@ -239,7 +239,7 @@ export const LineBoardAddAutomationPicker: Story = {
   parameters: {
     docs: {
       description: {
-        story: "Open the Backlog drawer and press Add automation. Taken catalog entries stay disabled.",
+        story: "Open the column menu and press Add automation. Taken catalog entries stay disabled.",
       },
     },
   },

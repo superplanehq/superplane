@@ -38,7 +38,7 @@ func ListFactoryLineRunnerModels(
 	}
 
 	return &pb.ListFactoryLineRunnerModelsResponse{
-		Models: serializeFactoryLLMModels(ids),
+		Models: serializeLineRunnerModels(ids),
 	}, nil
 }
 
@@ -68,22 +68,9 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 			return nil, err
 		}
 		for _, node := range []models.Node(version.Nodes) {
-			provider, ok := runnerComponentProvider(node.ComponentName())
-			if !ok {
-				continue
-			}
-			ids, err := models.ResolveSelectableLLMModels(
-				tx,
-				orgID,
-				&factoryID,
-				provider,
-				runnerFundingSource(node.Configuration),
-			)
+			ids, err := lineRunnerModelsForNode(tx, orgID, factoryID, node)
 			if err != nil {
 				return nil, err
-			}
-			if stored := storedRunnerModel(node.Configuration); stored != "" {
-				ids = append(ids, stored)
 			}
 			for _, id := range ids {
 				if _, dup := seen[id]; dup {
@@ -96,6 +83,49 @@ func listLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, lineName stri
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+func lineRunnerModelsForNode(tx *gorm.DB, orgID, factoryID uuid.UUID, node models.Node) ([]string, error) {
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return hostedSelectableLineRunnerModels(tx, orgID, factoryID, storedRunnerModel(node.Configuration))
+	}
+
+	provider, ok := runnerComponentProvider(node.ComponentName())
+	if !ok {
+		return nil, nil
+	}
+	ids, err := models.ResolveSelectableLLMModels(
+		tx,
+		orgID,
+		&factoryID,
+		provider,
+		runnerFundingSource(node.Configuration),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if stored := storedRunnerModel(node.Configuration); stored != "" {
+		ids = append(ids, stored)
+	}
+	return ids, nil
+}
+
+func hostedSelectableLineRunnerModels(tx *gorm.DB, orgID, factoryID uuid.UUID, stored string) ([]string, error) {
+	selectable, err := models.ListSelectableLLMModels(tx, orgID, &factoryID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(selectable)+1)
+	for _, model := range selectable {
+		if model.Source.ID != models.UsageFundingSourceHosted {
+			continue
+		}
+		ids = append(ids, model.Key)
+	}
+	if stored != "" {
+		ids = append(ids, stored)
+	}
+	return ids, nil
 }
 
 func runnerComponentProvider(component string) (string, bool) {

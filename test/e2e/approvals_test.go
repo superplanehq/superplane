@@ -32,10 +32,10 @@ func TestApprovals(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists()
 		groupName := steps.createApprovalGroup()
-		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameOwner, groupName)
+		steps.addApprovalWithUserRoleGroup("ReleaseApproval", models.Position{X: 600, Y: 200}, models.DisplayNameAdmin, groupName)
 		steps.saveCanvas()
 		steps.canvas.CommitAndPublish()
-		steps.verifyApprovalConfigurationPersisted(models.RoleOrgOwner, groupName)
+		steps.verifyApprovalConfigurationPersisted(models.RoleOrgAdmin, groupName)
 	})
 
 	t.Run("running and approving on a canvas", func(t *testing.T) {
@@ -73,7 +73,7 @@ func TestApprovals(t *testing.T) {
 	t.Run("running and approving a role requirement", func(t *testing.T) {
 		steps := &ApprovalSteps{t: t}
 		steps.start()
-		steps.givenCanvasWithManualTriggerRoleApprovalAndNoop(models.DisplayNameOwner)
+		steps.givenCanvasWithManualTriggerRoleApprovalAndNoop(models.DisplayNameAdmin)
 		steps.runManualTrigger()
 		steps.approveFirstPendingRequirement()
 		steps.assertApprovalExecutionFinishedAndOutputNodeProcessed()
@@ -533,7 +533,7 @@ func (s *ApprovalSteps) createApprovalGroup() string {
 		s.session.OrgID.String(),
 		models.DomainTypeOrganization,
 		groupName,
-		models.RoleOrgOwner,
+		models.RoleOrgAdmin,
 		groupName,
 		"",
 	)

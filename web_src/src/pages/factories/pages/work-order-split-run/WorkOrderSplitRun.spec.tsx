@@ -176,7 +176,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
     expect(runningDot).toHaveAttribute("title", "Running");
-    expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
+    expect(runningDot.className).toContain("animate-spin");
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
@@ -700,7 +700,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     const pendingDot = screen.getByTestId("split-run-log-tab-dot");
     expect(pendingDot).toHaveAttribute("title", "Pending");
-    expect(pendingDot.querySelector(".animate-ping")).toBeNull();
+    expect(pendingDot.className).not.toContain("animate-spin");
     const source = screen.getByTestId("split-run-source");
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
@@ -740,6 +740,32 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(refine.querySelector(".lucide-sparkles")).toBeInTheDocument();
     await user.hover(refine);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Ask an agent to update this task.");
+  });
+
+  it("tells a draft is under analysis and hides Reject while it runs", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+        analysisRuns: [
+          {
+            canvasId: "canvas-backlog",
+            workOrderId: DRAFT_WORK_ORDER.id ?? "",
+            run: {
+              id: "run-analysis",
+              canvasId: "canvas-backlog",
+              state: "STATE_STARTED",
+              createdAt: "2026-08-28T12:00:00Z",
+              updatedAt: "2026-08-28T12:00:00Z",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(screen.getByText("SuperPlane is currently analyzing this task")).toBeInTheDocument();
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(within(note).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+    expect(within(note).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
   });
 
   it("puts artifacts on the right and check analyses under the description", () => {

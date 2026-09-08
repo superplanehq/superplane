@@ -20,7 +20,7 @@ export function shouldShowHostedCreditEmptyBanner(args: {
 }
 
 /**
- * `canManageBilling` is ignored. Spending no longer offers checkout on this page.
+ * `canManageBilling` is ignored. Billing does not offer checkout on this page yet.
  */
 export function hostedCreditEmptyBannerCopy(
   billingEnabled: boolean,
@@ -33,14 +33,14 @@ export function hostedCreditEmptyBannerCopy(
   if (billingEnabled) {
     return {
       title: "Hosted credit is empty",
-      description: "Add hosted credit to start SuperPlane-hosted runs.",
-      actionLabel: "View spending",
+      description: "SuperPlane-hosted runs cannot start. Open Billing to review remaining credit.",
+      actionLabel: "View billing",
     };
   }
 
   return {
     title: "Hosted credit is empty",
     description: "SuperPlane-hosted runs cannot start until an installation admin adds credit.",
-    actionLabel: "View spending",
+    actionLabel: "View billing",
   };
 }

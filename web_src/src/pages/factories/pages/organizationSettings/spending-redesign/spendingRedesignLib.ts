@@ -8,11 +8,12 @@
  */
 
 import { formatCompactTokens, formatDurationSeconds, formatUsdCents } from "../../../lib/workOrderUsage";
+import { DAY_MS, formatUtcDay, startOfUtcDay } from "./spendingRedesignTime";
 
 export type SpendingUsageKind = "model" | "compute";
 export type SpendingFundingSource = "hosted" | "byok";
 export type SpendingPeriodPreset = "day" | "week" | "month" | "year" | "custom";
-export type SpendingBreakdown = "workspace" | "user" | "model" | "machine";
+export type SpendingBreakdown = "workspace" | "user" | "model" | "machine" | "funding_source";
 
 export interface SpendingCatalogItem {
   id: string;
@@ -46,6 +47,7 @@ export interface SpendingFilters {
   workspaceId: string;
   model: string;
   machineType: string;
+  fundingSource: string;
 }
 
 export interface SpendingTotals {
@@ -85,7 +87,13 @@ export const EMPTY_SPENDING_FILTERS: SpendingFilters = {
   workspaceId: "",
   model: "",
   machineType: "",
+  fundingSource: "",
 };
+
+export const SPENDING_FUNDING_SOURCE_OPTIONS: SpendingCatalogItem[] = [
+  { id: "hosted", label: "SuperPlane-hosted" },
+  { id: "byok", label: "Your keys" },
+];
 
 export const SPENDING_PERIOD_PRESETS: Array<{
   value: Exclude<SpendingPeriodPreset, "custom">;
@@ -98,6 +106,7 @@ export const SPENDING_PERIOD_PRESETS: Array<{
 ];
 
 export const SPENDING_BREAKDOWN_OPTIONS: Array<{ value: SpendingBreakdown; label: string }> = [
+  { value: "funding_source", label: "Source" },
   { value: "workspace", label: "Workspaces" },
   { value: "user", label: "Users" },
   { value: "model", label: "Models" },
@@ -105,11 +114,11 @@ export const SPENDING_BREAKDOWN_OPTIONS: Array<{ value: SpendingBreakdown; label
 ];
 
 export const MODEL_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter((option) => option.value !== "machine");
-export const MACHINE_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter((option) => option.value !== "model");
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
-const OTHER_SERIES_ID = "other";
+export const MACHINE_BREAKDOWN_OPTIONS = SPENDING_BREAKDOWN_OPTIONS.filter(
+  (option) => option.value !== "model" && option.value !== "funding_source",
+);
+export const DEFAULT_MODEL_BREAKDOWN: SpendingBreakdown = "model";
+export const DEFAULT_MACHINE_BREAKDOWN: SpendingBreakdown = "machine";
 
 export function modelKey(provider: string, model: string): string {
   return `${provider}/${model}`;
@@ -153,47 +162,9 @@ export function rangeFromCustomDays(from: Date, to: Date): SpendingDateRange {
 }
 
 export function hasActiveSpendingFilters(filters: SpendingFilters): boolean {
-  return Boolean(filters.userId || filters.workspaceId || filters.model || filters.machineType);
-}
-
-export function filterSpendingEvents(
-  events: SpendingUsageEvent[],
-  range: SpendingDateRange,
-  filters: SpendingFilters,
-  usageKind?: SpendingUsageKind,
-): SpendingUsageEvent[] {
-  return events.filter((event) => eventMatches(event, range, filters, usageKind));
-}
-
-export function buildSpendingReport({
-  events,
-  range,
-  filters,
-  breakdown,
-  catalogs,
-  usageKind,
-}: {
-  events: SpendingUsageEvent[];
-  range: SpendingDateRange;
-  filters: SpendingFilters;
-  breakdown: SpendingBreakdown;
-  catalogs: SpendingCatalogs;
-  usageKind: SpendingUsageKind;
-}): SpendingReport {
-  const matched = filterSpendingEvents(events, range, filters, usageKind);
-  const totals = sumSpendingTotals(matched);
-  const grain = chartGrainForRange(range);
-  const grouped = groupBreakdown(matched, breakdown, catalogs);
-  const seriesKeys = seriesKeysForBreakdown(grouped, breakdown);
-  const series = bucketEvents(matched, range, grain, breakdown, seriesKeys);
-
-  return {
-    range,
-    totals,
-    series,
-    seriesKeys,
-    breakdown: grouped,
-  };
+  return Boolean(
+    filters.userId || filters.workspaceId || filters.model || filters.machineType || filters.fundingSource,
+  );
 }
 
 export interface SpendingCatalogs {
@@ -203,22 +174,13 @@ export interface SpendingCatalogs {
   machines: SpendingCatalogItem[];
 }
 
-export function sumSpendingTotals(events: SpendingUsageEvent[]): SpendingTotals {
-  return events.reduce<SpendingTotals>(
-    (totals, event) => {
-      totals.costCents += event.costCents;
-      totals.tokens += event.totalTokens;
-      totals.durationSeconds += event.durationSeconds;
-      if (event.fundingSource === "hosted") {
-        totals.hostedCostCents += event.costCents;
-      } else {
-        totals.byokCostCents += event.costCents;
-      }
-      return totals;
-    },
-    { costCents: 0, tokens: 0, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 0 },
-  );
-}
+export {
+  buildSpendingReport,
+  filterSpendingEvents,
+  narrowSpendingReport,
+  spendingTimeGrainForRange,
+  sumSpendingTotals,
+} from "./spendingRedesignReport";
 
 export function formatSpendingRangeCaption(range: SpendingDateRange): string {
   const displayEnd = new Date(range.end.getTime() - 1);
@@ -265,246 +227,50 @@ export function spendingMetricCopy(totals: SpendingTotals): {
   };
 }
 
-type ChartGrain = "hour" | "day" | "month";
-
-export function spendingTimeGrainForRange(range: SpendingDateRange): ChartGrain {
-  return chartGrainForRange(range);
-}
-
-function eventMatches(
-  event: SpendingUsageEvent,
-  range: SpendingDateRange,
-  filters: SpendingFilters,
-  usageKind?: SpendingUsageKind,
-): boolean {
-  const occurred = Date.parse(event.occurredAt);
-  if (Number.isNaN(occurred) || occurred < range.start.getTime() || occurred >= range.end.getTime()) {
-    return false;
-  }
-  if (usageKind && event.usageKind !== usageKind) {
-    return false;
-  }
-  if (filters.userId && event.userId !== filters.userId) {
-    return false;
-  }
-  if (filters.workspaceId && event.factoryId !== filters.workspaceId) {
-    return false;
-  }
-  if (filters.model && modelKey(event.provider, event.model) !== filters.model) {
-    return false;
-  }
-  if (filters.machineType && event.machineType !== filters.machineType) {
-    return false;
-  }
-  return true;
-}
-
-function chartGrainForRange(range: SpendingDateRange): ChartGrain {
-  const span = range.end.getTime() - range.start.getTime();
-  if (span <= 2 * DAY_MS) {
-    return "hour";
-  }
-  if (span <= 90 * DAY_MS) {
-    return "day";
-  }
-  return "month";
-}
-
-function groupBreakdown(
-  events: SpendingUsageEvent[],
+export function spendingBreakdownLabel(
   breakdown: SpendingBreakdown,
-  catalogs: SpendingCatalogs,
-): SpendingBreakdownRow[] {
-  const totalsById = new Map<string, { tokens: number; durationSeconds: number; costCents: number }>();
-  for (const event of events) {
-    if (breakdown === "model" && event.usageKind !== "model") {
-      continue;
-    }
-    if (breakdown === "machine" && event.usageKind !== "compute") {
-      continue;
-    }
-    const id = breakdownId(event, breakdown);
-    const current = totalsById.get(id) ?? { tokens: 0, durationSeconds: 0, costCents: 0 };
-    current.tokens += event.totalTokens;
-    current.durationSeconds += event.durationSeconds;
-    current.costCents += event.costCents;
-    totalsById.set(id, current);
-  }
-
-  const totalCost = [...totalsById.values()].reduce((sum, row) => sum + row.costCents, 0);
-  const labels = labelCatalog(breakdown, catalogs);
-
-  return [...totalsById.entries()]
-    .map(([id, row]) => ({
-      id,
-      label: labels.get(id) ?? id,
-      tokens: row.tokens,
-      durationSeconds: row.durationSeconds,
-      costCents: row.costCents,
-      share: totalCost > 0 ? row.costCents / totalCost : 0,
-    }))
-    .sort((left, right) => right.costCents - left.costCents || left.label.localeCompare(right.label));
+  options: Array<{ value: SpendingBreakdown; label: string }>,
+): string {
+  return options.find((option) => option.value === breakdown)?.label ?? "Workspaces";
 }
 
-function seriesKeysForBreakdown(rows: SpendingBreakdownRow[], breakdown: SpendingBreakdown): SpendingCatalogItem[] {
-  const top = rows.slice(0, 5).map((row) => ({ id: row.id, label: row.label }));
-  if (rows.length > 5) {
-    top.push({ id: OTHER_SERIES_ID, label: otherSeriesLabel(breakdown) });
-  }
-  return top;
-}
-
-function bucketEvents(
-  events: SpendingUsageEvent[],
-  range: SpendingDateRange,
-  grain: ChartGrain,
-  breakdown: SpendingBreakdown,
-  seriesKeys: SpendingCatalogItem[],
-): SpendingSeriesPoint[] {
-  const buckets = emptyBuckets(range, grain);
-  const knownIds = new Set(seriesKeys.map((item) => item.id));
-  const hasOther = knownIds.has(OTHER_SERIES_ID);
-
-  for (const event of events) {
-    const bucketKey = bucketKeyFor(event.occurredAt, grain);
-    const point = buckets.get(bucketKey);
-    if (!point) {
-      continue;
-    }
-    const id = seriesIdForEvent(event, breakdown, knownIds, hasOther);
-    if (!id) {
-      continue;
-    }
-    point.values[id] = (point.values[id] ?? 0) + event.costCents;
-    point.totalCents += event.costCents;
-  }
-
-  return [...buckets.values()];
-}
-
-function seriesIdForEvent(
-  event: SpendingUsageEvent,
-  breakdown: SpendingBreakdown,
-  knownIds: Set<string>,
-  hasOther: boolean,
-): string | undefined {
-  if (breakdown === "model" && event.usageKind !== "model") {
-    return undefined;
-  }
-  if (breakdown === "machine" && event.usageKind !== "compute") {
-    return undefined;
-  }
-  const id = breakdownId(event, breakdown);
-  if (knownIds.has(id)) {
-    return id;
-  }
-  return hasOther ? OTHER_SERIES_ID : undefined;
-}
-
-function emptyBuckets(range: SpendingDateRange, grain: ChartGrain): Map<string, SpendingSeriesPoint> {
-  const buckets = new Map<string, SpendingSeriesPoint>();
-  if (grain === "hour") {
-    for (let time = range.start.getTime(); time < range.end.getTime(); time += HOUR_MS) {
-      const at = new Date(time);
-      const key = hourKey(at);
-      buckets.set(key, { key, label: formatHourLabel(at), totalCents: 0, values: {} });
-    }
-    return buckets;
-  }
-  if (grain === "day") {
-    for (let time = startOfUtcDay(range.start).getTime(); time < range.end.getTime(); time += DAY_MS) {
-      const at = new Date(time);
-      const key = dayKey(at);
-      buckets.set(key, { key, label: formatDayTick(at), totalCents: 0, values: {} });
-    }
-    return buckets;
-  }
-  let cursor = new Date(Date.UTC(range.start.getUTCFullYear(), range.start.getUTCMonth(), 1));
-  while (cursor.getTime() < range.end.getTime()) {
-    const key = monthKey(cursor);
-    buckets.set(key, { key, label: formatMonthTick(cursor), totalCents: 0, values: {} });
-    cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
-  }
-  return buckets;
-}
-
-function bucketKeyFor(occurredAt: string, grain: ChartGrain): string {
-  const at = new Date(occurredAt);
-  if (grain === "hour") {
-    return hourKey(at);
-  }
-  if (grain === "day") {
-    return dayKey(at);
-  }
-  return monthKey(at);
-}
-
-function breakdownId(event: SpendingUsageEvent, breakdown: SpendingBreakdown): string {
+export function spendingBreakdownColumnLabel(breakdown: SpendingBreakdown): string {
   if (breakdown === "workspace") {
-    return event.factoryId;
+    return "Workspace";
   }
   if (breakdown === "user") {
-    return event.userId;
+    return "User";
   }
   if (breakdown === "model") {
-    return modelKey(event.provider, event.model);
+    return "Model";
   }
-  return event.machineType;
-}
-
-function labelCatalog(breakdown: SpendingBreakdown, catalogs: SpendingCatalogs): Map<string, string> {
-  const items =
-    breakdown === "workspace"
-      ? catalogs.workspaces
-      : breakdown === "user"
-        ? catalogs.users
-        : breakdown === "model"
-          ? catalogs.models
-          : catalogs.machines;
-  return new Map(items.map((item) => [item.id, item.label]));
-}
-
-function otherSeriesLabel(breakdown: SpendingBreakdown): string {
-  if (breakdown === "workspace") {
-    return "Other workspaces";
+  if (breakdown === "funding_source") {
+    return "Source";
   }
-  if (breakdown === "user") {
-    return "Other users";
+  return "Machine type";
+}
+
+export function spendingUsageCopy(kind: SpendingUsageKind): {
+  title: string;
+  description: string;
+  emptyMessage: string;
+  testIdPrefix: string;
+  breakdownOptions: Array<{ value: SpendingBreakdown; label: string }>;
+} {
+  if (kind === "model") {
+    return {
+      title: "Model usage",
+      description: "SuperPlane-hosted model usage uses hosted credit. Your keys usage is estimated and is not billed.",
+      emptyMessage: "No model usage is recorded for this period.",
+      testIdPrefix: "spending-model",
+      breakdownOptions: MODEL_BREAKDOWN_OPTIONS,
+    };
   }
-  if (breakdown === "model") {
-    return "Other models";
-  }
-  return "Other machines";
-}
-
-function startOfUtcDay(value: Date): Date {
-  return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
-}
-
-function hourKey(value: Date): string {
-  return `${dayKey(value)}T${String(value.getUTCHours()).padStart(2, "0")}`;
-}
-
-function dayKey(value: Date): string {
-  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-${String(value.getUTCDate()).padStart(2, "0")}`;
-}
-
-function monthKey(value: Date): string {
-  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function formatUtcDay(value: Date): string {
-  return value.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
-function formatHourLabel(value: Date): string {
-  return `${String(value.getUTCHours()).padStart(2, "0")}:00`;
-}
-
-function formatDayTick(value: Date): string {
-  return value.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
-function formatMonthTick(value: Date): string {
-  return value.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" });
+  return {
+    title: "VM usage",
+    description: "Estimated spend in dollars for SuperPlane runner machines.",
+    emptyMessage: "No VM usage is recorded for this period.",
+    testIdPrefix: "spending-vm",
+    breakdownOptions: MACHINE_BREAKDOWN_OPTIONS,
+  };
 }
