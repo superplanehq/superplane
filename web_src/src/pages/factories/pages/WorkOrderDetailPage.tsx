@@ -210,8 +210,12 @@ function LoadedWorkOrderDetail({
   actions,
 }: LoadedWorkOrderDetailProps) {
   const navigate = useNavigate();
-  const duplicate = useDuplicateWorkOrderAction(organizationId, factoryId, (number) => {
-    navigate(workOrderDetailPath(organizationId, factoryKey, number));
+  const duplicate = useDuplicateWorkOrderAction(organizationId, factoryId, (copied) => {
+    if (copied.number) {
+      navigate(workOrderDetailPath(organizationId, factoryKey, copied.number), {
+        state: { peekOrder: copied },
+      });
+    }
   });
 
   return (

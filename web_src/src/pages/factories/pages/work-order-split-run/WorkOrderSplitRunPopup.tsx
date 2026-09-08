@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useWorkOrder } from "@/hooks/useFactoryData";
 import { FEATURE_FACTORY_DRAFT_START_MODEL } from "@/lib/experimentalFeatures";
 
@@ -248,7 +249,7 @@ export function WorkOrderSplitRunPopup({
   canUpdate?: boolean;
   canCreate?: boolean;
   onRefine?: () => void;
-  onCreated?: (orderNumber: string) => void;
+  onCreated?: (order: FactoriesWorkOrder) => void;
 }) {
   const canPickDraftStartModel = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_DRAFT_START_MODEL);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);

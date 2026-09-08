@@ -66,7 +66,7 @@ describe("WorkOrderSplitRunPopup duplicate", () => {
     await user.click(screen.getByTestId("work-order-duplicate-button"));
 
     expect(duplicateMutate).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id);
-    expect(onCreated).toHaveBeenCalledWith("201");
+    expect(onCreated).toHaveBeenCalledWith({ id: "wo-copy", number: "201" });
   });
 
   it("disables Duplicate without create permission", async () => {

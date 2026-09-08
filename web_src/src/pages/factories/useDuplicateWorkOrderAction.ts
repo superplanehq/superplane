@@ -1,3 +1,4 @@
+import type { FactoriesWorkOrder } from "@/api-client";
 import { useDuplicateWorkOrder } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -5,7 +6,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 export function useDuplicateWorkOrderAction(
   organizationId: string | undefined,
   factoryId: string | undefined,
-  onCreated?: (orderNumber: string) => void,
+  onCreated?: (order: FactoriesWorkOrder) => void,
 ) {
   const duplicateWorkOrder = useDuplicateWorkOrder(organizationId ?? "", factoryId ?? "");
 
@@ -16,9 +17,7 @@ export function useDuplicateWorkOrderAction(
     try {
       const copied = await duplicateWorkOrder.mutateAsync(orderId);
       showSuccessToast("Task duplicated.");
-      if (copied.number) {
-        onCreated?.(String(copied.number));
-      }
+      onCreated?.(copied);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to duplicate task."));
     }

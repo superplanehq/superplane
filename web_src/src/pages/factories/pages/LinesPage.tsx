@@ -953,9 +953,12 @@ function LineBoardSplitRunPopup({
       canDispatch={canDispatch && Boolean(resolvedLineName)}
       canUpdate={canUpdate}
       canCreate={canCreate}
-      onCreated={(number) => {
-        navigate(workOrderDetailPath(organizationId, factoryKey, number, lineId), {
-          state: { peekOrder: { number } },
+      onCreated={(order) => {
+        if (!order.number) {
+          return;
+        }
+        navigate(workOrderDetailPath(organizationId, factoryKey, order.number, lineId), {
+          state: { peekOrder: order },
         });
       }}
       isDispatching={isDispatching}
