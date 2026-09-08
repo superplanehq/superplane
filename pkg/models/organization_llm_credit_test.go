@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -381,7 +382,7 @@ func Test__ComputeUsageAloneCanExhaustHostedCredit(t *testing.T) {
 	require.Greater(t, before.RemainingMicros, int64(0))
 
 	// e1-large-amd64 at ~$2/hr; enough seconds to exceed the welcome grant.
-	secondsToExhaust := before.RemainingMicros/556 + 10
+	secondsToExhaust := before.RemainingMicros/pricebook.MicrosPerSecondE1Large + 10
 	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     runID,

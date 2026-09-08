@@ -18,7 +18,7 @@ func SumFactoryHostedBilledMicros(tx *gorm.DB, orgID, factoryID uuid.UUID) (int6
 	var billedMicros int64
 	err := tx.Model(&WorkspaceUsageEvent{}).
 		Select("COALESCE(SUM(cost_micros), 0)").
-		Where("organization_id = ? AND factory_id = ? AND funding_source = ? AND usage_kind IN ?", orgID, factoryID, UsageFundingSourceHosted, []string{UsageKindModel, UsageKindCompute}).
+		Where("organization_id = ? AND factory_id = ? AND funding_source = ?", orgID, factoryID, UsageFundingSourceHosted).
 		Scan(&billedMicros).Error
 	return billedMicros, err
 }
