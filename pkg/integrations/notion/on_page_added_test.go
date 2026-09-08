@@ -28,6 +28,13 @@ func pagePage(pages ...string) *http.Response {
 	return jsonResponse(fmt.Sprintf(`{"results":[%s],"has_more":false}`, strings.Join(pages, ",")))
 }
 
+// pageTimestamp formats a time the way Notion reports a page's created_time,
+// so tests can derive their fixtures from time.Now() rather than hardcoding
+// absolute dates.
+func pageTimestamp(at time.Time) string {
+	return formatPageTime(at)
+}
+
 func pageDocument(id, title, createdAt string) string {
 	return fmt.Sprintf(`{
 		"id":%q,
@@ -125,9 +132,10 @@ func Test__OnPageAdded__Setup(t *testing.T) {
 	// Pages that exist before the trigger does are not news. The first setup
 	// starts at the newest page the database already carries.
 	t.Run("starts polling at the database's newest page", func(t *testing.T) {
+		newest := pageTimestamp(time.Now().Add(-90 * time.Minute))
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 			databaseResponse(),
-			pagePage(pageDocument("page-1", "Fix payment retries", "2026-01-03T11:30:00.000Z")),
+			pagePage(pageDocument("page-1", "Fix payment retries", newest)),
 		}}
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
@@ -145,7 +153,7 @@ func Test__OnPageAdded__Setup(t *testing.T) {
 		stored := nodeMetadata(t, metadata)
 		require.NotNil(t, stored.Database)
 		assert.Equal(t, "Tasks", stored.Database.Name)
-		assert.Equal(t, "2026-01-03T11:30:00Z", stored.PolledUntil)
+		assert.Equal(t, newest, stored.PolledUntil)
 
 		assert.Equal(t, pollPagesHook, requests.Action)
 		assert.Equal(t, pollInterval, requests.Duration)
@@ -176,8 +184,9 @@ func Test__OnPageAdded__Setup(t *testing.T) {
 	// Setup runs again on every canvas update. Resetting the cursor there
 	// would replay pages the trigger already reported.
 	t.Run("keeps the cursor of an existing trigger", func(t *testing.T) {
+		cursor := pageTimestamp(time.Now().Add(-90 * time.Minute))
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{databaseResponse()}}
-		metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: "2026-01-03T11:30:00Z"}}
+		metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
 
 		err := trigger.Setup(core.TriggerContext{
 			Integration:   integrationWithDatabase(),
@@ -188,7 +197,7 @@ func Test__OnPageAdded__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "2026-01-03T11:30:00Z", nodeMetadata(t, metadata).PolledUntil)
+		assert.Equal(t, cursor, nodeMetadata(t, metadata).PolledUntil)
 		assert.Len(t, httpContext.Requests, 1, "an existing cursor must not be looked up again")
 	})
 }
@@ -199,16 +208,27 @@ func Test__OnPageAdded__HandleHook__UnknownHook(t *testing.T) {
 }
 
 func Test__OnPageAdded__Poll__EmitsPagesAddedAfterTheCursor(t *testing.T) {
+	now := time.Now().UTC()
+	cursor := pageTimestamp(now.Add(-3 * time.Hour))
+	older := pageTimestamp(now.Add(-2 * time.Hour))
+	newest := pageTimestamp(now.Add(-time.Hour))
+	beforeCursor := pageTimestamp(now.Add(-5 * time.Hour))
+
+	//
+	// The poll reads pages oldest first, so the fixture lists them that way.
+	// The page created before the cursor is a defensive case: Notion filters it
+	// out server-side, and the trigger drops it too rather than emitting it.
+	//
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		pagePage(
-			pageDocument("page-93", "Newest", "2026-01-04T09:00:00.000Z"),
-			pageDocument("page-92", "Older", "2026-01-03T09:00:00.000Z"),
-			pageDocument("page-91", "Already reported", "2026-01-01T09:00:00.000Z"),
+			pageDocument("page-91", "Already reported", beforeCursor),
+			pageDocument("page-92", "Older", older),
+			pageDocument("page-93", "Newest", newest),
 		),
 		blocksResponse("Body of Older"),
 		blocksResponse("Body of Newest"),
 	}}
-	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: "2026-01-02T09:00:00Z"}}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
 	events := &contexts.EventContext{}
 
 	_, err := (&OnPageAdded{}).HandleHook(pollContext(
@@ -218,7 +238,7 @@ func Test__OnPageAdded__Poll__EmitsPagesAddedAfterTheCursor(t *testing.T) {
 
 	// Oldest first, so the newest page ends up at the top of the backlog.
 	assert.Equal(t, []string{"Older", "Newest"}, emittedTitles(t, events))
-	assert.Equal(t, "2026-01-04T09:00:00Z", nodeMetadata(t, metadata).PolledUntil)
+	assert.Equal(t, newest, nodeMetadata(t, metadata).PolledUntil)
 
 	envelope, ok := events.Payloads[0].Data.(map[string]any)
 	require.True(t, ok)
@@ -233,7 +253,7 @@ func Test__OnPageAdded__Poll__EmitsPagesAddedAfterTheCursor(t *testing.T) {
 func Test__OnPageAdded__Poll__SchedulesTheNextPoll(t *testing.T) {
 	requests := &contexts.RequestContext{}
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{pagePage()}}
-	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: "2026-01-02T09:00:00Z"}}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: pageTimestamp(time.Now().Add(-time.Hour))}}
 
 	_, err := (&OnPageAdded{}).HandleHook(pollContext(
 		databaseConfiguration(), metadata, httpContext, &contexts.EventContext{}, requests,
@@ -252,7 +272,8 @@ func Test__OnPageAdded__Poll__KeepsPollingAfterAFailedRead(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		{StatusCode: http.StatusTooManyRequests, Body: io.NopCloser(strings.NewReader(`{"message":"Rate limited"}`))},
 	}}
-	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: "2026-01-02T09:00:00Z"}}
+	cursor := pageTimestamp(time.Now().Add(-time.Hour))
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
 	events := &contexts.EventContext{}
 
 	_, err := (&OnPageAdded{}).HandleHook(pollContext(
@@ -262,18 +283,23 @@ func Test__OnPageAdded__Poll__KeepsPollingAfterAFailedRead(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, events.Count())
 	assert.Equal(t, pollPagesHook, requests.Action)
-	assert.Equal(t, "2026-01-02T09:00:00Z", nodeMetadata(t, metadata).PolledUntil, "a failed read must not move the cursor")
+	assert.Equal(t, cursor, nodeMetadata(t, metadata).PolledUntil, "a failed read must not move the cursor")
 }
 
 func Test__OnPageAdded__Poll__StopsAtAPageWhoseContentFailsToRead(t *testing.T) {
+	now := time.Now().UTC()
+	cursor := pageTimestamp(now.Add(-3 * time.Hour))
+
+	// Pages arrive oldest first, so the first page emitted is "Older". Its
+	// content read fails, so nothing is emitted and the cursor stays behind it.
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		pagePage(
-			pageDocument("page-92", "Newest", "2026-01-04T09:00:00.000Z"),
-			pageDocument("page-91", "Older", "2026-01-03T09:00:00.000Z"),
+			pageDocument("page-91", "Older", pageTimestamp(now.Add(-2*time.Hour))),
+			pageDocument("page-92", "Newest", pageTimestamp(now.Add(-time.Hour))),
 		),
 		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"boom"}`))},
 	}}
-	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: "2026-01-02T09:00:00Z"}}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
 	events := &contexts.EventContext{}
 
 	_, err := (&OnPageAdded{}).HandleHook(pollContext(
@@ -282,7 +308,7 @@ func Test__OnPageAdded__Poll__StopsAtAPageWhoseContentFailsToRead(t *testing.T) 
 	require.NoError(t, err)
 
 	assert.Zero(t, events.Count())
-	assert.Equal(t, "2026-01-02T09:00:00Z", nodeMetadata(t, metadata).PolledUntil, "the cursor must stay behind the unread page")
+	assert.Equal(t, cursor, nodeMetadata(t, metadata).PolledUntil, "the cursor must stay behind the unread page")
 }
 
 func Test__OnPageAdded__Poll__WithoutACursorReportsNothing(t *testing.T) {

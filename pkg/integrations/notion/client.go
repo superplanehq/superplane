@@ -33,6 +33,7 @@ const (
 
 	sortTimestampCreated = "created_time"
 	sortDirectionNewest  = "descending"
+	sortDirectionOldest  = "ascending"
 )
 
 // Client talks to Notion's REST API using an internal integration token sent
@@ -237,16 +238,39 @@ func (c *Client) GetDatabase(id string) (*Database, error) {
 type queryOptions struct {
 	startCursor string
 	pageSize    int
+
+	// oldestFirst sorts the pages by creation time ascending rather than the
+	// default descending. A poll reads oldest first so it can advance its
+	// cursor as it goes and never skip a page when more were added than a
+	// single poll can read.
+	oldestFirst bool
+
+	// createdAfter, when set, asks Notion to return only pages created strictly
+	// after this RFC3339 timestamp. Filtering server-side keeps a poll bounded
+	// to the pages that are actually new.
+	createdAfter string
 }
 
-// queryDatabase reads one page of a database's pages, newest created first.
+// queryDatabase reads one page of a database's pages, newest created first by
+// default, or oldest first when the options ask for it.
 func (c *Client) queryDatabase(databaseID string, options queryOptions) ([]map[string]any, bool, string, error) {
+	direction := sortDirectionNewest
+	if options.oldestFirst {
+		direction = sortDirectionOldest
+	}
+
 	body := map[string]any{
-		"sorts":     []any{map[string]any{"timestamp": sortTimestampCreated, "direction": sortDirectionNewest}},
+		"sorts":     []any{map[string]any{"timestamp": sortTimestampCreated, "direction": direction}},
 		"page_size": options.pageSize,
 	}
 	if options.startCursor != "" {
 		body["start_cursor"] = options.startCursor
+	}
+	if options.createdAfter != "" {
+		body["filter"] = map[string]any{
+			"timestamp":          sortTimestampCreated,
+			sortTimestampCreated: map[string]any{"after": options.createdAfter},
+		}
 	}
 
 	responseBody, err := c.execJSONRequest(
@@ -274,11 +298,17 @@ func (c *Client) ListNewestPages(databaseID string, limit int) ([]map[string]any
 	return results, err
 }
 
-// ListChangedPageDocuments returns one page of the database's pages, most
-// recently created first, starting at cursor. The onPageAdded trigger walks
-// these to find what was created since its last poll.
-func (c *Client) ListChangedPageDocuments(databaseID, cursor string, pageSize int) ([]map[string]any, bool, string, error) {
-	return c.queryDatabase(databaseID, queryOptions{startCursor: cursor, pageSize: pageSize})
+// ListChangedPageDocuments returns one page of the database's pages created
+// after createdAfter, oldest created first, starting at cursor. The onPageAdded
+// trigger walks these oldest first so a burst larger than one poll can read is
+// caught up over several polls instead of skipping the overflow.
+func (c *Client) ListChangedPageDocuments(databaseID, cursor, createdAfter string, pageSize int) ([]map[string]any, bool, string, error) {
+	return c.queryDatabase(databaseID, queryOptions{
+		startCursor:  cursor,
+		pageSize:     pageSize,
+		oldestFirst:  true,
+		createdAfter: createdAfter,
+	})
 }
 
 // PageContent returns the plain text content of a page: its blocks, joined by
@@ -338,6 +368,12 @@ type Page struct {
 	Title   string
 	Content string
 	URL     string
+
+	// ParentDatabaseID is the database the page belongs to, when the page is a
+	// database entry. It lets a caller confirm an imported page belongs to the
+	// database the intake is scoped to, rather than trusting a caller-supplied
+	// id alone.
+	ParentDatabaseID string
 }
 
 // GetPage fetches a single page by id, with its content, for importing an
@@ -365,11 +401,37 @@ func (c *Client) GetPage(id string) (*Page, error) {
 
 	pageURL, _ := object["url"].(string)
 	return &Page{
-		ID:      pageID,
-		Title:   PageTitle(object),
-		Content: content,
-		URL:     pageURL,
+		ID:               pageID,
+		Title:            PageTitle(object),
+		Content:          content,
+		URL:              pageURL,
+		ParentDatabaseID: parentDatabaseID(object),
 	}, nil
+}
+
+// parentDatabaseID reads the id of the database a page belongs to. Pages that
+// live outside a database (or whose parent Notion did not return) yield an
+// empty id, which callers treat as out of scope.
+func parentDatabaseID(object map[string]any) string {
+	parent, ok := object["parent"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	id, _ := parent["database_id"].(string)
+	return id
+}
+
+// SameDatabase reports whether two Notion database ids refer to the same
+// database. Notion returns ids both with and without the dashes of their UUID
+// form, so the comparison ignores dashes and case. An empty id never matches,
+// so a page whose parent database could not be determined is out of scope.
+func SameDatabase(a, b string) bool {
+	na, nb := normalizeID(a), normalizeID(b)
+	return na != "" && na == nb
+}
+
+func normalizeID(id string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), "-", ""))
 }
 
 // ListPages returns the pages of the database whose title contains query

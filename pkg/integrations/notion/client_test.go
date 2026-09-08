@@ -1,8 +1,10 @@
 package notion
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,10 +94,11 @@ func Test__Client__GetDatabase(t *testing.T) {
 }
 
 func Test__Client__ListNewestPages(t *testing.T) {
+	createdAt := time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339Nano)
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"results":[
-			{"id":"page-1","created_time":"2026-01-03T09:00:00.000Z","properties":{"Name":{"type":"title","title":[{"plain_text":"Fix payment retries"}]}}}
-		],"has_more":false}`),
+		jsonResponse(fmt.Sprintf(`{"results":[
+			{"id":"page-1","created_time":%q,"properties":{"Name":{"type":"title","title":[{"plain_text":"Fix payment retries"}]}}}
+		],"has_more":false}`, createdAt)),
 	}}
 
 	pages, err := testClient(t, httpContext).ListNewestPages("db-1", 30)
@@ -113,15 +116,32 @@ func Test__Client__ListNewestPages(t *testing.T) {
 }
 
 func Test__Client__ListChangedPageDocuments(t *testing.T) {
+	createdAt := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	after := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339Nano)
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"results":[{"id":"page-1","created_time":"2026-01-03T09:00:00.000Z"}],"has_more":true,"next_cursor":"cursor-1"}`),
+		jsonResponse(fmt.Sprintf(`{"results":[{"id":"page-1","created_time":%q}],"has_more":true,"next_cursor":"cursor-1"}`, createdAt)),
 	}}
 
-	documents, hasMore, nextCursor, err := testClient(t, httpContext).ListChangedPageDocuments("db-1", "cursor-0", 50)
+	documents, hasMore, nextCursor, err := testClient(t, httpContext).ListChangedPageDocuments("db-1", "cursor-0", after, 50)
 	require.NoError(t, err)
 	require.Len(t, documents, 1)
 	assert.True(t, hasMore)
 	assert.Equal(t, "cursor-1", nextCursor)
+
+	// The read asks Notion for the oldest new pages first, filtered to those
+	// created after the cursor, so a burst is caught up without skipping pages.
+	body := requestBody(t, httpContext.Requests[0])
+	sorts, ok := body["sorts"].([]any)
+	require.True(t, ok)
+	require.Len(t, sorts, 1)
+	sort, ok := sorts[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ascending", sort["direction"])
+	filter, ok := body["filter"].(map[string]any)
+	require.True(t, ok)
+	createdFilter, ok := filter["created_time"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, after, createdFilter["after"])
 }
 
 func Test__Client__PageContent(t *testing.T) {
@@ -142,18 +162,39 @@ func Test__Client__PageContent(t *testing.T) {
 
 func Test__Client__GetPage(t *testing.T) {
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
-		jsonResponse(`{"id":"page-1","url":"https://www.notion.so/page-1","properties":{"Name":{"type":"title","title":[{"plain_text":"Fix payment retries"}]}}}`),
+		jsonResponse(`{"id":"page-1","url":"https://www.notion.so/page-1","parent":{"type":"database_id","database_id":"db-1"},"properties":{"Name":{"type":"title","title":[{"plain_text":"Fix payment retries"}]}}}`),
 		jsonResponse(`{"results":[{"type":"paragraph","paragraph":{"rich_text":[{"plain_text":"Retries fail silently."}]}}]}`),
 	}}
 
 	page, err := testClient(t, httpContext).GetPage("page-1")
 	require.NoError(t, err)
 	assert.Equal(t, &Page{
-		ID:      "page-1",
-		Title:   "Fix payment retries",
-		Content: "Retries fail silently.",
-		URL:     "https://www.notion.so/page-1",
+		ID:               "page-1",
+		Title:            "Fix payment retries",
+		Content:          "Retries fail silently.",
+		URL:              "https://www.notion.so/page-1",
+		ParentDatabaseID: "db-1",
 	}, page)
+}
+
+func Test__SameDatabase(t *testing.T) {
+	t.Run("matches ids that differ only by dashes and case", func(t *testing.T) {
+		assert.True(t, SameDatabase("AB-CD", "abcd"))
+		assert.True(t, SameDatabase(
+			"11111111-2222-3333-4444-555555555555",
+			"11111111222233334444555555555555",
+		))
+	})
+
+	t.Run("different databases do not match", func(t *testing.T) {
+		assert.False(t, SameDatabase("db-1", "db-2"))
+	})
+
+	t.Run("an empty id never matches", func(t *testing.T) {
+		assert.False(t, SameDatabase("", "db-1"))
+		assert.False(t, SameDatabase("db-1", ""))
+		assert.False(t, SameDatabase("", ""))
+	})
 }
 
 func Test__Client__ListPages(t *testing.T) {

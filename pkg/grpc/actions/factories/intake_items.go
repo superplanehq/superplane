@@ -246,6 +246,16 @@ func (s *notionIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem,
 		return nil, err
 	}
 
+	//
+	// A caller supplies the page id directly, so an id outside the intake's
+	// database must not import. The integration can read pages in every
+	// database shared with it, so the parent database is checked here rather
+	// than trusting the id.
+	//
+	if !notion.SameDatabase(page.ParentDatabaseID, s.databaseID) {
+		return nil, errIntakeItemNotFound
+	}
+
 	item := notionPageItem(*page)
 	return &item, nil
 }

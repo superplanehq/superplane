@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -297,11 +298,12 @@ func notionBlocksResponse(text string) *http.Response {
 // notionPagePage builds a page list as Notion's query API returns it, so the
 // titles are given newest first.
 func notionPagePage(titles []string) []map[string]any {
+	createdAt := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339Nano)
 	pages := make([]map[string]any, 0, len(titles))
 	for i, title := range titles {
 		pages = append(pages, map[string]any{
 			"id":           strconv.Itoa(len(titles) - i),
-			"created_time": "2026-01-01T00:00:00.000Z",
+			"created_time": createdAt,
 			"properties": map[string]any{
 				"Name": map[string]any{"type": "title", "title": []any{map[string]any{"plain_text": title}}},
 			},

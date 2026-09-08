@@ -1,6 +1,7 @@
 package notion
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -145,4 +146,18 @@ func jsonResponse(body string) *http.Response {
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
+}
+
+// requestBody decodes the JSON body a request carried, for asserting on what a
+// client asked Notion for.
+func requestBody(t *testing.T, request *http.Request) map[string]any {
+	t.Helper()
+
+	require.NotNil(t, request.Body)
+	raw, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+
+	body := map[string]any{}
+	require.NoError(t, json.Unmarshal(raw, &body))
+	return body
 }

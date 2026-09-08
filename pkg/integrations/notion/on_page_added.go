@@ -3,7 +3,6 @@ package notion
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -234,11 +233,11 @@ func emitChangedPages(
 	polledUntil time.Time,
 ) error {
 	//
-	// Notion answers newest first. Emitting the oldest page first keeps the
-	// newest at the top of a backlog, where the reader expects it.
+	// changedPages returns the pages oldest first, so emitting them in order
+	// keeps the newest at the top of a backlog and advances the cursor as it
+	// goes: a page that fails leaves the cursor behind it, and a burst larger
+	// than one poll can read is caught up over several polls.
 	//
-	slices.Reverse(documents)
-
 	cursor := polledUntil
 	for _, document := range documents {
 		createdAt, ok := pageTime(document, "created_time")
@@ -296,31 +295,38 @@ func BuildPageEvent(client *Client, document map[string]any) (map[string]any, er
 	return page, nil
 }
 
-// changedPages reads the pages of the database created after polledUntil.
-// Notion sorts them by creation time, so paging stops at the first page that
-// is not newer than the cursor.
+// changedPages reads the pages of the database created after polledUntil,
+// oldest first. Notion filters and sorts server-side, so a poll reads the
+// oldest unreported pages first and can advance its cursor page by page. When
+// more pages were added than one poll can read, the overflow stays newer than
+// the advanced cursor and is caught up by the next poll instead of skipped.
 func changedPages(client *Client, databaseID string, polledUntil time.Time) ([]map[string]any, error) {
 	changed := []map[string]any{}
 	cursor := ""
+	createdAfter := formatPageTime(polledUntil)
 
 	for page := 1; page <= maxPollPages; page++ {
-		documents, hasMore, nextCursor, err := client.ListChangedPageDocuments(databaseID, cursor, pollPageSize)
+		documents, hasMore, nextCursor, err := client.ListChangedPageDocuments(databaseID, cursor, createdAfter, pollPageSize)
 		if err != nil {
 			return nil, err
 		}
 
-		stop := false
 		for _, document := range documents {
+			//
+			// Notion has already filtered to pages created after the cursor.
+			// A page whose timestamp cannot be read is skipped rather than
+			// stopping the walk, so one odd page does not hide the pages after
+			// it.
+			//
 			createdAt, ok := pageTime(document, "created_time")
 			if !ok || !createdAt.After(polledUntil) {
-				stop = true
-				break
+				continue
 			}
 
 			changed = append(changed, document)
 		}
 
-		if stop || !hasMore || nextCursor == "" {
+		if !hasMore || nextCursor == "" {
 			return changed, nil
 		}
 		cursor = nextCursor
