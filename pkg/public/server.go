@@ -1117,6 +1117,14 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	if err != nil {
+		tx.Rollback()
+		log.Errorf("Error granting welcome credit for organization %s (%s): %v", organization.Name, organization.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
 	err = tx.Commit().Error
 	if err != nil {
 		log.Errorf("Error committing transaction for organization %s (%s) creation: %v", organization.Name, organization.ID, err)
@@ -1415,6 +1423,9 @@ func (s *Server) createInitialOrganizationAttempt(tx *gorm.DB, account *models.A
 	}
 	if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 		return nil, nil, fmt.Errorf("set organization creator: %w", err)
+	}
+	if err := models.GrantWelcomeCredit(tx, organization.ID, account.ID); err != nil {
+		return nil, nil, fmt.Errorf("grant welcome credit: %w", err)
 	}
 
 	workspace, err := models.CreateFactory(tx, organization.ID, "New workspace", "", "")

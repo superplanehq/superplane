@@ -858,6 +858,14 @@ func Test__CreateOrganization(t *testing.T) {
 		roles, err := authService.GetUserRolesForOrg(context.Background(), user.ID.String(), orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, roles)
+
+		credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+
+		reloaded, err := models.FindAccountByID(account.ID.String())
+		require.NoError(t, err)
+		assert.True(t, reloaded.HasReceivedWelcomeCredit())
 	})
 
 	t.Run("organizations with a duplicate name are both created and get distinct slugs", func(t *testing.T) {
@@ -923,6 +931,14 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.Equal(t, "Duplicate Organization", secondOrg.Name)
 		assert.NotEqual(t, firstOrg.ID, secondOrg.ID)
 		assert.NotEqual(t, firstOrg.Slug, secondOrg.Slug)
+
+		firstCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), firstOrg.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), firstCredit.GrantMicros)
+
+		secondCredit, err := models.DescribeOrganizationLLMCredit(database.Conn(), secondOrg.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), secondCredit.GrantMicros)
 	})
 
 	t.Run("organization creation returns 429 when account limit is reached", func(t *testing.T) {
