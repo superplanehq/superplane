@@ -163,6 +163,10 @@ value is set and that the App ID is a positive integer. Then restart
 If setup stays blocked, the installation still has no complete
 `SUPERPLANE_GITHUB_APP_*` set. Check `.env` and restart the server.
 
+CI sets dummy GitHub App values so factory E2E can open workspace setup.
+Local `make test.e2e` needs the same dummy values or a real app. Without
+them, `/account/onboarding` returns 503.
+
 ## Troubleshooting
 
 - **Webhooks not received:** Check `WEBHOOKS_BASE_URL`, ensure the tunnel is running, and that the third-party service uses the correct webhook URL.
