@@ -121,6 +121,56 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
+	t.Run("creating a Notion intake builds a healthy trigger to createWorkOrder canvas", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_NOTION_PAGES})
+
+		assert.Equal(t, pb.FactoryIntake_SOURCE_NOTION_PAGES, intake.GetSource())
+		assert.Equal(t, "Notion pages", intake.GetName())
+		assert.True(t, intake.GetHealthy())
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+		assert.Len(t, liveVersion.Nodes, 2)
+		assert.Len(t, liveVersion.Edges, 1)
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		assert.Equal(t, "notion.onPageAdded", trigger.ComponentName())
+	})
+
+	t.Run("a Notion intake listens to the selected database", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "notion")
+
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{
+			Source:        pb.FactoryIntake_SOURCE_NOTION_PAGES,
+			IntegrationId: integrationID,
+			ResourceId:    "database-42",
+		})
+
+		trigger := liveIntakeTrigger(t, r.Organization.ID, intake)
+		require.NotNil(t, trigger.IntegrationID)
+		assert.Equal(t, integrationID, *trigger.IntegrationID)
+		assert.Equal(t, "database-42", trigger.Configuration["database"])
+	})
+
+	t.Run("a Notion intake rejects an integration of another type", func(t *testing.T) {
+		factory := newFactory(t)
+		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
+
+		_, err := CreateFactoryIntake(ctx, deps, orgID, &pb.CreateFactoryIntakeRequest{
+			FactoryId:     factory.ID.String(),
+			Source:        pb.FactoryIntake_SOURCE_NOTION_PAGES,
+			IntegrationId: integrationID,
+			ResourceId:    "database-42",
+		})
+
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	})
+
 	t.Run("a GitHub intake listens with the workspace connection", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")

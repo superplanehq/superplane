@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/notion"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -31,6 +32,20 @@ func Test__ProductiveTaskItem(t *testing.T) {
 	assert.Equal(t, "Fix payment retries", item.Title)
 	assert.Equal(t, "Retries fail silently.", item.Body)
 	assert.Equal(t, "https://app.productive.io/12345/tasks/91", item.URL)
+}
+
+func Test__NotionPageItem(t *testing.T) {
+	item := notionPageItem(notion.Page{
+		ID:      "page-1",
+		Title:   "Fix payment retries",
+		Content: "Retries fail silently.",
+		URL:     "https://www.notion.so/Fix-payment-retries-page-1",
+	})
+
+	assert.Equal(t, "page-1", item.ID)
+	assert.Equal(t, "Fix payment retries", item.Title)
+	assert.Equal(t, "Retries fail silently.", item.Body)
+	assert.Equal(t, "https://www.notion.so/Fix-payment-retries-page-1", item.URL)
 }
 
 type stubIntakeItemSource struct {
