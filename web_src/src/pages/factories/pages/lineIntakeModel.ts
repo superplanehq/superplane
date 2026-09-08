@@ -5,6 +5,7 @@ import type {
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -35,7 +36,12 @@ import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
 export { ADD_INTAKE_TEMPLATES, filterAddIntakeTemplates, type AddIntakeTemplate } from "./addIntakeTemplates";
 
-export type LineIntakeSourceId = "github-issues" | "sentry-exceptions" | "pagerduty-incidents" | "productive-tasks";
+export type LineIntakeSourceId =
+  | "github-issues"
+  | "sentry-exceptions"
+  | "pagerduty-incidents"
+  | "productive-tasks"
+  | "notion-pages";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -143,6 +149,25 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "Create a task in Backlog",
     },
   },
+  {
+    id: "notion-pages",
+    name: "Notion pages",
+    description: "Create tasks from pages added to a Notion database.",
+    iconSrc: notionIcon,
+    iconAlt: "Notion",
+    listen: {
+      kind: "poll",
+      label: "On Notion page",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A page added to the database becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
 ];
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
@@ -184,6 +209,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_SENTRY_EXCEPTIONS: "sentry-exceptions",
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
+  SOURCE_NOTION_PAGES: "notion-pages",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
@@ -191,6 +217,7 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "sentry-exceptions": "SOURCE_SENTRY_EXCEPTIONS",
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
+  "notion-pages": "SOURCE_NOTION_PAGES",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {

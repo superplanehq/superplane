@@ -33,6 +33,10 @@ const FeatureFactorySentryIntake = "factory_sentry_intake"
 // available.
 const FeatureFactoryProductiveIntake = "factory_productive_intake"
 
+// FeatureFactoryNotionIntake gates the manual "Add intake" entry for Notion
+// in the Backlog column menu until the flow is generally available.
+const FeatureFactoryNotionIntake = "factory_notion_intake"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -52,6 +56,7 @@ var registry = []Feature{
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactorySentryIntake, Label: "Factory Sentry Intake", Description: "Add Sentry intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive.io Intake", Description: "Add Productive.io intake from the Backlog column menu"},
+	{ID: FeatureFactoryNotionIntake, Label: "Factory Notion Intake", Description: "Add Notion intake from the Backlog column menu"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureFactoryDraftStartModel, Label: "Draft Start Model", Description: "Show a model selector next to Start on a draft task"},
 }

@@ -31,6 +31,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Productive.io intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory notion intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryNotionIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryNotionIntake, f.ID)
+		assert.Equal(t, "Factory Notion Intake", f.Label)
+		assert.Equal(t, "Add Notion intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
