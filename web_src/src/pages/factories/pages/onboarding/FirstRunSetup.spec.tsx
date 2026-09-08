@@ -503,6 +503,12 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 
+  it("stays on the repository screen when an install-request flag is leftover on step=repo", () => {
+    renderSetup(pageModel({ openSection: "repo" }), "/org-1/workspaces/PAY/setup?step=repo&githubSetup=request");
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
   it("opens Connect when GitHub returned an install request without a step", () => {
     renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
 
@@ -561,14 +567,14 @@ describe("FirstRunSetup", () => {
   // returns to the screen that carries the action, not to a screen with no
   // question left to answer.
   it("resumes on the ticket screen when hosted credentials cover the agent", () => {
-    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: true, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-agent")).not.toBeInTheDocument();
   });
 
   it("resumes on the agent screen when the agent still needs a connected provider", () => {
-    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }));
+    renderSetup(pageModel({ hostedAgentReady: false, openSection: "agent" }), "/org-1/workspaces/PAY/setup?step=agent");
 
     expect(screen.getByTestId("first-run-agent")).toBeInTheDocument();
   });

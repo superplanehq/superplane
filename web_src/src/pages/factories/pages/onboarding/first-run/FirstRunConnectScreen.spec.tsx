@@ -128,7 +128,8 @@ describe("FirstRunConnectScreen", () => {
     );
     expect(screen.getByTestId("first-run-github-use-octo")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-other")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.missingAccount)).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-install-other")).toHaveTextContent(FIRST_RUN_COPY.connect.installThere);
   });
 
   it("asks which GitHub account to use when two installs are pending", async () => {

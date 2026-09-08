@@ -36,6 +36,7 @@ import type { FirstRunChrome, FirstRunTicketSource } from "./first-run/firstRunT
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import { WIZARD_STEPS, type IntegrationId, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import { isWizardStepId } from "./onboardingStatus";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
@@ -52,6 +53,24 @@ const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   // last saved answer opens the coding agent screen.
   name: "agent",
 };
+
+function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen {
+  const requestedStep = searchParams.get("step");
+  // A leftover githubSetup=request on a later step must not reopen Connect.
+  if (isWizardStepId(requestedStep)) {
+    return SCREEN_FOR_STEP[requestedStep];
+  }
+  if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
+    return "connect";
+  }
+  return "welcome";
+}
+
+function startConnectOnPicker(searchParams: URLSearchParams): boolean {
+  const step = searchParams.get("step");
+  if (step === "vcs") return true;
+  return step === null && searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE;
+}
 
 const STEP_FOR_SCREEN: Partial<Record<FirstRunScreen, WizardStepId>> = {
   connect: "vcs",
@@ -235,16 +254,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const setup = model.setup;
   const setOpenSection = model.setOpenSection;
 
-  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => {
-    if (searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE) {
-      return "connect";
-    }
-    // Only a provider round trip carries a step in the URL. A fresh visit,
-    // including a resumed pending organization or workspace, starts on the
-    // welcome screen.
-    const resumed = searchParams.get("step") !== null;
-    return resumed ? SCREEN_FOR_STEP[model.openSection] : "welcome";
-  });
+  const [openedScreen, setOpenedScreen] = useState<FirstRunScreen>(() => initialFirstRunScreen(searchParams));
   const openStep = useRef(model.openSection);
   const skipAgentScreen = model.hostedAgentReady;
 
@@ -271,7 +281,7 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // Only a GitHub round trip or a waiting install request lands on the
   // account picker page. A fresh pass opens the Connect GitHub page.
   const stage = useConnectStage(
-    searchParams.get("step") === "vcs" || searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE,
+    startConnectOnPicker(searchParams),
     accountPicker,
     meLoading || model.githubConnectionsLoading,
   );
