@@ -681,6 +681,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
       name?: string;
       steps?: FactoryLineStep[];
       columnColors?: Record<string, string>;
+      columnAutomations?: FactoriesFactoryLine["columnAutomations"];
     }) => {
       const response = await factoriesUpdateFactoryLine(
         withOrganizationHeader({
@@ -690,6 +691,7 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
             name: input.name,
             steps: input.steps,
             columnColors: input.columnColors,
+            columnAutomations: input.columnAutomations,
           },
         }),
       );

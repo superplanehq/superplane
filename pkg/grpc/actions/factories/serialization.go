@@ -286,13 +286,31 @@ func serializeFactoryLine(line *models.FactoryLine) *pb.FactoryLine {
 	}
 
 	return &pb.FactoryLine{
-		Id:           line.ID.String(),
-		Name:         line.Name,
-		Steps:        steps,
-		CreatedAt:    timestamppb.New(line.CreatedAt),
-		UpdatedAt:    timestamppb.New(line.UpdatedAt),
-		ColumnColors: line.ColumnColorsValue(),
+		Id:                line.ID.String(),
+		Name:              line.Name,
+		Steps:             steps,
+		CreatedAt:         timestamppb.New(line.CreatedAt),
+		UpdatedAt:         timestamppb.New(line.UpdatedAt),
+		ColumnColors:      line.ColumnColorsValue(),
+		ColumnAutomations: serializeFactoryLineColumnAutomations(line),
 	}
+}
+
+func serializeFactoryLineColumnAutomations(line *models.FactoryLine) map[string]*pb.FactoryLine_ColumnAutomations {
+	stored := line.ColumnAutomationsValue()
+	if len(stored) == 0 {
+		return nil
+	}
+
+	result := make(map[string]*pb.FactoryLine_ColumnAutomations, len(stored))
+	for key, ids := range stored {
+		canvasIDs := make([]string, len(ids))
+		for i, id := range ids {
+			canvasIDs[i] = id.String()
+		}
+		result[key] = &pb.FactoryLine_ColumnAutomations{CanvasIds: canvasIDs}
+	}
+	return result
 }
 
 func serializeFactories(factories []models.Factory, linesByFactory map[uuid.UUID][]models.FactoryLine) []*pb.Factory {

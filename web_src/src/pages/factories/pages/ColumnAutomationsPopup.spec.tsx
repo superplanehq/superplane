@@ -90,7 +90,7 @@ describe("ColumnAutomationsPopup", () => {
     expect(screen.getByTestId("column-automation-row-intake-github")).not.toHaveTextContent("running");
   });
 
-  it("reports row click and Add automation", async () => {
+  it("reports row click and New automation", async () => {
     const user = userEvent.setup();
     const onAdd = vi.fn();
     const onRowAction = vi.fn();

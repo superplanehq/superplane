@@ -235,11 +235,11 @@ export const LineBoardAutomationView: Story = {
 };
 
 export const LineBoardAddAutomationPicker: Story = {
-  name: "Line board — add automation picker",
+  name: "Line board — new automation",
   parameters: {
     docs: {
       description: {
-        story: "Open the Backlog drawer and press Add automation. Taken catalog entries stay disabled.",
+        story: "Open the Backlog automations menu. New automation creates a canvas and binds it to this column.",
       },
     },
   },

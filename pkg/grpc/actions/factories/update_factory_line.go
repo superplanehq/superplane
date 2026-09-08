@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -61,11 +62,19 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		}
 	}
 
-	if name == nil && steps == nil && columnColors == nil {
-		return nil, factoryErrorToStatus(invalidArgument("name, steps, or column colors must be provided"), "failed to update factory line")
+	var columnAutomations map[string][]uuid.UUID
+	if req.ColumnAutomations != nil {
+		columnAutomations, err = parseLineColumnAutomations(db, orgID, factoryID, req.GetColumnAutomations())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory line")
+		}
 	}
 
-	if err := line.Update(db, name, steps, columnColors); err != nil {
+	if name == nil && steps == nil && columnColors == nil && columnAutomations == nil {
+		return nil, factoryErrorToStatus(invalidArgument("name, steps, column colors, or column automations must be provided"), "failed to update factory line")
+	}
+
+	if err := line.Update(db, name, steps, columnColors, columnAutomations); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 

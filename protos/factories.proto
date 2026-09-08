@@ -848,6 +848,14 @@ message FactoryLine {
   // index>", "verify", "done"). Value is a color id. Missing keys use the
   // default color.
   map<string, string> column_colors = 7;
+  // Canvases shown in the column Automations menu. Keyed by column key
+  // ("backlog", "phase-<step index>", "verify", "done"). These canvases
+  // run on their own triggers. The line does not dispatch them.
+  map<string, ColumnAutomations> column_automations = 8;
+
+  message ColumnAutomations {
+    repeated string canvas_ids = 1;
+  }
 }
 
 message CreateFactoryLineRequest {
@@ -868,6 +876,9 @@ message UpdateFactoryLineRequest {
   // Full replacement of the board column colors. Absent means "do not
   // change"; present (including an empty map) replaces the stored map.
   map<string, string> column_colors = 5;
+  // Full replacement of column automation bindings. Absent means "do not
+  // change"; present (including an empty map) replaces the stored map.
+  map<string, FactoryLine.ColumnAutomations> column_automations = 6;
 }
 
 message UpdateFactoryLineResponse {

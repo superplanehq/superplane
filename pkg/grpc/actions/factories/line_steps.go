@@ -3,6 +3,7 @@ package factories
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
@@ -123,7 +124,14 @@ var factoryLineColumnColorIDs = map[string]bool{
 const (
 	factoryLineColumnColorKeyMaxLength = 64
 	factoryLineColumnColorMaxEntries   = 64
+	factoryLineColumnAutomationMaxIDs  = 64
 )
+
+var factoryLinePhaseKeyPattern = regexp.MustCompile(`^phase-\d+$`)
+
+func isFactoryLineColumnKey(key string) bool {
+	return key == "backlog" || key == "verify" || key == "done" || factoryLinePhaseKeyPattern.MatchString(key)
+}
 
 // parseLineColumnColors validates a full replacement map of board column
 // colors and returns a normalized, non-nil copy (an empty input map is a
@@ -143,6 +151,57 @@ func parseLineColumnColors(colors map[string]string) (map[string]string, error) 
 			return nil, invalidArgument(fmt.Sprintf("column color %q is not supported", colorID))
 		}
 		result[key] = colorID
+	}
+
+	return result, nil
+}
+
+// parseLineColumnAutomations validates a full replacement map of column
+// automation bindings and returns a normalized, non-nil copy. An empty
+// input map is a valid "clear all bindings" request.
+func parseLineColumnAutomations(
+	tx *gorm.DB,
+	organizationID, factoryID uuid.UUID,
+	input map[string]*pb.FactoryLine_ColumnAutomations,
+) (map[string][]uuid.UUID, error) {
+	if len(input) > factoryLineColumnColorMaxEntries {
+		return nil, invalidArgument("too many column automations")
+	}
+
+	result := make(map[string][]uuid.UUID, len(input))
+	for key, binding := range input {
+		if key == "" || len(key) > factoryLineColumnColorKeyMaxLength || !isFactoryLineColumnKey(key) {
+			return nil, invalidArgument(fmt.Sprintf("column automation key %q is invalid", key))
+		}
+
+		var canvasIDs []string
+		if binding != nil {
+			canvasIDs = binding.GetCanvasIds()
+		}
+		if len(canvasIDs) > factoryLineColumnAutomationMaxIDs {
+			return nil, invalidArgument(fmt.Sprintf("column %s: too many canvases", key))
+		}
+
+		seen := make(map[uuid.UUID]struct{}, len(canvasIDs))
+		ids := make([]uuid.UUID, 0, len(canvasIDs))
+		for i, raw := range canvasIDs {
+			ref := strings.TrimSpace(raw)
+			if ref == "" {
+				return nil, invalidArgument(fmt.Sprintf("column %s, canvas %d: canvas is required", key, i+1))
+			}
+			canvas, err := resolveFactoryOwnedApp(tx, organizationID, factoryID, ref)
+			if err != nil {
+				return nil, err
+			}
+			if _, exists := seen[canvas.ID]; exists {
+				return nil, invalidArgument(fmt.Sprintf("column %s: canvas %s is already attached", key, canvas.ID))
+			}
+			seen[canvas.ID] = struct{}{}
+			ids = append(ids, canvas.ID)
+		}
+		if len(ids) > 0 {
+			result[key] = ids
+		}
 	}
 
 	return result, nil

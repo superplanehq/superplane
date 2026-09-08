@@ -633,7 +633,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep(t *testing.T) {
 			Entrypoint: secondEntry,
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -701,7 +701,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__FinishesDispatchOnLastStepP
 	onlyApp, onlyEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: onlyApp.ID, Entrypoint: onlyEntry},
-	}, nil))
+	}, nil, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -766,7 +766,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchAfterSettledSt
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var inFlight *models.FactoryLineStepResult
@@ -830,7 +830,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__KeepsDispatchWithOpenStep(t
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var finalized *models.FactoryLineStepResult
@@ -898,7 +898,7 @@ func testExecuteNextFactoryLineStepFinishesDispatchWithResult(t *testing.T, term
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -954,7 +954,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__CancelsDispatchWhenOrderClo
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var dispatch *models.FactoryWorkOrderLineDispatch
 	var result *models.FactoryLineStepResult
@@ -1015,7 +1015,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var result *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1032,7 +1032,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__LineEditMidTraversalDoesNot
 		{Type: models.FactoryLineStepTypeRunApp, AppID: insertedApp.ID, Entrypoint: insertedEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	now := time.Now()
 	require.NoError(t, database.Conn().Model(result.Run).Updates(map[string]any{
@@ -1101,7 +1101,7 @@ func Test__RunFinalizer__FinalizeRunAdvancesFactoryLineInSameTransaction(t *test
 			Entrypoint: secondEntry,
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1167,7 +1167,7 @@ func Test__RunFinalizer__FinalizeRunRollsBackWhenFactoryLineAdvanceFails(t *test
 			Entrypoint: "missing-entrypoint",
 		},
 	}
-	require.NoError(t, line.Update(database.Conn(), nil, steps, nil))
+	require.NoError(t, line.Update(database.Conn(), nil, steps, nil, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1213,7 +1213,7 @@ func Test__RunFinalizer__ExecuteNextFactoryLineStep__RollsUpUsageWhenAlreadyFini
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -1359,7 +1359,7 @@ func Test__RunFinalizer__FinalizeRun__RollsUpUsageWhenAlreadyFinished(t *testing
 	require.NoError(t, line.Update(database.Conn(), nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: firstApp.ID, Entrypoint: firstEntry},
 		{Type: models.FactoryLineStepTypeRunApp, AppID: secondApp.ID, Entrypoint: secondEntry},
-	}, nil))
+	}, nil, nil))
 
 	var firstResult *models.FactoryLineStepResult
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {

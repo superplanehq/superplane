@@ -53,6 +53,7 @@ export type ColumnAutomationsInput = {
   prFeedbackHandlers?: FactoriesFactoryPrFeedbackHandler[];
   apps?: Array<{ id?: string; name?: string }>;
   workOrders?: FactoriesWorkOrder[];
+  columnAutomations?: LineColumnAutomations;
 };
 
 const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
@@ -91,12 +92,14 @@ const CUSTOM_ENTRY: ColumnAutomationCatalogEntry = {
   kind: "custom",
   name: "Custom automation",
   description: "Add a blank automation canvas to this column.",
-  trigger: "On task in this column",
-  action: "Run the automation",
+  trigger: "On its own triggers",
+  action: "Run this automation",
   iconSrc: "",
   iconAlt: "",
   unique: false,
 };
+
+export type LineColumnAutomations = Record<string, { canvasIds?: string[] }>;
 
 const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   id: PR_CLOSURE_CATALOG_ID,
@@ -200,20 +203,58 @@ export function columnAutomationsNeedRepair(automations: ColumnAutomation[]): bo
   return automations.some((automation) => automation.health === "needs-repair");
 }
 
+export function columnAutomationCanvasIds(bindings: LineColumnAutomations | undefined, key: ColumnKey): string[] {
+  return (bindings?.[key]?.canvasIds ?? []).map((id) => id.trim()).filter((id): id is string => Boolean(id));
+}
+
+export function addColumnAutomation(
+  current: LineColumnAutomations | undefined,
+  key: ColumnKey,
+  canvasId: string,
+): LineColumnAutomations {
+  const id = canvasId.trim();
+  const existing = columnAutomationCanvasIds(current, key);
+  const next: LineColumnAutomations = { ...current };
+  if (!id || existing.includes(id)) {
+    if (existing.length > 0) {
+      next[key] = { canvasIds: existing };
+    }
+    return next;
+  }
+  next[key] = { canvasIds: [...existing, id] };
+  return next;
+}
+
+export function removeColumnAutomation(
+  current: LineColumnAutomations | undefined,
+  key: ColumnKey,
+  canvasId: string,
+): LineColumnAutomations {
+  const id = canvasId.trim();
+  const remaining = columnAutomationCanvasIds(current, key).filter((entry) => entry !== id);
+  const next: LineColumnAutomations = { ...current };
+  if (remaining.length === 0) {
+    delete next[key];
+    return next;
+  }
+  next[key] = { canvasIds: remaining };
+  return next;
+}
+
 export function buildColumnAutomations(key: ColumnKey, input: ColumnAutomationsInput): ColumnAutomation[] {
-  if (key === "backlog") {
-    return [
-      ...intakeAutomations(input.intakes ?? [], input.workOrders ?? []),
-      ...analysisAutomation(input.apps ?? [], input.workOrders ?? []),
-    ];
-  }
-  if (key === "verify") {
-    return prFeedbackAutomations(input.prFeedbackHandlers ?? [], input.workOrders ?? []);
-  }
-  if (key === "done") {
-    return closureAutomation(input.apps ?? [], input.workOrders ?? []);
-  }
-  return agentStepAutomation(key, input.columnTitle, input.columns ?? [], input.workOrders ?? []);
+  const base =
+    key === "backlog"
+      ? [
+          ...intakeAutomations(input.intakes ?? [], input.workOrders ?? []),
+          ...analysisAutomation(input.apps ?? [], input.workOrders ?? []),
+        ]
+      : key === "verify"
+        ? prFeedbackAutomations(input.prFeedbackHandlers ?? [], input.workOrders ?? [])
+        : key === "done"
+          ? closureAutomation(input.apps ?? [], input.workOrders ?? [])
+          : agentStepAutomation(key, input.columnTitle, input.columns ?? [], input.workOrders ?? []);
+  const occupied = new Set(base.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
+  return [...base, ...customAutomations(key, input, occupied)];
 }
 
 function intakeAutomations(intakes: FactoriesFactoryIntake[], workOrders: FactoriesWorkOrder[]): ColumnAutomation[] {
@@ -332,6 +373,36 @@ function closureAutomation(
       canvasId: app.id,
     },
   ];
+}
+
+function customAutomations(
+  key: ColumnKey,
+  input: ColumnAutomationsInput,
+  occupiedCanvasIds: Set<string>,
+): ColumnAutomation[] {
+  const apps = input.apps ?? [];
+  const workOrders = input.workOrders ?? [];
+  return columnAutomationCanvasIds(input.columnAutomations, key).flatMap((canvasId) => {
+    if (occupiedCanvasIds.has(canvasId)) {
+      return [];
+    }
+    const name = apps.find((app) => app.id === canvasId)?.name?.trim() || "Automation";
+    return [
+      {
+        id: `custom-${key}-${canvasId}`,
+        kind: "custom" as const,
+        name,
+        trigger: CUSTOM_ENTRY.trigger,
+        action: CUSTOM_ENTRY.action,
+        iconSrc: CUSTOM_ENTRY.iconSrc,
+        iconAlt: CUSTOM_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(canvasId, workOrders),
+        catalogId: CUSTOM_CATALOG_ID,
+        canvasId,
+      },
+    ];
+  });
 }
 
 function agentStepAutomation(
@@ -455,8 +526,8 @@ export function catalogEntryToAutomation(
 
 export const COLUMN_AUTOMATIONS_COPY = {
   menuLabel: "Automations",
-  addLabel: "Add automation",
-  addHint: "Choose a trigger and an action.",
+  addLabel: "New automation",
+  addHint: "Create a canvas and open the editor.",
   pickerTitle: "Add automation",
   pickerDescription: "Choose an automation for this column.",
   sourceTaken: "This automation is already configured.",

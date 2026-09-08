@@ -12,6 +12,7 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
@@ -44,6 +45,7 @@ function renderLinesBoard(
 
 const createFactoryLineMutateAsync = vi.fn();
 const updateFactoryLineMutateAsync = vi.fn();
+const createCanvasMutateAsync = vi.hoisted(() => vi.fn());
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
 const useFactoryApps = vi.fn(() => ({ data: [] as FactoryApp[] }));
@@ -165,6 +167,7 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
       useCanvasMock(organizationId, canvasId, options),
+    useCreateCanvas: () => ({ mutateAsync: createCanvasMutateAsync, isPending: false }),
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
   };
@@ -188,6 +191,7 @@ async function resetLinesBoardMocks() {
   const { DEFAULT_CHECKS_BY_ORDER_ID } = await import("../__fixtures__/workOrderCheckFixtures");
   window.localStorage.clear();
   updateFactoryLineMutateAsync.mockReset();
+  createCanvasMutateAsync.mockReset();
   updateLineIsPending.value = false;
   useFactoryWorkOrders.mockReturnValue({ data: [] });
   useFactoryApps.mockReturnValue({ data: [] });
@@ -467,6 +471,88 @@ describe("LinesPage board", () => {
     );
     expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("configure=1");
+  });
+
+  it("creates New Automation and binds it to the originating column", async () => {
+    createCanvasMutateAsync.mockResolvedValue({ data: { canvas: { metadata: { id: "app-new" } } } });
+    updateFactoryLineMutateAsync.mockResolvedValue({
+      id: REFUND_LINE_PLAN_ID,
+      columnAutomations: { "phase-0": { canvasIds: ["app-new"] } },
+    });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`);
+
+    await user.click(screen.getByTestId("column-automations-add"));
+
+    await waitFor(() => {
+      expect(createCanvasMutateAsync).toHaveBeenCalledWith({
+        name: "New Automation",
+        description: "",
+        factoryId: PRIMARY_FACTORY_ID,
+        method: "ui",
+      });
+    });
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnAutomations: { "phase-0": { canvasIds: ["app-new"] } },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-new", {
+          from: "lines",
+          lineId: REFUND_LINE_PLAN_ID,
+          agent: true,
+        }),
+      );
+    });
+  });
+
+  it("lists a bound custom automation in the originating column menu", () => {
+    useFactoryApps.mockReturnValue({
+      data: [
+        { id: "app-refund-implementer", name: "Implement" },
+        { id: "app-custom", name: "New Automation" },
+      ],
+    });
+    const factory: FactoriesFactory = {
+      ...REFUND_FACTORY,
+      lines: REFUND_FACTORY.lines?.map((line) =>
+        line.id === REFUND_LINE_PLAN_ID
+          ? { ...line, columnAutomations: { "phase-0": { canvasIds: ["app-custom"] } } }
+          : line,
+      ),
+    };
+    renderLinesBoard(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`,
+      vi.fn(),
+      factory,
+    );
+
+    expect(screen.getByTestId("column-automation-row-custom-phase-0-app-custom")).toHaveTextContent("New Automation");
+    expect(screen.getByTestId("column-automation-row-custom-phase-0-app-custom")).toHaveTextContent(
+      "On its own triggers → Run this automation",
+    );
+  });
+
+  it("creates New Automation on Backlog and binds it to that column", async () => {
+    createCanvasMutateAsync.mockResolvedValue({ data: { canvas: { metadata: { id: "app-new" } } } });
+    updateFactoryLineMutateAsync.mockResolvedValue({
+      id: REFUND_LINE_PLAN_ID,
+      columnAutomations: { backlog: { canvasIds: ["app-new"] } },
+    });
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=backlog`);
+
+    await user.click(screen.getByTestId("column-automations-add"));
+
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        columnAutomations: { backlog: { canvasIds: ["app-new"] } },
+      });
+    });
   });
 
   it("opens the phase automations menu from the indicator", async () => {

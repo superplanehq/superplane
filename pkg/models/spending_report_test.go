@@ -43,7 +43,7 @@ func TestSummarizeSpendingKPITotalsAndExplorer(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -125,7 +125,7 @@ func TestSummarizeSpendingKPITotalsIgnoresFactoryFilter(t *testing.T) {
 		app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 		require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-		}, nil))
+		}, nil, nil))
 
 		var execution *models.FactoryWorkOrderExecution
 		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -195,7 +195,7 @@ func TestSummarizeSpendingExplorerFiltersByTaskOwner(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -282,7 +282,7 @@ func TestListSpendingFilterCatalogsUsesVersionedModelLabels(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -344,7 +344,7 @@ func TestListSpendingFilterCatalogsResolvesAliasFromAnyHostedAllowlist(t *testin
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

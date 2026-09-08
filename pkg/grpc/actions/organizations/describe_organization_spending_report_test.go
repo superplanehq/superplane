@@ -34,7 +34,7 @@ func Test__DescribeOrganizationSpendingReport(t *testing.T) {
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -114,7 +114,7 @@ func Test__DescribeOrganizationSpendingReport__KPITotalsIgnoreExplorerFilters(t 
 		app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 		require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-		}, nil))
+		}, nil, nil))
 
 		var execution *models.FactoryWorkOrderExecution
 		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -197,7 +197,7 @@ func Test__DescribeOrganizationSpendingReport__ModelBreakdownUsesVersionedLabels
 	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
 	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
 		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
-	}, nil))
+	}, nil, nil))
 
 	var execution *models.FactoryWorkOrderExecution
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {

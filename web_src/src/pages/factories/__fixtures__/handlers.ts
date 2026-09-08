@@ -77,6 +77,8 @@ interface RequestBody {
   result?: unknown;
   state?: unknown;
   steps?: unknown;
+  columnColors?: unknown;
+  columnAutomations?: unknown;
   body?: unknown;
 }
 
@@ -383,6 +385,12 @@ function factoryLinesRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
         existing.name = stringOrEmpty(request.name) || existing.name;
         if (Array.isArray(request.steps)) {
           existing.steps = request.steps as typeof existing.steps;
+        }
+        if (request.columnColors && typeof request.columnColors === "object") {
+          existing.columnColors = request.columnColors as FactoriesFactoryLine["columnColors"];
+        }
+        if (request.columnAutomations && typeof request.columnAutomations === "object") {
+          existing.columnAutomations = request.columnAutomations as FactoriesFactoryLine["columnAutomations"];
         }
         return { json: { line: existing } };
       },

@@ -49,10 +49,36 @@ function withPRFeedbackHandlers(
 }
 
 /** Populated board: Backlog intake + analysis, Implement agent, Verify listeners, Done closure. */
-export const columnAutomationsFixture: FactoriesFixture = withPRFeedbackHandlers(lineMetricsFactoriesFixture, [
-  PR_DISCUSSION_HANDLER,
-  PR_CHECKS_HANDLER,
-]);
+export const columnAutomationsFixture: FactoriesFixture = withPRFeedbackHandlers(
+  {
+    ...lineMetricsFactoriesFixture,
+    factories: lineMetricsFactoriesFixture.factories.map((factory) => {
+      if (factory.id !== PRIMARY_FACTORY_ID) {
+        return factory;
+      }
+      return {
+        ...factory,
+        lines: (factory.lines ?? []).map((line) => {
+          if (line.id !== REFUND_LINE_PLAN_ID) {
+            return line;
+          }
+          return {
+            ...line,
+            columnAutomations: { "phase-0": { canvasIds: ["app-column-custom"] } },
+          };
+        }),
+      };
+    }),
+    appsByFactoryId: {
+      ...lineMetricsFactoriesFixture.appsByFactoryId,
+      [PRIMARY_FACTORY_ID]: [
+        ...(lineMetricsFactoriesFixture.appsByFactoryId[PRIMARY_FACTORY_ID] ?? []),
+        { id: "app-column-custom", name: "New Automation" },
+      ],
+    },
+  },
+  [PR_DISCUSSION_HANDLER, PR_CHECKS_HANDLER],
+);
 
 /** Same board with a GitHub intake that needs repair. */
 export const columnAutomationsNeedsRepairFixture: FactoriesFixture = {

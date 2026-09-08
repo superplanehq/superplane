@@ -7,7 +7,9 @@ import type {
 } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
+import { useCreateCanvas } from "@/hooks/useCanvasData";
 import {
+  factoryAppsKey,
   useFactoryApps,
   useFactoryPullRequests,
   useFactoryWorkOrders,
@@ -22,20 +24,20 @@ import { useWorkOrderChecks } from "@/hooks/useWorkOrderChecks";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
 import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import type { BacklogAnalysisRun } from "../lib/backlogAnalysis";
 import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
-import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
@@ -124,17 +126,16 @@ import {
   factoryWorkOrdersBodyClassName,
 } from "./factoryPageLayoutStyles";
 import {
+  addColumnAutomation,
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   columnAutomationOpenPath,
-  catalogEntryToAutomation,
-  catalogForColumn,
   isColumnKey,
-  takenCatalogIds,
+  removeColumnAutomation,
   type ColumnAutomation,
-  type ColumnAutomationCatalogEntry,
   type ColumnKey,
 } from "../lib/columnAutomations";
+import { createNewColumnAutomationCanvas } from "./createNewColumnAutomation";
 import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
@@ -256,6 +257,7 @@ export function LinesPage() {
   const canUpdate = canAct("factories", "update");
   const canUpdateWorkOrders = canAct("work_orders", "update");
   const canCreateWorkOrder = canAct("work_orders", "create");
+  const canCreateAutomation = canAct("canvases", "create");
   const visibleWorkOrders = useMemo(
     () => applyVisibleWorkOrders(workOrders, factory, listState, me?.id),
     [factory, listState.filters, listState.scope, listState.search, me?.id, workOrders],
@@ -491,6 +493,7 @@ export function LinesPage() {
             apps={factoryApps}
             workOrders={visibleWorkOrders}
             canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+            canCreateAutomation={canCreateAutomation}
             canUpdate={canUpdate}
             onCreateWorkOrder={openCreateWorkOrder}
             intakePanel={intakePanel}
@@ -505,23 +508,6 @@ export function LinesPage() {
             prFeedbackHandlers={prFeedbackHandlers}
             showColumnAutomations={showColumnAutomations}
             automationsColumnKey={automationsColumnKey}
-            onAddCatalogAutomation={(entry) => {
-              if (entry.kind === "intake") {
-                const template = ADD_INTAKE_TEMPLATES.find((item) => item.id === entry.id);
-                if (template) {
-                  createIntakeFromTemplate(template);
-                }
-                return true;
-              }
-              if (entry.kind === "pr-discussion" || entry.kind === "pr-checks") {
-                const source = PR_FEEDBACK_SOURCES.find((item) => item.id === entry.id);
-                if (source) {
-                  createPRFeedbackFromSource(source);
-                }
-                return true;
-              }
-              return false;
-            }}
             workOrderCardContext={{
               organizationId,
               factoryId,
@@ -636,6 +622,7 @@ function LineDetail({
   apps,
   workOrders,
   canCreateWorkOrder,
+  canCreateAutomation,
   canUpdate,
   onCreateWorkOrder,
   intakePanel,
@@ -646,7 +633,6 @@ function LineDetail({
   prFeedbackHandlers,
   showColumnAutomations,
   automationsColumnKey,
-  onAddCatalogAutomation,
   workOrderCardContext,
   peekOrder,
   onOpenWorkOrder,
@@ -659,6 +645,7 @@ function LineDetail({
   apps: Array<{ id?: string; name?: string }>;
   workOrders: FactoriesWorkOrder[];
   canCreateWorkOrder: boolean;
+  canCreateAutomation: boolean;
   canUpdate: boolean;
   onCreateWorkOrder: () => void;
   intakePanel?: BacklogIntakePanel;
@@ -669,7 +656,6 @@ function LineDetail({
   prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
   showColumnAutomations: boolean;
   automationsColumnKey: ColumnKey | null;
-  onAddCatalogAutomation: (entry: ColumnAutomationCatalogEntry) => boolean;
   workOrderCardContext: WorkOrderCardContext;
   peekOrder?: FactoriesWorkOrder | null;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrder) => void;
@@ -689,7 +675,10 @@ function LineDetail({
   const { factory } = useFactoriesLayout();
   const agentSession = useCreateWithAgentSession(workspacePlanningRepository(factory), organizationId, factoryId);
   const navigate = useNavigate();
-  const [addAutomationOpen, setAddAutomationOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const createCanvas = useCreateCanvas(organizationId);
+  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
+  const [creatingAutomation, setCreatingAutomation] = useState(false);
   const [overlay, setOverlay] = useState<{
     extra: Record<string, ColumnAutomation[]>;
     disabledIds: string[];
@@ -705,10 +694,11 @@ function LineDetail({
         prFeedbackHandlers,
         apps,
         workOrders,
+        columnAutomations: line.columnAutomations,
       });
       return applyColumnAutomationsOverlay(base, overlay.extra[key], overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, prFeedbackHandlers, workOrders],
+    [apps, board, factoryIntakes, line.columnAutomations, overlay, prFeedbackHandlers, workOrders],
   );
 
   const openAutomations = (key: ColumnKey) => {
@@ -724,18 +714,6 @@ function LineDetail({
     }
     navigate(factoryHomePath(organizationId, factoryKey, line.id));
   };
-
-  const openColumnTitle = automationsColumnKey
-    ? automationsColumnKey === "backlog"
-      ? "Backlog"
-      : automationsColumnKey === "verify"
-        ? "Verify"
-        : automationsColumnKey === "done"
-          ? "Done"
-          : (board.find((column) => `phase-${column.stepIndex}` === automationsColumnKey)?.stepName ?? "Column")
-    : "";
-  const openAutomationsList = automationsColumnKey ? automationsFor(automationsColumnKey, openColumnTitle) : [];
-  const openCatalog = automationsColumnKey ? catalogForColumn(automationsColumnKey) : [];
 
   const handleRowAction = (automation: ColumnAutomation, action: ColumnAutomationRowAction) => {
     if (action === "settings") {
@@ -763,36 +741,58 @@ function LineDetail({
       return;
     }
     if (action === "remove") {
+      if (automation.kind === "custom" && automation.canvasId && line.id && automationsColumnKey) {
+        void updateLine
+          .mutateAsync({
+            lineId: line.id,
+            columnAutomations: removeColumnAutomation(
+              line.columnAutomations,
+              automationsColumnKey,
+              automation.canvasId,
+            ),
+          })
+          .catch((error) => {
+            showErrorToast(getApiErrorMessage(error, "Failed to remove automation"));
+          });
+        return;
+      }
       setOverlay((current) => ({ ...current, removedIds: [...current.removedIds, automation.id] }));
     }
   };
 
-  const handleAddCatalog = (entry: ColumnAutomationCatalogEntry) => {
-    setAddAutomationOpen(false);
-    if (onAddCatalogAutomation(entry) || !automationsColumnKey) {
+  const handleAddAutomation = async () => {
+    if (!canCreateAutomation || creatingAutomation || !automationsColumnKey || !line.id) {
       return;
     }
-    const added = catalogEntryToAutomation(entry, openColumnTitle, `local-${entry.id}-${Date.now()}`);
-    setOverlay((current) => ({
-      ...current,
-      extra: {
-        ...current.extra,
-        [automationsColumnKey]: [...(current.extra[automationsColumnKey] ?? []), added],
-      },
-    }));
+    setCreatingAutomation(true);
+    try {
+      const canvasId = await createNewColumnAutomationCanvas({
+        factoryId,
+        existingNames: apps.map((app) => app.name ?? ""),
+        createCanvas: createCanvas.mutateAsync,
+      });
+      await updateLine.mutateAsync({
+        lineId: line.id,
+        columnAutomations: addColumnAutomation(line.columnAutomations, automationsColumnKey, canvasId),
+      });
+      navigate(
+        factoryAppConfigurePath(organizationId, factoryKey, canvasId, {
+          from: "lines",
+          lineId: line.id,
+          agent: true,
+        }),
+      );
+      void queryClient.invalidateQueries({ queryKey: factoryAppsKey(organizationId, factoryId) });
+      showSuccessToast("Automation created.");
+    } catch (error) {
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create automation"));
+    } finally {
+      setCreatingAutomation(false);
+    }
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="lines-detail">
-      {showColumnAutomations ? (
-        <AddColumnAutomationPicker
-          open={addAutomationOpen}
-          onClose={() => setAddAutomationOpen(false)}
-          onSelect={handleAddCatalog}
-          catalog={openCatalog}
-          takenIds={takenCatalogIds(openAutomationsList, openCatalog)}
-        />
-      ) : null}
       {steps.length === 0 && backlogOrders.length === 0 && doneOrders.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No phases yet. Edit this line to add app-driven phases.</p>
       ) : (
@@ -821,9 +821,9 @@ function LineDetail({
           automationsOpenKey={automationsColumnKey}
           onOpenAutomations={openAutomations}
           onCloseAutomations={closeAutomations}
-          onAddAutomation={() => setAddAutomationOpen(true)}
+          onAddAutomation={() => void handleAddAutomation()}
           onAutomationRowAction={handleRowAction}
-          automationsLockOpen={addAutomationOpen}
+          addAutomationDisabled={!canCreateAutomation || creatingAutomation}
         />
       )}
       {peekOrderId && peekOrder ? (
@@ -1103,7 +1103,7 @@ function PhaseBoard({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
 }: {
   organizationId: string;
   factoryId: string;
@@ -1131,7 +1131,7 @@ function PhaseBoard({
   onCloseAutomations: () => void;
   onAddAutomation: () => void;
   onAutomationRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen: boolean;
+  addAutomationDisabled: boolean;
 }) {
   const [columnColors, setColumnColors] = useState<Record<string, LineBoardColumnColorId | null>>(() =>
     normalizeColumnColors(line.columnColors),
@@ -1252,7 +1252,7 @@ function PhaseBoard({
           onCloseAutomations={onCloseAutomations}
           onAddAutomation={onAddAutomation}
           onAutomationRowAction={onAutomationRowAction}
-          automationsLockOpen={automationsLockOpen}
+          addAutomationDisabled={addAutomationDisabled}
         />
       </div>
       {columns.map((column, index) => {
@@ -1289,7 +1289,7 @@ function PhaseBoard({
               onCloseAutomations={onCloseAutomations}
               onAddAutomation={onAddAutomation}
               onAutomationRowAction={onAutomationRowAction}
-              automationsLockOpen={automationsLockOpen}
+              addAutomationDisabled={addAutomationDisabled}
             />
           </div>
         );
@@ -1313,7 +1313,7 @@ function PhaseBoard({
           onCloseAutomations={onCloseAutomations}
           onAddAutomation={onAddAutomation}
           onAutomationRowAction={onAutomationRowAction}
-          automationsLockOpen={automationsLockOpen}
+          addAutomationDisabled={addAutomationDisabled}
         />
       </div>
       <div className={cn("relative flex min-h-0 self-stretch", workOrderKanbanLaneSizeClassName)}>
@@ -1333,7 +1333,7 @@ function PhaseBoard({
           onCloseAutomations={onCloseAutomations}
           onAddAutomation={onAddAutomation}
           onAutomationRowAction={onAutomationRowAction}
-          automationsLockOpen={automationsLockOpen}
+          addAutomationDisabled={addAutomationDisabled}
         />
       </div>
     </WorkOrderKanbanBoard>
@@ -1357,7 +1357,7 @@ function VerifyColumn({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1375,7 +1375,7 @@ function VerifyColumn({
   onCloseAutomations?: () => void;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen?: boolean;
+  addAutomationDisabled?: boolean;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1414,7 +1414,7 @@ function VerifyColumn({
             onClose={onCloseAutomations}
             onAdd={onAddAutomation}
             onRowAction={onAutomationRowAction}
-            lockOpen={automationsLockOpen}
+            addDisabled={addAutomationDisabled}
             testId="lines-verify-automations"
           />
           <ColumnLaneMenu title={title} testId="lines-verify-menu" colorId={colorId} onColorChange={onColorChange} />
@@ -1453,7 +1453,7 @@ function DoneColumn({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
 }: {
   orders: FactoriesWorkOrder[];
   title: string;
@@ -1469,7 +1469,7 @@ function DoneColumn({
   onCloseAutomations?: () => void;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen?: boolean;
+  addAutomationDisabled?: boolean;
 }) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
 
@@ -1496,7 +1496,7 @@ function DoneColumn({
             onClose={onCloseAutomations}
             onAdd={onAddAutomation}
             onRowAction={onAutomationRowAction}
-            lockOpen={automationsLockOpen}
+            addDisabled={addAutomationDisabled}
             testId="lines-done-automations"
           />
           <ColumnLaneMenu title={title} testId="lines-done-menu" colorId={colorId} onColorChange={onColorChange} />
@@ -1575,7 +1575,7 @@ function PhaseColumn({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
 }: {
   organizationId: string;
   factoryKey: string;
@@ -1596,7 +1596,7 @@ function PhaseColumn({
   onCloseAutomations?: () => void;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen?: boolean;
+  addAutomationDisabled?: boolean;
 }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const [visibleCount, setVisibleCount] = useState(LINE_PHASE_RUNS_PAGE_SIZE);
@@ -1652,7 +1652,7 @@ function PhaseColumn({
               onClose={onCloseAutomations}
               onAdd={onAddAutomation}
               onRowAction={onAutomationRowAction}
-              lockOpen={automationsLockOpen}
+              addDisabled={addAutomationDisabled}
               testId={`lines-phase-${column.stepIndex}-automations`}
             />
             <ColumnLaneMenu

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
 import {
+  addColumnAutomation,
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   catalogForColumn,
@@ -13,6 +14,7 @@ import {
   columnTitleForKey,
   isColumnKey,
   phaseIndexFromColumnKey,
+  removeColumnAutomation,
   takenCatalogIds,
 } from "./columnAutomations";
 import { factoryColumnAutomationViewPath, factoryIntakePath, factoryPRFeedbackPath } from "./factoryPagePaths";
@@ -186,6 +188,58 @@ describe("buildColumnAutomations", () => {
     ).toEqual([]);
   });
 
+  it("lists custom automations bound to a column", () => {
+    const automations = buildColumnAutomations("phase-0", {
+      columnTitle: "Implement",
+      columns: [IMPLEMENT_COLUMN],
+      apps: [
+        { id: "app-refund-implementer", name: "Implement" },
+        { id: "app-custom", name: "New Automation" },
+      ],
+      columnAutomations: { "phase-0": { canvasIds: ["app-custom"] } },
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({ kind: "agent-step", canvasId: "app-refund-implementer" }),
+      expect.objectContaining({
+        id: "custom-phase-0-app-custom",
+        kind: "custom",
+        name: "New Automation",
+        trigger: "On its own triggers",
+        action: "Run this automation",
+        canvasId: "app-custom",
+      }),
+    ]);
+  });
+
+  it("does not list a custom automation that is already the step app", () => {
+    const automations = buildColumnAutomations("phase-0", {
+      columnTitle: "Implement",
+      columns: [IMPLEMENT_COLUMN],
+      apps: [{ id: "app-refund-implementer", name: "Implement" }],
+      columnAutomations: { "phase-0": { canvasIds: ["app-refund-implementer"] } },
+    });
+
+    expect(automations).toEqual([expect.objectContaining({ kind: "agent-step", canvasId: "app-refund-implementer" })]);
+  });
+
+  it("lists custom automations on Backlog", () => {
+    const automations = buildColumnAutomations("backlog", {
+      columnTitle: "Backlog",
+      columnAutomations: { backlog: { canvasIds: ["app-custom"] } },
+      apps: [{ id: "app-custom", name: "Triage" }],
+    });
+
+    expect(automations).toEqual([
+      expect.objectContaining({
+        id: "custom-backlog-app-custom",
+        kind: "custom",
+        name: "Triage",
+        canvasId: "app-custom",
+      }),
+    ]);
+  });
+
   it("builds verify listeners from PR feedback handlers", () => {
     const automations = buildColumnAutomations("verify", {
       columnTitle: "Verify",
@@ -351,6 +405,24 @@ describe("columnAutomationViewTabs", () => {
 
   it("shows General then Automation when a form exists without an agent", () => {
     expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
+  });
+});
+
+describe("addColumnAutomation and removeColumnAutomation", () => {
+  it("appends a canvas to the column and removes it later", () => {
+    const added = addColumnAutomation(undefined, "phase-0", "app-new");
+    expect(added).toEqual({ "phase-0": { canvasIds: ["app-new"] } });
+
+    const again = addColumnAutomation(added, "phase-0", "app-new");
+    expect(again).toEqual({ "phase-0": { canvasIds: ["app-new"] } });
+
+    const second = addColumnAutomation(added, "phase-0", "app-other");
+    expect(second).toEqual({ "phase-0": { canvasIds: ["app-new", "app-other"] } });
+
+    expect(removeColumnAutomation(second, "phase-0", "app-new")).toEqual({
+      "phase-0": { canvasIds: ["app-other"] },
+    });
+    expect(removeColumnAutomation(added, "phase-0", "app-new")).toEqual({});
   });
 });
 
