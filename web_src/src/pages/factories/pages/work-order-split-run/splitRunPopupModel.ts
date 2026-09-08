@@ -3,7 +3,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/factoryPagePaths";
 import { extractArtifactMarkdownBody, toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
-import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "./splitRunMocks";
+import type { SplitRunFixture, SplitRunPhase } from "./splitRunMocks";
 import { isOriginTicketArtifact, type SplitRunSource } from "./splitRunSource";
 
 export type SplitRunPopupTab = "description" | "log";
@@ -14,24 +14,11 @@ export const SPLIT_RUN_PANE_GRID_CLASSNAME =
 
 const DESCRIPTION_NAMES = ["details.md", "description.md"];
 
-const LOG_TAB_DOT: Record<SplitRunPhaseStatus, string> = {
-  passed: "bg-[color:var(--status-completed-dot)]",
-  running: "bg-[color:var(--status-running-dot)]",
-  waiting: "bg-[color:var(--status-waiting-dot)]",
-  failed: "bg-[color:var(--status-failed-dot)]",
-  pending: "bg-[color:var(--status-draft-dot)]",
-  cancelled: "bg-[color:var(--status-cancelled-dot)]",
-};
-
 export function defaultSplitRunPopupTab(fixture: SplitRunFixture): SplitRunPopupTab {
   if (fixture.openPhaseId) {
     return "log";
   }
   return fixture.footer.kind === "draft" || fixture.footer.kind === "done" ? "description" : "log";
-}
-
-export function splitRunLogTabDotClass(status: SplitRunPhaseStatus): string {
-  return LOG_TAB_DOT[status];
 }
 
 function phaseRun(phase: SplitRunPhase | undefined): { appId: string; runId: string } | undefined {

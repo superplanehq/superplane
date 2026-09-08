@@ -176,7 +176,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(dialog).getByRole("tab", { name: "Description" })).toBeInTheDocument();
     const runningDot = within(dialog).getByTestId("split-run-log-tab-dot");
     expect(runningDot).toHaveAttribute("title", "Running");
-    expect(runningDot.querySelector(".animate-ping")).toBeTruthy();
+    expect(runningDot.className).toContain("animate-spin");
     expect(within(dialog).queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("split-run-checks")).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("heading", { name: "Automations" })).not.toBeInTheDocument();
@@ -700,7 +700,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-work-order-tab")).toBeInTheDocument();
     const pendingDot = screen.getByTestId("split-run-log-tab-dot");
     expect(pendingDot).toHaveAttribute("title", "Pending");
-    expect(pendingDot.querySelector(".animate-ping")).toBeNull();
+    expect(pendingDot.className).not.toContain("animate-spin");
     const source = screen.getByTestId("split-run-source");
     expect(within(source).getByRole("img", { name: "Leonardo DiCaprio" })).toBeInTheDocument();
     expect(within(source).getByText("Created manually")).toBeInTheDocument();
