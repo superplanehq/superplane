@@ -85,11 +85,22 @@ export function resolveOnboardingAgent(args: {
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
 }): OnboardingAgentPlan | undefined {
+  const hosted = hostedSuperPlanePlan(args);
+  if (hosted) return hosted;
+
   for (const providerId of AGENT_PROVIDER_IDS) {
     if (!args.connected.has(providerId)) continue;
     return planForConnectedProvider(providerId, args.hostedModels);
   }
 
+  return undefined;
+}
+
+function hostedSuperPlanePlan(args: {
+  remainingCreditCents: number;
+  defaultHostedProvider?: string;
+  defaultHostedModel?: string;
+}): OnboardingAgentPlan | undefined {
   if (args.remainingCreditCents <= 0) return undefined;
 
   const defaultProvider = args.defaultHostedProvider?.trim() ?? "";
