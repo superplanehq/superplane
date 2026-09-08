@@ -96,7 +96,10 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-signed-in-as")).toHaveTextContent(
       FIRST_RUN_COPY.connect.signedInAs("forestileao"),
     );
-    expect(screen.getByRole("link", { name: "@forestileao" })).toHaveAttribute("href", "https://github.com/forestileao");
+    expect(screen.getByRole("link", { name: "@forestileao" })).toHaveAttribute(
+      "href",
+      "https://github.com/forestileao",
+    );
   });
 
   it("hides the signed-in line when the picker has no GitHub login", () => {

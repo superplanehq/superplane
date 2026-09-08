@@ -86,9 +86,7 @@ export const PickerStillWaiting: Story = {
 
 export const WaitingNamedOrg: Story = {
   name: "2 Select account (waiting only)",
-  render: () => (
-    <CloudGitHubConnectStory installRequested githubOrganization="acme" githubLogin={CLOUD_GITHUB_LOGIN} />
-  ),
+  render: () => <CloudGitHubConnectStory installRequested githubOrganization="acme" githubLogin={CLOUD_GITHUB_LOGIN} />,
 };
 
 export const WaitingUnknownOrg: Story = {

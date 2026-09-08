@@ -99,9 +99,9 @@ export function FirstRunOnboardingMap() {
         <header className="space-y-3">
           <h1 className="workspace-page-title font-semibold">Onboarding</h1>
           <p className="text-[15px] leading-6 text-muted-foreground">
-            Welcome, connect GitHub, select an account, select a repository, connect tickets, then connect an agent
-            when hosted credit is not ready. Account rows can be connected or waiting for approval. You can pick a
-            connected account or install the App on another one. Repository rows come from that account.
+            Welcome, connect GitHub, select an account, select a repository, connect tickets, then connect an agent when
+            hosted credit is not ready. Account rows can be connected or waiting for approval. You can pick a connected
+            account or install the App on another one. Repository rows come from that account.
           </p>
         </header>
         {PATHS.map((path) => (
@@ -109,7 +109,9 @@ export function FirstRunOnboardingMap() {
             <h2 className="text-[15px] font-medium">{path.title}</h2>
             <ol className="list-decimal space-y-1 pl-5 text-[13px] leading-5 text-muted-foreground">
               {path.steps.map((step) => (
-                <li key={step.label}>{step.href ? <StoryLink href={step.href}>{step.label}</StoryLink> : step.label}</li>
+                <li key={step.label}>
+                  {step.href ? <StoryLink href={step.href}>{step.label}</StoryLink> : step.label}
+                </li>
               ))}
             </ol>
           </section>

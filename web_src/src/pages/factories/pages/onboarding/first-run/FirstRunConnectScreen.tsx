@@ -66,9 +66,7 @@ function FirstRunInstallRequested({ githubOrganization }: { githubOrganization: 
   );
 }
 
-type PickerRow =
-  | { kind: "waiting"; login: string }
-  | { kind: "ready"; installation: PendingGitHubInstallation };
+type PickerRow = { kind: "waiting"; login: string } | { kind: "ready"; installation: PendingGitHubInstallation };
 
 function githubAccountPickerRows(
   installations: PendingGitHubInstallation[],
@@ -94,14 +92,7 @@ function accountInitials(login: string): string {
 }
 
 function AccountGlyph({ login }: { login: string }) {
-  return (
-    <Avatar
-      square
-      initials={accountInitials(login)}
-      alt=""
-      className="size-8 bg-muted text-muted-foreground"
-    />
-  );
+  return <Avatar square initials={accountInitials(login)} alt="" className="size-8 bg-muted text-muted-foreground" />;
 }
 
 function AccountPickerWaitingRow({ login }: { login: string }) {
@@ -145,10 +136,7 @@ function AccountPickerReadyRow({
   return (
     <button
       type="button"
-      className={cn(
-        "flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent",
-        binding && "opacity-60",
-      )}
+      className={cn("flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-accent", binding && "opacity-60")}
       data-testid={`first-run-github-use-${installation.accountLogin}`}
       aria-label={copy.useAccount(installation.accountLogin)}
       disabled={binding}
@@ -244,6 +232,17 @@ function connectScreenState({
   };
 }
 
+function ConnectScreenHeading({ showAccountPicker, githubLogin }: { showAccountPicker: boolean; githubLogin: string }) {
+  return (
+    <FirstRunHeading headline={showAccountPicker ? copy.selectAccount : copy.headline}>
+      <p className="text-[15px] leading-6 text-muted-foreground">
+        {showAccountPicker ? copy.selectAccountBody : copy.body}
+      </p>
+      {showAccountPicker && githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
+    </FirstRunHeading>
+  );
+}
+
 export function FirstRunConnectScreen({
   loading = false,
   installRequested = false,
@@ -281,12 +280,7 @@ export function FirstRunConnectScreen({
   });
   return (
     <FirstRunShell testId="first-run-connect" chrome={chrome}>
-      <FirstRunHeading headline={showAccountPicker ? copy.selectAccount : copy.headline}>
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          {showAccountPicker ? copy.selectAccountBody : copy.body}
-        </p>
-        {showAccountPicker && githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
-      </FirstRunHeading>
+      <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
 
       <div className="mt-8 space-y-6">
         {loading ? (

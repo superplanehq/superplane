@@ -18,7 +18,9 @@ describe("FirstRunFlow", () => {
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent(CLOUD_GITHUB_GLOBEX);
     expect(screen.getByText(FIRST_RUN_COPY.connect.installRequested)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount(CLOUD_GITHUB_GLOBEX) })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: FIRST_RUN_COPY.connect.useAccount(CLOUD_GITHUB_GLOBEX) }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
     expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
