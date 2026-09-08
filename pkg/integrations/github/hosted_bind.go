@@ -21,7 +21,19 @@ var (
 )
 
 func (g *GitHub) bindHostedInstallation(ctx core.HTTPRequestContext, metadata common.Metadata, installationID string) error {
-	return g.bindHostedInstallationWith(ctx.Integration, ctx.Logger, metadata, installationID)
+	return g.BindHostedInstallation(ctx.Integration, ctx.Logger, metadata, installationID)
+}
+
+// BindHostedInstallation writes the GitHub installation id, owner, and
+// repositories onto a hosted connection and marks it ready. Local seed uses
+// this path so it does not go through the browser install callbacks.
+func (g *GitHub) BindHostedInstallation(
+	integration core.IntegrationContext,
+	logger *logrus.Entry,
+	metadata common.Metadata,
+	installationID string,
+) error {
+	return g.bindHostedInstallationWith(integration, logger, metadata, installationID)
 }
 
 func (g *GitHub) bindHostedInstallationWith(

@@ -174,6 +174,13 @@ func (w *RepositoryProvisionerWorker) ConsumeCanvasCreated(delivery tackle.Deliv
 	return nil
 }
 
+// ProvisionRepository creates the canvas git repository and commits any
+// persisted seed files. Local seed calls this in-process so it does not wait
+// for the RabbitMQ worker.
+func (w *RepositoryProvisionerWorker) ProvisionRepository(ctx context.Context, repository models.Repository) error {
+	return w.provisionRepository(ctx, repository)
+}
+
 func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, repository models.Repository) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		repository, err := models.LockPendingRepository(tx, repository.ID)

@@ -77,7 +77,7 @@ or Node installed on the host, only Docker.
 - Node.js + npm (provided by the dev container; used by Vite/frontend).
 - Docker with a working `docker compose`.
 
-Run these three steps once, in order:
+Run these steps once, in order:
 
 1. `make dev.up` — builds the dev-base image and starts containers (app, db,
    rabbitmq). The first run builds the image (~3-5 min); later runs reuse it.
@@ -86,7 +86,12 @@ Run these three steps once, in order:
    modules, or frontend deps change. By default only `superplane_dev` is
    migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also
    need `superplane_test` (E2E; backend CI sets this via the environment).
-3. `make dev.server` — starts the API (Go hot-reload via `air`) and the Vite dev
+3. Optional: `make seed` — creates a local owner, organization, and
+   GitHub-connected factory workspace, and skips the first-run wizard.
+   Put the six `SUPERPLANE_GITHUB_APP_*` values and `ANTHROPIC_API_KEY` in
+   `.env`. The GitHub App must already be installed on a GitHub account.
+   Seed writes only to `superplane_dev`. It does not drop the database.
+4. `make dev.server` — starts the API (Go hot-reload via `air`) and the Vite dev
    server. UI at http://localhost:8000; health check at
    http://localhost:8000/health. Use `make dev.server.fg` for foreground logs.
 
@@ -104,7 +109,8 @@ the runner repository.
 
 On first UI load, owner setup is enabled (`OWNER_SETUP_ENABLED=yes`), so you are
 prompted to create an admin account. Open registration is disabled by default
-(`BLOCK_SIGNUP=yes`).
+(`BLOCK_SIGNUP=yes`). After `make seed`, sign in with the printed email and
+password. The UI skips `/setup` and workspace onboarding.
 
 If `go mod download` / `go build` fail with missing or corrupt files in the Go
 module cache (the `go-pkg-cache` Docker volume mounted at `/go/pkg/mod`, often
