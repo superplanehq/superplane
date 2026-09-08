@@ -239,6 +239,8 @@ export function useIntegrationConnectDialog({
 
   return {
     integrationData,
+    /** Refetches the connected list, for screens that must not show a stale cache. */
+    refetchConnections: refetch,
     requestConnect,
     requestPrivateGitHubConnect,
     hostedGitHubAppInstall: githubConnect.hosted,

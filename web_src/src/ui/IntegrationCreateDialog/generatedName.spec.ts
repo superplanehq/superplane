@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { getNextParentheticalIntegrationName } from "@/pages/organization/settings/components/IntegrationSetup/lib";
+
 import { createWithGeneratedName, isNameTakenError } from "./generatedName";
 
 function nameTaken(name: string) {
@@ -14,6 +16,19 @@ describe("isNameTakenError", () => {
   it("ignores other failures", () => {
     expect(isNameTakenError({ message: "permission denied" })).toBe(false);
     expect(isNameTakenError(undefined)).toBe(false);
+  });
+});
+
+describe("getNextParentheticalIntegrationName", () => {
+  it("uses the owner name when it is free", () => {
+    expect(getNextParentheticalIntegrationName("github-acme", new Set())).toBe("github-acme");
+  });
+
+  it("appends (1) then (2) when the owner name is taken", () => {
+    expect(getNextParentheticalIntegrationName("github-acme", new Set(["github-acme"]))).toBe("github-acme (1)");
+    expect(getNextParentheticalIntegrationName("github-acme", new Set(["github-acme", "github-acme (1)"]))).toBe(
+      "github-acme (2)",
+    );
   });
 });
 

@@ -238,7 +238,9 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 10000);
 
-  it("continues from a seeded GitHub connection to the repository list", async () => {
+  // The connect screen offers no connected state. Workspace setup starts a
+  // new connect even when the organization already has a GitHub connection.
+  it("asks to connect GitHub even when the organization already has a connection", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -250,9 +252,10 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
-    await user.click(await screen.findByTestId("first-run-github-continue", {}, { timeout: 8000 }));
 
-    expect(await screen.findByRole("option", { name: /acme\/api/ }, { timeout: 8000 })).toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
   }, 15000);
 
   it("opens the repository list when GitHub sends the browser back to the VCS step", async () => {
