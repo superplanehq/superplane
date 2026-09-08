@@ -18,6 +18,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { BOARD_DONE_REJECTED_ORDER, BOARD_IMPLEMENT_FAILED_ORDER } from "../__fixtures__/lineMetricsBoardOrders";
+import { clearBacklogAnalysisPending, markBacklogAnalysisPending } from "../lib/backlogAnalysis";
 import type { FactoryPreviewFlags } from "./factoryPreviewFlagsContext";
 import { lineBoardColumnLaneClassName } from "./lineBoardColumnColors";
 import { LinesBoardSpecHarness } from "./linesPageSpecRender";
@@ -301,6 +302,30 @@ describe("LinesPage board", () => {
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("shows the analyzing state in the popup while a fresh draft awaits its run", async () => {
+    useFactoryWorkOrders.mockReturnValue({ data: REVIEW_CANDIDATE_WORK_ORDERS });
+    const analyzingOrderId = REVIEW_CANDIDATE_WORK_ORDERS[0].id!;
+    // The board optimistically knows this draft is analyzing before its Backlog
+    // run appears in the polled list. The popup must match the board card.
+    markBacklogAnalysisPending(analyzingOrderId);
+    try {
+      const user = userEvent.setup();
+      renderLinesBoard();
+
+      await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
+
+      const dialog = screen.getByTestId("work-order-split-run");
+      expect(
+        within(dialog).getByRole("heading", { name: "SuperPlane is currently analyzing this task" }),
+      ).toBeInTheDocument();
+      expect(within(dialog).queryByRole("button", { name: "Reject" })).not.toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Refine" })).toBeInTheDocument();
+      expect(within(dialog).getByRole("button", { name: "Start" })).toBeInTheDocument();
+    } finally {
+      clearBacklogAnalysisPending(analyzingOrderId);
+    }
   });
 
   it("opens the split run from a task permalink", () => {
