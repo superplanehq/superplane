@@ -102,6 +102,7 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
+      authorizeUrl: "",
       installations: [{ id: "11", accountLogin: "acme" }],
     });
   });
@@ -152,6 +153,7 @@ describe("pendingGitHubInstallPicker", () => {
       id: "int-1",
       state: "csrf",
       appSlug: "superplane",
+      authorizeUrl: "",
       installations: [
         { id: "11", accountLogin: "acme" },
         { id: "22", accountLogin: "octo" },
@@ -232,7 +234,10 @@ describe("startDirectGitHubConnect", () => {
     follow.mockClear();
   });
 
-  it("stays on onboarding when the account picker is already pending", async () => {
+  // Onboarding asks again which GitHub account to use on every Connect
+  // click. Many people stay signed in to two GitHub accounts, so the click
+  // must open GitHub authorization instead of reusing the stored picker.
+  it("opens GitHub authorization again on onboarding when a picker is pending", async () => {
     const create = vi.fn();
     const goTo = vi.fn();
 
@@ -245,9 +250,9 @@ describe("startDirectGitHubConnect", () => {
           metadata: { id: "int-1", integrationName: "github" },
           status: {
             state: "pending",
-            browserAction: { method: "GET", url: "https://github.com/login/oauth/authorize" },
             metadata: {
               startedByUserID: "user-1",
+              authorizeURL: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
               pendingInstallations: [
                 { id: "11", accountLogin: "acme" },
                 { id: "22", accountLogin: "octo" },
@@ -263,9 +268,44 @@ describe("startDirectGitHubConnect", () => {
 
     expect(started).toBe(true);
     expect(create).not.toHaveBeenCalled();
-    expect(follow).not.toHaveBeenCalled();
+    expect(follow).toHaveBeenCalledWith({
+      method: "GET",
+      url: "https://github.com/login/oauth/authorize?client_id=abc&state=csrf",
+    });
     expect(goTo).not.toHaveBeenCalled();
     expect(remember).toHaveBeenCalledWith("org-1", "/onboarding?attempt=1&step=vcs");
+  });
+
+  // A connection from before the authorize URL was stored cannot restart
+  // OAuth in place, so the click starts a fresh connect. The new connection
+  // also opens GitHub authorization.
+  it("starts a fresh connect on onboarding when the picker kept no authorize URL", async () => {
+    const action = { method: "GET", url: "https://github.com/login/oauth/authorize?client_id=new" };
+    const create = vi.fn().mockResolvedValue({ integration: { status: { browserAction: action } } });
+
+    const started = await startDirectGitHubConnect({
+      organizationId: "org-1",
+      returnTo: "/onboarding?attempt=1&step=vcs",
+      existingNames: new Set(),
+      connected: [
+        {
+          metadata: { id: "int-1", integrationName: "github" },
+          status: {
+            state: "pending",
+            metadata: {
+              startedByUserID: "user-1",
+              pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+            },
+          },
+        },
+      ],
+      currentUserId: "user-1",
+      create,
+    });
+
+    expect(started).toBe(true);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(follow).toHaveBeenCalledWith(action);
   });
 
   it("opens the picker page when pending installs exist", async () => {

@@ -11,6 +11,7 @@ import type { FirstRunChrome } from "./firstRunTypes";
 export function FirstRunChooseScreen({
   repositories,
   selectedRepository,
+  loading,
   chrome,
   onSelectRepository,
   onEditConnection,
@@ -18,6 +19,8 @@ export function FirstRunChooseScreen({
 }: {
   repositories: string[];
   selectedRepository: string | null;
+  /** True while the repository list loads or refreshes; hides stale entries. */
+  loading?: boolean;
   chrome?: FirstRunChrome;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
@@ -34,12 +37,16 @@ export function FirstRunChooseScreen({
 
       <div className="mt-8 space-y-4">
         <FirstRunPanel>
-          <RepositoryPicker
-            host="github"
-            repos={repositories}
-            selectedRepo={selectedRepository}
-            onSelect={onSelectRepository}
-          />
+          {loading ? (
+            <RepositoryListLoading />
+          ) : (
+            <RepositoryPicker
+              host="github"
+              repos={repositories}
+              selectedRepo={selectedRepository}
+              onSelect={onSelectRepository}
+            />
+          )}
           <p className="mt-3 text-[13px] text-muted-foreground">
             {copy.missingRepository}{" "}
             <button
@@ -89,5 +96,24 @@ export function FirstRunChooseScreen({
         </details>
       </div>
     </FirstRunShell>
+  );
+}
+
+/** Mirrors the repository picker layout: a search field and a short list. */
+function RepositoryListLoading() {
+  return (
+    <div className="space-y-3" data-testid="first-run-repositories-loading" aria-hidden>
+      <div className="h-9 animate-pulse rounded-md bg-accent/40" />
+      <div className="rounded-lg border border-border">
+        <ul className="divide-y divide-border">
+          {[0, 1, 2].map((row) => (
+            <li key={row} className="flex items-center gap-3 px-3 py-2.5">
+              <div className="size-4 shrink-0 animate-pulse rounded bg-accent/40" />
+              <div className="h-3.5 w-40 animate-pulse rounded bg-accent/40" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

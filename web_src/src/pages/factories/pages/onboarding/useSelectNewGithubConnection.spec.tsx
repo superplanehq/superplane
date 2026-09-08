@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationsIntegration } from "@/api-client";
 
-import { advanceAfterGithubConnect } from "./useOnboardingPageModel";
+import { advanceAfterGithubConnect } from "./advanceAfterGithubConnect";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const githubConnection: OrganizationsIntegration = {
@@ -31,7 +31,6 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
-        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -42,7 +41,10 @@ describe("useOnboardingGithubConnections", () => {
     expect(selectInstance).toHaveBeenCalledWith("github", "github-connection");
   });
 
-  it("selects the single ready connection on initial onboarding without the URL hint", async () => {
+  // Only the `pick=newest` round trip auto-selects. A ready connection from
+  // an earlier pass, or one bound by an approved install request outside the
+  // round trip, waits for the user to select the account.
+  it("does not auto-select a ready connection without the URL hint", () => {
     const selectInstance = vi.fn();
     const onConnectionSelected = vi.fn();
 
@@ -51,27 +53,6 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: false,
-        selectSingleInitial: true,
-        selections: {},
-        selectInstance,
-        onConnectionSelected,
-      }),
-    );
-
-    await waitFor(() => expect(onConnectionSelected).toHaveBeenCalledWith(githubConnection));
-    expect(selectInstance).toHaveBeenCalledWith("github", "github-connection");
-  });
-
-  it("does not auto-select without the URL hint outside initial onboarding", () => {
-    const selectInstance = vi.fn();
-    const onConnectionSelected = vi.fn();
-
-    renderHook(() =>
-      useOnboardingGithubConnections({
-        integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
-        openSection: "vcs",
-        selectNewest: false,
-        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -82,26 +63,27 @@ describe("useOnboardingGithubConnections", () => {
     expect(selectInstance).not.toHaveBeenCalled();
   });
 
-  it("does not auto-select on initial onboarding when several connections are ready", () => {
+  // The OAuth return also carries `pick=newest` while the new connect still
+  // waits for the account choice. The wizard must show that picker, not jump
+  // ahead with an older ready connection.
+  it("does not auto-select an old ready connection while an account picker is pending", () => {
     const selectInstance = vi.fn();
     const onConnectionSelected = vi.fn();
-    const otherConnection: OrganizationsIntegration = {
-      metadata: { id: "older-connection", integrationName: "github", createdAt: "2026-09-01T00:00:00Z" },
-      status: { state: "ready", metadata: { owner: "acme" } },
+    const pendingConnection: OrganizationsIntegration = {
+      metadata: { id: "github-pending", name: "GitHub 2", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: { pendingInstallations: [{ id: "11", accountLogin: "forestileao" }] },
+      },
     };
 
     renderHook(() =>
       useOnboardingGithubConnections({
         integrationData: [
-          {
-            name: "github",
-            allInstances: [githubConnection, otherConnection],
-            readyInstances: [githubConnection, otherConnection],
-          },
+          { name: "github", allInstances: [githubConnection, pendingConnection], readyInstances: [githubConnection] },
         ],
         openSection: "vcs",
-        selectNewest: false,
-        selectSingleInitial: true,
+        selectNewest: true,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -137,7 +119,6 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
-        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,
@@ -177,7 +158,6 @@ describe("useOnboardingGithubConnections", () => {
         integrationData: [{ name: "github", allInstances: [githubConnection], readyInstances: [githubConnection] }],
         openSection: "vcs",
         selectNewest: true,
-        selectSingleInitial: false,
         selections: {},
         selectInstance,
         onConnectionSelected,

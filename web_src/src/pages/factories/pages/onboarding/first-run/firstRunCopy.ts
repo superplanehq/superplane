@@ -10,6 +10,7 @@ export const FIRST_RUN_COPY = {
     switchOrganization: "Switch organization",
     loggedInAs: "Logged in as",
     stepLabel: (step: number, total: number) => `Step ${step} of ${total}`,
+    back: "Back",
   },
   welcome: {
     greeting: (firstName: string) => `Hi ${firstName}.`,
@@ -26,8 +27,6 @@ export const FIRST_RUN_COPY = {
     selectAccountBody: "The SuperPlane GitHub App is already installed on these accounts.",
     useAccount: (account: string) => `Use ${account}`,
     installDifferentAccount: "Install on a different account",
-    connected: "Connected",
-    continue: "Choose a repository",
     connectError: "SuperPlane could not connect to GitHub. Check your access and try again.",
     installRequested: GITHUB_INSTALL_REQUEST_TITLE,
     installRequestedBody: githubInstallRequestBody,
