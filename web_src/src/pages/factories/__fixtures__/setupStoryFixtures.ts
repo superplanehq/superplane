@@ -40,6 +40,7 @@ export const PENDING_PICKER_INTEGRATION: StorybookOrgIntegration = {
     state: "pending",
     metadata: {
       startedByUserID: "storybook-user",
+      startedByGitHubLogin: "forestileao",
       state: "csrf",
       githubApp: { slug: "superplane" },
       pendingInstallations: [

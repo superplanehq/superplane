@@ -10,6 +10,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
   hostedGitHubAuthorizeURL,
+  hostedGitHubStartedByLogin,
   hostedGitHubState,
   pendingGitHubInstallations,
   type PendingGitHubInstallation,
@@ -27,7 +28,24 @@ export type PendingGitHubAccountPicker = {
   appSlug: string;
   /** GitHub OAuth authorize URL, to ask again which account to use. */
   authorizeUrl: string;
+  /** GitHub login that authorized this connect. Empty when the field is absent. */
+  githubLogin: string;
 };
+
+function accountPickerFromItem(item: OrganizationsIntegration | undefined): PendingGitHubAccountPicker | undefined {
+  if (!item?.metadata?.id) {
+    return undefined;
+  }
+
+  return {
+    id: item.metadata.id,
+    installations: pendingGitHubInstallations(item.status?.metadata),
+    state: hostedGitHubState(item.status?.metadata),
+    appSlug: hostedGitHubAppSlug(item.status?.metadata),
+    authorizeUrl: hostedGitHubAuthorizeURL(item.status?.metadata),
+    githubLogin: hostedGitHubStartedByLogin(item.status?.metadata),
+  };
+}
 
 function startedByUserID(item: OrganizationsIntegration): string {
   const startedBy = item.status?.metadata?.startedByUserID;
@@ -89,17 +107,7 @@ export function pendingGitHubAccountPicker(
     }
     return pendingGitHubInstallations(item.status?.metadata).length >= 1;
   });
-  if (!pending?.metadata?.id) {
-    return undefined;
-  }
-
-  return {
-    id: pending.metadata.id,
-    installations: pendingGitHubInstallations(pending.status?.metadata),
-    state: hostedGitHubState(pending.status?.metadata),
-    appSlug: hostedGitHubAppSlug(pending.status?.metadata),
-    authorizeUrl: hostedGitHubAuthorizeURL(pending.status?.metadata),
-  };
+  return accountPickerFromItem(pending);
 }
 
 /**
@@ -118,19 +126,12 @@ export function githubAccountPickerFromConnection(
     return undefined;
   }
 
-  const installations = pendingGitHubInstallations(connection.status?.metadata);
-  const state = hostedGitHubState(connection.status?.metadata);
-  if (installations.length === 0 || state === "") {
+  const picker = accountPickerFromItem(connection);
+  if (!picker || picker.installations.length === 0 || picker.state === "") {
     return undefined;
   }
 
-  return {
-    id: connection.metadata.id,
-    installations,
-    state,
-    appSlug: hostedGitHubAppSlug(connection.status?.metadata),
-    authorizeUrl: hostedGitHubAuthorizeURL(connection.status?.metadata),
-  };
+  return picker;
 }
 
 export function isOnboardingSetupReturnPath(path: string | undefined): boolean {
