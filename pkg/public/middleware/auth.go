@@ -57,12 +57,15 @@ func IsOwnerSetupRequired() bool {
 	}
 
 	ownerSetupMu.RLock()
-	if ownerSetupNeededCache != nil {
-		val := *ownerSetupNeededCache
-		ownerSetupMu.RUnlock()
-		return val
-	}
+	cached := ownerSetupNeededCache
 	ownerSetupMu.RUnlock()
+
+	// A completed setup stays completed for this process. A "required"
+	// cache must be re-checked: local seed can create the first user while
+	// the API is already running.
+	if cached != nil && !*cached {
+		return false
+	}
 
 	var count int64
 

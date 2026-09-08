@@ -603,3 +603,14 @@ func assertImpersonationCookieCleared(t *testing.T, recorder *httptest.ResponseR
 
 	assert.Fail(t, "impersonation cookie was not cleared")
 }
+
+func TestIsOwnerSetupRequiredRequeriesWhenCachedAsNeeded(t *testing.T) {
+	ResetOwnerSetupStateForTests()
+	require.NoError(t, database.TruncateTables())
+
+	assert.True(t, IsOwnerSetupRequired())
+
+	_ = support.Setup(t)
+
+	assert.False(t, IsOwnerSetupRequired())
+}
