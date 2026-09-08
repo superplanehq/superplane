@@ -40,15 +40,31 @@ type OrderWebhookEvent struct {
 type OrderPaidEvent = OrderWebhookEvent
 
 type OrderData struct {
-	ID             string          `json:"id"`
-	Status         string          `json:"status"`
-	BillingReason  string          `json:"billing_reason"`
-	RefundedAmount int64           `json:"refunded_amount"`
-	NetAmount      int64           `json:"net_amount"`
-	Customer       OrderCustomer   `json:"customer"`
-	Product        OrderProduct    `json:"product"`
-	ProductPrice   priceJSON       `json:"product_price"`
-	Items          []orderItemJSON `json:"items"`
+	ID                 string          `json:"id"`
+	Status             string          `json:"status"`
+	BillingReason      string          `json:"billing_reason"`
+	RefundedAmount     int64           `json:"refunded_amount"`
+	NetAmount          int64           `json:"net_amount"`
+	ProductID          string          `json:"product_id"`
+	ExternalCustomerID string          `json:"external_customer_id"`
+	Customer           OrderCustomer   `json:"customer"`
+	Product            OrderProduct    `json:"product"`
+	ProductPrice       priceJSON       `json:"product_price"`
+	Items              []orderItemJSON `json:"items"`
+}
+
+func (d OrderData) organizationExternalID() string {
+	if id := strings.TrimSpace(d.Customer.ExternalID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(d.ExternalCustomerID)
+}
+
+func (d OrderData) productID() string {
+	if id := strings.TrimSpace(d.Product.ID); id != "" {
+		return id
+	}
+	return strings.TrimSpace(d.ProductID)
 }
 
 type OrderPaidData = OrderData
