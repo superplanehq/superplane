@@ -37,6 +37,11 @@ type OrganizationLLMCreditGrant struct {
 	PolarOrderID   *string
 	PolarRefundID  *string
 	CreatedAt      time.Time
+	ExpiresAt      *time.Time
+}
+
+func (g OrganizationLLMCreditGrant) IsExpired(now time.Time) bool {
+	return g.ExpiresAt != nil && !g.ExpiresAt.After(now)
 }
 
 func (OrganizationLLMCreditGrant) TableName() string {
@@ -57,16 +62,32 @@ func (OrganizationLLMSettings) TableName() string {
 
 // OrganizationLLMCreditSummary is remaining hosted credit for an org.
 type OrganizationLLMCreditSummary struct {
-	GrantMicros           int64
-	SuperPlaneGrantMicros int64
-	PurchasedCreditMicros int64
-	BilledMicros          int64
-	RemainingMicros       int64
-	MarkupBPS             int
-	Warning               bool
+	GrantMicros            int64
+	SuperPlaneGrantMicros  int64
+	PurchasedCreditMicros  int64
+	BilledMicros           int64
+	RemainingMicros        int64
+	MarkupBPS              int
+	Warning                bool
+	WelcomeCreditExpiresAt *time.Time
 }
 
-func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
+func GrantWelcomeCredit(tx *gorm.DB, orgID, accountID uuid.UUID) error {
+	if accountID == uuid.Nil {
+		return errors.New("account is required for welcome credit")
+	}
+
+	var account Account
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", accountID).
+		First(&account).Error
+	if err != nil {
+		return err
+	}
+	if account.HasReceivedWelcomeCredit() {
+		return nil
+	}
+
 	settings, err := GetInstallationLLMSettings(tx)
 	if err != nil {
 		return err
@@ -76,30 +97,41 @@ func GrantWelcomeCredit(tx *gorm.DB, orgID uuid.UUID) error {
 		return nil
 	}
 
+	now := time.Now()
 	var existing OrganizationLLMCreditGrant
 	err = tx.Where("organization_id = ? AND kind = ?", orgID, LLMCreditGrantKindWelcome).
 		First(&existing).Error
 	if err == nil {
-		return nil
+		return stampWelcomeCreditGrantedAt(tx, accountID, existing.CreatedAt)
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
+	expiresAt := now.Add(DefaultWelcomeGrantTTL)
 	grant := OrganizationLLMCreditGrant{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
 		Kind:           LLMCreditGrantKindWelcome,
 		AmountMicros:   amount,
-		CreatedAt:      time.Now(),
+		ActorAccountID: &accountID,
+		CreatedAt:      now,
+		ExpiresAt:      &expiresAt,
 	}
 	if err := tx.Create(&grant).Error; err != nil {
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-			return nil
+			return stampWelcomeCreditGrantedAt(tx, accountID, now)
 		}
 		return err
 	}
-	return nil
+
+	return stampWelcomeCreditGrantedAt(tx, accountID, now)
+}
+
+func stampWelcomeCreditGrantedAt(tx *gorm.DB, accountID uuid.UUID, grantedAt time.Time) error {
+	return tx.Model(&Account{}).
+		Where("id = ? AND welcome_credit_granted_at IS NULL", accountID).
+		Update("welcome_credit_granted_at", grantedAt).Error
 }
 
 func AddAdminLLMCreditGrant(tx *gorm.DB, orgID uuid.UUID, amountMicros int64, note string, actorAccountID *uuid.UUID) (*OrganizationLLMCreditGrant, error) {
@@ -376,27 +408,24 @@ func creditGrantActorDisplayName(account Account) string {
 }
 
 func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLLMCreditSummary, error) {
-	var kindTotals []struct {
-		Kind  string
-		Total int64
-	}
-	err := tx.Model(&OrganizationLLMCreditGrant{}).
-		Select("kind, COALESCE(SUM(amount_micros), 0) as total").
-		Where("organization_id = ?", orgID).
-		Group("kind").
-		Scan(&kindTotals).Error
+	grants, err := ListOrganizationLLMCreditGrants(tx, orgID)
 	if err != nil {
 		return OrganizationLLMCreditSummary{}, err
 	}
 
 	var grantMicros, superplaneGrantMicros, purchasedCreditMicros int64
-	for _, row := range kindTotals {
-		grantMicros += row.Total
-		switch row.Kind {
-		case LLMCreditGrantKindWelcome, LLMCreditGrantKindAdmin:
-			superplaneGrantMicros += row.Total
+	var welcomeExpiresAt *time.Time
+	now := time.Now()
+	for _, grant := range grants {
+		grantMicros += grant.AmountMicros
+		switch grant.Kind {
+		case LLMCreditGrantKindWelcome:
+			superplaneGrantMicros += grant.AmountMicros
+			welcomeExpiresAt = grant.ExpiresAt
+		case LLMCreditGrantKindAdmin:
+			superplaneGrantMicros += grant.AmountMicros
 		case LLMCreditGrantKindPolar, LLMCreditGrantKindPolarRefund:
-			purchasedCreditMicros += row.Total
+			purchasedCreditMicros += grant.AmountMicros
 		}
 	}
 
@@ -409,10 +438,7 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 		return OrganizationLLMCreditSummary{}, err
 	}
 
-	remaining := grantMicros - billedMicros
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := remainingHostedCreditMicros(grants, billedMicros, now)
 
 	markupBPS, err := ResolveOrganizationMarkupBPS(tx, orgID)
 	if err != nil {
@@ -431,14 +457,36 @@ func DescribeOrganizationLLMCredit(tx *gorm.DB, orgID uuid.UUID) (OrganizationLL
 	}
 
 	return OrganizationLLMCreditSummary{
-		GrantMicros:           grantMicros,
-		SuperPlaneGrantMicros: superplaneGrantMicros,
-		PurchasedCreditMicros: purchasedCreditMicros,
-		BilledMicros:          billedMicros,
-		RemainingMicros:       remaining,
-		MarkupBPS:             markupBPS,
-		Warning:               warning,
+		GrantMicros:            grantMicros,
+		SuperPlaneGrantMicros:  superplaneGrantMicros,
+		PurchasedCreditMicros:  purchasedCreditMicros,
+		BilledMicros:           billedMicros,
+		RemainingMicros:        remaining,
+		MarkupBPS:              markupBPS,
+		Warning:                warning,
+		WelcomeCreditExpiresAt: welcomeExpiresAt,
 	}, nil
+}
+
+func remainingHostedCreditMicros(grants []OrganizationLLMCreditGrant, billedMicros int64, now time.Time) int64 {
+	var expired, usable int64
+	for _, grant := range grants {
+		if grant.IsExpired(now) {
+			expired += grant.AmountMicros
+			continue
+		}
+		usable += grant.AmountMicros
+	}
+
+	spendAgainstUsable := billedMicros - expired
+	if spendAgainstUsable < 0 {
+		spendAgainstUsable = 0
+	}
+	remaining := usable - spendAgainstUsable
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
 
 func AssertHostedCreditAvailable(tx *gorm.DB, orgID uuid.UUID) error {
