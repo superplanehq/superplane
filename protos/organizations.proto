@@ -524,6 +524,7 @@ message DescribeOrganizationSpendingReportRequest {
   string group_by = 8;
   string time_grain = 9;
   string usage_kind = 10;
+  string funding_source = 11;
 }
 
 message SpendingReportTotals {
