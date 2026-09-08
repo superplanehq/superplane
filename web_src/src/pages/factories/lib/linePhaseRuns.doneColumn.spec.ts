@@ -147,4 +147,20 @@ describe("collectLineDoneOrders", () => {
 
     expect(done.map((entry) => entry.id)).toEqual(["wo-backlog-closed"]);
   });
+
+  it("excludes a draft rejected straight out of the Backlog — it never dispatched", () => {
+    const rejectedDraft = closedOrder({ id: "wo-rejected-draft", result: "RESULT_REJECTED" });
+
+    const done = collectLineDoneOrders([rejectedDraft], LINE);
+
+    expect(done).toEqual([]);
+  });
+
+  it("keeps a rejected order that already dispatched to this line", () => {
+    const rejectedAfterRun = closedOrder({ id: "wo-rejected-ran", result: "RESULT_REJECTED", lineId: "line-1" });
+
+    const done = collectLineDoneOrders([rejectedAfterRun], LINE);
+
+    expect(done.map((entry) => entry.id)).toEqual(["wo-rejected-ran"]);
+  });
 });
