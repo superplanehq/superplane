@@ -157,7 +157,7 @@ describe("IntakeSettingsHost", () => {
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
     expect(within(automation).getByRole("link", { name: "Edit automation" })).toHaveAttribute(
       "href",
-      "/org-1/workspaces/RF/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
+      "/org-1/workspaces/rf/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
     );
   });
 
