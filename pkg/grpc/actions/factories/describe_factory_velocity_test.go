@@ -917,9 +917,12 @@ func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) 
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	// Close on the current calendar day. A three-hour offset lands on
-	// yesterday when the suite runs just after midnight UTC.
-	mergedAt := time.Now()
+	now := time.Now()
+	// Anchor the merge to midday so it always lands in today's bucket, even
+	// when the suite runs in the first hours after local midnight. Subtracting
+	// a few hours from now would slip into yesterday near midnight and empty
+	// today's point.
+	mergedAt := time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location())
 
 	// Two tasks that closed today. Their spend differs, so the median is not
 	// the mean and a wrong aggregation shows.
