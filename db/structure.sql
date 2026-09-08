@@ -120,7 +120,8 @@ CREATE TABLE public.accounts (
     installation_admin boolean DEFAULT false NOT NULL,
     password_changed_at timestamp with time zone,
     blocked_at timestamp with time zone,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    welcome_credit_granted_at timestamp with time zone
 );
 
 
@@ -918,6 +919,7 @@ CREATE TABLE public.organization_llm_credit_grants (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     polar_order_id text,
     polar_refund_id text,
+    expires_at timestamp with time zone,
     CONSTRAINT organization_llm_credit_grants_amount_sign CHECK ((((kind = 'polar_refund'::text) AND (amount_micros < 0)) OR ((kind <> 'polar_refund'::text) AND (amount_micros > 0)))),
     CONSTRAINT organization_llm_credit_grants_kind CHECK ((kind = ANY (ARRAY['welcome'::text, 'admin'::text, 'polar'::text, 'polar_refund'::text])))
 );
@@ -4272,7 +4274,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260907234117	f
+20260908161327	f
 \.
 
 

@@ -266,6 +266,7 @@ func serializeSpendingCreditSnapshot(
 		RemainingCreditWarning: credit.Warning,
 		BillingEnabled:         billingEnabled,
 		HasBillingCustomer:     hasCustomer,
+		WelcomeCreditExpiresAt: protoTimestamp(credit.WelcomeCreditExpiresAt),
 	}
 }
 

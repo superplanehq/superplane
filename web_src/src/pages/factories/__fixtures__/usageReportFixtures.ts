@@ -14,6 +14,7 @@ export interface StorybookUsageReport {
   remainingCreditWarning?: boolean;
   billingEnabled?: boolean;
   hasBillingCustomer?: boolean;
+  welcomeCreditExpiresAt?: string;
   invoices?: Array<{
     id?: string;
     createdAt?: string;
@@ -40,6 +41,7 @@ export const EMPTY_USAGE_REPORT: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "0",
   remainingCreditWarning: false,
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
 export const NO_GRANT_USAGE_REPORT: StorybookUsageReport = {
@@ -77,6 +79,7 @@ export const DEFAULT_FACTORY_USAGE: StorybookUsageReport = {
   purchasedCreditCents: "0",
   hostedBilledCents: "876",
   remainingCreditWarning: false,
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
 /** Welcome grant spent. Remaining hosted credit is empty. Polar recovery is available. */
@@ -90,6 +93,19 @@ export const SPENT_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   remainingCreditWarning: true,
   billingEnabled: true,
   hasBillingCustomer: true,
+};
+
+export const EXPIRED_WELCOME_USAGE_REPORT: StorybookUsageReport = {
+  ...SPENT_CREDIT_USAGE_REPORT,
+  welcomeCreditExpiresAt: "2026-08-15T12:00:00.000Z",
+};
+
+export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...DEFAULT_FACTORY_USAGE,
+  remainingCreditCents: "14124",
+  grantTotalCents: "15000",
+  purchasedCreditCents: "10000",
+  welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
 /** Polar packs for empty-credit Storybook recovery screens. */

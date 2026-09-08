@@ -40,3 +40,32 @@ export const BillingOff: Story = {
   name: "Billing off",
   args: { billingEnabled: false },
 };
+
+/** Welcome credit remains. The action opens Billing. */
+export const Trial: Story = {
+  name: "Trial",
+  args: {
+    billingEnabled: true,
+    kind: "trial",
+    remainingCreditCents: 4124,
+    welcomeCreditExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+};
+
+/** Welcome credit is spent. The action opens Billing. */
+export const TrialEmpty: Story = {
+  name: "Trial empty",
+  args: {
+    billingEnabled: true,
+    kind: "trial-empty",
+  },
+};
+
+/** Welcome credit expired. The action opens Billing. */
+export const TrialEnded: Story = {
+  name: "Trial ended",
+  args: {
+    billingEnabled: true,
+    kind: "trial-expired",
+  },
+};
