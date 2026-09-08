@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationsIntegration } from "@/api-client";
 
-import { advanceAfterGithubConnect } from "./useOnboardingPageModel";
+import { advanceAfterGithubConnect } from "./advanceAfterGithubConnect";
 import { useOnboardingGithubConnections } from "./useSelectNewGithubConnection";
 
 const githubConnection: OrganizationsIntegration = {

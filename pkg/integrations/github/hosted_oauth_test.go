@@ -270,9 +270,73 @@ func Test__afterHostedAppBind(t *testing.T) {
 		assert.Equal(t, "ready", integration.State)
 		metadata := integration.Metadata.(common.Metadata)
 		assert.Equal(t, "11", metadata.InstallationID)
-		assert.Empty(t, metadata.PendingInstallations)
+		// The picker state stays, so onboarding can move the connection to
+		// another account later.
+		assert.Equal(t, "csrf", metadata.State)
+		assert.Len(t, metadata.PendingInstallations, 1)
 		assert.False(t, metadata.InstallRequested)
 		assertNoPlaintextSecrets(t, integration)
+	})
+
+	t.Run("rebinds a bound connection to another allowed installation", func(t *testing.T) {
+		t.Cleanup(resetBindClientHooks)
+		listInstallationRepos = func(context.Context, *gh.Client) ([]common.Repository, error) {
+			return []common.Repository{{ID: 2, Name: "other", URL: "https://github.com/octo/other"}}, nil
+		}
+		newInstallationClient = func(core.IntegrationContext, int64, string) (*gh.Client, error) {
+			return gh.NewClient(nil), nil
+		}
+		newAppJWTClient = func(core.IntegrationContext, int64) (*gh.Client, error) {
+			return gh.NewClient(nil), nil
+		}
+		listAppInstallations = func(context.Context, *gh.Client, string) (common.PendingInstallation, bool, error) {
+			return common.PendingInstallation{}, false, nil
+		}
+
+		integration := pendingHostedIntegration("csrf")
+		integration.State = "ready"
+		integration.Metadata = common.Metadata{
+			State:          "csrf",
+			HostedApp:      true,
+			InstallationID: "11",
+			Owner:          "acme",
+			GitHubApp:      common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme"},
+				{ID: "22", AccountLogin: "octo", AccountType: "Organization"},
+			},
+		}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/bind?state=csrf&installation_id=22", nil)
+
+		g.afterHostedAppBind(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		metadata := integration.Metadata.(common.Metadata)
+		assert.Equal(t, "22", metadata.InstallationID)
+		assert.Equal(t, "octo", metadata.Owner)
+	})
+
+	t.Run("redirects a bound connection when the state does not match", func(t *testing.T) {
+		integration := pendingHostedIntegration("csrf")
+		integration.State = "ready"
+		integration.Metadata = common.Metadata{
+			State:          "csrf",
+			HostedApp:      true,
+			InstallationID: "11",
+			Owner:          "acme",
+			GitHubApp:      common.GitHubAppMetadata{ID: 99, Slug: "superplane"},
+			PendingInstallations: []common.PendingInstallation{
+				{ID: "11", AccountLogin: "acme"},
+			},
+		}
+		ctx, rec := hostedRequestContext(integration, "/api/v1/github/app/bind?state=other&installation_id=11", nil)
+
+		g.afterHostedAppBind(ctx)
+
+		assert.Equal(t, http.StatusSeeOther, rec.Code)
+		metadata := integration.Metadata.(common.Metadata)
+		assert.Equal(t, "11", metadata.InstallationID)
+		assert.Equal(t, "acme", metadata.Owner)
 	})
 }
 

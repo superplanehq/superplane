@@ -10,7 +10,7 @@ describe("FirstRunConnectScreen", () => {
     const user = userEvent.setup();
     const onConnectGitHub = vi.fn();
 
-    render(<FirstRunConnectScreen githubConnected={false} onConnectGitHub={onConnectGitHub} onContinue={vi.fn()} />);
+    render(<FirstRunConnectScreen onConnectGitHub={onConnectGitHub} />);
 
     expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.connectGitHub);
     expect(screen.getByText(FIRST_RUN_COPY.connect.trust)).toBeInTheDocument();
@@ -22,13 +22,8 @@ describe("FirstRunConnectScreen", () => {
     expect(onConnectGitHub).toHaveBeenCalled();
   });
 
-  it("never shows the private GitHub App option, connected or not", () => {
-    const { rerender } = render(
-      <FirstRunConnectScreen githubConnected={false} onConnectGitHub={vi.fn()} onContinue={vi.fn()} />,
-    );
-    expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
-
-    rerender(<FirstRunConnectScreen githubConnected onConnectGitHub={vi.fn()} onContinue={vi.fn()} />);
+  it("never shows the private GitHub App option", () => {
+    render(<FirstRunConnectScreen onConnectGitHub={vi.fn()} />);
     expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
   });
 
@@ -36,14 +31,7 @@ describe("FirstRunConnectScreen", () => {
     const user = userEvent.setup();
     const onConnectGitHub = vi.fn();
 
-    render(
-      <FirstRunConnectScreen
-        githubConnected={false}
-        installRequested
-        onConnectGitHub={onConnectGitHub}
-        onContinue={vi.fn()}
-      />,
-    );
+    render(<FirstRunConnectScreen installRequested onConnectGitHub={onConnectGitHub} />);
 
     expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
       FIRST_RUN_COPY.connect.installRequested,
@@ -66,11 +54,9 @@ describe("FirstRunConnectScreen", () => {
   it("hides a connect error while the install request is waiting", () => {
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         installRequested
         connectError={FIRST_RUN_COPY.connect.connectError}
         onConnectGitHub={vi.fn()}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -80,15 +66,7 @@ describe("FirstRunConnectScreen", () => {
   });
 
   it("names the GitHub organization that is waiting for approval", () => {
-    render(
-      <FirstRunConnectScreen
-        githubConnected={false}
-        installRequested
-        githubOrganization="acme"
-        onConnectGitHub={vi.fn()}
-        onContinue={vi.fn()}
-      />,
-    );
+    render(<FirstRunConnectScreen installRequested githubOrganization="acme" onConnectGitHub={vi.fn()} />);
 
     expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
     expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
@@ -97,15 +75,7 @@ describe("FirstRunConnectScreen", () => {
   it("names the GitHub organization in the waiting tooltip", async () => {
     const user = userEvent.setup();
 
-    render(
-      <FirstRunConnectScreen
-        githubConnected={false}
-        installRequested
-        githubOrganization="acme"
-        onConnectGitHub={vi.fn()}
-        onContinue={vi.fn()}
-      />,
-    );
+    render(<FirstRunConnectScreen installRequested githubOrganization="acme" onConnectGitHub={vi.fn()} />);
 
     await user.hover(screen.getByTestId("first-run-github-install-requested"));
     expect(await screen.findByRole("tooltip")).toHaveTextContent(FIRST_RUN_COPY.connect.installRequestedBody("acme"));
@@ -114,13 +84,11 @@ describe("FirstRunConnectScreen", () => {
   it("asks which GitHub account to use when one install is pending", () => {
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         pendingInstallations={[{ id: "11", accountLogin: "octo" }]}
         githubState="csrf"
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
         onUseInstallation={vi.fn()}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -138,7 +106,6 @@ describe("FirstRunConnectScreen", () => {
 
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         pendingInstallations={[
           { id: "11", accountLogin: "acme" },
           { id: "22", accountLogin: "octo" },
@@ -147,7 +114,6 @@ describe("FirstRunConnectScreen", () => {
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
         onUseInstallation={onUseInstallation}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -167,7 +133,6 @@ describe("FirstRunConnectScreen", () => {
   it("hides the waiting chip when the picker offers the requested organization", () => {
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         installRequested
         githubOrganization="Acme"
         pendingInstallations={[{ id: "11", accountLogin: "acme" }]}
@@ -175,7 +140,6 @@ describe("FirstRunConnectScreen", () => {
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
         onUseInstallation={vi.fn()}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -186,7 +150,6 @@ describe("FirstRunConnectScreen", () => {
   it("keeps the waiting chip when the picker lacks the requested organization", () => {
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         installRequested
         githubOrganization="acme"
         pendingInstallations={[{ id: "22", accountLogin: "octo" }]}
@@ -194,7 +157,6 @@ describe("FirstRunConnectScreen", () => {
         githubAppSlug="superplane"
         onConnectGitHub={vi.fn()}
         onUseInstallation={vi.fn()}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -205,7 +167,6 @@ describe("FirstRunConnectScreen", () => {
   it("disables the picker while one account is binding", () => {
     render(
       <FirstRunConnectScreen
-        githubConnected={false}
         pendingInstallations={[
           { id: "11", accountLogin: "acme" },
           { id: "22", accountLogin: "octo" },
@@ -215,7 +176,6 @@ describe("FirstRunConnectScreen", () => {
         bindingInstallationId="11"
         onConnectGitHub={vi.fn()}
         onUseInstallation={vi.fn()}
-        onContinue={vi.fn()}
       />,
     );
 
@@ -223,15 +183,11 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-use-octo")).toBeDisabled();
   });
 
-  it("continues to the repository step after GitHub is connected", async () => {
-    const user = userEvent.setup();
-    const onContinue = vi.fn();
+  it("never shows a connected state; the picker or the connect button always shows", () => {
+    render(<FirstRunConnectScreen onConnectGitHub={vi.fn()} />);
 
-    render(<FirstRunConnectScreen githubConnected onConnectGitHub={vi.fn()} onContinue={onContinue} />);
-
-    expect(screen.getByTestId("first-run-github-connected")).toHaveTextContent(FIRST_RUN_COPY.connect.connected);
-    expect(screen.queryByTestId("first-run-create-private-github-app")).not.toBeInTheDocument();
-    await user.click(screen.getByTestId("first-run-github-continue"));
-    expect(onContinue).toHaveBeenCalled();
+    expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
   });
 });

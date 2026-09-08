@@ -58,6 +58,7 @@ export function useIntegrationConnectDialog({
   onSelectionsChange,
   preferredCreateNames,
   hiddenConfigurationFields,
+  manualSelectionNames,
 }: {
   organizationId: string;
   returnTo?: string;
@@ -68,6 +69,8 @@ export function useIntegrationConnectDialog({
   preferredCreateNames?: Record<string, string>;
   /** Configuration field names the create dialog never shows, keyed by integration name. */
   hiddenConfigurationFields?: Record<string, string[]>;
+  /** Integration names that are never auto-selected; the user must pick an instance. */
+  manualSelectionNames?: readonly string[];
 }) {
   const { data: me, isError: meFailed, isSuccess: meLoaded } = useMe(true, organizationId);
   const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
@@ -101,6 +104,7 @@ export function useIntegrationConnectDialog({
     integrationData,
     selections,
     onSelectionsChange,
+    manualSelectionNames,
   });
   useRefetchOnWindowFocus(refetch);
 
@@ -239,6 +243,8 @@ export function useIntegrationConnectDialog({
 
   return {
     integrationData,
+    /** Refetches the connected list, for screens that must not show a stale cache. */
+    refetchConnections: refetch,
     requestConnect,
     requestPrivateGitHubConnect,
     hostedGitHubAppInstall: githubConnect.hosted,

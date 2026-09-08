@@ -98,6 +98,36 @@ export function pendingGitHubAccountPicker(
   };
 }
 
+/**
+ * The account picker for a connection the account picker already bound. A
+ * bound connection keeps its installations and state, so onboarding shows the
+ * picker again and the member can move the connection to another account.
+ */
+export function githubAccountPickerFromConnection(
+  connection: OrganizationsIntegration | undefined,
+  currentUserId?: string,
+): PendingGitHubAccountPicker | undefined {
+  if (!connection?.metadata?.id || !currentUserId) {
+    return undefined;
+  }
+  if (connection.metadata.integrationName !== "github" || !isOwnPendingGitHub(connection, currentUserId)) {
+    return undefined;
+  }
+
+  const installations = pendingGitHubInstallations(connection.status?.metadata);
+  const state = hostedGitHubState(connection.status?.metadata);
+  if (installations.length === 0 || state === "") {
+    return undefined;
+  }
+
+  return {
+    id: connection.metadata.id,
+    installations,
+    state,
+    appSlug: hostedGitHubAppSlug(connection.status?.metadata),
+  };
+}
+
 export function isOnboardingSetupReturnPath(path: string | undefined): boolean {
   if (!path) {
     return false;
