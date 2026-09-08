@@ -197,39 +197,45 @@ describe("FirstRunSetup", () => {
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
-  it("saves the bound GitHub connection on a workspace that is not the initial organization", async () => {
+  function bindablePageModel(selectVcsConnection: OnboardingPageModel["selectVcsConnection"]) {
+    const pendingInstance = {
+      metadata: { id: "int-new", integrationName: "github" },
+      status: {
+        state: "pending",
+        metadata: {
+          startedByUserID: "user-1",
+          state: "csrf",
+          githubApp: { slug: "superplane" },
+          pendingInstallations: [{ id: "11", accountLogin: "acme" }],
+        },
+      },
+    };
+    // The static test model shows the post-bind refetch already applied: the
+    // bound connection reports ready.
+    const readyInstance = {
+      metadata: { id: "int-new", name: "github-acme", integrationName: "github" },
+      status: { state: "ready", metadata: { owner: "acme" } },
+    };
+    return pageModel({
+      openSection: "vcs",
+      selectVcsConnection,
+      githubConnections: {
+        name: "github",
+        readyInstances: [readyInstance],
+        allInstances: [pendingInstance],
+      },
+    });
+  }
+
+  it("saves the bound GitHub connection for a workspace of an existing organization", async () => {
     const user = userEvent.setup();
     const selectVcsConnection = vi.fn().mockResolvedValue(undefined);
     factory = { id: "factory-1", onboarding: {} };
-    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => Promise<void> | void }) => {
-      void options.onSuccess?.();
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
     });
 
-    renderSetup(
-      pageModel({
-        openSection: "vcs",
-        selectVcsConnection,
-        githubConnections: {
-          name: "github",
-          readyInstances: [],
-          allInstances: [
-            {
-              metadata: { id: "int-new", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "user-1",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [{ id: "11", accountLogin: "acme" }],
-                },
-              },
-            },
-          ],
-        },
-      }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
-    );
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
 
@@ -237,44 +243,20 @@ describe("FirstRunSetup", () => {
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
   });
 
-  it("does not reselect the connection after bind on the initial organization", async () => {
+  it("saves the bound GitHub connection for the initial organization", async () => {
     const user = userEvent.setup();
     const selectVcsConnection = vi.fn().mockResolvedValue(undefined);
     factory = { id: "factory-1", onboarding: { initial: true } };
-    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => Promise<void> | void }) => {
-      void options.onSuccess?.();
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
     });
 
-    renderSetup(
-      pageModel({
-        openSection: "vcs",
-        selectVcsConnection,
-        githubConnections: {
-          name: "github",
-          readyInstances: [],
-          allInstances: [
-            {
-              metadata: { id: "int-new", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "user-1",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [{ id: "11", accountLogin: "acme" }],
-                },
-              },
-            },
-          ],
-        },
-      }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
-    );
+    renderSetup(bindablePageModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") }));
 
+    await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
     expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
-    expect(selectVcsConnection).not.toHaveBeenCalled();
   });
 
   it("shows the GitHub account picker on the connect screen", () => {

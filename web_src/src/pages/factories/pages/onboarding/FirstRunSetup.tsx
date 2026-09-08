@@ -111,6 +111,28 @@ function workspaceOwnsGithubConnection(
   return Boolean(savedIntegrationId && selectedIntegrationId === savedIntegrationId && vcsReady);
 }
 
+/**
+ * Saves the connection the account picker bound, once the refreshed
+ * connection list reports it ready. The bind callback runs before the list
+ * re-renders, so an effect makes the save see the ready connection.
+ */
+function useSelectBoundGithubConnection(
+  boundIntegrationId: string | null,
+  clearBoundIntegrationId: () => void,
+  model: OnboardingPageModel,
+) {
+  const readyInstances = model.githubConnections.readyInstances;
+  const selectConnection = model.selectVcsConnection;
+
+  useEffect(() => {
+    if (!boundIntegrationId) return;
+    const bound = readyInstances.some((instance) => instance.metadata?.id === boundIntegrationId);
+    if (!bound) return;
+    clearBoundIntegrationId();
+    void selectConnection(boundIntegrationId);
+  }, [boundIntegrationId, clearBoundIntegrationId, readyInstances, selectConnection]);
+}
+
 /** Reports a failed repository list, which the choose screen shows as empty. */
 function useRepositoryErrorToast(error: unknown) {
   const reported = useRef<unknown>(null);
@@ -263,6 +285,8 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
   // through the connect screen again. Binding in place opens the repository
   // screen directly once the connection is ready.
   const bindInstallation = useBindGitHubInstallation(organizationId);
+  const [boundIntegrationId, setBoundIntegrationId] = useState<string | null>(null);
+  useSelectBoundGithubConnection(boundIntegrationId, () => setBoundIntegrationId(null), model);
   const useInstallation = (installation: PendingGitHubInstallation) => {
     const state = accountPicker?.state;
     const pendingId = accountPicker?.id;
@@ -270,10 +294,8 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bindInstallation.mutate(
       { state, installationId: installation.id },
       {
-        onSuccess: async () => {
-          if (!factory?.onboarding?.initial && pendingId) {
-            await model.selectVcsConnection(pendingId);
-          }
+        onSuccess: () => {
+          setBoundIntegrationId(pendingId ?? null);
           goToScreen("choose");
         },
         onError: (error) => showErrorToast(getApiErrorMessage(error, "Failed to connect the GitHub account")),
