@@ -2,6 +2,7 @@ import { Avatar } from "@/components/Avatar/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronRight, Clock, Loader2 } from "lucide-react";
+import { useState } from "react";
 
 import {
   hostedGitHubInstallURL,
@@ -96,13 +97,14 @@ function AccountGlyph({ login }: { login: string }) {
 }
 
 function AccountPickerWaitingRow({ login }: { login: string }) {
+  const [open, setOpen] = useState(false);
   const name = login !== "" ? login : copy.waitingAccount;
   return (
-    <Tooltip>
+    <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
-        <div
-          tabIndex={0}
-          className="flex cursor-default items-center gap-3 px-4 py-3"
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 px-4 py-3 text-left"
           data-testid="first-run-github-install-requested"
         >
           <AccountGlyph login={name} />
@@ -113,7 +115,7 @@ function AccountPickerWaitingRow({ login }: { login: string }) {
             {name}
           </span>
           <span className="shrink-0 text-[13px] text-muted-foreground">{copy.installRequested}</span>
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-md text-left text-pretty">
         <p>{copy.installRequestedBody(login)}</p>

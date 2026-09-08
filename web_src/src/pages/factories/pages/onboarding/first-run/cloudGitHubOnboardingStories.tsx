@@ -13,8 +13,8 @@ export function CloudGitHubConnectStory(props: Partial<ComponentProps<typeof Fir
       chrome={connectChrome}
       githubAppSlug={CLOUD_GITHUB_APP_SLUG}
       githubState={CLOUD_GITHUB_STATE}
-      onConnectGitHub={() => console.log("connect GitHub")}
-      onUseInstallation={(installation) => console.log("use installation", installation)}
+      onConnectGitHub={() => undefined}
+      onUseInstallation={() => undefined}
       {...props}
     />
   );

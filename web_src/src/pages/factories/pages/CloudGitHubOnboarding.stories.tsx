@@ -22,11 +22,23 @@ import {
   firstRunStoryChrome,
 } from "./onboarding/first-run/firstRunMocks";
 import { FirstRunChooseScreen } from "./onboarding/first-run/FirstRunChooseScreen";
+import { FirstRunConnectScreen } from "./onboarding/first-run/FirstRunConnectScreen";
 import {
   CloudGitHubConnectStory,
   CloudGitHubPathMap,
   CloudGitHubSettingsFrame,
 } from "./onboarding/first-run/cloudGitHubOnboardingStories";
+import type { ComponentProps } from "react";
+
+function loggedConnectStory(props: Partial<ComponentProps<typeof FirstRunConnectScreen>> = {}) {
+  return (
+    <CloudGitHubConnectStory
+      onConnectGitHub={() => console.log("connect GitHub")}
+      onUseInstallation={(installation) => console.log("use installation", installation)}
+      {...props}
+    />
+  );
+}
 
 /**
  * Every SuperPlane screen on the cloud public GitHub App path. First-run
@@ -49,23 +61,23 @@ export const PathMap: Story = {
 
 export const Connect: Story = {
   name: "1 Connect GitHub",
-  render: () => <CloudGitHubConnectStory />,
+  render: () => <loggedConnectStory />,
 };
 
 export const ConnectError: Story = {
   name: "1 Connect GitHub (error)",
-  render: () => <CloudGitHubConnectStory connectError={FIRST_RUN_COPY.connect.connectError} />,
+  render: () => <loggedConnectStory connectError={FIRST_RUN_COPY.connect.connectError} />,
 };
 
 export const ConnectLoading: Story = {
   name: "1 Connect GitHub (loading)",
-  render: () => <CloudGitHubConnectStory loading />,
+  render: () => <loggedConnectStory loading />,
 };
 
 export const AccountPicker: Story = {
   name: "2 Select account",
   render: () => (
-    <CloudGitHubConnectStory
+    <loggedConnectStory
       githubLogin={CLOUD_GITHUB_LOGIN}
       pendingInstallations={[CLOUD_GITHUB_ACME, CLOUD_GITHUB_OCTO]}
     />
@@ -75,7 +87,7 @@ export const AccountPicker: Story = {
 export const PickerStillWaiting: Story = {
   name: "2 Select account (waiting)",
   render: () => (
-    <CloudGitHubConnectStory
+    <loggedConnectStory
       installRequested
       githubOrganization="acme"
       githubLogin={CLOUD_GITHUB_LOGIN}
@@ -86,18 +98,18 @@ export const PickerStillWaiting: Story = {
 
 export const WaitingNamedOrg: Story = {
   name: "2 Select account (waiting only)",
-  render: () => <CloudGitHubConnectStory installRequested githubOrganization="acme" githubLogin={CLOUD_GITHUB_LOGIN} />,
+  render: () => <loggedConnectStory installRequested githubOrganization="acme" githubLogin={CLOUD_GITHUB_LOGIN} />,
 };
 
 export const WaitingUnknownOrg: Story = {
   name: "2 Select account (waiting, unnamed)",
-  render: () => <CloudGitHubConnectStory installRequested githubLogin={CLOUD_GITHUB_LOGIN} />,
+  render: () => <loggedConnectStory installRequested githubLogin={CLOUD_GITHUB_LOGIN} />,
 };
 
 export const PickerAfterApproval: Story = {
   name: "2 Select account (approved)",
   render: () => (
-    <CloudGitHubConnectStory
+    <loggedConnectStory
       installRequested
       githubOrganization="acme"
       githubLogin={CLOUD_GITHUB_LOGIN}
@@ -109,7 +121,7 @@ export const PickerAfterApproval: Story = {
 export const PickerBinding: Story = {
   name: "2 Select account (binding)",
   render: () => (
-    <CloudGitHubConnectStory
+    <loggedConnectStory
       githubLogin={CLOUD_GITHUB_LOGIN}
       pendingInstallations={[CLOUD_GITHUB_ACME, CLOUD_GITHUB_OCTO]}
       bindingInstallationId={CLOUD_GITHUB_ACME.id}
