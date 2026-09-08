@@ -43,6 +43,9 @@ export function resolveSplitRunOrder(
 export type FixtureForSplitRunPageOptions = {
   prFeedbackRuns?: PRFeedbackLogRun[];
   analysisRuns?: BacklogAnalysisRun[];
+  /** True while the Backlog automation still scores this draft, including the
+   * optimistic window before its run appears in `analysisRuns`. */
+  isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
 };
@@ -62,6 +65,7 @@ export function fixtureForSplitRunPage(
     demoArtifacts: false,
     prFeedbackRuns: options?.prFeedbackRuns,
     analysisRuns: options?.analysisRuns,
+    isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
   });
 }

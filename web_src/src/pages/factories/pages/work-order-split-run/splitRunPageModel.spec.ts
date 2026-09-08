@@ -94,6 +94,13 @@ describe("fixtureForSplitRunPage", () => {
     });
   });
 
+  it("passes the pending analyzing flag into the draft footer", () => {
+    const fixture = fixtureForSplitRunPage(DRAFT_WORK_ORDER, [], null, { analysisRuns: [], isAnalyzing: true });
+
+    expect(fixture?.footer.note?.headline).toBe("SuperPlane is currently analyzing this task");
+    expect(fixture?.footer.actions.map((action) => action.label)).not.toContain("Reject");
+  });
+
   it("resolves the source person's avatar through resolveUser", () => {
     const resolveUser = (userId: string | undefined, name?: string) =>
       userId

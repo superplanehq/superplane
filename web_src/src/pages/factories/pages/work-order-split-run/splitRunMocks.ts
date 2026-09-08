@@ -38,7 +38,7 @@ import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../l
 import { getWorkOrderDisplayStatus, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import { isActiveCanvasRun, statusForCanvasRun } from "../../lib/workOrderPullRequest";
-import type { BacklogAnalysisRun } from "../../lib/backlogAnalysis";
+import { hasActiveBacklogAnalysisRun, type BacklogAnalysisRun } from "../../lib/backlogAnalysis";
 import type { PRFeedbackLogRun } from "../prFeedbackSettingsModel";
 import {
   buildSplitRunFooter,
@@ -329,6 +329,12 @@ export type SplitRunFixtureOptions = {
   closer?: { actor?: OrgUserDisplay; automationName?: string };
   /** Backlog analysis runs for this task, shown as extra Log phases. */
   analysisRuns?: BacklogAnalysisRun[];
+  /**
+   * Whether the Backlog automation is still scoring this draft. Covers the
+   * optimistic window where a fresh draft is known to be analyzing before its
+   * run appears in `analysisRuns`, so the popup matches the board card.
+   */
+  isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
 };
@@ -378,6 +384,8 @@ function mappedWorkOrderFixture(order: FactoriesWorkOrder, options?: SplitRunFix
       fixesPaused: latestPRFeedbackRun(options?.prFeedbackRuns)?.kind === "fixes-paused",
       stoppedBy: options?.stoppedBy ?? options?.closer?.actor,
       closer: options?.closer,
+      analysisRuns: options?.analysisRuns,
+      isAnalyzing: options?.isAnalyzing,
     }),
   };
   if (order.id === "wo-board-implement-notify") {
@@ -398,6 +406,8 @@ function reviewSurfaces(
     fixesPaused?: boolean;
     stoppedBy?: OrgUserDisplay;
     closer?: { actor?: OrgUserDisplay; automationName?: string };
+    analysisRuns?: BacklogAnalysisRun[];
+    isAnalyzing?: boolean;
   },
 ): Pick<SplitRunFixture, "waitingNotes" | "checks" | "footer" | "footerTone"> {
   const demoArtifacts = input.demoArtifacts !== false;
@@ -408,7 +418,12 @@ function reviewSurfaces(
 
   if (displayStatus === "draft") {
     return surfaces(
-      buildSplitRunFooter({ kind: "draft", note: draftFooterNote(order), status: displayStatus }),
+      buildSplitRunFooter({
+        kind: "draft",
+        note: draftFooterNote(order),
+        status: displayStatus,
+        isAnalyzing: draftIsAnalyzing(input),
+      }),
       [],
       checks,
     );
@@ -438,6 +453,15 @@ function reviewSurfaces(
     );
   }
   return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
+}
+
+/**
+ * Whether a draft is still being scored. The optimistic `isAnalyzing` flag
+ * covers the window before a fresh draft's run appears in `analysisRuns`, so
+ * the popup matches the board card even during run discovery.
+ */
+function draftIsAnalyzing(input: { isAnalyzing?: boolean; analysisRuns?: BacklogAnalysisRun[] }): boolean {
+  return Boolean(input.isAnalyzing) || hasActiveBacklogAnalysisRun(input.analysisRuns ?? []);
 }
 
 function stoppedReviewSurface(

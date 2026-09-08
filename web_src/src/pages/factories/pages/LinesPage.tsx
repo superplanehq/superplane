@@ -840,6 +840,7 @@ function LineDetail({
           isDispatching={workOrderCardContext.dispatchingOrderIds.has(peekOrderId)}
           onDispatch={workOrderCardContext.onDispatch}
           analysisRuns={backlogAnalysis.runsByWorkOrder.get(peekOrderId) ?? []}
+          isAnalyzing={backlogAnalysis.analyzingOrderIds.has(peekOrderId)}
           onClose={onClosePeek}
           onRefine={() => {
             const id = peekOrder.id?.trim();
@@ -913,6 +914,7 @@ function LineBoardSplitRunPopup({
   isDispatching,
   onDispatch,
   analysisRuns,
+  isAnalyzing,
   onClose,
   onRefine,
 }: {
@@ -928,6 +930,7 @@ function LineBoardSplitRunPopup({
   isDispatching: boolean;
   onDispatch: (orderId: string, input: { lineName: string; model?: string }) => Promise<void>;
   analysisRuns: BacklogAnalysisRun[];
+  isAnalyzing: boolean;
   onClose: () => void;
   onRefine: () => void;
 }) {
@@ -956,6 +959,7 @@ function LineBoardSplitRunPopup({
         demoArtifacts: false,
         prFeedbackRuns,
         analysisRuns,
+        isAnalyzing,
         stoppedBy: closer.actor,
         closer,
         resolveUser,
