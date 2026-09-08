@@ -29,6 +29,28 @@ type StartFactoryConfigureEnterOptions = {
   deps: FactoryConfigureEnterDeps;
 };
 
+/** Give the staged-spec fetch a short window, then open Configure on the seed. */
+export const FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS = 2000;
+
+async function awaitStagedResync(
+  resync: FactoryConfigureEnterDeps["resyncStagedEditorState"],
+  versionId: string,
+): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      resync(versionId, { bumpResetNonce: false }),
+      new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, FACTORY_CONFIGURE_ENTER_RESYNC_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 /** Seed draft + await staged resync for one Configure visit. Returns cancel cleanup. */
 export function startFactoryConfigureEnter({
   visitId,
@@ -69,10 +91,11 @@ export function startFactoryConfigureEnter({
   setDraft(immediateSpec);
 
   // Await staged resync before enabling edit so a late applyStagedSpec cannot
-  // wipe edits typed against the immediate seed.
+  // wipe edits typed against the immediate seed. A hung repository-file fetch
+  // must not leave "Loading canvas..." forever: time-box it and keep the seed.
   void (async () => {
     try {
-      await resync(configureVersionId, { bumpResetNonce: false });
+      await awaitStagedResync(resync, configureVersionId);
     } catch {
       // Keep the immediate live/committed spec so Configure stays usable.
     }
