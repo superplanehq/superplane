@@ -30,10 +30,18 @@ type NodeMetadata struct {
 	Database *Database `json:"database,omitempty" mapstructure:"database,omitempty"`
 
 	// PolledUntil is the created time of the newest page the trigger emitted,
-	// as reported by Notion. The next poll only emits pages created after it.
-	// Notion timestamps are used rather than local clock reads, because the
-	// two drift and a drifting cursor either repeats or skips pages.
+	// as reported by Notion. The next poll re-reads that time and everything
+	// after it. Notion timestamps are used rather than local clock reads,
+	// because the two drift and a drifting cursor either repeats or skips pages.
 	PolledUntil string `json:"polledUntil,omitempty" mapstructure:"polledUntil,omitempty"`
+
+	// EmittedAtCursor holds the ids of the pages already handled whose created
+	// time equals PolledUntil. Notion reports created_time only to the minute,
+	// so several pages can share the cursor's minute. The next poll re-reads
+	// that minute (created_time on_or_after PolledUntil) and skips these ids, so
+	// a page sharing an emitted page's minute - an overflow page or one whose
+	// content could not be read yet - is neither skipped nor emitted twice.
+	EmittedAtCursor []string `json:"emittedAtCursor,omitempty" mapstructure:"emittedAtCursor,omitempty"`
 }
 
 // PageEnvelope wraps a page the way every consumer of this trigger reads it:

@@ -311,6 +311,118 @@ func Test__OnPageAdded__Poll__StopsAtAPageWhoseContentFailsToRead(t *testing.T) 
 	assert.Equal(t, cursor, nodeMetadata(t, metadata).PolledUntil, "the cursor must stay behind the unread page")
 }
 
+// Regression: Notion reports created_time only to the minute, so several pages
+// can share the cursor's minute. A page left unread at that minute - here one
+// whose content read fails - must be caught up by the next poll, not skipped
+// forever behind a strictly-after cursor.
+func Test__OnPageAdded__Poll__CatchesUpAPageSharingAnEmittedPagesMinute(t *testing.T) {
+	now := time.Now().UTC()
+	cursor := pageTimestamp(now.Add(-3 * time.Hour))
+	older := pageTimestamp(now.Add(-2 * time.Hour))
+	boundary := pageTimestamp(now.Add(-time.Hour))
+
+	trigger := &OnPageAdded{}
+	metadata := &contexts.MetadataContext{Metadata: NodeMetadata{PolledUntil: cursor}}
+
+	// First poll: three pages arrive, two of them at the same boundary minute.
+	// The second boundary page's content read fails, so it is not emitted.
+	firstPoll := &contexts.HTTPContext{Responses: []*http.Response{
+		pagePage(
+			pageDocument("page-a", "A", older),
+			pageDocument("page-b", "B", boundary),
+			pageDocument("page-c", "C", boundary),
+		),
+		blocksResponse("Body A"),
+		blocksResponse("Body B"),
+		{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"boom"}`))},
+	}}
+	firstEvents := &contexts.EventContext{}
+
+	_, err := trigger.HandleHook(pollContext(
+		databaseConfiguration(), metadata, firstPoll, firstEvents, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"A", "B"}, emittedTitles(t, firstEvents))
+	stored := nodeMetadata(t, metadata)
+	assert.Equal(t, boundary, stored.PolledUntil, "the cursor advances to the boundary minute")
+	assert.Equal(t, []string{"page-b"}, stored.EmittedAtCursor, "only the emitted boundary page is recorded")
+
+	// Second poll: the cursor's minute is re-read (on_or_after), so both
+	// boundary pages come back. The already-emitted one is dropped by id, and
+	// the one that failed before is emitted now instead of being lost.
+	secondPoll := &contexts.HTTPContext{Responses: []*http.Response{
+		pagePage(
+			pageDocument("page-b", "B", boundary),
+			pageDocument("page-c", "C", boundary),
+		),
+		blocksResponse("Body C"),
+	}}
+	secondEvents := &contexts.EventContext{}
+
+	_, err = trigger.HandleHook(pollContext(
+		databaseConfiguration(), metadata, secondPoll, secondEvents, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"C"}, emittedTitles(t, secondEvents), "the boundary page is caught up, not skipped")
+	stored = nodeMetadata(t, metadata)
+	assert.Equal(t, boundary, stored.PolledUntil)
+	assert.ElementsMatch(t, []string{"page-b", "page-c"}, stored.EmittedAtCursor, "both boundary pages are now recorded")
+}
+
+// Regression: the first poll must not replay pages that already existed when the
+// trigger was added, including pages that share the newest page's minute.
+func Test__OnPageAdded__Setup__RecordsTheNewestMinuteSoTheFirstPollDoesNotReplayIt(t *testing.T) {
+	now := time.Now().UTC()
+	newest := pageTimestamp(now.Add(-90 * time.Minute))
+	older := pageTimestamp(now.Add(-2 * time.Hour))
+
+	trigger := &OnPageAdded{}
+	metadata := &contexts.MetadataContext{}
+
+	// Two pre-existing pages share the newest minute; a third is older.
+	setup := &contexts.HTTPContext{Responses: []*http.Response{
+		databaseResponse(),
+		pagePage(
+			pageDocument("page-1", "Newest one", newest),
+			pageDocument("page-2", "Newest two", newest),
+			pageDocument("page-3", "Older", older),
+		),
+	}}
+
+	err := trigger.Setup(core.TriggerContext{
+		Integration:   integrationWithDatabase(),
+		HTTP:          setup,
+		Metadata:      metadata,
+		Requests:      &contexts.RequestContext{},
+		Configuration: databaseConfiguration(),
+	})
+	require.NoError(t, err)
+
+	stored := nodeMetadata(t, metadata)
+	assert.Equal(t, newest, stored.PolledUntil)
+	assert.ElementsMatch(t, []string{"page-1", "page-2"}, stored.EmittedAtCursor,
+		"every page sharing the newest minute is recorded so it is not replayed")
+
+	// The first poll re-reads the newest minute and finds only those two pages;
+	// both are already recorded, so nothing is reported as new.
+	poll := &contexts.HTTPContext{Responses: []*http.Response{
+		pagePage(
+			pageDocument("page-1", "Newest one", newest),
+			pageDocument("page-2", "Newest two", newest),
+		),
+	}}
+	events := &contexts.EventContext{}
+
+	_, err = trigger.HandleHook(pollContext(
+		databaseConfiguration(), metadata, poll, events, &contexts.RequestContext{},
+	))
+	require.NoError(t, err)
+
+	assert.Zero(t, events.Count(), "pages that existed before the trigger must not be replayed")
+}
+
 func Test__OnPageAdded__Poll__WithoutACursorReportsNothing(t *testing.T) {
 	httpContext := &contexts.HTTPContext{}
 	metadata := &contexts.MetadataContext{}

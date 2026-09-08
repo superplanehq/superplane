@@ -117,19 +117,20 @@ func Test__Client__ListNewestPages(t *testing.T) {
 
 func Test__Client__ListChangedPageDocuments(t *testing.T) {
 	createdAt := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
-	after := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339Nano)
+	onOrAfter := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339Nano)
 	httpContext := &contexts.HTTPContext{Responses: []*http.Response{
 		jsonResponse(fmt.Sprintf(`{"results":[{"id":"page-1","created_time":%q}],"has_more":true,"next_cursor":"cursor-1"}`, createdAt)),
 	}}
 
-	documents, hasMore, nextCursor, err := testClient(t, httpContext).ListChangedPageDocuments("db-1", "cursor-0", after, 50)
+	documents, hasMore, nextCursor, err := testClient(t, httpContext).ListChangedPageDocuments("db-1", "cursor-0", onOrAfter, 50)
 	require.NoError(t, err)
 	require.Len(t, documents, 1)
 	assert.True(t, hasMore)
 	assert.Equal(t, "cursor-1", nextCursor)
 
 	// The read asks Notion for the oldest new pages first, filtered to those
-	// created after the cursor, so a burst is caught up without skipping pages.
+	// created at or after the cursor, so the cursor's own minute is re-read and
+	// a burst is caught up without skipping pages.
 	body := requestBody(t, httpContext.Requests[0])
 	sorts, ok := body["sorts"].([]any)
 	require.True(t, ok)
@@ -141,7 +142,7 @@ func Test__Client__ListChangedPageDocuments(t *testing.T) {
 	require.True(t, ok)
 	createdFilter, ok := filter["created_time"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, after, createdFilter["after"])
+	assert.Equal(t, onOrAfter, createdFilter["on_or_after"])
 }
 
 func Test__Client__PageContent(t *testing.T) {

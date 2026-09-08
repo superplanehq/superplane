@@ -129,12 +129,13 @@ func (t *OnPageAdded) Setup(ctx core.TriggerContext) error {
 	// after that reaches the canvas.
 	//
 	if metadata.PolledUntil == "" {
-		polledUntil, err := newestPageChange(client, config.Database)
+		polledUntil, emittedIDs, err := newestPageBoundary(client, config.Database)
 		if err != nil {
 			return err
 		}
 
 		metadata.PolledUntil = polledUntil
+		metadata.EmittedAtCursor = emittedIDs
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
@@ -209,7 +210,7 @@ func (t *OnPageAdded) pollPages(ctx core.TriggerHookContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	documents, err := changedPages(client, config.Database, polledUntil)
+	documents, err := changedPages(client, config.Database, polledUntil, metadata.EmittedAtCursor)
 	if err != nil {
 		//
 		// A failed read must not fail the request: the request is retried at
@@ -238,7 +239,13 @@ func emitChangedPages(
 	// goes: a page that fails leaves the cursor behind it, and a burst larger
 	// than one poll can read is caught up over several polls.
 	//
+	// The cursor is a (time, ids) pair: PolledUntil and the ids of the pages
+	// already emitted at that exact minute. Notion reports created_time only to
+	// the minute, so the ids are what tell an unread page sharing an emitted
+	// page's minute from a page that was already handled.
+	//
 	cursor := polledUntil
+	emittedAtCursor := append([]string{}, metadata.EmittedAtCursor...)
 	for _, document := range documents {
 		createdAt, ok := pageTime(document, "created_time")
 		if !ok {
@@ -249,8 +256,9 @@ func emitChangedPages(
 		if err != nil {
 			//
 			// Stop at the first page whose content could not be read and
-			// keep the cursor behind it, so the next poll starts from there
-			// instead of skipping it.
+			// keep the cursor behind it, so the next poll re-reads from there
+			// instead of skipping it. Its minute is left in the cursor, and its
+			// id is not recorded, so the re-read finds it again.
 			//
 			ctx.Logger.Errorf("Error reading the content of Notion page %v: %v", document["id"], err)
 			break
@@ -261,17 +269,33 @@ func emitChangedPages(
 			break
 		}
 
-		if createdAt.After(cursor) {
+		id, _ := document["id"].(string)
+		switch {
+		case createdAt.After(cursor):
+			//
+			// A newer minute: the pages at the old minute are now strictly
+			// behind the cursor, so only this page's id has to be remembered.
+			//
 			cursor = createdAt
+			emittedAtCursor = []string{id}
+		case createdAt.Equal(cursor):
+			emittedAtCursor = append(emittedAtCursor, id)
 		}
 	}
 
-	if !cursor.After(polledUntil) {
-		return nil
+	//
+	// Persist when the cursor moved to a newer minute, or when it stayed on the
+	// same minute but gained an id - the second case is how an overflow or a
+	// retried page at the boundary minute is recorded without losing the pages
+	// already handled there.
+	//
+	if cursor.After(polledUntil) || len(emittedAtCursor) != len(metadata.EmittedAtCursor) {
+		metadata.PolledUntil = formatPageTime(cursor)
+		metadata.EmittedAtCursor = emittedAtCursor
+		return ctx.Metadata.Set(metadata)
 	}
 
-	metadata.PolledUntil = formatPageTime(cursor)
-	return ctx.Metadata.Set(metadata)
+	return nil
 }
 
 // BuildPageEvent maps a page the way an intake reads it: every field Notion
@@ -295,31 +319,45 @@ func BuildPageEvent(client *Client, document map[string]any) (map[string]any, er
 	return page, nil
 }
 
-// changedPages reads the pages of the database created after polledUntil,
-// oldest first. Notion filters and sorts server-side, so a poll reads the
-// oldest unreported pages first and can advance its cursor page by page. When
-// more pages were added than one poll can read, the overflow stays newer than
-// the advanced cursor and is caught up by the next poll instead of skipped.
-func changedPages(client *Client, databaseID string, polledUntil time.Time) ([]map[string]any, error) {
+// changedPages reads the pages of the database created at or after polledUntil,
+// oldest first, and drops the ones already handled. Notion filters and sorts
+// server-side, so a poll reads the oldest unreported pages first and can advance
+// its cursor page by page. The cursor's own minute is re-read (on_or_after) and
+// the pages already emitted at that minute are dropped by id, so a page sharing
+// an emitted page's minute is caught up rather than skipped. When more pages
+// were added than one poll can read, the overflow stays no older than the
+// advanced cursor and is caught up by the next poll instead of skipped.
+func changedPages(client *Client, databaseID string, polledUntil time.Time, emittedAtCursor []string) ([]map[string]any, error) {
+	handled := make(map[string]bool, len(emittedAtCursor))
+	for _, id := range emittedAtCursor {
+		handled[id] = true
+	}
+
 	changed := []map[string]any{}
 	cursor := ""
-	createdAfter := formatPageTime(polledUntil)
+	createdOnOrAfter := formatPageTime(polledUntil)
 
 	for page := 1; page <= maxPollPages; page++ {
-		documents, hasMore, nextCursor, err := client.ListChangedPageDocuments(databaseID, cursor, createdAfter, pollPageSize)
+		documents, hasMore, nextCursor, err := client.ListChangedPageDocuments(databaseID, cursor, createdOnOrAfter, pollPageSize)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, document := range documents {
 			//
-			// Notion has already filtered to pages created after the cursor.
-			// A page whose timestamp cannot be read is skipped rather than
+			// Notion has already filtered to the cursor's minute and later. A
+			// page whose timestamp cannot be read is skipped rather than
 			// stopping the walk, so one odd page does not hide the pages after
-			// it.
+			// it. Pages strictly older than the cursor are dropped defensively,
+			// and pages already emitted at the cursor's minute are dropped by id
+			// so the re-read of that minute does not report them again.
 			//
 			createdAt, ok := pageTime(document, "created_time")
-			if !ok || !createdAt.After(polledUntil) {
+			if !ok || createdAt.Before(polledUntil) {
+				continue
+			}
+
+			if id, _ := document["id"].(string); handled[id] {
 				continue
 			}
 
@@ -335,24 +373,43 @@ func changedPages(client *Client, databaseID string, polledUntil time.Time) ([]m
 	return changed, nil
 }
 
-// newestPageChange reports the creation time of the newest page the database
-// already carries, or the current time when it has no pages to read.
-func newestPageChange(client *Client, databaseID string) (string, error) {
-	documents, err := client.ListNewestPages(databaseID, 1)
+// newestPageBoundary reports the creation time of the newest page the database
+// already carries, together with the ids of every page sharing that exact
+// minute, or the current time and no ids when it has no pages to read. Setup
+// records these so the first poll re-reads the boundary minute (on_or_after)
+// without re-emitting pages that already existed when the trigger was added.
+func newestPageBoundary(client *Client, databaseID string) (string, []string, error) {
+	documents, err := client.ListNewestPages(databaseID, pollPageSize)
 	if err != nil {
-		return "", fmt.Errorf("error reading the pages of database %s: %v", databaseID, err)
+		return "", nil, fmt.Errorf("error reading the pages of database %s: %v", databaseID, err)
 	}
 
 	if len(documents) == 0 {
-		return formatPageTime(time.Now()), nil
+		return formatPageTime(time.Now()), nil, nil
 	}
 
-	createdAt, ok := pageTime(documents[0], "created_time")
+	newest, ok := pageTime(documents[0], "created_time")
 	if !ok {
-		return formatPageTime(time.Now()), nil
+		return formatPageTime(time.Now()), nil, nil
 	}
 
-	return formatPageTime(createdAt), nil
+	//
+	// The pages arrive newest first, so every page sharing the newest minute is
+	// at the front of the list. Recording their ids keeps the first poll from
+	// reporting a page that already existed as if it had just been added.
+	//
+	ids := []string{}
+	for _, document := range documents {
+		createdAt, ok := pageTime(document, "created_time")
+		if !ok || !createdAt.Equal(newest) {
+			break
+		}
+		if id, _ := document["id"].(string); id != "" {
+			ids = append(ids, id)
+		}
+	}
+
+	return formatPageTime(newest), ids, nil
 }
 
 // pageTime reads one of a page's timestamp attributes.

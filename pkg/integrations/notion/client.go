@@ -245,10 +245,13 @@ type queryOptions struct {
 	// single poll can read.
 	oldestFirst bool
 
-	// createdAfter, when set, asks Notion to return only pages created strictly
+	// createdOnOrAfter, when set, asks Notion to return only pages created at or
 	// after this RFC3339 timestamp. Filtering server-side keeps a poll bounded
-	// to the pages that are actually new.
-	createdAfter string
+	// to the pages that are actually new. The cursor's own minute is included
+	// (on_or_after, not after) so a page sharing an emitted page's minute is
+	// re-read and can be caught up rather than skipped; the poll then drops the
+	// pages it already handled by id.
+	createdOnOrAfter string
 }
 
 // queryDatabase reads one page of a database's pages, newest created first by
@@ -266,10 +269,10 @@ func (c *Client) queryDatabase(databaseID string, options queryOptions) ([]map[s
 	if options.startCursor != "" {
 		body["start_cursor"] = options.startCursor
 	}
-	if options.createdAfter != "" {
+	if options.createdOnOrAfter != "" {
 		body["filter"] = map[string]any{
 			"timestamp":          sortTimestampCreated,
-			sortTimestampCreated: map[string]any{"after": options.createdAfter},
+			sortTimestampCreated: map[string]any{"on_or_after": options.createdOnOrAfter},
 		}
 	}
 
@@ -298,16 +301,16 @@ func (c *Client) ListNewestPages(databaseID string, limit int) ([]map[string]any
 	return results, err
 }
 
-// ListChangedPageDocuments returns one page of the database's pages created
-// after createdAfter, oldest created first, starting at cursor. The onPageAdded
-// trigger walks these oldest first so a burst larger than one poll can read is
-// caught up over several polls instead of skipping the overflow.
-func (c *Client) ListChangedPageDocuments(databaseID, cursor, createdAfter string, pageSize int) ([]map[string]any, bool, string, error) {
+// ListChangedPageDocuments returns one page of the database's pages created at
+// or after createdOnOrAfter, oldest created first, starting at cursor. The
+// onPageAdded trigger walks these oldest first so a burst larger than one poll
+// can read is caught up over several polls instead of skipping the overflow.
+func (c *Client) ListChangedPageDocuments(databaseID, cursor, createdOnOrAfter string, pageSize int) ([]map[string]any, bool, string, error) {
 	return c.queryDatabase(databaseID, queryOptions{
-		startCursor:  cursor,
-		pageSize:     pageSize,
-		oldestFirst:  true,
-		createdAfter: createdAfter,
+		startCursor:      cursor,
+		pageSize:         pageSize,
+		oldestFirst:      true,
+		createdOnOrAfter: createdOnOrAfter,
 	})
 }
 
