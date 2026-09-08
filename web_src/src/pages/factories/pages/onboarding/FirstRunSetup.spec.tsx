@@ -82,6 +82,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     refreshGithubConnections: vi.fn().mockResolvedValue(undefined),
+    githubConnectionsLoading: false,
     requestPrivateGitHubConnect: vi.fn(),
     offersPrivateGitHubAppSetup: false,
     createVcsConnection: vi.fn(),
@@ -254,6 +255,78 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
+  });
+
+  // Get started always opens the Connect GitHub page, even when picker data
+  // exists. The user picks the GitHub account on every forward pass, because
+  // many people stay signed in to two GitHub accounts.
+  it("opens the Connect GitHub page from Get started even when picker data exists", async () => {
+    const user = userEvent.setup();
+
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup");
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-get-started"));
+
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+  });
+
+  // Back walks the exact pages in reverse order: account picker, Connect
+  // GitHub page, welcome.
+  it("walks back from the picker to the Connect GitHub page and then to welcome", async () => {
+    const user = userEvent.setup();
+
+    renderSetup(boundConnectionModel(vi.fn().mockResolvedValue(true)), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+
+    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-back"));
+
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+  });
+
+  it("reopens the account picker when the user goes back from the repository screen", async () => {
+    const user = userEvent.setup();
+    const selectVcsConnection = vi.fn().mockResolvedValue(true);
+    bindMutate.mockImplementation((_vars: unknown, options: { onSuccess?: () => void }) => {
+      options.onSuccess?.();
+    });
+
+    renderSetup(boundConnectionModel(selectVcsConnection), "/org-1/workspaces/PAY/setup?step=vcs");
+
+    await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("octo") }));
+    expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("first-run-back"));
+    expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
+  });
+
+  // A GitHub round trip reloads the page, so the picker data arrives after
+  // the first render. The screen must not flash the connect button first.
+  it("shows a placeholder on the connect screen while the connection list loads", () => {
+    renderSetup(
+      pageModel({ openSection: "vcs", githubConnectionsLoading: true }),
+      "/org-1/workspaces/PAY/setup?step=vcs",
+    );
+
+    expect(screen.getByTestId("first-run-connect-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
+  // A refresh of the repository list must not show cached repositories from
+  // an earlier connection while the fresh list loads.
+  it("shows a placeholder on the repository screen while the list refreshes", () => {
+    renderSetup(
+      pageModel({ openSection: "repo", repositories: ["octo/stale-repo"], repositoriesLoading: true }),
+      "/org-1/workspaces/PAY/setup?step=repo",
+    );
+
+    expect(screen.getByTestId("first-run-repositories-loading")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
   });
 
   it("moves the bound connection to another account through the picker", async () => {

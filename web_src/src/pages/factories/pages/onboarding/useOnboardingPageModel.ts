@@ -199,7 +199,9 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   return {
     githubIntegration,
     repositories,
-    repositoriesLoading: resources.isLoading,
+    // `isFetching` also covers refetches after an edit of the GitHub
+    // connection, so the screen shows a placeholder instead of a stale list.
+    repositoriesLoading: resources.isFetching,
     repositoriesError: resources.error,
   };
 }
@@ -304,12 +306,10 @@ function useOnboardingGithubConnectionsForPage(args: {
   return useOnboardingGithubConnections({
     integrationData: args.integrationData,
     openSection: args.openSection,
+    // Only the `pick=newest` round trip auto-selects. Every other path,
+    // including an install request approved outside the round trip, shows
+    // the account picker and waits for the user to select the account.
     selectNewest,
-    // An install request approved on GitHub binds the connection outside the
-    // wizard round trip, so the `pick=newest` hint is gone when the user
-    // returns. Initial onboarding still selects the single ready connection,
-    // which also names the organization after the GitHub account.
-    selectSingleInitial: args.factory?.onboarding?.initial === true,
     selections: args.selections,
     selectInstance: args.selectInstance,
     onConnectionSelected,
@@ -472,6 +472,7 @@ export function useOnboardingPageModel(args: {
     // The connect screen refetches on open, so the picker never shows a
     // stale connection list.
     refreshGithubConnections: connect.refetchConnections,
+    githubConnectionsLoading: connect.connectionsLoading,
     requestPrivateGitHubConnect: connect.requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: connect.offersPrivateGitHubAppSetup,
     createVcsConnection: () => connect.createNew("github"),

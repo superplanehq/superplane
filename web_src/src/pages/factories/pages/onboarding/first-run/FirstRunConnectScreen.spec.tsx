@@ -183,6 +183,17 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByTestId("first-run-github-use-octo")).toBeDisabled();
   });
 
+  // A GitHub round trip reloads the page, so the picker data arrives after
+  // the first render. The placeholder keeps the screen from flashing the
+  // connect button before the picker.
+  it("shows a placeholder instead of the connect button while loading", () => {
+    render(<FirstRunConnectScreen loading onConnectGitHub={vi.fn()} />);
+
+    expect(screen.getByTestId("first-run-connect-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
+  });
+
   it("never shows a connected state; the picker or the connect button always shows", () => {
     render(<FirstRunConnectScreen onConnectGitHub={vi.fn()} />);
 

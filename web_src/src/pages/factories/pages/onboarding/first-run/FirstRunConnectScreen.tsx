@@ -114,6 +114,7 @@ function connectScreenState({
 }
 
 export function FirstRunConnectScreen({
+  loading = false,
   installRequested = false,
   githubOrganization = "",
   pendingInstallations = [],
@@ -125,6 +126,8 @@ export function FirstRunConnectScreen({
   onConnectGitHub,
   onUseInstallation,
 }: {
+  /** True while the picker data still loads after a GitHub round trip. */
+  loading?: boolean;
   installRequested?: boolean;
   githubOrganization?: string;
   pendingInstallations?: PendingGitHubInstallation[];
@@ -150,21 +153,38 @@ export function FirstRunConnectScreen({
       </FirstRunHeading>
 
       <div className="mt-8 space-y-3">
-        <ConnectScreenBody
-          githubOrganization={githubOrganization}
-          pendingInstallations={pendingInstallations}
-          githubState={githubState}
-          githubAppSlug={githubAppSlug}
-          bindingInstallationId={bindingInstallationId}
-          showAccountPicker={showAccountPicker}
-          waitingForApproval={waitingForApproval}
-          onConnectGitHub={onConnectGitHub}
-          onUseInstallation={onUseInstallation}
-        />
+        {loading ? (
+          <ConnectScreenLoading />
+        ) : (
+          <ConnectScreenBody
+            githubOrganization={githubOrganization}
+            pendingInstallations={pendingInstallations}
+            githubState={githubState}
+            githubAppSlug={githubAppSlug}
+            bindingInstallationId={bindingInstallationId}
+            showAccountPicker={showAccountPicker}
+            waitingForApproval={waitingForApproval}
+            onConnectGitHub={onConnectGitHub}
+            onUseInstallation={onUseInstallation}
+          />
+        )}
         <p className="text-[13px] text-muted-foreground">{copy.trust}</p>
         {connectError && !waitingForApproval ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>
     </FirstRunShell>
+  );
+}
+
+/**
+ * Placeholder while the picker data loads after a GitHub round trip, so the
+ * screen does not flash the connect button before the picker.
+ */
+function ConnectScreenLoading() {
+  return (
+    <div className="space-y-3" data-testid="first-run-connect-loading" aria-hidden>
+      <div className="h-14 animate-pulse rounded-md bg-accent/40" />
+      <div className="h-9 w-40 animate-pulse rounded-md bg-accent/40" />
+    </div>
   );
 }
 

@@ -73,7 +73,11 @@ export function useIntegrationConnectDialog({
   manualSelectionNames?: readonly string[];
 }) {
   const { data: me, isError: meFailed, isSuccess: meLoaded } = useMe(true, organizationId);
-  const { data: connected = [], refetch } = useConnectedIntegrations(organizationId, {
+  const {
+    data: connected = [],
+    refetch,
+    isLoading: connectionsLoading,
+  } = useConnectedIntegrations(organizationId, {
     enabled: !!organizationId,
   });
   const { data: availableIntegrations = [] } = useAvailableIntegrations({
@@ -105,6 +109,7 @@ export function useIntegrationConnectDialog({
     selections,
     onSelectionsChange,
     manualSelectionNames,
+    loading: connectionsLoading,
   });
   useRefetchOnWindowFocus(refetch);
 
@@ -243,6 +248,8 @@ export function useIntegrationConnectDialog({
 
   return {
     integrationData,
+    /** True while the first load of the connected list is in flight. */
+    connectionsLoading,
     /** Refetches the connected list, for screens that must not show a stale cache. */
     refetchConnections: refetch,
     requestConnect,

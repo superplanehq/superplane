@@ -260,6 +260,14 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 }
 
 func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.HostedApp, metadata common.Metadata) {
+	// The OAuth callback removes the browser action once installations load,
+	// so the connect screen keeps the authorize URL from metadata to ask
+	// again which GitHub account to use.
+	oauthEnabled := app.UserOAuthEnabled() && ctx.BaseURL != ""
+	if oauthEnabled {
+		metadata.AuthorizeURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	}
+
 	if len(metadata.PendingInstallations) >= 1 {
 		ctx.Integration.SetMetadata(metadata)
 		return
@@ -267,8 +275,8 @@ func (g *GitHub) refreshHostedPendingAction(ctx core.SyncContext, app common.Hos
 
 	actionURL := common.HostedAppInstallURL(app.Slug, metadata.State)
 	description := hostedInstallDescription
-	if app.UserOAuthEnabled() && ctx.BaseURL != "" && len(metadata.PendingInstallations) == 0 {
-		actionURL = common.HostedAppAuthorizeURL(app.ClientID, common.HostedAppOAuthCallbackURL(ctx.BaseURL), metadata.State)
+	if oauthEnabled {
+		actionURL = metadata.AuthorizeURL
 		description = hostedOAuthDescription
 	}
 

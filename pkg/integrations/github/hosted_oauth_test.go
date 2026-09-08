@@ -38,6 +38,7 @@ func Test__Sync_hostedUserOAuth(t *testing.T) {
 	assert.Contains(t, integrationCtx.BrowserAction.URL, "redirect_uri=")
 	assert.NotContains(t, integrationCtx.BrowserAction.URL, "/app/installations")
 	assert.NotContains(t, integrationCtx.BrowserAction.URL, "installations/new")
+	assert.Equal(t, integrationCtx.BrowserAction.URL, integrationCtx.Metadata.(common.Metadata).AuthorizeURL)
 }
 
 func Test__exchangeGitHubUserOAuthToken(t *testing.T) {
@@ -553,6 +554,10 @@ func Test__Sync_hostedAppKeepsPendingMetadata(t *testing.T) {
 	assert.Equal(t, "/onboarding?attempt=new&step=vcs", metadata.SetupReturnPath)
 	require.Len(t, metadata.PendingInstallations, 2)
 	assert.Nil(t, integrationCtx.BrowserAction)
+	// The picker page has no browser action, so the connect screen re-asks
+	// the GitHub account through the authorize URL kept in metadata.
+	assert.Contains(t, metadata.AuthorizeURL, "https://github.com/login/oauth/authorize?")
+	assert.Contains(t, metadata.AuthorizeURL, "state=csrf-keep")
 }
 
 func Test__Sync_hostedAppOffersApprovedInstallInPicker(t *testing.T) {

@@ -11,7 +11,11 @@ import {
 } from "@/lib/hostedGitHubInstall";
 import { useBindGitHubInstallation } from "@/hooks/useBindGitHubInstallation";
 import { useRecheckGitHubInstallRequest } from "@/hooks/useRecheckGitHubInstallRequest";
-import { githubAccountPickerFromConnection, pendingGitHubAccountPicker } from "@/lib/startDirectGitHubConnect";
+import {
+  githubAccountPickerFromConnection,
+  pendingGitHubAccountPicker,
+  type PendingGitHubAccountPicker,
+} from "@/lib/startDirectGitHubConnect";
 import {
   GITHUB_SETUP_ORG_PARAM,
   GITHUB_SETUP_REQUEST_PARAM,
@@ -65,11 +69,11 @@ const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
 };
 
 // The reverse path walks the exact screens in reverse order, back to the
-// welcome screen. The connect screen asks for the GitHub account again on
-// the next forward pass.
+// welcome screen. The connect screen has two pages (the Connect GitHub page
+// and the account picker), so `backActionFor` in FirstRunSetup handles the
+// connect and choose screens itself.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
   connect: "welcome",
-  choose: "connect",
   tickets: "choose",
   agent: "tickets",
 };
@@ -145,6 +149,29 @@ function useFreshConnectionsOnConnectScreen(screen: FirstRunScreen, refresh: () 
   }, [screen, refresh]);
 }
 
+/**
+ * The connect step is two pages: the Connect GitHub page with the connect
+ * button, and the account picker. Get started always opens the connect
+ * button page; only a GitHub round trip (or Back from the repository screen)
+ * opens the picker. So the user picks the GitHub account on every forward
+ * pass, and Back walks repository, picker, connect, welcome in order.
+ */
+function useConnectStage(
+  startOnPicker: boolean,
+  accountPicker: PendingGitHubAccountPicker | undefined,
+  sourcesLoading: boolean,
+) {
+  const [pickerOpen, setPickerOpen] = useState(startOnPicker);
+  return {
+    pickerShowing: pickerOpen && Boolean(accountPicker),
+    // A GitHub round trip reloads the page, so the picker data arrives after
+    // the first render. The screen shows a placeholder until the connection
+    // list settles, instead of flashing the connect button first.
+    pickerLoading: pickerOpen && !accountPicker && sourcesLoading,
+    setPickerOpen,
+  };
+}
+
 /** Reports a failed repository list, which the choose screen shows as empty. */
 function useRepositoryErrorToast(error: unknown) {
   const reported = useRef<unknown>(null);
@@ -203,7 +230,7 @@ function AgentScreen({
  */
 function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId } = useFactoriesLayout();
-  const { data: me } = useMe(true, organizationId);
+  const { data: me, isPending: meLoading } = useMe(true, organizationId);
   const [searchParams] = useSearchParams();
   const setup = model.setup;
   const setOpenSection = model.setOpenSection;
@@ -230,7 +257,29 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setOpenedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const goToScreen = (next: FirstRunScreen) => {
+  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
+  // user. The /account id is the account, so a match would hide the picker.
+  // A bound connection keeps its picker data, so Back from the repository
+  // screen offers the accounts again instead of a dead connected state.
+  const selectedConnection = model.githubConnections.readyInstances.find(
+    (instance) => instance.metadata?.id === model.selectedVcsConnectionId,
+  );
+  const accountPicker =
+    pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
+    githubAccountPickerFromConnection(selectedConnection, me?.id);
+
+  // Only a GitHub round trip or a waiting install request lands on the
+  // account picker page. A fresh pass opens the Connect GitHub page.
+  const stage = useConnectStage(
+    searchParams.get("step") === "vcs" || searchParams.get(GITHUB_SETUP_REQUEST_PARAM) === GITHUB_SETUP_REQUEST_VALUE,
+    accountPicker,
+    meLoading || model.githubConnectionsLoading,
+  );
+
+  const goToScreen = (next: FirstRunScreen, connectStage: "button" | "picker" = "button") => {
+    if (next === "connect") {
+      stage.setPickerOpen(connectStage === "picker");
+    }
     const step = STEP_FOR_SCREEN[next];
     if (step) {
       // Keeps the provider return URL on the step the user is answering.
@@ -287,17 +336,6 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
       .map((instance) => hostedGitHubInstallRequestedAccount(instance.status?.metadata))
       .find((account) => account !== "") ||
     "";
-  // Pass the /me user id, not account.id. startedByUserID is the SuperPlane
-  // user. The /account id is the account, so a match would hide the picker.
-  // A bound connection keeps its picker data, so Back from the repository
-  // screen offers the accounts again instead of a dead connected state.
-  const selectedConnection = model.githubConnections.readyInstances.find(
-    (instance) => instance.metadata?.id === model.selectedVcsConnectionId,
-  );
-  const accountPicker =
-    pendingGitHubAccountPicker(model.githubConnections.allInstances, me?.id) ??
-    githubAccountPickerFromConnection(selectedConnection, me?.id);
-
   // Binding through a page redirect reloads the whole app and walks the user
   // through the connect screen again. Binding in place opens the repository
   // screen directly once the connection is ready.
@@ -334,12 +372,45 @@ function useFirstRunSetupFlow(model: OnboardingPageModel) {
     installRequested,
     githubOrganization,
     accountPicker,
+    pickerShowing: stage.pickerShowing,
+    pickerLoading: stage.pickerLoading,
+    closePicker: () => stage.setPickerOpen(false),
     bindingInstallationId: bindInstallation.isPending ? bindInstallation.variables?.installationId : undefined,
     useInstallation,
     goToScreen,
     continueFromRepository,
     continueFromTickets,
     selectTicketSource,
+  };
+}
+
+type FirstRunFlow = ReturnType<typeof useFirstRunSetupFlow>;
+
+/**
+ * Back walks the exact screens in reverse order: repository, account picker,
+ * Connect GitHub, welcome. The picker is a page of the connect screen, so
+ * Back on the picker closes it instead of changing screens.
+ */
+function backActionFor(target: FirstRunScreen, flow: FirstRunFlow): (() => void) | undefined {
+  if (target === "connect" && flow.pickerShowing) {
+    return flow.closePicker;
+  }
+  if (target === "choose") {
+    return () => flow.goToScreen("connect", "picker");
+  }
+  const backScreen = BACK_SCREEN[target];
+  return backScreen ? () => flow.goToScreen(backScreen) : undefined;
+}
+
+/** Picker data for the connect screen. The Connect GitHub page passes none. */
+function pickerPropsFor(flow: FirstRunFlow) {
+  if (!flow.pickerShowing) {
+    return {};
+  }
+  return {
+    pendingInstallations: flow.accountPicker?.installations,
+    githubState: flow.accountPicker?.state,
+    githubAppSlug: flow.accountPicker?.appSlug,
   };
 }
 
@@ -367,7 +438,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const canSwitchOrganization = hasOtherWorkspace || otherOrganizations.length > 0;
 
   const chromeFor = (target: FirstRunScreen): FirstRunChrome => {
-    const backScreen = BACK_SCREEN[target];
     return {
       displayName: firstNameOf(account?.name),
       email: account?.email,
@@ -375,7 +445,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       organizationSwitch: canSwitchOrganization ? { currentOrganizationRouteId: organizationId } : undefined,
       stepIndex: STEP_INDEX_FOR_SCREEN[target],
       stepCount: flow.skipAgentScreen ? FIRST_RUN_STEP_COUNT - 1 : FIRST_RUN_STEP_COUNT,
-      onBack: backScreen ? () => flow.goToScreen(backScreen) : undefined,
+      onBack: backActionFor(target, flow),
     };
   };
 
@@ -392,11 +462,10 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   if (flow.screen === "connect") {
     return (
       <FirstRunConnectScreen
+        loading={flow.pickerLoading}
         installRequested={flow.installRequested}
         githubOrganization={flow.githubOrganization}
-        pendingInstallations={flow.accountPicker?.installations}
-        githubState={flow.accountPicker?.state}
-        githubAppSlug={flow.accountPicker?.appSlug}
+        {...pickerPropsFor(flow)}
         bindingInstallationId={flow.bindingInstallationId}
         chrome={chromeFor("connect")}
         onConnectGitHub={() => model.requestConnect("github")}
@@ -410,6 +479,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunChooseScreen
         repositories={model.repositories}
         selectedRepository={setup.selectedRepo}
+        loading={model.repositoriesLoading}
         chrome={chromeFor("choose")}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}

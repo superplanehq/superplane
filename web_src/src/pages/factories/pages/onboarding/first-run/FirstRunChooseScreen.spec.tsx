@@ -82,6 +82,25 @@ describe("FirstRunChooseScreen", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  // A refresh after an edit of the GitHub connection must not show the old
+  // cached repositories. The screen shows a placeholder until the list loads.
+  it("shows a placeholder instead of stale repositories while loading", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["octo/stale-repo"]}
+        selectedRepository={null}
+        loading
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-repositories-loading")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
   it("disables continue until a repository is selected", () => {
     render(
       <FirstRunChooseScreen

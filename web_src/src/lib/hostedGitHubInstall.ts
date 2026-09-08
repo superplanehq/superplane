@@ -66,6 +66,20 @@ export function hostedGitHubState(metadata: unknown): string {
   return typeof state === "string" ? state : "";
 }
 
+/**
+ * The GitHub user OAuth authorize URL stored on the connection. The OAuth
+ * callback removes the browser action, so a repeat Connect click uses this
+ * URL to ask again which GitHub account to use.
+ */
+export function hostedGitHubAuthorizeURL(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const url = (metadata as { authorizeURL?: unknown }).authorizeURL;
+  return typeof url === "string" ? url : "";
+}
+
 export function hostedGitHubAppSlug(metadata: unknown): string {
   if (!metadata || typeof metadata !== "object") {
     return "";

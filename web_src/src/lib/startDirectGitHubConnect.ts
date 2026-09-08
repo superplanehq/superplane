@@ -9,6 +9,7 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   hostedGitHubAppSlug,
+  hostedGitHubAuthorizeURL,
   hostedGitHubState,
   pendingGitHubInstallations,
   type PendingGitHubInstallation,
@@ -24,6 +25,8 @@ export type PendingGitHubAccountPicker = {
   installations: PendingGitHubInstallation[];
   state: string;
   appSlug: string;
+  /** GitHub OAuth authorize URL, to ask again which account to use. */
+  authorizeUrl: string;
 };
 
 function startedByUserID(item: OrganizationsIntegration): string {
@@ -95,6 +98,7 @@ export function pendingGitHubAccountPicker(
     installations: pendingGitHubInstallations(pending.status?.metadata),
     state: hostedGitHubState(pending.status?.metadata),
     appSlug: hostedGitHubAppSlug(pending.status?.metadata),
+    authorizeUrl: hostedGitHubAuthorizeURL(pending.status?.metadata),
   };
 }
 
@@ -125,6 +129,7 @@ export function githubAccountPickerFromConnection(
     installations,
     state,
     appSlug: hostedGitHubAppSlug(connection.status?.metadata),
+    authorizeUrl: hostedGitHubAuthorizeURL(connection.status?.metadata),
   };
 }
 
@@ -197,7 +202,14 @@ async function resumePendingGitHubConnect(args: StartDirectGitHubConnectArgs): P
   if (picker) {
     rememberIntegrationSetupReturn(args.organizationId, args.returnTo);
     if (isOnboardingSetupReturnPath(args.returnTo)) {
-      return true;
+      // Onboarding asks again which GitHub account to use on every Connect
+      // click, so the click goes to GitHub authorization instead of the
+      // stored picker. Without a stored authorize URL the flow falls
+      // through and starts a fresh connect, which also opens authorization.
+      if (picker.authorizeUrl) {
+        return followBrowserAction({ method: "GET", url: picker.authorizeUrl });
+      }
+      return false;
     }
 
     const path = githubInstallPickerPath(args.organizationId, picker.id, args.integrationsBasePath);

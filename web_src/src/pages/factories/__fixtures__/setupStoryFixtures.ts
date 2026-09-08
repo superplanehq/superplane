@@ -30,6 +30,27 @@ export const CONNECTED_SETUP_INTEGRATIONS: StorybookOrgIntegration[] = [
   readyConnection("claude", CLAUDE_CONNECTION_ID, "acme-claude"),
 ];
 
+/**
+ * A GitHub connect the storybook user just authorized on GitHub: still
+ * pending, with the account picker data the OAuth callback stored.
+ */
+export const PENDING_PICKER_INTEGRATION: StorybookOrgIntegration = {
+  metadata: { id: "storybook-github-pending", name: "github-2", integrationName: "github" },
+  status: {
+    state: "pending",
+    metadata: {
+      startedByUserID: "storybook-user",
+      state: "csrf",
+      githubApp: { slug: "superplane" },
+      pendingInstallations: [
+        { id: "11", accountLogin: "forestigamer" },
+        { id: "22", accountLogin: "forestileao" },
+      ],
+    },
+  },
+  spec: { configuration: {} },
+};
+
 const vcsAnswered: FactoriesFactoryOnboarding = { vcsIntegrationId: GITHUB_CONNECTION_ID };
 const repositoryAnswered: FactoriesFactoryOnboarding = { ...vcsAnswered, appRepository: SETUP_APP_REPOSITORY };
 const issuesAnswered: FactoriesFactoryOnboarding = {
