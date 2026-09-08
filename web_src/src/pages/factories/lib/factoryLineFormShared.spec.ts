@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  attachCanvasToLineStep,
   setParallelismLabel,
   clampLineStepParallelism,
   DEFAULT_LINE_STEP_PARALLELISM,
@@ -37,5 +38,43 @@ describe("lineStepParallelism", () => {
 
     expect(steps[0]?.maxParallelism).toBe(20);
     expect(steps[1]?.maxParallelism).toBe(4);
+  });
+});
+
+describe("attachCanvasToLineStep", () => {
+  it("sets the canvas on an empty originating step", () => {
+    const steps = attachCanvasToLineStep(
+      [{ type: "runApp" }, { type: "runApp", app: { app: "app-impl" } }],
+      0,
+      "app-new",
+    );
+
+    expect(steps).toEqual([
+      { type: "runApp", app: { app: "app-new", entrypoint: "" } },
+      { type: "runApp", app: { app: "app-impl", entrypoint: "" } },
+    ]);
+  });
+
+  it("inserts a new step after an originating step that already has a canvas", () => {
+    const steps = attachCanvasToLineStep(
+      [
+        { type: "runApp", app: { app: "app-impl", entrypoint: "start-impl" } },
+        { type: "runApp", app: { app: "app-verify", entrypoint: "start-verify" } },
+      ],
+      0,
+      "app-new",
+    );
+
+    expect(steps).toEqual([
+      { type: "runApp", app: { app: "app-impl", entrypoint: "start-impl" } },
+      { type: "runApp", app: { app: "app-new", entrypoint: "" } },
+      { type: "runApp", app: { app: "app-verify", entrypoint: "start-verify" } },
+    ]);
+  });
+
+  it("appends a step when the originating index is past the line", () => {
+    const steps = attachCanvasToLineStep([{ type: "runApp", app: { app: "app-impl" } }], 4, "app-new");
+
+    expect(steps.at(-1)).toEqual({ type: "runApp", app: { app: "app-new", entrypoint: "" } });
   });
 });

@@ -115,6 +115,7 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
   return {
     ...actual,
     useCanvas: () => ({ data: { spec: { nodes: [] } }, isPending: false, isError: false }),
+    useCreateCanvas: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useUpdateCanvasVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: vi.fn(), isPending: false }),
   };

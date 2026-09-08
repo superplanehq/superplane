@@ -12,6 +12,7 @@ import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
+  PRIMARY_FACTORY_ID,
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY,
   REFUND_LINE_HOTFIX_ID,
@@ -156,6 +157,7 @@ const useWorkOrderChecks = vi.hoisted(() =>
 );
 
 const useCanvasMock = vi.hoisted(() => vi.fn());
+const createCanvasMutateAsync = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
 
@@ -165,6 +167,7 @@ vi.mock("@/hooks/useCanvasData", async (importOriginal) => {
     ...actual,
     useCanvas: (organizationId: string, canvasId: string, options?: { enabled?: boolean }) =>
       useCanvasMock(organizationId, canvasId, options),
+    useCreateCanvas: () => ({ mutateAsync: createCanvasMutateAsync, isPending: false }),
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
   };
@@ -213,6 +216,7 @@ async function resetLinesBoardMocks() {
     }
     return canvasQuery(canvasWithoutAgent);
   });
+  createCanvasMutateAsync.mockReset().mockResolvedValue({ data: { canvas: { metadata: { id: "app-new" } } } });
   updateCanvasVersionMutateAsync.mockReset().mockResolvedValue({});
   commitCanvasStagingMutateAsync.mockReset().mockResolvedValue({});
 }
@@ -480,6 +484,43 @@ describe("LinesPage board", () => {
     );
     expect(screen.getByTestId("column-automations-popup")).toBeInTheDocument();
     expect(screen.getByTestId("column-automations-add")).toBeInTheDocument();
+  });
+
+  it("creates New Automation and opens the editor with the agent panel", async () => {
+    updateFactoryLineMutateAsync.mockResolvedValue({});
+    const user = userEvent.setup();
+    renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?automations=phase-0`);
+
+    await user.click(screen.getByTestId("column-automations-add"));
+
+    await waitFor(() => {
+      expect(createCanvasMutateAsync).toHaveBeenCalledWith({
+        name: "New Automation",
+        description: "",
+        factoryId: PRIMARY_FACTORY_ID,
+        method: "ui",
+      });
+    });
+    await waitFor(() => {
+      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
+        lineId: REFUND_LINE_PLAN_ID,
+        steps: [
+          { type: "runApp", app: { app: "app-refund-implementer", entrypoint: "start-implementation" } },
+          { type: "runApp", app: { app: "app-new", entrypoint: "" } },
+          { type: "runApp", app: { app: "app-refund-verifier", entrypoint: "start-verification" } },
+        ],
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        factoryAppConfigurePath("org-1", PRIMARY_FACTORY_KEY, "app-new", {
+          from: "lines",
+          lineId: REFUND_LINE_PLAN_ID,
+          agent: true,
+        }),
+      );
+    });
+    expect(screen.queryByTestId("add-column-automation-picker")).not.toBeInTheDocument();
   });
 
   it("opens the verify and done automations menus from the indicators", async () => {

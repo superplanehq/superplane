@@ -49,7 +49,7 @@ export type BacklogColumnProps = {
   onCloseAutomations?: () => void;
   onAddAutomation?: () => void;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  automationsLockOpen?: boolean;
+  addAutomationDisabled?: boolean;
 };
 
 export type BacklogIntakePanel = {
@@ -89,7 +89,7 @@ export function BacklogColumn({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
 }: BacklogColumnProps) {
   const surfaceClassName = lineBoardColumnLaneClassName(colorId);
   const atCapacity = size != null && orders.length >= size;
@@ -128,7 +128,7 @@ export function BacklogColumn({
             onCloseAutomations={onCloseAutomations}
             onAddAutomation={onAddAutomation}
             onAutomationRowAction={onAutomationRowAction}
-            automationsLockOpen={automationsLockOpen}
+            addAutomationDisabled={addAutomationDisabled}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
             colorId={colorId}
@@ -167,7 +167,7 @@ function BacklogColumnHeaderActions({
   onCloseAutomations,
   onAddAutomation,
   onAutomationRowAction,
-  automationsLockOpen,
+  addAutomationDisabled,
   onOpenSettings,
   onAddIntake,
   colorId,
@@ -181,7 +181,7 @@ function BacklogColumnHeaderActions({
   | "onCloseAutomations"
   | "onAddAutomation"
   | "onAutomationRowAction"
-  | "automationsLockOpen"
+  | "addAutomationDisabled"
   | "onOpenSettings"
   | "onAddIntake"
   | "colorId"
@@ -201,7 +201,7 @@ function BacklogColumnHeaderActions({
         onClose={onCloseAutomations}
         onAdd={onAddAutomation}
         onRowAction={onAutomationRowAction}
-        lockOpen={automationsLockOpen}
+        addDisabled={addAutomationDisabled}
         testId="lines-backlog-automations"
       />
       <ColumnLaneMenu

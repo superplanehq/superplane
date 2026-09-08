@@ -53,7 +53,7 @@ export function ColumnAutomationsHeaderSlot({
   onClose,
   onAdd,
   onRowAction,
-  lockOpen,
+  addDisabled,
   testId,
 }: {
   title: string;
@@ -64,7 +64,7 @@ export function ColumnAutomationsHeaderSlot({
   onClose?: () => void;
   onAdd?: () => void;
   onRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  lockOpen?: boolean;
+  addDisabled?: boolean;
   testId: string;
 }) {
   if (!onOpen || !onClose || !onAdd || !onRowAction || !automations) {
@@ -76,7 +76,7 @@ export function ColumnAutomationsHeaderSlot({
       columnKey={columnKey}
       automations={automations}
       open={open}
-      lockOpen={lockOpen}
+      addDisabled={addDisabled}
       onOpen={onOpen}
       onClose={onClose}
       onAdd={onAdd}

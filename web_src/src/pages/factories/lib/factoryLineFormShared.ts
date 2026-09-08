@@ -64,6 +64,26 @@ export function setParallelismLabel(parallelism: number): string {
   return `Set parallelism (${parallelism})`;
 }
 
+/** Bind a canvas to a line step. Empty steps receive the canvas. Occupied steps get a new step after them. */
+export function attachCanvasToLineStep(
+  steps: FactoryLineStep[] | undefined,
+  stepIndex: number,
+  canvasId: string,
+): FactoryLineStep[] {
+  const drafts = draftStepsFromLine(steps);
+  const current = drafts[stepIndex];
+  if (!current) {
+    drafts.push({ appId: canvasId, entrypoint: "", maxParallelism: "" });
+    return draftStepsToProto(drafts);
+  }
+  if (!current.appId.trim()) {
+    drafts[stepIndex] = { ...current, appId: canvasId };
+    return draftStepsToProto(drafts);
+  }
+  drafts.splice(stepIndex + 1, 0, { appId: canvasId, entrypoint: "", maxParallelism: "" });
+  return draftStepsToProto(drafts);
+}
+
 export function replaceLineStepParallelism(
   steps: FactoryLineStep[] | undefined,
   stepIndex: number,

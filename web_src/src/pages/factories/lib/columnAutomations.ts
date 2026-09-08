@@ -455,8 +455,8 @@ export function catalogEntryToAutomation(
 
 export const COLUMN_AUTOMATIONS_COPY = {
   menuLabel: "Automations",
-  addLabel: "Add automation",
-  addHint: "Choose a trigger and an action.",
+  addLabel: "New automation",
+  addHint: "Create a canvas and open the editor.",
   pickerTitle: "Add automation",
   pickerDescription: "Choose an automation for this column.",
   sourceTaken: "This automation is already configured.",

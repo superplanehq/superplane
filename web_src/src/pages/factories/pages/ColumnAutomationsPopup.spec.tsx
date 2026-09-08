@@ -66,6 +66,8 @@ describe("ColumnAutomationsPopup", () => {
       "On GitHub issue → Create a task in Backlog",
     );
     expect(screen.getByTestId("column-automations-divider")).toBeInTheDocument();
+    expect(screen.getByTestId("column-automations-add")).toHaveTextContent("New automation");
+    expect(screen.getByTestId("column-automations-add")).toHaveTextContent("Create a canvas and open the editor.");
     expect(screen.queryByRole("button", { name: "GitHub issues menu" })).not.toBeInTheDocument();
   });
 
@@ -90,7 +92,7 @@ describe("ColumnAutomationsPopup", () => {
     expect(screen.getByTestId("column-automation-row-intake-github")).not.toHaveTextContent("running");
   });
 
-  it("reports row click and Add automation", async () => {
+  it("reports row click and New automation", async () => {
     const user = userEvent.setup();
     const onAdd = vi.fn();
     const onRowAction = vi.fn();

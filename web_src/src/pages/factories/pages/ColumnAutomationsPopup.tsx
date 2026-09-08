@@ -13,7 +13,7 @@ import {
 
 export type ColumnAutomationRowAction = "settings" | "edit" | "disable" | "enable" | "remove";
 
-/** Same hover surface for an automation row and Add automation. */
+/** Same hover surface for an automation row and New automation. */
 const AUTOMATION_ITEM_CLASS =
   "flex w-full cursor-pointer items-start gap-3 rounded-md px-2.5 py-2.5 text-left hover:bg-accent";
 
@@ -26,8 +26,7 @@ interface ColumnAutomationsPopupProps {
   onRowAction: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
   open?: boolean;
   onOpen?: () => void;
-  /** Keep the menu open while another dialog (Add automation) is up. */
-  lockOpen?: boolean;
+  addDisabled?: boolean;
   trigger?: ReactNode;
 }
 
@@ -41,7 +40,7 @@ export function ColumnAutomationsPopup({
   onRowAction,
   open = true,
   onOpen,
-  lockOpen = false,
+  addDisabled = false,
   trigger,
 }: ColumnAutomationsPopupProps) {
   const title = `${columnTitle} automations`;
@@ -55,7 +54,7 @@ export function ColumnAutomationsPopup({
     <Popover
       open={menuOpen}
       onOpenChange={(next) => {
-        if (!next && lockOpen) {
+        if (!next && addDisabled) {
           return;
         }
         setMenuOpen(next);
@@ -106,8 +105,9 @@ export function ColumnAutomationsPopup({
         <button
           type="button"
           onClick={onAdd}
+          disabled={addDisabled}
           data-testid="column-automations-add"
-          className={cn(AUTOMATION_ITEM_CLASS, "mt-0.5")}
+          className={cn(AUTOMATION_ITEM_CLASS, "mt-0.5", addDisabled && "cursor-not-allowed opacity-60")}
         >
           <Plus className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="min-w-0">
