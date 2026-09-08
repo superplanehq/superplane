@@ -59,9 +59,38 @@ func TestRunSuperPlaneExecuteUsesNodeModelOverDefault(t *testing.T) {
 		Model:    "claude-sonnet-4-6",
 	}, core.HostedLLMAccess{
 		APIKey:        "sk-or",
-		AllowedModels: []string{"anthropic/claude-sonnet-4-6"},
+		AllowedModels: []string{"anthropic/claude-sonnet-4-6", "x-ai/grok-4.6"},
 	})
 	assert.Equal(t, "sk-or", requireEnvironmentValue(t, req.Environment, envOpenRouterAPIKey))
+	assert.Equal(t, "3600", requireEnvironmentValue(t, req.Environment, runner.EnvExecutionTimeoutSeconds))
+	modelsFile := requireTaskFile(t, req.Files, "openrouter_models.json")
+	assert.JSONEq(t, `["anthropic/claude-sonnet-4-6","x-ai/grok-4.6"]`, modelsFile.Content)
+	prepare := requireTaskFile(t, req.Files, "prepare.sh").Content
+	assert.Contains(t, prepare, "opencode CLI not found")
+	assert.NotContains(t, strings.Join(commandStrings(req.Commands), "\n"), " 128")
+}
+
+func TestBuildSuperPlaneBrokerTaskOpenRouterShipsPlanningMCP(t *testing.T) {
+	prompt := "hello"
+	spec := RunSuperPlaneSpec{
+		MachineType: testRunnerMachineType,
+		Steps: []runner.AgentStep{
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: &prompt},
+		},
+	}
+	_, files, err := buildSuperPlaneBrokerTask(
+		models.UsageProviderOpenRouter,
+		spec,
+		"anthropic/claude-sonnet-4-6",
+		"",
+		nil,
+		[]runner.BrokerEnvironmentVariable{{Name: runner.EnvSuperplanePlanningID, Value: "session-1"}},
+		[]string{"anthropic/claude-sonnet-4-6"},
+	)
+	require.NoError(t, err)
+	assert.True(t, hasTaskFile(files, "planning_session_mcp.js"))
+	assert.True(t, hasTaskFile(files, "mcp.json"))
+	assert.True(t, hasTaskFile(files, "openrouter_models.json"))
 }
 
 func TestRunSuperPlaneExecuteUsesNodeModelWhenDefaultIsMissing(t *testing.T) {
@@ -215,6 +244,25 @@ func hasTaskFile(files []runner.BrokerTaskFile, path string) bool {
 		}
 	}
 	return false
+}
+
+func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {
+	t.Helper()
+	for _, file := range files {
+		if file.Path == path {
+			return file
+		}
+	}
+	t.Fatalf("missing task file %q", path)
+	return runner.BrokerTaskFile{}
+}
+
+func commandStrings(commands []runner.BrokerCommand) []string {
+	out := make([]string, 0, len(commands))
+	for _, command := range commands {
+		out = append(out, command.Command)
+	}
+	return out
 }
 
 func TestRunSuperPlaneExecuteRejectsPrivateHostedBaseURL(t *testing.T) {
