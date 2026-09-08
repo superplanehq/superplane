@@ -132,6 +132,15 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:          "{{ root().data.data.attributes.title }}",
 		createDescription:    "{{ root().data.data.attributes.description }}",
 	},
+	models.FactoryIntakeSourceNotionPages: {
+		name:              "Notion pages",
+		description:       "Create a work order when a page is added to a Notion database.",
+		triggerComponent:  "notion.onPageAdded",
+		triggerName:       "On Page Added",
+		analysisSubject:   "Notion page",
+		createTitle:       "{{ root().data.data.title }}",
+		createDescription: "{{ root().data.data.content }}",
+	},
 }
 
 func intakeSourceByTriggerComponent(component string) (string, bool) {

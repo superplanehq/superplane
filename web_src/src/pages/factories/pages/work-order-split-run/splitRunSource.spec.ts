@@ -31,6 +31,12 @@ describe("sourceTicketLabel", () => {
   it("uses the task id alone for Productive.io, whose link holds an organization id", () => {
     expect(sourceTicketLabel("https://app.productive.io/48521/tasks/19976991")).toBe("#19976991");
   });
+
+  it("recovers the page title from a Notion page URL", () => {
+    expect(sourceTicketLabel("https://www.notion.so/Fix-payment-retries-8a1e6d2f8b0e4e9b9a3a3a6b2f9c9d10")).toBe(
+      "Fix payment retries",
+    );
+  });
 });
 
 describe("splitRunSourceForOrder", () => {
@@ -135,6 +141,15 @@ describe("splitRunSourceForOrder", () => {
         origin: { url: "https://app.productive.io/1-acme/tasks/task/19976991" },
       }),
     ).toEqual(expect.objectContaining({ kind: "intake", name: "Productive.io tasks" }));
+  });
+
+  it("names the Notion intake from a page link", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: { url: "https://www.notion.so/Fix-payment-retries-8a1e6d2f8b0e4e9b9a3a3a6b2f9c9d10" },
+      }),
+    ).toEqual(expect.objectContaining({ kind: "intake", name: "Notion pages" }));
   });
 
   it("uses the person and Created manually when a person opened the task", () => {

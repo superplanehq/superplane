@@ -1,4 +1,5 @@
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -39,6 +40,12 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Productive.io tasks",
     description: "Create tasks from Productive.io tasks.",
     iconSrc: productiveIcon,
+  },
+  {
+    id: "notion-pages",
+    name: "Notion pages",
+    description: "Create tasks from pages added to a Notion database.",
+    iconSrc: notionIcon,
   },
   {
     id: "improve-ci-runtime",

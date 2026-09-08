@@ -1,5 +1,6 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import notionIcon from "@/assets/icons/integrations/notion.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -22,6 +23,7 @@ export type SplitRunIntakeKind =
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
+  | "notion-pages"
   | "slack";
 
 export type SplitRunSource =
@@ -50,6 +52,7 @@ const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: s
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
   "pagerduty-incidents": { name: "PagerDuty incidents", iconSrc: pagerdutyIcon, iconAlt: "PagerDuty" },
   "productive-tasks": { name: "Productive.io tasks", iconSrc: productiveIcon, iconAlt: "Productive.io" },
+  "notion-pages": { name: "Notion pages", iconSrc: notionIcon, iconAlt: "Notion" },
   slack: { name: "Slack", iconSrc: slackIcon, iconAlt: "Slack" },
 };
 
@@ -59,6 +62,7 @@ const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: s
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
+  { pattern: /notion/i, kind: "notion-pages" },
 ];
 
 export function sourceTicketLabel(url: string): string {
@@ -75,6 +79,11 @@ export function sourceTicketLabel(url: string): string {
   // name. A number says nothing to a reader, so the task id stands alone.
   if (parsed.hostname.endsWith("productive.io")) {
     return id ? `#${id}` : parsed.hostname;
+  }
+  // Notion page URLs carry the title in the path, followed by the page id.
+  // The title reads better to a person than the id does.
+  if (parsed.hostname.endsWith("notion.so")) {
+    return notionPageTitle(parsed) ?? parsed.hostname;
   }
   const org = parsed.hostname.split(".")[0] ?? parsed.hostname;
   if (id) {
@@ -166,7 +175,23 @@ function intakeKindFromHref(href: string): SplitRunIntakeKind {
   if (host.includes("slack.com")) {
     return "slack";
   }
+  if (host.includes("notion.so")) {
+    return "notion-pages";
+  }
   return intakeKindFromLabel(host);
+}
+
+// notionPageTitle recovers the page title Notion embeds in a page URL's path,
+// which ends with the page id, optionally separated from the title by a
+// hyphen.
+function notionPageTitle(parsed: URL): string | undefined {
+  const slug = parsed.pathname.split("/").filter(Boolean).at(-1);
+  if (!slug) {
+    return undefined;
+  }
+  const withoutId = slug.replace(/-?[0-9a-fA-F]{32}$/, "");
+  const title = withoutId.replace(/-/g, " ").trim();
+  return title || undefined;
 }
 
 function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLookup): OrgUserDisplay {

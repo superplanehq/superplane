@@ -25,7 +25,11 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { cn } from "@/lib/utils";
-import { FEATURE_FACTORY_PRODUCTIVE_INTAKE, FEATURE_FACTORY_SENTRY_INTAKE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_NOTION_INTAKE,
+  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SENTRY_INTAKE,
+} from "@/lib/experimentalFeatures";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Clock, MoreHorizontal, Pencil, Plus } from "lucide-react";
@@ -139,6 +143,7 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import { PlanningReviewPopup } from "./PlanningReviewPopup";
+import { NotionIntakeSetupDialog } from "./NotionIntakeSetupDialog";
 import { ProductiveIntakeSetupDialog } from "./ProductiveIntakeSetupDialog";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
@@ -228,6 +233,7 @@ export function LinesPage() {
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
   const canAddSentryIntake = hasExperimentalFeature(FEATURE_FACTORY_SENTRY_INTAKE);
   const canAddProductiveIntake = hasExperimentalFeature(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+  const canAddNotionIntake = hasExperimentalFeature(FEATURE_FACTORY_NOTION_INTAKE);
   const addIntakeTemplates = useMemo(() => {
     const allowedIds = new Set(["github-issues"]);
     if (canAddSentryIntake) {
@@ -236,12 +242,16 @@ export function LinesPage() {
     if (canAddProductiveIntake) {
       allowedIds.add("productive-tasks");
     }
+    if (canAddNotionIntake) {
+      allowedIds.add("notion-pages");
+    }
     return ADD_INTAKE_TEMPLATES.filter((template) => allowedIds.has(template.id));
-  }, [canAddSentryIntake, canAddProductiveIntake]);
+  }, [canAddSentryIntake, canAddProductiveIntake, canAddNotionIntake]);
   // The menu entry only pays off once a source beyond the default GitHub issues is available.
-  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake;
+  const canAddIntakeFromMenu = canAddSentryIntake || canAddProductiveIntake || canAddNotionIntake;
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
+  const [notionIntakeSetupOpen, setNotionIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -360,6 +370,10 @@ export function LinesPage() {
       setProductiveIntakeSetupOpen(true);
       return;
     }
+    if (template.id === "notion-pages") {
+      setNotionIntakeSetupOpen(true);
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -435,6 +449,12 @@ export function LinesPage() {
         organizationId={organizationId}
         factoryId={factoryId}
         onClose={() => setProductiveIntakeSetupOpen(false)}
+      />
+      <NotionIntakeSetupDialog
+        open={notionIntakeSetupOpen}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        onClose={() => setNotionIntakeSetupOpen(false)}
       />
       <AddPRFeedbackPicker
         open={addPRFeedbackOpen}
