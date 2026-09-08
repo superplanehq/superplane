@@ -463,9 +463,7 @@ describe("FirstRunSetup", () => {
       "/org-1/workspaces/PAY/setup?step=vcs",
     );
 
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
+    expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.connect.selectAccount })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
