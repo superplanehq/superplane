@@ -9,12 +9,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
-import {
-  DEFAULT_GITHUB_INTAKE_SETTINGS,
-  GITHUB_INTAKE_RUNS,
-  type IntakeAutomationRun,
-  type IntakeSettingsTab,
-} from "./intakeSourceSettingsModel";
+import { DEFAULT_GITHUB_INTAKE_SETTINGS, type IntakeSettingsTab } from "./intakeSourceSettingsModel";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -71,8 +66,6 @@ function renderPopup(
   props: {
     onSave?: (next: typeof DEFAULT_GITHUB_INTAKE_SETTINGS) => void;
     onClose?: () => void;
-    onOpenRun?: (run: IntakeAutomationRun) => void;
-    runs?: IntakeAutomationRun[];
     editAutomationHref?: string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
@@ -87,8 +80,6 @@ function renderPopup(
               settings={DEFAULT_GITHUB_INTAKE_SETTINGS}
               automationGraph={githubAutomationGraph}
               onSave={props.onSave ?? vi.fn()}
-              onOpenRun={props.onOpenRun}
-              runs={props.runs}
               editAutomationHref={props.editAutomationHref}
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
@@ -118,10 +109,10 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.getByRole("checkbox", { name: "bug" })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: "Any assignment" })).toBeChecked();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Runs", "Automation"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-runs")).not.toBeInTheDocument();
   });
 
   it("shows the intake automation on the Automation tab", async () => {
@@ -147,57 +138,13 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
   });
 
-  it("lists scored intake runs on the Runs tab", async () => {
-    const onOpenRun = vi.fn();
-    const user = userEvent.setup();
-    renderPopup({ onOpenRun, runs: GITHUB_INTAKE_RUNS });
-
-    await user.click(screen.getByRole("tab", { name: "Runs" }));
-
-    const runs = screen.getByTestId("intake-source-runs");
-    expect(runs).toHaveAccessibleName("Runs");
-    expect(within(runs).getByText("Handle duplicate refunds on retry")).toBeInTheDocument();
-    expect(within(runs).queryByText("acme/payments-service")).not.toBeInTheDocument();
-    expect(within(runs).queryByText("acme/docs")).not.toBeInTheDocument();
-
-    const implement = within(runs).getByTestId("intake-source-run-gh-issue-1");
-    expect(implement).toHaveTextContent("94%");
-    expect(implement).toHaveTextContent("3h ago");
-    expect(implement).toHaveTextContent("2h ago");
-    expect(implement).toHaveTextContent("Implement");
-    expect(implement).toHaveTextContent("Writing the retry handler.");
-    expect(implement).not.toHaveTextContent("Moved to Backlog");
-
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-2")).toHaveTextContent("Verify");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-3")).toHaveTextContent("In Backlog");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-4")).toHaveTextContent("Rejected");
-    expect(within(runs).getByTestId("intake-source-run-gh-issue-5")).toHaveTextContent("Waiting for review.");
-
-    const held = within(runs).getByTestId("intake-source-run-gh-issue-6");
-    expect(held).toHaveTextContent("52%");
-    expect(held).toHaveTextContent("Not moved to Backlog");
-    expect(held).not.toHaveTextContent("Below the confidence score");
-
-    expect(within(runs).getAllByTestId(/^intake-source-run-/)).toHaveLength(6);
-    expect(screen.queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("intake-source-settings-save")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "View run for Handle duplicate refunds on retry" }));
-    expect(onOpenRun).toHaveBeenCalledWith(expect.objectContaining({ id: "gh-issue-1", placement: "progressed" }));
-  });
-
   it("puts Agent after General when the intake canvas has an agent", async () => {
     const user = userEvent.setup();
     renderPopup({
       agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1", onSave: vi.fn() },
     });
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "General",
-      "Agent",
-      "Runs",
-      "Automation",
-    ]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Agent", "Automation"]);
 
     await user.click(screen.getByTestId("intake-settings-tab-agent"));
     expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();

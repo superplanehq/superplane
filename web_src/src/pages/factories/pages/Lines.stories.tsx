@@ -101,20 +101,6 @@ export const LineBoardIntakeAutomation: Story = {
   },
 };
 
-export const LineBoardIntakeRuns: Story = {
-  name: "Line board — intake runs",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=runs`}
-        factoriesFixture={lineMetricsFactoriesFixture}
-        appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
-      />
-    );
-  },
-};
-
 export const LineBoardGithubAndSentry: Story = {
   name: "Line board — GitHub and Sentry listeners",
   render: () => {

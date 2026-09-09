@@ -4,20 +4,18 @@ import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, History, Settings, Workflow } from "lucide-react";
+import { Bot, Settings, Workflow } from "lucide-react";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
 import {
   INTAKE_SETTINGS_COPY,
   intakeSettingsTabs,
   normalizeIntakeSourceSettings,
-  type IntakeAutomationRun,
   type IntakeListenMode,
   type IntakeSettingsTab,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
-import { IntakeRunsList } from "./IntakeSettingsRuns";
 import { IntakeSettingsRadioOption } from "./IntakeSettingsRadioOption";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
@@ -32,14 +30,9 @@ interface IntakeSourceSettingsPopupProps {
   automationLoading?: boolean;
   automationError?: boolean;
   onRetryAutomation?: () => void;
-  runs?: IntakeAutomationRun[];
-  runsLoading?: boolean;
-  runsError?: boolean;
-  onRetryRuns?: () => void;
   onSave: (next: IntakeSourceSettings) => Promise<void> | void;
   savePending?: boolean;
   saveError?: string;
-  onOpenRun?: (run: IntakeAutomationRun) => void;
   editAutomationHref?: string;
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
@@ -54,14 +47,9 @@ export function IntakeSourceSettingsPopup({
   automationLoading = false,
   automationError = false,
   onRetryAutomation,
-  runs = [],
-  runsLoading = false,
-  runsError = false,
-  onRetryRuns,
   onSave,
   savePending = false,
   saveError,
-  onOpenRun,
   editAutomationHref,
   agent,
   onClose,
@@ -103,10 +91,6 @@ export function IntakeSourceSettingsPopup({
                 {INTAKE_SETTINGS_COPY.agentTab}
               </TabsTrigger>
             ) : null}
-            <TabsTrigger value="runs" data-testid="intake-settings-tab-runs">
-              <History />
-              {INTAKE_SETTINGS_COPY.runsTab}
-            </TabsTrigger>
             <TabsTrigger value="automation" data-testid="intake-settings-tab-automation">
               <Workflow />
               {INTAKE_SETTINGS_COPY.automationTab}
@@ -124,11 +108,6 @@ export function IntakeSourceSettingsPopup({
         automationLoading={automationLoading}
         automationError={automationError}
         onRetryAutomation={onRetryAutomation}
-        runs={runs}
-        runsLoading={runsLoading}
-        runsError={runsError}
-        onRetryRuns={onRetryRuns}
-        onOpenRun={onOpenRun}
         editAutomationHref={editAutomationHref}
         savePending={savePending}
         saveError={saveError}
@@ -151,11 +130,6 @@ function IntakeSettingsTabPanel({
   automationLoading,
   automationError,
   onRetryAutomation,
-  runs,
-  runsLoading,
-  runsError,
-  onRetryRuns,
-  onOpenRun,
   editAutomationHref,
   savePending,
   saveError,
@@ -173,11 +147,6 @@ function IntakeSettingsTabPanel({
   automationLoading: boolean;
   automationError: boolean;
   onRetryAutomation?: () => void;
-  runs: IntakeAutomationRun[];
-  runsLoading: boolean;
-  runsError: boolean;
-  onRetryRuns?: () => void;
-  onOpenRun?: (run: IntakeAutomationRun) => void;
   editAutomationHref?: string;
   savePending?: boolean;
   saveError?: string;
@@ -209,11 +178,6 @@ function IntakeSettingsTabPanel({
         showAutomationNote={false}
         showCancel={false}
       />
-    );
-  }
-  if (tab === "runs") {
-    return (
-      <IntakeRunsList runs={runs} loading={runsLoading} error={runsError} onRetry={onRetryRuns} onOpenRun={onOpenRun} />
     );
   }
   return (
