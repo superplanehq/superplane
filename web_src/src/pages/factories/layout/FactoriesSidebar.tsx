@@ -18,8 +18,8 @@ interface FactoriesSidebarProps {
 }
 
 /**
- * Icon rail shared by the workspace shell and workspace settings, so the
- * board, Velocity, and settings stay one click away on both screens.
+ * Icon rail shared by the workspace shell and workspace settings.
+ * Board and Velocity stay on the rail. Workspace settings open from the switcher.
  */
 export function FactoriesSidebar({ organizationId, factoryKey, factory, factories }: FactoriesSidebarProps) {
   const navigate = useNavigate();
@@ -40,6 +40,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         factory={factory}
         factories={factories}
         canCreateFactory={canAct("factories", "create")}
+        canOpenSettings={canAct("factories", "update")}
         permissionsLoading={permissionsLoading}
         onCreateFactory={() => navigate(newFactoryPath(organizationId))}
       />
@@ -47,8 +48,6 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         organizationId={organizationId}
         factoryKey={factoryKey}
         lineId={routeLineId ?? firstFactoryLineId(factory)}
-        canOpenSettings={canAct("factories", "update")}
-        permissionsLoading={permissionsLoading}
       />
       <div className="flex-1" />
       <SidebarUserMenu

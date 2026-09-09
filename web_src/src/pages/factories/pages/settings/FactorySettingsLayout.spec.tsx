@@ -29,7 +29,7 @@ describe("FactorySettingsLayout sidebar", () => {
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(screen.getByTestId("factory-settings-main").className).toMatch(/overflow-y-auto/);
     expect(screen.getByTestId("factories-sidebar")).toBeInTheDocument();
-    expect(screen.getByTestId("factories-workspace-settings-link")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("factories-workspace-settings-link")).not.toBeInTheDocument();
     expect(within(sidebar).queryByTestId("factory-settings-back")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-account-nav")).toHaveTextContent("Account");
     expect(within(sidebar).getByTestId("factory-settings-find")).toBeInTheDocument();
