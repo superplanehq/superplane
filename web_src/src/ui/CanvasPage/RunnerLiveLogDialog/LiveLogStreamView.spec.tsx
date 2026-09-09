@@ -26,6 +26,7 @@ beforeEach(() => {
     sections: [],
     orphanLines: [],
     error: null,
+    isLoading: false,
     isStreaming: false,
     telemetry: { num_turns: 0, usage: {}, tool_counts: {}, turns: [] },
     usageSeries: [],
@@ -36,11 +37,12 @@ beforeEach(() => {
 });
 
 describe("LiveLogStreamView", () => {
-  it("does not wait for more logs after an execution finishes", () => {
+  it("shows loading while it fetches logs for a finished execution", () => {
     useLiveLogStreamMock.mockReturnValue({
       sections: [],
       orphanLines: [],
       error: null,
+      isLoading: true,
       isStreaming: true,
       toggleSection: vi.fn(),
       retry: vi.fn(),
@@ -49,9 +51,9 @@ describe("LiveLogStreamView", () => {
 
     render(<LiveLogStreamView execution={finishedExecution} />);
 
-    expect(screen.getByText("No logs available")).toBeInTheDocument();
-    expect(screen.getByText("This execution did not produce log output.")).toBeInTheDocument();
+    expect(screen.getByText("Loading logs")).toBeInTheDocument();
     expect(screen.queryByText("Waiting for logs")).not.toBeInTheDocument();
+    expect(screen.queryByText("No logs available")).not.toBeInTheDocument();
   });
 
   it("shows the empty state when a finished execution has no logs", () => {
@@ -75,6 +77,7 @@ describe("LiveLogStreamView", () => {
       sections: [],
       orphanLines: [],
       error: "Failed to fetch",
+      isLoading: false,
       isStreaming: false,
       toggleSection: vi.fn(),
       retry,
@@ -94,6 +97,7 @@ describe("LiveLogStreamView", () => {
       sections: [],
       orphanLines: [],
       error: "The log stream is not available yet",
+      isLoading: false,
       isStreaming: false,
       toggleSection: vi.fn(),
       retry: vi.fn(),
@@ -152,6 +156,7 @@ describe("LiveLogStreamView", () => {
       ],
       orphanLines: [],
       error: null,
+      isLoading: false,
       isStreaming: false,
       toggleSection: vi.fn(),
       retry: vi.fn(),

@@ -16,7 +16,7 @@ export function LiveLogStreamView({
   session?: { organizationId?: string; canvasId?: string };
 }) {
   const executionInFlight = isExecutionInFlight(execution);
-  const { sections, orphanLines, error, retry, toggleSection, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, retry, toggleSection, scrollRef } = useLiveLogStream(
     execution.id,
     executionInFlight,
     terminalCommandStatusForExecution(execution),
@@ -37,8 +37,9 @@ export function LiveLogStreamView({
           compact={hasAnyLogs}
         />
       ) : null}
-      {!error && !hasAnyLogs && executionInFlight ? <LiveLogStateNotice state="waiting" /> : null}
-      {!error && !hasAnyLogs && !executionInFlight ? <LiveLogStateNotice state="empty" /> : null}
+      {!error && !hasAnyLogs && isLoading ? <LiveLogStateNotice state="loading" /> : null}
+      {!error && !hasAnyLogs && !isLoading && executionInFlight ? <LiveLogStateNotice state="waiting" /> : null}
+      {!error && !hasAnyLogs && !isLoading && !executionInFlight ? <LiveLogStateNotice state="empty" /> : null}
 
       {sections.map((section, index) => (
         <CommandSectionView

@@ -37,6 +37,7 @@ const initialLogState: LogState = {
   sections: [],
   orphanLines: [],
   error: null,
+  isLoading: false,
   isStreaming: false,
 };
 
@@ -97,7 +98,7 @@ function commandSectionFinalDuration(section: CommandSection, endedAtMs: number 
 }
 
 function applyStreamFailure(state: LogState, message: string): LogState {
-  return { ...state, error: message, isStreaming: false };
+  return { ...state, error: message, isLoading: false, isStreaming: false };
 }
 
 function createStreamHandlers(
@@ -108,6 +109,7 @@ function createStreamHandlers(
   onFailure: (message: string) => void,
 ): LiveLogStreamHandlers {
   return {
+    onOpen: () => setState((prev) => ({ ...prev, error: null, isLoading: false, isStreaming: true })),
     onLogLine: (text) =>
       setState((prev) => ({ ...appendLineToLatestSection(prev, text, replayLineSkip), error: null })),
     onStreamError: (message) => {
@@ -208,7 +210,7 @@ async function waitForLiveLogReconnect(
   sessionAbort: AbortController,
   setState: Dispatch<SetStateAction<LogState>>,
 ): Promise<boolean> {
-  setState((prev) => ({ ...prev, isStreaming: false }));
+  setState((prev) => ({ ...prev, isLoading: true, isStreaming: false }));
   try {
     await sleep(RECONNECT_DELAY_MS, sessionAbort.signal);
   } catch {
@@ -292,7 +294,7 @@ export function useLiveLogStream(
   const routeCanvasId = useCanvasId();
   const organizationId = session?.organizationId || routeOrganizationId;
   const canvasId = session?.canvasId || routeCanvasId;
-  const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isStreaming: true }));
+  const [state, setState] = useState<LogState>(() => ({ ...initialLogState, isLoading: true, isStreaming: true }));
   const [usage, setUsage] = useState(emptyPromptUsageState);
   const [sessionAttempt, setSessionAttempt] = useState(0);
 
@@ -324,13 +326,13 @@ export function useLiveLogStream(
 
   useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
-      setState((prev) => ({ ...prev, isStreaming: false }));
+      setState((prev) => ({ ...prev, isLoading: false, isStreaming: false }));
       return;
     }
 
     const sessionAbort = new AbortController();
     let activeStream: LiveLogStream | null = null;
-    setState({ ...initialLogState, isStreaming: true });
+    setState({ ...initialLogState, isLoading: true, isStreaming: true });
     setUsage(emptyPromptUsageState());
 
     void runLiveLogSession({
@@ -348,7 +350,7 @@ export function useLiveLogStream(
       },
     }).finally(() => {
       if (!sessionAbort.signal.aborted) {
-        setState((prev) => ({ ...prev, isStreaming: false }));
+        setState((prev) => ({ ...prev, isLoading: false, isStreaming: false }));
       }
     });
 

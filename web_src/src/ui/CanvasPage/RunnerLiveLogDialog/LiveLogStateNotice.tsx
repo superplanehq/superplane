@@ -1,11 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { CircleAlert, Loader2, RefreshCw, Terminal } from "lucide-react";
+import { CircleAlert, Loader2, Radio, RefreshCw, Terminal } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+
+type NonErrorLiveLogState = "loading" | "waiting" | "empty";
 
 type LiveLogStateNoticeProps =
   | {
-      state: "waiting" | "empty";
+      state: NonErrorLiveLogState;
       compact?: boolean;
     }
   | {
@@ -15,6 +18,29 @@ type LiveLogStateNoticeProps =
       onRetry: () => void;
       compact?: boolean;
     };
+
+const liveLogStateContent: Record<
+  NonErrorLiveLogState,
+  { title: string; description: string; Icon: LucideIcon; iconClassName?: string }
+> = {
+  loading: {
+    title: "Loading logs",
+    description: "SuperPlane is loading saved log output.",
+    Icon: Loader2,
+    iconClassName: "animate-spin",
+  },
+  waiting: {
+    title: "Waiting for logs",
+    description: "Logs will appear when the runner sends output.",
+    Icon: Radio,
+    iconClassName: "animate-pulse",
+  },
+  empty: {
+    title: "No logs available",
+    description: "This execution did not produce log output.",
+    Icon: Terminal,
+  },
+};
 
 export function LiveLogStateNotice(props: LiveLogStateNoticeProps) {
   const compact = props.compact ?? false;
@@ -55,39 +81,32 @@ export function LiveLogStateNotice(props: LiveLogStateNoticeProps) {
     );
   }
 
-  const isWaiting = props.state === "waiting";
+  const content = liveLogStateContent[props.state];
   return (
     <div
-      role={isWaiting ? "status" : undefined}
+      role={props.state === "empty" ? undefined : "status"}
       className={cn(
         "flex flex-col items-center justify-center gap-2 px-6 text-center",
         compact ? "py-4" : "min-h-48 py-8",
       )}
     >
-      <StateIcon tone={isWaiting ? "waiting" : "empty"}>
-        {isWaiting ? (
-          <Loader2 className="size-5 animate-spin" aria-hidden />
-        ) : (
-          <Terminal className="size-5" aria-hidden />
-        )}
+      <StateIcon tone={props.state}>
+        <content.Icon className={cn("size-5", content.iconClassName)} aria-hidden />
       </StateIcon>
       <div className="space-y-1">
-        <p className="text-sm font-medium text-slate-700 dark:text-gray-200">
-          {isWaiting ? "Waiting for logs" : "No logs available"}
-        </p>
-        <p className="text-xs text-slate-500 dark:text-gray-400">
-          {isWaiting ? "Logs will appear when the runner sends output." : "This execution did not produce log output."}
-        </p>
+        <p className="text-sm font-medium text-slate-700 dark:text-gray-200">{content.title}</p>
+        <p className="text-xs text-slate-500 dark:text-gray-400">{content.description}</p>
       </div>
     </div>
   );
 }
 
-function StateIcon({ tone, children }: { tone: "waiting" | "empty" | "error"; children: ReactNode }) {
+function StateIcon({ tone, children }: { tone: "loading" | "waiting" | "empty" | "error"; children: ReactNode }) {
   return (
     <div
       className={cn("flex size-10 items-center justify-center rounded-full", {
-        "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300": tone === "waiting",
+        "bg-blue-100 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300": tone === "loading",
+        "bg-amber-100 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300": tone === "waiting",
         "bg-slate-200 text-slate-500 dark:bg-gray-800 dark:text-gray-400": tone === "empty",
         "bg-red-100 text-red-600 dark:bg-red-950/50 dark:text-red-300": tone === "error",
       })}

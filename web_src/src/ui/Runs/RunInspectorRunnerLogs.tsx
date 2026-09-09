@@ -41,7 +41,7 @@ export function RunnerLogsTimelineCard({ section, isOpen }: { section: RunInspec
 function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecution }) {
   const executionInfo = buildExecutionInfo(execution);
   const executionInFlight = isExecutionInFlight(executionInfo);
-  const { sections, orphanLines, error, retry, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, retry, scrollRef } = useLiveLogStream(
     executionInfo.id,
     executionInFlight,
     terminalCommandStatusForExecution(executionInfo),
@@ -51,6 +51,10 @@ function RunnerLogsTerminal({ execution }: { execution: CanvasesCanvasNodeExecut
 
   if (error) {
     return <LiveLogStateNotice state="error" error={error} willRetry={executionInFlight} onRetry={retry} compact />;
+  }
+
+  if (lines.length === 0 && isLoading) {
+    return <LiveLogStateNotice state="loading" compact />;
   }
 
   if (lines.length === 0 && executionInFlight) {

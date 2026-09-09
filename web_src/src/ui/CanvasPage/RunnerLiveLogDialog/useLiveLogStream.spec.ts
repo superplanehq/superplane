@@ -68,6 +68,7 @@ function baseLogState(): LogState {
     ],
     orphanLines: [],
     error: null,
+    isLoading: false,
     isStreaming: false,
   };
 }
@@ -184,6 +185,30 @@ describe("runner live log state", () => {
 });
 
 describe("useLiveLogStream", () => {
+  it("stops loading after the live log response opens", async () => {
+    let openStream: (() => void) | undefined;
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void }) =>
+        new Promise<void>((resolve) => {
+          openStream = () => {
+            handlers.onOpen?.();
+            resolve();
+          };
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    expect(result.current.isLoading).toBe(true);
+    act(() => openStream?.());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
   it("reports a request error and retries the terminal log session on demand", async () => {
     pumpMock.mockRejectedValue(new Error("Failed to fetch"));
     const { result } = renderHook(() =>
