@@ -1,5 +1,6 @@
-import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
+import { useDispatchWorkOrder, useReorderWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import type { WorkOrderReorderMove } from "@/pages/factories/lib/workOrderReorder";
 import { useCallback, useState } from "react";
 
 const NO_ORDERS: ReadonlySet<string> = new Set();
@@ -8,6 +9,7 @@ const NO_ORDERS: ReadonlySet<string> = new Set();
 export function useWorkOrderCardActions(organizationId: string, factoryId: string) {
   const dispatchWorkOrder = useDispatchWorkOrder(organizationId, factoryId);
   const updateAssignees = useUpdateWorkOrderAssignees(organizationId, factoryId);
+  const reorderWorkOrder = useReorderWorkOrder(organizationId, factoryId);
   // The mutation is shared by every card on the page, so its pending flag
   // cannot say which card the user clicked. Track the tasks in flight
   // instead, so only their controls show a busy state.
@@ -44,11 +46,25 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
     [updateAssignees],
   );
 
+  const onReorder = useCallback(
+    async (move: WorkOrderReorderMove) => {
+      try {
+        // mutateAsync runs onMutate synchronously first, moving the card
+        // in the cache right away — see useReorderWorkOrder.
+        await reorderWorkOrder.mutateAsync(move);
+      } catch {
+        showErrorToast("Failed to save the new task order.");
+      }
+    },
+    [reorderWorkOrder],
+  );
+
   return {
     dispatchingOrderIds,
     isAssigneesSaving: updateAssignees.isPending,
     onDispatch,
     onAssigneesSave,
+    onReorder,
   };
 }
 

@@ -14,6 +14,7 @@ import {
   buildWorkOrderListEntries,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
+import type { WorkOrderReorderMove } from "../lib/workOrderReorder";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
 import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { WorkOrdersBoardView } from "./WorkOrdersBoardView";
@@ -45,6 +46,8 @@ interface WorkOrdersLoadedViewProps {
   isAssigneesSaving: boolean;
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  /** Persists a Board drag-and-drop reorder within one column. */
+  onReorder: (move: WorkOrderReorderMove) => void;
   hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
@@ -116,6 +119,8 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
         <WorkOrdersBoardView
           {...sharedProps}
           factoryId={factory.id}
+          ordering={state.ordering}
+          onReorder={props.onReorder}
           addressingFeedbackOrderIds={addressingFeedbackOrderIds}
           addressingFeedbackLabels={addressingFeedbackLabels}
           waitingOnChecksOrderIds={waitingOnChecksOrderIds}

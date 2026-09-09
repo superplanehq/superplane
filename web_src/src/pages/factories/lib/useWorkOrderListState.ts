@@ -59,7 +59,7 @@ const SCOPE_STORAGE_PREFIX = "sp:work-orders:scope";
 const FILTERS_STORAGE_PREFIX = "sp:work-orders:filters";
 
 const DEFAULT_LAYOUT: WorkOrderLayoutId = "board";
-const DEFAULT_ORDERING: WorkOrderOrdering = "updated";
+const DEFAULT_ORDERING: WorkOrderOrdering = "manual";
 const DEFAULT_SCOPE: WorkOrderScope = "all";
 
 const VALID_LAYOUTS = new Set(WORK_ORDER_LAYOUTS.map((item) => item.id));

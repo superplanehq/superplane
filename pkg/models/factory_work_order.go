@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,11 +24,33 @@ const (
 	FactoryWorkOrderResultCompleted = "completed"
 	FactoryWorkOrderResultRejected  = "rejected"
 	FactoryWorkOrderResultFailed    = "failed"
+
+	// factoryWorkOrderPositionGap is the default distance left between two
+	// neighboring positions. Reordering next to an end (top/bottom, or an
+	// empty column) adds/subtracts this gap instead of averaging, so there
+	// is room for more manual moves on that side before positions need to
+	// be rebalanced.
+	factoryWorkOrderPositionGap = 1000
 )
 
 var (
 	ErrFactoryWorkOrderNotFound     = errors.New("factory work order not found")
 	ErrFactoryWorkOrderInvalidState = errors.New("invalid work order state transition")
+	ErrFactoryWorkOrderLaneMismatch = errors.New("work order reorder must stay within the same board column")
+)
+
+// FactoryWorkOrderLane mirrors the board columns the Tasks UI derives from
+// display status (see workOrderProgress.ts): Backlog, Running, Needs
+// attention, Done. It exists purely to validate that a manual reorder
+// does not move a card across columns; the frontend still owns the
+// authoritative display status and label.
+type FactoryWorkOrderLane string
+
+const (
+	FactoryWorkOrderLaneBacklog FactoryWorkOrderLane = "backlog"
+	FactoryWorkOrderLaneRunning FactoryWorkOrderLane = "running"
+	FactoryWorkOrderLaneReview  FactoryWorkOrderLane = "review"
+	FactoryWorkOrderLaneDone    FactoryWorkOrderLane = "done"
 )
 
 var (
@@ -77,8 +100,16 @@ type FactoryWorkOrder struct {
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	// Position is the manual drag-and-drop order within the factory. Lower
+	// values sort first. Board/List group orders into lanes by display
+	// status but share this single per-factory sequence, so an order keeps
+	// its place relative to its lane-mates no matter which lane it lands in
+	// after a status change. New orders start before every existing one
+	// (see NextFactoryWorkOrderPosition), matching the newest-first default
+	// sort.
+	Position  float64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -107,6 +138,23 @@ func (o *FactoryWorkOrder) IsClosed() bool {
 // the first dispatch from `draft` also promotes it to `open`.
 func (o *FactoryWorkOrder) IsDispatchable() bool {
 	return o.State == FactoryWorkOrderStateDraft || o.State == FactoryWorkOrderStateOpen
+}
+
+// Lane buckets the order the same way the Tasks board does. hasActiveDispatch
+// reports whether the order has a line dispatch still in progress (see
+// FindActiveLineDispatch) — the caller loads it so a validation that checks
+// several orders can share one query instead of Lane doing its own lookup.
+func (o *FactoryWorkOrder) Lane(hasActiveDispatch bool) FactoryWorkOrderLane {
+	switch {
+	case o.State == FactoryWorkOrderStateDraft:
+		return FactoryWorkOrderLaneBacklog
+	case o.State == FactoryWorkOrderStateClosed:
+		return FactoryWorkOrderLaneDone
+	case hasActiveDispatch:
+		return FactoryWorkOrderLaneRunning
+	default:
+		return FactoryWorkOrderLaneReview
+	}
 }
 
 func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
@@ -153,6 +201,26 @@ type FactoryWorkOrderStatusUpdate struct {
 	Run        *factory.RunRef
 	App        *factory.AppRef
 	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+}
+
+// NextFactoryWorkOrderPosition returns the position a newly created work
+// order should use: before every existing order of the factory, matching
+// the newest-first default sort new orders have always had.
+func NextFactoryWorkOrderPosition(tx *gorm.DB, factoryID uuid.UUID) (float64, error) {
+	var lowest sql.NullFloat64
+	err := tx.
+		Model(&FactoryWorkOrder{}).
+		Where("factory_id = ?", factoryID).
+		Select("MIN(position)").
+		Scan(&lowest).
+		Error
+	if err != nil {
+		return 0, err
+	}
+	if !lowest.Valid {
+		return 0, nil
+	}
+	return lowest.Float64 - factoryWorkOrderPositionGap, nil
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -267,6 +335,44 @@ func (o *FactoryWorkOrder) UpdateContent(tx *gorm.DB, title *string, description
 	o.UpdatedAt = now
 	updates["updated_at"] = now
 	return tx.Model(o).Omit(clause.Associations).Updates(updates).Error
+}
+
+// Reorder moves the order to a new manual position, computed from its
+// destination neighbors: `previous` is the order that should immediately
+// precede it and `next` the order that should immediately follow it, both
+// within the same board column. Either may be nil to place the order at
+// that end of the column. A no-op (position unchanged) skips the write.
+func (o *FactoryWorkOrder) Reorder(tx *gorm.DB, previous, next *FactoryWorkOrder) error {
+	position := workOrderPositionBetween(previous, next)
+	if position == o.Position {
+		return nil
+	}
+
+	now := time.Now()
+	o.Position = position
+	o.UpdatedAt = now
+	return tx.Model(o).Omit(clause.Associations).Updates(map[string]any{
+		"position":   o.Position,
+		"updated_at": o.UpdatedAt,
+	}).Error
+}
+
+// workOrderPositionBetween picks a value that sorts after `previous` and
+// before `next`. Averaging the two neighbors keeps every other order's
+// position untouched; missing a neighbor means the target end of the
+// column, so it steps away from the remaining neighbor by the standard
+// gap instead.
+func workOrderPositionBetween(previous, next *FactoryWorkOrder) float64 {
+	switch {
+	case previous != nil && next != nil:
+		return (previous.Position + next.Position) / 2
+	case previous != nil:
+		return previous.Position + factoryWorkOrderPositionGap
+	case next != nil:
+		return next.Position - factoryWorkOrderPositionGap
+	default:
+		return 0
+	}
 }
 
 func (o *FactoryWorkOrder) UpdateAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID, updatedBy uuid.UUID) error {

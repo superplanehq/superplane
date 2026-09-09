@@ -788,6 +788,7 @@ CREATE TABLE public.factory_work_orders (
     origin_label text,
     repository text,
     default_branch text,
+    "position" double precision NOT NULL,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -2793,6 +2794,13 @@ CREATE INDEX idx_factory_work_order_queue_items_order ON public.factory_work_ord
 --
 
 CREATE INDEX idx_factory_work_order_queue_items_step ON public.factory_work_order_queue_items USING btree (line_id, step_index, created_at);
+
+
+--
+-- Name: idx_factory_work_orders_factory_position; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_work_orders_factory_position ON public.factory_work_orders USING btree (factory_id, "position");
 
 
 --

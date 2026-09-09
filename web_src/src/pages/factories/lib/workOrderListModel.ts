@@ -282,10 +282,18 @@ export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; toolt
 /** Statuses that the Needs attention scope keeps. Running is in flight. */
 const ACTIVE_SCOPE_STATUSES: WorkOrderDisplayStatus[] = ["draft", "waiting", "failed"];
 
-/** Ordering options in the Display menu. `updated` is the default. */
-export type WorkOrderOrdering = "updated" | "status" | "spend" | "key";
+/**
+ * Ordering options in the Display menu. `manual` is the default: cards keep
+ * the drag-and-drop order saved for the workspace (see `WorkOrder.position`
+ * on the API). Choosing another option overrides that order until the user
+ * switches back to Manual; dragging is only enabled in Manual (see
+ * `WorkOrdersBoardView`), since a card's place under, say, Spend order is
+ * computed, not something a drag could sensibly change.
+ */
+export type WorkOrderOrdering = "manual" | "updated" | "status" | "spend" | "key";
 
 export const WORK_ORDER_ORDERINGS: Array<{ id: WorkOrderOrdering; label: string }> = [
+  { id: "manual", label: "Manual" },
   { id: "updated", label: "Updated" },
   { id: "status", label: "Status" },
   { id: "spend", label: "Spend" },
@@ -371,6 +379,9 @@ export function applyWorkOrderOrdering(
 ): WorkOrderListEntry[] {
   const sorted = [...entries];
   switch (ordering) {
+    case "manual":
+      // The API already returns orders by manual position; keep it as-is.
+      break;
     case "updated":
       sorted.sort((a, b) => b.updatedAtMs - a.updatedAtMs || a.title.localeCompare(b.title));
       break;
