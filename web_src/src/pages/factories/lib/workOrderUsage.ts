@@ -44,6 +44,83 @@ export function formatDurationSeconds(seconds: number): string {
   return `${hours} h ${minutes} min`;
 }
 
+export function formatUsageTaskName(workOrderKey: string | undefined, title: string | undefined): string {
+  const key = workOrderKey?.trim() ?? "";
+  const name = title?.trim() || "Untitled task";
+  return key ? `${key} · ${name}` : name;
+}
+
+export function formatUsageTokensAndTime(tokens: number, durationSeconds: number): string {
+  const parts: string[] = [];
+  if (tokens > 0) {
+    parts.push(formatCompactTokens(tokens));
+  }
+  if (durationSeconds > 0) {
+    parts.push(formatDurationSeconds(durationSeconds));
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+export interface UsageRunResources {
+  /** Models the hosted credit paid for. */
+  models?: string[];
+  /** Models your own provider keys paid for. */
+  byokModels?: string[];
+  machineTypes?: string[];
+}
+
+export function formatUsageRunResources({ models, byokModels, machineTypes }: UsageRunResources): string {
+  const parts = [usageModelLabel(models, byokModels), uniqueUsageLabels(machineTypes).join(" · ")].filter(Boolean);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+/** Notes your keys only on the models your keys paid for, so a mixed run stays accurate. */
+function usageModelLabel(models: string[] | undefined, byokModels: string[] | undefined): string {
+  const hosted = uniqueUsageLabels(models);
+  const byok = uniqueUsageLabels(byokModels);
+  if (byok.length === 0) {
+    return hosted.join(" · ");
+  }
+  const byokLabel = `${byok.join(" · ")} (your keys)`;
+  if (hosted.length === 0) {
+    return byokLabel;
+  }
+  return `${hosted.join(" · ")} · ${byokLabel}`;
+}
+
+export function formatUsageOccurredAtUtc(value: string | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "—";
+  }
+  const date = parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const hours = String(parsed.getUTCHours()).padStart(2, "0");
+  const minutes = String(parsed.getUTCMinutes()).padStart(2, "0");
+  return `${date} ${hours}:${minutes} UTC`;
+}
+
+function uniqueUsageLabels(values: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const labels: string[] = [];
+  for (const value of values ?? []) {
+    const label = value.trim();
+    if (!label || seen.has(label)) {
+      continue;
+    }
+    seen.add(label);
+    labels.push(label);
+  }
+  return labels;
+}
+
 export function formatWorkOrderUsage(totalTokens: number, totalCostCents: number, durationSeconds = 0): string | null {
   const parts: string[] = [];
   if (totalCostCents > 0) {
