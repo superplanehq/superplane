@@ -1815,9 +1815,11 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 
 			organizationID := ""
 			var organizationUUID uuid.UUID
+			var factoryID *uuid.UUID
 			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
 				organizationID = workflow.OrganizationID.String()
 				organizationUUID = workflow.OrganizationID
+				factoryID = workflow.FactoryID
 			}
 
 			return &core.ExecutionContext{
@@ -1837,6 +1839,7 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 				Files:          contexts.NewRepositoryFilesContext(s.gitProvider, execution.WorkflowID),
 				Usage:          contexts.NewUsageContext(organizationUUID, execution),
+				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
 			}, nil
 		},
 	})

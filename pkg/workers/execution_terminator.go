@@ -258,6 +258,7 @@ func (w *ExecutionTerminator) cancelComponent(
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
 		Usage:          contexts.NewUsageContext(orgUUID, execution),
+		HostedLLM:      contexts.NewHostedLLMContext(tx, w.encryptor, orgUUID, canvas.FactoryID),
 	}
 
 	if node.AppInstallationID != nil {
