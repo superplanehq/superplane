@@ -80,6 +80,15 @@ describe("NewWorkspacePage", () => {
 
     expect(createFactory).not.toHaveBeenCalled();
     expect(screen.queryByTestId("github-app-required")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Checking GitHub setup…");
+  });
+
+  it("shows progress while the workspace is created", () => {
+    createFactory.mockReturnValue(new Promise(() => undefined));
+
+    renderPage();
+
+    expect(screen.getByRole("status")).toHaveTextContent("Creating workspace…");
   });
 
   it("does not create a workspace when the catalog request fails", () => {

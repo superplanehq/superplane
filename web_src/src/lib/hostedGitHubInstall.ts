@@ -4,6 +4,44 @@ export type PendingGitHubInstallation = {
   accountType?: string;
 };
 
+export type PendingGitHubInstallRequest = {
+  id?: string;
+  accountLogin: string;
+  requesterLogin?: string;
+  createdAt?: string;
+};
+
+export function pendingGitHubInstallRequests(metadata: unknown): PendingGitHubInstallRequest[] {
+  if (!metadata || typeof metadata !== "object") return [];
+
+  const raw = (metadata as { installRequests?: unknown }).installRequests;
+  if (Array.isArray(raw)) {
+    return raw.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as {
+        id?: unknown;
+        accountLogin?: unknown;
+        requesterLogin?: unknown;
+        createdAt?: unknown;
+      };
+      const id = typeof row.id === "number" ? String(row.id) : row.id;
+      return [
+        {
+          ...(typeof id === "string" && id !== "" ? { id } : {}),
+          accountLogin: typeof row.accountLogin === "string" ? row.accountLogin.trim() : "",
+          ...(typeof row.requesterLogin === "string" && row.requesterLogin !== ""
+            ? { requesterLogin: row.requesterLogin }
+            : {}),
+          ...(typeof row.createdAt === "string" && row.createdAt !== "" ? { createdAt: row.createdAt } : {}),
+        },
+      ];
+    });
+  }
+
+  if ((metadata as { installRequested?: unknown }).installRequested !== true) return [];
+  return [{ accountLogin: hostedGitHubInstallRequestedAccount(metadata) }];
+}
+
 export function pendingGitHubInstallations(metadata: unknown): PendingGitHubInstallation[] {
   if (!metadata || typeof metadata !== "object") {
     return [];
@@ -40,7 +78,10 @@ export function hostedGitHubInstallRequested(metadata: unknown): boolean {
     return false;
   }
 
-  return (metadata as { installRequested?: unknown }).installRequested === true;
+  return (
+    (metadata as { installRequested?: unknown }).installRequested === true ||
+    pendingGitHubInstallRequests(metadata).length > 0
+  );
 }
 
 export function hostedGitHubInstallRequestedAccount(metadata: unknown): string {
@@ -53,8 +94,7 @@ export function hostedGitHubInstallRequestedAccount(metadata: unknown): string {
     return requested;
   }
 
-  const owner = (metadata as { owner?: unknown }).owner;
-  return typeof owner === "string" ? owner : "";
+  return "";
 }
 
 export function hostedGitHubState(metadata: unknown): string {

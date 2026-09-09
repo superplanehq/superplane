@@ -208,6 +208,21 @@ function useOnboardingGithubRepos(organizationId: string, githubIntegrationId: s
   };
 }
 
+/**
+ * After an organization rename, the connection list reloads under the new
+ * slug before the repository request can start. Keep one loader visible
+ * through both requests.
+ */
+function isRepositoryListLoading(args: {
+  savedIntegrationId?: string;
+  selectedIntegrationId: string;
+  connectionsLoading: boolean;
+  repositoriesLoading: boolean;
+}): boolean {
+  if (!args.savedIntegrationId && !args.selectedIntegrationId) return false;
+  return args.connectionsLoading || args.repositoriesLoading;
+}
+
 function useOnboardingGithubConnectionSelected(args: {
   organizationId: string;
   factoryId: string;
@@ -468,6 +483,7 @@ export function useOnboardingPageModel(args: {
     // True when hosted credentials cover the agent, so setup can skip the
     // agent screen and provision from the ticket screen.
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,
     requestConnect: connect.requestConnect,
@@ -496,7 +512,12 @@ export function useOnboardingPageModel(args: {
     },
     integrationDialogs: connect.dialogs,
     repositories: github.repositories,
-    repositoriesLoading: github.repositoriesLoading,
+    repositoriesLoading: isRepositoryListLoading({
+      savedIntegrationId: onboarding?.vcsIntegrationId,
+      selectedIntegrationId: githubIntegrationId,
+      connectionsLoading: connect.connectionsLoading,
+      repositoriesLoading: github.repositoriesLoading,
+    }),
     repositoriesError: github.repositoriesError,
     canConfigureWorkspace: canConfigureWorkspace(canAct),
     saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,

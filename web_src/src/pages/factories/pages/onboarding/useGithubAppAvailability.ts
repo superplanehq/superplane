@@ -25,7 +25,7 @@ export function githubAppAvailabilityFromCatalog(args: {
 }
 
 export function useGithubAppAvailability(organizationId: string): GithubAppAvailability & {
-  retry: () => void;
+  retry: () => Promise<void>;
 } {
   const definitions = useAvailableIntegrations({ enabled: !!organizationId, organizationId });
   const githubDefinition = (definitions.data ?? []).find((definition) => definition.name === "github");
@@ -35,8 +35,8 @@ export function useGithubAppAvailability(organizationId: string): GithubAppAvail
       isError: definitions.isError,
       githubDefinition,
     }),
-    retry: () => {
-      void definitions.refetch();
+    retry: async () => {
+      await definitions.refetch();
     },
   };
 }

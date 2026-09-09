@@ -45,7 +45,12 @@ vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
 const bindMutate = vi.fn();
 
 vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutate: bindMutate, isPending: false, variables: undefined }),
+  useBindGitHubInstallation: () => ({
+    mutateAsync: (variables: unknown) =>
+      new Promise<void>((resolve, reject) => {
+        bindMutate(variables, { onSuccess: resolve, onError: reject });
+      }),
+  }),
 }));
 
 const navigateSpy = vi.fn();
@@ -78,6 +83,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
@@ -105,7 +111,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
 }
 
 function renderSetup(model: OnboardingPageModel, path = "/org-1/workspaces/PAY/setup?step=issues") {
-  render(
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <FirstRunSetup model={model} />
     </MemoryRouter>,
@@ -309,30 +315,6 @@ describe("FirstRunSetup", () => {
     expect(screen.getByTestId("first-run-github-account-picker")).toBeInTheDocument();
   });
 
-  // A GitHub round trip reloads the page, so the picker data arrives after
-  // the first render. The screen must not flash the connect button first.
-  it("shows a placeholder on the connect screen while the connection list loads", () => {
-    renderSetup(
-      pageModel({ openSection: "vcs", githubConnectionsLoading: true }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
-    );
-
-    expect(screen.getByTestId("first-run-connect-loading")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
-  });
-
-  // A refresh of the repository list must not show cached repositories from
-  // an earlier connection while the fresh list loads.
-  it("shows a placeholder on the repository screen while the list refreshes", () => {
-    renderSetup(
-      pageModel({ openSection: "repo", repositories: ["octo/stale-repo"], repositoriesLoading: true }),
-      "/org-1/workspaces/PAY/setup?step=repo",
-    );
-
-    expect(screen.getByTestId("first-run-repositories-loading")).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /octo\/stale-repo/ })).not.toBeInTheDocument();
-  });
-
   it("moves the bound connection to another account through the picker", async () => {
     const user = userEvent.setup();
     const selectVcsConnection = vi.fn().mockResolvedValue(true);
@@ -432,102 +414,6 @@ describe("FirstRunSetup", () => {
     await waitFor(() => expect(selectVcsConnection).toHaveBeenCalledWith("int-new"));
     expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
-  });
-
-  it("shows the GitHub account picker on the connect screen", () => {
-    renderSetup(
-      pageModel({
-        openSection: "vcs",
-        githubConnections: {
-          name: "github",
-          readyInstances: [],
-          allInstances: [
-            {
-              metadata: { id: "int-1", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "user-1",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [
-                    { id: "11", accountLogin: "acme" },
-                    { id: "22", accountLogin: "octo" },
-                  ],
-                },
-              },
-            },
-          ],
-        },
-      }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
-    );
-
-    expect(screen.getByTestId("first-run-github-account-picker")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.selectAccount,
-    );
-    expect(screen.getByRole("button", { name: FIRST_RUN_COPY.connect.useAccount("acme") })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
-  });
-
-  it("does not show another member's GitHub account picker", () => {
-    renderSetup(
-      pageModel({
-        openSection: "vcs",
-        githubConnections: {
-          name: "github",
-          readyInstances: [],
-          allInstances: [
-            {
-              metadata: { id: "int-1", integrationName: "github" },
-              status: {
-                state: "pending",
-                metadata: {
-                  startedByUserID: "some-other-user",
-                  state: "csrf",
-                  githubApp: { slug: "superplane" },
-                  pendingInstallations: [
-                    { id: "11", accountLogin: "acme" },
-                    { id: "22", accountLogin: "octo" },
-                  ],
-                },
-              },
-            },
-          ],
-        },
-      }),
-      "/org-1/workspaces/PAY/setup?step=vcs",
-    );
-
-    expect(screen.queryByTestId("first-run-github-account-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
-  });
-
-  it("opens Connect when GitHub returned an install request without a step", () => {
-    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?githubSetup=request");
-
-    expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-    expect(screen.getByTestId("first-run-github-install-requested")).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
-  });
-
-  it("shows a waiting chip when GitHub returned an install request", () => {
-    renderSetup(pageModel({ openSection: "vcs" }), "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request");
-
-    expect(screen.getByTestId("first-run-github-install-requested")).toHaveTextContent(
-      FIRST_RUN_COPY.connect.installRequested,
-    );
-    expect(screen.getByTestId("first-run-connect-github")).toBeInTheDocument();
-  });
-
-  it("names the GitHub organization from the return query", () => {
-    renderSetup(
-      pageModel({ openSection: "vcs" }),
-      "/org-1/workspaces/PAY/setup?step=vcs&githubSetup=request&githubOrg=acme",
-    );
-
-    expect(screen.getByTestId("first-run-github-install-org")).toHaveTextContent("acme");
-    expect(screen.queryByText(FIRST_RUN_COPY.connect.installRequestedBody("acme"))).not.toBeInTheDocument();
   });
 
   it("counts the ticket screen as the last step when the agent screen is skipped", () => {

@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { RepositoryPicker } from "../onboardingSteps";
@@ -12,6 +12,7 @@ export function FirstRunChooseScreen({
   repositories,
   selectedRepository,
   loading,
+  saving = false,
   chrome,
   onSelectRepository,
   onEditConnection,
@@ -21,6 +22,7 @@ export function FirstRunChooseScreen({
   selectedRepository: string | null;
   /** True while the repository list loads or refreshes; hides stale entries. */
   loading?: boolean;
+  saving?: boolean;
   chrome?: FirstRunChrome;
   onSelectRepository: (repository: string) => void;
   onEditConnection: () => void;
@@ -28,9 +30,10 @@ export function FirstRunChooseScreen({
 }) {
   const copy = FIRST_RUN_COPY.choose;
   const [whyMissingOpen, setWhyMissingOpen] = useState(false);
+  const busy = Boolean(loading || saving);
 
   return (
-    <FirstRunShell testId="first-run-choose" chrome={chrome}>
+    <FirstRunShell testId="first-run-choose" chrome={chrome} busy={busy}>
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
       </FirstRunHeading>
@@ -44,6 +47,7 @@ export function FirstRunChooseScreen({
               host="github"
               repos={repositories}
               selectedRepo={selectedRepository}
+              disabled={busy}
               onSelect={onSelectRepository}
             />
           )}
@@ -52,6 +56,7 @@ export function FirstRunChooseScreen({
             <button
               type="button"
               onClick={onEditConnection}
+              disabled={busy}
               className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
             >
               {copy.editConnection}
@@ -63,15 +68,17 @@ export function FirstRunChooseScreen({
         </FirstRunPanel>
 
         <div className="space-y-2">
-          <Button
+          <LoadingButton
             type="button"
             className="w-full"
-            disabled={!selectedRepository}
+            disabled={!selectedRepository || busy}
+            loading={saving}
+            loadingText={copy.saving}
             onClick={onContinue}
             data-testid="first-run-continue-to-tickets"
           >
             {selectedRepository ? copy.continueReady : copy.continue}
-          </Button>
+          </LoadingButton>
           <p className="text-[12px] text-muted-foreground">{copy.moreLater}</p>
         </div>
 
@@ -79,9 +86,15 @@ export function FirstRunChooseScreen({
           className="rounded-lg border border-border p-3 text-left open:pb-4"
           open={whyMissingOpen}
           onToggle={(event) => setWhyMissingOpen(event.currentTarget.open)}
+          aria-disabled={busy || undefined}
           data-testid="first-run-choose-why-missing"
         >
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[13px] text-muted-foreground [&::-webkit-details-marker]:hidden">
+          <summary
+            className={cn(
+              "flex cursor-pointer list-none items-center justify-between gap-2 text-[13px] text-muted-foreground [&::-webkit-details-marker]:hidden",
+              busy && "pointer-events-none opacity-50",
+            )}
+          >
             {copy.missingTitle}
             <ChevronDown
               className={cn("size-3.5 shrink-0 transition-transform", whyMissingOpen && "rotate-180")}
@@ -99,21 +112,15 @@ export function FirstRunChooseScreen({
   );
 }
 
-/** Mirrors the repository picker layout: a search field and a short list. */
 function RepositoryListLoading() {
   return (
-    <div className="space-y-3" data-testid="first-run-repositories-loading" aria-hidden>
-      <div className="h-9 animate-pulse rounded-md bg-accent/40" />
-      <div className="rounded-lg border border-border">
-        <ul className="divide-y divide-border">
-          {[0, 1, 2].map((row) => (
-            <li key={row} className="flex items-center gap-3 px-3 py-2.5">
-              <div className="size-4 shrink-0 animate-pulse rounded bg-accent/40" />
-              <div className="h-3.5 w-40 animate-pulse rounded bg-accent/40" />
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div
+      className="flex min-h-32 items-center justify-center gap-2 text-[13px] text-muted-foreground"
+      data-testid="first-run-repositories-loading"
+      role="status"
+    >
+      <Loader2 className="size-4 animate-spin" data-testid="first-run-repositories-spinner" aria-hidden />
+      <span>{FIRST_RUN_COPY.choose.loading}</span>
     </div>
   );
 }
