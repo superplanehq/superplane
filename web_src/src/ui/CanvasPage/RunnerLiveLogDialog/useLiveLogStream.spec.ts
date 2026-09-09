@@ -4,6 +4,7 @@ import type { ExecutionInfo } from "../../../pages/app/mappers/types";
 import type { LogState } from "./types";
 import {
   finalizeRunningCommandSections,
+  isBenignLiveLogStreamError,
   terminalCommandStatusForExecution,
   terminalTimeMsForExecution,
   useLiveLogStream,
@@ -261,5 +262,80 @@ describe("useLiveLogStream", () => {
     await waitFor(() => expect(result.current.error).toBeNull());
     expect(result.current.isLoading).toBe(false);
     expect(result.current.orphanLines).toEqual(["existing output"]);
+  });
+});
+
+describe("isBenignLiveLogStreamError", () => {
+  it("returns true for CloudWatch log stream not found errors", () => {
+    const error = new Error(
+      "operation error CloudWatch Logs: GetLogEvents, https response error StatusCode: 400, RequestID: 956fc899-8020-40c1-9a6a-af4a136c8f5d, ResourceNotFoundException: The specified log stream does not exist.",
+    );
+    expect(isBenignLiveLogStreamError(error)).toBe(true);
+  });
+
+  it("returns false for unrelated errors", () => {
+    expect(isBenignLiveLogStreamError(new Error("Failed to fetch"))).toBe(false);
+    expect(isBenignLiveLogStreamError(new Error("Network timeout"))).toBe(false);
+    expect(isBenignLiveLogStreamError(new Error("ResourceNotFoundException"))).toBe(false);
+    expect(isBenignLiveLogStreamError(new Error("The specified log stream does not exist"))).toBe(false);
+  });
+});
+
+describe("createLiveLogFailureReporter", () => {
+  it("skips Sentry reporting for benign broker stream errors", async () => {
+    const benignError = new Error(
+      "operation error CloudWatch Logs: GetLogEvents, https response error StatusCode: 400, RequestID: 956fc899-8020-40c1-9a6a-af4a136c8f5d, ResourceNotFoundException: The specified log stream does not exist.",
+    );
+
+    pumpMock.mockImplementation(
+      (handlers: { onStreamError?: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onStreamError?.(benignError.message);
+          resolve();
+        }),
+    );
+
+    renderHook(() =>
+      useLiveLogStream("execution-1", false, "failed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(pumpMock).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports genuine broker errors to Sentry", async () => {
+    const genuineError = new Error("Connection refused");
+
+    pumpMock.mockImplementation(
+      (handlers: { onStreamError?: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onStreamError?.(genuineError.message);
+          resolve();
+        }),
+    );
+
+    renderHook(() =>
+      useLiveLogStream("execution-1", false, "failed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(captureExceptionMock).toHaveBeenCalledOnce());
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Connection refused" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "broker"],
+        extra: {
+          organizationId: "organization-1",
+          canvasId: "canvas-1",
+          executionId: "execution-1",
+        },
+      }),
+    );
   });
 });
