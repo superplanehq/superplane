@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Bot, LoaderCircle, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { type ColumnAutomationActivity, type ColumnAutomationLastRunStatus } from "../lib/columnAutomationActivity";
 import { COLUMN_AUTOMATIONS_COPY, type ColumnAutomation, type ColumnAutomationKind } from "../lib/columnAutomations";
@@ -22,6 +23,8 @@ interface ColumnAutomationsPopupProps {
   activity?: ColumnAutomationActivity;
   /** Open the menu on first render. Used by stories. */
   defaultOpen?: boolean;
+  /** Replaces the default icon button. Used by the header rows. */
+  trigger?: ReactNode;
 }
 
 /** Header icon. Click opens a menu with the automation summary. */
@@ -30,32 +33,12 @@ export function ColumnAutomationsPopup({
   onAction,
   activity,
   defaultOpen = false,
+  trigger,
 }: ColumnAutomationsPopupProps) {
-  const needsRepair = automation.health === "needs-repair";
-  const disabled = automation.health === "disabled";
-
   return (
     <DropdownMenu defaultOpen={defaultOpen}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={automation.name}
-          title={automation.name}
-          data-testid={`column-automation-icon-${automation.id}`}
-          className={cn(
-            "relative flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-            disabled && "opacity-70",
-          )}
-        >
-          <ColumnAutomationGlyph automation={automation} className="size-3.5" />
-          {needsRepair ? (
-            <span
-              className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-amber-500"
-              data-testid={`column-automation-icon-${automation.id}-needs-repair`}
-              aria-hidden
-            />
-          ) : null}
-        </button>
+        {trigger ?? <ColumnAutomationIconButton automation={automation} />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56 p-0" data-testid="column-automations-popup">
         <div className="p-1">
@@ -69,6 +52,40 @@ export function ColumnAutomationsPopup({
     </DropdownMenu>
   );
 }
+
+/** Header icon. Used as a direct settings button or as a menu trigger. */
+export const ColumnAutomationIconButton = forwardRef<
+  HTMLButtonElement,
+  { automation: ColumnAutomation } & ButtonHTMLAttributes<HTMLButtonElement>
+>(function ColumnAutomationIconButton({ automation, className, ...props }, ref) {
+  const needsRepair = automation.health === "needs-repair";
+  const disabled = automation.health === "disabled";
+
+  return (
+    <button
+      type="button"
+      aria-label={automation.name}
+      title={automation.name}
+      data-testid={`column-automation-icon-${automation.id}`}
+      className={cn(
+        "relative flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        disabled && "opacity-70",
+        className,
+      )}
+      {...props}
+      ref={ref}
+    >
+      <ColumnAutomationGlyph automation={automation} className="size-3.5" />
+      {needsRepair ? (
+        <span
+          className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-amber-500"
+          data-testid={`column-automation-icon-${automation.id}-needs-repair`}
+          aria-hidden
+        />
+      ) : null}
+    </button>
+  );
+});
 
 export function ColumnAutomationGlyph({
   automation,

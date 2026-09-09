@@ -200,13 +200,12 @@ describe("IntakeSettingsHost", () => {
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
     expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
-    const edit = within(screen.getByTestId("intake-source-settings")).getByRole("link", { name: "Edit automation" });
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute(
       "href",
       "/org-1/workspaces/rf/apps/app-github-issues-intake?configure=1&agent=1&from=lines&lineId=line-plan",
     );
-    expect(edit.className).toContain("rounded-md");
-    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(useInfiniteCanvasRuns).toHaveBeenCalledWith("app-github-issues-intake", {}, true);
     const sidebar = within(automation).getByTestId("canvas-runs-sidebar");
     expect(within(sidebar).getByText("On mention on Issue")).toBeInTheDocument();

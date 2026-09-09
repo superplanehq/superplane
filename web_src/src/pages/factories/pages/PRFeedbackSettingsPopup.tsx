@@ -110,8 +110,6 @@ export function PRFeedbackSettingsPopup({
               </TabsList>
             </Tabs>
           }
-          editHref={tab === "automation" ? editAutomationHref : undefined}
-          editLabel={PR_FEEDBACK_SETTINGS_COPY.editAutomation}
         />
       </PopupHeader>
       {tab === "automation" ? (
@@ -119,6 +117,7 @@ export function PRFeedbackSettingsPopup({
           graph={automationGraph}
           canvasId={canvasId}
           runHrefFor={runHrefFor}
+          editHref={editAutomationHref}
           loading={automationLoading}
           error={automationError}
           onRetry={onRetryAutomation}

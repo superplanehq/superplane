@@ -6,7 +6,7 @@ const EMPTY_USAGE_SERIES: AgentPromptUsageSeries[] = [];
 import { formatClockDurationLabel } from "@/lib/duration";
 import { formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { cn, resolveIcon } from "@/lib/utils";
-import { ChevronRight, CircleX, Loader2, Maximize2, Pencil, RotateCw } from "lucide-react";
+import { ChevronRight, CircleX, Loader2, Maximize2, RotateCw } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
@@ -406,8 +406,6 @@ type PhaseLogCardProps = {
   actionBusy?: boolean;
   /** Full-screen run page with the log in the sidebar. */
   runHref?: string;
-  /** Configure URL of the automation that owns the phase. */
-  editHref?: string;
   collapsible?: boolean;
   organizationId?: string;
   canvasId?: string;
@@ -432,7 +430,6 @@ export function PhaseLogCard({
   onStop,
   onRerun,
   runHref,
-  editHref,
   actionBusy = false,
   collapsible = true,
   organizationId,
@@ -504,7 +501,6 @@ export function PhaseLogCard({
               onStop={onStop}
               onRerun={onRerun}
               runHref={runHref}
-              editHref={editHref}
               actionBusy={actionBusy}
               onUsageOpenChange={onUsageOpenChange}
             />
@@ -545,7 +541,6 @@ function AutomationHeader({
   onStop,
   onRerun,
   runHref,
-  editHref,
   actionBusy,
   onUsageOpenChange,
 }: {
@@ -558,7 +553,6 @@ function AutomationHeader({
   onStop?: () => void;
   onRerun?: () => void;
   runHref?: string;
-  editHref?: string;
   actionBusy: boolean;
   onUsageOpenChange?: (open: boolean) => void;
 }) {
@@ -584,7 +578,7 @@ function AutomationHeader({
           <span className="min-w-0 truncate text-foreground">{phase.name}</span>
         </div>
       )}
-      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} editHref={editHref} /> : null}
+      {expanded ? <PhaseActionPills phase={phase} runHref={runHref} /> : null}
       {phase.status === "running" && onStop ? (
         <PhaseStopButton phaseId={phase.id} busy={actionBusy} onStop={onStop} />
       ) : null}
@@ -621,28 +615,18 @@ const PHASE_ACTION_LINK = cn(
   "inline-flex size-6 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
 );
 const VIEW_RUN_LABEL = "View automation run";
-const EDIT_AUTOMATION_LABEL = "Edit automation";
 const RERUN_LABEL = "Rerun";
 const STOP_LABEL = "Stop";
 const PHASE_STOP_ACTION = cn(PHASE_ACTION_LINK, "hover:bg-destructive/10 hover:text-destructive");
 
-function PhaseActionPills({ phase, runHref, editHref }: { phase: SplitRunPhase; runHref?: string; editHref?: string }) {
-  if (!runHref && !editHref) {
+function PhaseActionPills({ phase, runHref }: { phase: SplitRunPhase; runHref?: string }) {
+  if (!runHref) {
     return null;
   }
   return (
-    <>
-      {runHref ? (
-        <PhaseActionLink href={runHref} testId={`split-run-phase-run-${phase.id}`} label={VIEW_RUN_LABEL}>
-          <Maximize2 className="size-3.5" aria-hidden />
-        </PhaseActionLink>
-      ) : null}
-      {editHref ? (
-        <PhaseActionLink href={editHref} testId={`split-run-phase-edit-${phase.id}`} label={EDIT_AUTOMATION_LABEL}>
-          <Pencil className="size-3.5" aria-hidden />
-        </PhaseActionLink>
-      ) : null}
-    </>
+    <PhaseActionLink href={runHref} testId={`split-run-phase-run-${phase.id}`} label={VIEW_RUN_LABEL}>
+      <Maximize2 className="size-3.5" aria-hidden />
+    </PhaseActionLink>
   );
 }
 

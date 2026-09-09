@@ -23,13 +23,14 @@ interface WorkOrdersHeaderProps {
   onCreateWorkOrder: () => void;
   canCreate: boolean;
   permissionsLoading: boolean;
+  hostedCreditHeaderKicker?: ReactNode;
   hostedCreditEmptyBanner?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
 }
 
 /**
- * Compact title bar for the Tasks page. Title, scope, and Filter
- * stay on the left. Search, Display, and New sit on the right.
+ * Compact title bar for the Tasks page. Title stays on the left.
+ * Scope, Filter, Search, Display, and New sit on the right.
  *
  * The Filter menu and the chip row read from one shared set of options, so
  * both always show the same labels.
@@ -41,6 +42,7 @@ export function WorkOrdersHeader({
   onCreateWorkOrder,
   canCreate,
   permissionsLoading,
+  hostedCreditHeaderKicker,
   hostedCreditEmptyBanner,
   brokenIntegrationsBanner,
 }: WorkOrdersHeaderProps) {
@@ -53,7 +55,8 @@ export function WorkOrdersHeader({
       className={factorySectionHeaderClassName}
       data-testid="work-orders-header"
       title="Tasks"
-      leading={
+      leading={hostedCreditHeaderKicker}
+      actions={
         <>
           <ScopePills
             value={state.scope}
@@ -62,10 +65,6 @@ export function WorkOrdersHeader({
             testIdPrefix="work-orders-scope"
           />
           <FilterMenu state={state} lineOptions={lineOptions} assigneeOptions={assigneeOptions} />
-        </>
-      }
-      actions={
-        <>
           <SearchField
             inputRef={searchRef}
             open={state.searchOpen}

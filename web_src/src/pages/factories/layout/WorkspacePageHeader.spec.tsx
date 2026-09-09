@@ -17,6 +17,15 @@ describe("WorkspacePageHeader (section variant)", () => {
     expect(screen.queryByTestId("workspace-page-header-kicker")).not.toBeInTheDocument();
   });
 
+  it("renders compact content above the title", () => {
+    renderHeader(
+      <WorkspacePageHeader title="Tasks" aboveTitle={<span data-testid="trial-kicker">Trial 13 days.</span>} />,
+    );
+    expect(screen.getByTestId("workspace-page-header-above-title")).toContainElement(
+      screen.getByTestId("trial-kicker"),
+    );
+  });
+
   it("renders leading content next to the title", () => {
     renderHeader(
       <WorkspacePageHeader title="Tasks" leading={<span data-testid="scope-pills">All | Active | My</span>} />,

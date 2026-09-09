@@ -412,12 +412,12 @@ describe("PRFeedbackSettingsPopup automation", () => {
     expect(automation).toHaveAccessibleName("Automation");
     expect(within(automation).getAllByText("Find Pull Request").length).toBeGreaterThan(0);
     const headerRow = screen.getByTestId("settings-automation-header-row");
-    const edit = within(headerRow).getByRole("link", { name: "Edit automation" });
     expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();
     expect(within(headerRow).getByRole("tab", { name: "Automation" })).toBeInTheDocument();
+    expect(within(headerRow).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
+    const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-pr-feedback?configure=1&agent=1");
-    expect(edit.className).toContain("rounded-md");
-    expect(within(automation).queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(document.querySelector(".sp-canvas-editing")).toBeNull();
     expect(within(automation).queryByRole("button", { name: /Add next component/ })).not.toBeInTheDocument();
     expect(within(automation).queryByText("passed")).not.toBeInTheDocument();
