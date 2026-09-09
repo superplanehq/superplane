@@ -1,14 +1,19 @@
 import { Text } from "@/components/Text/text";
-import { Input, InputGroup } from "@/components/Input/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { InputGroup } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { hostedProviderLabel } from "@/lib/hostedCredit";
 import { filterModelIds, uniqueSortedModelIds } from "@/lib/hostedLLMModels";
-import { Switch } from "@/ui/switch";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { HostedLLMProvider, ProviderForm } from "./hostedLLMSettingsApi";
+
+function providerFieldId(provider: string, field: string) {
+  return `installation-llm-${provider}-${field}`;
+}
 
 export function HostedLLMProviderCard({
   provider,
@@ -30,6 +35,9 @@ export function HostedLLMProviderCard({
   onSave: (provider: string) => void;
 }) {
   const modelChoices = uniqueSortedModelIds([...form.listedModels, ...form.allowedModels]);
+  const enabledId = providerFieldId(provider.provider, "enabled");
+  const apiKeyId = providerFieldId(provider.provider, "api-key");
+  const baseUrlId = providerFieldId(provider.provider, "base-url");
   return (
     <div className="rounded-md border border-slate-200 p-4 dark:border-gray-700/70">
       <div className="flex items-center justify-between gap-4">
@@ -43,21 +51,30 @@ export function HostedLLMProviderCard({
               : "No API key is stored for this provider."}
           </Text>
         </div>
-        <Switch
-          data-testid={`installation-llm-${provider.provider}-enabled`}
-          checked={form.enabled}
-          onCheckedChange={(checked) => onFormChange(provider.provider, { enabled: checked })}
-        />
+        <div className="flex items-center">
+          <Label htmlFor={enabledId} className="sr-only">
+            Enable {hostedProviderLabel(provider.provider)}
+          </Label>
+          <Switch
+            id={enabledId}
+            data-testid={enabledId}
+            checked={form.enabled}
+            onCheckedChange={(checked) => onFormChange(provider.provider, { enabled: checked })}
+          />
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div>
-          <Label className="mb-2 block text-left">API key</Label>
+          <Label htmlFor={apiKeyId} className="mb-2 block text-left">
+            API key
+          </Label>
           <InputGroup>
             <Input
+              id={apiKeyId}
               type="password"
               className="ph-no-capture"
-              data-testid={`installation-llm-${provider.provider}-api-key`}
+              data-testid={apiKeyId}
               value={form.apiKey}
               onChange={(event) => onFormChange(provider.provider, { apiKey: event.target.value })}
               placeholder={provider.api_key_configured ? "Leave blank to keep the current key" : "Provider API key"}
@@ -65,9 +82,12 @@ export function HostedLLMProviderCard({
           </InputGroup>
         </div>
         <div>
-          <Label className="mb-2 block text-left">Base URL (optional)</Label>
+          <Label htmlFor={baseUrlId} className="mb-2 block text-left">
+            Base URL (optional)
+          </Label>
           <InputGroup>
             <Input
+              id={baseUrlId}
               value={form.baseURL}
               onChange={(event) => onFormChange(provider.provider, { baseURL: event.target.value })}
               placeholder="Use the provider default"
@@ -131,14 +151,18 @@ function OpenRouterProvisioningKeyField({
   form: ProviderForm;
   onFormChange: (provider: string, patch: Partial<ProviderForm>) => void;
 }) {
+  const managementKeyId = providerFieldId(provider.provider, "management-key");
   return (
     <div className="mt-4">
-      <Label className="mb-2 block text-left">Provisioning API Key</Label>
+      <Label htmlFor={managementKeyId} className="mb-2 block text-left">
+        Provisioning API Key
+      </Label>
       <InputGroup>
         <Input
+          id={managementKeyId}
           type="password"
           className="ph-no-capture"
-          data-testid={`installation-llm-${provider.provider}-management-key`}
+          data-testid={managementKeyId}
           value={form.managementKey}
           onChange={(event) => onFormChange(provider.provider, { managementKey: event.target.value })}
           placeholder={
@@ -170,22 +194,26 @@ function HostedProviderModelAllowlist({
   const [query, setQuery] = useState("");
   const visibleModels = useMemo(() => filterModelIds(modelIds, query), [modelIds, query]);
   const selectedCount = allowedModels.length;
+  const searchId = providerFieldId(provider, "model-search");
 
   return (
     <div className="mt-4 space-y-3">
+      <Label htmlFor={searchId} className="sr-only">
+        Search models
+      </Label>
       <InputGroup className="relative">
         <Search
           size={14}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
         />
         <Input
+          id={searchId}
           type="search"
           className="pl-9"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search models..."
-          aria-label="Search models"
-          data-testid={`installation-llm-${provider}-model-search`}
+          data-testid={searchId}
         />
       </InputGroup>
       <Text className="text-xs text-gray-500 dark:text-gray-400">

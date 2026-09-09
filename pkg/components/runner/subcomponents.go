@@ -37,7 +37,7 @@ func CancelBrokerTask(ctx core.ExecutionContext) error {
 }
 
 func RevokeOpenRouterChildKey(httpCtx core.HTTPContext, state core.ExecutionStateContext, hosted core.HostedLLMContext, logger *logrus.Entry) {
-	revokeOpenRouterChildKey(httpCtx, state, hosted, logger)
+	_ = revokeOpenRouterChildKey(httpCtx, state, hosted, logger)
 }
 
 func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {

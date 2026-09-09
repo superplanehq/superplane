@@ -74,7 +74,8 @@ describe("HostedLLMSettings", () => {
         .map((node) => node.textContent),
     ).toEqual(["anthropic/claude-sonnet-4", "openai/gpt-4.1"]);
 
-    const search = screen.getByTestId("installation-llm-openrouter-model-search");
+    const search = screen.getByLabelText("Search models");
+    expect(search).toHaveAttribute("id", "installation-llm-openrouter-model-search");
     await user.type(search, "gpt");
 
     expect(within(list).queryByText("anthropic/claude-sonnet-4")).not.toBeInTheDocument();
@@ -175,8 +176,20 @@ describe("HostedLLMSettings", () => {
 
     render(<HostedLLMSettings />);
 
-    const provisioningKey = await screen.findByTestId("installation-llm-openrouter-management-key");
+    const provisioningKey = await screen.findByLabelText("Provisioning API Key");
+    expect(provisioningKey).toHaveAttribute("id", "installation-llm-openrouter-management-key");
     expect(provisioningKey).toHaveAttribute("placeholder", "Leave blank to keep the current key");
+    expect(screen.getByLabelText("Enable OpenRouter")).toHaveAttribute("id", "installation-llm-openrouter-enabled");
+    const apiKeys = screen.getAllByLabelText("API key");
+    expect(apiKeys.map((node) => node.getAttribute("id"))).toEqual([
+      "installation-llm-anthropic-api-key",
+      "installation-llm-openai-api-key",
+      "installation-llm-openrouter-api-key",
+    ]);
+    expect(screen.getAllByLabelText("Base URL (optional)")[2]).toHaveAttribute(
+      "id",
+      "installation-llm-openrouter-base-url",
+    );
     expect(screen.getByText(/uses this key to create a short-lived OpenRouter key/)).toBeInTheDocument();
     expect(screen.getByText(/does not send this key to the runner/)).toBeInTheDocument();
     expect(screen.queryByTestId("installation-llm-anthropic-management-key")).not.toBeInTheDocument();
