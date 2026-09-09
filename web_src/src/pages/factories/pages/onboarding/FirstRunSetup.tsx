@@ -145,6 +145,33 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
   };
 }
 
+/** Hosted credentials provision from this screen, so it shows finish progress. */
+function TicketsScreenHost({
+  flow,
+  saving,
+  chrome,
+  sphere,
+}: {
+  flow: FirstRunSetupFlow;
+  saving: boolean;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  const finishing = flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && saving);
+  return (
+    <FirstRunTicketsScreen
+      ticketSource={DEFAULT_TICKET_SOURCE}
+      chrome={chrome}
+      sphere={sphere}
+      continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+      saving={flow.blockingAction === "saving-ticket-source" || finishing}
+      savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      onSelectTicketSource={flow.selectTicketSource}
+      onAnalyzeTickets={() => void flow.continueFromTickets()}
+    />
+  );
+}
+
 /**
  * Workspace setup, on the first-run screens. Each answer is saved through the
  * setup model. The last screen provisions the workspace and opens it.
@@ -217,7 +244,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         bindingInstallationId={flow.bindingInstallationId}
         connecting={flow.blockingAction === "opening-github"}
         chrome={chromeFor("connect")}
-        sphere={sphereFor("connect", initial, setup.selectedRepo)}
+        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", initial, setup.selectedRepo)}
+        stepper={initial}
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
@@ -234,6 +262,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
         sphere={sphereFor("choose", initial, setup.selectedRepo)}
+        stepper={initial ? { organizationName: model.githubOwner } : undefined}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}
         onContinue={() => void flow.continueFromRepository()}
@@ -243,23 +272,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
 
   if (flow.screen === "tickets") {
     return (
-      <FirstRunTicketsScreen
-        ticketSource={DEFAULT_TICKET_SOURCE}
+      <TicketsScreenHost
+        flow={flow}
+        saving={model.saving}
         chrome={chromeFor("tickets")}
         sphere={sphereFor("tickets", initial, setup.selectedRepo)}
-        continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
-        saving={
-          flow.blockingAction === "saving-ticket-source" ||
-          flow.blockingAction === "finishing-setup" ||
-          (flow.skipAgentScreen && model.saving)
-        }
-        savingLabel={
-          flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && model.saving)
-            ? FIRST_RUN_COPY.finish.saving
-            : FIRST_RUN_COPY.tickets.saving
-        }
-        onSelectTicketSource={flow.selectTicketSource}
-        onAnalyzeTickets={() => void flow.continueFromTickets()}
       />
     );
   }

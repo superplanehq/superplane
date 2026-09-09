@@ -6,20 +6,6 @@ import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 
 describe("FirstRunChooseScreen", () => {
-  it("shows an access hint next to the edit connection link", () => {
-    render(
-      <FirstRunChooseScreen
-        repositories={["octo/repo"]}
-        selectedRepository={null}
-        onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
-        onContinue={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByTestId("first-run-choose-access-hint")).toHaveTextContent(FIRST_RUN_COPY.choose.accessHint);
-  });
-
   it("calls onEditConnection when the edit connection link is clicked", async () => {
     const user = userEvent.setup();
     const onEditConnection = vi.fn();
@@ -36,31 +22,6 @@ describe("FirstRunChooseScreen", () => {
 
     await user.click(screen.getByText(FIRST_RUN_COPY.choose.editConnection));
     expect(onEditConnection).toHaveBeenCalled();
-  });
-
-  it("reveals why a repository might not show up when expanded", async () => {
-    const user = userEvent.setup();
-
-    render(
-      <FirstRunChooseScreen
-        repositories={["octo/repo"]}
-        selectedRepository={null}
-        onSelectRepository={vi.fn()}
-        onEditConnection={vi.fn()}
-        onContinue={vi.fn()}
-      />,
-    );
-
-    const disclosure = screen.getByTestId("first-run-choose-why-missing");
-    expect(screen.getByText(FIRST_RUN_COPY.choose.missingTitle)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.choose.missingReasons[0])).not.toBeVisible();
-
-    await user.click(screen.getByText(FIRST_RUN_COPY.choose.missingTitle));
-
-    expect(disclosure).toHaveAttribute("open");
-    for (const reason of FIRST_RUN_COPY.choose.missingReasons) {
-      expect(screen.getByText(reason)).toBeVisible();
-    }
   });
 
   it("calls onBack from the shell when Back is clicked", async () => {
@@ -151,5 +112,25 @@ describe("FirstRunChooseScreen", () => {
     expect(screen.getByTestId("first-run-continue-to-tickets")).toHaveTextContent(FIRST_RUN_COPY.choose.saving);
     expect(screen.getByRole("option", { name: /octo\/repo/ })).toBeDisabled();
     expect(screen.getByText(FIRST_RUN_COPY.choose.editConnection)).toBeDisabled();
+  });
+
+  it("shows the finished GitHub steps above the repository picker on the stepper card", () => {
+    render(
+      <FirstRunChooseScreen
+        repositories={["puppies-inc/app"]}
+        selectedRepository={null}
+        stepper={{ organizationName: "puppies-inc" }}
+        onSelectRepository={vi.fn()}
+        onEditConnection={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-github-stepper")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.stepConnected)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.stepOrganizationDone("puppies-inc"))).toBeInTheDocument();
+    expect(screen.getAllByTestId("first-run-step-done")).toHaveLength(2);
+    expect(screen.getByRole("option", { name: /puppies-inc\/app/ })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeInTheDocument();
   });
 });

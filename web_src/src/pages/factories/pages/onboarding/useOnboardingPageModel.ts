@@ -364,6 +364,19 @@ function useSelectOnboardingVcsConnection(args: {
   };
 }
 
+/** The mutation hooks the page model saves and provisions through. */
+function useOnboardingMutations(organizationId: string, factoryId: string) {
+  return {
+    updateFactory: useUpdateFactory(organizationId, factoryId),
+    updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
+    updateOrganization: useUpdateOrganization(organizationId),
+    createLine: useCreateFactoryLine(organizationId, factoryId),
+    createIntake: useCreateFactoryIntake(organizationId, factoryId),
+    createPRFeedbackHandler: useCreateFactoryPRFeedbackHandler(organizationId, factoryId),
+    installer: useInstallFactory({ organizationId }),
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -404,13 +417,15 @@ export function useOnboardingPageModel(args: {
 
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
-  const updateFactory = useUpdateFactory(args.organizationId, args.factoryId);
-  const updateOnboarding = useFactoryOnboarding(args.organizationId, args.factoryId);
-  const updateOrganization = useUpdateOrganization(args.organizationId);
-  const createLine = useCreateFactoryLine(args.organizationId, args.factoryId);
-  const createIntake = useCreateFactoryIntake(args.organizationId, args.factoryId);
-  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(args.organizationId, args.factoryId);
-  const installer = useInstallFactory({ organizationId: args.organizationId });
+  const {
+    updateFactory,
+    updateOnboarding,
+    updateOrganization,
+    createLine,
+    createIntake,
+    createPRFeedbackHandler,
+    installer,
+  } = useOnboardingMutations(args.organizationId, args.factoryId);
   const githubIntegrationId = integrations.selections.github?.ready ? integrations.selections.github.id : "";
   const githubConnections = useOnboardingGithubConnectionsForPage({
     ...args,
@@ -441,6 +456,10 @@ export function useOnboardingPageModel(args: {
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
   });
+  const githubOwner = githubOwnerFromConnections(
+    [...githubConnections.readyInstances, ...githubConnections.allInstances],
+    githubIntegrationId,
+  );
   const finish = useFinishOnboarding({
     ...args,
     setup,
@@ -461,10 +480,7 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     hostedModelsLoading: agent.hostedModelsLoading,
     plan: agent.plan,
-    githubOwner: githubOwnerFromConnections(
-      [...githubConnections.readyInstances, ...githubConnections.allInstances],
-      githubIntegrationId,
-    ),
+    githubOwner,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
@@ -528,5 +544,7 @@ export function useOnboardingPageModel(args: {
     // Fresh organization + first workspace: the redesigned split-pane look.
     initialOnboarding: args.factory?.onboarding?.initial === true,
     provisionedDestination,
+    // Names the finished organization row on the GitHub stepper card.
+    githubOwner,
   };
 }
