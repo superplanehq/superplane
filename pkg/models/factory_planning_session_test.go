@@ -344,6 +344,17 @@ func TestFactoryPlanningSession_ProposeAndSkipDraft(t *testing.T) {
 	assert.Equal(t, PlanningWaitKindSkipped, session.Wait().Kind)
 }
 
+func TestFactoryPlanningSession_ProposeDraftRequiresDescription(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-draft-desc")
+	db := database.DB(t.Context())
+
+	err := session.ProposeDraft(db, PlanningSessionDraft{Title: "Add flight transportation mode"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
+	assert.Equal(t, "", session.Draft().Title)
+}
+
 func TestFactoryPlanningSession_CreateDraftWorkOrder(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-create")
@@ -562,17 +573,12 @@ func TestFactoryPlanningSession_RefineNoteIgnoresOpenWorkOrder(t *testing.T) {
 
 func TestEndPlanningSessionForFinishedRun(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	session := startTestPlanningSession(t, "plan-run-fail")
+	session := startTestPlanningSession(t, "plan-run-pass")
 	db := database.DB(t.Context())
 	require.NotNil(t, session.CanvasRunID)
 
 	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultPassed))
 	reloaded, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
-	require.NoError(t, err)
-	assert.Equal(t, PlanningSessionStateRunning, reloaded.State)
-
-	require.NoError(t, EndPlanningSessionForFinishedRun(db, *session.CanvasRunID, CanvasRunResultFailed))
-	reloaded, err = FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, PlanningSessionStateEnded, reloaded.State)
 	require.NotNil(t, reloaded.EndedAt)

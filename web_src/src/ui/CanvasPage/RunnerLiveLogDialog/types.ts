@@ -50,5 +50,6 @@ export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
   error: string | null;
+  isLoading: boolean;
   isStreaming: boolean;
 };
