@@ -1,5 +1,5 @@
 import type { FactoriesFactory } from "@/api-client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
@@ -43,6 +43,11 @@ export function OnboardingGate() {
   // so that write cannot unmount the analysis screen. A later open of setup
   // still leaves for the board.
   const startedIncomplete = useRef(isIncomplete);
+  useEffect(() => {
+    if (!isIncomplete && !isSetupRoute) {
+      startedIncomplete.current = false;
+    }
+  }, [isIncomplete, isSetupRoute]);
 
   if (!isIncomplete) {
     if (holdSetupAfterThisVisitCompletes(startedIncomplete.current, isSetupRoute)) {
