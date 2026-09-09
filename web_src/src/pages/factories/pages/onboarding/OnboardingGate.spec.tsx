@@ -64,6 +64,36 @@ function CompletionHarness() {
       <button type="button" onClick={() => navigate("/org-1/workspaces/PAY/setup")}>
         open setup
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          factoryId = "factory-2";
+          factory = {
+            id: factoryId,
+            lines: [{ id: "line-plan" }],
+            onboarding: { completedAt: "2026-08-17T12:00:00Z" },
+          };
+          setTick((n) => n + 1);
+          navigate("/org-1/workspaces/PAY/lines/line-plan");
+        }}
+      >
+        switch to completed workspace
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          factoryId = "factory-1";
+          factory = {
+            id: factoryId,
+            lines: [{ id: "line-plan" }],
+            onboarding: { completedAt: "2026-08-17T12:00:00Z" },
+          };
+          setTick((n) => n + 1);
+          navigate("/org-1/workspaces/PAY/setup");
+        }}
+      >
+        open first workspace setup
+      </button>
       <Routes>
         <Route path="/org-1/workspaces/PAY" element={<Layout />}>
           <Route element={<OnboardingGate />}>
@@ -182,6 +212,21 @@ describe("OnboardingGate", () => {
     await user.click(screen.getByRole("button", { name: "complete" }));
 
     expect(screen.getByText("/org-1/workspaces/PAY/setup")).toBeInTheDocument();
+  });
+
+  it("does not retain a completed workspace hold after switching workspaces", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <CompletionHarness />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "complete" }));
+    await user.click(screen.getByRole("button", { name: "switch to completed workspace" }));
+    await user.click(screen.getByRole("button", { name: "open first workspace setup" }));
+
+    expect(await screen.findByText("/org-1/workspaces/pay/lines/line-plan")).toBeInTheDocument();
   });
 
   it("opens the line board when a completed workspace leaves setup", async () => {

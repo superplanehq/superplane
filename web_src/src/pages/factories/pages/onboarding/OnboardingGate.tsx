@@ -48,7 +48,7 @@ export function OnboardingGate() {
       startedIncompleteFactoryId.current = factoryId;
       return;
     }
-    if (!isSetupRoute && startedIncompleteFactoryId.current === factoryId) {
+    if (!isSetupRoute) {
       startedIncompleteFactoryId.current = null;
     }
   }, [factoryId, isIncomplete, isSetupRoute]);
