@@ -152,6 +152,11 @@ func (s *FactoryService) ListFactoryRepositoryStatusChecks(ctx context.Context, 
 	return actions.ListFactoryRepositoryStatusChecks(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryRepositoryReviewBots(ctx context.Context, req *pb.ListFactoryRepositoryReviewBotsRequest) (*pb.ListFactoryRepositoryReviewBotsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryRepositoryReviewBots(ctx, s.intakeDeps, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryPullRequests(ctx context.Context, req *pb.ListFactoryPullRequestsRequest) (*pb.ListFactoryPullRequestsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryPullRequests(ctx, organizationID, req)

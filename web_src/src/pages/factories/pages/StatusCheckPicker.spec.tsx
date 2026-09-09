@@ -25,9 +25,7 @@ describe("statusCheckRows", () => {
 
 describe("StatusCheckPicker", () => {
   it("keeps selected checks visible while the catalog loads", () => {
-    render(
-      <StatusCheckPicker names={["lint", "e2e"]} catalog={[]} loading onToggle={vi.fn()} />,
-    );
+    render(<StatusCheckPicker names={["lint", "e2e"]} catalog={[]} loading onToggle={vi.fn()} />);
 
     expect(screen.getByTestId("pr-feedback-check-option-lint")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("pr-feedback-check-option-e2e")).toHaveAttribute("aria-selected", "true");

@@ -185,6 +185,17 @@ function renderAutomationPopup() {
   );
 }
 
+describe("PRFeedbackSettingsPopup discussion", () => {
+  it("does not offer name or repository fields and keeps mention and allowed bots", () => {
+    renderChecksPopup(vi.fn(), discussionDraft({ mention: "", allowedBots: ["coderabbitai"] }));
+
+    expect(screen.queryByTestId("pr-feedback-name")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pr-feedback-repository")).not.toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-mention")).toHaveValue("");
+    expect(screen.getByTestId("pr-feedback-allowed-bots")).toHaveValue("coderabbitai");
+  });
+});
+
 describe("PRFeedbackSettingsPopup check names", () => {
   it("does not offer name or repository fields because those come from setup", () => {
     renderChecksPopup(vi.fn(), checksDraft({ checkNames: ["lint"] }), "org-1", "factory-1");

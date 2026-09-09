@@ -251,6 +251,48 @@ func (c *Client) ListCommits(
 	return c.underlying.Repositories.ListCommits(ctx, owner, name, opts)
 }
 
+func (c *Client) ListReviews(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestReview, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.ListOptions{PerPage: 100}
+
+	var all []*github.PullRequestReview
+	for {
+		reviews, resp, err := c.underlying.PullRequests.ListReviews(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list reviews: %w", err)
+		}
+
+		all = append(all, reviews...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
+func (c *Client) ListPullRequestComments(ctx context.Context, repository string, pullNumber int) ([]*github.PullRequestComment, error) {
+	owner, name := c.ownerAndName(repository)
+	opts := &github.PullRequestListCommentsOptions{
+		ListOptions: github.ListOptions{PerPage: 100},
+	}
+
+	var all []*github.PullRequestComment
+	for {
+		comments, resp, err := c.underlying.PullRequests.ListComments(ctx, owner, name, pullNumber, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pull request comments: %w", err)
+		}
+
+		all = append(all, comments...)
+		if resp == nil || resp.NextPage == 0 {
+			return all, nil
+		}
+
+		opts.Page = resp.NextPage
+	}
+}
+
 func (c *Client) ListPullRequestReviewComments(
 	ctx context.Context,
 	repository string,

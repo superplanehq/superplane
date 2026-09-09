@@ -3,6 +3,7 @@ import {
   useCreateFactoryPRFeedbackHandler,
   useDeleteFactoryPRFeedbackHandler,
   useFactoryPRFeedbackHandlers,
+  useFactoryRepositoryReviewBots,
   useFactoryRepositoryStatusChecks,
   useUpdateFactoryPRFeedbackHandler,
 } from "@/hooks/useFactoryPRFeedbackData";
@@ -13,11 +14,11 @@ import { useState } from "react";
 import { factoryAppConfigurePath } from "../lib/factoryPagePaths";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
+import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
-  apiPRFeedbackSource,
   takenPRFeedbackSourceIds,
   prFeedbackDraftFromHandler,
   prFeedbackSettingsToApi,
@@ -55,8 +56,12 @@ export function PRFeedbackSettingsHost({
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [checksSource, setChecksSource] = useState<PRFeedbackSource | null>(null);
+  const [discussionSource, setDiscussionSource] = useState<PRFeedbackSource | null>(null);
   useFactoryRepositoryStatusChecks(organizationId, factoryId, "", {
     enabled: pickerOpen || Boolean(checksSource),
+  });
+  useFactoryRepositoryReviewBots(organizationId, factoryId, "", {
+    enabled: pickerOpen || Boolean(discussionSource),
   });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
@@ -71,16 +76,7 @@ export function PRFeedbackSettingsHost({
       setChecksSource(source);
       return;
     }
-    createHandler
-      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
-      .then((created) => {
-        if (created.id) {
-          onCreated?.(created.id);
-        }
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-      });
+    setDiscussionSource(source);
   };
 
   if (handlersQuery.isPending) {
@@ -141,6 +137,20 @@ export function PRFeedbackSettingsHost({
             onClose={() => setChecksSource(null)}
             onCreated={(id) => {
               setChecksSource(null);
+              onCreated?.(id);
+            }}
+          />
+        ) : null}
+        {discussionSource ? (
+          <DiscussionPRFeedbackSetupDialog
+            open
+            organizationId={organizationId}
+            factoryId={factoryId}
+            repository=""
+            source={discussionSource}
+            onClose={() => setDiscussionSource(null)}
+            onCreated={(id) => {
+              setDiscussionSource(null);
               onCreated?.(id);
             }}
           />

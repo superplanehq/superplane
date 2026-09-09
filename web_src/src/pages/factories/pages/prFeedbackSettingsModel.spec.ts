@@ -313,9 +313,11 @@ describe("prFeedbackListenTitle", () => {
 });
 
 describe("prFeedbackDraftIsValid", () => {
-  it("requires a name, repository, and mention", () => {
+  it("requires a name and repository", () => {
     expect(prFeedbackDraftIsValid(discussionDraft())).toBe(true);
     expect(prFeedbackDraftIsValid(discussionDraft({ name: "" }))).toBe(false);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "" }))).toBe(true);
+    expect(prFeedbackDraftIsValid(discussionDraft({ mention: "superplaneagent" }))).toBe(false);
   });
 
   it("does not require an allowed bots list", () => {
@@ -370,6 +372,15 @@ describe("prFeedbackDraftFromHandler", () => {
 
     expect(prFeedbackDraftFromHandler(handler).allowedBots).toEqual(["coderabbitai", "bugbot"]);
     expect(prFeedbackDraftFromHandler(handler).source).toBe("discussion");
+  });
+
+  it("keeps an empty mention", () => {
+    const handler: FactoriesFactoryPrFeedbackHandler = {
+      name: "Address PR feedback",
+      settings: { subject: { repository: "acme/app" }, discussion: { mention: "" } },
+    };
+
+    expect(prFeedbackDraftFromHandler(handler).mention).toBe("");
   });
 
   it("defaults to an empty allowed bots list", () => {

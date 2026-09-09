@@ -7,7 +7,6 @@ import {
   PRFeedbackChecksFields,
   PRFeedbackDiscussionFields,
   PRFeedbackHealthSection,
-  PRFeedbackTextField,
 } from "./PRFeedbackSettingsFields";
 import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
@@ -179,24 +178,6 @@ function PRFeedbackGeneralTab({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
           <PRFeedbackHealthSection healthy={healthy} checks={checks} />
-          {checks ? null : (
-            <>
-              <PRFeedbackTextField
-                id="pr-feedback-name"
-                label={PR_FEEDBACK_SETTINGS_COPY.nameLabel}
-                helper={PR_FEEDBACK_SETTINGS_COPY.nameHelper}
-                value={draft.name}
-                onChange={(value) => onUpdate("name", value)}
-              />
-              <PRFeedbackTextField
-                id="pr-feedback-repository"
-                label={PR_FEEDBACK_SETTINGS_COPY.repositoryLabel}
-                helper={PR_FEEDBACK_SETTINGS_COPY.repositoryHelper}
-                value={draft.repository}
-                onChange={(value) => onUpdate("repository", value)}
-              />
-            </>
-          )}
           {checks ? (
             <PRFeedbackChecksFields
               organizationId={organizationId}

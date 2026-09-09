@@ -2,6 +2,7 @@ import {
   factoriesCreateFactoryPrFeedbackHandler,
   factoriesDeleteFactoryPrFeedbackHandler,
   factoriesListFactoryPrFeedbackHandlers,
+  factoriesListFactoryRepositoryReviewBots,
   factoriesListFactoryRepositoryStatusChecks,
   factoriesUpdateFactoryPrFeedbackHandler,
 } from "@/api-client";
@@ -9,6 +10,7 @@ import type {
   FactoriesFactoryPrFeedbackHandler,
   FactoriesFactoryPrFeedbackHandlerSettings,
   FactoriesFactoryPrFeedbackHandlerSource,
+  FactoriesFactoryRepositoryReviewBot,
   FactoriesFactoryRepositoryStatusCheck,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -21,6 +23,8 @@ const factoryPRFeedbackQueryKeys = {
     ["factories", organizationId, factoryId, "pr-feedback-handlers"] as const,
   statusChecks: (organizationId: string, factoryId: string, repository: string) =>
     ["factories", organizationId, factoryId, "repository-status-checks", repository] as const,
+  reviewBots: (organizationId: string, factoryId: string, repository: string) =>
+    ["factories", organizationId, factoryId, "repository-review-bots", repository] as const,
 };
 
 export function factoryPRFeedbackHandlersKey(organizationId: string, factoryId: string) {
@@ -146,6 +150,30 @@ export function useFactoryRepositoryStatusChecks(
         }),
       );
       return response.data?.checks ?? [];
+    },
+    enabled: Boolean(organizationId && factoryId && (options?.enabled ?? true)),
+    staleTime: 60_000,
+  });
+}
+
+export function useFactoryRepositoryReviewBots(
+  organizationId: string,
+  factoryId: string,
+  repository: string,
+  options?: { enabled?: boolean },
+) {
+  const trimmedRepository = repository.trim();
+  return useQuery({
+    queryKey: factoryPRFeedbackQueryKeys.reviewBots(organizationId, factoryId, trimmedRepository),
+    queryFn: async (): Promise<FactoriesFactoryRepositoryReviewBot[]> => {
+      const response = await factoriesListFactoryRepositoryReviewBots(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId },
+          query: trimmedRepository ? { repository: trimmedRepository } : undefined,
+        }),
+      );
+      return response.data?.bots ?? [];
     },
     enabled: Boolean(organizationId && factoryId && (options?.enabled ?? true)),
     staleTime: 60_000,

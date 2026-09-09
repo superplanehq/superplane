@@ -31,9 +31,6 @@ func defaultPRFeedbackSettings() prFeedbackSettings {
 func (s prFeedbackSettings) normalized() prFeedbackSettings {
 	s.Repository = strings.TrimSpace(s.Repository)
 	s.Mention = strings.TrimSpace(s.Mention)
-	if s.Mention == "" {
-		s.Mention = prFeedbackDefaultMention
-	}
 	s.AllowedBots = normalizedAllowedBots(s.AllowedBots)
 	s.CheckNames = normalizedCheckNames(s.CheckNames)
 	s.RunnerIntegrationIDs = normalizedUniqueStrings(s.RunnerIntegrationIDs)
@@ -103,9 +100,7 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 		if repository := strings.TrimSpace(prFeedbackNodeString(node, "repository")); repository != "" {
 			settings.Repository = repository
 		}
-		if mention := strings.TrimSpace(prFeedbackNodeString(node, "contentFilter")); mention != "" {
-			settings.Mention = mention
-		}
+		settings.Mention = strings.TrimSpace(prFeedbackNodeString(node, "contentFilter"))
 		settings.IgnoreBots = prFeedbackNodeBool(node, "ignoreBots", settings.IgnoreBots)
 		settings.AllowedBots = prFeedbackNodeStringSlice(node, "allowedBots")
 		break
@@ -185,9 +180,6 @@ func validatePRFeedbackSettingsForSource(
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 		if requested != nil && requested.GetChecks() != nil && len(requested.GetChecks().GetRunnerIntegrationIds()) > 0 {
 			return invalidArgument("discussion handlers do not accept runner integrations")
-		}
-		if strings.TrimSpace(settings.Mention) == "" {
-			return invalidArgument("mention cannot be empty")
 		}
 		return nil
 	}

@@ -35,7 +35,7 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   {
     id: "discussion",
     name: "Pull request discussion",
-    description: "Address comments and reviews after a mention.",
+    description: "Address comments and reviews on a pull request.",
     listenTitle: "Listening to pull request comments",
     iconSrc: githubIcon,
     iconAlt: "GitHub",
@@ -103,7 +103,8 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   repositoryLabel: "Repository",
   repositoryHelper: "Listen for mentions on pull requests in this repository.",
   mentionLabel: "Mention",
-  mentionHelper: "Use an exact GitHub mention, for example @superplaneagent.",
+  mentionHelper:
+    "Leave this field empty to start a run from any human comment or review. Use @superplaneagent to require a mention.",
   ignoreBotsLabel: "Ignore bot comments",
   ignoreBotsHelper: "Do not start a run when a bot writes the mention.",
   allowedBotsLabel: "Allowed bots",
@@ -118,15 +119,30 @@ export const PR_FEEDBACK_SETTINGS_COPY = {
   checkNamesRequired: "Required",
   checkNamesLoadError: "SuperPlane could not load status checks from this repository.",
   wizardTitle: "Fix pull request checks",
+  wizardCommentsTitle: "Address PR feedback",
+  wizardMentionDescription: "Require @superplaneagent from human reviewers.",
+  wizardMentionHelper:
+    "Humans must mention @superplaneagent to start a run. Turn this off to start a run from any human comment or review.",
+  wizardMentionOption: "Require @superplaneagent",
+  wizardBotsLabel: "Review bots",
+  wizardBotsHelper: "Start a run when these bots comment or review. SuperPlane ignores other bots.",
+  wizardBotsLoading: "Loading review bots",
+  wizardBotsLoadingDetail: "Reading recent pull request reviews and comments...",
+  wizardBotsEmpty: "No review bots found. Add a bot login below.",
+  wizardBotsLoadError: "SuperPlane could not load review bots from this repository.",
+  wizardBotsAddLabel: "Add bot login",
+  wizardBotsAddHelper: "Use the GitHub bot login if discovery missed it.",
+  wizardBotsAddPlaceholder: "coderabbitai",
+  wizardBotsAdd: "Add",
+  wizardStepMention: "Step 1 of 2",
+  wizardStepBots: "Step 2 of 2",
   wizardChecksDescription: "Keep the status checks SuperPlane must wait for and fix.",
   wizardToolsDescription:
     "Connect the external tools reporting the status checks so the agent fixing the issues has enough access to troubleshoot the issues.",
   wizardToolsUnknown:
     "SuperPlane could not match these checks to a CI tool. The agent may not have enough context to fix them.",
-  wizardToolsUnselected:
-    "Some of the checks you selected require additional access that you are not granting.",
-  wizardToolsUnselectedDetail:
-    "That prevents the agent from having enough context to fix issues correctly.",
+  wizardToolsUnselected: "Some of the checks you selected require additional access that you are not granting.",
+  wizardToolsUnselectedDetail: "That prevents the agent from having enough context to fix issues correctly.",
   wizardContinue: "Continue",
   wizardFinish: "Finish",
   wizardFinishing: "Finishing...",
@@ -206,11 +222,7 @@ function handlerDraftRepository(handler: FactoriesFactoryPrFeedbackHandler): str
 }
 
 function handlerDraftMention(mention: string | undefined): string {
-  const trimmed = mention?.trim();
-  if (trimmed) {
-    return trimmed;
-  }
-  return "@superplaneagent";
+  return mention?.trim() ?? "";
 }
 
 export function prFeedbackListenTitle(source?: FactoriesFactoryPrFeedbackHandlerSource | PRFeedbackSourceId): string {
@@ -293,7 +305,7 @@ export function prFeedbackDraftIsValid(draft: PRFeedbackDraftSettings): boolean 
   if (next.source === "checks") {
     return next.checkNames.length > 0 && next.maximumAttempts >= 1 && next.maximumAttempts <= 10;
   }
-  return next.mention.startsWith("@");
+  return next.mention.length === 0 || next.mention.startsWith("@");
 }
 
 export function prFeedbackSettingsToApi(draft: PRFeedbackDraftSettings): FactoriesFactoryPrFeedbackHandlerSettings {

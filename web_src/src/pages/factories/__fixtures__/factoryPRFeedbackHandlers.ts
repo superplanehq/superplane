@@ -54,6 +54,21 @@ export function factoryPRFeedbackRoutes(fixture: FactoriesFixture): FactoryPRFee
             }
           : null,
     },
+    {
+      pattern: route("/api/v1/factories/([^/]+)/repository-review-bots"),
+      resolve: (_match, method) =>
+        method === "GET"
+          ? {
+              json: {
+                repository: "acme/api",
+                bots: [
+                  { login: "coderabbitai", displayName: "coderabbitai[bot]" },
+                  { login: "bugbot", displayName: "bugbot[bot]" },
+                ],
+              },
+            }
+          : null,
+    },
   ];
 }
 

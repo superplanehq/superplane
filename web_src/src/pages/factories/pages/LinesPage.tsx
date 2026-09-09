@@ -14,8 +14,8 @@ import {
   useUpdateFactoryLine,
 } from "@/hooks/useFactoryData";
 import {
-  useCreateFactoryPRFeedbackHandler,
   useFactoryPRFeedbackHandlers,
+  useFactoryRepositoryReviewBots,
   useFactoryRepositoryStatusChecks,
 } from "@/hooks/useFactoryPRFeedbackData";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
@@ -43,6 +43,7 @@ import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { ChecksPRFeedbackSetupDialog } from "./ChecksPRFeedbackSetupDialog";
+import { DiscussionPRFeedbackSetupDialog } from "./DiscussionPRFeedbackSetupDialog";
 import { NextStepsPanel } from "./NextStepsPanel";
 import { runWorkspaceNextStepAction, workspaceNextSteps } from "./workspaceNextStepCatalog";
 import { BacklogColumn, type BacklogIntakePanel } from "./BacklogColumn";
@@ -160,7 +161,6 @@ import { PRFeedbackSettingsHost } from "./PRFeedbackSettingsHost";
 import {
   PR_FEEDBACK_SETTINGS_COPY,
   PR_FEEDBACK_SOURCES,
-  apiPRFeedbackSource,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
   prFeedbackHandlerForSource,
@@ -227,7 +227,6 @@ export function LinesPage() {
   const listState = useWorkOrderListState(factoryId);
   const { data: factoryIntakes = [] } = useFactoryIntakes(organizationId, factoryId);
   const createIntake = useCreateFactoryIntake(organizationId, factoryId);
-  const createPRFeedbackHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
   const configuredIntakes = useMemo(() => intakeSourcesFromFactoryIntakes(factoryIntakes), [factoryIntakes]);
   const showAddIntakeControl = useFactoryPreviewFlag("addIntakeControl");
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
@@ -249,8 +248,13 @@ export function LinesPage() {
   const [productiveIntakeSetupOpen, setProductiveIntakeSetupOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const [checksPRFeedbackSource, setChecksPRFeedbackSource] = useState<PRFeedbackSource | null>(null);
-  useFactoryRepositoryStatusChecks(organizationId, factoryId, factory?.onboarding?.appRepository?.trim() ?? "", {
+  const [discussionPRFeedbackSource, setDiscussionPRFeedbackSource] = useState<PRFeedbackSource | null>(null);
+  const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
+  useFactoryRepositoryStatusChecks(organizationId, factoryId, appRepository, {
     enabled: addPRFeedbackOpen || Boolean(checksPRFeedbackSource),
+  });
+  useFactoryRepositoryReviewBots(organizationId, factoryId, appRepository, {
+    enabled: addPRFeedbackOpen || Boolean(discussionPRFeedbackSource),
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -359,17 +363,7 @@ export function LinesPage() {
       setChecksPRFeedbackSource(source);
       return;
     }
-    createPRFeedbackHandler
-      .mutateAsync({ source: apiPRFeedbackSource(source.id), name: source.defaultName })
-      .then((handler) => {
-        if (!handler.id) {
-          return;
-        }
-        navigate(factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, handler.id));
-      })
-      .catch((error) => {
-        showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.createError));
-      });
+    setDiscussionPRFeedbackSource(source);
   };
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
@@ -465,10 +459,21 @@ export function LinesPage() {
           open
           organizationId={organizationId}
           factoryId={factoryId}
-          repository={factory.onboarding?.appRepository?.trim() ?? ""}
+          repository={appRepository}
           source={checksPRFeedbackSource}
           onClose={() => setChecksPRFeedbackSource(null)}
           onCreated={() => setChecksPRFeedbackSource(null)}
+        />
+      ) : null}
+      {discussionPRFeedbackSource ? (
+        <DiscussionPRFeedbackSetupDialog
+          open
+          organizationId={organizationId}
+          factoryId={factoryId}
+          repository={appRepository}
+          source={discussionPRFeedbackSource}
+          onClose={() => setDiscussionPRFeedbackSource(null)}
+          onCreated={() => setDiscussionPRFeedbackSource(null)}
         />
       ) : null}
       {automationViewCanvasId ? (

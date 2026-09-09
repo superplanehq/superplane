@@ -322,6 +322,15 @@ func TestRepositoryStatusChecksRouteUsesFactoryRead(t *testing.T) {
 	assert.Equal(t, "read", rule.Action)
 }
 
+func TestRepositoryReviewBotsRouteUsesFactoryRead(t *testing.T) {
+	rules := DefaultAuthorizationRules()
+
+	rule, ok := rules[HTTPRoute{Method: http.MethodGet, Pattern: "/api/v1/factories/{factory_id}/repository-review-bots"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+}
+
 func TestSetUserOwnerRouteUsesMembersUpdate(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 

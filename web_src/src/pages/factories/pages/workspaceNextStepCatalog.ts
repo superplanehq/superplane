@@ -21,7 +21,7 @@ export interface WorkspaceNextStepContext {
 export const WORKSPACE_NEXT_STEPS_COPY = {
   title: "You finished workspace setup",
   description:
-    "The factory can implement tasks and will open pull requests for them. Configure status checks for those pull requests next.",
+    "The factory can implement tasks and will open pull requests for them. Configure verification for those pull requests next.",
   configure: "Configure...",
 } as const;
 
@@ -35,7 +35,7 @@ const WORKSPACE_NEXT_STEPS: Array<
   {
     id: "pr-comments-handler",
     title: "Configure comments handler",
-    description: "Start a fix when someone mentions the agent on a pull request.",
+    description: "Start a fix from pull request comments and reviews.",
     action: { type: "configure-pr-feedback", sourceId: "discussion" },
     isDone: (ctx) => ctx.takenPRFeedbackSources.includes("discussion"),
   },
