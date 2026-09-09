@@ -55,8 +55,10 @@ export function finishOnboardingError(args: {
   return null;
 }
 
+export type OnboardingDestination = { organizationId: string; factoryKey: string; lineId: string };
+
 /** The line board, where the new GitHub intake sits at the foot of Backlog. */
-export function afterOnboardingPath(args: { organizationId: string; factoryKey: string; lineId: string }) {
+export function afterOnboardingPath(args: OnboardingDestination) {
   return factoryHomePath(args.organizationId, args.factoryKey, args.lineId);
 }
 
@@ -79,6 +81,7 @@ export async function afterWorkspaceProvisioned(args: {
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
   invalidateAccountOrganizations: () => void;
   navigate: ReturnType<typeof useNavigate>;
+  onProvisioned?: (destination: OnboardingDestination) => void;
 }): Promise<void> {
   let organizationId = args.organizationId;
   if (args.updateOrganization) {
@@ -95,6 +98,11 @@ export async function afterWorkspaceProvisioned(args: {
   }
   args.invalidateAccountOrganizations();
   markWorkspaceGettingStarted(organizationId, args.factoryId);
+  const destination = { organizationId, factoryKey: args.factoryKey, lineId: args.lineId };
+  if (args.onProvisioned) {
+    args.onProvisioned(destination);
+    return;
+  }
   navigateAfterFinish(args.navigate, organizationId, args.factoryKey, args.lineId);
 }
 
@@ -208,6 +216,7 @@ export function useFinishOnboarding(args: {
   plan: OnboardingAgentPlan | undefined;
   githubOwner?: string;
   updateOrganization?: (identity: { name: string; slug: string }) => Promise<string | undefined>;
+  onProvisioned?: (destination: OnboardingDestination) => void;
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -268,6 +277,7 @@ export function useFinishOnboarding(args: {
           void queryClient.invalidateQueries({ queryKey: accountOrganizationsQueryKey });
         },
         navigate,
+        onProvisioned: args.onProvisioned,
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to finish workspace setup"));
