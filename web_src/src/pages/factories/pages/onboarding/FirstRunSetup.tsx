@@ -3,9 +3,11 @@ import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { posthog } from "@/posthog";
+import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
+import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
 import { FIRST_RUN_STEP_COUNT, FirstRunHeading, FirstRunPanel, FirstRunShell } from "./first-run/FirstRunShell";
@@ -13,7 +15,10 @@ import { FirstRunTicketsScreen } from "./first-run/FirstRunTicketsScreen";
 import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
+import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
+import { sphereFor } from "./first-run/firstRunSphereFor";
 import { WIZARD_STEPS } from "./onboardingFixtures";
+import { afterOnboardingPath } from "./useFinishOnboarding";
 import {
   DEFAULT_TICKET_SOURCE,
   useFirstRunSetupFlow,
@@ -63,6 +68,7 @@ function AgentScreen({
   organizationId,
   setup,
   chrome,
+  sphere,
   saving,
   loading,
   onRequestConnect,
@@ -71,13 +77,14 @@ function AgentScreen({
   organizationId: string;
   setup: OnboardingSetupApi;
   chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   saving: boolean;
   loading: boolean;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
   return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide">
+    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
         <p className="text-[13px] text-muted-foreground">{AGENT_STEP.purpose}</p>
       </FirstRunHeading>
@@ -138,6 +145,33 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
   };
 }
 
+/** Hosted credentials provision from this screen, so it shows finish progress. */
+function TicketsScreenHost({
+  flow,
+  saving,
+  chrome,
+  sphere,
+}: {
+  flow: FirstRunSetupFlow;
+  saving: boolean;
+  chrome: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
+}) {
+  const finishing = flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && saving);
+  return (
+    <FirstRunTicketsScreen
+      ticketSource={DEFAULT_TICKET_SOURCE}
+      chrome={chrome}
+      sphere={sphere}
+      continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
+      saving={flow.blockingAction === "saving-ticket-source" || finishing}
+      savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      onSelectTicketSource={flow.selectTicketSource}
+      onAnalyzeTickets={() => void flow.continueFromTickets()}
+    />
+  );
+}
+
 /**
  * Workspace setup, on the first-run screens. Each answer is saved through the
  * setup model. The last screen provisions the workspace and opens it.
@@ -145,7 +179,9 @@ function pickerPropsFor(flow: FirstRunSetupFlow) {
 export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { account } = useAccount();
   const { organizationId, factoryId, factories } = useFactoriesLayout();
+  const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
+  const destination = model.provisionedDestination;
   useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
@@ -173,11 +209,24 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
     };
   };
 
+  if (destination) {
+    return (
+      <FirstRunAnalysisHost
+        organizationId={destination.organizationId}
+        factoryId={factoryId}
+        chrome={{ displayName: firstNameOf(account?.name), email: account?.email, onLogOut: signOut, stepIndex: 4 }}
+        selectedRepo={setup.selectedRepo}
+        onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
+      />
+    );
+  }
+
   if (flow.screen === "welcome") {
     return (
       <FirstRunWelcomeScreen
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
+        sphere={sphereFor("welcome", setup.selectedRepo)}
         onGetStarted={() => flow.goToScreen("connect")}
       />
     );
@@ -193,6 +242,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         bindingInstallationId={flow.bindingInstallationId}
         connecting={flow.blockingAction === "opening-github"}
         chrome={chromeFor("connect")}
+        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", setup.selectedRepo)}
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
@@ -208,6 +258,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         loading={model.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
+        sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
+        organizationName={model.githubOwner}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}
         onContinue={() => void flow.continueFromRepository()}
@@ -217,22 +269,11 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
 
   if (flow.screen === "tickets") {
     return (
-      <FirstRunTicketsScreen
-        ticketSource={DEFAULT_TICKET_SOURCE}
+      <TicketsScreenHost
+        flow={flow}
+        saving={model.saving}
         chrome={chromeFor("tickets")}
-        continueLabel={flow.skipAgentScreen ? FIRST_RUN_COPY.tickets.analyze : FIRST_RUN_COPY.tickets.continue}
-        saving={
-          flow.blockingAction === "saving-ticket-source" ||
-          flow.blockingAction === "finishing-setup" ||
-          (flow.skipAgentScreen && model.saving)
-        }
-        savingLabel={
-          flow.blockingAction === "finishing-setup" || (flow.skipAgentScreen && model.saving)
-            ? FIRST_RUN_COPY.finish.saving
-            : FIRST_RUN_COPY.tickets.saving
-        }
-        onSelectTicketSource={flow.selectTicketSource}
-        onAnalyzeTickets={() => void flow.continueFromTickets()}
+        sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}
       />
     );
   }
@@ -242,6 +283,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
+      sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.blockingAction === "finishing-setup" || model.saving}
       loading={model.agentLoading}
       onRequestConnect={model.requestConnect}

@@ -20,8 +20,7 @@ describe("FirstRunTicketsScreen", () => {
     );
 
     expect(screen.getByRole("heading", { name: FIRST_RUN_COPY.tickets.headline })).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.trust)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.scoreHint)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.intro)).toBeInTheDocument();
     expect(screen.queryByText(/The analysis starts when you choose/)).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
 

@@ -4,9 +4,10 @@ import { Clock } from "lucide-react";
 
 import { hostedGitHubInstallURL, type PendingGitHubInstallation } from "@/lib/hostedGitHubInstall";
 
-import { IntegrationChoiceIcon } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FirstRunHeading, FirstRunPanel, FirstRunShell } from "./FirstRunShell";
+import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
+import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.connect;
@@ -22,39 +23,39 @@ function SignedInAsLine({ login }: { login: string }) {
   );
 }
 
-function FirstRunInstallRequested({ githubOrganizations }: { githubOrganizations: string[] }) {
-  const organization = githubOrganizations.length === 1 ? githubOrganizations[0] : "";
+/**
+ * Requested organizations as rows in the organization list, so a pending
+ * approval reads as one more organization instead of a separate panel. The
+ * connect screen rechecks the request every few seconds; an approved
+ * organization replaces its waiting row with a Use button. The tooltip
+ * carries the detail (who approves, no refresh needed) so the row itself
+ * stays one line.
+ */
+function FirstRunPendingOrganizationRows({ githubOrganizations }: { githubOrganizations: string[] }) {
+  const rows = githubOrganizations.length > 0 ? githubOrganizations : [""];
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div data-testid="first-run-github-install-requested">
-          <FirstRunPanel>
-            <div className="flex items-start gap-3">
-              <IntegrationChoiceIcon name="github" />
-              <div className="min-w-0 flex-1 text-left">
-                <p className="text-[13px] font-medium">{copy.installRequested}</p>
-                {githubOrganizations.length > 0 ? (
-                  <ul className="mt-0.5 text-[13px] text-muted-foreground" data-testid="first-run-github-install-org">
-                    {githubOrganizations.map((account) => (
-                      <li key={account}>{account}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                <p className="mt-1 text-[12px] text-muted-foreground">{copy.installRequestedNext}</p>
-              </div>
-              <Clock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+    <div className="space-y-2 text-left" data-testid="first-run-github-install-requested">
+      {rows.map((account) => (
+        <Tooltip key={account}>
+          <TooltipTrigger asChild>
+            <div
+              className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]"
+              data-testid="first-run-github-waiting-row"
+            >
+              <span className="min-w-0 truncate font-medium">{account || copy.installRequested}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                <Clock className="size-3.5" aria-hidden />
+                {account ? copy.installRequested : null}
+              </span>
             </div>
-          </FirstRunPanel>
-        </div>
-      </TooltipTrigger>
-      <TooltipContent
-        side="top"
-        className="w-[var(--radix-tooltip-trigger-width)] max-w-md space-y-1 text-left text-pretty"
-      >
-        <p>{copy.installRequestedBody(organization)}</p>
-        <p>{copy.installRequestedNext}</p>
-      </TooltipContent>
-    </Tooltip>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-md space-y-1 text-left text-pretty">
+            <p>{copy.installRequestedBody(account)}</p>
+            <p>{copy.installRequestedNext}</p>
+          </TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
   );
 }
 
@@ -78,10 +79,6 @@ function FirstRunGitHubAccountPicker({
   const binding = bindingInstallationId !== undefined || disabled;
   return (
     <div className="space-y-3 text-left" data-testid="first-run-github-account-picker">
-      <FirstRunPanel>
-        <p className="text-[13px] font-medium">{copy.selectAccount}</p>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">{copy.selectAccountBody}</p>
-      </FirstRunPanel>
       {installations.map((installation) => (
         <LoadingButton
           key={installation.id}
@@ -163,6 +160,7 @@ export function FirstRunConnectScreen({
   connecting = false,
   connectError,
   chrome,
+  sphere,
   onConnectGitHub,
   onUseInstallation,
   onInstallOther,
@@ -181,6 +179,7 @@ export function FirstRunConnectScreen({
   connecting?: boolean;
   connectError?: string;
   chrome?: FirstRunChrome;
+  sphere?: FirstRunSphereProps;
   onConnectGitHub: () => void;
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
@@ -198,6 +197,7 @@ export function FirstRunConnectScreen({
       testId="first-run-connect"
       chrome={chrome}
       busy={loading || connecting || bindingInstallationId !== undefined}
+      sphere={sphere}
     >
       <ConnectScreenHeading showAccountPicker={showAccountPicker} githubLogin={githubLogin} />
 
@@ -219,7 +219,6 @@ export function FirstRunConnectScreen({
             onInstallOther={onInstallOther}
           />
         )}
-        <p className="text-[12px] text-muted-foreground">{copy.trust}</p>
         <ConnectScreenError error={connectError} waitingForApproval={waitingForApproval} />
       </div>
     </FirstRunShell>
@@ -232,10 +231,19 @@ function requestedGitHubOrganizations(organizations: string[] | undefined, legac
 }
 
 function ConnectScreenHeading({ showAccountPicker, githubLogin }: { showAccountPicker: boolean; githubLogin: string }) {
+  // On the stepper card the picker is the organization step, so the heading
+  // asks the organization question instead of repeating the connect ask.
+  if (showAccountPicker) {
+    return (
+      <FirstRunHeading headline={copy.selectAccount}>
+        <p className="text-[15px] leading-6 text-muted-foreground">{copy.selectAccountBody}</p>
+        {githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
+      </FirstRunHeading>
+    );
+  }
   return (
     <FirstRunHeading headline={copy.headline}>
       <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
-      {showAccountPicker && githubLogin ? <SignedInAsLine login={githubLogin} /> : null}
     </FirstRunHeading>
   );
 }
@@ -286,10 +294,13 @@ function ConnectScreenBody({
   onUseInstallation?: (installation: PendingGitHubInstallation) => void;
   onInstallOther?: () => void;
 }) {
+  const organizationStatus = waitingForApproval ? (
+    <FirstRunPendingOrganizationRows githubOrganizations={githubOrganizations} />
+  ) : null;
+
   if (showAccountPicker && onUseInstallation) {
     return (
-      <>
-        {waitingForApproval ? <FirstRunInstallRequested githubOrganizations={githubOrganizations} /> : null}
+      <FirstRunGithubStepper current="organization" organizationStatus={organizationStatus}>
         <FirstRunGitHubAccountPicker
           installations={pendingInstallations}
           githubAppSlug={githubAppSlug}
@@ -299,23 +310,26 @@ function ConnectScreenBody({
           onUseInstallation={onUseInstallation}
           onInstallOther={onInstallOther}
         />
-      </>
+      </FirstRunGithubStepper>
     );
   }
 
   return (
-    <>
-      {waitingForApproval ? <FirstRunInstallRequested githubOrganizations={githubOrganizations} /> : null}
-      <LoadingButton
-        type="button"
-        className="min-w-40"
-        onClick={onConnectGitHub}
-        loading={connecting}
-        loadingText={copy.openingGitHub}
-        data-testid="first-run-connect-github"
-      >
-        {copy.connectGitHub}
-      </LoadingButton>
-    </>
+    <FirstRunGithubStepper
+      current="connect"
+      action={
+        <LoadingButton
+          type="button"
+          size="sm"
+          onClick={onConnectGitHub}
+          loading={connecting}
+          loadingText={copy.openingGitHub}
+          data-testid="first-run-connect-github"
+        >
+          {copy.connectAction}
+        </LoadingButton>
+      }
+      organizationStatus={organizationStatus}
+    />
   );
 }
