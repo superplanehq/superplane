@@ -15,14 +15,22 @@ function workspaceLabel(factory: FirstRunWorkspaceOption): string {
 
 export function FirstRunWorkspaceSwitch({
   switcher,
+  disabled,
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> | undefined;
+  disabled?: boolean;
 }) {
   if (!switcher) return null;
-  return <FirstRunWorkspaceSwitchMenu switcher={switcher} />;
+  return <FirstRunWorkspaceSwitchMenu switcher={switcher} disabled={disabled} />;
 }
 
-function FirstRunWorkspaceSwitchMenu({ switcher }: { switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> }) {
+function FirstRunWorkspaceSwitchMenu({
+  switcher,
+  disabled,
+}: {
+  switcher: NonNullable<FirstRunChrome["workspaceSwitch"]>;
+  disabled?: boolean;
+}) {
   const navigate = useNavigate();
   const copy = FIRST_RUN_COPY.chrome;
   const [open, setOpen] = useState(false);
@@ -37,6 +45,7 @@ function FirstRunWorkspaceSwitchMenu({ switcher }: { switcher: NonNullable<First
             type="button"
             aria-label={`${copy.switchWorkspace}, ${currentName}`}
             title={currentName}
+            disabled={disabled}
             className={cn(
               factoriesRailControlClassName,
               "bg-muted text-[11px] font-medium tracking-[-0.01em] text-foreground hover:bg-accent",

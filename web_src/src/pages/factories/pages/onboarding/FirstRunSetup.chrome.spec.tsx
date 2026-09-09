@@ -40,7 +40,7 @@ vi.mock("@/hooks/useRecheckGitHubInstallRequest", () => ({
 }));
 
 vi.mock("@/hooks/useBindGitHubInstallation", () => ({
-  useBindGitHubInstallation: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+  useBindGitHubInstallation: () => ({ mutateAsync: vi.fn() }),
 }));
 
 const navigateSpy = vi.fn();
@@ -72,6 +72,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
   return {
     setup: setupState(),
     hostedAgentReady: false,
+    agentLoading: false,
     openSection: "issues",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),

@@ -4,19 +4,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { OrganizationsIntegration } from "@/api-client";
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
 import { integrationKeys } from "@/hooks/useIntegrations";
-import { hostedGitHubInstallRequested } from "@/lib/hostedGitHubInstall";
+import { pendingGitHubRequestConnection } from "@/lib/startDirectGitHubConnect";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 const RECHECK_INTERVAL_MS = 5_000;
 
-export function pendingGitHubInstallRequestId(instances: OrganizationsIntegration[]): string | undefined {
-  const pending = instances.find(
-    (instance) =>
-      instance.metadata?.integrationName === "github" &&
-      instance.status?.state !== "ready" &&
-      hostedGitHubInstallRequested(instance.status?.metadata),
-  );
-  return pending?.metadata?.id;
+export function pendingGitHubInstallRequestId(
+  instances: OrganizationsIntegration[],
+  currentUserId?: string,
+  preferredIntegrationId?: string,
+): string | undefined {
+  return pendingGitHubRequestConnection(instances, currentUserId, preferredIntegrationId)?.id;
 }
 
 /**
@@ -26,17 +24,17 @@ export function pendingGitHubInstallRequestId(instances: OrganizationsIntegratio
  * webhook cannot find a connection without an installation id, so the server
  * only learns about an approval during a connection sync. An empty update
  * runs that sync: an approved installation joins the account picker, where
- * the user picks it. Runs on page access and then every 10 seconds until the
+ * the user picks it. Runs on page access and then every five seconds until the
  * request resolves or the page closes.
  */
-export function useRecheckGitHubInstallRequest(organizationId: string, instances: OrganizationsIntegration[]) {
+export function useRecheckGitHubInstallRequest(organizationId: string, integrationId?: string, enabled = true) {
   const queryClient = useQueryClient();
-  const integrationId = pendingGitHubInstallRequestId(instances);
 
   useEffect(() => {
-    if (!organizationId || !integrationId) return;
+    if (!organizationId || !integrationId || !enabled) return;
 
     let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const recheck = async () => {
       try {
         await organizationsUpdateIntegration(
@@ -51,13 +49,13 @@ export function useRecheckGitHubInstallRequest(organizationId: string, instances
       }
       if (cancelled) return;
       await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+      if (!cancelled) timeout = setTimeout(() => void recheck(), RECHECK_INTERVAL_MS);
     };
 
     void recheck();
-    const interval = setInterval(() => void recheck(), RECHECK_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
     };
-  }, [organizationId, integrationId, queryClient]);
+  }, [enabled, organizationId, integrationId, queryClient]);
 }

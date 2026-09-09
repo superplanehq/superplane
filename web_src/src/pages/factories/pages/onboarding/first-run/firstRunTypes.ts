@@ -8,6 +8,7 @@ export type FirstRunWorkspaceOption = {
 };
 
 export type FirstRunChrome = {
+  busy?: boolean;
   email?: string;
   displayName?: string;
   onLogOut?: () => void;
