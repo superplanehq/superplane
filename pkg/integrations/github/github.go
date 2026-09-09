@@ -224,7 +224,10 @@ func (g *GitHub) syncHostedApp(ctx core.SyncContext, config Configuration) error
 	returnPath := firstSafeSetupReturnPath(config.SetupReturnPath, existing.SetupReturnPath)
 	if existing.HostedApp && existing.State != "" {
 		existing.SetupReturnPath = returnPath
-		if existing.HasInstallRequests() {
+		// A member can request an installation without the request callback
+		// reaching this server, so a known GitHub login is enough to ask
+		// GitHub for that member's open install requests.
+		if existing.HasInstallRequests() || strings.TrimSpace(existing.StartedByGitHubLogin) != "" {
 			// Adopt records the requested account it found on GitHub and
 			// moves an approved installation into the account picker;
 			// refreshHostedPendingAction below persists both.
