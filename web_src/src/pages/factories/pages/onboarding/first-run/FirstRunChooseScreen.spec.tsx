@@ -119,7 +119,7 @@ describe("FirstRunChooseScreen", () => {
       <FirstRunChooseScreen
         repositories={["puppies-inc/app"]}
         selectedRepository={null}
-        stepper={{ organizationName: "puppies-inc" }}
+        organizationName="puppies-inc"
         onSelectRepository={vi.fn()}
         onEditConnection={vi.fn()}
         onContinue={vi.fn()}

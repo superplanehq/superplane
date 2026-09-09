@@ -76,7 +76,7 @@ export function FirstRunFlow({
   }
 
   if (screen === "connect") {
-    return <FirstRunConnectScreen chrome={chromeFor(1)} stepper onConnectGitHub={() => setScreen("choose")} />;
+    return <FirstRunConnectScreen chrome={chromeFor(1)} onConnectGitHub={() => setScreen("choose")} />;
   }
 
   if (screen === "choose") {
@@ -84,7 +84,7 @@ export function FirstRunFlow({
       <FirstRunChooseScreen
         repositories={FIRST_RUN_REPOSITORIES}
         selectedRepository={selectedRepository}
-        stepper={{ organizationName: "acme" }}
+        organizationName="acme"
         chrome={chromeFor(2, () => setScreen("connect"))}
         onSelectRepository={setSelectedRepository}
         onEditConnection={() => setScreen("connect")}

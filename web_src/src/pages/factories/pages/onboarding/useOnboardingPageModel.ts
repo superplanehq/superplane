@@ -541,8 +541,6 @@ export function useOnboardingPageModel(args: {
     saving: saving || installer.isInstalling || createIntake.isPending || createPRFeedbackHandler.isPending,
     ...saves,
     finish: finishSetup,
-    // Fresh organization + first workspace: the redesigned split-pane look.
-    initialOnboarding: args.factory?.onboarding?.initial === true,
     provisionedDestination,
     // Names the finished organization row on the GitHub stepper card.
     githubOwner,

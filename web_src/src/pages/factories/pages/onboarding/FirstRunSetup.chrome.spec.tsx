@@ -96,7 +96,6 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     saveRepository: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
-    initialOnboarding: false,
     provisionedDestination: null,
     githubOwner: undefined,
     ...overrides,
@@ -197,23 +196,15 @@ describe("FirstRunSetup chrome", () => {
     expect(screen.queryByTestId("first-run-cancel")).not.toBeInTheDocument();
   });
 
-  it("shows the factory sphere on welcome when this is the initial organization", () => {
+  // A new organization and a new workspace in an existing organization use
+  // the same redesigned screens, so the sphere pane shows on both.
+  it("shows the factory sphere on welcome", () => {
     render(
       <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-        <FirstRunSetup model={pageModel({ initialOnboarding: true, openSection: "vcs" })} />
+        <FirstRunSetup model={pageModel({ openSection: "vcs" })} />
       </MemoryRouter>,
     );
 
     expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
-  });
-
-  it("keeps the centered welcome look when this is not the initial organization", () => {
-    render(
-      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
-        <FirstRunSetup model={pageModel({ initialOnboarding: false, openSection: "vcs" })} />
-      </MemoryRouter>,
-    );
-
-    expect(screen.queryByText(FIRST_RUN_COPY.sphere.captionSetup)).not.toBeInTheDocument();
   });
 });

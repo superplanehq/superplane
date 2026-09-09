@@ -30,8 +30,8 @@ export const FIRST_RUN_COPY = {
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
     stepRepository: "Choose repository",
-    selectAccount: "Choose the organization SuperPlane should work in",
-    selectAccountBody: "This decides which repositories and tickets SuperPlane can read.",
+    selectAccount: "Choose a GitHub organization",
+    selectAccountBody: "SuperPlane sees only the repositories and tickets in the organization you choose.",
     useAccount: (account: string) => `Use ${account}`,
     missingAccount: "Do not see your GitHub account or organization?",
     installThere: "Install SuperPlane on more GitHub organizations.",
@@ -44,7 +44,7 @@ export const FIRST_RUN_COPY = {
     connectingAccount: (account: string) => `Connecting ${account}…`,
   },
   choose: {
-    headline: "Choose the repository where SuperPlane will open pull requests",
+    headline: "Choose your first repository",
     repositoryLabel: "Repository",
     repositoryHelper: "SuperPlane scores tickets against this codebase and opens pull requests here for review.",
     searchPlaceholder: "Search repositories",
@@ -57,7 +57,7 @@ export const FIRST_RUN_COPY = {
     moreLater: "You can add more repositories later.",
   },
   tickets: {
-    headline: "Choose the backlog SuperPlane should scan for routine work",
+    headline: "Choose the backlog to scan",
     intro: "SuperPlane reads these tickets and scores each one by how likely an agent can complete it.",
     githubIssues: "GitHub Issues",
     jira: "Jira",

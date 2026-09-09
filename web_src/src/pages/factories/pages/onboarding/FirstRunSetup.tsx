@@ -181,7 +181,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const { organizationId, factoryId, factories } = useFactoriesLayout();
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
-  const initial = model.initialOnboarding;
   const destination = model.provisionedDestination;
   useFreshConnectionsOnConnectScreen(flow.screen, model.refreshGithubConnections);
   const setup = model.setup;
@@ -216,7 +215,6 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         organizationId={destination.organizationId}
         factoryId={factoryId}
         chrome={{ displayName: firstNameOf(account?.name), email: account?.email, onLogOut: signOut, stepIndex: 4 }}
-        initial={initial}
         selectedRepo={setup.selectedRepo}
         onGoToBoard={() => navigate(afterOnboardingPath(destination), { replace: true })}
       />
@@ -228,7 +226,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       <FirstRunWelcomeScreen
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
-        sphere={sphereFor("welcome", initial, setup.selectedRepo)}
+        sphere={sphereFor("welcome", setup.selectedRepo)}
         onGetStarted={() => flow.goToScreen("connect")}
       />
     );
@@ -244,8 +242,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         bindingInstallationId={flow.bindingInstallationId}
         connecting={flow.blockingAction === "opening-github"}
         chrome={chromeFor("connect")}
-        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", initial, setup.selectedRepo)}
-        stepper={initial}
+        sphere={sphereFor(flow.pickerShowing ? "organization" : "connect", setup.selectedRepo)}
         onConnectGitHub={() => void flow.connectGitHub()}
         onUseInstallation={flow.useInstallation}
         onInstallOther={() => void flow.installOnAnotherAccount()}
@@ -261,8 +258,8 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         loading={model.repositoriesLoading}
         saving={flow.blockingAction === "saving-repository"}
         chrome={chromeFor("choose")}
-        sphere={sphereFor("choose", initial, setup.selectedRepo)}
-        stepper={initial ? { organizationName: model.githubOwner } : undefined}
+        sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
+        organizationName={model.githubOwner}
         onSelectRepository={setup.selectRepo}
         onEditConnection={() => model.requestConfigure()}
         onContinue={() => void flow.continueFromRepository()}
@@ -276,7 +273,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         flow={flow}
         saving={model.saving}
         chrome={chromeFor("tickets")}
-        sphere={sphereFor("tickets", initial, setup.selectedRepo)}
+        sphere={sphereFor("tickets", setup.selectedRepo, model.githubOwner)}
       />
     );
   }
@@ -286,7 +283,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       organizationId={organizationId}
       setup={setup}
       chrome={chromeFor("agent")}
-      sphere={sphereFor("agent", initial, setup.selectedRepo)}
+      sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
       saving={flow.blockingAction === "finishing-setup" || model.saving}
       loading={model.agentLoading}
       onRequestConnect={model.requestConnect}
