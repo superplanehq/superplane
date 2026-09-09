@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -62,14 +63,20 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 		InputTokens:     1_000_000,
 		TotalTokens:     1_000_000,
 	}))
+	const (
+		computeMachineType = "e1-tiny-amd64"
+		computeSeconds     = int64(45)
+	)
+	computeCostMicros := pricebook.EstimateComputeMicros(computeMachineType, computeMachineType, computeSeconds)
+	require.Greater(t, computeCostMicros, int64(0))
 	require.NoError(t, models.RecordComputeUsage(db, models.ComputeUsageEventInput{
 		OrganizationID:  r.Organization.ID,
 		CanvasRunID:     *execution.RunID,
 		NodeExecutionID: uuid.New(),
 		NodeID:          "runner",
-		MachineType:     "e1-tiny-amd64",
-		FleetID:         "e1-tiny-amd64",
-		DurationSeconds: 45,
+		MachineType:     computeMachineType,
+		FleetID:         computeMachineType,
+		DurationSeconds: computeSeconds,
 		IdempotencyKey:  "runner:compute:org-usage",
 	}))
 
@@ -85,14 +92,16 @@ func Test__DescribeOrganizationWorkspaceUsage(t *testing.T) {
 	assert.Equal(t, int64(250)+resp.ByMachineType[0].CostCents, resp.TotalCostCents)
 	require.Len(t, resp.ByModel, 1)
 	assert.Equal(t, "openai", resp.ByModel[0].Provider)
-	assert.Equal(t, int64(45), resp.TotalDurationSeconds)
-	assert.Equal(t, "e1-tiny-amd64", resp.ByMachineType[0].MachineType)
-	assert.Equal(t, int64(45), resp.ByMachineType[0].DurationSeconds)
-	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.RemainingCreditCents)
+	assert.Equal(t, computeSeconds, resp.TotalDurationSeconds)
+	assert.Equal(t, computeMachineType, resp.ByMachineType[0].MachineType)
+	assert.Equal(t, computeSeconds, resp.ByMachineType[0].DurationSeconds)
+	// Hosted compute usage draws down the welcome grant at the raw provider rate.
+	grantMicros := models.CentsToMicros(models.DefaultWelcomeGrantCents)
+	assert.Equal(t, pricebook.MicrosToCents(grantMicros-computeCostMicros), resp.RemainingCreditCents)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.GrantTotalCents)
 	assert.Equal(t, models.DefaultWelcomeGrantCents, resp.SuperplaneGrantCents)
 	assert.Equal(t, int64(0), resp.PurchasedCreditCents)
-	assert.Equal(t, int64(0), resp.HostedBilledCents)
+	assert.Equal(t, pricebook.MicrosToCents(computeCostMicros), resp.HostedBilledCents)
 	assert.False(t, resp.RemainingCreditWarning)
 	assert.Empty(t, resp.Invoices)
 	require.NotNil(t, resp.WelcomeCreditExpiresAt)
