@@ -409,9 +409,12 @@ function defaultSpawnOpenCode(args, options) {
   });
 }
 
-function spawnHasAssistantReply(formatter) {
+function spawnHasCompleteAssistantTurn(spawnResult, formatter) {
   const text = formatter && typeof formatter.lastText === "function" ? formatter.lastText() : "";
-  return Boolean(String(text || "").trim());
+  if (!String(text || "").trim()) {
+    return false;
+  }
+  return tokenTotal(spawnResult && spawnResult.usage) > 0;
 }
 
 function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
@@ -428,7 +431,7 @@ function spawnTurnFailed(spawnResult, formatter, allowSoftExitWithReply) {
   if (!allowSoftExitWithReply) {
     return true;
   }
-  return !spawnHasAssistantReply(formatter);
+  return !spawnHasCompleteAssistantTurn(spawnResult, formatter);
 }
 
 async function spawnOpenCodeTurn(args, env, cwd, formatter, helpers) {
@@ -633,6 +636,8 @@ function createOpenCodeFormatter(telemetry, onSession) {
       errorText = "";
       announcedStart = false;
       lastText = "";
+      usage = emptyUsage();
+      cost = 0;
     },
     handleLine(raw) {
       const line = String(raw || "").trim();
