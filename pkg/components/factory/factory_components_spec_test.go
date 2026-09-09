@@ -39,6 +39,9 @@ type fakeFactoryContext struct {
 	setStatusNoteResult *core.WorkOrderStatusNote
 	setStatusNoteErr    error
 
+	clearStatusNoteCalls  int
+	clearStatusNoteParams core.ClearWorkOrderStatusNoteParams
+
 	lastActivityParams core.AddPullRequestActivityParams
 	activityResult     *core.PullRequestActivityResult
 	activityErr        error
@@ -86,6 +89,12 @@ func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStat
 	f.setStatusNoteCalls++
 	f.setStatusNoteParams = params
 	return f.setStatusNoteResult, f.setStatusNoteErr
+}
+
+func (f *fakeFactoryContext) ClearWorkOrderStatusNote(params core.ClearWorkOrderStatusNoteParams) error {
+	f.clearStatusNoteCalls++
+	f.clearStatusNoteParams = params
+	return nil
 }
 
 func (f *fakeFactoryContext) AddPullRequest(_ core.AddPullRequestParams) (*core.PullRequest, error) {

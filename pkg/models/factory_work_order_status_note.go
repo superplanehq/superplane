@@ -131,15 +131,18 @@ func (o *FactoryWorkOrder) SetStatusNote(
 	return note, nil
 }
 
-// ClearStatusNote removes the note with the given key. Unknown keys are
-// a no-op. Lifecycle transitions clear the whole set in UpdateStatus.
-func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB, key string) error {
+// ClearStatusNote removes the note with the given key and reports whether a
+// note was actually removed, so callers can skip side effects (e.g. a UI
+// refresh) on a no-op. Unknown keys are a no-op. Lifecycle transitions clear
+// the whole set in UpdateStatus.
+func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB, key string) (bool, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return fmt.Errorf("%w: key is required", ErrFactoryWorkOrderStatusNoteInvalid)
+		return false, fmt.Errorf("%w: key is required", ErrFactoryWorkOrderStatusNoteInvalid)
 	}
 
-	return tx.Transaction(func(tx *gorm.DB) error {
+	removed := false
+	err := tx.Transaction(func(tx *gorm.DB) error {
 		if err := o.lockAndReload(tx); err != nil {
 			return err
 		}
@@ -156,8 +159,13 @@ func (o *FactoryWorkOrder) ClearStatusNote(tx *gorm.DB, key string) error {
 			return nil
 		}
 
+		removed = true
 		return o.persistStatusNotes(tx, kept)
 	})
+	if err != nil {
+		return false, err
+	}
+	return removed, nil
 }
 
 // ClearStatusNotes removes every note without a state transition, for

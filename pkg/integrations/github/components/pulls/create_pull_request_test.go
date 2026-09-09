@@ -22,6 +22,9 @@ type fakeFactoryContext struct {
 
 	setStatusNoteCalls  int
 	setStatusNoteParams core.SetWorkOrderStatusNoteParams
+
+	clearStatusNoteCalls  int
+	clearStatusNoteParams core.ClearWorkOrderStatusNoteParams
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, error) {
@@ -52,6 +55,12 @@ func (f *fakeFactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStat
 	f.setStatusNoteCalls++
 	f.setStatusNoteParams = params
 	return nil, nil
+}
+
+func (f *fakeFactoryContext) ClearWorkOrderStatusNote(params core.ClearWorkOrderStatusNoteParams) error {
+	f.clearStatusNoteCalls++
+	f.clearStatusNoteParams = params
+	return nil
 }
 
 func (f *fakeFactoryContext) AddPullRequest(_ core.AddPullRequestParams) (*core.PullRequest, error) {
@@ -331,6 +340,9 @@ func Test__CreatePullRequest__Execute_AssignsWorkOrderAssignees(t *testing.T) {
 		assert.Equal(t, "wo-1", factoryCtx.resolveAssigneeAccountsParams.OrderID)
 		assert.Equal(t, "github", factoryCtx.resolveAssigneeAccountsParams.Provider)
 		assert.Equal(t, 0, factoryCtx.setStatusNoteCalls, "no notice expected when everyone is linked")
+		require.Equal(t, 1, factoryCtx.clearStatusNoteCalls, "a stale unlinked notice should be cleared when everyone is linked")
+		assert.Equal(t, "wo-1", factoryCtx.clearStatusNoteParams.OrderID)
+		assert.Equal(t, assigneeLinkNoticeKey, factoryCtx.clearStatusNoteParams.NoteKey)
 		require.Len(t, httpCtx.Requests, 2)
 		assert.Equal(t, "/repos/testhq/hello/issues/42/assignees", httpCtx.Requests[1].URL.Path)
 	})
@@ -351,6 +363,7 @@ func Test__CreatePullRequest__Execute_AssignsWorkOrderAssignees(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, 1, factoryCtx.setStatusNoteCalls)
+		assert.Equal(t, 0, factoryCtx.clearStatusNoteCalls, "the notice must not be cleared while an assignee is unlinked")
 		assert.Equal(t, "wo-1", factoryCtx.setStatusNoteParams.OrderID)
 		assert.Equal(t, assigneeLinkNoticeKey, factoryCtx.setStatusNoteParams.NoteKey)
 		assert.NotEmpty(t, factoryCtx.setStatusNoteParams.Headline)

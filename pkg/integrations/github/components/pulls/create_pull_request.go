@@ -301,6 +301,13 @@ func (c *CreatePullRequest) assignWorkOrderAssignees(ctx core.ExecutionContext, 
 		}); err != nil {
 			log.WithError(err).Warnf("Failed to set unlinked GitHub assignee notice for work order %s", orderID)
 		}
+	} else if err := ctx.Factory.ClearWorkOrderStatusNote(core.ClearWorkOrderStatusNoteParams{
+		OrderID: orderID,
+		NoteKey: assigneeLinkNoticeKey,
+	}); err != nil {
+		// Clear any stale notice from a prior run: everyone is linked now,
+		// so an earlier "link your GitHub account" note no longer applies.
+		log.WithError(err).Warnf("Failed to clear unlinked GitHub assignee notice for work order %s", orderID)
 	}
 
 	for _, login := range resolved.Logins {

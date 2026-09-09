@@ -44,6 +44,11 @@ type FactoryContext interface {
 	// it. Any lifecycle transition clears the whole set. The order must
 	// be open.
 	SetWorkOrderStatusNote(params SetWorkOrderStatusNoteParams) (*WorkOrderStatusNote, error)
+	// ClearWorkOrderStatusNote removes the status note identified by NoteKey,
+	// so a note stops showing once the condition that raised it no longer
+	// holds (e.g. every assignee has since linked their account). Clearing an
+	// absent note is a no-op. The order must be open.
+	ClearWorkOrderStatusNote(params ClearWorkOrderStatusNoteParams) error
 	AddPullRequest(params AddPullRequestParams) (*PullRequest, error)
 	UpdatePullRequest(params UpdatePullRequestParams) (*PullRequest, error)
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
@@ -135,6 +140,16 @@ type SetWorkOrderStatusNoteParams struct {
 	CtaLabel            string
 	CtaURL              string
 	ShowOnlyWhenWaiting bool
+}
+
+// ClearWorkOrderStatusNoteParams configures
+// FactoryContext.ClearWorkOrderStatusNote.
+type ClearWorkOrderStatusNoteParams struct {
+	// OrderID identifies the work order to target; see
+	// UpdateWorkOrderStatusParams.OrderID.
+	OrderID string
+	// NoteKey identifies the note to remove (e.g. "pr-closure").
+	NoteKey string
 }
 
 type WorkOrder struct {

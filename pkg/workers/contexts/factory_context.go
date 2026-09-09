@@ -387,6 +387,23 @@ func (c *FactoryContext) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNo
 	return statusNoteToCore(order, note), nil
 }
 
+func (c *FactoryContext) ClearWorkOrderStatusNote(params core.ClearWorkOrderStatusNoteParams) error {
+	order, err := c.resolveWorkOrder(params.OrderID)
+	if err != nil {
+		return err
+	}
+
+	removed, err := order.ClearStatusNote(c.tx, params.NoteKey)
+	if err != nil {
+		return err
+	}
+
+	if removed {
+		c.notifyWorkOrderUpdated(order.FactoryID, order.ID, factory.EventTypeOrderStatusNoteUpdated)
+	}
+	return nil
+}
+
 // FindWorkOrder resolves a work order by id or by an artifact key,
 // independent of the current run's `factory_work_order_executions` row.
 // This is what lets a plain webhook-triggered run (e.g. github.onPullRequest)
