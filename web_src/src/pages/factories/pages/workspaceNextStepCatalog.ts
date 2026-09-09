@@ -2,12 +2,19 @@ import { type PRFeedbackSourceId } from "./prFeedbackSettingsModel";
 
 export type WorkspaceNextStepId = "pr-comments-handler" | "pr-checks-handler";
 
-export type WorkspaceNextStepAction = { type: "configure-pr-feedback"; sourceId: PRFeedbackSourceId };
+export type WorkspaceNextStepAction = { type: "open-pr-feedback-setup"; sourceId: PRFeedbackSourceId };
 
 export interface WorkspaceNextStep {
   id: WorkspaceNextStepId;
+  /** Short name used in lists and tests. */
   title: string;
-  description: string;
+  /** Banner header when this step is the next action. */
+  bannerTitle: string;
+  /** What already works before this step is configured. */
+  worksCopy: string;
+  /** What stays missing until the user configures this step. */
+  missingCopy: string;
+  ctaLabel: string;
   action: WorkspaceNextStepAction;
   done: boolean;
 }
@@ -18,15 +25,15 @@ export interface WorkspaceNextStepContext {
   takenPRFeedbackSources: readonly PRFeedbackSourceId[];
 }
 
-export const WORKSPACE_NEXT_STEPS_COPY = {
-  title: "You finished workspace setup",
-  description:
-    "The factory can implement tasks and will open pull requests for them. Configure verification for those pull requests next.",
-  configure: "Configure...",
-} as const;
-
-export function workspaceNextStepsProgressCopy(done: number, total: number): string {
-  return `${done} of ${total} complete`;
+export interface WorkspaceNextStepBanner {
+  doneCount: number;
+  totalCount: number;
+  /** First incomplete step; drives the single CTA. */
+  activeStep: WorkspaceNextStep;
+  title: string;
+  worksCopy: string;
+  missingCopy: string;
+  ctaLabel: string;
 }
 
 const WORKSPACE_NEXT_STEPS: Array<
@@ -34,19 +41,30 @@ const WORKSPACE_NEXT_STEPS: Array<
 > = [
   {
     id: "pr-comments-handler",
-    title: "Configure comments handler",
-    description: "Start a fix from pull request comments and reviews.",
-    action: { type: "configure-pr-feedback", sourceId: "discussion" },
+    title: "Comments handler",
+    bannerTitle: "How should pull request comments be handled?",
+    worksCopy:
+      "This SuperPlane workspace can implement tasks and open pull requests for them, but it will not start fixes from pull request reviews yet.",
+    missingCopy: "Configure how pull request reviews should be handled next.",
+    ctaLabel: "Configure comments",
+    action: { type: "open-pr-feedback-setup", sourceId: "discussion" },
     isDone: (ctx) => ctx.takenPRFeedbackSources.includes("discussion"),
   },
   {
     id: "pr-checks-handler",
-    title: "Configure status checks handler",
-    description: "Wait for status checks and start a fix when a selected check fails.",
-    action: { type: "configure-pr-feedback", sourceId: "checks" },
+    title: "Status checks handler",
+    bannerTitle: "How should failing status checks be handled?",
+    worksCopy: "Pull request comments and reviews can start a fix.",
+    missingCopy: "SuperPlane will not wait for failing status checks until you configure this.",
+    ctaLabel: "Configure status checks",
+    action: { type: "open-pr-feedback-setup", sourceId: "checks" },
     isDone: (ctx) => ctx.takenPRFeedbackSources.includes("checks"),
   },
 ];
+
+export function workspaceNextStepsProgressCopy(done: number, total: number): string {
+  return `${done}/${total}`;
+}
 
 export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNextStep[] {
   if (!ctx.onboardingComplete || !ctx.canConfigure) {
@@ -62,11 +80,27 @@ export function workspaceNextSteps(ctx: WorkspaceNextStepContext): WorkspaceNext
   return steps;
 }
 
+export function workspaceNextStepBanner(steps: WorkspaceNextStep[]): WorkspaceNextStepBanner | null {
+  const activeStep = steps.find((step) => !step.done);
+  if (!activeStep) {
+    return null;
+  }
+  return {
+    doneCount: steps.filter((step) => step.done).length,
+    totalCount: steps.length,
+    activeStep,
+    title: activeStep.bannerTitle,
+    worksCopy: activeStep.worksCopy,
+    missingCopy: activeStep.missingCopy,
+    ctaLabel: activeStep.ctaLabel,
+  };
+}
+
 export function runWorkspaceNextStepAction(
   action: WorkspaceNextStepAction,
-  handlers: { configurePRFeedback: (sourceId: PRFeedbackSourceId) => void },
+  handlers: { openPRFeedbackSetup: (sourceId: PRFeedbackSourceId) => void },
 ) {
-  if (action.type === "configure-pr-feedback") {
-    handlers.configurePRFeedback(action.sourceId);
+  if (action.type === "open-pr-feedback-setup") {
+    handlers.openPRFeedbackSetup(action.sourceId);
   }
 }

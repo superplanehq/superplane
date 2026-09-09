@@ -112,6 +112,7 @@ import {
   factoryHomePath,
   factoryIntakePath,
   factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
@@ -122,6 +123,7 @@ import {
   isPRFeedbackSearchOpen,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
+  prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import {
@@ -163,7 +165,6 @@ import {
   PR_FEEDBACK_SOURCES,
   hasAvailablePRFeedbackSource,
   isPRFeedbackSettingsTab,
-  prFeedbackHandlerForSource,
   prFeedbackListenTitle,
   prFeedbackSourceById,
   takenPRFeedbackSourceIds,
@@ -517,20 +518,17 @@ export function LinesPage() {
           />
           <NextStepsPanel
             steps={nextSteps}
-            onSelect={(step) =>
+            onContinue={(step) =>
               runWorkspaceNextStepAction(step.action, {
-                configurePRFeedback: (sourceId) => {
-                  const existing = prFeedbackHandlerForSource(prFeedbackHandlers, sourceId);
-                  if (existing?.id) {
-                    navigate(
-                      factoryPRFeedbackPath(organizationId, factoryKey, selectedLine.id, undefined, existing.id),
-                    );
-                    return;
-                  }
-                  const source = prFeedbackSourceById(sourceId);
-                  if (source) {
-                    createPRFeedbackFromSource(source);
-                  }
+                openPRFeedbackSetup: (sourceId) => {
+                  navigate(
+                    factoryPRFeedbackSetupPath(
+                      organizationId,
+                      factoryKey,
+                      selectedLine.id,
+                      prFeedbackSetupKindFromSourceId(sourceId),
+                    ),
+                  );
                 },
               })
             }

@@ -39,4 +39,6 @@ export {
   WorkOrderDetailPage,
   WorkOrdersPage,
   WorkspaceOverviewPage,
+  ChecksPRFeedbackSetupPage,
+  DiscussionPRFeedbackSetupPage,
 } from "./pages";

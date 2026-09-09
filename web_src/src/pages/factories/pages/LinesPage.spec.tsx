@@ -695,9 +695,17 @@ describe("LinesPage board", () => {
   it("shows comments and status checks as open after onboarding", () => {
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("0 of 2 complete");
-    expect(screen.getByTestId("workspace-next-step-pr-comments-handler")).toHaveAttribute("data-state", "open");
-    expect(screen.getByTestId("workspace-next-step-pr-checks-handler")).toHaveAttribute("data-state", "open");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "How should pull request comments be handled?",
+    );
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("0/2");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "This SuperPlane workspace can implement tasks and open pull requests for them, but it will not start fixes from pull request reviews yet.",
+    );
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "Configure how pull request reviews should be handled next.",
+    );
+    expect(screen.getByTestId("workspace-next-step-cta-pr-comments-handler")).toHaveTextContent("Configure comments");
   });
 
   it("shows the provisioned comments handler as done and status checks as open", () => {
@@ -706,13 +714,19 @@ describe("LinesPage board", () => {
     });
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("You finished workspace setup");
     expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
-      "Configure verification for those pull requests next.",
+      "How should failing status checks be handled?",
     );
-    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent("1 of 2 complete");
-    expect(screen.getByTestId("workspace-next-step-pr-comments-handler")).toHaveAttribute("data-state", "done");
-    expect(screen.getByTestId("workspace-next-step-pr-checks-handler")).toHaveAttribute("data-state", "open");
+    expect(screen.getByTestId("workspace-next-steps-progress")).toHaveTextContent("1/2");
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "Pull request comments and reviews can start a fix.",
+    );
+    expect(screen.getByTestId("workspace-next-steps")).toHaveTextContent(
+      "SuperPlane will not wait for failing status checks until you configure this.",
+    );
+    expect(screen.getByTestId("workspace-next-step-cta-pr-checks-handler")).toHaveTextContent(
+      "Configure status checks",
+    );
   });
 
   it("hides next steps when the status-check handler is configured", () => {
@@ -727,71 +741,33 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("workspace-next-steps")).not.toBeInTheDocument();
   });
 
-  it("opens comments handler settings from the done next step", async () => {
+  it("opens the comments setup page from the next-step CTA", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
+
+    await user.click(screen.getByTestId("workspace-next-step-cta-pr-comments-handler"));
+
+    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}/setup/comments`,
+    );
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
+  });
+
+  it("opens the checks setup page from the next-step CTA after comments are done", async () => {
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [{ id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true }],
     });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
-    await user.click(screen.getByTestId("workspace-next-step-pr-comments-handler"));
-
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}?prFeedback=1&prFeedbackHandler=handler-discussion`,
-    );
-  });
-
-  it("opens the comments wizard from the next step", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("workspace-next-step-pr-comments-handler"));
-
-    expect(screen.getByTestId("discussion-pr-feedback-setup")).toBeInTheDocument();
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
-  });
-
-  it("returns to the board after the comments wizard finishes", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("workspace-next-step-pr-comments-handler"));
-    await user.click(screen.getByTestId("discussion-setup-finish"));
-
-    expect(screen.queryByTestId("discussion-pr-feedback-setup")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("pr-feedback-settings")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-verify-column")).toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
-    );
-    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("prFeedback=");
-  });
-
-  it("opens the checks wizard from the next step", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("workspace-next-step-pr-checks-handler"));
+    await user.click(screen.getByTestId("workspace-next-step-cta-pr-checks-handler"));
 
     expect(screen.getByTestId("checks-pr-feedback-setup")).toBeInTheDocument();
-    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
-  });
-
-  it("returns to the board after the checks wizard finishes", async () => {
-    const user = userEvent.setup();
-    renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
-
-    await user.click(screen.getByTestId("workspace-next-step-pr-checks-handler"));
-    await user.click(screen.getByTestId("checks-setup-finish"));
-
-    expect(screen.queryByTestId("checks-pr-feedback-setup")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("pr-feedback-settings")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-verify-column")).toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}`,
+      `/org-1/workspaces/${PRIMARY_FACTORY_KEY}/lines/${REFUND_LINE_PLAN_ID}/setup/checks`,
     );
-    expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("prFeedback=");
+    expect(createFactoryPRFeedbackHandler).not.toHaveBeenCalled();
   });
 
   it("hides add when every feedback source already has a handler", () => {

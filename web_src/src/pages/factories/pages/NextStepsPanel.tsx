@@ -1,94 +1,55 @@
-import { Check } from "lucide-react";
-
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 import {
-  WORKSPACE_NEXT_STEPS_COPY,
+  workspaceNextStepBanner,
   workspaceNextStepsProgressCopy,
   type WorkspaceNextStep,
 } from "./workspaceNextStepCatalog";
 
 export function NextStepsPanel({
   steps,
-  onSelect,
+  onContinue,
 }: {
   steps: WorkspaceNextStep[];
-  onSelect: (step: WorkspaceNextStep) => void;
+  onContinue: (step: WorkspaceNextStep) => void;
 }) {
-  if (steps.length === 0) {
+  const banner = workspaceNextStepBanner(steps);
+  if (!banner) {
     return null;
   }
 
-  const doneCount = steps.filter((step) => step.done).length;
+  const progress = workspaceNextStepsProgressCopy(banner.doneCount, banner.totalCount);
 
   return (
     <section className="px-3 pb-3" data-testid="workspace-next-steps">
-      <div role="status" className="rounded-lg border border-border bg-background px-3.5 py-3">
-        <div className="flex items-start justify-between gap-3">
+      <div
+        role="status"
+        className="flex flex-col gap-3 rounded-lg border border-border bg-background px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+      >
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
+          <Badge
+            variant="secondary"
+            className="shrink-0 rounded-full px-3 py-1.5 text-[15px] font-semibold tabular-nums tracking-tight"
+            data-testid="workspace-next-steps-progress"
+          >
+            {progress}
+          </Badge>
           <div className="min-w-0">
-            <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-foreground">
-              {WORKSPACE_NEXT_STEPS_COPY.title}
-            </h2>
-            <p className="mt-1.5 text-[13px] text-muted-foreground">{WORKSPACE_NEXT_STEPS_COPY.description}</p>
+            <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-foreground">{banner.title}</h2>
+            <p className="mt-1.5 text-[13px] text-muted-foreground">{banner.worksCopy}</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">{banner.missingCopy}</p>
           </div>
-          <p className="shrink-0 pt-1 text-[12px] font-medium text-muted-foreground">
-            {workspaceNextStepsProgressCopy(doneCount, steps.length)}
-          </p>
         </div>
-        <ul className="mt-3 overflow-hidden rounded-md border border-border">
-          {steps.map((step, index) => (
-            <li key={step.id} className={index > 0 ? "border-t border-border" : undefined}>
-              <NextStepRow step={step} onSelect={onSelect} />
-            </li>
-          ))}
-        </ul>
+        <Button
+          type="button"
+          className="shrink-0 self-start sm:self-center"
+          onClick={() => onContinue(banner.activeStep)}
+          data-testid={`workspace-next-step-cta-${banner.activeStep.id}`}
+        >
+          {banner.ctaLabel}
+        </Button>
       </div>
     </section>
   );
-}
-
-function NextStepRow({ step, onSelect }: { step: WorkspaceNextStep; onSelect: (step: WorkspaceNextStep) => void }) {
-  const status = WORKSPACE_NEXT_STEPS_COPY.configure;
-  const body = (
-    <>
-      <NextStepStatusIcon done={step.done} />
-      <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            "block text-[13px] font-medium tracking-[-0.01em]",
-            step.done ? "text-muted-foreground" : "text-foreground",
-          )}
-        >
-          {step.title}
-        </span>
-        <span className="mt-0.5 block text-[12px] text-muted-foreground">{step.description}</span>
-      </span>
-      <span className="shrink-0 text-[12px] font-medium text-foreground">{status}</span>
-    </>
-  );
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(step)}
-      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent/30"
-      data-testid={`workspace-next-step-${step.id}`}
-      data-state={step.done ? "done" : "open"}
-      aria-label={`${step.title}, ${status}`}
-    >
-      {body}
-    </button>
-  );
-}
-
-function NextStepStatusIcon({ done }: { done: boolean }) {
-  if (done) {
-    return (
-      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-        <Check className="size-3" strokeWidth={2.5} aria-hidden />
-      </span>
-    );
-  }
-
-  return <span className="size-5 shrink-0 rounded-full border-2 border-foreground bg-background" aria-hidden />;
 }

@@ -10,6 +10,7 @@ import {
   pathAfterWorkspaceSwitch,
   factoryIntakePath,
   factoryPRFeedbackPath,
+  factoryPRFeedbackSetupPath,
   factoryColumnAutomationsPath,
   factoryColumnAutomationViewPath,
   columnAutomationsKeyFromSearch,
@@ -20,6 +21,7 @@ import {
   isPRFeedbackSearchOpen,
   prFeedbackHandlerIdFromSearch,
   prFeedbackSettingsTabFromSearch,
+  prFeedbackSetupKindFromSourceId,
   factorySettingsGeneralPathAfterKeyChange,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
@@ -118,6 +120,22 @@ describe("factoryIntakePath", () => {
   it("reads the settings tab from the search string", () => {
     expect(intakeSettingsTabFromSearch("?intake=1&settings=automation")).toBe("automation");
     expect(intakeSettingsTabFromSearch("intake=1")).toBeNull();
+  });
+});
+
+describe("factoryPRFeedbackSetupPath", () => {
+  it("opens the comments and checks setup pages on the line board", () => {
+    expect(factoryPRFeedbackSetupPath("org-1", "SP", "line-plan", "comments")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan/setup/comments",
+    );
+    expect(factoryPRFeedbackSetupPath("org-1", "SP", "line-plan", "checks")).toBe(
+      "/org-1/workspaces/SP/lines/line-plan/setup/checks",
+    );
+  });
+
+  it("maps PR feedback source ids to setup path kinds", () => {
+    expect(prFeedbackSetupKindFromSourceId("discussion")).toBe("comments");
+    expect(prFeedbackSetupKindFromSourceId("checks")).toBe("checks");
   });
 });
 

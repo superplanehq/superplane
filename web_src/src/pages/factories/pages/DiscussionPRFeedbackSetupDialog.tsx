@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ArrowLeft, Check } from "lucide-react";
@@ -16,10 +16,33 @@ interface DiscussionPRFeedbackSetupDialogProps {
   source: PRFeedbackSource;
   onClose: () => void;
   onCreated: (handlerId: string) => void;
+  /** Dialog overlay (default) or inline card for a dedicated setup page. */
+  presentation?: "dialog" | "page";
 }
 
 export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetupDialogProps) {
-  const setup = useDiscussionPRFeedbackSetup(props.organizationId, props.factoryId, props.repository, props.open);
+  const presentation = props.presentation ?? "dialog";
+  const setup = useDiscussionPRFeedbackSetup(
+    props.organizationId,
+    props.factoryId,
+    props.repository,
+    props.open || presentation === "page",
+  );
+  const body = (
+    <DiscussionSetupBody setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
+  );
+
+  if (presentation === "page") {
+    return (
+      <div
+        className="grid h-[min(36rem,80vh)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-border bg-background"
+        data-testid="discussion-pr-feedback-setup"
+      >
+        {body}
+      </div>
+    );
+  }
+
   return (
     <Dialog open={props.open} onOpenChange={(next) => !next && props.onClose()}>
       <DialogContent
@@ -27,24 +50,42 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
         showCloseButton
         data-testid="discussion-pr-feedback-setup"
       >
-        <SetupHeader step={setup.step} onBack={() => setup.setStep("mention")} />
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {setup.step === "mention" ? <MentionStep setup={setup} /> : <BotsStep setup={setup} />}
-          {setup.error ? (
-            <p className="workspace-body-text mt-4 text-destructive" role="alert">
-              {setup.error}
-            </p>
-          ) : null}
-        </div>
-        <SetupFooter setup={setup} source={props.source} onClose={props.onClose} onCreated={props.onCreated} />
+        {body}
       </DialogContent>
     </Dialog>
   );
 }
 
+function DiscussionSetupBody({
+  setup,
+  source,
+  onClose,
+  onCreated,
+}: {
+  setup: DiscussionPRFeedbackSetupModel;
+  source: PRFeedbackSource;
+  onClose: () => void;
+  onCreated: (handlerId: string) => void;
+}) {
+  return (
+    <>
+      <SetupHeader step={setup.step} onBack={() => setup.setStep("mention")} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+        {setup.step === "mention" ? <MentionStep setup={setup} /> : <BotsStep setup={setup} />}
+        {setup.error ? (
+          <p className="workspace-body-text mt-4 text-destructive" role="alert">
+            {setup.error}
+          </p>
+        ) : null}
+      </div>
+      <SetupFooter setup={setup} source={source} onClose={onClose} onCreated={onCreated} />
+    </>
+  );
+}
+
 function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () => void }) {
   return (
-    <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+    <header className="shrink-0 border-b border-border px-5 py-4 text-left">
       <div className="flex items-center gap-2.5">
         {step === "bots" ? (
           <button
@@ -57,16 +98,16 @@ function SetupHeader({ step, onBack }: { step: "mention" | "bots"; onBack: () =>
           </button>
         ) : null}
         <IntegrationIcon integrationName="github" className="size-5 shrink-0" size={20} />
-        <DialogTitle className="min-w-0 text-[15px] font-semibold leading-5">
+        <h2 className="min-w-0 text-[15px] font-semibold leading-5">
           {PR_FEEDBACK_SETTINGS_COPY.wizardCommentsTitle}
-        </DialogTitle>
+        </h2>
       </div>
-      <DialogDescription className="sr-only">
+      <p className="sr-only">
         {step === "bots"
           ? PR_FEEDBACK_SETTINGS_COPY.wizardBotsHelper
           : PR_FEEDBACK_SETTINGS_COPY.wizardMentionDescription}
-      </DialogDescription>
-    </DialogHeader>
+      </p>
+    </header>
   );
 }
 
