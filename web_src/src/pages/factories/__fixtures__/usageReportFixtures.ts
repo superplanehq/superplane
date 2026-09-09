@@ -108,6 +108,16 @@ export const PURCHASED_CREDIT_USAGE_REPORT: StorybookUsageReport = {
   welcomeCreditExpiresAt: "2026-09-22T12:00:00.000Z",
 };
 
+/** Purchased hosted credit remains, but the balance is at or below $20. */
+export const LOW_CREDIT_USAGE_REPORT: StorybookUsageReport = {
+  ...PURCHASED_CREDIT_USAGE_REPORT,
+  remainingCreditCents: "1500",
+  hostedBilledCents: "13500",
+  remainingCreditWarning: true,
+  billingEnabled: true,
+  hasBillingCustomer: true,
+};
+
 /** Polar packs for empty-credit Storybook recovery screens. */
 export const STORYBOOK_HOSTED_CREDIT_PRODUCTS = [
   { id: "prod-50", name: "Hosted credit 50", amountCents: "5000" },

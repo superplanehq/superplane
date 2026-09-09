@@ -100,4 +100,18 @@ describe("HostedCreditEmptyBanner", () => {
     expect(screen.getByTestId("hosted-credit-empty-banner")).toHaveTextContent("Trial ended");
     expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
   });
+
+  it("shows remaining purchased credit when the balance is low", () => {
+    render(
+      <MemoryRouter>
+        <HostedCreditEmptyBanner billingEnabled kind="low" remainingCreditCents={1500} spendingHref={billingHref} />
+      </MemoryRouter>,
+    );
+
+    const banner = screen.getByTestId("hosted-credit-empty-banner");
+    expect(banner).toHaveTextContent("Hosted credit is low");
+    expect(banner).toHaveTextContent("$15.00 remaining");
+    expect(banner).toHaveAttribute("data-tone", "warning");
+    expect(screen.getByRole("link", { name: "Add credits" })).toHaveAttribute("href", billingHref);
+  });
 });
