@@ -263,6 +263,11 @@ func (s *FactoryService) DescribeFactoryUsage(ctx context.Context, req *pb.Descr
 	return actions.DescribeFactoryUsage(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ListFactoryWorkOrderRunUsage(ctx context.Context, req *pb.ListFactoryWorkOrderRunUsageRequest) (*pb.ListFactoryWorkOrderRunUsageResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ListFactoryWorkOrderRunUsage(ctx, organizationID, req)
+}
+
 func (s *FactoryService) ListFactoryLLMModels(ctx context.Context, req *pb.ListFactoryLLMModelsRequest) (*pb.ListFactoryLLMModelsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.ListFactoryLLMModels(ctx, organizationID, req)

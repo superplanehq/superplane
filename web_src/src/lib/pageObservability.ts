@@ -205,6 +205,10 @@ function resolveOrganizationSettingsPageObservability(
     return { pageKey: "organizationSettingsBilling", attributes: organizationAttributes };
   }
 
+  if (section === "usage") {
+    return { pageKey: "organizationSettingsUsage", attributes: organizationAttributes };
+  }
+
   if (section === "integrations") {
     if (!rest[0]) {
       return { pageKey: "organizationSettingsIntegrations", attributes: organizationAttributes };

@@ -298,6 +298,38 @@ type UsageReportFilter struct {
 	FundingSource  string
 }
 
+// WorkOrderRunUsage is one task-run spend row grouped from the ledger.
+type WorkOrderRunUsage struct {
+	WorkOrderExecutionID uuid.UUID
+	WorkOrderID          uuid.UUID
+	WorkOrderNumber      int64
+	Title                string
+	LastOccurredAt       time.Time
+	UserID               *uuid.UUID
+	UserName             string
+	UserEmail            string
+	TotalTokens          int64
+	DurationSeconds      int64
+	CostMicros           int64
+	HostedCostMicros     int64
+	BYOKCostMicros       int64
+	UsedBYOK             bool
+	Models               []string
+	MachineTypes         []string
+}
+
+func (r WorkOrderRunUsage) CostCents() int64 {
+	return pricebook.MicrosToCents(r.CostMicros)
+}
+
+func (r WorkOrderRunUsage) HostedCostCents() int64 {
+	return pricebook.MicrosToCents(r.HostedCostMicros)
+}
+
+func (r WorkOrderRunUsage) BYOKCostCents() int64 {
+	return pricebook.MicrosToCents(r.BYOKCostMicros)
+}
+
 // UsageTotals is a token, duration, and cost sum.
 type UsageTotals struct {
 	TotalTokens     int64
@@ -616,6 +648,114 @@ func SummarizeComputeUsage(tx *gorm.DB, filter UsageReportFilter) (UsageTotals, 
 	}
 
 	return totals, byMachine, nil
+}
+
+const workOrderRunUsageSelect = `
+	workspace_usage_events.work_order_execution_id,
+	factory_work_orders.id AS work_order_id,
+	factory_work_orders.number AS work_order_number,
+	factory_work_orders.title AS title,
+	MAX(workspace_usage_events.occurred_at) AS last_occurred_at,
+	factory_work_orders.created_by_id AS user_id,
+	COALESCE(users.name, '') AS user_name,
+	COALESCE(users.email, '') AS user_email,
+	COALESCE(SUM(workspace_usage_events.total_tokens), 0) AS total_tokens,
+	COALESCE(SUM(workspace_usage_events.duration_seconds), 0) AS duration_seconds,
+	COALESCE(SUM(workspace_usage_events.cost_micros), 0) AS cost_micros,
+	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceHosted + `' AND workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS hosted_cost_micros,
+	COALESCE(SUM(CASE WHEN workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `' THEN workspace_usage_events.cost_micros ELSE 0 END), 0) AS byok_cost_micros,
+	COALESCE(BOOL_OR(workspace_usage_events.usage_kind = '` + UsageKindModel + `' AND workspace_usage_events.funding_source = '` + UsageFundingSourceBYOK + `'), false) AS used_byok,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindModel + `' THEN workspace_usage_events.provider || '/' || workspace_usage_events.model END, E'\n'), '') AS models,
+	COALESCE(STRING_AGG(DISTINCT CASE WHEN workspace_usage_events.usage_kind = '` + UsageKindCompute + `' AND workspace_usage_events.machine_type <> '' THEN workspace_usage_events.machine_type END, E'\n'), '') AS machine_types`
+
+type workOrderRunUsageScanRow struct {
+	WorkOrderExecutionID uuid.UUID
+	WorkOrderID          uuid.UUID
+	WorkOrderNumber      int64
+	Title                string
+	LastOccurredAt       time.Time
+	UserID               *uuid.UUID
+	UserName             string
+	UserEmail            string
+	TotalTokens          int64
+	DurationSeconds      int64
+	CostMicros           int64
+	HostedCostMicros     int64
+	BYOKCostMicros       int64
+	UsedBYOK             bool
+	Models               string
+	MachineTypes         string
+}
+
+func workOrderRunUsageQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
+	return spendingScopedQuery(tx, filter, true).
+		Joins("LEFT JOIN users ON users.id = factory_work_orders.created_by_id").
+		Where("workspace_usage_events.work_order_execution_id IS NOT NULL")
+}
+
+// ListWorkOrderRunUsage returns paginated task-run spend from the ledger.
+// It does not write usage or change remaining hosted credit.
+func ListWorkOrderRunUsage(tx *gorm.DB, filter UsageReportFilter, limit, offset int) ([]WorkOrderRunUsage, int64, error) {
+	var totalRow struct {
+		Count int64
+	}
+	err := workOrderRunUsageQuery(tx, filter).
+		Select("COUNT(DISTINCT workspace_usage_events.work_order_execution_id) AS count").
+		Scan(&totalRow).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	total := totalRow.Count
+
+	var rows []workOrderRunUsageScanRow
+	err = workOrderRunUsageQuery(tx, filter).
+		Select(workOrderRunUsageSelect).
+		Group(`workspace_usage_events.work_order_execution_id, factory_work_orders.id, factory_work_orders.number, factory_work_orders.title, factory_work_orders.created_by_id, users.name, users.email`).
+		Order("MAX(workspace_usage_events.occurred_at) DESC").
+		Order("workspace_usage_events.work_order_execution_id DESC").
+		Limit(limit).
+		Offset(offset).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]WorkOrderRunUsage, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, WorkOrderRunUsage{
+			WorkOrderExecutionID: row.WorkOrderExecutionID,
+			WorkOrderID:          row.WorkOrderID,
+			WorkOrderNumber:      row.WorkOrderNumber,
+			Title:                row.Title,
+			LastOccurredAt:       row.LastOccurredAt,
+			UserID:               row.UserID,
+			UserName:             row.UserName,
+			UserEmail:            row.UserEmail,
+			TotalTokens:          row.TotalTokens,
+			DurationSeconds:      row.DurationSeconds,
+			CostMicros:           row.CostMicros,
+			HostedCostMicros:     row.HostedCostMicros,
+			BYOKCostMicros:       row.BYOKCostMicros,
+			UsedBYOK:             row.UsedBYOK,
+			Models:               splitUsageAgg(row.Models),
+			MachineTypes:         splitUsageAgg(row.MachineTypes),
+		})
+	}
+	return result, total, nil
+}
+
+func splitUsageAgg(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, "\n")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }
 
 // RollupUsage copies ledger totals into the cached execution columns.

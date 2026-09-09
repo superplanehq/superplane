@@ -215,6 +215,22 @@ function factoryDetailRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     ...factoryIntakeRoutes(fixture),
     ...factoryPRFeedbackRoutes(fixture),
     {
+      pattern: re("/api/v1/factories/([^/]+)/usage-history"),
+      resolve: (match, _method, _body, url) => {
+        const all = fixture.usageHistoryByFactoryId?.[match[1]] ?? [];
+        const requestedLimit = Number(url.searchParams.get("limit") ?? 50);
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, requestedLimit) : 50;
+        const requestedOffset = Number(url.searchParams.get("offset") ?? 0);
+        const offset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
+        return {
+          json: {
+            rows: all.slice(offset, offset + limit),
+            totalCount: all.length,
+          },
+        };
+      },
+    },
+    {
       pattern: re("/api/v1/factories/([^/]+)/usage"),
       resolve: (match) => ({ json: fixture.usageByFactoryId?.[match[1]] ?? EMPTY_USAGE_REPORT }),
     },
